@@ -1,96 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>動詞ドリル · Verb Drill</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>body { background:#fafaf9; margin:0; }</style>
+  <style>body{background:#fafaf9;margin:0;}</style>
 </head>
 <body>
   <div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;color:#78716c;">Loading…</div></div>
-
 <script type="text/babel">
-const { useState, useEffect, useRef, useMemo } = React;
+const{useState,useEffect,useRef,useMemo}=React;
 
 // ============================================================================
-// INLINE ICONS
+// ICONS
 // ============================================================================
-const Icon = ({ d, className='w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{d}</svg>
-);
-const IconCheck = (p) => <Icon {...p} d={<polyline points="20 6 9 17 4 12"/>}/>;
-const IconX = (p) => <Icon {...p} d={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>}/>;
-const IconPlus = (p) => <Icon {...p} d={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>}/>;
-const IconTrash = (p) => <Icon {...p} d={<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></>}/>;
-const IconRefresh = (p) => <Icon {...p} d={<><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></>}/>;
-const IconFlame = (p) => <Icon {...p} d={<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>}/>;
-const IconCloud = (p) => <Icon {...p} d={<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>}/>;
+const Icon=({d,className='w-4 h-4'})=>(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{d}</svg>);
+const IconCheck=(p)=><Icon {...p} d={<polyline points="20 6 9 17 4 12"/>}/>;
+const IconX=(p)=><Icon {...p} d={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>}/>;
+const IconPlus=(p)=><Icon {...p} d={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>}/>;
+const IconTrash=(p)=><Icon {...p} d={<><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></>}/>;
+const IconRefresh=(p)=><Icon {...p} d={<><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></>}/>;
+const IconFlame=(p)=><Icon {...p} d={<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>}/>;
+const IconCloud=(p)=><Icon {...p} d={<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>}/>;
+const IconChat=(p)=><Icon {...p} d={<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>}/>;
 
 // ============================================================================
 // VERB DATA
 // ============================================================================
-const STARTER_VERBS = [
-  { dict:'食べる', reading:'たべる', meaning:'to eat', group:'ichidan' },
-  { dict:'見る', reading:'みる', meaning:'to see / watch', group:'ichidan' },
-  { dict:'寝る', reading:'ねる', meaning:'to sleep', group:'ichidan' },
-  { dict:'起きる', reading:'おきる', meaning:'to wake up', group:'ichidan' },
-  { dict:'出る', reading:'でる', meaning:'to leave / exit', group:'ichidan' },
-  { dict:'教える', reading:'おしえる', meaning:'to teach', group:'ichidan' },
-  { dict:'覚える', reading:'おぼえる', meaning:'to remember', group:'ichidan' },
-  { dict:'着る', reading:'きる', meaning:'to wear', group:'ichidan' },
-  { dict:'開ける', reading:'あける', meaning:'to open', group:'ichidan' },
-  { dict:'閉める', reading:'しめる', meaning:'to close', group:'ichidan' },
-  { dict:'行く', reading:'いく', meaning:'to go', group:'godan' },
-  { dict:'書く', reading:'かく', meaning:'to write', group:'godan' },
-  { dict:'話す', reading:'はなす', meaning:'to speak', group:'godan' },
-  { dict:'待つ', reading:'まつ', meaning:'to wait', group:'godan' },
-  { dict:'死ぬ', reading:'しぬ', meaning:'to die', group:'godan' },
-  { dict:'遊ぶ', reading:'あそぶ', meaning:'to play', group:'godan' },
-  { dict:'飲む', reading:'のむ', meaning:'to drink', group:'godan' },
-  { dict:'取る', reading:'とる', meaning:'to take', group:'godan' },
-  { dict:'買う', reading:'かう', meaning:'to buy', group:'godan' },
-  { dict:'泳ぐ', reading:'およぐ', meaning:'to swim', group:'godan' },
-  { dict:'読む', reading:'よむ', meaning:'to read', group:'godan' },
-  { dict:'立つ', reading:'たつ', meaning:'to stand', group:'godan' },
-  { dict:'走る', reading:'はしる', meaning:'to run', group:'godan' },
-  { dict:'帰る', reading:'かえる', meaning:'to return home', group:'godan' },
-  { dict:'聞く', reading:'きく', meaning:'to listen / ask', group:'godan' },
-  { dict:'持つ', reading:'もつ', meaning:'to hold', group:'godan' },
-  { dict:'使う', reading:'つかう', meaning:'to use', group:'godan' },
-  { dict:'作る', reading:'つくる', meaning:'to make', group:'godan' },
-  { dict:'する', reading:'する', meaning:'to do', group:'suru' },
-  { dict:'来る', reading:'くる', meaning:'to come', group:'kuru' },
+const STARTER_VERBS=[
+  {dict:'食べる',reading:'たべる',meaning:'to eat',group:'ichidan'},
+  {dict:'見る',reading:'みる',meaning:'to see / watch',group:'ichidan'},
+  {dict:'寝る',reading:'ねる',meaning:'to sleep',group:'ichidan'},
+  {dict:'起きる',reading:'おきる',meaning:'to wake up',group:'ichidan'},
+  {dict:'出る',reading:'でる',meaning:'to leave / exit',group:'ichidan'},
+  {dict:'教える',reading:'おしえる',meaning:'to teach',group:'ichidan'},
+  {dict:'覚える',reading:'おぼえる',meaning:'to remember',group:'ichidan'},
+  {dict:'着る',reading:'きる',meaning:'to wear',group:'ichidan'},
+  {dict:'開ける',reading:'あける',meaning:'to open',group:'ichidan'},
+  {dict:'閉める',reading:'しめる',meaning:'to close',group:'ichidan'},
+  {dict:'行く',reading:'いく',meaning:'to go',group:'godan'},
+  {dict:'書く',reading:'かく',meaning:'to write',group:'godan'},
+  {dict:'話す',reading:'はなす',meaning:'to speak',group:'godan'},
+  {dict:'待つ',reading:'まつ',meaning:'to wait',group:'godan'},
+  {dict:'死ぬ',reading:'しぬ',meaning:'to die',group:'godan'},
+  {dict:'遊ぶ',reading:'あそぶ',meaning:'to play',group:'godan'},
+  {dict:'飲む',reading:'のむ',meaning:'to drink',group:'godan'},
+  {dict:'取る',reading:'とる',meaning:'to take',group:'godan'},
+  {dict:'買う',reading:'かう',meaning:'to buy',group:'godan'},
+  {dict:'泳ぐ',reading:'およぐ',meaning:'to swim',group:'godan'},
+  {dict:'読む',reading:'よむ',meaning:'to read',group:'godan'},
+  {dict:'立つ',reading:'たつ',meaning:'to stand',group:'godan'},
+  {dict:'走る',reading:'はしる',meaning:'to run',group:'godan'},
+  {dict:'帰る',reading:'かえる',meaning:'to return home',group:'godan'},
+  {dict:'聞く',reading:'きく',meaning:'to listen / ask',group:'godan'},
+  {dict:'持つ',reading:'もつ',meaning:'to hold',group:'godan'},
+  {dict:'使う',reading:'つかう',meaning:'to use',group:'godan'},
+  {dict:'作る',reading:'つくる',meaning:'to make',group:'godan'},
+  {dict:'する',reading:'する',meaning:'to do',group:'suru'},
+  {dict:'来る',reading:'くる',meaning:'to come',group:'kuru'},
 ];
 
-const CONJ_TYPES = [
-  { id:'plain-present', label:'Plain Present', sub:'辞書形', hint:'dictionary form' },
-  { id:'plain-past', label:'Plain Past', sub:'た形', hint:'~た / ~だ' },
-  { id:'plain-negative', label:'Plain Negative', sub:'ない形', hint:'~ない' },
-  { id:'plain-past-negative', label:'Plain Past Negative', sub:'', hint:'~なかった' },
-  { id:'polite-present', label:'Polite Present', sub:'ます形', hint:'~ます' },
-  { id:'polite-past', label:'Polite Past', sub:'', hint:'~ました' },
-  { id:'polite-negative', label:'Polite Negative', sub:'', hint:'~ません' },
-  { id:'polite-past-negative', label:'Polite Past Negative', sub:'', hint:'~ませんでした' },
-  { id:'te-form', label:'Te-form', sub:'て形', hint:'~て / ~で' },
-  { id:'potential', label:'Potential', sub:'可能形', hint:'can / be able to' },
-  { id:'volitional', label:'Volitional', sub:'意向形', hint:"let's ~" },
-  { id:'conditional-tara', label:'Conditional たら', sub:'', hint:'if / when' },
-  { id:'conditional-ba', label:'Conditional ば', sub:'', hint:'if' },
-  { id:'imperative', label:'Imperative', sub:'命令形', hint:'do ~!' },
-  { id:'passive', label:'Passive', sub:'受身形', hint:'be ~ed' },
-  { id:'causative', label:'Causative', sub:'使役形', hint:'make / let ~' },
+const CONJ_TYPES=[
+  {id:'plain-present',label:'Plain Present',sub:'辞書形',hint:'dictionary form'},
+  {id:'plain-past',label:'Plain Past',sub:'た形',hint:'~た / ~だ'},
+  {id:'plain-negative',label:'Plain Negative',sub:'ない形',hint:'~ない'},
+  {id:'plain-past-negative',label:'Plain Past Negative',sub:'',hint:'~なかった'},
+  {id:'polite-present',label:'Polite Present',sub:'ます形',hint:'~ます'},
+  {id:'polite-past',label:'Polite Past',sub:'',hint:'~ました'},
+  {id:'polite-negative',label:'Polite Negative',sub:'',hint:'~ません'},
+  {id:'polite-past-negative',label:'Polite Past Negative',sub:'',hint:'~ませんでした'},
+  {id:'te-form',label:'Te-form',sub:'て形',hint:'~て / ~で'},
+  {id:'potential',label:'Potential',sub:'可能形',hint:'can / be able to'},
+  {id:'volitional',label:'Volitional',sub:'意向形',hint:"let's ~"},
+  {id:'conditional-tara',label:'Conditional たら',sub:'',hint:'if / when'},
+  {id:'conditional-ba',label:'Conditional ば',sub:'',hint:'if'},
+  {id:'imperative',label:'Imperative',sub:'命令形',hint:'do ~!'},
+  {id:'passive',label:'Passive',sub:'受身形',hint:'be ~ed'},
+  {id:'causative',label:'Causative',sub:'使役形',hint:'make / let ~'},
 ];
-const TYPE_LABEL = {};
-for (const t of CONJ_TYPES) TYPE_LABEL[t.id] = t.label;
+const TYPE_LABEL={};
+for(const t of CONJ_TYPES)TYPE_LABEL[t.id]=t.label;
 
 // ============================================================================
 // ROMAJI → HIRAGANA
 // ============================================================================
-const ROMAJI_MAP = {
+const ROMAJI_MAP={
   kya:'きゃ',kyu:'きゅ',kyo:'きょ',gya:'ぎゃ',gyu:'ぎゅ',gyo:'ぎょ',
   sha:'しゃ',shu:'しゅ',sho:'しょ',shi:'し',cha:'ちゃ',chu:'ちゅ',cho:'ちょ',chi:'ち',tsu:'つ',
   nya:'にゃ',nyu:'にゅ',nyo:'にょ',hya:'ひゃ',hyu:'ひゅ',hyo:'ひょ',
@@ -106,34 +104,25 @@ const ROMAJI_MAP = {
   ra:'ら',ri:'り',ru:'る',re:'れ',ro:'ろ',wa:'わ',wo:'を',
   a:'あ',i:'い',u:'う',e:'え',o:'お',
 };
-function toHiragana(s) {
-  if (!s) return '';
-  s = s.toLowerCase().trim();
-  let out='', i=0;
-  while (i < s.length) {
-    const ch = s[i];
-    if (ch.charCodeAt(0) > 127) { out+=ch; i++; continue; }
-    if (/\s/.test(ch)) { i++; continue; }
-    if (ch==='n') {
-      const nx=s[i+1];
-      if (nx===undefined||nx==='n'||!/[aiueoy]/.test(nx)) { out+='ん'; i++; continue; }
-    }
-    if (i<s.length-1 && /[bcdfghjkmpqrstvwxyz]/.test(ch) && s[i]===s[i+1]) { out+='っ'; i++; continue; }
+function toHiragana(s){
+  if(!s)return'';
+  s=s.toLowerCase().trim();
+  let out='',i=0;
+  while(i<s.length){
+    const ch=s[i];
+    if(ch.charCodeAt(0)>127){out+=ch;i++;continue;}
+    if(/\s/.test(ch)){i++;continue;}
+    if(ch==='n'){const nx=s[i+1];if(nx===undefined||nx==='n'||!/[aiueoy]/.test(nx)){out+='ん';i++;continue;}}
+    if(i<s.length-1&&/[bcdfghjkmpqrstvwxyz]/.test(ch)&&s[i]===s[i+1]){out+='っ';i++;continue;}
     let matched=false;
-    for (let len=3; len>=1; len--) {
-      const sub=s.slice(i,i+len);
-      if (ROMAJI_MAP[sub]) { out+=ROMAJI_MAP[sub]; i+=len; matched=true; break; }
-    }
-    if (!matched) { out+=ch; i++; }
+    for(let len=3;len>=1;len--){const sub=s.slice(i,i+len);if(ROMAJI_MAP[sub]){out+=ROMAJI_MAP[sub];i+=len;matched=true;break;}}
+    if(!matched){out+=ch;i++;}
   }
   return out;
 }
-function isAllKana(s) {
-  if (!s) return false;
-  for (const ch of s) {
-    const c=ch.charCodeAt(0);
-    if (!((c>=0x3040&&c<=0x309F)||(c>=0x30A0&&c<=0x30FF))) return false;
-  }
+function isAllKana(s){
+  if(!s)return false;
+  for(const ch of s){const c=ch.charCodeAt(0);if(!((c>=0x3040&&c<=0x309F)||(c>=0x30A0&&c<=0x30FF)))return false;}
   return true;
 }
 
@@ -147,32 +136,13 @@ const O_ROW={う:'お',く:'こ',ぐ:'ご',す:'そ',つ:'と',ぬ:'の',ぶ:'�
 const PAST_END={く:'いた',ぐ:'いだ',す:'した',つ:'った',う:'った',る:'った',ぬ:'んだ',ぶ:'んだ',む:'んだ'};
 const TE_END={く:'いて',ぐ:'いで',す:'して',つ:'って',う:'って',る:'って',ぬ:'んで',ぶ:'んで',む:'んで'};
 
-function conjugate(verb, type) {
-  const {reading, group} = verb;
-  if (group==='ichidan') {
-    const stem=reading.slice(0,-1);
-    const M={'plain-present':reading,'plain-past':stem+'た','plain-negative':stem+'ない','plain-past-negative':stem+'なかった','polite-present':stem+'ます','polite-past':stem+'ました','polite-negative':stem+'ません','polite-past-negative':stem+'ませんでした','te-form':stem+'て','potential':stem+'られる','volitional':stem+'よう','conditional-tara':stem+'たら','conditional-ba':stem+'れば','imperative':stem+'ろ','passive':stem+'られる','causative':stem+'させる'};
-    return M[type]||'';
-  }
-  if (group==='godan') {
-    const stem=reading.slice(0,-1), last=reading.slice(-1);
-    let pastEnd=PAST_END[last], teEnd=TE_END[last];
-    if (reading==='いく'||reading.endsWith('いく')) { pastEnd='った'; teEnd='って'; }
-    if (reading==='ある') { if(type==='plain-negative')return'ない'; if(type==='plain-past-negative')return'なかった'; }
-    const M={'plain-present':reading,'plain-past':stem+pastEnd,'plain-negative':stem+A_ROW[last]+'ない','plain-past-negative':stem+A_ROW[last]+'なかった','polite-present':stem+I_ROW[last]+'ます','polite-past':stem+I_ROW[last]+'ました','polite-negative':stem+I_ROW[last]+'ません','polite-past-negative':stem+I_ROW[last]+'ませんでした','te-form':stem+teEnd,'potential':stem+E_ROW[last]+'る','volitional':stem+O_ROW[last]+'う','conditional-tara':stem+pastEnd+'ら','conditional-ba':stem+E_ROW[last]+'ば','imperative':stem+E_ROW[last],'passive':stem+A_ROW[last]+'れる','causative':stem+A_ROW[last]+'せる'};
-    return M[type]||'';
-  }
-  if (group==='suru') {
-    const stem=reading.endsWith('する')?reading.slice(0,-2):'';
-    const M={'plain-present':'する','plain-past':'した','plain-negative':'しない','plain-past-negative':'しなかった','polite-present':'します','polite-past':'しました','polite-negative':'しません','polite-past-negative':'しませんでした','te-form':'して','potential':'できる','volitional':'しよう','conditional-tara':'したら','conditional-ba':'すれば','imperative':'しろ','passive':'される','causative':'させる'};
-    return stem+(M[type]||'');
-  }
-  if (group==='kuru') {
-    const stem=reading.endsWith('くる')?reading.slice(0,-2):'';
-    const M={'plain-present':'くる','plain-past':'きた','plain-negative':'こない','plain-past-negative':'こなかった','polite-present':'きます','polite-past':'きました','polite-negative':'きません','polite-past-negative':'きませんでした','te-form':'きて','potential':'こられる','volitional':'こよう','conditional-tara':'きたら','conditional-ba':'くれば','imperative':'こい','passive':'こられる','causative':'こさせる'};
-    return stem+(M[type]||'');
-  }
-  return '';
+function conjugate(verb,type){
+  const{reading,group}=verb;
+  if(group==='ichidan'){const stem=reading.slice(0,-1);const M={'plain-present':reading,'plain-past':stem+'た','plain-negative':stem+'ない','plain-past-negative':stem+'なかった','polite-present':stem+'ます','polite-past':stem+'ました','polite-negative':stem+'ません','polite-past-negative':stem+'ませんでした','te-form':stem+'て','potential':stem+'られる','volitional':stem+'よう','conditional-tara':stem+'たら','conditional-ba':stem+'れば','imperative':stem+'ろ','passive':stem+'られる','causative':stem+'させる'};return M[type]||'';}
+  if(group==='godan'){const stem=reading.slice(0,-1),last=reading.slice(-1);let pastEnd=PAST_END[last],teEnd=TE_END[last];if(reading==='いく'||reading.endsWith('いく')){pastEnd='った';teEnd='って';}if(reading==='ある'){if(type==='plain-negative')return'ない';if(type==='plain-past-negative')return'なかった';}const M={'plain-present':reading,'plain-past':stem+pastEnd,'plain-negative':stem+A_ROW[last]+'ない','plain-past-negative':stem+A_ROW[last]+'なかった','polite-present':stem+I_ROW[last]+'ます','polite-past':stem+I_ROW[last]+'ました','polite-negative':stem+I_ROW[last]+'ません','polite-past-negative':stem+I_ROW[last]+'ませんでした','te-form':stem+teEnd,'potential':stem+E_ROW[last]+'る','volitional':stem+O_ROW[last]+'う','conditional-tara':stem+pastEnd+'ら','conditional-ba':stem+E_ROW[last]+'ば','imperative':stem+E_ROW[last],'passive':stem+A_ROW[last]+'れる','causative':stem+A_ROW[last]+'せる'};return M[type]||'';}
+  if(group==='suru'){const stem=reading.endsWith('する')?reading.slice(0,-2):'';const M={'plain-present':'する','plain-past':'した','plain-negative':'しない','plain-past-negative':'しなかった','polite-present':'します','polite-past':'しました','polite-negative':'しません','polite-past-negative':'しませんでした','te-form':'して','potential':'できる','volitional':'しよう','conditional-tara':'したら','conditional-ba':'すれば','imperative':'しろ','passive':'される','causative':'させる'};return stem+(M[type]||'');}
+  if(group==='kuru'){const stem=reading.endsWith('くる')?reading.slice(0,-2):'';const M={'plain-present':'くる','plain-past':'きた','plain-negative':'こない','plain-past-negative':'こなかった','polite-present':'きます','polite-past':'きました','polite-negative':'きません','polite-past-negative':'きませんでした','te-form':'きて','potential':'こられる','volitional':'こよう','conditional-tara':'きたら','conditional-ba':'くれば','imperative':'こい','passive':'こられる','causative':'こさせる'};return stem+(M[type]||'');}
+  return'';
 }
 
 // ============================================================================
@@ -180,265 +150,269 @@ function conjugate(verb, type) {
 // ============================================================================
 const GROUP_NAMES={ichidan:'an ichidan verb (る-verb / Group 2)',godan:'a godan verb (う-verb / Group 1)',suru:'irregular (the verb する, Group 3)',kuru:'irregular (the verb 来る, Group 3)'};
 
-function explainConjugation(verb, type) {
-  const {reading, group, dict} = verb;
-  const result = conjugate(verb, type);
-  const stem = reading.slice(0,-1), last = reading.slice(-1);
-  const intro = `${dict} (${reading}) is ${GROUP_NAMES[group]}.`;
-  let rule='', derivation=result, note='';
-
-  if (group==='ichidan') {
-    const M={
-      'plain-present':['Dictionary form — no change.',result],
-      'plain-past':['Drop the final る and add た.',`${stem} + た = ${result}`],
-      'plain-negative':['Drop the final る and add ない.',`${stem} + ない = ${result}`],
-      'plain-past-negative':['Drop る and add なかった. (ない acts like an い-adjective, so its past is なかった.)',`${stem} + なかった = ${result}`],
-      'polite-present':['Drop る and add ます.',`${stem} + ます = ${result}`],
-      'polite-past':['Drop る and add ました.',`${stem} + ました = ${result}`],
-      'polite-negative':['Drop る and add ません.',`${stem} + ません = ${result}`],
-      'polite-past-negative':['Drop る and add ませんでした.',`${stem} + ませんでした = ${result}`],
-      'te-form':['Drop る and add て. (Ichidan te-form has no sound changes, unlike godan.)',`${stem} + て = ${result}`],
-      'potential':['Drop る and add られる. Note: same form as passive — context distinguishes them.',`${stem} + られる = ${result}`],
-      'volitional':['Drop る and add よう.',`${stem} + よう = ${result}`],
-      'conditional-tara':['Past form + ら.',`${stem} + たら = ${result}`],
-      'conditional-ba':['Drop る and add れば.',`${stem} + れば = ${result}`],
-      'imperative':['Drop る and add ろ. (Blunt — used in commands.)',`${stem} + ろ = ${result}`],
-      'passive':['Drop る and add られる. Same form as potential.',`${stem} + られる = ${result}`],
-      'causative':['Drop る and add させる.',`${stem} + させる = ${result}`],
-    };
-    [rule, derivation] = M[type]||['',result];
-  } else if (group==='godan') {
-    const isIku = reading==='いく'||reading.endsWith('いく');
-    const ikuNote = isIku?' Note: 行く is the famous exception — past/te use った/って, not いた/いて.':'';
-    const pEnd = isIku?'った':PAST_END[last];
-    const teEnd = isIku?'って':TE_END[last];
-    const M={
-      'plain-present':['Dictionary form — no change.',result],
-      'plain-past':[`Past ending by final kana: く→いた, ぐ→いだ, す→した, つ/う/る→った, ぬ/ぶ/む→んだ.${ikuNote}`,`${stem} + ${pEnd} = ${result}  (${last}→${pEnd})`],
-      'plain-negative':[`Change final kana to あ-row (う→わ, not あ!), then add ない.`,`${stem} + ${A_ROW[last]} + ない = ${result}  (${last}→${A_ROW[last]})`],
-      'plain-past-negative':[`Change final kana to あ-row, then add なかった.`,`${stem} + ${A_ROW[last]} + なかった = ${result}`],
-      'polite-present':[`Change final kana to い-row, then add ます.`,`${stem} + ${I_ROW[last]} + ます = ${result}  (${last}→${I_ROW[last]})`],
-      'polite-past':[`Change final kana to い-row, then add ました.`,`${stem} + ${I_ROW[last]} + ました = ${result}`],
-      'polite-negative':[`Change final kana to い-row, then add ません.`,`${stem} + ${I_ROW[last]} + ません = ${result}`],
-      'polite-past-negative':[`Change final kana to い-row, then add ませんでした.`,`${stem} + ${I_ROW[last]} + ませんでした = ${result}`],
-      'te-form':[`Te-form mirrors past tense but with て/で: く→いて, ぐ→いで, す→して, つ/う/る→って, ぬ/ぶ/む→んで.${ikuNote}`,`${stem} + ${teEnd} = ${result}  (${last}→${teEnd})`],
-      'potential':[`Change final kana to え-row, then add る.`,`${stem} + ${E_ROW[last]} + る = ${result}  (${last}→${E_ROW[last]})`],
-      'volitional':[`Change final kana to お-row, then add う.`,`${stem} + ${O_ROW[last]} + う = ${result}  (${last}→${O_ROW[last]})`],
-      'conditional-tara':['Past tense form + ら.',`${stem} + ${pEnd} + ら = ${result}`],
-      'conditional-ba':[`Change final kana to え-row, then add ば.`,`${stem} + ${E_ROW[last]} + ば = ${result}`],
-      'imperative':[`Change final kana to え-row. (Blunt form.)`,`${stem} + ${E_ROW[last]} = ${result}`],
-      'passive':[`Change final kana to あ-row, then add れる.`,`${stem} + ${A_ROW[last]} + れる = ${result}`],
-      'causative':[`Change final kana to あ-row, then add せる.`,`${stem} + ${A_ROW[last]} + せる = ${result}`],
-    };
-    [rule, derivation] = M[type]||['',result];
-    if (/[いきしちにひみりぎじぢびぴえけせてねへめれげぜでべぺ]る$/.test(reading)) {
-      note = `Trap alert: ${dict} (${reading}) ends in an い/え-row kana + る, which makes it look ichidan — but it's actually godan. Common offenders: 帰る, 走る, 入る, 知る, 切る, 要る.`;
-    }
-  } else if (group==='suru') {
-    const compound = reading.endsWith('する')&&reading!=='する'?reading.slice(0,-2):'';
-    const M={'plain-present':'Dictionary form.','plain-past':'する → した. Irregular; memorize.','plain-negative':'する → しない.','plain-past-negative':'する → しなかった.','polite-present':'する → します.','polite-past':'する → しました.','polite-negative':'する → しません.','polite-past-negative':'する → しませんでした.','te-form':'する → して.','potential':'Special: する → できる (not されられる). One of the most common irregularities in Japanese.','volitional':'する → しよう.','conditional-tara':'する → したら.','conditional-ba':'する → すれば.','imperative':'する → しろ.','passive':'する → される.','causative':'する → させる.'};
-    rule = M[type]||'';
-    derivation = compound?`${compound} stays, then conjugate the する part → ${result}`:result;
-  } else if (group==='kuru') {
-    const M={'plain-present':'来る (くる) — dictionary form.','plain-past':'来る → 来た (きた). The く shifts to き.','plain-negative':'来る → 来ない (こない). The く shifts to こ.','plain-past-negative':'来る → 来なかった (こなかった). く → こ.','polite-present':'来る → 来ます (きます). く → き.','polite-past':'来る → 来ました (きました). く → き.','polite-negative':'来る → 来ません (きません). く → き.','polite-past-negative':'来る → 来ませんでした. く → き.','te-form':'来る → 来て (きて). く → き.','potential':'来る → 来られる (こられる). く → こ.','volitional':'来る → 来よう (こよう). く → こ.','conditional-tara':'来る → 来たら (きたら). く → き.','conditional-ba':'来る → 来れば (くれば). The く stays as く here — the only form where it does.','imperative':'来る → 来い (こい). く → こ.','passive':'来る → 来られる (こられる). Same form as potential. く → こ.','causative':'来る → 来させる (こさせる). く → こ.'};
-    rule = `${dict} is irregular: the く stem shifts between く/き/こ depending on conjugation.`;
-    note = M[type]||'';
-  }
-  return {intro, rule, derivation, note};
+function explainConjugation(verb,type){
+  const{reading,group,dict}=verb;
+  const result=conjugate(verb,type);
+  const stem=reading.slice(0,-1),last=reading.slice(-1);
+  const intro=`${dict} (${reading}) is ${GROUP_NAMES[group]}.`;
+  let rule='',derivation=result,note='';
+  if(group==='ichidan'){const M={'plain-present':['Dictionary form.',result],'plain-past':['Drop る, add た.',`${stem} + た = ${result}`],'plain-negative':['Drop る, add ない.',`${stem} + ない = ${result}`],'plain-past-negative':['Drop る, add なかった.',`${stem} + なかった = ${result}`],'polite-present':['Drop る, add ます.',`${stem} + ます = ${result}`],'polite-past':['Drop る, add ました.',`${stem} + ました = ${result}`],'polite-negative':['Drop る, add ません.',`${stem} + ません = ${result}`],'polite-past-negative':['Drop る, add ませんでした.',`${stem} + ませんでした = ${result}`],'te-form':['Drop る, add て.',`${stem} + て = ${result}`],'potential':['Drop る, add られる.',`${stem} + られる = ${result}`],'volitional':['Drop る, add よう.',`${stem} + よう = ${result}`],'conditional-tara':['Past form + ら.',`${stem} + たら = ${result}`],'conditional-ba':['Drop る, add れば.',`${stem} + れば = ${result}`],'imperative':['Drop る, add ろ.',`${stem} + ろ = ${result}`],'passive':['Drop る, add られる.',`${stem} + られる = ${result}`],'causative':['Drop る, add させる.',`${stem} + させる = ${result}`]};[rule,derivation]=M[type]||['',result];}
+  else if(group==='godan'){const isIku=reading==='いく'||reading.endsWith('いく');const ikuNote=isIku?' Note: 行く is irregular — past/te use った/って.':'';const pEnd=isIku?'った':PAST_END[last];const teEnd=isIku?'って':TE_END[last];const M={'plain-present':['Dictionary form.',result],'plain-past':[`Past: く→いた, ぐ→いだ, す→した, つ/う/る→った, ぬ/ぶ/む→んだ.${ikuNote}`,`${stem} + ${pEnd} = ${result}`],'plain-negative':[`あ-row (う→わ!) + ない.`,`${stem} + ${A_ROW[last]} + ない = ${result}`],'plain-past-negative':[`あ-row + なかった.`,`${stem} + ${A_ROW[last]} + なかった = ${result}`],'polite-present':[`い-row + ます.`,`${stem} + ${I_ROW[last]} + ます = ${result}`],'polite-past':[`い-row + ました.`,`${stem} + ${I_ROW[last]} + ました = ${result}`],'polite-negative':[`い-row + ません.`,`${stem} + ${I_ROW[last]} + ません = ${result}`],'polite-past-negative':[`い-row + ませんでした.`,`${stem} + ${I_ROW[last]} + ませんでした = ${result}`],'te-form':[`Te mirrors past with て/で: く→いて, ぐ→いで, す→して, つ/う/る→って, ぬ/ぶ/む→んで.${ikuNote}`,`${stem} + ${teEnd} = ${result}`],'potential':[`え-row + る.`,`${stem} + ${E_ROW[last]} + る = ${result}`],'volitional':[`お-row + う.`,`${stem} + ${O_ROW[last]} + う = ${result}`],'conditional-tara':['Past form + ら.',`${stem} + ${pEnd} + ら = ${result}`],'conditional-ba':[`え-row + ば.`,`${stem} + ${E_ROW[last]} + ば = ${result}`],'imperative':[`え-row (blunt).`,`${stem} + ${E_ROW[last]} = ${result}`],'passive':[`あ-row + れる.`,`${stem} + ${A_ROW[last]} + れる = ${result}`],'causative':[`あ-row + せる.`,`${stem} + ${A_ROW[last]} + せる = ${result}`]};[rule,derivation]=M[type]||['',result];if(/[いきしちにひみりぎじぢびぴえけせてねへめれげぜでべぺ]る$/.test(reading)){note=`Trap: ${dict} looks ichidan but is godan.`;}}
+  else if(group==='suru'){const compound=reading.endsWith('する')&&reading!=='する'?reading.slice(0,-2):'';const M={'plain-present':'Dictionary form.','plain-past':'する → した (irregular).','plain-negative':'する → しない.','plain-past-negative':'する → しなかった.','polite-present':'する → します.','polite-past':'する → しました.','polite-negative':'する → しません.','polite-past-negative':'する → しませんでした.','te-form':'する → して.','potential':'Special: する → できる.','volitional':'する → しよう.','conditional-tara':'する → したら.','conditional-ba':'する → すれば.','imperative':'する → しろ.','passive':'する → される.','causative':'する → させる.'};rule=M[type]||'';derivation=compound?`${compound} + (する conjugated) = ${result}`:result;}
+  else if(group==='kuru'){const M={'plain-present':'来る (くる).','plain-past':'来る → 来た (きた). く→き.','plain-negative':'来る → 来ない (こない). く→こ.','plain-past-negative':'来る → 来なかった. く→こ.','polite-present':'来る → 来ます (きます). く→き.','polite-past':'来る → 来ました. く→き.','polite-negative':'来る → 来ません. く→き.','polite-past-negative':'来る → 来ませんでした. く→き.','te-form':'来る → 来て (きて). く→き.','potential':'来る → 来られる (こられる). く→こ.','volitional':'来る → 来よう (こよう). く→こ.','conditional-tara':'来る → 来たら (きたら). く→き.','conditional-ba':'来る → 来れば (くれば). く stays.','imperative':'来る → 来い (こい). く→こ.','passive':'来る → 来られる. く→こ.','causative':'来る → 来させる. く→こ.'};rule=`${dict} is irregular: く shifts to き (polite/past/te) or こ (negative/potential/volitional).`;note=M[type]||'';}
+  return{intro,rule,derivation,note};
 }
 
-function diagnose(verb, type, userAnswer) {
-  const got = toHiragana(userAnswer);
-  if (!got) return '';
-  for (const t of CONJ_TYPES) {
-    if (t.id===type) continue;
-    if (conjugate(verb,t.id)===got) return `That's actually the ${t.label.toLowerCase()} form of ${verb.dict} — you applied the wrong conjugation pattern.`;
+function diagnose(verb,type,userAnswer){
+  const got=toHiragana(userAnswer);
+  if(!got)return'';
+  for(const t of CONJ_TYPES){if(t.id===type)continue;if(conjugate(verb,t.id)===got)return`That's the ${t.label.toLowerCase()} form — wrong conjugation pattern.`;}
+  for(const g of['ichidan','godan'].filter(g=>g!==verb.group)){try{const alt=conjugate({...verb,group:g},type);if(alt===got)return`You conjugated this as a ${g==='ichidan'?'る-verb':'う-verb'}, but ${verb.dict} is ${verb.group==='ichidan'?'ichidan':verb.group==='godan'?'godan':'irregular'}.`;}catch{}}
+  return'';
+}
+
+// ============================================================================
+// AI (Gemini)
+// ============================================================================
+const AI_SYSTEM=`You are a friendly Japanese language teacher helping a student who just got a verb conjugation wrong. The student can read hiragana and katakana but struggles with kanji. Always write Japanese in hiragana/katakana with romaji in brackets after it, e.g. たべた [tabeta]. Be warm, encouraging, and concise — 2 to 3 short paragraphs at most. Focus on the specific rule missed and give one extra example.`;
+
+async function callGemini(contents,apiKey,maxTokens=600,temp=0.7){
+  if(!apiKey)throw new Error('No Gemini API key — add it in Settings.');
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({contents,systemInstruction:{parts:[{text:AI_SYSTEM}]},generationConfig:{maxOutputTokens:maxTokens,temperature:temp}})});
+  const d=await r.json();
+  if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
+  return d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+}
+
+async function lookupVerbWithGemini(query,apiKey){
+  if(!apiKey)throw new Error('No Gemini API key set');
+  const prompt=`Look up this Japanese verb: "${query}"\n\nReturn ONLY a JSON object (no markdown, no extra text):\n{"dict":"kanji/kana dictionary form","reading":"hiragana only","meaning":"English meaning starting with to","group":"ichidan or godan or suru or kuru"}\n\nIf the input is English or romaji, find the most common Japanese verb for that meaning.`;
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:150,temperature:0.1}})});
+  const d=await r.json();
+  if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
+  const text=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+  const result=JSON.parse(text.trim().replace(/```json\n?|```\n?/g,'').trim());
+  if(!result.dict||!result.reading||!result.meaning||!['ichidan','godan','suru','kuru'].includes(result.group))
+    throw new Error('Unexpected AI response — try a different input');
+  return result;
+}
+
+async function getSuggestedVerb(existingVerbs,apiKey){
+  if(!apiKey)throw new Error('No Gemini API key set');
+  const list=existingVerbs.map(v=>`${v.dict} (${v.reading}) — ${v.meaning} [${v.group}]`).join('\n');
+  const prompt=`I'm learning Japanese verb conjugation with an SRS app. Here are the ${existingVerbs.length} verbs I'm already studying:\n\n${list}\n\nBased on my current vocabulary, suggest ONE new verb to add next. Consider JLPT frequency, useful patterns I haven't covered, and what learners at this level typically need. Do NOT suggest any verb already in my list.\n\nReturn ONLY a JSON object (no markdown):\n{"dict":"e.g. 始める","reading":"e.g. はじめる","meaning":"e.g. to begin","group":"ichidan or godan or suru or kuru","reason":"One sentence explaining why this is a good next verb for me."}`;
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:200,temperature:0.9}})});
+  const d=await r.json();
+  if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
+  const text=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+  const result=JSON.parse(text.trim().replace(/```json\n?|```\n?/g,'').trim());
+  if(!result.dict||!result.reading||!result.meaning||!['ichidan','godan','suru','kuru'].includes(result.group))throw new Error('Unexpected AI response');
+  return result;
+}
+
+function buildContext(verb,type,userAnswer,expected,explanation){
+  const ti=CONJ_TYPES.find(t=>t.id===type);
+  return`I'm studying Japanese and just got this wrong.\n\nVerb: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: ${ti.label} (${ti.hint})\nMy answer: ${toHiragana(userAnswer)||'(blank)'}\nCorrect: ${expected}\n\nAuto-explanation: ${explanation.intro} ${explanation.rule}${explanation.derivation&&explanation.derivation!==expected?'\nStep: '+explanation.derivation:''}${explanation.note?'\nNote: '+explanation.note:''}\n\nHelp me understand why the answer is ${expected} and where I went wrong. Always show romaji.`;
+}
+
+function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey}){
+  const[apiHistory,setApiHistory]=useState([]);
+  const[display,setDisplay]=useState([]);
+  const[input,setInput]=useState('');
+  const[loading,setLoading]=useState(true);
+  const endRef=useRef(null);
+  const context=useMemo(()=>buildContext(verb,type,userAnswer,expected,explanation),[]);
+
+  useEffect(()=>{
+    const init=[{role:'user',content:context}];
+    const geminiMsgs=init.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+    callGemini(geminiMsgs,geminiKey)
+      .then(reply=>{setApiHistory([...init,{role:'assistant',content:reply}]);setDisplay([{role:'assistant',content:reply}]);})
+      .catch(e=>setDisplay([{role:'assistant',content:`Error: ${e.message}`}]))
+      .finally(()=>setLoading(false));
+  },[]);
+
+  useEffect(()=>{endRef.current?.scrollIntoView({behavior:'smooth'});},[display,loading]);
+
+  async function send(){
+    if(!input.trim()||loading)return;
+    const txt=input;setInput('');
+    const newDisplay=[...display,{role:'user',content:txt}];
+    setDisplay(newDisplay);setLoading(true);
+    const newApi=[...apiHistory,{role:'user',content:txt}];
+    try{
+      const geminiMsgs=newApi.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+      const reply=await callGemini(geminiMsgs,geminiKey);
+      setApiHistory([...newApi,{role:'assistant',content:reply}]);
+      setDisplay([...newDisplay,{role:'assistant',content:reply}]);
+    }catch(e){setDisplay([...newDisplay,{role:'assistant',content:`Error: ${e.message}`}]);}
+    setLoading(false);
   }
-  for (const g of ['ichidan','godan'].filter(g=>g!==verb.group)) {
-    try { const alt=conjugate({...verb,group:g},type); if(alt===got) return `You conjugated this as if it were a ${g==='ichidan'?'る-verb (ichidan)':'う-verb (godan)'}, but ${verb.dict} is ${verb.group==='ichidan'?'ichidan':verb.group==='godan'?'godan':'irregular'}.`; } catch {}
-  }
-  return '';
+
+  return(
+    <div className="mt-3 pt-3 border-t border-rose-200">
+      <div className="text-xs font-medium text-stone-500 mb-2 flex items-center gap-1.5"><IconChat className="w-3.5 h-3.5"/>Chat with Gemini</div>
+      <div className="space-y-2 max-h-56 overflow-y-auto pb-1">
+        {loading&&!display.length&&<div className="text-sm text-stone-400 italic px-3 py-2">Gemini is thinking…</div>}
+        {display.map((m,i)=>(
+          <div key={i} style={{whiteSpace:'pre-wrap'}}
+            className={`text-sm px-3 py-2 rounded-lg leading-relaxed ${m.role==='assistant'?'bg-white border border-stone-200 text-stone-800':'bg-indigo-50 border border-indigo-100 text-indigo-900 ml-6 text-right'}`}>
+            {m.content}
+          </div>
+        ))}
+        {loading&&display.length>0&&<div className="text-sm text-stone-400 italic px-3">Gemini is thinking…</div>}
+        <div ref={endRef}/>
+      </div>
+      <div className="flex gap-2 mt-2">
+        <input type="text" value={input} onChange={e=>setInput(e.target.value)}
+          onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();send();}}}
+          placeholder="Ask a follow-up…" disabled={loading}
+          autoCorrect="off" spellCheck="false"
+          className="flex-1 px-3 py-1.5 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none disabled:opacity-50"/>
+        <button onClick={send} disabled={loading||!input.trim()}
+          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Send</button>
+      </div>
+    </div>
+  );
 }
 
 // ============================================================================
 // SRS
 // ============================================================================
-const DAY = 86400000;
-function defaultState() {
-  return { cards:{}, enabledTypes:CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id), session:{reviewed:0,correct:0} };
-}
-function gradeCard(card, correct) {
+const DAY=86400000;
+function defaultState(){return{cards:{},enabledTypes:CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),session:{reviewed:0,correct:0}};}
+function gradeCard(card,correct){
   const now=Date.now();
-  if (!card) card={ease:2.5,interval:0,reps:0,nextReview:0,correct:0,incorrect:0,lastSeen:0};
-  if (correct) {
-    let iv; if(card.reps===0)iv=1; else if(card.reps===1)iv=3; else iv=Math.ceil(card.interval*card.ease);
-    return {ease:card.ease,reps:card.reps+1,interval:iv,nextReview:now+iv*DAY,correct:card.correct+1,incorrect:card.incorrect,lastSeen:now};
-  }
-  return {ease:Math.max(1.3,card.ease-0.2),reps:0,interval:0,nextReview:now+60000,correct:card.correct,incorrect:card.incorrect+1,lastSeen:now};
+  if(!card)card={ease:2.5,interval:0,reps:0,nextReview:0,correct:0,incorrect:0,lastSeen:0};
+  if(correct){let iv;if(card.reps===0)iv=1;else if(card.reps===1)iv=3;else iv=Math.ceil(card.interval*card.ease);return{ease:card.ease,reps:card.reps+1,interval:iv,nextReview:now+iv*DAY,correct:card.correct+1,incorrect:card.incorrect,lastSeen:now};}
+  return{ease:Math.max(1.3,card.ease-0.2),reps:0,interval:0,nextReview:now+60000,correct:card.correct,incorrect:card.incorrect+1,lastSeen:now};
 }
-function selectNext(state, verbs, types, lastId) {
-  const now=Date.now(), all=[];
-  for (const v of verbs) for (const t of types) {
-    const id=v.dict+'|'+t;
-    if(id===lastId&&verbs.length*types.length>1) continue;
-    all.push({verb:v,type:t,id,card:state.cards[id]});
-  }
-  if (!all.length) return null;
+function selectNext(state,verbs,types,lastId){
+  const now=Date.now(),all=[];
+  for(const v of verbs)for(const t of types){const id=v.dict+'|'+t;if(id===lastId&&verbs.length*types.length>1)continue;all.push({verb:v,type:t,id,card:state.cards[id]});}
+  if(!all.length)return null;
   const due=all.filter(c=>c.card&&c.card.nextReview<=now);
-  if (due.length) { due.sort((a,b)=>a.card.nextReview-b.card.nextReview); const sl=due.slice(0,Math.min(5,due.length)); return sl[Math.floor(Math.random()*sl.length)]; }
+  if(due.length){due.sort((a,b)=>a.card.nextReview-b.card.nextReview);const sl=due.slice(0,Math.min(5,due.length));return sl[Math.floor(Math.random()*sl.length)];}
   const fresh=all.filter(c=>!c.card);
-  if (fresh.length) return fresh[Math.floor(Math.random()*fresh.length)];
-  all.sort((a,b)=>a.card.nextReview-b.card.nextReview); return all[0];
+  if(fresh.length)return fresh[Math.floor(Math.random()*fresh.length)];
+  all.sort((a,b)=>a.card.nextReview-b.card.nextReview);return all[0];
 }
-function fmtInterval(d) {
-  if(!d)return'new'; if(d<1)return'<1d'; if(d<30)return Math.round(d)+'d'; if(d<365)return Math.round(d/30)+'mo'; return (d/365).toFixed(1)+'y';
+function fmtInterval(d){if(!d)return'new';if(d<1)return'<1d';if(d<30)return Math.round(d)+'d';if(d<365)return Math.round(d/30)+'mo';return(d/365).toFixed(1)+'y';}
+
+// ============================================================================
+// STORAGE (localStorage)
+// ============================================================================
+const STORAGE_KEY='jp-verb-srs-v1';
+const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
+
+function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
+function saveAll(state,customVerbs,syncConfig,lastSyncedAt,geminiKey=''){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify({state,customVerbs,syncConfig,lastSyncedAt,geminiKey}));}catch{}
 }
 
 // ============================================================================
-// STORAGE (localStorage — works cross-browser, cross-device via Supabase sync)
+// CLOUD SYNC
 // ============================================================================
-const STORAGE_KEY = 'jp-verb-srs-v1';
-const DEFAULT_SYNC = {url:'',anonKey:'',syncId:'',enabled:false};
-
-function loadAll() {
-  try { const raw=localStorage.getItem(STORAGE_KEY); if(!raw)return null; return JSON.parse(raw); } catch { return null; }
-}
-function saveAll(state, customVerbs, syncConfig, lastSyncedAt) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({state,customVerbs,syncConfig,lastSyncedAt})); } catch {}
-}
-
-// ============================================================================
-// CLOUD SYNC (Supabase REST — works fully outside sandbox!)
-// ============================================================================
-function cleanCfg(cfg) { return {...cfg, url:(cfg.url||'').trim().replace(/\/+$/,''), anonKey:(cfg.anonKey||'').trim(), syncId:(cfg.syncId||'').trim()}; }
-function syncReady(cfg) { return !!(cfg&&cfg.url&&cfg.anonKey&&cfg.syncId); }
-
-async function cloudFetch(cfg) {
-  const c=cleanCfg(cfg);
-  const r=await fetch(`${c.url}/rest/v1/srs_state?id=eq.${encodeURIComponent(c.syncId)}&select=data,updated_at`,
-    {headers:{apikey:c.anonKey,Authorization:`Bearer ${c.anonKey}`}});
-  if(!r.ok){const t=await r.text().catch(()=>''); throw new Error(`HTTP ${r.status}${t?': '+t.slice(0,120):''}`);}
-  const rows=await r.json(); return rows[0]||null;
-}
-async function cloudUpsert(cfg, payload) {
-  const c=cleanCfg(cfg);
-  const r=await fetch(`${c.url}/rest/v1/srs_state`,{method:'POST',
-    headers:{apikey:c.anonKey,Authorization:`Bearer ${c.anonKey}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},
-    body:JSON.stringify({id:c.syncId,data:payload,updated_at:new Date().toISOString()})});
-  if(!r.ok){const t=await r.text().catch(()=>''); throw new Error(`HTTP ${r.status}${t?': '+t.slice(0,120):''}`);}
-}
+function cleanCfg(cfg){return{...cfg,url:(cfg.url||'').trim().replace(/\/+$/,''),anonKey:(cfg.anonKey||'').trim(),syncId:(cfg.syncId||'').trim()};}
+function syncReady(cfg){return!!(cfg&&cfg.url&&cfg.anonKey&&cfg.syncId);}
+async function cloudFetch(cfg){const c=cleanCfg(cfg);const r=await fetch(`${c.url}/rest/v1/srs_state?id=eq.${encodeURIComponent(c.syncId)}&select=data,updated_at`,{headers:{apikey:c.anonKey,Authorization:`Bearer ${c.anonKey}`}});if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(`HTTP ${r.status}${t?': '+t.slice(0,120):''}`);}const rows=await r.json();return rows[0]||null;}
+async function cloudUpsert(cfg,payload){const c=cleanCfg(cfg);const r=await fetch(`${c.url}/rest/v1/srs_state`,{method:'POST',headers:{apikey:c.anonKey,Authorization:`Bearer ${c.anonKey}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:c.syncId,data:payload,updated_at:new Date().toISOString()})});if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(`HTTP ${r.status}${t?': '+t.slice(0,120):''}`);}};
 
 // ============================================================================
 // MAIN APP
 // ============================================================================
-function App() {
-  const [tab, setTab] = useState('study');
-  const [state, setState] = useState(defaultState);
-  const [customVerbs, setCustomVerbs] = useState([]);
-  const [syncConfig, setSyncConfig] = useState(DEFAULT_SYNC);
-  const [syncStatus, setSyncStatus] = useState({kind:'idle',message:'',at:null});
-  const [hydrated, setHydrated] = useState(false);
-  const pushTimer = useRef(null);
-  const lastSyncedAtRef = useRef(0);
+function App(){
+  const[tab,setTab]=useState('study');
+  const[state,setState]=useState(defaultState);
+  const[customVerbs,setCustomVerbs]=useState([]);
+  const[syncConfig,setSyncConfig]=useState(DEFAULT_SYNC);
+  const[syncStatus,setSyncStatus]=useState({kind:'idle',message:'',at:null});
+  const[geminiKey,setGeminiKey]=useState('');
+  const[hydrated,setHydrated]=useState(false);
+  const pushTimer=useRef(null);
+  const lastSyncedAtRef=useRef(0);
 
-  useEffect(() => {
-    const local = loadAll();
-    let cfg = DEFAULT_SYNC;
-    if (local) {
-      if (local.state) setState({...defaultState(),...local.state,session:{reviewed:0,correct:0}});
-      if (Array.isArray(local.customVerbs)) setCustomVerbs(local.customVerbs);
-      if (local.syncConfig) { cfg={...DEFAULT_SYNC,...local.syncConfig}; setSyncConfig(cfg); }
-      if (typeof local.lastSyncedAt==='number') lastSyncedAtRef.current=local.lastSyncedAt;
+  useEffect(()=>{
+    const local=loadAll();
+    let cfg=DEFAULT_SYNC;
+    if(local){
+      if(local.state)setState({...defaultState(),...local.state,session:{reviewed:0,correct:0}});
+      if(Array.isArray(local.customVerbs))setCustomVerbs(local.customVerbs);
+      if(local.syncConfig){cfg={...DEFAULT_SYNC,...local.syncConfig};setSyncConfig(cfg);}
+      if(typeof local.lastSyncedAt==='number')lastSyncedAtRef.current=local.lastSyncedAt;
+      if(local.geminiKey)setGeminiKey(local.geminiKey);
     }
-    if (cfg.enabled&&syncReady(cfg)) {
+    if(cfg.enabled&&syncReady(cfg)){
       setSyncStatus({kind:'syncing',message:'Checking cloud…',at:null});
-      cloudFetch(cfg).then(cloud => {
-        if (cloud&&cloud.data) {
+      cloudFetch(cfg).then(cloud=>{
+        if(cloud&&cloud.data){
           const cloudAt=cloud.updated_at?new Date(cloud.updated_at).getTime():0;
-          if (cloudAt>lastSyncedAtRef.current) {
-            if(cloud.data.state) setState({...defaultState(),...cloud.data.state,session:{reviewed:0,correct:0}});
-            if(Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);
-            lastSyncedAtRef.current=cloudAt;
-            setSyncStatus({kind:'ok',message:'Restored from cloud',at:cloudAt});
-          } else {
-            setSyncStatus({kind:'ok',message:'Up to date',at:lastSyncedAtRef.current});
-          }
-        } else {
-          setSyncStatus({kind:'ok',message:'New cloud row — local will be uploaded',at:null});
-        }
-      }).catch(e => setSyncStatus({kind:'error',message:e.message||'Cloud unreachable',at:null}));
+          if(cloudAt>lastSyncedAtRef.current){
+            if(cloud.data.state)setState({...defaultState(),...cloud.data.state,session:{reviewed:0,correct:0}});
+            if(Array.isArray(cloud.data.customVerbs))setCustomVerbs(cloud.data.customVerbs);
+            lastSyncedAtRef.current=cloudAt;setSyncStatus({kind:'ok',message:'Restored from cloud',at:cloudAt});
+          }else{setSyncStatus({kind:'ok',message:'Up to date',at:lastSyncedAtRef.current});}
+        }else{setSyncStatus({kind:'ok',message:'New cloud row — will upload',at:null});}
+      }).catch(e=>setSyncStatus({kind:'error',message:e.message||'Cloud unreachable',at:null}));
     }
     setHydrated(true);
-  }, []);
+  },[]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    saveAll(state, customVerbs, syncConfig, lastSyncedAtRef.current);
-    if (syncConfig.enabled&&syncReady(syncConfig)) {
-      if (pushTimer.current) clearTimeout(pushTimer.current);
-      pushTimer.current = setTimeout(async () => {
+  useEffect(()=>{
+    if(!hydrated)return;
+    saveAll(state,customVerbs,syncConfig,lastSyncedAtRef.current,geminiKey);
+    if(syncConfig.enabled&&syncReady(syncConfig)){
+      if(pushTimer.current)clearTimeout(pushTimer.current);
+      pushTimer.current=setTimeout(async()=>{
         setSyncStatus(s=>({...s,kind:'syncing',message:'Saving to cloud…'}));
-        try {
-          await cloudUpsert(syncConfig,{state,customVerbs});
-          const now=Date.now(); lastSyncedAtRef.current=now;
-          saveAll(state,customVerbs,syncConfig,now);
-          setSyncStatus({kind:'ok',message:'Saved to cloud',at:now});
-        } catch(e) { setSyncStatus({kind:'error',message:e.message||'Push failed',at:null}); }
-      }, 2000);
+        try{await cloudUpsert(syncConfig,{state,customVerbs});const now=Date.now();lastSyncedAtRef.current=now;saveAll(state,customVerbs,syncConfig,now,geminiKey);setSyncStatus({kind:'ok',message:'Saved to cloud',at:now});}
+        catch(e){setSyncStatus({kind:'error',message:e.message||'Push failed',at:null});}
+      },2000);
     }
-  }, [state, customVerbs, syncConfig, hydrated]);
+  },[state,customVerbs,syncConfig,geminiKey,hydrated]);
 
-  async function syncNow() {
-    if (!syncReady(syncConfig)) return;
+  async function syncNow(){
+    if(!syncReady(syncConfig))return;
     setSyncStatus({kind:'syncing',message:'Syncing…',at:null});
-    try {
+    try{
       const cloud=await cloudFetch(syncConfig);
       const cloudAt=cloud&&cloud.updated_at?new Date(cloud.updated_at).getTime():0;
-      if (cloud&&cloud.data&&cloudAt>lastSyncedAtRef.current) {
-        if(cloud.data.state) setState({...defaultState(),...cloud.data.state,session:state.session});
-        if(Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);
-        lastSyncedAtRef.current=cloudAt;
-        setSyncStatus({kind:'ok',message:'Pulled newer data from cloud',at:cloudAt});
-      } else {
-        await cloudUpsert(syncConfig,{state,customVerbs});
-        const now=Date.now(); lastSyncedAtRef.current=now;
-        setSyncStatus({kind:'ok',message:'Pushed local to cloud',at:now});
+      if(cloud&&cloud.data&&cloudAt>lastSyncedAtRef.current){
+        if(cloud.data.state)setState({...defaultState(),...cloud.data.state,session:state.session});
+        if(Array.isArray(cloud.data.customVerbs))setCustomVerbs(cloud.data.customVerbs);
+        lastSyncedAtRef.current=cloudAt;setSyncStatus({kind:'ok',message:'Pulled from cloud',at:cloudAt});
+      }else{
+        await cloudUpsert(syncConfig,{state,customVerbs});const now=Date.now();lastSyncedAtRef.current=now;setSyncStatus({kind:'ok',message:'Pushed to cloud',at:now});
       }
-    } catch(e) { setSyncStatus({kind:'error',message:e.message||'Sync failed',at:null}); }
+    }catch(e){setSyncStatus({kind:'error',message:e.message||'Sync failed',at:null});}
   }
 
-  const allVerbs = useMemo(() => [...STARTER_VERBS,...customVerbs],[customVerbs]);
+  const allVerbs=useMemo(()=>[...STARTER_VERBS,...customVerbs],[customVerbs]);
 
-  return (
+  return(
     <div className="min-h-screen bg-stone-50 text-stone-800" style={{fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif'}}>
       <div className="max-w-2xl mx-auto px-4 py-6">
         <header className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">動詞 <span className="text-stone-400 font-normal">·</span> Verb Drill</h1>
-            <p className="text-xs text-stone-500 mt-0.5">Spaced repetition for Japanese conjugation</p>
-          </div>
+          <div><h1 className="text-xl font-semibold tracking-tight">動詞 <span className="text-stone-400 font-normal">·</span> Verb Drill</h1><p className="text-xs text-stone-500 mt-0.5">Spaced repetition for Japanese conjugation</p></div>
           <div className="text-xs text-stone-500 text-right">
             <div>{state.session.correct}/{state.session.reviewed} this session</div>
-            {syncConfig.enabled&&(
-              <div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind==='error'?'text-rose-500':syncStatus.kind==='syncing'?'text-amber-500':'text-emerald-600'}`}>
-                <IconCloud className="w-3 h-3"/>
-                <span>{syncStatus.kind==='syncing'?'syncing':syncStatus.kind==='error'?'sync error':'synced'}</span>
-              </div>
-            )}
+            {syncConfig.enabled&&(<div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind==='error'?'text-rose-500':syncStatus.kind==='syncing'?'text-amber-500':'text-emerald-600'}`}><IconCloud className="w-3 h-3"/><span>{syncStatus.kind==='syncing'?'syncing':syncStatus.kind==='error'?'sync error':'synced'}</span></div>)}
           </div>
         </header>
         <nav className="flex gap-1 mb-6 p-1 bg-white rounded-xl border border-stone-200">
           {['study','stats','verbs','settings'].map(t=>(
-            <button key={t} onClick={()=>setTab(t)}
-              className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>
-              {t}
-            </button>
+            <button key={t} onClick={()=>setTab(t)} className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
-        {tab==='study'&&<StudyView state={state} setState={setState} verbs={allVerbs}/>}
+        {tab==='study'&&<StudyView state={state} setState={setState} verbs={allVerbs} geminiKey={geminiKey}/>}
         {tab==='stats'&&<StatsView state={state} verbs={allVerbs}/>}
-        {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs}/>}
-        {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow}/>}
+        {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} geminiKey={geminiKey}/>}
+        {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey}/>}
       </div>
     </div>
   );
@@ -447,51 +421,42 @@ function App() {
 // ============================================================================
 // STUDY VIEW
 // ============================================================================
-function StudyView({state, setState, verbs}) {
-  const [current, setCurrent] = useState(null);
-  const [answer, setAnswer] = useState('');
-  const [phase, setPhase] = useState('answering');
-  const [wasCorrect, setWasCorrect] = useState(false);
-  const inputRef = useRef(null);
-  const enabledTypes = state.enabledTypes.length>0?state.enabledTypes:['plain-past'];
+function StudyView({state,setState,verbs,geminiKey}){
+  const[current,setCurrent]=useState(null);
+  const[answer,setAnswer]=useState('');
+  const[phase,setPhase]=useState('answering');
+  const[wasCorrect,setWasCorrect]=useState(false);
+  const[chatOpen,setChatOpen]=useState(false);
+  const inputRef=useRef(null);
+  const enabledTypes=state.enabledTypes.length>0?state.enabledTypes:['plain-past'];
 
-  useEffect(()=>{ if(current===null){ setCurrent(selectNext(state,verbs,enabledTypes,null)); } },[current]);
-  useEffect(()=>{ if(phase==='answering'&&inputRef.current) inputRef.current.focus(); },[current,phase]);
+  useEffect(()=>{if(current===null){setCurrent(selectNext(state,verbs,enabledTypes,null));}},[current]);
+  useEffect(()=>{if(phase==='answering'&&inputRef.current)inputRef.current.focus();},[current,phase]);
 
-  if (!current) return (
-    <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
-      <p className="text-stone-600 mb-2">No cards available</p>
-      <p className="text-xs text-stone-400">Enable some conjugation types in Settings.</p>
-    </div>
-  );
+  if(!current)return(<div className="bg-white rounded-2xl border border-stone-200 p-12 text-center"><p className="text-stone-600 mb-2">No cards available</p><p className="text-xs text-stone-400">Enable conjugation types in Settings.</p></div>);
 
   const expected=conjugate(current.verb,current.type);
   const typeInfo=CONJ_TYPES.find(t=>t.id===current.type);
   const explanation=phase==='reviewing'&&!wasCorrect?explainConjugation(current.verb,current.type):null;
   const diagnostic=phase==='reviewing'&&!wasCorrect?diagnose(current.verb,current.type,answer):'';
 
-  function submit() {
-    if (phase==='reviewing') {
-      setCurrent(selectNext(state,verbs,enabledTypes,current.id)); setAnswer(''); setPhase('answering'); return;
-    }
-    if (!answer.trim()) return;
+  function submit(){
+    if(phase==='reviewing'){setChatOpen(false);setCurrent(selectNext(state,verbs,enabledTypes,current.id));setAnswer('');setPhase('answering');return;}
+    if(!answer.trim())return;
     const ok=toHiragana(answer)===expected;
-    setState({...state, cards:{...state.cards,[current.id]:gradeCard(state.cards[current.id],ok)}, session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)}});
-    setWasCorrect(ok); setPhase('reviewing');
+    setState({...state,cards:{...state.cards,[current.id]:gradeCard(state.cards[current.id],ok)},session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)}});
+    setWasCorrect(ok);setPhase('reviewing');
   }
 
   const preview=toHiragana(answer);
   const card=state.cards[current.id];
 
-  return (
+  return(
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
         <div className="px-6 pt-5 pb-3 border-b border-stone-100">
           <div className="flex items-baseline justify-between">
-            <div>
-              <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">{typeInfo.label}</div>
-              <div className="text-xs text-stone-400 mt-0.5">{typeInfo.sub&&(typeInfo.sub+' · ')}{typeInfo.hint}</div>
-            </div>
+            <div><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">{typeInfo.label}</div><div className="text-xs text-stone-400 mt-0.5">{typeInfo.sub&&(typeInfo.sub+' · ')}{typeInfo.hint}</div></div>
             <div className="text-xs text-stone-400">{card?(fmtInterval(card.interval)+' · ease '+card.ease.toFixed(1)):'new'}</div>
           </div>
         </div>
@@ -499,11 +464,7 @@ function StudyView({state, setState, verbs}) {
           <div className="text-5xl font-medium mb-2" lang="ja">{current.verb.dict}</div>
           {current.verb.dict!==current.verb.reading&&<div className="text-base text-stone-500" lang="ja">{current.verb.reading}</div>}
           <div className="text-sm text-stone-400 mt-2 italic">{current.verb.meaning}</div>
-          <div className="text-xs text-stone-400 mt-1">
-            {current.verb.group==='ichidan'&&'る-verb (Group 2)'}
-            {current.verb.group==='godan'&&'う-verb (Group 1)'}
-            {(current.verb.group==='suru'||current.verb.group==='kuru')&&'Irregular (Group 3)'}
-          </div>
+          <div className="text-xs text-stone-400 mt-1">{current.verb.group==='ichidan'&&'る-verb (Group 2)'}{current.verb.group==='godan'&&'う-verb (Group 1)'}{(current.verb.group==='suru'||current.verb.group==='kuru')&&'Irregular (Group 3)'}</div>
         </div>
         <div className="px-6 pb-6">
           {phase==='answering'?(
@@ -512,17 +473,12 @@ function StudyView({state, setState, verbs}) {
                 placeholder="Type romaji or kana…" className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none transition"
                 lang="ja" autoComplete="off" autoCorrect="off" spellCheck="false"/>
               {answer&&preview!==answer&&<div className="mt-2 text-center text-sm text-stone-500" lang="ja">→ {preview}</div>}
-              <button onClick={submit} disabled={!answer.trim()}
-                className="w-full mt-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40">
-                Check (Enter)
-              </button>
+              <button onClick={submit} disabled={!answer.trim()} className="w-full mt-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40">Check (Enter)</button>
             </>
           ):(
             <div className={`rounded-xl p-4 ${wasCorrect?'bg-emerald-50 border border-emerald-200':'bg-rose-50 border border-rose-200'}`}>
               <div className="flex items-start gap-3">
-                <div className={`mt-0.5 flex-shrink-0 ${wasCorrect?'text-emerald-600':'text-rose-600'}`}>
-                  {wasCorrect?<IconCheck className="w-5 h-5"/>:<IconX className="w-5 h-5"/>}
-                </div>
+                <div className={`mt-0.5 flex-shrink-0 ${wasCorrect?'text-emerald-600':'text-rose-600'}`}>{wasCorrect?<IconCheck className="w-5 h-5"/>:<IconX className="w-5 h-5"/>}</div>
                 <div className="flex-1">
                   <div className={`text-sm font-medium ${wasCorrect?'text-emerald-800':'text-rose-800'}`}>{wasCorrect?'Correct!':'Not quite.'}</div>
                   {!wasCorrect&&<div className="text-xs text-rose-700 mt-1">You wrote: <span lang="ja">{toHiragana(answer)||'(empty)'}</span></div>}
@@ -537,19 +493,23 @@ function StudyView({state, setState, verbs}) {
                   {explanation.rule&&<div className="text-sm text-stone-700 leading-relaxed">{explanation.rule}</div>}
                   {explanation.derivation&&explanation.derivation!==expected&&<div className="text-base text-center bg-white/70 rounded-lg px-3 py-2 text-stone-900" lang="ja">{explanation.derivation}</div>}
                   {explanation.note&&<div className="text-xs text-stone-600 italic bg-stone-50/80 rounded-lg px-3 py-2 border border-stone-200">{explanation.note}</div>}
+                  {geminiKey?(!chatOpen?(
+                    <button onClick={()=>setChatOpen(true)} className="w-full mt-1 py-2 border border-rose-200 hover:bg-rose-100/50 rounded-xl text-sm text-rose-700 flex items-center justify-center gap-1.5 transition">
+                      <IconChat className="w-4 h-4"/> Ask Gemini why
+                    </button>
+                  ):(
+                    <ChatPanel verb={current.verb} type={current.type} userAnswer={answer} expected={expected} explanation={explanation} geminiKey={geminiKey}/>
+                  )):(
+                    <div className="text-xs text-stone-400 text-center pt-1">Add a Gemini API key in Settings to enable AI chat.</div>
+                  )}
                 </div>
               )}
-              <button onClick={submit} autoFocus
-                className="w-full mt-3 py-2.5 bg-stone-800 hover:bg-stone-900 text-white rounded-xl font-medium transition">
-                Next (Enter)
-              </button>
+              <button onClick={submit} autoFocus className="w-full mt-3 py-2.5 bg-stone-800 hover:bg-stone-900 text-white rounded-xl font-medium transition">Next (Enter)</button>
             </div>
           )}
         </div>
       </div>
-      <div className="text-center text-xs text-stone-400">
-        Tip: type romaji like <span className="font-mono text-stone-500">tabeta</span> or kana <span lang="ja" className="text-stone-500">たべた</span> — both work.
-      </div>
+      <div className="text-center text-xs text-stone-400">Tip: type romaji like <span className="font-mono text-stone-500">tabeta</span> or kana <span lang="ja" className="text-stone-500">たべた</span></div>
     </div>
   );
 }
@@ -557,291 +517,211 @@ function StudyView({state, setState, verbs}) {
 // ============================================================================
 // STATS VIEW
 // ============================================================================
-function StatsView({state, verbs}) {
-  const stats = useMemo(()=>{
-    const now=Date.now(); let totalReviews=0,totalCorrect=0,due=0,learning=0,mastered=0,fresh=0,total=0;
-    const leeches=[];
-    for (const v of verbs) for (const t of state.enabledTypes) {
-      total++; const id=v.dict+'|'+t, c=state.cards[id];
-      if(!c){fresh++;continue;}
-      totalReviews+=c.correct+c.incorrect; totalCorrect+=c.correct;
-      if(c.nextReview<=now)due++; if(c.interval>=30)mastered++; else learning++;
-      if(c.incorrect>=3&&c.incorrect>c.correct*0.5) leeches.push({id,verb:v,type:t,card:c});
-    }
-    leeches.sort((a,b)=>b.card.incorrect-a.card.incorrect);
-    return {totalReviews,totalCorrect,acc:totalReviews>0?Math.round((totalCorrect/totalReviews)*100):0,due,learning,mastered,fresh,leeches:leeches.slice(0,10),total};
-  },[state,verbs]);
-
-  const Stat=({label,value})=>(
-    <div className="bg-white rounded-xl border border-stone-200 p-4">
-      <div className="text-2xl font-semibold text-stone-800">{value}</div>
-      <div className="text-xs text-stone-500 mt-0.5">{label}</div>
-    </div>
-  );
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat label="Due now" value={stats.due}/><Stat label="Learning" value={stats.learning}/>
-        <Stat label="Mastered" value={stats.mastered}/><Stat label="New" value={stats.fresh}/>
-      </div>
-      <div className="bg-white rounded-2xl border border-stone-200 p-5">
-        <div className="flex items-baseline justify-between mb-2">
-          <h3 className="font-medium">Lifetime accuracy</h3>
-          <span className="text-2xl font-semibold text-stone-800">{stats.acc}%</span>
-        </div>
-        <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
-          <div className="h-full bg-emerald-500 transition-all" style={{width:stats.acc+'%'}}/>
-        </div>
-        <div className="text-xs text-stone-500 mt-2">{stats.totalCorrect} correct out of {stats.totalReviews} reviews across {stats.total} active cards</div>
-      </div>
-      <div className="bg-white rounded-2xl border border-stone-200 p-5">
-        <h3 className="font-medium mb-3 flex items-center gap-2">
-          <IconFlame className="w-4 h-4 text-rose-500"/>Leeches <span className="text-xs text-stone-400 font-normal">(cards you keep missing)</span>
-        </h3>
-        {stats.leeches.length===0?<p className="text-sm text-stone-500">No leeches yet — keep going!</p>:(
-          <ul className="space-y-2">
-            {stats.leeches.map(l=>(
-              <li key={l.id} className="flex items-center justify-between py-1.5 px-2 hover:bg-stone-50 rounded-lg">
-                <div><span className="font-medium" lang="ja">{l.verb.dict}</span><span className="text-xs text-stone-400 ml-2">{TYPE_LABEL[l.type]}</span></div>
-                <div className="text-xs text-rose-600">{l.card.incorrect} miss{l.card.incorrect===1?'':'es'}</div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
+function StatsView({state,verbs}){
+  const stats=useMemo(()=>{const now=Date.now();let totalReviews=0,totalCorrect=0,due=0,learning=0,mastered=0,fresh=0,total=0;const leeches=[];for(const v of verbs)for(const t of state.enabledTypes){total++;const id=v.dict+'|'+t,c=state.cards[id];if(!c){fresh++;continue;}totalReviews+=c.correct+c.incorrect;totalCorrect+=c.correct;if(c.nextReview<=now)due++;if(c.interval>=30)mastered++;else learning++;if(c.incorrect>=3&&c.incorrect>c.correct*0.5)leeches.push({id,verb:v,type:t,card:c});}leeches.sort((a,b)=>b.card.incorrect-a.card.incorrect);return{totalReviews,totalCorrect,acc:totalReviews>0?Math.round((totalCorrect/totalReviews)*100):0,due,learning,mastered,fresh,leeches:leeches.slice(0,10),total};},[state,verbs]);
+  const Stat=({label,value})=>(<div className="bg-white rounded-xl border border-stone-200 p-4"><div className="text-2xl font-semibold text-stone-800">{value}</div><div className="text-xs text-stone-500 mt-0.5">{label}</div></div>);
+  return(<div className="space-y-4"><div className="grid grid-cols-2 sm:grid-cols-4 gap-3"><Stat label="Due now" value={stats.due}/><Stat label="Learning" value={stats.learning}/><Stat label="Mastered" value={stats.mastered}/><Stat label="New" value={stats.fresh}/></div><div className="bg-white rounded-2xl border border-stone-200 p-5"><div className="flex items-baseline justify-between mb-2"><h3 className="font-medium">Lifetime accuracy</h3><span className="text-2xl font-semibold text-stone-800">{stats.acc}%</span></div><div className="h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 transition-all" style={{width:stats.acc+'%'}}/></div><div className="text-xs text-stone-500 mt-2">{stats.totalCorrect} correct / {stats.totalReviews} reviews / {stats.total} cards</div></div><div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-3 flex items-center gap-2"><IconFlame className="w-4 h-4 text-rose-500"/>Leeches</h3>{stats.leeches.length===0?<p className="text-sm text-stone-500">No leeches yet!</p>:<ul className="space-y-2">{stats.leeches.map(l=>(<li key={l.id} className="flex items-center justify-between py-1.5 px-2 hover:bg-stone-50 rounded-lg"><div><span className="font-medium" lang="ja">{l.verb.dict}</span><span className="text-xs text-stone-400 ml-2">{TYPE_LABEL[l.type]}</span></div><div className="text-xs text-rose-600">{l.card.incorrect} miss{l.card.incorrect===1?'':'es'}</div></li>))}</ul>}</div></div>);
 }
 
 // ============================================================================
 // VERBS VIEW
 // ============================================================================
-function VerbsView({customVerbs, setCustomVerbs}) {
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({dict:'',reading:'',meaning:'',group:'ichidan'});
-  const [err, setErr] = useState('');
+function VerbsView({customVerbs,setCustomVerbs,geminiKey}){
+  const[showAdd,setShowAdd]=useState(false);
+  const[query,setQuery]=useState('');
+  const[addPhase,setAddPhase]=useState('idle');
+  const[suggestion,setSuggestion]=useState(null);
+  const[addError,setAddError]=useState('');
+  const[mf,setMf]=useState({dict:'',reading:'',meaning:'',group:'ichidan'});
+  const[mErr,setMErr]=useState('');
+  const[verbSugg,setVerbSugg]=useState(null);
+  const[suggLoading,setSuggLoading]=useState(false);
+  const[suggErr,setSuggErr]=useState('');
 
-  function add() {
-    setErr('');
-    if(!form.dict.trim()||!form.reading.trim()||!form.meaning.trim()){setErr('All fields are required');return;}
-    const reading=toHiragana(form.reading);
-    if(!isAllKana(reading)){setErr('Reading must be hiragana (or convertible romaji)');return;}
-    if(form.group==='ichidan'&&!reading.endsWith('る')){setErr('Ichidan verbs must end in る');return;}
-    if(form.group==='godan'&&!/[うくぐすつぬぶむる]$/.test(reading)){setErr('Godan verbs must end in う/く/ぐ/す/つ/ぬ/ぶ/む/る');return;}
-    if([...STARTER_VERBS,...customVerbs].some(v=>v.dict===form.dict.trim())){setErr('This verb already exists');return;}
-    setCustomVerbs([...customVerbs,{dict:form.dict.trim(),reading,meaning:form.meaning.trim(),group:form.group}]);
-    setForm({dict:'',reading:'',meaning:'',group:'ichidan'}); setShowAdd(false);
+  const allVerbs=useMemo(()=>[...STARTER_VERBS,...customVerbs],[customVerbs]);
+
+  async function fetchSugg(verbs){
+    const vlist=verbs||allVerbs;
+    setSuggLoading(true);setSuggErr('');setVerbSugg(null);
+    try{const r=await getSuggestedVerb(vlist,geminiKey);setVerbSugg(r);}
+    catch(e){setSuggErr(e.message);}
+    finally{setSuggLoading(false);}
+  }
+
+  useEffect(()=>{if(geminiKey)fetchSugg();},[geminiKey]);
+
+  function resetAdd(){setShowAdd(false);setQuery('');setAddPhase('idle');setSuggestion(null);setAddError('');setMf({dict:'',reading:'',meaning:'',group:'ichidan'});setMErr('');}
+
+  async function lookup(){
+    if(!query.trim()||addPhase==='loading')return;
+    setAddPhase('loading');setAddError('');
+    try{const r=await lookupVerbWithGemini(query,geminiKey);setSuggestion(r);setAddPhase('confirming');}
+    catch(e){setAddPhase('error');setAddError(e.message);}
+  }
+
+  function doAdd(verb){
+    if([...STARTER_VERBS,...customVerbs].some(v=>v.dict===verb.dict)){setAddError(`${verb.dict} is already in your list`);setAddPhase('error');return;}
+    const newCustom=[...customVerbs,verb];
+    setCustomVerbs(newCustom);
+    resetAdd();
+    if(geminiKey)fetchSugg([...STARTER_VERBS,...newCustom]);
+  }
+
+  function addManual(){
+    setMErr('');
+    if(!mf.dict.trim()||!mf.reading.trim()||!mf.meaning.trim()){setMErr('All fields required');return;}
+    const reading=toHiragana(mf.reading);
+    if(!isAllKana(reading)){setMErr('Reading must be hiragana');return;}
+    if(mf.group==='ichidan'&&!reading.endsWith('る')){setMErr('Ichidan must end in る');return;}
+    if(mf.group==='godan'&&!/[うくぐすつぬぶむる]$/.test(reading)){setMErr('Godan must end in う/く/ぐ/す/つ/ぬ/ぶ/む/る');return;}
+    doAdd({dict:mf.dict.trim(),reading,meaning:mf.meaning.trim(),group:mf.group});
   }
 
   const groupLabel={ichidan:'る-verb',godan:'う-verb',suru:'irregular',kuru:'irregular'};
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="text-sm text-stone-600">{STARTER_VERBS.length} starter + {customVerbs.length} custom = {STARTER_VERBS.length+customVerbs.length} verbs</div>
-        <button onClick={()=>setShowAdd(!showAdd)} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition">
-          <IconPlus className="w-4 h-4"/>Add verb
-        </button>
-      </div>
-      {showAdd&&(
-        <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-3">
-          <h3 className="font-medium">New verb</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-xs text-stone-500 block mb-1">Dictionary form</label>
-              <input type="text" value={form.dict} onChange={e=>setForm({...form,dict:e.target.value})} placeholder="食べる" lang="ja" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
-            <div><label className="text-xs text-stone-500 block mb-1">Reading (kana/romaji)</label>
-              <input type="text" value={form.reading} onChange={e=>setForm({...form,reading:e.target.value})} placeholder="たべる or taberu" lang="ja" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
+  const groupLong={ichidan:'る-verb (ichidan / Group 2)',godan:'う-verb (godan / Group 1)',suru:'irregular する (Group 3)',kuru:'irregular 来る (Group 3)'};
+
+  return(<div className="space-y-4">
+    <div className="flex justify-between items-center">
+      <div className="text-sm text-stone-600">{STARTER_VERBS.length} starter + {customVerbs.length} custom = {STARTER_VERBS.length+customVerbs.length} verbs</div>
+      <button onClick={()=>setShowAdd(!showAdd)} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition"><IconPlus className="w-4 h-4"/>Add verb</button>
+    </div>
+
+    {geminiKey&&(
+      <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">💡 Suggested next verb</div>
+          <button onClick={()=>fetchSugg()} disabled={suggLoading} className="text-xs text-indigo-500 hover:text-indigo-700 disabled:opacity-50 transition">
+            {suggLoading?'…':'Suggest another ↻'}
+          </button>
+        </div>
+        {suggLoading&&!verbSugg&&<div className="text-sm text-indigo-400 italic">Finding a good next verb for you…</div>}
+        {suggErr&&<div className="text-sm text-rose-600">{suggErr}</div>}
+        {verbSugg&&!suggLoading&&(
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-2xl font-medium" lang="ja">{verbSugg.dict}</span>
+                {verbSugg.dict!==verbSugg.reading&&<span className="text-sm text-indigo-600" lang="ja">{verbSugg.reading}</span>}
+              </div>
+              <div className="text-sm text-stone-600 italic">{verbSugg.meaning}</div>
+              <div className="text-xs text-stone-500 mt-1 leading-relaxed">{verbSugg.reason}</div>
+            </div>
+            <button onClick={()=>doAdd(verbSugg)} className="flex-shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Add</button>
           </div>
-          <div><label className="text-xs text-stone-500 block mb-1">Meaning</label>
-            <input type="text" value={form.meaning} onChange={e=>setForm({...form,meaning:e.target.value})} placeholder="to eat" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
-          <div><label className="text-xs text-stone-500 block mb-1">Group</label>
+        )}
+      </div>
+    )}
+
+    {showAdd&&(<div className="bg-white rounded-2xl border border-stone-200 p-5">
+      <h3 className="font-medium mb-3">Add a verb</h3>
+      {geminiKey?(
+        addPhase!=='confirming'?(
+          <div className="space-y-2">
             <div className="flex gap-2">
-              {[{id:'ichidan',label:'る-verb'},{id:'godan',label:'う-verb'},{id:'suru',label:'suru-compound'}].map(g=>(
-                <button key={g.id} onClick={()=>setForm({...form,group:g.id})}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${form.group===g.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>
-                  {g.label}
-                </button>
-              ))}
+              <input type="text" value={query}
+                onChange={e=>{setQuery(e.target.value);if(addPhase==='error'){setAddPhase('idle');setAddError('');}}}
+                onKeyDown={e=>{if(e.key==='Enter')lookup();}}
+                placeholder="食べる, taberu, to eat, swim…"
+                disabled={addPhase==='loading'}
+                autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                className="flex-1 px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none disabled:opacity-50"/>
+              <button onClick={lookup} disabled={!query.trim()||addPhase==='loading'}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium min-w-16">
+                {addPhase==='loading'?'…':'Look up'}
+              </button>
+            </div>
+            {addError&&<div className="text-sm text-rose-600">{addError}</div>}
+          </div>
+        ):(
+          <div className="space-y-3">
+            <p className="text-sm text-stone-600">Is this the right verb?</p>
+            <div className="bg-stone-50 border border-stone-200 rounded-xl p-4">
+              <div className="text-3xl font-medium mb-1" lang="ja">{suggestion.dict}</div>
+              {suggestion.dict!==suggestion.reading&&<div className="text-base text-stone-500 mb-1" lang="ja">{suggestion.reading}</div>}
+              <div className="text-sm text-stone-500 italic">{suggestion.meaning}</div>
+              <div className="text-xs text-stone-400 mt-1">{groupLong[suggestion.group]}</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={()=>doAdd(suggestion)} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Add verb</button>
+              <button onClick={()=>{setAddPhase('idle');setSuggestion(null);setQuery('');}} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm">Try again</button>
             </div>
           </div>
-          {err&&<div className="text-sm text-rose-600">{err}</div>}
-          <div className="flex gap-2 pt-2">
-            <button onClick={add} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">Add</button>
-            <button onClick={()=>{setShowAdd(false);setErr('');}} className="px-4 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg">Cancel</button>
+        )
+      ):(
+        <div className="space-y-3">
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Add a Gemini API key in Settings for AI lookup and suggestions.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-xs text-stone-500 block mb-1">Dictionary form</label><input type="text" value={mf.dict} onChange={e=>setMf({...mf,dict:e.target.value})} placeholder="食べる" lang="ja" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
+            <div><label className="text-xs text-stone-500 block mb-1">Reading (kana/romaji)</label><input type="text" value={mf.reading} onChange={e=>setMf({...mf,reading:e.target.value})} placeholder="taberu" lang="ja" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
           </div>
+          <div><label className="text-xs text-stone-500 block mb-1">Meaning</label><input type="text" value={mf.meaning} onChange={e=>setMf({...mf,meaning:e.target.value})} placeholder="to eat" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
+          <div><label className="text-xs text-stone-500 block mb-1">Group</label><div className="flex gap-2">{[{id:'ichidan',label:'る-verb'},{id:'godan',label:'う-verb'},{id:'suru',label:'suru'}].map(g=>(<button key={g.id} onClick={()=>setMf({...mf,group:g.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${mf.group===g.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{g.label}</button>))}</div></div>
+          {mErr&&<div className="text-sm text-rose-600">{mErr}</div>}
+          <button onClick={addManual} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm">Add</button>
         </div>
       )}
-      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider">
-            <tr><th className="px-4 py-2 text-left font-medium">Verb</th><th className="px-4 py-2 text-left font-medium">Reading</th>
-              <th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Meaning</th><th className="px-4 py-2 text-left font-medium">Group</th><th className="px-4 py-2"></th></tr>
-          </thead>
-          <tbody>
-            {[...STARTER_VERBS,...customVerbs].map((v,i)=>(
-              <tr key={v.dict} className="border-t border-stone-100">
-                <td className="px-4 py-2 font-medium" lang="ja">{v.dict}</td>
-                <td className="px-4 py-2 text-stone-600" lang="ja">{v.reading}</td>
-                <td className="px-4 py-2 text-stone-500 hidden sm:table-cell">{v.meaning}</td>
-                <td className="px-4 py-2 text-xs text-stone-500">{groupLabel[v.group]}</td>
-                <td className="px-4 py-2 text-right">{i>=STARTER_VERBS.length&&<button onClick={()=>setCustomVerbs(customVerbs.filter(c=>c.dict!==v.dict))} className="text-stone-400 hover:text-rose-600 transition"><IconTrash className="w-4 h-4"/></button>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+      <button onClick={resetAdd} className="mt-3 text-xs text-stone-400 hover:text-stone-600 block">Cancel</button>
+    </div>)}
+
+    <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden"><table className="w-full text-sm"><thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider"><tr><th className="px-4 py-2 text-left font-medium">Verb</th><th className="px-4 py-2 text-left font-medium">Reading</th><th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Meaning</th><th className="px-4 py-2 text-left font-medium">Group</th><th className="px-4 py-2"></th></tr></thead><tbody>{[...STARTER_VERBS,...customVerbs].map((v,i)=>(<tr key={v.dict} className="border-t border-stone-100"><td className="px-4 py-2 font-medium" lang="ja">{v.dict}</td><td className="px-4 py-2 text-stone-600" lang="ja">{v.reading}</td><td className="px-4 py-2 text-stone-500 hidden sm:table-cell">{v.meaning}</td><td className="px-4 py-2 text-xs text-stone-500">{groupLabel[v.group]}</td><td className="px-4 py-2 text-right">{i>=STARTER_VERBS.length&&<button onClick={()=>setCustomVerbs(customVerbs.filter(c=>c.dict!==v.dict))} className="text-stone-400 hover:text-rose-600 transition"><IconTrash className="w-4 h-4"/></button>}</td></tr>))}</tbody></table></div>
+  </div>);
 }
 
 // ============================================================================
 // SETTINGS VIEW
 // ============================================================================
-function SettingsView({state, setState, customVerbs, setCustomVerbs, syncConfig, setSyncConfig, syncStatus, syncNow}) {
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
-  const [importText, setImportText] = useState('');
-  const [importErr, setImportErr] = useState('');
-  const [msg, setMsg] = useState('');
-  const [copyOk, setCopyOk] = useState(false);
-  const [syncForm, setSyncForm] = useState({url:syncConfig.url,anonKey:syncConfig.anonKey,syncId:syncConfig.syncId});
+function SettingsView({state,setState,customVerbs,setCustomVerbs,syncConfig,setSyncConfig,syncStatus,syncNow,geminiKey,setGeminiKey}){
+  const[confirmReset,setConfirmReset]=useState(false);
+  const[exportOpen,setExportOpen]=useState(false);
+  const[importOpen,setImportOpen]=useState(false);
+  const[importText,setImportText]=useState('');
+  const[importErr,setImportErr]=useState('');
+  const[msg,setMsg]=useState('');
+  const[copyOk,setCopyOk]=useState(false);
+  const[syncForm,setSyncForm]=useState({url:syncConfig.url,anonKey:syncConfig.anonKey,syncId:syncConfig.syncId});
+  const[localGeminiKey,setLocalGeminiKey]=useState(geminiKey);
+  const[geminiMsg,setGeminiMsg]=useState('');
 
-  useEffect(()=>setSyncForm({url:syncConfig.url,anonKey:syncConfig.anonKey,syncId:syncConfig.syncId}),
-    [syncConfig.url,syncConfig.anonKey,syncConfig.syncId]);
+  useEffect(()=>setSyncForm({url:syncConfig.url,anonKey:syncConfig.anonKey,syncId:syncConfig.syncId}),[syncConfig.url,syncConfig.anonKey,syncConfig.syncId]);
+  useEffect(()=>setLocalGeminiKey(geminiKey),[geminiKey]);
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
-  function saveCfg(enabled) {
-    setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),
-      enabled:enabled!==undefined?enabled:syncConfig.enabled});
-  }
-
-  const exportData = useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:1,exportedAt:new Date().toISOString(),
-    state:{cards:state.cards,enabledTypes:state.enabledTypes},customVerbs}),[state,customVerbs]);
-
-  function toggle(id) {
-    const has=state.enabledTypes.includes(id);
-    setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});
-  }
-  function reset() { setState({...defaultState(),enabledTypes:state.enabledTypes}); setConfirmReset(false); }
-  async function copyExport() {
-    try { if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(exportData);setCopyOk(true);setTimeout(()=>setCopyOk(false),2000);} } catch {}
-  }
-  function doImport() {
-    setImportErr('');
-    try {
-      const data=JSON.parse(importText.trim());
-      if(data.format!=='jp-verb-srs') throw new Error("doesn't look like a verb-drill backup");
-      if(!data.state||typeof data.state.cards!=='object') throw new Error('missing card data');
-      setState({cards:data.state.cards,enabledTypes:Array.isArray(data.state.enabledTypes)?data.state.enabledTypes:state.enabledTypes,session:{reviewed:0,correct:0}});
-      if(Array.isArray(data.customVerbs)) setCustomVerbs(data.customVerbs);
-      setImportText(''); setImportOpen(false); setMsg('Progress restored!'); setTimeout(()=>setMsg(''),3000);
-    } catch(e) { setImportErr('Invalid backup: '+(e.message||'parsing failed')); }
-  }
-
+  function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:1,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes},customVerbs}),[state,customVerbs]);
+  function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
+  function reset(){setState({...defaultState(),enabledTypes:state.enabledTypes});setConfirmReset(false);}
+  async function copyExport(){try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(exportData);setCopyOk(true);setTimeout(()=>setCopyOk(false),2000);}}catch{}}
+  function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState({cards:data.state.cards,enabledTypes:Array.isArray(data.state.enabledTypes)?data.state.enabledTypes:state.enabledTypes,session:{reviewed:0,correct:0}});if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
   const statusColor=syncStatus.kind==='error'?'text-rose-700 bg-rose-50 border-rose-200':syncStatus.kind==='syncing'?'text-amber-700 bg-amber-50 border-amber-200':syncStatus.kind==='ok'?'text-emerald-700 bg-emerald-50 border-emerald-200':'text-stone-600 bg-stone-50 border-stone-200';
 
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-stone-200 p-5">
-        <h3 className="font-medium mb-1">Conjugation types in scope</h3>
-        <p className="text-xs text-stone-500 mb-4">Toggle which conjugations the drill should ask about.</p>
-        <div className="space-y-2">
-          {CONJ_TYPES.map(t=>{
-            const on=state.enabledTypes.includes(t.id);
-            return (
-              <div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-stone-50">
-                <div><div className="text-sm font-medium">{t.label}</div><div className="text-xs text-stone-500">{t.sub&&(t.sub+' · ')}{t.hint}</div></div>
-                <button onClick={()=>toggle(t.id)} className={`relative w-10 h-6 rounded-full transition flex-shrink-0 ${on?'bg-indigo-600':'bg-stone-300'}`}>
-                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on?'translate-x-4':''}`}/>
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+  return(<div className="space-y-4">
+    <div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-1">Conjugation types in scope</h3><p className="text-xs text-stone-500 mb-4">Toggle which conjugations to drill.</p><div className="space-y-2">{CONJ_TYPES.map(t=>{const on=state.enabledTypes.includes(t.id);return(<div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-stone-50"><div><div className="text-sm font-medium">{t.label}</div><div className="text-xs text-stone-500">{t.sub&&(t.sub+' · ')}{t.hint}</div></div><button onClick={()=>toggle(t.id)} className={`relative w-10 h-6 rounded-full transition flex-shrink-0 ${on?'bg-indigo-600':'bg-stone-300'}`}><span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on?'translate-x-4':''}`}/></button></div>);})}</div></div>
 
-      <div className="bg-white rounded-2xl border border-stone-200 p-5">
-        <h3 className="font-medium mb-1 flex items-center gap-2"><IconCloud className="w-4 h-4 text-indigo-600"/>Cloud sync (Supabase)</h3>
-        <p className="text-xs text-stone-500 mb-3">Sync progress across devices. Use the same three values on every device.</p>
-        {(syncStatus.message||syncConfig.enabled)&&(
-          <div className={`mb-3 text-xs rounded-lg border px-3 py-2 ${statusColor}`}>
-            <div className="flex items-center justify-between">
-              <span>{syncStatus.message||(syncConfig.enabled?'Sync enabled':'Sync disabled')}</span>
-              {syncStatus.at&&<span className="text-stone-500">{new Date(syncStatus.at).toLocaleTimeString()}</span>}
-            </div>
-          </div>
-        )}
-        <div className="space-y-2">
-          <div><label className="text-xs text-stone-500 block mb-1">Project URL</label>
-            <input type="text" value={syncForm.url} onChange={e=>setSyncForm({...syncForm,url:e.target.value})} placeholder="https://xxxxx.supabase.co" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-              className="w-full px-3 py-2 text-sm font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
-          <div><label className="text-xs text-stone-500 block mb-1">anon / public key</label>
-            <input type="password" value={syncForm.anonKey} onChange={e=>setSyncForm({...syncForm,anonKey:e.target.value})} placeholder="eyJ..." autoCorrect="off" autoCapitalize="off" spellCheck="false"
-              className="w-full px-3 py-2 text-sm font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
-          <div><label className="text-xs text-stone-500 block mb-1">Sync ID <span className="text-stone-400 font-normal">(same on every device)</span></label>
-            <input type="text" value={syncForm.syncId} onChange={e=>setSyncForm({...syncForm,syncId:e.target.value})} placeholder="my-japan-2026-xyz" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-              className="w-full px-3 py-2 text-sm font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
-        </div>
-        <div className="flex gap-2 mt-3">
-          {!syncConfig.enabled?(
-            <button onClick={()=>saveCfg(true)} disabled={!formReady}
-              className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Enable sync</button>
-          ):(
-            <>
-              <button onClick={()=>{saveCfg(true);syncNow();}} disabled={!formReady}
-                className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Sync now</button>
-              <button onClick={()=>saveCfg(false)} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm">Disable</button>
-            </>
-          )}
-        </div>
+    <div className="bg-white rounded-2xl border border-stone-200 p-5">
+      <h3 className="font-medium mb-1 flex items-center gap-2"><IconChat className="w-4 h-4 text-indigo-600"/>AI Chat (Gemini)</h3>
+      <p className="text-xs text-stone-500 mb-3">Powers "Ask Gemini why" after wrong answers, and AI verb lookup. Free key at <span className="text-indigo-600 font-medium">aistudio.google.com</span></p>
+      <div><label className="text-xs text-stone-500 block mb-1">Gemini API key</label>
+        <input type="password" value={localGeminiKey} onChange={e=>setLocalGeminiKey(e.target.value)} placeholder="AIza..." autoCorrect="off" autoCapitalize="off" spellCheck="false"
+          className="w-full px-3 py-2 text-sm font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
+      <div className="flex gap-2 mt-3">
+        <button onClick={()=>{setGeminiKey(localGeminiKey.trim());setGeminiMsg('Saved!');setTimeout(()=>setGeminiMsg(''),2000);}} disabled={!localGeminiKey.trim()}
+          className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Save key</button>
+        {geminiKey&&<button onClick={()=>{setGeminiKey('');setLocalGeminiKey('');}} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm">Clear</button>}
       </div>
-
-      <div className="bg-white rounded-2xl border border-stone-200 p-5">
-        <h3 className="font-medium mb-1">Backup & restore (manual)</h3>
-        <p className="text-xs text-stone-500 mb-3">Copy/paste JSON to move progress without cloud sync.</p>
-        {msg&&<div className="mb-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">{msg}</div>}
-        <div className="flex gap-2">
-          <button onClick={()=>{setExportOpen(!exportOpen);setImportOpen(false);}} className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${exportOpen?'bg-stone-800 text-white border-stone-800':'border-stone-200 hover:bg-stone-50'}`}>Export</button>
-          <button onClick={()=>{setImportOpen(!importOpen);setExportOpen(false);setImportErr('');}} className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${importOpen?'bg-stone-800 text-white border-stone-800':'border-stone-200 hover:bg-stone-50'}`}>Import</button>
-        </div>
-        {exportOpen&&(
-          <div className="mt-3 space-y-2">
-            <textarea readOnly value={exportData} onFocus={e=>e.target.select()} className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 rounded-lg bg-stone-50 text-stone-700"/>
-            <button onClick={copyExport} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">{copyOk?'✓ Copied':'Copy to clipboard'}</button>
-          </div>
-        )}
-        {importOpen&&(
-          <div className="mt-3 space-y-2">
-            <textarea value={importText} onChange={e=>{setImportText(e.target.value);setImportErr('');}} placeholder="Paste your exported backup JSON here…"
-              className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none" autoCorrect="off" autoCapitalize="off" spellCheck="false"/>
-            {importErr&&<div className="text-sm text-rose-600">{importErr}</div>}
-            <p className="text-xs text-rose-600">⚠ Restoring will replace your current progress and custom verbs.</p>
-            <button onClick={doImport} disabled={!importText.trim()}
-              className="w-full py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Restore from backup</button>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white rounded-2xl border border-stone-200 p-5">
-        <h3 className="font-medium mb-1">Reset progress</h3>
-        <p className="text-xs text-stone-500 mb-3">Clear all SRS state. Custom verbs and enabled types stay.</p>
-        {!confirmReset?(
-          <button onClick={()=>setConfirmReset(true)} className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm">
-            <IconRefresh className="w-4 h-4"/>Reset all progress
-          </button>
-        ):(
-          <div className="flex gap-2">
-            <button onClick={reset} className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm">Yes, reset everything</button>
-            <button onClick={()=>setConfirmReset(false)} className="px-3 py-1.5 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm">Cancel</button>
-          </div>
-        )}
-      </div>
-      <div className="text-xs text-stone-400 text-center pt-2">Progress saves automatically to your browser.</div>
+      {geminiMsg&&<div className="mt-2 text-sm text-emerald-700">{geminiMsg}</div>}
+      {geminiKey&&!geminiMsg&&<div className="mt-2 text-xs text-emerald-700">✓ Key saved — AI features active</div>}
     </div>
-  );
+
+    <div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-1 flex items-center gap-2"><IconCloud className="w-4 h-4 text-indigo-600"/>Cloud sync (Supabase)</h3><p className="text-xs text-stone-500 mb-3">Same values on every device to stay in sync.</p>{(syncStatus.message||syncConfig.enabled)&&(<div className={`mb-3 text-xs rounded-lg border px-3 py-2 ${statusColor}`}><div className="flex items-center justify-between"><span>{syncStatus.message||(syncConfig.enabled?'Enabled':'Disabled')}</span>{syncStatus.at&&<span>{new Date(syncStatus.at).toLocaleTimeString()}</span>}</div></div>)}<div className="space-y-2"><div><label className="text-xs text-stone-500 block mb-1">Project URL</label><input type="text" value={syncForm.url} onChange={e=>setSyncForm({...syncForm,url:e.target.value})} placeholder="https://xxxxx.supabase.co" autoCorrect="off" autoCapitalize="off" spellCheck="false" className="w-full px-3 py-2 text-sm font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div><div><label className="text-xs text-stone-500 block mb-1">anon / public key</label><input type="password" value={syncForm.anonKey} onChange={e=>setSyncForm({...syncForm,anonKey:e.target.value})} placeholder="eyJ..." autoCorrect="off" autoCapitalize="off" spellCheck="false" className="w-full px-3 py-2 text-sm font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div><div><label className="text-xs text-stone-500 block mb-1">Sync ID <span className="text-stone-400 font-normal">(same on every device)</span></label><input type="text" value={syncForm.syncId} onChange={e=>setSyncForm({...syncForm,syncId:e.target.value})} placeholder="my-japan-2026-xyz" autoCorrect="off" autoCapitalize="off" spellCheck="false" className="w-full px-3 py-2 text-sm font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div></div><div className="flex gap-2 mt-3">{!syncConfig.enabled?(<button onClick={()=>saveCfg(true)} disabled={!formReady} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Enable sync</button>):(<><button onClick={()=>{saveCfg(true);syncNow();}} disabled={!formReady} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Sync now</button><button onClick={()=>saveCfg(false)} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm">Disable</button></>)}</div></div>
+
+    <div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-1">Backup & restore</h3><p className="text-xs text-stone-500 mb-3">Manual JSON transfer without cloud sync.</p>{msg&&<div className="mb-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">{msg}</div>}<div className="flex gap-2"><button onClick={()=>{setExportOpen(!exportOpen);setImportOpen(false);}} className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${exportOpen?'bg-stone-800 text-white border-stone-800':'border-stone-200 hover:bg-stone-50'}`}>Export</button><button onClick={()=>{setImportOpen(!importOpen);setExportOpen(false);setImportErr('');}} className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${importOpen?'bg-stone-800 text-white border-stone-800':'border-stone-200 hover:bg-stone-50'}`}>Import</button></div>{exportOpen&&(<div className="mt-3 space-y-2"><textarea readOnly value={exportData} onFocus={e=>e.target.select()} className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 rounded-lg bg-stone-50"/><button onClick={copyExport} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">{copyOk?'✓ Copied':'Copy to clipboard'}</button></div>)}{importOpen&&(<div className="mt-3 space-y-2"><textarea value={importText} onChange={e=>{setImportText(e.target.value);setImportErr('');}} placeholder="Paste backup JSON…" className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none" autoCorrect="off" autoCapitalize="off" spellCheck="false"/>{importErr&&<div className="text-sm text-rose-600">{importErr}</div>}<p className="text-xs text-rose-600">⚠ Restoring replaces current progress.</p><button onClick={doImport} disabled={!importText.trim()} className="w-full py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Restore</button></div>)}</div>
+
+    <div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-1">Reset progress</h3><p className="text-xs text-stone-500 mb-3">Clear all SRS state. Custom verbs and settings stay.</p>{!confirmReset?(<button onClick={()=>setConfirmReset(true)} className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm"><IconRefresh className="w-4 h-4"/>Reset all progress</button>):(<div className="flex gap-2"><button onClick={reset} className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm">Yes, reset</button><button onClick={()=>setConfirmReset(false)} className="px-3 py-1.5 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm">Cancel</button></div>)}</div>
+    <div className="text-xs text-stone-400 text-center pt-2">Progress saves automatically to your browser.</div>
+  </div>);
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
