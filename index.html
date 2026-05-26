@@ -309,6 +309,47 @@ const E_ROW={う:'え',く:'け',ぐ:'げ',す:'せ',つ:'て',ぬ:'ね',ぶ:'�
 const O_ROW={う:'お',く:'こ',ぐ:'ご',す:'そ',つ:'と',ぬ:'の',ぶ:'ぼ',む:'も',る:'ろ'};
 const PAST_END={く:'いた',ぐ:'いだ',す:'した',つ:'った',う:'った',る:'った',ぬ:'んだ',ぶ:'んだ',む:'んだ'};
 const TE_END={く:'いて',ぐ:'いで',す:'して',つ:'って',う:'って',る:'って',ぬ:'んで',ぶ:'んで',む:'んで'};
+const ONBIN_TE_CHOICES=['て','って','んで','いて','いで','して','きて'];
+const ONBIN_TA_CHOICES=['た','った','んだ','いた','いだ','した','きた'];
+const ONBIN_PATTERN_META={
+  ichidan:{label:'ichidan る',cue:'Drop る, add て / た.',group:'る'},
+  utsuru:{label:'う・つ・る',cue:'う・つ・る compress to small っ.',group:'っ'},
+  mnb:{label:'む・ぶ・ぬ',cue:'む・ぶ・ぬ become ん + voiced ending.',group:'ん'},
+  ku:{label:'く',cue:'く becomes いて / いた.',group:'い'},
+  gu:{label:'ぐ',cue:'ぐ becomes いで / いだ.',group:'い'},
+  su:{label:'す',cue:'す becomes して / した.',group:'し'},
+  iku:{label:'行く exception',cue:'行く is the famous exception: いって / いった.',group:'っ'},
+  suru:{label:'する',cue:'する becomes して / した.',group:'し'},
+  kuru:{label:'来る',cue:'来る becomes きて / きた.',group:'き'}
+};
+function onbinPatternForVerb(verb){
+  if(!verb)return ONBIN_PATTERN_META.ichidan;
+  if(verb.group==='ichidan')return ONBIN_PATTERN_META.ichidan;
+  if(verb.group==='suru')return ONBIN_PATTERN_META.suru;
+  if(verb.group==='kuru')return ONBIN_PATTERN_META.kuru;
+  if(verb.group==='godan'){
+    const r=verb.reading;
+    if(r==='いく'||r.endsWith('いく'))return ONBIN_PATTERN_META.iku;
+    const last=r.slice(-1);
+    if(['う','つ','る'].includes(last))return ONBIN_PATTERN_META.utsuru;
+    if(['む','ぶ','ぬ'].includes(last))return ONBIN_PATTERN_META.mnb;
+    if(last==='く')return ONBIN_PATTERN_META.ku;
+    if(last==='ぐ')return ONBIN_PATTERN_META.gu;
+    if(last==='す')return ONBIN_PATTERN_META.su;
+  }
+  return ONBIN_PATTERN_META.ichidan;
+}
+function onbinStem(verb){
+  if(!verb)return'';
+  if(verb.group==='suru'&&verb.reading.endsWith('する'))return verb.reading.slice(0,-2);
+  if(verb.group==='kuru'&&verb.reading.endsWith('くる'))return verb.reading.slice(0,-2);
+  return verb.reading.slice(0,-1);
+}
+function onbinTailFor(verb,targetType){
+  const expected=conjugate(verb,targetType);
+  const stem=onbinStem(verb);
+  return expected.startsWith(stem)?expected.slice(stem.length):expected;
+}
 
 function conjugate(verb,type){
   const{reading,group}=verb;
@@ -668,10 +709,10 @@ function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey}){
 // ============================================================================
 const DAY=86400000;
 function localDateKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*DAY);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},game:{played:0,bestScore:0,bestCombo:0},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
+function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
 function mergeState(saved,sessionOverride){
   const base=defaultState();
-  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,game:(saved&&saved.game)||base.game,daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
   if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
     merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
   }
@@ -903,13 +944,14 @@ function App(){
             {syncConfig.enabled&&(<div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind==='error'?'text-rose-500':syncStatus.kind==='syncing'?'text-amber-500':'text-emerald-600'}`}><IconCloud className="w-3 h-3"/><span>{syncStatus.kind==='syncing'?'syncing':syncStatus.kind==='error'?'sync error':'synced'}</span></div>)}
           </div>
         </header>
-        <nav className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-[repeat(13,minmax(0,1fr))] gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','rush','classify','mistakes','shadow','lessons','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
+        <nav className="grid grid-cols-3 sm:grid-cols-7 lg:grid-cols-[repeat(14,minmax(0,1fr))] gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
+          {['study','rush','endings','classify','mistakes','shadow','lessons','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
             <button key={t} onClick={()=>setTab(t)} className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
         {tab==='study'&&<StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='rush'&&<RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
+        {tab==='endings'&&<EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
         {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
         {tab==='shadow'&&<ShadowView state={state} setState={setState} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
@@ -1297,6 +1339,103 @@ function RushView({state,setState,verbs,practicePrefs=DEFAULT_PREFS,wordLists=[]
         <div className="bg-white rounded-2xl border border-stone-200 p-5">
           <h3 className="font-medium mb-3">Rush log</h3>
           {!recent.length?<div className="text-sm text-stone-500 py-8 text-center">No attempts yet.</div>:<div className="space-y-2">{recent.map((r,i)=><div key={i} className={`rounded-xl border px-3 py-2 ${r.ok?'border-emerald-200 bg-emerald-50':'border-rose-200 bg-rose-50'}`}><div className="flex items-center justify-between gap-2"><span className="text-xs text-stone-500">{r.type}</span><span className={`text-xs font-semibold ${r.ok?'text-emerald-700':'text-rose-700'}`}>{r.ok?'OK':'MISS'}</span></div><div className="mt-1 text-sm" lang="ja">{r.prompt} → {r.expected}</div><div className="text-xs text-stone-500 mt-1">You: <span lang="ja">{r.answer}</span></div></div>)}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ENDINGS VIEW
+// ============================================================================
+function EndingsView({state,setState,verbs,practicePrefs=DEFAULT_PREFS,wordLists=[],geminiKey}){
+  const drillVerbs=useMemo(()=>filterWordsForPrefs(verbs,practicePrefs,wordLists).filter(v=>!isAdjective(v)),[verbs,practicePrefs,wordLists]);
+  const stats=state.onbin||defaultState().onbin;
+  const[target,setTarget]=useState('te-form');
+  const[current,setCurrent]=useState(null);
+  const[result,setResult]=useState(null);
+  const[hintChars,setHintChars]=useState(0);
+  const[aiTip,setAiTip]=useState('');
+  const[aiLoading,setAiLoading]=useState(false);
+  const[aiErr,setAiErr]=useState('');
+  useEffect(()=>{if(!current&&drillVerbs.length)next(drillVerbs);},[current,drillVerbs,target]);
+  useEffect(()=>{if(current&&drillVerbs.length&&!drillVerbs.some(v=>v.dict===current.dict&&v.group===current.group)){setCurrent(null);setResult(null);}},[drillVerbs,current]);
+  function next(pool=drillVerbs){
+    if(!pool.length){setCurrent(null);return;}
+    setCurrent(shuffled(pool)[0]);setResult(null);setHintChars(0);setAiTip('');setAiErr('');
+  }
+  if(!drillVerbs.length)return(<div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No verbs match the current filters.</div>);
+  if(!current)return null;
+  const expected=conjugate(current,target);
+  const expectedTail=onbinTailFor(current,target);
+  const pattern=onbinPatternForVerb(current);
+  const prompt=promptDisplay(current,null,practicePrefs);
+  const expectedView=formDisplay(expected,practicePrefs);
+  const choices=(target==='te-form'?ONBIN_TE_CHOICES:ONBIN_TA_CHOICES);
+  const patternStats=stats.byPattern?.[pattern.label]||{attempted:0,correct:0};
+  const acc=stats.attempted?Math.round(stats.correct/stats.attempted*100):0;
+  const hint=expected.split('').map((ch,i)=>i<hintChars?ch:'＿').join('');
+  function choose(tail){
+    if(result)return;
+    const ok=tail===expectedTail;
+    setResult({ok,tail});
+    setState(s=>{
+      const prev=s.onbin||defaultState().onbin;
+      const pp=prev.byPattern?.[pattern.label]||{attempted:0,correct:0};
+      const streak=ok?(prev.streak||0)+1:0;
+      return{...s,
+        onbin:{...prev,attempted:(prev.attempted||0)+1,correct:(prev.correct||0)+(ok?1:0),hints:(prev.hints||0)+hintChars,streak,bestStreak:Math.max(prev.bestStreak||0,streak),byPattern:{...(prev.byPattern||{}),[pattern.label]:{attempted:(pp.attempted||0)+1,correct:(pp.correct||0)+(ok?1:0),lastAt:Date.now()}}},
+        daily:ok?bumpDaily(s.daily,true,practicePrefs.dailyGoal||10):s.daily
+      };
+    });
+  }
+  async function generateMnemonic(){
+    if(!geminiKey)return;
+    setAiLoading(true);setAiTip('');setAiErr('');
+    try{
+      const promptText=`Create one short memorable learner mnemonic for this Japanese conjugation sound-change pattern.\nVerb: ${current.dict} (${current.reading}, ${current.meaning})\nTarget: ${target==='te-form'?'te-form':'plain past / ta-form'}\nPattern: ${pattern.label}\nRule: ${pattern.cue}\nCorrect answer: ${expected}\nKeep it under 35 words, friendly, and include the Japanese ending.`;
+      const reply=await callGemini([{role:'user',parts:[{text:promptText}]}],geminiKey,350,0.45,AI_COACH_SYSTEM);
+      setAiTip(reply.trim());
+    }catch(e){setAiErr(e.message);}
+    setAiLoading(false);
+  }
+  return(
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white rounded-xl border border-stone-200 p-4"><div className="text-2xl font-semibold tabular-nums">{stats.correct||0}/{stats.attempted||0}</div><div className="text-xs text-stone-500">Ending accuracy</div></div>
+        <div className="bg-white rounded-xl border border-stone-200 p-4"><div className="text-2xl font-semibold tabular-nums">{acc}%</div><div className="text-xs text-stone-500">Overall</div></div>
+        <div className="bg-white rounded-xl border border-stone-200 p-4"><div className="text-2xl font-semibold tabular-nums">{stats.streak||0}</div><div className="text-xs text-stone-500">Streak</div></div>
+        <div className="bg-white rounded-xl border border-stone-200 p-4"><div className="text-2xl font-semibold tabular-nums">{patternStats.correct||0}/{patternStats.attempted||0}</div><div className="text-xs text-stone-500">{pattern.label}</div></div>
+      </div>
+      <div className="grid lg:grid-cols-[1fr_280px] gap-4">
+        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div><h3 className="font-medium flex items-center gap-2"><IconSpark className="w-4 h-4 text-indigo-600"/>Te/Ta Ending Lab</h3><p className="text-xs text-stone-500">Rapid sound-change drill for て-form and plain past endings.</p></div>
+            <div className="flex gap-2">{[{id:'te-form',label:'て'},{id:'plain-past',label:'た'}].map(o=><button key={o.id} onClick={()=>{setTarget(o.id);setCurrent(null);setResult(null);}} className={`px-3 py-2 rounded-lg text-sm border ${target===o.id?'bg-stone-800 text-white border-stone-800':'border-stone-200 hover:bg-stone-50'}`}>{o.label}</button>)}</div>
+          </div>
+          <div className="rounded-2xl bg-stone-50 border border-stone-200 p-5 text-center">
+            <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium mb-2">Choose the ending tail</div>
+            <div className="text-4xl sm:text-5xl font-semibold" lang={prompt.lang}>{prompt.main}</div>
+            {prompt.sub&&<div className="text-sm text-stone-500 mt-1">{prompt.sub}</div>}
+            <div className="mt-2 text-sm text-stone-500">{current.meaning}</div>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white border border-stone-200 px-3 py-1 text-xs text-stone-600"><span>{pattern.label}</span><span className="text-stone-300">|</span><span>{pattern.cue}</span></div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+            {choices.map(c=><button key={c} onClick={()=>choose(c)} disabled={!!result} className={`min-h-14 px-3 py-3 rounded-xl border text-xl transition ${result&&c===expectedTail?'bg-emerald-50 border-emerald-300 text-emerald-800':result&&c===result.tail&&!result.ok?'bg-rose-50 border-rose-300 text-rose-800':'bg-white border-stone-200 hover:border-indigo-400 hover:bg-indigo-50'}`} lang="ja">{c}</button>)}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button onClick={()=>setHintChars(Math.min(expected.length,hintChars+1))} disabled={hintChars>=expected.length||!!result} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 disabled:opacity-40 rounded-lg text-sm">Hint kana</button>
+            <button onClick={generateMnemonic} disabled={!geminiKey||aiLoading} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm">{aiLoading?'Thinking...':'AI memory hook'}</button>
+            {result&&<button onClick={()=>next()} autoFocus className="ml-auto px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium">Next</button>}
+          </div>
+          {hintChars>0&&<div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-xl tracking-widest" lang="ja">{hint}</div>}
+          {result&&<div className={`mt-4 rounded-xl border p-4 ${result.ok?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}><div className={`text-sm font-medium ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Clean sound change.':'Different ending pattern.'}</div><div className="text-2xl mt-1" lang={expectedView.lang}>{expectedView.main}</div>{expectedView.sub&&<div className="text-xs text-stone-500 mt-1">{expectedView.sub}</div>}<div className="text-sm text-stone-700 mt-2">{pattern.cue}</div></div>}
+          {aiErr&&<div className="mt-3 text-sm text-rose-600">{aiErr}</div>}
+          {aiTip&&<div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-900 leading-relaxed">{aiTip}</div>}
+        </div>
+        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <h3 className="font-medium mb-3">Pattern map</h3>
+          <div className="space-y-2">{Object.values(ONBIN_PATTERN_META).map(p=>{const s=stats.byPattern?.[p.label]||{attempted:0,correct:0};const pct=s.attempted?Math.round(s.correct/s.attempted*100):0;return <div key={p.label} className="rounded-xl border border-stone-200 px-3 py-2"><div className="flex items-center justify-between gap-2"><span className="font-medium text-sm">{p.label}</span><span className="text-xs text-stone-500">{s.correct||0}/{s.attempted||0}</span></div><div className="mt-1 h-1.5 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{width:pct+'%'}}/></div><div className="mt-1 text-xs text-stone-500">{p.cue}</div></div>;})}</div>
         </div>
       </div>
     </div>
@@ -2177,7 +2316,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:9,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:10,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
