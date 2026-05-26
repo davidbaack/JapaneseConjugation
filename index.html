@@ -176,6 +176,25 @@ function diagnose(verb,type,userAnswer){
 // ============================================================================
 const AI_SYSTEM=`You are a friendly Japanese language teacher helping a student who just got a verb conjugation wrong. The student can read hiragana and katakana but struggles with kanji. Always write Japanese in hiragana/katakana with romaji in brackets after it, e.g. たべた [tabeta]. Be warm, encouraging, and concise — 2 to 3 short paragraphs at most. Focus on the specific rule missed and give one extra example.`;
 
+function geminiText(d){
+  const parts=d.candidates?.[0]?.content?.parts||[];
+  return(parts.find(p=>!p.thought)||parts[0])?.text||'';
+}
+function extractJSON(text){
+  for(let i=0;i<text.length;i++){
+    if(text[i]!=='{')continue;
+    let depth=0,inStr=false;
+    for(let j=i;j<text.length;j++){
+      const c=text[j];
+      if(inStr){if(c==='\\')j++;else if(c==='"')inStr=false;}
+      else if(c==='"')inStr=true;
+      else if(c==='{')depth++;
+      else if(c==='}'){if(!--depth){try{return JSON.parse(text.slice(i,j+1));}catch(e){break;}}}
+    }
+  }
+  return null;
+}
+
 async function callGemini(contents,apiKey,maxTokens=600,temp=0.7){
   if(!apiKey)throw new Error('No Gemini API key — add it in Settings.');
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
@@ -183,8 +202,7 @@ async function callGemini(contents,apiKey,maxTokens=600,temp=0.7){
      body:JSON.stringify({contents,systemInstruction:{parts:[{text:AI_SYSTEM}]},generationConfig:{maxOutputTokens:maxTokens,temperature:temp}})});
   const d=await r.json();
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
-  const parts=d.candidates?.[0]?.content?.parts||[];
-  return parts.find(p=>!p.thought)?.text||parts[0]?.text||'';
+  return geminiText(d);
 }
 
 async function lookupVerbWithGemini(query,apiKey){
@@ -195,12 +213,8 @@ async function lookupVerbWithGemini(query,apiKey){
      body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:150,temperature:0.1}})});
   const d=await r.json();
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
-  const lparts=d.candidates?.[0]?.content?.parts||[];
-  const text=lparts.find(p=>!p.thought)?.text||lparts[0]?.text||'';
-  const jsonMatch=text.match(/\{[\s\S]*\}/);
-  if(!jsonMatch)throw new Error('Unexpected AI response — try a different input');
-  let result;try{result=JSON.parse(jsonMatch[0]);}catch{throw new Error('Unexpected AI response — try a different input');}
-  if(!result.dict||!result.reading||!result.meaning||!['ichidan','godan','suru','kuru'].includes(result.group))
+  const result=extractJSON(geminiText(d));
+  if(!result||!result.dict||!result.reading||!result.meaning||!['ichidan','godan','suru','kuru'].includes(result.group))
     throw new Error('Unexpected AI response — try a different input');
   return result;
 }
@@ -213,12 +227,8 @@ async function getSuggestedVerb(existingVerbs,apiKey){
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:200,temperature:0.9}})});
   const d=await r.json();
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
-  const sparts=d.candidates?.[0]?.content?.parts||[];
-  const text=sparts.find(p=>!p.thought)?.text||sparts[0]?.text||'';
-  const jsonMatch=text.match(/\{[\s\S]*\}/);
-  if(!jsonMatch)throw new Error('Unexpected AI response');
-  let result;try{result=JSON.parse(jsonMatch[0]);}catch{throw new Error('Unexpected AI response');}
-  if(!result.dict||!result.reading||!result.meaning||!['ichidan','godan','suru','kuru'].includes(result.group))throw new Error('Unexpected AI response');
+  const result=extractJSON(geminiText(d));
+  if(!result||!result.dict||!result.reading||!result.meaning||!['ichidan','godan','suru','kuru'].includes(result.group))throw new Error('Unexpected AI response');
   return result;
 }
 
