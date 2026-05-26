@@ -180,6 +180,15 @@ function geminiText(d){
   const parts=d.candidates?.[0]?.content?.parts||[];
   return(parts.find(p=>!p.thought)||parts[0])?.text||'';
 }
+function normalizeGroup(g){
+  if(!g)return null;
+  const v=g.toLowerCase();
+  if(v.includes('ichidan')||v.includes('ru-verb')||v.includes('group 2'))return'ichidan';
+  if(v.includes('godan')||v.includes('u-verb')||v.includes('group 1'))return'godan';
+  if(v.includes('suru'))return'suru';
+  if(v.includes('kuru'))return'kuru';
+  return null;
+}
 function extractJSON(text){
   for(let i=0;i<text.length;i++){
     if(text[i]!=='{')continue;
@@ -210,11 +219,12 @@ async function lookupVerbWithGemini(query,apiKey){
   const prompt=`Look up this Japanese verb: "${query}"\n\nReturn ONLY a JSON object (no markdown, no extra text):\n{"dict":"kanji/kana dictionary form","reading":"hiragana only","meaning":"English meaning starting with to","group":"ichidan or godan or suru or kuru"}\n\nIf the input is English or romaji, find the most common Japanese verb for that meaning.`;
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:150,temperature:0.1}})});
+     body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1024,temperature:0.1,thinkingConfig:{thinkingBudget:0}}})});
   const d=await r.json();
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
   const result=extractJSON(geminiText(d));
-  if(!result||!result.dict||!result.reading||!result.meaning||!['ichidan','godan','suru','kuru'].includes(result.group))
+  if(result)result.group=normalizeGroup(result.group);
+  if(!result||!result.dict||!result.reading||!result.meaning||!result.group)
     throw new Error('Unexpected AI response — try a different input');
   return result;
 }
@@ -224,11 +234,12 @@ async function getSuggestedVerb(existingVerbs,apiKey){
   const list=existingVerbs.map(v=>`${v.dict} (${v.reading}) — ${v.meaning} [${v.group}]`).join('\n');
   const prompt=`I'm learning Japanese verb conjugation with an SRS app. Here are the ${existingVerbs.length} verbs I'm already studying:\n\n${list}\n\nBased on my current vocabulary, suggest ONE new verb to add next. Consider JLPT frequency, useful patterns I haven't covered, and what learners at this level typically need. Do NOT suggest any verb already in my list.\n\nReturn ONLY a JSON object (no markdown):\n{"dict":"e.g. 始める","reading":"e.g. はじめる","meaning":"e.g. to begin","group":"ichidan or godan or suru or kuru","reason":"One sentence explaining why this is a good next verb for me."}`;
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:200,temperature:0.9}})});
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1024,temperature:0.9,thinkingConfig:{thinkingBudget:0}}})});
   const d=await r.json();
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
   const result=extractJSON(geminiText(d));
-  if(!result||!result.dict||!result.reading||!result.meaning||!['ichidan','godan','suru','kuru'].includes(result.group))throw new Error('Unexpected AI response');
+  if(result)result.group=normalizeGroup(result.group);
+  if(!result||!result.dict||!result.reading||!result.meaning||!result.group)throw new Error('Unexpected AI response');
   return result;
 }
 
