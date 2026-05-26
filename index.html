@@ -2702,16 +2702,17 @@ function surfaceFormFor(item,typeId){
 }
 function scannerCandidatesForWord(word){
   const seen=new Set(),candidates=[];
-  function add(surface,type=null,kind='form'){
+  function add(surface,type=null,kind='form',reading=''){
     const s=String(surface||'').trim();
     if(s.length<2||seen.has(s))return;
-    seen.add(s);candidates.push({surface:s,type,kind});
+    seen.add(s);candidates.push({surface:s,type,kind,reading:reading||s});
   }
-  add(word.dict,null,'dictionary');
-  add(word.reading,null,'dictionary');
+  add(word.dict,null,'dictionary',word.reading);
+  add(word.reading,null,'dictionary',word.reading);
   for(const type of compatibleTypes(word)){
-    add(conjugateItem(word,type.id),type,'form');
-    add(surfaceFormFor(word,type.id),type,'form');
+    const answer=conjugateItem(word,type.id);
+    add(answer,type,'form',answer);
+    add(surfaceFormFor(word,type.id),type,'form',answer);
   }
   return candidates;
 }
@@ -2732,7 +2733,7 @@ function findTextScannerMatches(text,words){
         const key=`${wordKey(word)}|${c.type?.id||'dictionary'}|${c.surface}|${index}`;
         if(seen.has(key))continue;
         seen.add(key);
-        out.push({word,key:wordKey(word),surface:c.surface,type:c.type,kind:c.kind,index,label:c.type?.label||'Dictionary'});
+        out.push({word,key:wordKey(word),surface:c.surface,reading:c.reading,type:c.type,kind:c.kind,index,label:c.type?.label||'Dictionary'});
       }
     }
   }
@@ -2747,6 +2748,23 @@ function scannerContext(text,index,length){
   const raw=String(text||'');
   const start=Math.max(0,index-18),end=Math.min(raw.length,index+length+18);
   return `${start>0?'...':''}${raw.slice(start,end)}${end<raw.length?'...':''}`;
+}
+function scannerMatchId(match){return match?`${match.key}|${match.type?.id||'dictionary'}|${match.surface}|${match.index}`:'';}
+function buildScannerReaderSegments(text,matches){
+  const raw=String(text||'');
+  if(!raw)return[];
+  const ordered=[...matches].sort((a,b)=>a.index-b.index||b.surface.length-a.surface.length);
+  const segments=[];
+  let cursor=0;
+  for(const match of ordered){
+    const start=match.index,end=start+match.surface.length;
+    if(start<cursor||start<0||end>raw.length)continue;
+    if(start>cursor)segments.push({kind:'text',text:raw.slice(cursor,start)});
+    segments.push({kind:'match',match,id:scannerMatchId(match)});
+    cursor=end;
+  }
+  if(cursor<raw.length)segments.push({kind:'text',text:raw.slice(cursor)});
+  return segments;
 }
 function normalizeScannerGroup(group){
   const v=String(group||'').trim().toLowerCase();
@@ -2876,11 +2894,16 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
   const[fileLoading,setFileLoading]=useState(false);
   const[fileErr,setFileErr]=useState('');
   const[imagePreview,setImagePreview]=useState('');
+  const[readerMatchId,setReaderMatchId]=useState('');
   const matches=useMemo(()=>findTextScannerMatches(text,words),[text,words]);
   const uniqueWords=useMemo(()=>uniqueScannerWords(matches),[matches]);
+  const readerSegments=useMemo(()=>buildScannerReaderSegments(text,matches),[text,matches]);
+  const selectedReaderMatch=readerMatchId?matches.find(m=>scannerMatchId(m)===readerMatchId):null;
+  const readerDetail=selectedReaderMatch||readerSegments.find(s=>s.kind==='match')?.match||null;
   const visibleMatches=matches.slice(0,80);
   const formCount=matches.filter(m=>m.kind==='form').length;
   const selectedIds=practicePrefs.wordListIds||[];
+  useEffect(()=>{if(readerMatchId&&!matches.some(m=>scannerMatchId(m)===readerMatchId))setReaderMatchId('');},[readerMatchId,matches]);
   async function importSourceFile(event){
     const file=event.target.files?.[0];
     if(event.target)event.target.value='';
@@ -2916,7 +2939,7 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
     finally{setFileLoading(false);}
   }
   function clearScanner(){
-    setText('');setMsg('');setAiRows([]);setAiErr('');setFileErr('');setImagePreview('');
+    setText('');setMsg('');setAiRows([]);setAiErr('');setFileErr('');setImagePreview('');setReaderMatchId('');
   }
   function createListFromKeys(keys,name){
     const clean=[...new Set(keys)].filter(Boolean);
@@ -2995,6 +3018,35 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
         </div>
         {msg&&<div className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
       </div>
+      {text.trim()&&<div className="bg-white rounded-2xl border border-stone-200 p-5">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div><h3 className="font-medium">Reader overlay</h3><p className="text-xs text-stone-500">Tap highlighted conjugations for lookup details.</p></div>
+          {readerDetail&&<button onClick={()=>speakJapanese(readerDetail.reading||readerDetail.surface,0.85,practicePrefs.voiceURI)} className="p-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-500" title="Speak"><IconVolume className="w-4 h-4"/></button>}
+        </div>
+        <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-4 text-lg leading-loose whitespace-pre-wrap" lang="ja">
+          {readerSegments.map((seg,i)=>seg.kind==='text'?<span key={`t-${i}`}>{seg.text}</span>:<button key={seg.id||i} onClick={()=>setReaderMatchId(seg.id)} className={`mx-0.5 px-1.5 py-1 rounded-lg align-baseline transition ${scannerMatchId(readerDetail)===seg.id?'bg-indigo-600 text-white':'bg-amber-100 hover:bg-amber-200 text-stone-900'}`} lang="ja"><ruby>{seg.match.surface}{seg.match.reading&&seg.match.reading!==seg.match.surface&&<rt>{seg.match.reading}</rt>}</ruby></button>)}
+        </div>
+        {readerDetail&&<div className="mt-4 grid md:grid-cols-[1fr_1.25fr] gap-3">
+          <div className="rounded-xl border border-stone-200 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div><div className="text-2xl font-medium" lang="ja">{readerDetail.surface}</div><div className="text-sm text-stone-500" lang="ja">{readerDetail.reading||readerDetail.word.reading}</div></div>
+              <span className="text-[11px] px-2 py-1 rounded-lg bg-stone-100 text-stone-500">{readerDetail.label}</span>
+            </div>
+            <div className="mt-2 text-sm"><span className="font-medium" lang="ja">{readerDetail.word.dict}</span><span className="text-stone-500"> · {readerDetail.word.meaning}</span></div>
+            <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[readerDetail.word.group]}</div>
+          </div>
+          <div className="rounded-xl border border-stone-200 p-3">
+            {readerDetail.type?<>
+              <div className="text-sm font-medium">{readerDetail.type.label}</div>
+              <div className="text-xs text-stone-500 mt-1">{explainItem(readerDetail.word,readerDetail.type.id).rule||readerDetail.type.hint}</div>
+              <div className="mt-2 text-xs text-stone-400" lang="ja">{scannerContext(text,readerDetail.index,readerDetail.surface.length)}</div>
+            </>:<>
+              <div className="text-sm font-medium">Dictionary form</div>
+              <div className="text-xs text-stone-500 mt-1">Base word match from the scanned text.</div>
+            </>}
+          </div>
+        </div>}
+      </div>}
       <div className="grid lg:grid-cols-[1fr_300px] gap-4">
         <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between gap-3">
