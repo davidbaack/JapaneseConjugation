@@ -753,10 +753,10 @@ function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey,practice
 // ============================================================================
 const DAY=86400000;
 function localDateKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*DAY);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
+function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
 function mergeState(saved,sessionOverride){
   const base=defaultState();
-  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
   if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
     merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
   }
@@ -1050,15 +1050,16 @@ function App(){
             {syncConfig.enabled&&(<div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind==='error'?'text-rose-500':syncStatus.kind==='syncing'?'text-amber-500':'text-emerald-600'}`}><IconCloud className="w-3 h-3"/><span>{syncStatus.kind==='syncing'?'syncing':syncStatus.kind==='error'?'sync error':'synced'}</span></div>)}
           </div>
         </header>
-        <nav className="grid grid-cols-3 sm:grid-cols-7 lg:grid-cols-[repeat(14,minmax(0,1fr))] gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','rush','endings','classify','mistakes','shadow','lessons','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
-            <button key={t} onClick={()=>setTab(t)} className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
+        <nav className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
+          {['study','rush','endings','classify','meaning','mistakes','shadow','lessons','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
+            <button key={t} onClick={()=>setTab(t)} className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
         {tab==='study'&&<StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='rush'&&<RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='endings'&&<EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
         {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
+        {tab==='meaning'&&<MeaningView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
         {tab==='shadow'&&<ShadowView state={state} setState={setState} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='lessons'&&<LessonsView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
@@ -1702,6 +1703,105 @@ function classifyHint(word){
   if(word.group==='kuru')return '来る is irregular: くる, きた, こない, きて.';
   if(word.group==='i-adjective')return `${word.reading} conjugates as an い-adjective: ${conjugateAdjective(word,'adj-plain-past')}, ${conjugateAdjective(word,'adj-plain-negative')}.`;
   return `${word.reading} is a な-adjective: ${conjugateAdjective(word,'adj-attributive')} + noun, or ${conjugateAdjective(word,'adj-polite-present')}.`;
+}
+function meaningChoiceWords(current,words){
+  const seen=new Set([`${current.group}|${current.dict}`]);
+  const choices=[current];
+  for(const w of shuffled(words)){
+    const key=`${w.group}|${w.dict}`;
+    if(seen.has(key))continue;
+    seen.add(key);choices.push(w);
+    if(choices.length>=4)break;
+  }
+  return shuffled(choices);
+}
+function MeaningView({state,setState,words,practicePrefs,wordLists=[],geminiKey}){
+  const filtered=useMemo(()=>filterWordsForPrefs(words,practicePrefs,wordLists),[words,practicePrefs,wordLists]);
+  const[mode,setMode]=useState('jp-en');
+  const[current,setCurrent]=useState(null);
+  const[result,setResult]=useState(null);
+  const[aiTip,setAiTip]=useState('');
+  const[aiLoading,setAiLoading]=useState(false);
+  const[aiErr,setAiErr]=useState('');
+  const aiRequestRef=useRef(0);
+  const choices=useMemo(()=>current?meaningChoiceWords(current,filtered):[],[current,filtered]);
+  useEffect(()=>{if(!current&&filtered.length)setCurrent(filtered[Math.floor(Math.random()*filtered.length)]);},[current,filtered]);
+  useEffect(()=>{if(current&&filtered.length&&!filtered.some(w=>w.dict===current.dict&&w.group===current.group)){setCurrent(null);setResult(null);}},[filtered,current]);
+  useEffect(()=>{setResult(null);setAiTip('');setAiErr('');aiRequestRef.current++;setAiLoading(false);},[current,mode]);
+  if(!filtered.length)return(<div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No words match the current filters.</div>);
+  if(!current)return null;
+  const stats=state.meaning||defaultState().meaning;
+  const acc=stats.attempted?Math.round(stats.correct/stats.attempted*100):0;
+  const currentView=promptDisplay(current,null,practicePrefs);
+  function choose(choice){
+    if(result)return;
+    const ok=choice.dict===current.dict&&choice.group===current.group;
+    const key=`${current.group}|${current.dict}|${mode}`;
+    const prev=stats.byWord?.[key]||{attempted:0,correct:0};
+    setState({...state,meaning:{attempted:(stats.attempted||0)+1,correct:(stats.correct||0)+(ok?1:0),byWord:{...(stats.byWord||{}),[key]:{attempted:prev.attempted+1,correct:prev.correct+(ok?1:0),lastAt:Date.now()}}},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)});
+    setResult({ok,choice});
+  }
+  function next(){
+    setResult(null);setAiTip('');setAiErr('');aiRequestRef.current++;setAiLoading(false);
+    const pool=filtered.length>1?filtered.filter(w=>w.dict!==current.dict||w.group!==current.group):filtered;
+    setCurrent(pool[Math.floor(Math.random()*pool.length)]);
+  }
+  async function generateMeaningHook(){
+    if(!geminiKey||!current)return;
+    const requestId=++aiRequestRef.current;
+    setAiLoading(true);setAiTip('');setAiErr('');
+    try{
+      const promptText=`Create one short memory hook for this Japanese vocabulary item.\nWord: ${current.dict} (${current.reading})\nMeaning: ${current.meaning}\nType: ${GROUP_NAMES[current.group]||current.group}\nKeep it under 45 words. Include a usage nuance or contrast only if it helps the learner remember the meaning.`;
+      const reply=await callGemini([{role:'user',parts:[{text:promptText}]}],geminiKey,350,0.45,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
+      if(aiRequestRef.current===requestId)setAiTip(reply.trim());
+    }catch(e){if(aiRequestRef.current===requestId)setAiErr(e.message);}
+    if(aiRequestRef.current===requestId)setAiLoading(false);
+  }
+  return(
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-stone-200 p-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div><h3 className="font-medium">Meaning drill</h3><p className="text-xs text-stone-500">Reinforce vocabulary while you practice conjugation words.</p></div>
+          <div className="text-xs text-stone-500 text-right"><div>{stats.correct}/{stats.attempted}</div><div>{acc}% accuracy</div></div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 mb-4">{[{id:'jp-en',label:'JP -> meaning'},{id:'en-jp',label:'Meaning -> JP'}].map(o=><button key={o.id} onClick={()=>{setMode(o.id);setResult(null);}} className={`px-3 py-2 rounded-lg text-sm border transition ${mode===o.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>)}</div>
+        <div className="text-center py-5 rounded-2xl bg-stone-50 border border-stone-200">
+          {mode==='jp-en'?(
+            <>
+              <ScriptDisplay view={currentView} className="text-5xl font-medium mb-2" subClassName="text-stone-500"/>
+              <button onClick={()=>speakJapanese(current.reading,0.9,practicePrefs.voiceURI)} className="mt-2 px-3 py-2 border border-stone-200 hover:bg-white rounded-lg text-sm text-stone-600 inline-flex items-center gap-1.5"><IconVolume className="w-4 h-4"/>Speak</button>
+            </>
+          ):(
+            <div className="text-3xl sm:text-4xl font-semibold text-stone-800 px-4">{current.meaning}</div>
+          )}
+          <div className="text-[11px] text-stone-400 mt-3">JLPT {getWordMeta(current).jlpt}{getWordMeta(current).lesson?` · Genki L${getWordMeta(current).lesson}`:''}</div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-2 mt-4">
+          {choices.map(c=>{
+            const isCorrect=c.dict===current.dict&&c.group===current.group;
+            const chosen=result&&result.choice.dict===c.dict&&result.choice.group===c.group;
+            const cls=result&&isCorrect?'bg-emerald-50 border-emerald-300 text-emerald-800':result&&chosen&&!result.ok?'bg-rose-50 border-rose-300 text-rose-800':'bg-white border-stone-200 hover:border-indigo-400 hover:bg-indigo-50';
+            return mode==='jp-en'
+              ? <button key={`${c.group}|${c.dict}`} onClick={()=>choose(c)} disabled={!!result} className={`min-h-14 px-3 py-3 rounded-xl border text-sm font-medium transition ${cls}`}>{c.meaning}</button>
+              : <button key={`${c.group}|${c.dict}`} onClick={()=>choose(c)} disabled={!!result} className={`min-h-14 px-3 py-3 rounded-xl border transition ${cls}`}><ScriptDisplay view={promptDisplay(c,null,practicePrefs)} className="text-xl font-medium" subClassName="text-xs text-stone-500 mt-1"/></button>;
+          })}
+        </div>
+        {result&&(
+          <div className={`mt-4 rounded-xl border p-4 ${result.ok?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
+            <div className={`text-sm font-medium ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Correct.':'Not quite.'}</div>
+            <div className="mt-2 flex items-baseline justify-center gap-2 flex-wrap"><span className="text-2xl font-medium" lang="ja">{current.dict}</span>{current.dict!==current.reading&&<span className="text-sm text-stone-500" lang="ja">{current.reading}</span>}<span className="text-sm text-stone-500 italic">{current.meaning}</span></div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button onClick={generateMeaningHook} disabled={!geminiKey||aiLoading} className="flex-1 min-w-[9rem] py-2 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium inline-flex items-center justify-center gap-1.5"><IconSpark className="w-4 h-4"/>{aiLoading?'Thinking...':'AI memory hook'}</button>
+              <button onClick={next} autoFocus className="flex-1 min-w-[7rem] py-2 px-3 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-sm font-medium">Next</button>
+            </div>
+            {!geminiKey&&<div className="mt-2 text-xs text-stone-400 text-center">Add a Gemini key in Settings for memory hooks.</div>}
+            {aiErr&&<div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
+            {aiTip&&<div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-900 leading-relaxed">{aiTip}</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 function ClassificationView({state,setState,words,practicePrefs,wordLists=[]}){
   const filtered=useMemo(()=>filterWordsForPrefs(words,practicePrefs,wordLists),[words,practicePrefs,wordLists]);
@@ -2475,7 +2575,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:17,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:18,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,meaning:state.meaning,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
