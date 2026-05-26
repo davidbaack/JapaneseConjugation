@@ -162,6 +162,21 @@ const ALL_CARD_TYPES=[...CONJ_TYPES,...ADJ_TYPES];
 const TYPE_LABEL={};
 for(const t of ALL_CARD_TYPES)TYPE_LABEL[t.id]=t.label;
 function getTypeInfo(id){return ALL_CARD_TYPES.find(t=>t.id===id)||{id,label:id,sub:'',hint:''};}
+function compatibleTypes(item){return isAdjective(item)?ADJ_TYPES:CONJ_TYPES;}
+function isTypeCompatible(item,typeId){return compatibleTypes(item).some(t=>t.id===typeId);}
+function hashString(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h);}
+function pickPromptType(item,targetType,prefs=DEFAULT_PREFS){
+  const source=prefs.promptForm||'dictionary';
+  const types=compatibleTypes(item).filter(t=>t.id!==targetType);
+  if(source==='dictionary'||!types.length)return null;
+  if(source==='random')return types[hashString(`${item.dict}|${targetType}|${prefs.scriptMode||''}`)%types.length].id;
+  if(isTypeCompatible(item,source)&&source!==targetType)return source;
+  return null;
+}
+function promptFormLabel(item,promptType){
+  if(!promptType)return isAdjective(item)?'Dictionary adjective':'Dictionary verb';
+  return getTypeInfo(promptType).label;
+}
 
 // ============================================================================
 // ROMAJI → HIRAGANA
@@ -544,10 +559,10 @@ function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey}){
 // ============================================================================
 const DAY=86400000;
 function localDateKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*DAY);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function defaultState(){return{cards:{},verbStats:{},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
+function defaultState(){return{cards:{},verbStats:{},mistakes:[],enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
 function mergeState(saved,sessionOverride){
   const base=defaultState();
-  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
   if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
     merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
   }
@@ -566,6 +581,16 @@ function bumpDaily(daily,correct,dailyGoal){
   const goalStreak=(d.goalStreak||0)+(!wasGoalHit&&goalHit?1:0);
   const currentAnswerStreak=correct?(d.currentAnswerStreak||0)+1:0;
   return{...d,count,goalHit,goalStreak,bestGoalStreak:Math.max(d.bestGoalStreak||0,goalStreak),currentAnswerStreak,bestAnswerStreak:Math.max(d.bestAnswerStreak||0,currentAnswerStreak)};
+}
+function recordMistake(mistakes,item,type,promptType,userAnswer,expected){
+  const key=`${item.group}|${item.dict}|${type}|${promptType||'dictionary'}`;
+  const now=Date.now();
+  const prior=(mistakes||[]).find(m=>m.key===key);
+  const fresh={key,dict:item.dict,reading:item.reading,meaning:item.meaning,group:item.group,type,promptType:promptType||null,userAnswer,expected,at:now,count:(prior?.count||0)+1,resolved:false};
+  return[fresh,...(mistakes||[]).filter(m=>m.key!==key)].slice(0,50);
+}
+function markMistakeResolved(mistakes,key){
+  return(mistakes||[]).map(m=>m.key===key?{...m,resolved:true,resolvedAt:Date.now()}:m);
 }
 function gradeCard(card,correct){
   const now=Date.now();
@@ -655,7 +680,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],wordTypes:['verb','i-adjective','na-adjective']};
+const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji',promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],wordTypes:['verb','i-adjective','na-adjective']};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -765,13 +790,14 @@ function App(){
             {syncConfig.enabled&&(<div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind==='error'?'text-rose-500':syncStatus.kind==='syncing'?'text-amber-500':'text-emerald-600'}`}><IconCloud className="w-3 h-3"/><span>{syncStatus.kind==='syncing'?'syncing':syncStatus.kind==='error'?'sync error':'synced'}</span></div>)}
           </div>
         </header>
-        <nav className="grid grid-cols-4 sm:grid-cols-8 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','classify','reference','coach','stats','levels','verbs','settings'].map(t=>(
+        <nav className="grid grid-cols-3 sm:grid-cols-9 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
+          {['study','classify','mistakes','reference','coach','stats','levels','verbs','settings'].map(t=>(
             <button key={t} onClick={()=>setTab(t)} className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
         {tab==='study'&&<StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs}/>}
+        {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
         {tab==='reference'&&<ReferenceView verbs={allVerbs} adjectives={allAdjectives} geminiKey={geminiKey}/>}
         {tab==='coach'&&<CoachView geminiKey={geminiKey}/>}
         {tab==='stats'&&<StatsView state={state} verbs={allWords}/>}
@@ -832,6 +858,8 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS})
   if(!current)return(<div className="bg-white rounded-2xl border border-stone-200 p-12 text-center"><p className="text-stone-600 mb-2">No cards available</p><p className="text-xs text-stone-400">Enable conjugation types in Settings.</p></div>);
 
   const expected=conjugateItem(current.verb,current.type);
+  const promptType=pickPromptType(current.verb,current.type,practicePrefs);
+  const promptValue=promptType?conjugateItem(current.verb,promptType):(practicePrefs.scriptMode==='hiragana'?current.verb.reading:current.verb.dict);
   const typeInfo=getTypeInfo(current.type);
   const explanation=phase==='reviewing'&&!wasCorrect?explainItem(current.verb,current.type):null;
   const diagnostic=phase==='reviewing'&&!wasCorrect?diagnoseItem(current.verb,current.type,answer):'';
@@ -849,7 +877,8 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS})
     const dict=current.verb.dict,rid=current.id;
     const prevVS=(state.verbStats?.[dict]?.[rid])||{seen:0,incorrect:0};
     const newVerbStats={...state.verbStats,[dict]:{...(state.verbStats?.[dict]||{}),[rid]:{seen:prevVS.seen+1,incorrect:prevVS.incorrect+(ok?0:1)}}};
-    setState({...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)});
+    const nextMistakes=ok?state.mistakes:recordMistake(state.mistakes,current.verb,current.type,promptType,normalized,expected);
+    setState({...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,mistakes:nextMistakes,session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)});
     setWasCorrect(ok);setPhase('reviewing');
   }
 
@@ -874,8 +903,10 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS})
           </div>
         </div>
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center">
-          <div className="text-4xl sm:text-5xl font-medium mb-2" lang="ja">{practicePrefs.scriptMode==='hiragana'?current.verb.reading:current.verb.dict}</div>
-          {practicePrefs.scriptMode!=='hiragana'&&current.verb.dict!==current.verb.reading&&<div className="text-base text-stone-500" lang="ja">{current.verb.reading}</div>}
+          <div className="text-xs uppercase tracking-wider text-stone-400 font-medium mb-2">From {promptFormLabel(current.verb,promptType)}</div>
+          <div className="text-4xl sm:text-5xl font-medium mb-2" lang="ja">{promptValue}</div>
+          {!promptType&&practicePrefs.scriptMode!=='hiragana'&&current.verb.dict!==current.verb.reading&&<div className="text-base text-stone-500" lang="ja">{current.verb.reading}</div>}
+          {promptType&&<div className="text-xs text-stone-400">Base: <span lang="ja">{current.verb.dict}</span>{current.verb.dict!==current.verb.reading&&<span lang="ja"> · {current.verb.reading}</span>}</div>}
           <div className="text-sm text-stone-400 mt-2 italic">{current.verb.meaning}</div>
           <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[current.verb.group]} · {wordType}</div>
           <div className="text-[11px] text-stone-400 mt-1">JLPT {getWordMeta(current.verb).jlpt}{getWordMeta(current.verb).lesson?` · Genki L${getWordMeta(current.verb).lesson}`:''}</div>
@@ -1104,6 +1135,82 @@ function ClassificationView({state,setState,words,practicePrefs}){
             <div className={`font-medium text-sm ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Correct.':'Not quite.'} <span className="font-normal">It is {CLASSIFY_OPTIONS.find(o=>o.id===current.group)?.label}.</span></div>
             <div className="text-sm text-stone-700 mt-2">{classifyHint(current)}</div>
             <button onClick={next} autoFocus className="w-full mt-3 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-sm font-medium">Next</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MistakesView({state,setState,practicePrefs}){
+  const mistakes=state.mistakes||[];
+  const open=mistakes.filter(m=>!m.resolved);
+  const[activeKey,setActiveKey]=useState(open[0]?.key||mistakes[0]?.key||null);
+  const[answer,setAnswer]=useState('');
+  const[result,setResult]=useState(null);
+  useEffect(()=>{if(activeKey&&!mistakes.some(m=>m.key===activeKey))setActiveKey(open[0]?.key||mistakes[0]?.key||null);},[mistakes,open,activeKey]);
+  const active=mistakes.find(m=>m.key===activeKey)||open[0]||mistakes[0]||null;
+  function itemFromMistake(m){return{dict:m.dict,reading:m.reading,meaning:m.meaning,group:m.group};}
+  function retest(m){setActiveKey(m.key);setAnswer('');setResult(null);}
+  function submit(){
+    if(!active||!answer.trim())return;
+    const item=itemFromMistake(active);
+    const expected=conjugateItem(item,active.type)||active.expected;
+    const ok=toHiragana(answer)===expected;
+    setResult({ok,expected,item});
+    if(ok)setState({...state,mistakes:markMistakeResolved(state.mistakes,active.key),daily:bumpDaily(state.daily,true,practicePrefs.dailyGoal||10)});
+  }
+  const activeItem=active?itemFromMistake(active):null;
+  const activeExpected=activeItem?conjugateItem(activeItem,active.type)||active.expected:'';
+  return(
+    <div className="grid lg:grid-cols-[320px_1fr] gap-4">
+      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+        <div className="p-4 border-b border-stone-100 flex items-center justify-between">
+          <div><h3 className="font-medium">Mistake history</h3><p className="text-xs text-stone-500">{open.length} unresolved / {mistakes.length} total</p></div>
+          {!!mistakes.length&&<button onClick={()=>setState({...state,mistakes:mistakes.filter(m=>!m.resolved)})} className="text-xs text-stone-400 hover:text-rose-600">Clear resolved</button>}
+        </div>
+        {!mistakes.length?(
+          <div className="p-8 text-center text-sm text-stone-500">Missed answers will appear here for one-tap retests.</div>
+        ):(
+          <div className="max-h-[560px] overflow-y-auto divide-y divide-stone-50">
+            {mistakes.map(m=>(<button key={m.key} onClick={()=>retest(m)} className={`w-full text-left px-4 py-3 transition ${active?.key===m.key?'bg-indigo-50':'hover:bg-stone-50'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-stone-800" lang="ja">{m.dict}</span>
+                <span className={`text-[11px] ${m.resolved?'text-emerald-600':'text-rose-600'}`}>{m.resolved?'resolved':`${m.count}x`}</span>
+              </div>
+              <div className="text-xs text-stone-500">{getTypeInfo(m.type).label}{m.promptType?` from ${promptFormLabel(itemFromMistake(m),m.promptType)}`:''}</div>
+              <div className="text-xs text-stone-400 truncate">You wrote <span lang="ja">{m.userAnswer}</span>; expected <span lang="ja">{m.expected}</span></div>
+            </button>))}
+          </div>
+        )}
+      </div>
+      <div className="bg-white rounded-2xl border border-stone-200 p-5">
+        {!active?(
+          <div className="text-center text-stone-500 py-16">No mistakes to retest yet.</div>
+        ):(
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Retest missed card</div>
+                <div className="text-4xl font-medium mt-2" lang="ja">{active.promptType?conjugateItem(activeItem,active.promptType):(practicePrefs.scriptMode==='hiragana'?active.reading:active.dict)}</div>
+                {active.promptType&&<div className="text-xs text-stone-400 mt-1">Base: <span lang="ja">{active.dict}</span> · {promptFormLabel(activeItem,active.promptType)}</div>}
+                <div className="text-sm text-stone-500 italic mt-2">{active.meaning}</div>
+                <div className="text-xs text-stone-400 mt-1">Answer with {getTypeInfo(active.type).label}</div>
+              </div>
+              <button onClick={()=>speakJapanese(activeExpected)} className="p-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-500" title="Speak"><IconVolume className="w-4 h-4"/></button>
+            </div>
+            <div>
+              <input value={answer} onChange={e=>{setAnswer(e.target.value);setResult(null);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();submit();}}} placeholder="Type romaji or kana…" className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none" lang="ja" autoComplete="off" autoCorrect="off" spellCheck="false"/>
+              {answer&&toHiragana(answer)!==answer&&<div className="mt-2 text-center text-sm text-stone-500" lang="ja">→ {toHiragana(answer)}</div>}
+              <button onClick={submit} disabled={!answer.trim()} className="w-full mt-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium">Retest</button>
+            </div>
+            {result&&(
+              <div className={`rounded-xl border p-4 ${result.ok?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
+                <div className={`text-sm font-medium ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Resolved.':'Still needs work.'}</div>
+                <div className="text-xl mt-2" lang="ja">{activeExpected}</div>
+                {!result.ok&&<div className="mt-3 text-sm text-stone-700">{explainItem(result.item,active.type).rule}</div>}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1395,7 +1502,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:4,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},daily:state.daily,classify:state.classify},customVerbs,customAdjectives,practicePrefs}),[state,customVerbs,customAdjectives,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:5,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],daily:state.daily,classify:state.classify},customVerbs,customAdjectives,practicePrefs}),[state,customVerbs,customAdjectives,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -1418,6 +1525,16 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
         <div>
           <label className="text-xs text-stone-500 block mb-1">Script</label>
           <div className="flex gap-2">{[{id:'kanji',label:'Kanji + kana'},{id:'hiragana',label:'Hiragana'}].map(o=>(<button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,scriptMode:o.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.scriptMode===o.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs text-stone-500 block mb-1">Prompt form</label>
+          <select value={practicePrefs.promptForm||'dictionary'} onChange={e=>setPracticePrefs({...practicePrefs,promptForm:e.target.value})} className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none">
+            <option value="dictionary">Dictionary form</option>
+            <option value="random">Random compatible source form</option>
+            <optgroup label="Verb source forms">{CONJ_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</optgroup>
+            <optgroup label="Adjective source forms">{ADJ_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</optgroup>
+          </select>
+          <p className="text-[11px] text-stone-400 mt-1">Practice transformations like て-form → passive; incompatible sources fall back to dictionary form.</p>
         </div>
         <div>
           <label className="text-xs text-stone-500 block mb-1">Daily goal</label>
