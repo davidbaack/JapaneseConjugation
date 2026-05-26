@@ -163,7 +163,7 @@ const GRAMMAR_LESSONS=[
   {id:'potential',title:'Potential means ability',forms:['potential'],body:'Ichidan verbs add られる, godan verbs shift to the え-row and add る, する becomes できる, and 来る becomes 来られる. Potential verbs usually mark the thing you can do with が in careful Japanese.',examples:[['食べる','食べられる','寿司が食べられます。'],['書く','書ける','漢字が書けます。'],['する','できる','予約ができます。']]},
   {id:'passive-causative',title:'Passive and causative change roles',forms:['passive','causative','causative-passive'],body:'Passive means the subject receives an action. Causative means someone makes or lets another person act. Causative-passive means someone is made to do something.',examples:[['待つ','待たされる','駅で待たされました。'],['書く','書かせる','先生が名前を書かせました。'],['褒める','褒められる','先生に褒められました。']]},
   {id:'adjectives',title:'Adjectives conjugate like predicates',forms:['adj-plain-past','adj-plain-negative','adj-te-form','adj-adverb'],body:'い-adjectives drop い and use かった, くない, くて, and く. な-adjectives behave more like nouns with だ/です, だった, ではない, で, な, and に.',examples:[['高い','高かった','昨日は高かったです。'],['便利','便利ではない','この駅は便利ではありません。'],['早い','早く','早く起きます。']]},
-  {id:'conditionals',title:'Conditionals choose nuance',forms:['conditional-ba','conditional-tara','adj-conditional','adj-tara'],body:'ば often feels rule-like or prerequisite-like. たら is broad and works for if/when. Adjectives use ければ for い-adjectives and なら for な-adjectives.',examples:[['行く','行けば','駅に行けば分かります。'],['食べる','食べたら','食べたら、出かけましょう。'],['安い','安ければ','安ければ買います。']]}
+  {id:'conditionals',title:'Conditionals choose nuance',forms:['conditional-ba','conditional-tara','negative-conditional-tara','adj-conditional','adj-tara','adj-negative-tara'],body:'ば often feels rule-like or prerequisite-like. たら is broad and works for if/when. Negative たら uses the plain past negative plus ら, such as 使わなかったら.',examples:[['行く','行けば','駅に行けば分かります。'],['食べる','食べなかったら','食べなかったら、教えてください。'],['安い','安くなかったら','安くなかったら買いません。']]}
 ];
 const SHADOW_SCENARIOS=[
   {id:'cafe',title:'Cafe Request',level:'N5',focus:'te-form',lines:[
@@ -218,6 +218,7 @@ const CONJ_TYPES=[
   {id:'potential-negative',label:'Potential Negative',sub:'',hint:'cannot ~'},
   {id:'volitional',label:'Volitional',sub:'意向形',hint:"let's ~"},
   {id:'conditional-tara',label:'Conditional たら',sub:'',hint:'if / when'},
+  {id:'negative-conditional-tara',label:'Negative たら',sub:'なかったら',hint:'if / when not ~'},
   {id:'conditional-ba',label:'Conditional ば',sub:'',hint:'if'},
   {id:'conditional-nara',label:'Conditional なら',sub:'',hint:'if it is that ~'},
   {id:'conjectural',label:'Conjectural',sub:'だろう',hint:'probably ~'},
@@ -250,6 +251,7 @@ const ADJ_TYPES=[
   {id:'adj-attributive',label:'Noun Modifier',sub:'連体形',hint:'~ noun'},
   {id:'adj-conditional',label:'Adj. Conditional',sub:'ば / なら',hint:'if it is ~'},
   {id:'adj-tara',label:'Adj. たら',sub:'条件形',hint:'if / when it is ~'},
+  {id:'adj-negative-tara',label:'Adj. Negative たら',sub:'なかったら',hint:'if / when it is not ~'},
   {id:'adj-sou',label:'Looks Like',sub:'そう',hint:'looks ~'},
   {id:'adj-sugiru',label:'Too Much',sub:'すぎる',hint:'too ~'},
   {id:'adj-naru',label:'Become',sub:'なる',hint:'becomes ~'},
@@ -257,7 +259,7 @@ const ADJ_TYPES=[
 const ALL_CARD_TYPES=[...CONJ_TYPES,...ADJ_TYPES];
 const TYPE_PACKS=[
   {id:'basics',label:'Basics',hint:'Past, negative, polite, and te-form foundations.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','te-form','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form']},
-  {id:'everyday',label:'Everyday',hint:'Common conversation forms for requests, ability, desire, and conditionals.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','masu-stem','te-form','potential','potential-negative','volitional','polite-volitional','conditional-tara','conditional-ba','desiderative','progressive','request-kudasai','permission','obligation','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form','adj-adverb','adj-conditional','adj-tara','adj-sou','adj-naru']},
+  {id:'everyday',label:'Everyday',hint:'Common conversation forms for requests, ability, desire, and conditionals.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','masu-stem','te-form','potential','potential-negative','volitional','polite-volitional','conditional-tara','negative-conditional-tara','conditional-ba','desiderative','progressive','request-kudasai','permission','obligation','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form','adj-adverb','adj-conditional','adj-tara','adj-negative-tara','adj-sou','adj-naru']},
   {id:'advanced',label:'Advanced',hint:'Passive, causative, commands, conjecture, and nuanced connectors.',typeIds:['polite-te','polite-conditional-tara','conditional-nara','conjectural','imperative','passive','passive-negative','causative','causative-negative','causative-passive','negative-te','prohibition','negative-request','adj-attributive','adj-sugiru']},
   {id:'all',label:'All forms',hint:'Enable every verb and adjective form in the app.',typeIds:ALL_CARD_TYPES.map(t=>t.id)}
 ];
@@ -445,7 +447,7 @@ function conjugate(verb,type){
       'plain-present':reading,'plain-past':past,'plain-negative':neg,'plain-past-negative':stem+'なかった',
       'polite-present':stem+'ます','polite-past':stem+'ました','polite-negative':stem+'ません','polite-past-negative':stem+'ませんでした',
       'masu-stem':stem,'polite-volitional':stem+'ましょう','polite-te':stem+'まして','polite-conditional-tara':stem+'ましたら',
-      'te-form':te,'potential':stem+'られる','potential-negative':stem+'られない','volitional':stem+'よう','conditional-tara':past+'ら','conditional-ba':stem+'れば',
+      'te-form':te,'potential':stem+'られる','potential-negative':stem+'られない','volitional':stem+'よう','conditional-tara':past+'ら','negative-conditional-tara':stem+'なかったら','conditional-ba':stem+'れば',
       'conditional-nara':reading+'なら','conjectural':reading+'だろう','imperative':stem+'ろ','passive':stem+'られる','passive-negative':stem+'られない',
       'causative':stem+'させる','causative-negative':stem+'させない','causative-passive':stem+'させられる',
       'desiderative':stem+'たい','progressive':te+'いる','negative-te':neg+'で','prohibition':reading+'な',
@@ -464,7 +466,7 @@ function conjugate(verb,type){
       'plain-present':reading,'plain-past':past,'plain-negative':neg,'plain-past-negative':pastNeg,
       'polite-present':iStem+'ます','polite-past':iStem+'ました','polite-negative':iStem+'ません','polite-past-negative':iStem+'ませんでした',
       'masu-stem':iStem,'polite-volitional':iStem+'ましょう','polite-te':iStem+'まして','polite-conditional-tara':iStem+'ましたら',
-      'te-form':te,'potential':eStem+'る','potential-negative':eStem+'ない','volitional':oStem+'う','conditional-tara':past+'ら','conditional-ba':eStem+'ば',
+      'te-form':te,'potential':eStem+'る','potential-negative':eStem+'ない','volitional':oStem+'う','conditional-tara':past+'ら','negative-conditional-tara':pastNeg+'ら','conditional-ba':eStem+'ば',
       'conditional-nara':reading+'なら','conjectural':reading+'だろう','imperative':eStem,'passive':aStem+'れる','passive-negative':aStem+'れない',
       'causative':aStem+'せる','causative-negative':aStem+'せない','causative-passive':aStem+'せられる',
       'desiderative':iStem+'たい','progressive':te+'いる','negative-te':neg+'で','prohibition':reading+'な',
@@ -478,7 +480,7 @@ function conjugate(verb,type){
       'plain-present':'する','plain-past':'した','plain-negative':'しない','plain-past-negative':'しなかった',
       'polite-present':'します','polite-past':'しました','polite-negative':'しません','polite-past-negative':'しませんでした',
       'masu-stem':'し','polite-volitional':'しましょう','polite-te':'しまして','polite-conditional-tara':'しましたら',
-      'te-form':'して','potential':'できる','potential-negative':'できない','volitional':'しよう','conditional-tara':'したら','conditional-ba':'すれば',
+      'te-form':'して','potential':'できる','potential-negative':'できない','volitional':'しよう','conditional-tara':'したら','negative-conditional-tara':'しなかったら','conditional-ba':'すれば',
       'conditional-nara':'するなら','conjectural':'するだろう','imperative':'しろ','passive':'される','passive-negative':'されない',
       'causative':'させる','causative-negative':'させない','causative-passive':'させられる',
       'desiderative':'したい','progressive':'している','negative-te':'しないで','prohibition':'するな',
@@ -492,7 +494,7 @@ function conjugate(verb,type){
       'plain-present':'くる','plain-past':'きた','plain-negative':'こない','plain-past-negative':'こなかった',
       'polite-present':'きます','polite-past':'きました','polite-negative':'きません','polite-past-negative':'きませんでした',
       'masu-stem':'き','polite-volitional':'きましょう','polite-te':'きまして','polite-conditional-tara':'きましたら',
-      'te-form':'きて','potential':'こられる','potential-negative':'こられない','volitional':'こよう','conditional-tara':'きたら','conditional-ba':'くれば',
+      'te-form':'きて','potential':'こられる','potential-negative':'こられない','volitional':'こよう','conditional-tara':'きたら','negative-conditional-tara':'こなかったら','conditional-ba':'くれば',
       'conditional-nara':'くるなら','conjectural':'くるだろう','imperative':'こい','passive':'こられる','passive-negative':'こられない',
       'causative':'こさせる','causative-negative':'こさせない','causative-passive':'こさせられる',
       'desiderative':'きたい','progressive':'きている','negative-te':'こないで','prohibition':'くるな',
@@ -517,7 +519,7 @@ function conjugateAdjective(adj,type){
       'adj-plain-present':reading,'adj-plain-past':past,'adj-plain-negative':neg,'adj-plain-past-negative':pastNeg,
       'adj-polite-present':reading+'です','adj-polite-past':past+'です','adj-polite-negative':neg+'です','adj-polite-past-negative':pastNeg+'です',
       'adj-te-form':stem+'くて','adj-adverb':stem+'く','adj-attributive':reading,'adj-conditional':stem+'ければ',
-      'adj-tara':past+'ら','adj-sou':stem+'そう','adj-sugiru':stem+'すぎる','adj-naru':stem+'くなる'
+      'adj-tara':past+'ら','adj-negative-tara':pastNeg+'ら','adj-sou':stem+'そう','adj-sugiru':stem+'すぎる','adj-naru':stem+'くなる'
     };
     return M[type]||'';
   }
@@ -527,7 +529,7 @@ function conjugateAdjective(adj,type){
       'adj-plain-present':stem+'だ','adj-plain-past':stem+'だった','adj-plain-negative':stem+'ではない','adj-plain-past-negative':stem+'ではなかった',
       'adj-polite-present':stem+'です','adj-polite-past':stem+'でした','adj-polite-negative':stem+'ではありません','adj-polite-past-negative':stem+'ではありませんでした',
       'adj-te-form':stem+'で','adj-adverb':stem+'に','adj-attributive':stem+'な','adj-conditional':stem+'なら',
-      'adj-tara':stem+'だったら','adj-sou':stem+'そう','adj-sugiru':stem+'すぎる','adj-naru':stem+'になる'
+      'adj-tara':stem+'だったら','adj-negative-tara':stem+'ではなかったら','adj-sou':stem+'そう','adj-sugiru':stem+'すぎる','adj-naru':stem+'になる'
     };
     return M[type]||'';
   }
@@ -547,10 +549,10 @@ function explainConjugation(verb,type){
   const stem=reading.slice(0,-1),last=reading.slice(-1);
   const intro=`${dict} (${reading}) is ${GROUP_NAMES[group]}.`;
   let rule='',derivation=result,note='';
-  if(group==='ichidan'){const M={'plain-present':['Dictionary form.',result],'plain-past':['Drop る, add た.',`${stem} + た = ${result}`],'plain-negative':['Drop る, add ない.',`${stem} + ない = ${result}`],'plain-past-negative':['Drop る, add なかった.',`${stem} + なかった = ${result}`],'polite-present':['Drop る, add ます.',`${stem} + ます = ${result}`],'polite-past':['Drop る, add ました.',`${stem} + ました = ${result}`],'polite-negative':['Drop る, add ません.',`${stem} + ません = ${result}`],'polite-past-negative':['Drop る, add ませんでした.',`${stem} + ませんでした = ${result}`],'te-form':['Drop る, add て.',`${stem} + て = ${result}`],'potential':['Drop る, add られる.',`${stem} + られる = ${result}`],'volitional':['Drop る, add よう.',`${stem} + よう = ${result}`],'conditional-tara':['Past form + ら.',`${stem} + たら = ${result}`],'conditional-ba':['Drop る, add れば.',`${stem} + れば = ${result}`],'imperative':['Drop る, add ろ.',`${stem} + ろ = ${result}`],'passive':['Drop る, add られる.',`${stem} + られる = ${result}`],'causative':['Drop る, add させる.',`${stem} + させる = ${result}`]};[rule,derivation]=M[type]||['',result];}
-  else if(group==='godan'){const isIku=reading==='いく'||reading.endsWith('いく');const ikuNote=isIku?' Note: 行く is irregular — past/te use った/って.':'';const pEnd=isIku?'った':PAST_END[last];const teEnd=isIku?'って':TE_END[last];const M={'plain-present':['Dictionary form.',result],'plain-past':[`Past: く→いた, ぐ→いだ, す→した, つ/う/る→った, ぬ/ぶ/む→んだ.${ikuNote}`,`${stem} + ${pEnd} = ${result}`],'plain-negative':[`あ-row (う→わ!) + ない.`,`${stem} + ${A_ROW[last]} + ない = ${result}`],'plain-past-negative':[`あ-row + なかった.`,`${stem} + ${A_ROW[last]} + なかった = ${result}`],'polite-present':[`い-row + ます.`,`${stem} + ${I_ROW[last]} + ます = ${result}`],'polite-past':[`い-row + ました.`,`${stem} + ${I_ROW[last]} + ました = ${result}`],'polite-negative':[`い-row + ません.`,`${stem} + ${I_ROW[last]} + ません = ${result}`],'polite-past-negative':[`い-row + ませんでした.`,`${stem} + ${I_ROW[last]} + ませんでした = ${result}`],'te-form':[`Te mirrors past with て/で: く→いて, ぐ→いで, す→して, つ/う/る→って, ぬ/ぶ/む→んで.${ikuNote}`,`${stem} + ${teEnd} = ${result}`],'potential':[`え-row + る.`,`${stem} + ${E_ROW[last]} + る = ${result}`],'volitional':[`お-row + う.`,`${stem} + ${O_ROW[last]} + う = ${result}`],'conditional-tara':['Past form + ら.',`${stem} + ${pEnd} + ら = ${result}`],'conditional-ba':[`え-row + ば.`,`${stem} + ${E_ROW[last]} + ば = ${result}`],'imperative':[`え-row (blunt).`,`${stem} + ${E_ROW[last]} = ${result}`],'passive':[`あ-row + れる.`,`${stem} + ${A_ROW[last]} + れる = ${result}`],'causative':[`あ-row + せる.`,`${stem} + ${A_ROW[last]} + せる = ${result}`]};[rule,derivation]=M[type]||['',result];if(/[いきしちにひみりぎじぢびぴえけせてねへめれげぜでべぺ]る$/.test(reading)){note=`Trap: ${dict} looks ichidan but is godan.`;}}
-  else if(group==='suru'){const compound=reading.endsWith('する')&&reading!=='する'?reading.slice(0,-2):'';const M={'plain-present':'Dictionary form.','plain-past':'する → した (irregular).','plain-negative':'する → しない.','plain-past-negative':'する → しなかった.','polite-present':'する → します.','polite-past':'する → しました.','polite-negative':'する → しません.','polite-past-negative':'する → しませんでした.','te-form':'する → して.','potential':'Special: する → できる.','volitional':'する → しよう.','conditional-tara':'する → したら.','conditional-ba':'する → すれば.','imperative':'する → しろ.','passive':'する → される.','causative':'する → させる.'};rule=M[type]||'';derivation=compound?`${compound} + (する conjugated) = ${result}`:result;}
-  else if(group==='kuru'){const M={'plain-present':'来る (くる).','plain-past':'来る → 来た (きた). く→き.','plain-negative':'来る → 来ない (こない). く→こ.','plain-past-negative':'来る → 来なかった. く→こ.','polite-present':'来る → 来ます (きます). く→き.','polite-past':'来る → 来ました. く→き.','polite-negative':'来る → 来ません. く→き.','polite-past-negative':'来る → 来ませんでした. く→き.','te-form':'来る → 来て (きて). く→き.','potential':'来る → 来られる (こられる). く→こ.','volitional':'来る → 来よう (こよう). く→こ.','conditional-tara':'来る → 来たら (きたら). く→き.','conditional-ba':'来る → 来れば (くれば). く stays.','imperative':'来る → 来い (こい). く→こ.','passive':'来る → 来られる. く→こ.','causative':'来る → 来させる. く→こ.'};rule=`${dict} is irregular: く shifts to き (polite/past/te) or こ (negative/potential/volitional).`;note=M[type]||'';}
+  if(group==='ichidan'){const M={'plain-present':['Dictionary form.',result],'plain-past':['Drop る, add た.',`${stem} + た = ${result}`],'plain-negative':['Drop る, add ない.',`${stem} + ない = ${result}`],'plain-past-negative':['Drop る, add なかった.',`${stem} + なかった = ${result}`],'polite-present':['Drop る, add ます.',`${stem} + ます = ${result}`],'polite-past':['Drop る, add ました.',`${stem} + ました = ${result}`],'polite-negative':['Drop る, add ません.',`${stem} + ません = ${result}`],'polite-past-negative':['Drop る, add ませんでした.',`${stem} + ませんでした = ${result}`],'te-form':['Drop る, add て.',`${stem} + て = ${result}`],'potential':['Drop る, add られる.',`${stem} + られる = ${result}`],'volitional':['Drop る, add よう.',`${stem} + よう = ${result}`],'conditional-tara':['Past form + ら.',`${stem} + たら = ${result}`],'negative-conditional-tara':['Plain past negative + ら.',`${stem} + なかった + ら = ${result}`],'conditional-ba':['Drop る, add れば.',`${stem} + れば = ${result}`],'imperative':['Drop る, add ろ.',`${stem} + ろ = ${result}`],'passive':['Drop る, add られる.',`${stem} + られる = ${result}`],'causative':['Drop る, add させる.',`${stem} + させる = ${result}`]};[rule,derivation]=M[type]||['',result];}
+  else if(group==='godan'){const isIku=reading==='いく'||reading.endsWith('いく');const ikuNote=isIku?' Note: 行く is irregular — past/te use った/って.':'';const pEnd=isIku?'った':PAST_END[last];const teEnd=isIku?'って':TE_END[last];const negPast=conjugate(verb,'plain-past-negative');const M={'plain-present':['Dictionary form.',result],'plain-past':[`Past: く→いた, ぐ→いだ, す→した, つ/う/る→った, ぬ/ぶ/む→んだ.${ikuNote}`,`${stem} + ${pEnd} = ${result}`],'plain-negative':[`あ-row (う→わ!) + ない.`,`${stem} + ${A_ROW[last]} + ない = ${result}`],'plain-past-negative':[`あ-row + なかった.`,`${stem} + ${A_ROW[last]} + なかった = ${result}`],'polite-present':[`い-row + ます.`,`${stem} + ${I_ROW[last]} + ます = ${result}`],'polite-past':[`い-row + ました.`,`${stem} + ${I_ROW[last]} + ました = ${result}`],'polite-negative':[`い-row + ません.`,`${stem} + ${I_ROW[last]} + ません = ${result}`],'polite-past-negative':[`い-row + ませんでした.`,`${stem} + ${I_ROW[last]} + ませんでした = ${result}`],'te-form':[`Te mirrors past with て/で: く→いて, ぐ→いで, す→して, つ/う/る→って, ぬ/ぶ/む→んで.${ikuNote}`,`${stem} + ${teEnd} = ${result}`],'potential':[`え-row + る.`,`${stem} + ${E_ROW[last]} + る = ${result}`],'volitional':[`お-row + う.`,`${stem} + ${O_ROW[last]} + う = ${result}`],'conditional-tara':['Past form + ら.',`${stem} + ${pEnd} + ら = ${result}`],'negative-conditional-tara':['Plain past negative + ら; う-ending verbs use わ.',`${negPast} + ら = ${result}`],'conditional-ba':[`え-row + ば.`,`${stem} + ${E_ROW[last]} + ば = ${result}`],'imperative':[`え-row (blunt).`,`${stem} + ${E_ROW[last]} = ${result}`],'passive':[`あ-row + れる.`,`${stem} + ${A_ROW[last]} + れる = ${result}`],'causative':[`あ-row + せる.`,`${stem} + ${A_ROW[last]} + せる = ${result}`]};[rule,derivation]=M[type]||['',result];if(/[いきしちにひみりぎじぢびぴえけせてねへめれげぜでべぺ]る$/.test(reading)){note=`Trap: ${dict} looks ichidan but is godan.`;}}
+  else if(group==='suru'){const compound=reading.endsWith('する')&&reading!=='する'?reading.slice(0,-2):'';const M={'plain-present':'Dictionary form.','plain-past':'する → した (irregular).','plain-negative':'する → しない.','plain-past-negative':'する → しなかった.','polite-present':'する → します.','polite-past':'する → しました.','polite-negative':'する → しません.','polite-past-negative':'する → しませんでした.','te-form':'する → して.','potential':'Special: する → できる.','volitional':'する → しよう.','conditional-tara':'する → したら.','negative-conditional-tara':'する → しなかったら.','conditional-ba':'する → すれば.','imperative':'する → しろ.','passive':'する → される.','causative':'する → させる.'};rule=M[type]||'';derivation=compound?`${compound} + (する conjugated) = ${result}`:result;}
+  else if(group==='kuru'){const M={'plain-present':'来る (くる).','plain-past':'来る → 来た (きた). く→き.','plain-negative':'来る → 来ない (こない). く→こ.','plain-past-negative':'来る → 来なかった. く→こ.','polite-present':'来る → 来ます (きます). く→き.','polite-past':'来る → 来ました. く→き.','polite-negative':'来る → 来ません. く→き.','polite-past-negative':'来る → 来ませんでした. く→き.','te-form':'来る → 来て (きて). く→き.','potential':'来る → 来られる (こられる). く→こ.','volitional':'来る → 来よう (こよう). く→こ.','conditional-tara':'来る → 来たら (きたら). く→き.','negative-conditional-tara':'来る → 来なかったら (こなかったら). く→こ.','conditional-ba':'来る → 来れば (くれば). く stays.','imperative':'来る → 来い (こい). く→こ.','passive':'来る → 来られる. く→こ.','causative':'来る → 来させる. く→こ.'};rule=`${dict} is irregular: く shifts to き (polite/past/te) or こ (negative/potential/volitional).`;note=M[type]||'';}
   return{intro,rule,derivation,note};
 }
 
@@ -575,6 +577,7 @@ function explainAdjective(adj,type){
       'adj-attributive':['Use the dictionary form before a noun.',result],
       'adj-conditional':['Drop い, add ければ.',`${stem} + ければ = ${result}`],
       'adj-tara':['Plain past + ら.',`${stem} + かった + ら = ${result}`],
+      'adj-negative-tara':['Plain past negative + ら.',`${stem} + くなかった + ら = ${result}`],
       'adj-sou':['Drop い, add そう.',`${stem} + そう = ${result}`],
       'adj-sugiru':['Drop い, add すぎる.',`${stem} + すぎる = ${result}`],
       'adj-naru':['Drop い, add くなる.',`${stem} + くなる = ${result}`]
@@ -597,6 +600,7 @@ function explainAdjective(adj,type){
       'adj-attributive':['Add な before a noun.',`${s} + な = ${result}`],
       'adj-conditional':['Use なら for the common conditional.',`${s} + なら = ${result}`],
       'adj-tara':['Plain past + ら.',`${s} + だった + ら = ${result}`],
+      'adj-negative-tara':['Plain past negative + ら.',`${s} + ではなかった + ら = ${result}`],
       'adj-sou':['Add そう.',`${s} + そう = ${result}`],
       'adj-sugiru':['Add すぎる.',`${s} + すぎる = ${result}`],
       'adj-naru':['Add になる.',`${s} + になる = ${result}`]
@@ -826,6 +830,7 @@ function contextSentenceFor(item,type){
       'adj-attributive':[`${form}場所です。`,'Uses the adjective before a noun.'],
       'adj-conditional':[`${form}、行きます。`,'Uses the conditional before a result.'],
       'adj-tara':[`${form}、行きます。`,'Uses the tara conditional before a result.'],
+      'adj-negative-tara':[`${form}、行きません。`,'If it is not that way, the result changes.'],
       'adj-sou':[`${form}です。`,'Looks or seems that way.'],
       'adj-sugiru':[`${form}ので、困ります。`,'Too much of that quality causes a problem.'],
       'adj-naru':[`だんだん${form}。`,'Shows a change into that state.']
@@ -851,6 +856,7 @@ function contextSentenceFor(item,type){
     'potential-negative':[`今は${form}。`,'Says this cannot be done now.'],
     'volitional':[`明日、${form}。`,"Let's do this tomorrow."],
     'conditional-tara':[`${form}、教えてください。`,'If or when this happens, please tell me.'],
+    'negative-conditional-tara':[`${form}、教えてください。`,'If or when this does not happen, please tell me.'],
     'conditional-ba':[`${form}、上手になります。`,'If you do this, you improve.'],
     'conditional-nara':[`${form}、今がいいです。`,'If doing this, now is good.'],
     'conjectural':[`たぶん${form}。`,'Probably does this.'],
@@ -1376,6 +1382,7 @@ function englishForForm(item,type){
       'adj-adverb':`in a ${base} way`,
       'adj-conditional':`if it is ${base}`,
       'adj-tara':`if/when it was ${base}`,
+      'adj-negative-tara':`if/when it was not ${base}`,
       'adj-sou':`looks ${base}`,
       'adj-sugiru':`too ${base}`,
       'adj-naru':`becomes ${base}`
@@ -1400,6 +1407,7 @@ function englishForForm(item,type){
     'potential-negative':`cannot ${action}`,
     'volitional':`let's ${action}`,
     'conditional-tara':`if/when someone did ${action}`,
+    'negative-conditional-tara':`if/when someone did not ${action}`,
     'conditional-ba':mapActionMeaning(item.meaning,a=>`if someone ${thirdPerson(a)}`),
     'conditional-nara':mapActionMeaning(item.meaning,a=>`if it is that someone ${thirdPerson(a)}`),
     'conjectural':mapActionMeaning(item.meaning,a=>`probably ${thirdPerson(a)}`),
@@ -4035,7 +4043,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:36,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:37,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
