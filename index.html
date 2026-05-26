@@ -983,10 +983,10 @@ function normalizeReferenceState(ref={}){
   const history=Array.isArray(ref.history)?ref.history.filter(w=>w&&w.dict&&w.reading&&w.group).map(w=>({dict:w.dict,reading:w.reading,meaning:w.meaning||'',group:w.group,lastAt:w.lastAt||Date.now(),count:w.count||1})).slice(0,24):[];
   return{recentSearches,history};
 }
-function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},ambient:{sessions:0,played:0,lastAt:null},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},mock:{taken:0,bestPct:0,lastPct:0,lastScore:0,lastTotal:0,lastAt:null,bySkill:{}},reader:{sessions:0,chars:0,encounters:0,wordSeen:{},lastAt:null},reference:normalizeReferenceState(),enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0,skipped:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
+function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},ambient:{sessions:0,played:0,lastAt:null},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},mock:{taken:0,bestPct:0,lastPct:0,lastScore:0,lastTotal:0,lastAt:null,bySkill:{}},reader:{sessions:0,chars:0,encounters:0,wordSeen:{},lastAt:null},production:{attempted:0,correct:0,lastScore:0,lastAt:null},reference:normalizeReferenceState(),enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0,skipped:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
 function mergeState(saved,sessionOverride){
   const base=defaultState();
-  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,ambient:(saved&&saved.ambient)||base.ambient,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,mock:(saved&&saved.mock)||base.mock,reader:{...base.reader,...((saved&&saved.reader)||{}),wordSeen:((saved&&saved.reader&&saved.reader.wordSeen)||{})},reference:normalizeReferenceState(saved&&saved.reference),daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,ambient:(saved&&saved.ambient)||base.ambient,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,mock:(saved&&saved.mock)||base.mock,reader:{...base.reader,...((saved&&saved.reader)||{}),wordSeen:((saved&&saved.reader&&saved.reader.wordSeen)||{})},production:(saved&&saved.production)||base.production,reference:normalizeReferenceState(saved&&saved.reference),daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
   if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
     merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
   }
@@ -1350,7 +1350,7 @@ function App(){
         {tab==='shadow'&&<ShadowView state={state} setState={setState} words={allWords} wordLists={wordLists} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='lessons'&&<LessonsView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='reference'&&<ReferenceView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} wordLists={wordLists} setWordLists={setWordLists} geminiKey={geminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs}/>}
-        {tab==='coach'&&<CoachView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
+        {tab==='coach'&&<CoachView state={state} setState={setState} words={allWords} wordLists={wordLists} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='stats'&&<StatsView state={state} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='levels'&&<SRSLevelView state={state} verbs={allWords}/>}
         {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} geminiKey={geminiKey} state={state}/>}
@@ -4329,11 +4329,39 @@ function ScannerView({state,setState,words,customVerbs,setCustomVerbs,customAdje
   );
 }
 
-function CoachView({geminiKey,practicePrefs=DEFAULT_PREFS}){
+function buildProductionSeeds(state,words=[],practicePrefs=DEFAULT_PREFS,wordLists=[],limit=10){
+  const filtered=filterWordsForPrefs(words,practicePrefs,wordLists);
+  const weakTypes=new Set(weakTypeIdsForState(state,state.enabledTypes||[]));
+  const pool=[];
+  for(const word of filtered){
+    for(const type of practiceTypesForItem(word,state.enabledTypes,practicePrefs)){
+      const answer=conjugateItem(word,type.id);
+      if(!answer)continue;
+      const ruleId=referenceRuleIdFor(word,type.id);
+      const progress=referenceProgressFor(state,word,type.id);
+      const weak=ruleWeakScore(state,ruleId);
+      const priority=weak*3+(weakTypes.has(type.id)?4:0)+(progress.status==='due'?3:progress.status==='new'?1:0);
+      pool.push({word,type,answer,ruleId,progress,priority});
+    }
+  }
+  if(!pool.length)return[];
+  const ordered=pool.some(p=>p.priority>0)?pool.sort((a,b)=>b.priority-a.priority||a.type.label.localeCompare(b.type.label)):shuffled(pool);
+  return ordered.slice(0,limit);
+}
+function CoachView({state,setState,words=[],wordLists=[],geminiKey,practicePrefs=DEFAULT_PREFS}){
   const[text,setText]=useState('');
   const[result,setResult]=useState('');
   const[loading,setLoading]=useState(false);
   const[err,setErr]=useState('');
+  const[challenge,setChallenge]=useState(null);
+  const[challengeAnswer,setChallengeAnswer]=useState('');
+  const[challengeFeedback,setChallengeFeedback]=useState(null);
+  const[challengeLoading,setChallengeLoading]=useState(false);
+  const[challengeErr,setChallengeErr]=useState('');
+  const[grading,setGrading]=useState(false);
+  const production=state.production||defaultState().production;
+  const productionPct=production.attempted?Math.round((production.correct||0)/(production.attempted||1)*100):0;
+  const challengeSeeds=useMemo(()=>buildProductionSeeds(state,words,practicePrefs,wordLists,10),[state.cards,state.mistakes,state.enabledTypes,state.verbStats,words,practicePrefs,wordLists]);
   async function run(){
     if(!text.trim()||!geminiKey)return;
     setLoading(true);setErr('');setResult('');
@@ -4344,14 +4372,91 @@ function CoachView({geminiKey,practicePrefs=DEFAULT_PREFS}){
     }catch(e){setErr(e.message);}
     setLoading(false);
   }
+  async function generateChallenge(){
+    if(!geminiKey||!challengeSeeds.length)return;
+    setChallengeLoading(true);setChallengeErr('');setChallengeFeedback(null);setChallengeAnswer('');
+    try{
+      const seedLines=challengeSeeds.map((s,i)=>`${i+1}. ${s.word.dict} (${s.word.reading}) - ${s.word.meaning}; ${GROUP_NAMES[s.word.group]||s.word.group}; required form ${s.type.label}: ${s.answer}`).join('\n');
+      const prompt=`Create one Japanese sentence production challenge for a conjugation learner.\n\nChoose exactly one seed from this list and require the learner to use its required conjugated form in a natural sentence:\n${seedLines}\n\nReturn ONLY JSON:\n{"seedIndex":1,"englishPrompt":"English sentence the learner should produce","hint":"short non-answer cue","modelJapanese":"one natural model answer using the required form"}\n\nKeep the English prompt short and concrete. Do not ask for a literal word-for-word translation.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,900,0.45,aiSystemFromPrefs(practicePrefs,'You create precise Japanese sentence-production drills. Return valid JSON only. Use the required conjugated form exactly in the model answer.'));
+      const data=extractJSON(reply);
+      const seed=challengeSeeds[Math.max(0,Math.min(challengeSeeds.length-1,(Number(data?.seedIndex)||1)-1))]||challengeSeeds[0];
+      if(!data||!seed)throw new Error('AI did not return a usable challenge.');
+      setChallenge({
+        seedIndex:Number(data.seedIndex)||1,
+        english:String(data.englishPrompt||'').trim()||`Write a natural sentence using ${seed.answer}.`,
+        hint:String(data.hint||'').trim()||`${seed.type.label} of ${seed.word.dict}`,
+        model:String(data.modelJapanese||'').trim(),
+        word:seed.word,
+        type:seed.type.id,
+        typeLabel:seed.type.label,
+        expected:seed.answer,
+        rule:explainItem(seed.word,seed.type.id).rule||seed.type.hint
+      });
+    }catch(e){setChallengeErr(e.message||'Challenge generation failed.');}
+    setChallengeLoading(false);
+  }
+  async function gradeChallenge(){
+    if(!challenge||!challengeAnswer.trim()||!geminiKey)return;
+    setGrading(true);setChallengeErr('');setChallengeFeedback(null);
+    try{
+      const prompt=`Grade this Japanese sentence-production answer for a conjugation drill.\n\nEnglish prompt: ${challenge.english}\nRequired word: ${challenge.word.dict} (${challenge.word.reading}) - ${challenge.word.meaning}\nRequired form: ${challenge.typeLabel}\nRequired conjugated form: ${challenge.expected}\nModel answer: ${challenge.model||'(none)'}\nLearner answer: ${challengeAnswer}\n\nReturn ONLY JSON:\n{"correct":true,"score":0,"correctedJapanese":"...","feedback":"one concise explanation","rule":"specific conjugation rule","nextDrill":"one tiny follow-up prompt"}\n\nMark correct only if the sentence is natural enough and uses the required conjugated form correctly.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1000,0.2,aiSystemFromPrefs(practicePrefs,'You are a strict but helpful Japanese production grader. Return valid JSON only.'));
+      const data=extractJSON(reply);
+      if(!data)throw new Error('AI did not return structured feedback.');
+      const score=Math.max(0,Math.min(100,Number(data.score)||0));
+      const correct=data.correct===true||String(data.correct).toLowerCase()==='true'||score>=80;
+      const feedback={correct,score,corrected:String(data.correctedJapanese||'').trim(),feedback:String(data.feedback||'').trim(),rule:String(data.rule||challenge.rule||'').trim(),nextDrill:String(data.nextDrill||'').trim()};
+      setChallengeFeedback(feedback);
+      setState(prev=>{
+        const prior=prev.production||defaultState().production;
+        return{...prev,production:{...prior,attempted:(prior.attempted||0)+1,correct:(prior.correct||0)+(correct?1:0),lastScore:score,lastAt:Date.now()}};
+      });
+    }catch(e){setChallengeErr(e.message||'AI grading failed.');}
+    setGrading(false);
+  }
   return(
-    <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
-      <div className="flex items-center gap-2"><IconSpark className="w-4 h-4 text-indigo-600"/><h3 className="font-medium">AI sentence coach</h3></div>
-      <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="昨日、映画を見ます。 / I want to say: I was made to wait…" className="w-full min-h-32 px-3 py-2 border border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none" lang="ja" autoCorrect="off" spellCheck="false"/>
-      <button onClick={run} disabled={!text.trim()||!geminiKey||loading} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium">{loading?'Checking…':'Check with AI'}</button>
-      {!geminiKey&&<div className="text-xs text-stone-400 text-center">Add a Gemini API key in Settings.</div>}
-      {err&&<div className="text-sm text-rose-600">{err}</div>}
-      {result&&<div className="border-t border-stone-100 pt-4 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{result}</div>}
+    <div className="grid lg:grid-cols-2 gap-4">
+      <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
+        <div className="flex items-center gap-2"><IconSpark className="w-4 h-4 text-indigo-600"/><h3 className="font-medium">AI sentence coach</h3></div>
+        <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="昨日、映画を見ます。 / I want to say: I was made to wait…" className="w-full min-h-32 px-3 py-2 border border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none" lang="ja" autoCorrect="off" spellCheck="false"/>
+        <button onClick={run} disabled={!text.trim()||!geminiKey||loading} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium">{loading?'Checking…':'Check with AI'}</button>
+        {!geminiKey&&<div className="text-xs text-stone-400 text-center">Add a Gemini API key in Settings.</div>}
+        {err&&<div className="text-sm text-rose-600">{err}</div>}
+        {result&&<div className="border-t border-stone-100 pt-4 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{result}</div>}
+      </div>
+      <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2"><IconSpark className="w-4 h-4 text-indigo-600"/><h3 className="font-medium">AI production drill</h3></div>
+            <p className="text-xs text-stone-500 mt-1">Generate a sentence task from current filters and weak conjugation forms.</p>
+          </div>
+          <div className="text-right text-xs text-stone-500"><div className="font-medium text-stone-700">{productionPct}%</div><div>{production.correct||0}/{production.attempted||0}</div></div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {challengeSeeds.slice(0,4).map(s=><span key={`${s.ruleId}-${s.word.dict}`} className="px-2 py-1 rounded-lg bg-stone-100 text-xs text-stone-600">{s.word.dict} · {s.type.label}</span>)}
+          {!challengeSeeds.length&&<span className="text-xs text-stone-400">No words match the current filters.</span>}
+        </div>
+        <button onClick={generateChallenge} disabled={!geminiKey||challengeLoading||!challengeSeeds.length} className="w-full py-2.5 bg-stone-800 hover:bg-stone-900 disabled:opacity-40 text-white rounded-xl font-medium">{challengeLoading?'Building challenge…':'Generate sentence challenge'}</button>
+        {!geminiKey&&<div className="text-xs text-stone-400 text-center">Add a Gemini API key in Settings.</div>}
+        {challenge&&<div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+          <div className="text-xs uppercase tracking-wider text-indigo-700 font-medium">Produce Japanese</div>
+          <div className="mt-2 text-sm font-medium text-stone-900">{challenge.english}</div>
+          <div className="mt-2 text-xs text-indigo-900/80">Required: <span lang="ja">{challenge.expected}</span> · {challenge.typeLabel} of <span lang="ja">{challenge.word.dict}</span></div>
+          <div className="mt-1 text-xs text-stone-500">Hint: {challenge.hint}</div>
+          <textarea value={challengeAnswer} onChange={e=>setChallengeAnswer(e.target.value)} placeholder="日本語で答えてください…" className="mt-3 w-full min-h-24 px-3 py-2 border border-indigo-100 rounded-xl focus:border-indigo-500 focus:outline-none bg-white" lang="ja" autoCorrect="off" spellCheck="false"/>
+          <button onClick={gradeChallenge} disabled={!challengeAnswer.trim()||grading} className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium">{grading?'Grading…':'Grade production'}</button>
+          {challenge.model&&<button onClick={()=>speakJapanese(challenge.model,0.85,practicePrefs.voiceURI)} className="w-full mt-2 py-2 border border-indigo-200 hover:bg-white rounded-xl text-sm text-indigo-700 inline-flex items-center justify-center gap-1.5"><IconVolume className="w-4 h-4"/>Hear model answer</button>}
+        </div>}
+        {challengeErr&&<div className="text-sm text-rose-600">{challengeErr}</div>}
+        {challengeFeedback&&<div className={`rounded-xl border p-4 ${challengeFeedback.correct?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
+          <div className={`text-sm font-medium ${challengeFeedback.correct?'text-emerald-800':'text-rose-800'}`}>{challengeFeedback.correct?'Production accepted':'Needs revision'} · {challengeFeedback.score}%</div>
+          {challengeFeedback.corrected&&<div className="mt-2 text-lg" lang="ja">{challengeFeedback.corrected}</div>}
+          {challengeFeedback.feedback&&<div className="mt-2 text-sm text-stone-700 leading-relaxed">{challengeFeedback.feedback}</div>}
+          {challengeFeedback.rule&&<div className="mt-2 text-xs text-stone-600">{challengeFeedback.rule}</div>}
+          {challengeFeedback.nextDrill&&<div className="mt-2 rounded-lg bg-white/70 border border-stone-200 px-3 py-2 text-xs text-stone-600">{challengeFeedback.nextDrill}</div>}
+        </div>}
+      </div>
     </div>
   );
 }
@@ -4802,7 +4907,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:39,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,reference:state.reference,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:39,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,production:state.production||defaultState().production,reference:state.reference,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
