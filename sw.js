@@ -1,4 +1,4 @@
-const CACHE_NAME = 'conjugation-dojo-v34';
+const CACHE_NAME = 'conjugation-dojo-v35';
 const ASSETS = [
   './',
   './index.html',

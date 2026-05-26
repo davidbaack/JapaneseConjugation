@@ -2533,6 +2533,32 @@ function classifyHint(word){
   if(word.group==='i-adjective')return `${word.reading} conjugates as an い-adjective: ${conjugateAdjective(word,'adj-plain-past')}, ${conjugateAdjective(word,'adj-plain-negative')}.`;
   return `${word.reading} is a な-adjective: ${conjugateAdjective(word,'adj-attributive')} + noun, or ${conjugateAdjective(word,'adj-polite-present')}.`;
 }
+const TRANSITIVE_VERB_PAIRS=[
+  {transitive:{dict:'開ける',reading:'あける',meaning:'to open something',group:'ichidan'},intransitive:{dict:'開く',reading:'あく',meaning:'to open / become open',group:'godan'},scene:'door, window, shop'},
+  {transitive:{dict:'閉める',reading:'しめる',meaning:'to close something',group:'ichidan'},intransitive:{dict:'閉まる',reading:'しまる',meaning:'to close / be closed',group:'godan'},scene:'door, lid, store'},
+  {transitive:{dict:'出す',reading:'だす',meaning:'to take out / submit',group:'godan'},intransitive:{dict:'出る',reading:'でる',meaning:'to go out / appear',group:'ichidan'},scene:'person, item, result'},
+  {transitive:{dict:'入れる',reading:'いれる',meaning:'to put in',group:'ichidan'},intransitive:{dict:'入る',reading:'はいる',meaning:'to enter / fit in',group:'godan'},scene:'room, container, group'},
+  {transitive:{dict:'壊す',reading:'こわす',meaning:'to break something',group:'godan'},intransitive:{dict:'壊れる',reading:'こわれる',meaning:'to break / be broken',group:'ichidan'},scene:'machine, object'},
+  {transitive:{dict:'始める',reading:'はじめる',meaning:'to start something',group:'ichidan'},intransitive:{dict:'始まる',reading:'はじまる',meaning:'to begin',group:'godan'},scene:'class, meeting, event'},
+  {transitive:{dict:'終える',reading:'おえる',meaning:'to finish something',group:'ichidan'},intransitive:{dict:'終わる',reading:'おわる',meaning:'to end / finish',group:'godan'},scene:'work, class, event'},
+  {transitive:{dict:'つける',reading:'つける',meaning:'to turn on / attach',group:'ichidan'},intransitive:{dict:'つく',reading:'つく',meaning:'to turn on / be attached',group:'godan'},scene:'light, mark, device'},
+  {transitive:{dict:'消す',reading:'けす',meaning:'to turn off / erase',group:'godan'},intransitive:{dict:'消える',reading:'きえる',meaning:'to disappear / go out',group:'ichidan'},scene:'light, text, fire'},
+  {transitive:{dict:'落とす',reading:'おとす',meaning:'to drop something',group:'godan'},intransitive:{dict:'落ちる',reading:'おちる',meaning:'to fall / drop',group:'ichidan'},scene:'object, score, leaf'},
+  {transitive:{dict:'集める',reading:'あつめる',meaning:'to gather / collect something',group:'ichidan'},intransitive:{dict:'集まる',reading:'あつまる',meaning:'to gather / assemble',group:'godan'},scene:'people, data, things'},
+  {transitive:{dict:'直す',reading:'なおす',meaning:'to fix something',group:'godan'},intransitive:{dict:'直る',reading:'なおる',meaning:'to be fixed / recover',group:'godan'},scene:'mistake, machine, habit'}
+];
+function matchesVerbBase(word,base){return !!(word&&base&&word.group===base.group&&(word.dict===base.dict||word.reading===base.reading));}
+function transitivePairFor(word,words=[]){
+  if(!word||isAdjective(word))return null;
+  for(const pair of TRANSITIVE_VERB_PAIRS){
+    const role=matchesVerbBase(word,pair.transitive)?'transitive':matchesVerbBase(word,pair.intransitive)?'intransitive':null;
+    if(!role)continue;
+    const partnerBase=role==='transitive'?pair.intransitive:pair.transitive;
+    const partner=words.find(w=>matchesVerbBase(w,partnerBase))||partnerBase;
+    return{pair,role,partnerRole:role==='transitive'?'intransitive':'transitive',partner,partnerInDeck:words.some(w=>matchesVerbBase(w,partnerBase))};
+  }
+  return null;
+}
 function meaningChoiceWords(current,words){
   const seen=new Set([`${current.group}|${current.dict}`]);
   const choices=[current];
@@ -3531,6 +3557,9 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
   const[scratchAiText,setScratchAiText]=useState('');
   const[scratchAiLoading,setScratchAiLoading]=useState(false);
   const[scratchAiErr,setScratchAiErr]=useState('');
+  const[pairAiText,setPairAiText]=useState('');
+  const[pairAiLoading,setPairAiLoading]=useState(false);
+  const[pairAiErr,setPairAiErr]=useState('');
   const[favoriteMsg,setFavoriteMsg]=useState('');
   const words=useMemo(()=>[...verbs,...adjectives],[verbs,adjectives]);
   const reference=normalizeReferenceState(state.reference);
@@ -3542,6 +3571,8 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
   const scratchMatchesKnown=!!(scratchCandidate&&words.some(w=>w.group===scratchCandidate.group&&(w.dict===scratchCandidate.dict||w.reading===scratchCandidate.reading)));
   const showScratch=!!(query.trim()&&scratchCandidate&&!scratchMatchesKnown);
   const scratchRows=showScratch?formRows(scratchCandidate):[];
+  const transitivePair=selected?transitivePairFor(selected,words):null;
+  const transitivePartnerView=transitivePair?promptDisplay(transitivePair.partner,null,practicePrefs):null;
   useEffect(()=>{if(!selected||!words.some(w=>w.dict===selected.dict))setSelected(matches[0]||words[0]||null);},[matches,words,selected]);
   useEffect(()=>{setLookupAiText('');setLookupAiErr('');},[query]);
   useEffect(()=>{setScratchIndex(0);setScratchAiText('');setScratchAiErr('');setScratchAiLoading(false);},[query]);
@@ -3562,6 +3593,7 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
   useEffect(()=>{setAccentText('');setAccentErr('');},[selected?.dict,selected?.group]);
   useEffect(()=>{setKanjiText('');setKanjiErr('');},[selected?.dict,selected?.group]);
   useEffect(()=>{setWritingText('');setWritingErr('');},[selected?.dict,selected?.group]);
+  useEffect(()=>{setPairAiText('');setPairAiErr('');setPairAiLoading(false);},[selected?.dict,selected?.group]);
   useEffect(()=>{setFavoriteMsg('');},[selected?.dict,selected?.group]);
   function updateReference(fn){setState(prev=>({...prev,reference:fn(prev.reference)}));}
   function rememberSearch(q=query){updateReference(ref=>referenceWithSearch(ref,q));}
@@ -3677,6 +3709,18 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
     }catch(e){setScratchAiErr(e.message||'AI verification failed.');}
     setScratchAiLoading(false);
   }
+  async function explainTransitivePair(){
+    if(!transitivePair||!geminiKey)return;
+    setPairAiLoading(true);setPairAiErr('');setPairAiText('');
+    try{
+      const selectedRole=transitivePair.role==='transitive'?'他動詞 / transitive':'自動詞 / intransitive';
+      const partnerRole=transitivePair.partnerRole==='transitive'?'他動詞 / transitive':'自動詞 / intransitive';
+      const prompt=`Contrast this Japanese transitive/intransitive verb pair for a conjugation learner.\n\nSelected: ${selected.dict} (${selected.reading}) — ${selected.meaning} [${selectedRole}]\nPair: ${transitivePair.partner.dict} (${transitivePair.partner.reading}) — ${transitivePair.partner.meaning} [${partnerRole}]\nScene: ${transitivePair.pair.scene}\n\nExplain the difference with を vs が/は frames, give one natural sentence for each verb, and warn about any form that looks like passive/causative but is actually a separate lexical pair. Keep it concise and practical.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1000,0.25,aiSystemFromPrefs(practicePrefs,'You are a careful Japanese grammar coach. Explain transitive and intransitive verb pairs with particles, context, and learner traps. Do not overgeneralize suffix patterns.'));
+      setPairAiText(reply);
+    }catch(e){setPairAiErr(e.message||'AI pair contrast failed.');}
+    setPairAiLoading(false);
+  }
   if(!selected)return(<div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No words available.</div>);
   return(
     <div className="grid lg:grid-cols-[280px_1fr] gap-4">
@@ -3780,6 +3824,36 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
             {favoriteMsg&&<span className="text-emerald-700">{favoriteMsg}</span>}
           </div>
         </div>
+        {transitivePair&&<div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Transitive pair</div>
+              <h3 className="font-medium mt-1">自動詞 / 他動詞 contrast</h3>
+              <p className="text-xs text-stone-500 mt-1">Same scene, different argument pattern: を for acting on something, が/は for what happens.</p>
+            </div>
+            <button onClick={explainTransitivePair} disabled={!geminiKey||pairAiLoading} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5"><IconSpark className="w-4 h-4"/>{pairAiLoading?'Contrasting...':'AI contrast'}</button>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3 mt-4">
+            <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+              <div className="text-[11px] uppercase tracking-wider text-stone-500">Current · {transitivePair.role==='transitive'?'他動詞':'自動詞'}</div>
+              <ScriptDisplay view={selectedView} className="text-2xl font-medium mt-1" subClassName="text-xs text-stone-500"/>
+              <div className="text-xs text-stone-500 mt-2">{selected.meaning}</div>
+              <div className="text-[11px] text-stone-400 mt-1">{transitivePair.role==='transitive'?'Usually frames an object with を.':'Usually frames the thing/event with が or は.'}</div>
+            </div>
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3">
+              <div className="text-[11px] uppercase tracking-wider text-indigo-700">Pair · {transitivePair.partnerRole==='transitive'?'他動詞':'自動詞'}</div>
+              <ScriptDisplay view={transitivePartnerView} className="text-2xl font-medium mt-1" subClassName="text-xs text-stone-500"/>
+              <div className="text-xs text-stone-500 mt-2">{transitivePair.partner.meaning}</div>
+              <div className="text-[11px] text-stone-400 mt-1">Scene: {transitivePair.pair.scene}</div>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {transitivePair.partnerInDeck&&<button onClick={()=>chooseReferenceWord(transitivePair.partner)} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm text-stone-600">Open pair</button>}
+            {!geminiKey&&<span className="text-xs text-stone-400">Add a Gemini key for contextual pair coaching.</span>}
+          </div>
+          {pairAiErr&&<div className="mt-2 text-sm text-rose-600">{pairAiErr}</div>}
+          {pairAiText&&<div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">{pairAiText}</div>}
+        </div>}
         <div className="bg-white rounded-2xl border border-stone-200 p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-medium"><IconBook className="w-4 h-4 text-indigo-600"/>Dictionary & kanji</div>
