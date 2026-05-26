@@ -2792,6 +2792,7 @@ function parseScannerAIWords(text){
 const SCANNER_TEXT_EXT=/\.(txt|md|csv|tsv|srt|vtt|json|html?)$/i;
 function isScannerTextFile(file){return!!file&&(String(file.type||'').startsWith('text/')||SCANNER_TEXT_EXT.test(file.name||''));}
 function isScannerImageFile(file){return!!file&&String(file.type||'').startsWith('image/');}
+function isScannerPdfFile(file){return!!file&&(String(file.type||'')==='application/pdf'||/\.pdf$/i.test(file.name||''));}
 function readScannerFileAsText(file){
   return new Promise((resolve,reject)=>{
     const reader=new FileReader();
@@ -2810,8 +2811,8 @@ function readScannerFileAsDataURL(file){
 }
 function scannerInlineDataFromDataURL(dataUrl,file={}){
   const m=String(dataUrl||'').match(/^data:([^;,]+);base64,(.*)$/);
-  if(!m)throw new Error('Could not prepare that image.');
-  return{inlineData:{mimeType:file.type||m[1]||'image/jpeg',data:m[2]}};
+  if(!m)throw new Error('Could not prepare that file.');
+  return{inlineData:{mimeType:file.type||m[1]||'application/octet-stream',data:m[2]}};
 }
 function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS}){
   const[query,setQuery]=useState('');
@@ -2920,7 +2921,25 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
       }catch(e){setFileErr(e.message||'Could not read that file.');}
       return;
     }
-    if(!isScannerImageFile(file)){setFileErr('Choose an image or text file.');return;}
+    if(isScannerPdfFile(file)){
+      if(!geminiKey){setFileErr('Add a Gemini API key in Settings to scan PDFs.');return;}
+      setFileLoading(true);setAiRows([]);setAiErr('');setImagePreview('');
+      try{
+        const dataUrl=await readScannerFileAsDataURL(file);
+        const prompt=`Read this Japanese PDF for a conjugation practice app.\n\nExtract the Japanese text in natural reading order and identify useful verbs/adjectives, including words that appear in conjugated forms.\n\nReturn ONLY JSON with this shape:\n{"text":"Japanese text excerpt or full text in reading order","words":[{"dict":"dictionary form in Japanese","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective","evidence":"surface form seen in the PDF"}]}\n\nIf the PDF is long, prioritize the first Japanese-heavy pages and preserve complete sentences where possible.`;
+        const reply=await callGemini([{role:'user',parts:[scannerInlineDataFromDataURL(dataUrl,file),{text:prompt}]}],geminiKey,2600,0.1,'You are a careful Japanese document reader and grammar extraction assistant. Return only valid JSON.');
+        const data=extractJSON(reply);
+        const pdfText=String(data?.text||data?.ocrText||data?.japanese||'').trim();
+        const rows=parseScannerAIWords(data||reply);
+        if(pdfText)setText(prev=>prev.trim()?`${prev.trim()}\n\n${pdfText}`:pdfText);
+        if(rows.length)setAiRows(rows);
+        if(!pdfText&&!rows.length)setFileErr('No Japanese text found in that PDF.');
+        else setMsg(`Scanned ${file.name}${rows.length?` and found ${rows.length} AI candidate${rows.length===1?'':'s'}.`:'.'}`);
+      }catch(e){setFileErr(e.message||'PDF scan failed.');}
+      finally{setFileLoading(false);}
+      return;
+    }
+    if(!isScannerImageFile(file)){setFileErr('Choose an image, PDF, or text file.');return;}
     if(!geminiKey){setFileErr('Add a Gemini API key in Settings to scan images.');return;}
     setFileLoading(true);setAiRows([]);setAiErr('');
     try{
@@ -3003,8 +3022,8 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
         <textarea value={text} onChange={e=>{setText(e.target.value);setMsg('');}} placeholder="昨日、静かなカフェで本を読んで、ケーキを食べました。" className="w-full min-h-40 px-3 py-2 border border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none" lang="ja" autoCorrect="off" spellCheck="false"/>
         <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2 mt-3 items-end">
           <label className="block">
-            <span className="text-xs text-stone-500 block mb-1">Photo/text source</span>
-            <input type="file" accept="image/*,.txt,.md,.csv,.tsv,.srt,.vtt" capture="environment" onChange={importSourceFile} disabled={fileLoading} className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-stone-100 file:text-stone-700"/>
+            <span className="text-xs text-stone-500 block mb-1">Photo/PDF/text source</span>
+            <input type="file" accept="image/*,application/pdf,.pdf,.txt,.md,.csv,.tsv,.srt,.vtt,.html,.htm" capture="environment" onChange={importSourceFile} disabled={fileLoading} className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-stone-100 file:text-stone-700"/>
           </label>
           <button onClick={clearScanner} disabled={!text&&!imagePreview&&!aiRows.length} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 disabled:opacity-40 rounded-lg text-sm">Clear</button>
         </div>
