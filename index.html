@@ -792,7 +792,24 @@ function gradeCard(card,correct){
   if(correct){let iv;if(card.reps===0)iv=1;else if(card.reps===1)iv=3;else iv=Math.ceil(card.interval*card.ease);return{ease:card.ease,reps:card.reps+1,interval:iv,nextReview:now+iv*DAY,correct:card.correct+1,incorrect:card.incorrect,lastSeen:now};}
   return{ease:Math.max(1.3,card.ease-0.2),reps:0,interval:0,nextReview:now+60000,correct:card.correct,incorrect:card.incorrect+1,lastSeen:now};
 }
-function selectNext(state,verbs,enabledTypes,lastRuleId){
+function ruleWeakScore(state,ruleId){
+  const card=(state.cards||{})[ruleId]||{};
+  const reviews=(card.correct||0)+(card.incorrect||0);
+  const missRate=reviews?(card.incorrect||0)/reviews:0;
+  const unresolved=(state.mistakes||[]).filter(m=>!m.resolved&&ruleId.endsWith(`|${m.type}`)).reduce((sum,m)=>sum+(m.count||1),0);
+  const verbStats=Object.values(state.verbStats||{}).map(vs=>vs[ruleId]).filter(Boolean);
+  const verbMisses=verbStats.reduce((sum,s)=>sum+(s.incorrect||0),0);
+  return (card.incorrect||0)*2+missRate*4+unresolved*3+verbMisses;
+}
+function pickWeakWeighted(pool,state){
+  const scored=pool.map(p=>({...p,weakScore:ruleWeakScore(state,p.rule.id)}));
+  if(!scored.some(p=>p.weakScore>0))return null;
+  const weights=scored.map(p=>1+p.weakScore*p.weakScore);
+  let r=Math.random()*weights.reduce((a,b)=>a+b,0);
+  for(let i=0;i<scored.length;i++){r-=weights[i];if(r<=0)return scored[i];}
+  return scored[scored.length-1];
+}
+function selectNext(state,verbs,enabledTypes,lastRuleId,prefs=DEFAULT_PREFS){
   const now=Date.now(),pool=[];
   for(const rule of RULES){
     if(!enabledTypes.includes(rule.type))continue;
@@ -806,9 +823,15 @@ function selectNext(state,verbs,enabledTypes,lastRuleId){
   const fresh=avail.filter(p=>!state.cards[p.rule.id]);
   const future=avail.filter(p=>{const c=state.cards[p.rule.id];return c&&c.nextReview>now;});
   let chosen;
-  if(due.length){due.sort((a,b)=>state.cards[a.rule.id].nextReview-state.cards[b.rule.id].nextReview);const sl=due.slice(0,Math.min(5,due.length));chosen=sl[Math.floor(Math.random()*sl.length)];}
-  else if(fresh.length){chosen=fresh[Math.floor(Math.random()*fresh.length)];}
-  else{future.sort((a,b)=>state.cards[a.rule.id].nextReview-state.cards[b.rule.id].nextReview);chosen=future[0];}
+  if((prefs.practiceFocus||'balanced')==='weak'){
+    const weakPool=[...due,...future,...fresh];
+    chosen=pickWeakWeighted(weakPool,state);
+  }
+  if(!chosen){
+    if(due.length){due.sort((a,b)=>state.cards[a.rule.id].nextReview-state.cards[b.rule.id].nextReview);const sl=due.slice(0,Math.min(5,due.length));chosen=sl[Math.floor(Math.random()*sl.length)];}
+    else if(fresh.length){chosen=fresh[Math.floor(Math.random()*fresh.length)];}
+    else{future.sort((a,b)=>state.cards[a.rule.id].nextReview-state.cards[b.rule.id].nextReview);chosen=future[0];}
+  }
   if(!chosen)return null;
   const verb=pickVerb(chosen.candidates,chosen.rule.id,state.verbStats);
   return{id:chosen.rule.id,verb,type:chosen.rule.type,card:state.cards[chosen.rule.id],ruleLabel:chosen.rule.label};
@@ -874,7 +897,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,listeningPrompt:false,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,listeningPrompt:false,practiceFocus:'balanced',voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -1158,7 +1181,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const promptType=current?pickPromptType(current.verb,current.type,practicePrefs):null;
   const promptAudioText=current?(promptType?conjugateItem(current.verb,promptType):current.verb.reading):'';
 
-  useEffect(()=>{if(current===null){setCurrent(selectNext(state,practiceWords,enabledTypes,null));}},[current,practiceWords,enabledTypes]);
+  useEffect(()=>{if(current===null){setCurrent(selectNext(state,practiceWords,enabledTypes,null,practicePrefs));}},[current,practiceWords,enabledTypes,practicePrefs]);
   useEffect(()=>{if(current&&practiceWords.length&&!practiceWords.some(w=>w.dict===current.verb.dict&&w.group===current.verb.group)){setCurrent(null);setAnswer('');setPhase('answering');}},[practiceWords,current]);
   useEffect(()=>{if(phase==='answering'&&inputRef.current)inputRef.current.focus();},[current,phase]);
   useEffect(()=>{setShowPromptText(!listeningPrompt);},[current?.id,listeningPrompt]);
@@ -1189,7 +1212,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const hidePromptText=listeningPrompt&&phase==='answering'&&!showPromptText;
 
   function submit(choiceValue){
-    if(phase==='reviewing'){setChatOpen(false);setCurrent(selectNext(state,practiceWords,enabledTypes,current.id));setAnswer('');setPhase('answering');return;}
+    if(phase==='reviewing'){setChatOpen(false);setCurrent(selectNext(state,practiceWords,enabledTypes,current.id,practicePrefs));setAnswer('');setPhase('answering');return;}
     const raw=choiceValue!==undefined?choiceValue:answer;
     if(!raw.trim())return;
     const normalized=choiceValue!==undefined?raw:toHiragana(raw);
@@ -1210,7 +1233,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
       <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium mb-2">Timed drill complete</div>
       <div className="text-4xl font-semibold text-stone-900 mb-2">{state.session.correct}/{state.session.reviewed}</div>
       <div className="text-sm text-stone-500 mb-5">Session accuracy: {state.session.reviewed?Math.round(state.session.correct/state.session.reviewed*100):0}%</div>
-      <button onClick={()=>{setEndAt(Date.now()+(practicePrefs.durationSec||60)*1000);setNow(Date.now());setCurrent(selectNext(state,practiceWords,enabledTypes,current.id));setAnswer('');setPhase('answering');}} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium">Restart timed drill</button>
+      <button onClick={()=>{setEndAt(Date.now()+(practicePrefs.durationSec||60)*1000);setNow(Date.now());setCurrent(selectNext(state,practiceWords,enabledTypes,current.id,practicePrefs));setAnswer('');setPhase('answering');}} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium">Restart timed drill</button>
     </div>
   );
 
@@ -2452,7 +2475,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:16,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:17,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -2486,6 +2509,10 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
         <div>
           <label className="text-xs text-stone-500 block mb-1">Answer mode</label>
           <div className="flex gap-2">{[{id:'input',label:'Free input'},{id:'choice',label:'Multiple choice'}].map(o=>(<button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,answerMode:o.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.answerMode===o.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
+        </div>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Practice focus</label>
+          <div className="flex gap-2">{[{id:'balanced',label:'Balanced'},{id:'weak',label:'Weak spots'}].map(o=>(<button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,practiceFocus:o.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${((practicePrefs.practiceFocus||'balanced')===o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
         </div>
         <div>
           <label className="text-xs text-stone-500 block mb-1">Theme</label>
