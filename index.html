@@ -111,10 +111,13 @@ const WORD_META={
 };
 function getWordMeta(word){return{jlpt:'N3',lesson:null,...(WORD_META[word.dict]||{})};}
 function wordKind(word){return isAdjective(word)?word.group:'verb';}
-function filterWordsForPrefs(words,prefs=DEFAULT_PREFS){
+function wordKey(word){return`${word.group}:${word.dict}`;}
+function filterWordsForPrefs(words,prefs=DEFAULT_PREFS,wordLists=[]){
   const levels=prefs.jlptLevels&&prefs.jlptLevels.length?prefs.jlptLevels:JLPT_LEVELS;
   const types=prefs.wordTypes&&prefs.wordTypes.length?prefs.wordTypes:WORD_TYPE_OPTIONS.map(o=>o.id);
-  return words.filter(w=>levels.includes(getWordMeta(w).jlpt)&&types.includes(wordKind(w)));
+  const selectedLists=prefs.wordListIds&&prefs.wordListIds.length?prefs.wordListIds:[];
+  const allowedKeys=selectedLists.length?new Set(wordLists.filter(l=>selectedLists.includes(l.id)).flatMap(l=>l.wordKeys||[])):null;
+  return words.filter(w=>levels.includes(getWordMeta(w).jlpt)&&types.includes(wordKind(w))&&(!allowedKeys||allowedKeys.has(wordKey(w))));
 }
 
 const CONJ_TYPES=[
@@ -680,11 +683,11 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji',promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],wordTypes:['verb','i-adjective','na-adjective']};
+const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji',promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
-function saveAll(state,customVerbs,customAdjectives,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
-  try{localStorage.setItem(STORAGE_KEY,JSON.stringify({state,customVerbs,customAdjectives,syncConfig,lastSyncedAt,geminiKey,practicePrefs}));}catch{}
+function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify({state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey,practicePrefs}));}catch{}
 }
 
 // ============================================================================
@@ -703,6 +706,7 @@ function App(){
   const[state,setState]=useState(defaultState);
   const[customVerbs,setCustomVerbs]=useState([]);
   const[customAdjectives,setCustomAdjectives]=useState([]);
+  const[wordLists,setWordLists]=useState([]);
   const[practicePrefs,setPracticePrefs]=useState(DEFAULT_PREFS);
   const[syncConfig,setSyncConfig]=useState(DEFAULT_SYNC);
   const[syncStatus,setSyncStatus]=useState({kind:'idle',message:'',at:null});
@@ -718,6 +722,7 @@ function App(){
       if(local.state)setState(mergeState(local.state,{reviewed:0,correct:0}));
       if(Array.isArray(local.customVerbs))setCustomVerbs(local.customVerbs);
       if(Array.isArray(local.customAdjectives))setCustomAdjectives(local.customAdjectives);
+      if(Array.isArray(local.wordLists))setWordLists(local.wordLists);
       if(local.practicePrefs)setPracticePrefs({...DEFAULT_PREFS,...local.practicePrefs});
       if(local.syncConfig){cfg={...DEFAULT_SYNC,...local.syncConfig};setSyncConfig(cfg);}
       if(typeof local.lastSyncedAt==='number')lastSyncedAtRef.current=local.lastSyncedAt;
@@ -732,6 +737,7 @@ function App(){
             if(cloud.data.state)setState(mergeState(cloud.data.state,{reviewed:0,correct:0}));
             if(Array.isArray(cloud.data.customVerbs))setCustomVerbs(cloud.data.customVerbs);
             if(Array.isArray(cloud.data.customAdjectives))setCustomAdjectives(cloud.data.customAdjectives);
+            if(Array.isArray(cloud.data.wordLists))setWordLists(cloud.data.wordLists);
             if(cloud.data.practicePrefs)setPracticePrefs({...DEFAULT_PREFS,...cloud.data.practicePrefs});
             lastSyncedAtRef.current=cloudAt;setSyncStatus({kind:'ok',message:'Restored from cloud',at:cloudAt});
           }else{setSyncStatus({kind:'ok',message:'Up to date',at:lastSyncedAtRef.current});}
@@ -743,16 +749,16 @@ function App(){
 
   useEffect(()=>{
     if(!hydrated)return;
-    saveAll(state,customVerbs,customAdjectives,syncConfig,lastSyncedAtRef.current,geminiKey,practicePrefs);
+    saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAtRef.current,geminiKey,practicePrefs);
     if(syncConfig.enabled&&syncReady(syncConfig)){
       if(pushTimer.current)clearTimeout(pushTimer.current);
       pushTimer.current=setTimeout(async()=>{
         setSyncStatus(s=>({...s,kind:'syncing',message:'Saving to cloud…'}));
-        try{await cloudUpsert(syncConfig,{state,customVerbs,customAdjectives,practicePrefs});const now=Date.now();lastSyncedAtRef.current=now;saveAll(state,customVerbs,customAdjectives,syncConfig,now,geminiKey,practicePrefs);setSyncStatus({kind:'ok',message:'Saved to cloud',at:now});}
+        try{await cloudUpsert(syncConfig,{state,customVerbs,customAdjectives,wordLists,practicePrefs});const now=Date.now();lastSyncedAtRef.current=now;saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,now,geminiKey,practicePrefs);setSyncStatus({kind:'ok',message:'Saved to cloud',at:now});}
         catch(e){setSyncStatus({kind:'error',message:e.message||'Push failed',at:null});}
       },2000);
     }
-  },[state,customVerbs,customAdjectives,syncConfig,geminiKey,practicePrefs,hydrated]);
+  },[state,customVerbs,customAdjectives,wordLists,syncConfig,geminiKey,practicePrefs,hydrated]);
 
   async function syncNow(){
     if(!syncReady(syncConfig))return;
@@ -764,10 +770,11 @@ function App(){
         if(cloud.data.state)setState(mergeState(cloud.data.state,state.session));
         if(Array.isArray(cloud.data.customVerbs))setCustomVerbs(cloud.data.customVerbs);
         if(Array.isArray(cloud.data.customAdjectives))setCustomAdjectives(cloud.data.customAdjectives);
+        if(Array.isArray(cloud.data.wordLists))setWordLists(cloud.data.wordLists);
         if(cloud.data.practicePrefs)setPracticePrefs({...DEFAULT_PREFS,...cloud.data.practicePrefs});
         lastSyncedAtRef.current=cloudAt;setSyncStatus({kind:'ok',message:'Pulled from cloud',at:cloudAt});
       }else{
-        await cloudUpsert(syncConfig,{state,customVerbs,customAdjectives,practicePrefs});const now=Date.now();lastSyncedAtRef.current=now;setSyncStatus({kind:'ok',message:'Pushed to cloud',at:now});
+        await cloudUpsert(syncConfig,{state,customVerbs,customAdjectives,wordLists,practicePrefs});const now=Date.now();lastSyncedAtRef.current=now;setSyncStatus({kind:'ok',message:'Pushed to cloud',at:now});
       }
     }catch(e){setSyncStatus({kind:'error',message:e.message||'Sync failed',at:null});}
   }
@@ -790,20 +797,21 @@ function App(){
             {syncConfig.enabled&&(<div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind==='error'?'text-rose-500':syncStatus.kind==='syncing'?'text-amber-500':'text-emerald-600'}`}><IconCloud className="w-3 h-3"/><span>{syncStatus.kind==='syncing'?'syncing':syncStatus.kind==='error'?'sync error':'synced'}</span></div>)}
           </div>
         </header>
-        <nav className="grid grid-cols-3 sm:grid-cols-9 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','classify','mistakes','reference','coach','stats','levels','verbs','settings'].map(t=>(
+        <nav className="grid grid-cols-3 sm:grid-cols-10 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
+          {['study','classify','mistakes','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
             <button key={t} onClick={()=>setTab(t)} className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
-        {tab==='study'&&<StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
-        {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs}/>}
+        {tab==='study'&&<StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists}/>}
+        {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
         {tab==='reference'&&<ReferenceView verbs={allVerbs} adjectives={allAdjectives} geminiKey={geminiKey}/>}
         {tab==='coach'&&<CoachView geminiKey={geminiKey}/>}
         {tab==='stats'&&<StatsView state={state} verbs={allWords}/>}
         {tab==='levels'&&<SRSLevelView state={state} verbs={allWords}/>}
         {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} geminiKey={geminiKey} state={state}/>}
-        {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs}/>}
+        {tab==='lists'&&<ListsView words={allWords} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs}/>}
+        {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs}/>}
       </div>
     </div>
   );
@@ -828,7 +836,7 @@ function makeChoices(current,verbs){
   for(const v of shuffled(verbs.filter(v=>v.group===current.verb.group))){const x=conjugateItem(v,current.type);if(x&&x!==expected)set.add(x);if(set.size>=4)break;}
   return shuffled([...set].slice(0,4));
 }
-function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS}){
+function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,wordLists=[]}){
   const[current,setCurrent]=useState(null);
   const[answer,setAnswer]=useState('');
   const[phase,setPhase]=useState('answering');
@@ -838,7 +846,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS})
   const[now,setNow]=useState(Date.now());
   const inputRef=useRef(null);
   const enabledTypes=state.enabledTypes.length>0?state.enabledTypes:['plain-past'];
-  const practiceWords=useMemo(()=>filterWordsForPrefs(verbs,practicePrefs),[verbs,practicePrefs]);
+  const practiceWords=useMemo(()=>filterWordsForPrefs(verbs,practicePrefs,wordLists),[verbs,practicePrefs,wordLists]);
 
   useEffect(()=>{if(current===null){setCurrent(selectNext(state,practiceWords,enabledTypes,null));}},[current,practiceWords,enabledTypes]);
   useEffect(()=>{if(current&&practiceWords.length&&!practiceWords.some(w=>w.dict===current.verb.dict&&w.group===current.verb.group)){setCurrent(null);setAnswer('');setPhase('answering');}},[practiceWords,current]);
@@ -1091,8 +1099,8 @@ function classifyHint(word){
   if(word.group==='i-adjective')return `${word.reading} conjugates as an い-adjective: ${conjugateAdjective(word,'adj-plain-past')}, ${conjugateAdjective(word,'adj-plain-negative')}.`;
   return `${word.reading} is a な-adjective: ${conjugateAdjective(word,'adj-attributive')} + noun, or ${conjugateAdjective(word,'adj-polite-present')}.`;
 }
-function ClassificationView({state,setState,words,practicePrefs}){
-  const filtered=useMemo(()=>filterWordsForPrefs(words,practicePrefs),[words,practicePrefs]);
+function ClassificationView({state,setState,words,practicePrefs,wordLists=[]}){
+  const filtered=useMemo(()=>filterWordsForPrefs(words,practicePrefs,wordLists),[words,practicePrefs,wordLists]);
   const[current,setCurrent]=useState(null);
   const[result,setResult]=useState(null);
   useEffect(()=>{if(!current&&filtered.length)setCurrent(filtered[Math.floor(Math.random()*filtered.length)]);},[current,filtered]);
@@ -1332,6 +1340,105 @@ function CoachView({geminiKey}){
 }
 
 // ============================================================================
+// LISTS VIEW
+// ============================================================================
+function parseWordRows(text){
+  return text.split(/\r?\n/).map(line=>line.trim()).filter(Boolean).map(line=>{
+    const cols=line.split(/\t|,/).map(c=>c.trim()).filter(Boolean);
+    if(cols.length<4)return null;
+    const groupText=cols[3].toLowerCase();
+    const group=normalizeGroup(cols[3])||(groupText.includes('i-adjective')||groupText.includes('i-adj')||cols[3].includes('い')?'i-adjective':groupText.includes('na-adjective')||groupText.includes('na-adj')||cols[3].includes('な')?'na-adjective':null);
+    if(!group)return null;
+    const reading=toHiragana(cols[1]);
+    if(!isAllKana(reading))return null;
+    return{dict:cols[0],reading,meaning:cols[2],group};
+  }).filter(Boolean);
+}
+function addUniqueWord(list,word){return list.some(w=>w.dict===word.dict&&w.group===word.group)?list:[...list,word];}
+function ListsView({words,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,wordLists,setWordLists,practicePrefs,setPracticePrefs}){
+  const[name,setName]=useState('');
+  const[activeId,setActiveId]=useState(wordLists[0]?.id||'');
+  const[query,setQuery]=useState('');
+  const[importText,setImportText]=useState('');
+  const[msg,setMsg]=useState('');
+  const active=wordLists.find(l=>l.id===activeId)||wordLists[0]||null;
+  useEffect(()=>{if(!activeId&&wordLists[0])setActiveId(wordLists[0].id);if(activeId&&!wordLists.some(l=>l.id===activeId))setActiveId(wordLists[0]?.id||'');},[wordLists,activeId]);
+  const activeKeys=new Set(active?.wordKeys||[]);
+  const matches=useMemo(()=>searchWords(query,words).slice(0,120),[query,words]);
+  const selectedIds=practicePrefs.wordListIds||[];
+  function createList(){
+    const n=name.trim()||`List ${wordLists.length+1}`;
+    const l={id:'list-'+Date.now().toString(36),name:n,wordKeys:[]};
+    setWordLists([...wordLists,l]);setActiveId(l.id);setName('');
+  }
+  function deleteList(id){
+    setWordLists(wordLists.filter(l=>l.id!==id));
+    setPracticePrefs({...practicePrefs,wordListIds:selectedIds.filter(x=>x!==id)});
+  }
+  function toggleActiveFilter(id){
+    const next=selectedIds.includes(id)?selectedIds.filter(x=>x!==id):[...selectedIds,id];
+    setPracticePrefs({...practicePrefs,wordListIds:next});
+  }
+  function toggleWord(word){
+    if(!active)return;
+    const key=wordKey(word);
+    const next=activeKeys.has(key)?active.wordKeys.filter(k=>k!==key):[...(active.wordKeys||[]),key];
+    setWordLists(wordLists.map(l=>l.id===active.id?{...l,wordKeys:next}:l));
+  }
+  function importRows(){
+    if(!active)return;
+    const rows=parseWordRows(importText);
+    if(!rows.length){setMsg('No valid rows found. Use dict,reading,meaning,group.');return;}
+    let verbs=customVerbs,adjs=customAdjectives,keys=new Set(active.wordKeys||[]);
+    for(const r of rows){
+      if(isAdjective(r))adjs=addUniqueWord(adjs,r);else verbs=addUniqueWord(verbs,r);
+      keys.add(wordKey(r));
+    }
+    setCustomVerbs(verbs);setCustomAdjectives(adjs);
+    setWordLists(wordLists.map(l=>l.id===active.id?{...l,wordKeys:[...keys]}:l));
+    setImportText('');setMsg(`Imported ${rows.length} row${rows.length===1?'':'s'} into ${active.name}.`);
+  }
+  return(
+    <div className="grid lg:grid-cols-[280px_1fr] gap-4">
+      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+        <div className="p-4 border-b border-stone-100">
+          <h3 className="font-medium mb-3">Study lists</h3>
+          <div className="flex gap-2"><input value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')createList();}} placeholder="New list name" className="min-w-0 flex-1 px-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/><button onClick={createList} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"><IconPlus className="w-4 h-4"/></button></div>
+        </div>
+        <div className="divide-y divide-stone-50">
+          {wordLists.length===0?<div className="p-6 text-sm text-stone-500">Create a list to scope drills or collect textbook vocabulary.</div>:wordLists.map(l=>(<div key={l.id} className={`p-3 ${active?.id===l.id?'bg-indigo-50':'bg-white'}`}>
+            <button onClick={()=>setActiveId(l.id)} className="w-full text-left"><div className="font-medium text-stone-800">{l.name}</div><div className="text-xs text-stone-500">{(l.wordKeys||[]).length} words</div></button>
+            <div className="flex gap-2 mt-2"><button onClick={()=>toggleActiveFilter(l.id)} className={`flex-1 px-2 py-1.5 rounded-lg text-xs border ${selectedIds.includes(l.id)?'bg-stone-800 text-white border-stone-800':'border-stone-200 hover:bg-stone-50'}`}>{selectedIds.includes(l.id)?'In drill':'Use in drill'}</button><button onClick={()=>deleteList(l.id)} className="px-2 py-1.5 border border-stone-200 hover:text-rose-600 rounded-lg text-xs">Delete</button></div>
+          </div>))}
+        </div>
+      </div>
+      <div className="space-y-4">
+        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div><h3 className="font-medium">{active?active.name:'No list selected'}</h3><p className="text-xs text-stone-500">Add starter/custom words, then enable lists as drill scopes.</p></div>
+            {selectedIds.length>0&&<button onClick={()=>setPracticePrefs({...practicePrefs,wordListIds:[]})} className="text-xs text-stone-400 hover:text-stone-700">Clear list filter</button>}
+          </div>
+          <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search words or conjugated forms" className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none" autoCorrect="off" spellCheck="false"/>
+          <div className="mt-3 max-h-72 overflow-y-auto grid sm:grid-cols-2 gap-2">
+            {matches.map(w=><button key={wordKey(w)} disabled={!active} onClick={()=>toggleWord(w)} className={`text-left px-3 py-2 rounded-xl border transition ${activeKeys.has(wordKey(w))?'bg-emerald-50 border-emerald-200':'bg-white border-stone-200 hover:border-indigo-300'}`}>
+              <div className="flex items-center justify-between gap-2"><span className="font-medium" lang="ja">{w.dict}</span><span className="text-[11px] text-stone-400">{isAdjective(w)?'adj':'verb'}</span></div>
+              <div className="text-xs text-stone-500" lang="ja">{w.reading}</div><div className="text-xs text-stone-400 truncate">{w.meaning}</div>
+            </button>)}
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <h3 className="font-medium mb-1">Bulk import into list</h3>
+          <p className="text-xs text-stone-500 mb-3">Paste CSV/TSV rows: dictionary, reading, meaning, group. Groups: ichidan, godan, suru, kuru, i-adjective, na-adjective.</p>
+          <textarea value={importText} onChange={e=>{setImportText(e.target.value);setMsg('');}} placeholder={"始める,はじめる,to begin,ichidan\n有名,ゆうめい,famous,na-adjective"} className="w-full h-28 px-3 py-2 text-sm font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none" autoCorrect="off" spellCheck="false"/>
+          {msg&&<div className="mt-2 text-sm text-stone-600">{msg}</div>}
+          <button onClick={importRows} disabled={!active||!importText.trim()} className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium">Import rows</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // VERBS VIEW
 // ============================================================================
 function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
@@ -1485,7 +1592,7 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
 // ============================================================================
 // SETTINGS VIEW
 // ============================================================================
-function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,syncConfig,setSyncConfig,syncStatus,syncNow,geminiKey,setGeminiKey,practicePrefs,setPracticePrefs}){
+function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,wordLists,setWordLists,syncConfig,setSyncConfig,syncStatus,syncNow,geminiKey,setGeminiKey,practicePrefs,setPracticePrefs}){
   const[confirmReset,setConfirmReset]=useState(false);
   const[exportOpen,setExportOpen]=useState(false);
   const[importOpen,setImportOpen]=useState(false);
@@ -1502,7 +1609,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:5,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],daily:state.daily,classify:state.classify},customVerbs,customAdjectives,practicePrefs}),[state,customVerbs,customAdjectives,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:6,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -1511,7 +1618,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
   }
   function reset(){setState({...defaultState(),enabledTypes:state.enabledTypes});setConfirmReset(false);}
   async function copyExport(){try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(exportData);setCopyOk(true);setTimeout(()=>setCopyOk(false),2000);}}catch{}}
-  function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState(mergeState(data.state,{reviewed:0,correct:0}));if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);if(Array.isArray(data.customAdjectives))setCustomAdjectives(data.customAdjectives);if(data.practicePrefs)setPracticePrefs({...DEFAULT_PREFS,...data.practicePrefs});setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
+  function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState(mergeState(data.state,{reviewed:0,correct:0}));if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);if(Array.isArray(data.customAdjectives))setCustomAdjectives(data.customAdjectives);if(Array.isArray(data.wordLists))setWordLists(data.wordLists);if(data.practicePrefs)setPracticePrefs({...DEFAULT_PREFS,...data.practicePrefs});setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
   const statusColor=syncStatus.kind==='error'?'text-rose-700 bg-rose-50 border-rose-200':syncStatus.kind==='syncing'?'text-amber-700 bg-amber-50 border-amber-200':syncStatus.kind==='ok'?'text-emerald-700 bg-emerald-50 border-emerald-200':'text-stone-600 bg-stone-50 border-stone-200';
 
   return(<div className="space-y-4">
