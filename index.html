@@ -287,10 +287,11 @@ function isRedundantPracticeType(item,typeId,enabledTypeIds,prefs=DEFAULT_PREFS)
 function hashString(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h);}
 function pickPromptType(item,targetType,prefs=DEFAULT_PREFS){
   const source=prefs.promptForm||'dictionary';
-  const types=compatibleTypes(item).filter(t=>t.id!==targetType);
+  const allowTrick=!!prefs.trickQuestions;
+  const types=compatibleTypes(item).filter(t=>allowTrick||t.id!==targetType);
   if(source==='dictionary'||!types.length)return null;
-  if(source==='random')return types[hashString(`${item.dict}|${targetType}|${JSON.stringify(resolveDisplayScripts(prefs))}`)%types.length].id;
-  if(isTypeCompatible(item,source)&&source!==targetType)return source;
+  if(source==='random')return types[hashString(`${item.dict}|${targetType}|${allowTrick?'trick':'normal'}|${JSON.stringify(resolveDisplayScripts(prefs))}`)%types.length].id;
+  if(isTypeCompatible(item,source)&&(allowTrick||source!==targetType))return source;
   return null;
 }
 function promptFormLabel(item,promptType){
@@ -1070,7 +1071,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,practiceFocus:'balanced',skipDuplicateForms:true,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordGroups:['ichidan','godan','suru','kuru','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,practiceFocus:'balanced',skipDuplicateForms:true,trickQuestions:false,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordGroups:['ichidan','godan','suru','kuru','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -1433,10 +1434,11 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const diagnostic=phase==='reviewing'&&!wasCorrect&&!reverseDrill?diagnoseItem(current.verb,current.type,answer):'';
   const choices=reverseDrill?makeReverseChoices(current,practiceWords):makeChoices(current,practiceWords);
   const wordType=isAdjective(current.verb)?'Adjective':'Verb';
+  const noChangePrompt=!reverseDrill&&promptType===current.type;
   const taskLabel=reverseDrill?`Reverse ${typeInfo.label}`:typeInfo.label;
-  const taskHint=reverseDrill?'answer with dictionary form':typeInfo.hint;
+  const taskHint=reverseDrill?'answer with dictionary form':noChangePrompt?'same form; answer may not change':typeInfo.hint;
   const taskSub=reverseDrill?'辞書形':typeInfo.sub;
-  const taskOverride=reverseDrill?`Reverse drill: identify the dictionary form from ${typeInfo.label} (${sourceForm})`:'';
+  const taskOverride=reverseDrill?`Reverse drill: identify the dictionary form from ${typeInfo.label} (${sourceForm})`:noChangePrompt?`Trick no-change drill: the prompt is already ${typeInfo.label}, so the correct answer is the same form.`:'';
   const reviewLimit=Number(practicePrefs.reviewLimit||0);
   const reviewsDone=Math.max(0,(state.session.reviewed||0)-reviewBase);
   const reviewSetComplete=reviewLimit>0&&reviewsDone>=reviewLimit;
@@ -1509,6 +1511,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
             <ScriptDisplay view={promptView} className="text-4xl sm:text-5xl font-medium mb-2" subClassName="text-base text-stone-500"/>
           )}
           {promptType&&!hidePromptText&&<div className="text-xs text-stone-400">Base: <span lang="ja">{current.verb.dict}</span>{current.verb.dict!==current.verb.reading&&<span lang="ja"> · {current.verb.reading}</span>}</div>}
+          {noChangePrompt&&!hidePromptText&&<div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[11px] font-medium">Trick: no change needed</div>}
           {reverseDrill&&!hidePromptText&&<div className="text-xs text-stone-400">Answer with the dictionary form.</div>}
           <div className="text-sm text-stone-400 mt-2 italic">{current.verb.meaning}</div>
           <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[current.verb.group]} · {wordType}</div>
@@ -3812,7 +3815,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:28,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:29,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -3886,7 +3889,10 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
             <optgroup label="Verb source forms">{CONJ_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</optgroup>
             <optgroup label="Adjective source forms">{ADJ_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</optgroup>
           </select>
-          <p className="text-[11px] text-stone-400 mt-1">Practice transformations like て-form → passive; incompatible sources fall back to dictionary form.</p>
+          <div className="mt-2 grid sm:grid-cols-[1fr_auto] gap-2 items-center">
+            <p className="text-[11px] text-stone-400">Practice transformations like て-form → passive; incompatible sources fall back to dictionary form.</p>
+            <button onClick={()=>setPracticePrefs({...practicePrefs,trickQuestions:!practicePrefs.trickQuestions})} className={`px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.trickQuestions?'bg-indigo-600 text-white border-indigo-600':'bg-white border-stone-200 hover:border-stone-300'}`}>Trick questions {practicePrefs.trickQuestions?'on':'off'}</button>
+          </div>
         </div>
         <div>
           <label className="text-xs text-stone-500 block mb-1">Daily goal</label>
