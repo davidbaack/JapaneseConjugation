@@ -1550,6 +1550,26 @@ function editDistance(a,b){
   for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
   return dp[a.length][b.length];
 }
+function hasAdjacentTransposition(a,b){
+  a=Array.from(normalizeJapaneseText(a));b=Array.from(normalizeJapaneseText(b));
+  if(a.length!==b.length)return false;
+  const diffs=[];
+  for(let i=0;i<a.length;i++)if(a[i]!==b[i])diffs.push(i);
+  return diffs.length===2&&diffs[1]===diffs[0]+1&&a[diffs[0]]===b[diffs[1]]&&a[diffs[1]]===b[diffs[0]];
+}
+function typoGuardForAnswer(raw,normalized,expected,item,reverseDrill){
+  const submitted=reverseDrill?toHiragana(raw):normalized;
+  const target=reverseDrill?item.reading:expected;
+  if(!submitted||!target||submitted===target)return null;
+  const maxLen=Math.max(Array.from(normalizeJapaneseText(submitted)).length,Array.from(normalizeJapaneseText(target)).length);
+  if(maxLen<3)return null;
+  const distance=editDistance(submitted,target);
+  let detail='';
+  if(distance===1)detail=reverseDrill?'The dictionary form is very close. Check one character, then press Enter again.':'One kana is off. Check the highlighted cells, then press Enter again.';
+  else if(hasAdjacentTransposition(submitted,target))detail=reverseDrill?'Two adjacent characters look swapped. Fix them, then press Enter again.':'Two adjacent kana look swapped. Fix them, then press Enter again.';
+  else return null;
+  return{key:`${target}|${submitted}`,submitted,target,detail};
+}
 function speechSimilarity(target,heard){
   const a=normalizeJapaneseText(target),b=normalizeJapaneseText(heard);
   if(!a||!b)return null;
@@ -1608,6 +1628,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const[aiHintErr,setAiHintErr]=useState('');
   const[coachRevealed,setCoachRevealed]=useState(0);
   const[revealedMiss,setRevealedMiss]=useState(false);
+  const[typoGuard,setTypoGuard]=useState(null);
   const[endAt,setEndAt]=useState(null);
   const[now,setNow]=useState(Date.now());
   const[reviewBase,setReviewBase]=useState(state.session.reviewed||0);
@@ -1631,6 +1652,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   useEffect(()=>{if(current&&phase==='reviewing'&&practicePrefs.autoSpeak)speakJapanese(conjugateItem(current.verb,current.type),0.9,practicePrefs.voiceURI);},[current,phase,practicePrefs.autoSpeak,practicePrefs.voiceURI]);
   useEffect(()=>{setCoachRevealed(0);},[current?.id,practicePrefs.answerMode]);
   useEffect(()=>{if(phase==='answering')setRevealedMiss(false);},[current?.id,phase]);
+  useEffect(()=>{setTypoGuard(null);},[current?.id,phase]);
   useEffect(()=>{setReviewBase(state.session.reviewed||0);},[practicePrefs.reviewLimit]);
   useEffect(()=>{
     if(practicePrefs.durationSec>0)setEndAt(Date.now()+practicePrefs.durationSec*1000);
@@ -1697,7 +1719,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   function submit(choiceValue){
     if(autoAdvanceRef.current){clearTimeout(autoAdvanceRef.current);autoAdvanceRef.current=null;}
     if(phase==='reviewing'){
-      setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setPhase('answering');
+      setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setTypoGuard(null);setPhase('answering');
       if(!reviewSetComplete)setCurrent(selectNext(state,practiceWords,enabledTypes,current.id,practicePrefs));
       return;
     }
@@ -1705,6 +1727,8 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
     if(!raw.trim())return;
     const normalized=choiceValue!==undefined?raw:toHiragana(raw);
     const ok=reverseDrill?dictionaryAnswerMatches(raw,current.verb):normalized===expected;
+    const nearMiss=choiceValue===undefined&&!ok?typoGuardForAnswer(raw,normalized,expected,current.verb,reverseDrill):null;
+    if(nearMiss&&typoGuard?.key!==nearMiss.key){setTypoGuard(nearMiss);return;}
     if(choiceValue!==undefined)setAnswer(raw);
     const dict=current.verb.dict,rid=current.id;
     const prevVS=(state.verbStats?.[dict]?.[rid])||{seen:0,incorrect:0};
@@ -1719,7 +1743,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
       autoAdvanceRef.current=setTimeout(()=>{
         autoAdvanceRef.current=null;
         if(endAt&&Date.now()>=endAt)return;
-        setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setPhase('answering');
+        setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setTypoGuard(null);setPhase('answering');
         setCurrent(selectNext(nextState,practiceWords,enabledTypes,current.id,practicePrefs));
       },850);
     }
@@ -1729,7 +1753,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
     if(autoAdvanceRef.current){clearTimeout(autoAdvanceRef.current);autoAdvanceRef.current=null;}
     const nextState={...state,session:{...(state.session||{}),skipped:(state.session?.skipped||0)+1}};
     setState(nextState);
-    setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setPhase('answering');setWasCorrect(false);
+    setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setTypoGuard(null);setPhase('answering');setWasCorrect(false);
     setCurrent(selectNext(nextState,practiceWords,enabledTypes,current.id,practicePrefs));
   }
   function revealAnswer(){
@@ -1741,7 +1765,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
     const nextMistakes=recordMistake(state.mistakes,current.verb,current.type,reverseDrill?current.type:promptType,'(revealed)',expected);
     const nextState={...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],false)},verbStats:newVerbStats,mistakes:nextMistakes,session:{...(state.session||{}),reviewed:(state.session?.reviewed||0)+1,correct:state.session?.correct||0},daily:bumpDaily(state.daily,false,practicePrefs.dailyGoal||10)};
     setState(nextState);
-    setAnswer('');setChatOpen(!!geminiKey&&!!practicePrefs.autoAiExplainErrors);setRevealedMiss(true);setWasCorrect(false);setPhase('reviewing');
+    setAnswer('');setTypoGuard(null);setChatOpen(!!geminiKey&&!!practicePrefs.autoAiExplainErrors);setRevealedMiss(true);setWasCorrect(false);setPhase('reviewing');
   }
 
   const card=state.cards[current.id];
@@ -1807,6 +1831,10 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                 <span className="text-xs text-indigo-400">· {current.ruleLabel}</span>
                 <span className="text-xs text-stone-400">{taskSub&&(taskSub+' · ')}{taskHint}</span>
               </div>
+              {typoGuard&&<div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <div className="font-medium">Almost - possible typo.</div>
+                <div className="text-xs mt-0.5">{typoGuard.detail}</div>
+              </div>}
               {practicePrefs.answerMode==='choice'?(
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1828,7 +1856,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                     </div>
                     <div className={`mt-2 text-xs text-center ${coachWrongIndex>=0?'text-rose-700':coachPreview===expected?'text-emerald-700':'text-stone-500'}`}>{coachStatus}</div>
                   </div>
-                  <input ref={inputRef} type="text" value={answer} onChange={e=>setAnswer(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();answer.trim()?submit():skipCurrent();}else if(e.key==='Escape'){e.preventDefault();skipCurrent();}}}
+                  <input ref={inputRef} type="text" value={answer} onChange={e=>{setTypoGuard(null);setAnswer(e.target.value);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();answer.trim()?submit():skipCurrent();}else if(e.key==='Escape'){e.preventDefault();skipCurrent();}}}
                     placeholder={reverseDrill?'Type dictionary form...':'Type romaji or kana...'} className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none transition"
                     lang="ja" autoComplete="off" autoCorrect="off" spellCheck="false"/>
                   {answer&&coachPreview!==answer&&<div className="mt-2 text-center text-sm text-stone-500" lang="ja">→ {coachPreview}</div>}
@@ -1841,7 +1869,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                 </>
               ):(
                 <>
-                  <input ref={inputRef} type="text" value={answer} onChange={e=>setAnswer(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();answer.trim()?submit():skipCurrent();}else if(e.key==='Escape'){e.preventDefault();skipCurrent();}}}
+                  <input ref={inputRef} type="text" value={answer} onChange={e=>{setTypoGuard(null);setAnswer(e.target.value);}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();answer.trim()?submit():skipCurrent();}else if(e.key==='Escape'){e.preventDefault();skipCurrent();}}}
                     placeholder={reverseDrill?'Type dictionary form…':'Type romaji or kana…'} className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none transition"
                     lang="ja" autoComplete="off" autoCorrect="off" spellCheck="false"/>
                   {answer&&preview!==answer&&<div className="mt-2 text-center text-sm text-stone-500" lang="ja">→ {preview}</div>}
