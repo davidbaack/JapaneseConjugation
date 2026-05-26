@@ -266,6 +266,24 @@ for(const t of ALL_CARD_TYPES)TYPE_LABEL[t.id]=t.label;
 function getTypeInfo(id){return ALL_CARD_TYPES.find(t=>t.id===id)||{id,label:id,sub:'',hint:''};}
 function compatibleTypes(item){return isAdjective(item)?ADJ_TYPES:CONJ_TYPES;}
 function isTypeCompatible(item,typeId){return compatibleTypes(item).some(t=>t.id===typeId);}
+function enabledTypeIdsFor(enabledTypeIds){return enabledTypeIds&&enabledTypeIds.length?enabledTypeIds:ALL_CARD_TYPES.map(t=>t.id);}
+function practiceTypesForItem(item,enabledTypeIds,prefs=DEFAULT_PREFS){
+  const enabled=new Set(enabledTypeIdsFor(enabledTypeIds));
+  const skip=prefs.skipDuplicateForms!==false;
+  const seen=new Set();
+  return compatibleTypes(item).filter(t=>{
+    if(!enabled.has(t.id))return false;
+    const answer=conjugateItem(item,t.id);
+    if(!answer)return false;
+    if(skip&&seen.has(answer))return false;
+    seen.add(answer);
+    return true;
+  });
+}
+function isRedundantPracticeType(item,typeId,enabledTypeIds,prefs=DEFAULT_PREFS){
+  if(prefs.skipDuplicateForms===false)return false;
+  return !practiceTypesForItem(item,enabledTypeIds,prefs).some(t=>t.id===typeId);
+}
 function hashString(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h);}
 function pickPromptType(item,targetType,prefs=DEFAULT_PREFS){
   const source=prefs.promptForm||'dictionary';
@@ -968,7 +986,7 @@ function selectNext(state,verbs,enabledTypes,lastRuleId,prefs=DEFAULT_PREFS){
   const now=Date.now(),pool=[];
   for(const rule of RULES){
     if(!enabledTypes.includes(rule.type))continue;
-    const candidates=rule.verbFilter(verbs);
+    const candidates=rule.verbFilter(verbs).filter(item=>!isRedundantPracticeType(item,rule.type,enabledTypes,prefs));
     if(!candidates.length)continue;
     pool.push({rule,candidates});
   }
@@ -1052,7 +1070,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,practiceFocus:'balanced',voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordGroups:['ichidan','godan','suru','kuru','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,practiceFocus:'balanced',skipDuplicateForms:true,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordGroups:['ichidan','godan','suru','kuru','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -1592,7 +1610,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
 // ============================================================================
 function RushView({state,setState,verbs,practicePrefs=DEFAULT_PREFS,wordLists=[]}){
   const gameWords=useMemo(()=>filterWordsForPrefs(verbs,practicePrefs,wordLists),[verbs,practicePrefs,wordLists]);
-  const eligible=useMemo(()=>gameWords.filter(w=>compatibleTypes(w).some(t=>state.enabledTypes.includes(t.id))),[gameWords,state.enabledTypes]);
+  const eligible=useMemo(()=>gameWords.filter(w=>practiceTypesForItem(w,state.enabledTypes,practicePrefs).length),[gameWords,state.enabledTypes,practicePrefs]);
   const game=state.game||defaultState().game;
   const[active,setActive]=useState(false);
   const[paused,setPaused]=useState(false);
@@ -1621,7 +1639,7 @@ function RushView({state,setState,verbs,practicePrefs=DEFAULT_PREFS,wordLists=[]
   function buildRound(){
     if(!eligible.length)return null;
     const item=shuffled(eligible)[0];
-    const types=compatibleTypes(item).filter(t=>state.enabledTypes.includes(t.id));
+    const types=practiceTypesForItem(item,state.enabledTypes,practicePrefs);
     if(!types.length)return null;
     const type=shuffled(types)[0];
     const promptType=pickPromptType(item,type.id,practicePrefs);
@@ -1780,7 +1798,7 @@ function choiceListForGroup(item,words){
 function buildMockQuestions(words,state,practicePrefs=DEFAULT_PREFS,wordLists=[],count=12){
   const filtered=filterWordsForPrefs(words,practicePrefs,wordLists);
   const enabled=state.enabledTypes&&state.enabledTypes.length?state.enabledTypes:ALL_CARD_TYPES.map(t=>t.id);
-  const conjWords=filtered.filter(w=>compatibleTypes(w).some(t=>enabled.includes(t.id)));
+  const conjWords=filtered.filter(w=>practiceTypesForItem(w,enabled,practicePrefs).length);
   const kinds=[];
   if(conjWords.length)kinds.push('conjugation');
   if(filtered.length>=2)kinds.push('meaning','recognition','classify');
@@ -1791,7 +1809,7 @@ function buildMockQuestions(words,state,practicePrefs=DEFAULT_PREFS,wordLists=[]
     const item=shuffled(pool)[0];
     if(!item)continue;
     if(kind==='conjugation'){
-      const types=compatibleTypes(item).filter(t=>enabled.includes(t.id));
+      const types=practiceTypesForItem(item,enabled,practicePrefs);
       const type=shuffled(types)[0];
       const answer=conjugateItem(item,type.id);
       questions.push({id:`mock-${i}-${kind}-${wordKey(item)}-${type.id}`,kind,skill:'Conjugation',item,type:type.id,answerKey:answer,answerLabel:answer,choices:choiceListForForms(item,type.id,filtered),prompt:'Choose the requested conjugated form.',note:explainItem(item,type.id).rule||getTypeInfo(type.id).hint});
@@ -2459,7 +2477,7 @@ function buildAmbientDeck(words,state,practicePrefs=DEFAULT_PREFS,wordLists=[],m
   const cards=[];
   for(const rule of RULES){
     if(!enabled.includes(rule.type))continue;
-    const pool=rule.verbFilter(filtered);
+    const pool=rule.verbFilter(filtered).filter(item=>!isRedundantPracticeType(item,rule.type,enabled,practicePrefs));
     if(!pool.length)continue;
     const item=shuffled(pool)[0];
     const form=conjugateItem(item,rule.type);
@@ -2484,7 +2502,7 @@ function AmbientReviewPanel({state,setState,words,practicePrefs=DEFAULT_PREFS,wo
   const ambient=state.ambient||defaultState().ambient;
   const deck=useMemo(()=>buildAmbientDeck(words,state,practicePrefs,wordLists,mode,18),[words,state.cards,state.mistakes,state.enabledTypes,state.verbStats,practicePrefs,wordLists,mode]);
   const current=deck[index%Math.max(1,deck.length)]||null;
-  useEffect(()=>{setIndex(0);setPlaying(false);},[mode,practicePrefs.wordListIds,practicePrefs.jlptLevels,practicePrefs.wordTypes,practicePrefs.wordGroups,practicePrefs.genkiLessons]);
+  useEffect(()=>{setIndex(0);setPlaying(false);},[mode,practicePrefs.wordListIds,practicePrefs.jlptLevels,practicePrefs.wordTypes,practicePrefs.wordGroups,practicePrefs.genkiLessons,practicePrefs.skipDuplicateForms]);
   useEffect(()=>()=>{if(timerRef.current)clearTimeout(timerRef.current);},[]);
   useEffect(()=>{
     if(timerRef.current){clearTimeout(timerRef.current);timerRef.current=null;}
@@ -3794,7 +3812,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:27,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:28,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -3846,6 +3864,10 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
         <div>
           <label className="text-xs text-stone-500 block mb-1">Practice focus</label>
           <div className="flex gap-2">{[{id:'balanced',label:'Balanced'},{id:'weak',label:'Weak spots'}].map(o=>(<button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,practiceFocus:o.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${((practicePrefs.practiceFocus||'balanced')===o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
+        </div>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Duplicate answers</label>
+          <div className="grid grid-cols-2 gap-2">{[{id:true,label:'Skip'},{id:false,label:'Keep'}].map(o=><button key={String(o.id)} onClick={()=>setPracticePrefs({...practicePrefs,skipDuplicateForms:o.id})} className={`px-3 py-2 rounded-lg text-sm border transition ${((practicePrefs.skipDuplicateForms!==false)===o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>)}</div>
         </div>
         <div>
           <label className="text-xs text-stone-500 block mb-1">Theme</label>
