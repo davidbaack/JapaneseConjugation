@@ -855,10 +855,10 @@ function ContextExamplePanel({item,type,geminiKey,practicePrefs=DEFAULT_PREFS}){
 // ============================================================================
 const DAY=86400000;
 function localDateKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*DAY);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},ambient:{sessions:0,played:0,lastAt:null},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},mock:{taken:0,bestPct:0,lastPct:0,lastScore:0,lastTotal:0,lastAt:null,bySkill:{}},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
+function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},ambient:{sessions:0,played:0,lastAt:null},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},mock:{taken:0,bestPct:0,lastPct:0,lastScore:0,lastTotal:0,lastAt:null,bySkill:{}},reader:{sessions:0,chars:0,encounters:0,wordSeen:{},lastAt:null},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
 function mergeState(saved,sessionOverride){
   const base=defaultState();
-  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,ambient:(saved&&saved.ambient)||base.ambient,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,mock:(saved&&saved.mock)||base.mock,daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,ambient:(saved&&saved.ambient)||base.ambient,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,mock:(saved&&saved.mock)||base.mock,reader:{...base.reader,...((saved&&saved.reader)||{}),wordSeen:((saved&&saved.reader&&saved.reader.wordSeen)||{})},daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
   if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
     merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
   }
@@ -1163,7 +1163,7 @@ function App(){
         {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='meaning'&&<MeaningView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
         {tab==='mock'&&<MockTestView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
-        {tab==='scanner'&&<ScannerView words={allWords} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey}/>}
+        {tab==='scanner'&&<ScannerView state={state} setState={setState} words={allWords} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey}/>}
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
         {tab==='shadow'&&<ShadowView state={state} setState={setState} words={allWords} wordLists={wordLists} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='lessons'&&<LessonsView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
@@ -2737,7 +2737,13 @@ function findTextScannerMatches(text,words){
       }
     }
   }
-  return out.sort((a,b)=>a.index-b.index||b.surface.length-a.surface.length).slice(0,240);
+  const accepted=[];
+  for(const match of out.sort((a,b)=>b.surface.length-a.surface.length||a.index-b.index)){
+    const start=match.index,end=start+match.surface.length;
+    if(accepted.some(m=>start<m.index+m.surface.length&&end>m.index))continue;
+    accepted.push(match);
+  }
+  return accepted.sort((a,b)=>a.index-b.index||b.surface.length-a.surface.length).slice(0,240);
 }
 function uniqueScannerWords(matches){
   const seen=new Set(),out=[];
@@ -2754,7 +2760,7 @@ function scannerSentenceContext(text,index,length){
   if(!raw)return'';
   const left=raw.slice(0,Math.max(0,index));
   const rightStart=Math.min(raw.length,index+length);
-  const stops=['。','！','？','!','?','\n'];
+  const stops=['\u3002','\uff01','\uff1f','!','?','\n'];
   let start=0,end=raw.length;
   for(const stop of stops){const pos=left.lastIndexOf(stop);if(pos>=start)start=pos+1;}
   for(const stop of stops){const pos=raw.indexOf(stop,rightStart);if(pos!==-1&&pos+1<end)end=pos+1;}
@@ -2776,6 +2782,40 @@ function buildScannerReaderSegments(text,matches){
   }
   if(cursor<raw.length)segments.push({kind:'text',text:raw.slice(cursor)});
   return segments;
+}
+function readerSeenCount(reader,key){return Number(reader?.wordSeen?.[key]?.count||0);}
+function recordReaderSession(reader,text,matches){
+  const now=Date.now(),base=reader||{};
+  const wordSeen={...(base.wordSeen||{})};
+  const unique=uniqueScannerWords(matches);
+  for(const word of unique){
+    const key=wordKey(word),prior=wordSeen[key]||{};
+    wordSeen[key]={dict:word.dict,reading:word.reading,meaning:word.meaning,group:word.group,count:(prior.count||0)+1,firstAt:prior.firstAt||now,lastAt:now};
+  }
+  return{...base,sessions:(base.sessions||0)+1,chars:(base.chars||0)+String(text||'').length,encounters:(base.encounters||0)+unique.length,wordSeen,lastAt:now};
+}
+function scannerSentenceRanges(text){
+  const raw=String(text||''),ranges=[];let start=0;
+  const stops=new Set(['\u3002','\uff01','\uff1f','!','?','\n']);
+  for(let i=0;i<raw.length;i++){
+    if(stops.has(raw[i])){
+      const end=i+1,chunk=raw.slice(start,end).trim();
+      if(chunk)ranges.push({start,end,text:chunk});
+      start=end;
+    }
+  }
+  const tail=raw.slice(start).trim();
+  if(tail)ranges.push({start,end:raw.length,text:tail});
+  return ranges;
+}
+function buildIPlusOneSentences(text,matches,reader){
+  return scannerSentenceRanges(text).map(range=>{
+    const byKey=new Map();
+    for(const m of matches){if(m.index>=range.start&&m.index<range.end&&!byKey.has(m.key))byKey.set(m.key,m);}
+    const all=[...byKey.values()];
+    const newMatches=all.filter(m=>readerSeenCount(reader,m.key)<1);
+    return{...range,matches:all,newMatches};
+  }).filter(s=>s.matches.length&&s.newMatches.length===1).slice(0,4);
 }
 function normalizeScannerGroup(group){
   const v=String(group||'').trim().toLowerCase();
@@ -2897,7 +2937,7 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
   );
 }
 
-function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,wordLists,setWordLists,practicePrefs,setPracticePrefs,geminiKey}){
+function ScannerView({state,setState,words,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,wordLists,setWordLists,practicePrefs,setPracticePrefs,geminiKey}){
   const[text,setText]=useState('');
   const[msg,setMsg]=useState('');
   const[aiRows,setAiRows]=useState([]);
@@ -2910,9 +2950,13 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
   const[readerAiText,setReaderAiText]=useState('');
   const[readerAiErr,setReaderAiErr]=useState('');
   const[readerAiLoading,setReaderAiLoading]=useState(false);
+  const readerStats=state.reader||defaultState().reader;
   const matches=useMemo(()=>findTextScannerMatches(text,words),[text,words]);
   const uniqueWords=useMemo(()=>uniqueScannerWords(matches),[matches]);
   const readerSegments=useMemo(()=>buildScannerReaderSegments(text,matches),[text,matches]);
+  const iPlusOne=useMemo(()=>buildIPlusOneSentences(text,matches,readerStats),[text,matches,readerStats]);
+  const newWordCount=uniqueWords.filter(w=>readerSeenCount(readerStats,wordKey(w))<1).length;
+  const seenWordCount=uniqueWords.length-newWordCount;
   const selectedReaderMatch=readerMatchId?matches.find(m=>scannerMatchId(m)===readerMatchId):null;
   const readerDetail=selectedReaderMatch||readerSegments.find(s=>s.kind==='match')?.match||null;
   const readerContext=readerDetail?scannerSentenceContext(text,readerDetail.index,readerDetail.surface.length):'';
@@ -2990,6 +3034,12 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
     const stamp=new Date().toLocaleDateString([],{month:'short',day:'numeric'});
     createListFromKeys(uniqueWords.map(wordKey),`Scan ${stamp}`);
   }
+  function trackReaderSession(){
+    if(!matches.length)return;
+    const nextReader=recordReaderSession(readerStats,text,matches);
+    setState({...state,reader:nextReader});
+    setMsg(`Tracked ${uniqueWords.length} unique word${uniqueWords.length===1?'':'s'} from this passage.`);
+  }
   async function extractWithAI(){
     if(!text.trim()||!geminiKey)return;
     setAiLoading(true);setAiErr('');setAiRows([]);setMsg('');
@@ -3043,7 +3093,10 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
             <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Text scanner</div>
             <h3 className="text-xl font-semibold mt-1">Mine conjugations from real Japanese</h3>
           </div>
-          <button onClick={createKnownList} disabled={!uniqueWords.length} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm flex items-center gap-1.5"><IconList className="w-4 h-4"/>Create list</button>
+          <div className="flex gap-2">
+            <button onClick={trackReaderSession} disabled={!uniqueWords.length} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 disabled:opacity-40 rounded-lg text-sm">Track</button>
+            <button onClick={createKnownList} disabled={!uniqueWords.length} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm flex items-center gap-1.5"><IconList className="w-4 h-4"/>Create list</button>
+          </div>
         </div>
         <textarea value={text} onChange={e=>{setText(e.target.value);setMsg('');}} placeholder="昨日、静かなカフェで本を読んで、ケーキを食べました。" className="w-full min-h-40 px-3 py-2 border border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none" lang="ja" autoCorrect="off" spellCheck="false"/>
         <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2 mt-3 items-end">
@@ -3061,6 +3114,11 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
           <div className="rounded-xl bg-stone-50 border border-stone-200 px-3 py-2"><div className="text-2xl font-semibold tabular-nums">{uniqueWords.length}</div><div className="text-xs text-stone-500">words</div></div>
           <div className="rounded-xl bg-stone-50 border border-stone-200 px-3 py-2"><div className="text-2xl font-semibold tabular-nums">{formCount}</div><div className="text-xs text-stone-500">forms</div></div>
         </div>
+        {uniqueWords.length>0&&<div className="mt-3 grid sm:grid-cols-3 gap-2 text-center">
+          <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2"><div className="text-xl font-semibold tabular-nums">{seenWordCount}</div><div className="text-xs text-emerald-700">seen before</div></div>
+          <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2"><div className="text-xl font-semibold tabular-nums">{newWordCount}</div><div className="text-xs text-amber-700">new to tracker</div></div>
+          <div className="rounded-xl bg-indigo-50 border border-indigo-200 px-3 py-2"><div className="text-xl font-semibold tabular-nums">{iPlusOne.length}</div><div className="text-xs text-indigo-700">i+1 sentences</div></div>
+        </div>}
         {msg&&<div className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
       </div>
       {text.trim()&&<div className="bg-white rounded-2xl border border-stone-200 p-5">
@@ -3069,7 +3127,7 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
           {readerDetail&&<button onClick={()=>speakJapanese(readerDetail.reading||readerDetail.surface,0.85,practicePrefs.voiceURI)} className="p-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-500" title="Speak"><IconVolume className="w-4 h-4"/></button>}
         </div>
         <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-4 text-lg leading-loose whitespace-pre-wrap" lang="ja">
-          {readerSegments.map((seg,i)=>seg.kind==='text'?<span key={`t-${i}`}>{seg.text}</span>:<button key={seg.id||i} onClick={()=>setReaderMatchId(seg.id)} className={`mx-0.5 px-1.5 py-1 rounded-lg align-baseline transition ${scannerMatchId(readerDetail)===seg.id?'bg-indigo-600 text-white':'bg-amber-100 hover:bg-amber-200 text-stone-900'}`} lang="ja"><ruby>{seg.match.surface}{seg.match.reading&&seg.match.reading!==seg.match.surface&&<rt>{seg.match.reading}</rt>}</ruby></button>)}
+          {readerSegments.map((seg,i)=>seg.kind==='text'?<span key={`t-${i}`}>{seg.text}</span>:<button key={seg.id||i} onClick={()=>setReaderMatchId(seg.id)} className={`mx-0.5 px-1.5 py-1 rounded-lg align-baseline transition ${scannerMatchId(readerDetail)===seg.id?'bg-indigo-600 text-white':readerSeenCount(readerStats,seg.match.key)>0?'bg-emerald-100 hover:bg-emerald-200 text-stone-900':'bg-amber-100 hover:bg-amber-200 text-stone-900'}`} lang="ja"><ruby>{seg.match.surface}{seg.match.reading&&seg.match.reading!==seg.match.surface&&<rt>{seg.match.reading}</rt>}</ruby></button>)}
         </div>
         {readerDetail&&<div className="mt-4 grid md:grid-cols-[1fr_1.25fr] gap-3">
           <div className="rounded-xl border border-stone-200 p-3">
@@ -3079,6 +3137,7 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
             </div>
             <div className="mt-2 text-sm"><span className="font-medium" lang="ja">{readerDetail.word.dict}</span><span className="text-stone-500"> · {readerDetail.word.meaning}</span></div>
             <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[readerDetail.word.group]}</div>
+            <div className="mt-2 text-xs font-medium">{readerSeenCount(readerStats,readerDetail.key)>0?`Seen ${readerSeenCount(readerStats,readerDetail.key)} time${readerSeenCount(readerStats,readerDetail.key)===1?'':'s'}`:'New to reader tracker'}</div>
           </div>
           <div className="rounded-xl border border-stone-200 p-3">
             {readerDetail.type?<>
@@ -3099,6 +3158,13 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
             {readerAiErr&&<div className="mt-2 text-sm text-rose-600">{readerAiErr}</div>}
             {readerAiText&&<div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{readerAiText}</div>}
           </div>
+        </div>}
+        {iPlusOne.length>0&&<div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+          <div className="text-sm font-medium text-indigo-800">i+1 sentence candidates</div>
+          <div className="mt-2 space-y-2">{iPlusOne.map(s=><button key={`${s.start}-${s.end}`} onClick={()=>setReaderMatchId(scannerMatchId(s.newMatches[0]))} className="w-full text-left rounded-lg bg-white/70 hover:bg-white border border-indigo-100 px-3 py-2">
+            <div className="text-sm" lang="ja">{s.text}</div>
+            <div className="text-xs text-indigo-600 mt-1">New: <span lang="ja">{s.newMatches[0].word.dict}</span> · {s.newMatches[0].word.meaning}</div>
+          </button>)}</div>
         </div>}
       </div>}
       <div className="grid lg:grid-cols-[1fr_300px] gap-4">
@@ -3545,7 +3611,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:22,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:23,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
