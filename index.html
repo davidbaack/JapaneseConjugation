@@ -3248,6 +3248,24 @@ function scannerInlineDataFromDataURL(dataUrl,file={}){
   if(!m)throw new Error('Could not prepare that file.');
   return{inlineData:{mimeType:file.type||m[1]||'application/octet-stream',data:m[2]}};
 }
+function splitJapaneseMorae(text=''){
+  const small='ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ';
+  const morae=[];
+  for(const ch of String(text||'')){
+    if(small.includes(ch)&&morae.length)morae[morae.length-1]+=ch;
+    else morae.push(ch);
+  }
+  return morae.filter(Boolean);
+}
+function pronunciationPracticeForms(item){
+  const ids=isAdjective(item)?['adj-plain-present','adj-plain-negative','adj-plain-past','adj-te-form','adj-polite-present']:['plain-present','plain-negative','plain-past','te-form','polite-present','potential'];
+  const seen=new Set();
+  return formRows(item).filter(r=>ids.includes(r.type.id)).map(r=>r.answer).filter(v=>{
+    if(seen.has(v))return false;
+    seen.add(v);
+    return true;
+  }).slice(0,6);
+}
 function referenceWordSnapshot(word){
   return{dict:word.dict,reading:word.reading,meaning:word.meaning||'',group:word.group,lastAt:Date.now()};
 }
@@ -3275,6 +3293,9 @@ function ReferenceView({state,setState,verbs,adjectives,geminiKey,practicePrefs=
   const[lookupAiText,setLookupAiText]=useState('');
   const[lookupAiLoading,setLookupAiLoading]=useState(false);
   const[lookupAiErr,setLookupAiErr]=useState('');
+  const[accentText,setAccentText]=useState('');
+  const[accentLoading,setAccentLoading]=useState(false);
+  const[accentErr,setAccentErr]=useState('');
   const words=useMemo(()=>[...verbs,...adjectives],[verbs,adjectives]);
   const reference=normalizeReferenceState(state.reference);
   const historyWords=reference.history.map(h=>words.find(w=>wordKey(w)===wordKey(h))||h);
@@ -3284,7 +3305,10 @@ function ReferenceView({state,setState,verbs,adjectives,geminiKey,practicePrefs=
   useEffect(()=>{setLookupAiText('');setLookupAiErr('');},[query]);
   const rows=selected?formRows(selected):[];
   const selectedView=selected?promptDisplay(selected,null,practicePrefs):null;
+  const selectedMorae=selected?splitJapaneseMorae(selected.reading):[];
+  const pronunciationForms=selected?pronunciationPracticeForms(selected):[];
   useEffect(()=>{setCopyTableOk(false);},[selected?.dict,selected?.group]);
+  useEffect(()=>{setAccentText('');setAccentErr('');},[selected?.dict,selected?.group]);
   function updateReference(fn){setState(prev=>({...prev,reference:fn(prev.reference)}));}
   function rememberSearch(q=query){updateReference(ref=>referenceWithSearch(ref,q));}
   function chooseReferenceWord(word,q=query){
@@ -3330,6 +3354,17 @@ function ReferenceView({state,setState,verbs,adjectives,geminiKey,practicePrefs=
       setLookupAiText(reply);
     }catch(e){setLookupAiErr(e.message||'AI lookup failed.');}
     setLookupAiLoading(false);
+  }
+  async function generateAccentGuide(){
+    if(!selected||!geminiKey)return;
+    setAccentLoading(true);setAccentErr('');setAccentText('');
+    try{
+      const keyForms=pronunciationForms.map(f=>`${f} (${kanaToRomaji(f)})`).join(', ');
+      const prompt=`Create a compact pronunciation and Tokyo pitch-accent coaching note for this Japanese ${isAdjective(selected)?'adjective':'verb'}.\n\nWord: ${selected.dict}\nReading: ${selected.reading}\nMeaning: ${selected.meaning}\nClass: ${GROUP_NAMES[selected.group]||selected.group}\nUseful conjugated forms to mention: ${keyForms}\n\nIf the exact accent is uncertain, say so clearly instead of pretending certainty. Include: likely accent label/number if known, mora-by-mora pitch shape in plain text, how pitch may shift in common conjugated forms, one shadowing drill, and one learner mistake to listen for. Keep it short and practical.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,900,0.2,aiSystemFromPrefs(practicePrefs,'You are a careful Japanese pronunciation coach. Be honest about uncertainty in pitch-accent data and focus on practical listening and speaking guidance.'));
+      setAccentText(reply);
+    }catch(e){setAccentErr(e.message||'Accent guide failed.');}
+    setAccentLoading(false);
   }
   if(!selected)return(<div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No words available.</div>);
   return(
@@ -3397,10 +3432,26 @@ function ReferenceView({state,setState,verbs,adjectives,geminiKey,practicePrefs=
             </div>
           </div>
         </div>
+        <div className="bg-white rounded-2xl border border-stone-200 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium"><IconVolume className="w-4 h-4 text-indigo-600"/>Pronunciation lab</div>
+            <button onClick={generateAccentGuide} disabled={!geminiKey||accentLoading} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5"><IconSpark className="w-4 h-4"/>{accentLoading?'Listening...':'AI accent'}</button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">{selectedMorae.map((m,i)=><span key={`${m}-${i}`} className="min-w-8 px-2 py-1 rounded-lg border border-stone-200 bg-stone-50 text-center text-lg" lang="ja">{m}</span>)}</div>
+          <div className="mt-3 grid sm:grid-cols-3 gap-2">
+            <button onClick={()=>speakJapanese(selected.reading,0.9,practicePrefs.voiceURI)} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm inline-flex items-center justify-center gap-1.5"><IconVolume className="w-4 h-4"/>Word</button>
+            <button onClick={()=>speakJapanese(selected.reading,0.62,practicePrefs.voiceURI)} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm inline-flex items-center justify-center gap-1.5"><IconVolume className="w-4 h-4"/>Slow</button>
+            <button onClick={()=>speakJapanese(pronunciationForms.join('、'),0.78,practicePrefs.voiceURI)} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm inline-flex items-center justify-center gap-1.5"><IconVolume className="w-4 h-4"/>Forms</button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">{pronunciationForms.map(f=><button key={f} onClick={()=>speakJapanese(f,0.82,practicePrefs.voiceURI)} className="px-2.5 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-50 text-sm" lang="ja">{f}</button>)}</div>
+          {!geminiKey&&<div className="mt-2 text-xs text-stone-400">Add a Gemini key for Tokyo accent notes.</div>}
+          {accentErr&&<div className="mt-2 text-sm text-rose-600">{accentErr}</div>}
+          {accentText&&<div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{accentText}</div>}
+        </div>
         <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider"><tr><th className="px-4 py-2 text-left font-medium">Form</th><th className="px-4 py-2 text-left font-medium">Answer</th><th className="px-4 py-2 text-left font-medium hidden md:table-cell">Rule</th></tr></thead>
-            <tbody>{rows.map(r=>{const rv=formDisplay(r.answer,practicePrefs);return <tr key={r.type.id} className="border-t border-stone-100"><td className="px-4 py-2"><div className="font-medium">{r.type.label}</div><div className="text-xs text-stone-400">{r.type.hint}</div></td><td className="px-4 py-2"><ScriptDisplay view={rv} className="text-lg" subClassName="text-xs text-stone-400"/></td><td className="px-4 py-2 text-xs text-stone-500 hidden md:table-cell">{r.explanation.rule}</td></tr>;})}</tbody>
+            <tbody>{rows.map(r=>{const rv=formDisplay(r.answer,practicePrefs);return <tr key={r.type.id} className="border-t border-stone-100"><td className="px-4 py-2"><div className="font-medium">{r.type.label}</div><div className="text-xs text-stone-400">{r.type.hint}</div></td><td className="px-4 py-2"><div className="flex items-center gap-2"><ScriptDisplay view={rv} className="text-lg" subClassName="text-xs text-stone-400"/><button onClick={()=>speakJapanese(r.answer,0.85,practicePrefs.voiceURI)} className="p-1.5 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-500 flex-shrink-0" title={`Speak ${r.type.label}`}><IconVolume className="w-3.5 h-3.5"/></button></div></td><td className="px-4 py-2 text-xs text-stone-500 hidden md:table-cell">{r.explanation.rule}</td></tr>;})}</tbody>
           </table>
         </div>
         <div className="bg-white rounded-2xl border border-stone-200 p-4">
