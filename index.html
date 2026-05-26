@@ -304,6 +304,16 @@ function selectNext(state,verbs,types,lastId){
 }
 function fmtInterval(d){if(!d)return'new';if(d<1)return'<1d';if(d<30)return Math.round(d)+'d';if(d<365)return Math.round(d/30)+'mo';return(d/365).toFixed(1)+'y';}
 
+const SRS_LEVELS=[
+  {id:0,name:'Uncut',   sub:'Not started',         bg:'bg-stone-100',   text:'text-stone-500',  border:'border-stone-200',  dot:'bg-stone-400'},
+  {id:1,name:'Shard',   sub:'1–3 day intervals',    bg:'bg-sky-50',      text:'text-sky-700',    border:'border-sky-200',    dot:'bg-sky-400'},
+  {id:2,name:'Crystal', sub:'4–13 day intervals',   bg:'bg-indigo-50',   text:'text-indigo-700', border:'border-indigo-200', dot:'bg-indigo-500'},
+  {id:3,name:'Gem',     sub:'2–8 week intervals',   bg:'bg-teal-50',     text:'text-teal-700',   border:'border-teal-200',   dot:'bg-teal-500'},
+  {id:4,name:'Jewel',   sub:'2–6 month intervals',  bg:'bg-violet-50',   text:'text-violet-700', border:'border-violet-200', dot:'bg-violet-500'},
+  {id:5,name:'Treasure',sub:'6+ month intervals',   bg:'bg-amber-50',    text:'text-amber-700',  border:'border-amber-200',  dot:'bg-amber-500'},
+];
+function getCardLevel(card){if(!card||card.reps===0)return 0;const iv=card.interval;if(iv<4)return 1;if(iv<14)return 2;if(iv<60)return 3;if(iv<180)return 4;return 5;}
+
 // ============================================================================
 // STORAGE (localStorage)
 // ============================================================================
@@ -405,12 +415,13 @@ function App(){
           </div>
         </header>
         <nav className="flex gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','stats','verbs','settings'].map(t=>(
+          {['study','stats','levels','verbs','settings'].map(t=>(
             <button key={t} onClick={()=>setTab(t)} className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
         {tab==='study'&&<StudyView state={state} setState={setState} verbs={allVerbs} geminiKey={geminiKey}/>}
         {tab==='stats'&&<StatsView state={state} verbs={allVerbs}/>}
+        {tab==='levels'&&<SRSLevelView state={state} verbs={allVerbs}/>}
         {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} geminiKey={geminiKey}/>}
         {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey}/>}
       </div>
@@ -525,6 +536,135 @@ function StatsView({state,verbs}){
   const stats=useMemo(()=>{const now=Date.now();let totalReviews=0,totalCorrect=0,due=0,learning=0,mastered=0,fresh=0,total=0;const leeches=[];for(const v of verbs)for(const t of state.enabledTypes){total++;const id=v.dict+'|'+t,c=state.cards[id];if(!c){fresh++;continue;}totalReviews+=c.correct+c.incorrect;totalCorrect+=c.correct;if(c.nextReview<=now)due++;if(c.interval>=30)mastered++;else learning++;if(c.incorrect>=3&&c.incorrect>c.correct*0.5)leeches.push({id,verb:v,type:t,card:c});}leeches.sort((a,b)=>b.card.incorrect-a.card.incorrect);return{totalReviews,totalCorrect,acc:totalReviews>0?Math.round((totalCorrect/totalReviews)*100):0,due,learning,mastered,fresh,leeches:leeches.slice(0,10),total};},[state,verbs]);
   const Stat=({label,value})=>(<div className="bg-white rounded-xl border border-stone-200 p-4"><div className="text-2xl font-semibold text-stone-800">{value}</div><div className="text-xs text-stone-500 mt-0.5">{label}</div></div>);
   return(<div className="space-y-4"><div className="grid grid-cols-2 sm:grid-cols-4 gap-3"><Stat label="Due now" value={stats.due}/><Stat label="Learning" value={stats.learning}/><Stat label="Mastered" value={stats.mastered}/><Stat label="New" value={stats.fresh}/></div><div className="bg-white rounded-2xl border border-stone-200 p-5"><div className="flex items-baseline justify-between mb-2"><h3 className="font-medium">Lifetime accuracy</h3><span className="text-2xl font-semibold text-stone-800">{stats.acc}%</span></div><div className="h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 transition-all" style={{width:stats.acc+'%'}}/></div><div className="text-xs text-stone-500 mt-2">{stats.totalCorrect} correct / {stats.totalReviews} reviews / {stats.total} cards</div></div><div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-3 flex items-center gap-2"><IconFlame className="w-4 h-4 text-rose-500"/>Leeches</h3>{stats.leeches.length===0?<p className="text-sm text-stone-500">No leeches yet!</p>:<ul className="space-y-2">{stats.leeches.map(l=>(<li key={l.id} className="flex items-center justify-between py-1.5 px-2 hover:bg-stone-50 rounded-lg"><div><span className="font-medium" lang="ja">{l.verb.dict}</span><span className="text-xs text-stone-400 ml-2">{TYPE_LABEL[l.type]}</span></div><div className="text-xs text-rose-600">{l.card.incorrect} miss{l.card.incorrect===1?'':'es'}</div></li>))}</ul>}</div></div>);
+}
+
+// ============================================================================
+// SRS LEVELS VIEW
+// ============================================================================
+function VerbLevelRow({verb,cardLevels,overallLevel,expanded,onToggle,enabledTypes}){
+  const lDef=SRS_LEVELS[overallLevel];
+  return(
+    <div>
+      <button onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 text-left transition">
+        <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${lDef.dot}`}/>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-lg font-medium" lang="ja">{verb.dict}</span>
+            {verb.dict!==verb.reading&&<span className="text-xs text-stone-400" lang="ja">{verb.reading}</span>}
+          </div>
+          <div className="text-xs text-stone-400 truncate">{verb.meaning}</div>
+        </div>
+        <div className="flex gap-0.5 items-center flex-shrink-0" title="Conjugation level spread">
+          {[1,2,3,4,5].map(l=>{const n=cardLevels.filter(c=>c.level===l).length;return(<div key={l} className={`w-2 h-2 rounded-sm transition-colors ${n>0?SRS_LEVELS[l].dot:'bg-stone-100'}`}/>);})}
+        </div>
+        <span className={`flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full border ${lDef.bg} ${lDef.text} ${lDef.border}`}>{lDef.name}</span>
+        <svg className={`w-4 h-4 text-stone-300 flex-shrink-0 transition-transform ${expanded?'rotate-180':''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      {expanded&&(
+        <div className="px-5 pb-4 pt-0">
+          <div className="grid grid-cols-2 gap-1 border-t border-stone-100 pt-2">
+            {enabledTypes.map(t=>{const cl=cardLevels.find(c=>c.type===t);const l=cl?cl.level:0;const lD=SRS_LEVELS[l];return(<div key={t} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border ${lD.bg} ${lD.border}`}><span className="text-xs text-stone-600 truncate mr-2">{TYPE_LABEL[t]}</span><span className={`text-xs font-semibold flex-shrink-0 ${lD.text}`}>{lD.name}</span></div>);})}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SRSLevelView({state,verbs}){
+  const[expandedVerb,setExpandedVerb]=useState(null);
+  const[groupByLevel,setGroupByLevel]=useState(true);
+  const enabledTypes=state.enabledTypes.length>0?state.enabledTypes:CONJ_TYPES.map(t=>t.id);
+
+  const verbData=useMemo(()=>verbs.map(verb=>{
+    const cardLevels=enabledTypes.map(t=>({type:t,level:getCardLevel(state.cards[verb.dict+'|'+t])}));
+    const avg=cardLevels.reduce((s,c)=>s+c.level,0)/(cardLevels.length||1);
+    return{verb,cardLevels,overallLevel:Math.round(avg)};
+  }),[state,verbs,enabledTypes]);
+
+  const levelCounts=useMemo(()=>{const c=[0,0,0,0,0,0];for(const{cardLevels}of verbData)for(const{level}of cardLevels)c[level]++;return c;},[verbData]);
+  const totalCards=levelCounts.reduce((s,c)=>s+c,0)||1;
+
+  const grouped=useMemo(()=>SRS_LEVELS.map(l=>({...l,items:verbData.filter(vd=>vd.overallLevel===l.id)})),[verbData]);
+  const sorted=useMemo(()=>[...verbData].sort((a,b)=>b.overallLevel-a.overallLevel||a.verb.meaning.localeCompare(b.verb.meaning)),[verbData]);
+
+  function toggleVerb(dict){setExpandedVerb(ev=>ev===dict?null:dict);}
+
+  return(
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-stone-200 p-5">
+        <h3 className="font-medium mb-3">Level breakdown <span className="text-stone-400 font-normal text-sm">· {totalCards} cards</span></h3>
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {SRS_LEVELS.map((l,i)=>(
+            <div key={l.id} className={`rounded-xl border p-3 ${l.bg} ${l.border}`}>
+              <div className={`text-2xl font-bold ${l.text}`}>{levelCounts[i]}</div>
+              <div className={`text-xs font-semibold mt-0.5 ${l.text}`}>{l.name}</div>
+              <div className="text-xs text-stone-400 mt-0.5 leading-tight hidden sm:block">{l.sub}</div>
+            </div>
+          ))}
+        </div>
+        <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden flex">
+          {SRS_LEVELS.map((l,i)=>levelCounts[i]>0?(
+            <div key={l.id} className={`h-full ${l.dot} transition-all`} style={{width:(levelCounts[i]/totalCards*100)+'%'}}/>
+          ):null)}
+        </div>
+        <div className="flex gap-3 mt-2 flex-wrap">
+          {SRS_LEVELS.map((l,i)=>levelCounts[i]>0?(
+            <div key={l.id} className="flex items-center gap-1">
+              <div className={`w-2 h-2 rounded-sm ${l.dot}`}/>
+              <span className="text-xs text-stone-500">{l.name}</span>
+            </div>
+          ):null)}
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-stone-500">{verbs.length} verbs · {enabledTypes.length} conjugation{enabledTypes.length!==1?'s':''} each</div>
+        <button onClick={()=>setGroupByLevel(g=>!g)} className="text-xs px-3 py-1.5 border border-stone-200 rounded-lg hover:bg-stone-50 text-stone-600 transition">
+          {groupByLevel?'Sort by level ↕':'Group by level'}
+        </button>
+      </div>
+
+      {groupByLevel?(
+        grouped.filter(g=>g.items.length>0).map(group=>(
+          <div key={group.id} className="overflow-hidden rounded-xl border border-stone-200">
+            <div className={`flex items-center justify-between px-4 py-2 border-b ${group.bg} ${group.border}`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-sm ${group.dot}`}/>
+                <span className={`text-xs font-bold uppercase tracking-wider ${group.text}`}>{group.name}</span>
+                <span className={`text-xs ${group.text} opacity-70`}>{group.sub}</span>
+              </div>
+              <span className={`text-xs font-medium ${group.text}`}>{group.items.length} verb{group.items.length!==1?'s':''}</span>
+            </div>
+            <div className="bg-white divide-y divide-stone-100">
+              {group.items.map(vd=>(
+                <VerbLevelRow key={vd.verb.dict} {...vd} expanded={expandedVerb===vd.verb.dict} onToggle={()=>toggleVerb(vd.verb.dict)} enabledTypes={enabledTypes}/>
+              ))}
+            </div>
+          </div>
+        ))
+      ):(
+        <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden divide-y divide-stone-100">
+          {sorted.map(vd=>(
+            <VerbLevelRow key={vd.verb.dict} {...vd} expanded={expandedVerb===vd.verb.dict} onToggle={()=>toggleVerb(vd.verb.dict)} enabledTypes={enabledTypes}/>
+          ))}
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl border border-stone-200 p-4">
+        <div className="text-xs font-semibold text-stone-400 mb-2 uppercase tracking-wider">Level guide</div>
+        <div className="space-y-1.5">
+          {SRS_LEVELS.map(l=>(
+            <div key={l.id} className="flex items-center gap-2.5">
+              <div className={`w-3 h-3 rounded-sm flex-shrink-0 ${l.dot}`}/>
+              <span className={`text-xs font-semibold w-16 flex-shrink-0 ${l.text}`}>{l.name}</span>
+              <span className="text-xs text-stone-400">{l.sub}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ============================================================================
