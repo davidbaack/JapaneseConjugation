@@ -313,7 +313,7 @@ function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey}){
 // SRS
 // ============================================================================
 const DAY=86400000;
-function defaultState(){return{cards:{},enabledTypes:CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),session:{reviewed:0,correct:0}};}
+function defaultState(){return{cards:{},verbStats:{},enabledTypes:CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),session:{reviewed:0,correct:0}};}
 function gradeCard(card,correct){
   const now=Date.now();
   if(!card)card={ease:2.5,interval:0,reps:0,nextReview:0,correct:0,incorrect:0,lastSeen:0};
@@ -338,8 +338,19 @@ function selectNext(state,verbs,enabledTypes,lastRuleId){
   else if(fresh.length){chosen=fresh[Math.floor(Math.random()*fresh.length)];}
   else{future.sort((a,b)=>state.cards[a.rule.id].nextReview-state.cards[b.rule.id].nextReview);chosen=future[0];}
   if(!chosen)return null;
-  const verb=chosen.candidates[Math.floor(Math.random()*chosen.candidates.length)];
+  const verb=pickVerb(chosen.candidates,chosen.rule.id,state.verbStats);
   return{id:chosen.rule.id,verb,type:chosen.rule.type,card:state.cards[chosen.rule.id],ruleLabel:chosen.rule.label};
+}
+function pickVerb(candidates,ruleId,verbStats){
+  const vs=verbStats||{};
+  const withS=candidates.map(v=>{const s=(vs[v.dict]||{})[ruleId]||{seen:0,incorrect:0};return{v,seen:s.seen,incorrect:s.incorrect};});
+  const unseen=withS.filter(x=>x.seen===0);
+  if(unseen.length)return unseen[Math.floor(Math.random()*unseen.length)].v;
+  const weights=withS.map(x=>x.incorrect+1);
+  const total=weights.reduce((a,b)=>a+b,0);
+  let r=Math.random()*total;
+  for(let i=0;i<withS.length;i++){r-=weights[i];if(r<=0)return withS[i].v;}
+  return withS[withS.length-1].v;
 }
 function fmtInterval(d){if(!d)return'new';if(d<1)return'<1d';if(d<30)return Math.round(d)+'d';if(d<365)return Math.round(d/30)+'mo';return(d/365).toFixed(1)+'y';}
 
@@ -485,7 +496,7 @@ function App(){
         {tab==='study'&&<StudyView state={state} setState={setState} verbs={allVerbs} geminiKey={geminiKey}/>}
         {tab==='stats'&&<StatsView state={state} verbs={allVerbs}/>}
         {tab==='levels'&&<SRSLevelView state={state} verbs={allVerbs}/>}
-        {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} geminiKey={geminiKey}/>}
+        {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} geminiKey={geminiKey} state={state}/>}
         {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey}/>}
       </div>
     </div>
@@ -518,7 +529,10 @@ function StudyView({state,setState,verbs,geminiKey}){
     if(phase==='reviewing'){setChatOpen(false);setCurrent(selectNext(state,verbs,enabledTypes,current.id));setAnswer('');setPhase('answering');return;}
     if(!answer.trim())return;
     const ok=toHiragana(answer)===expected;
-    setState({...state,cards:{...state.cards,[current.id]:gradeCard(state.cards[current.id],ok)},session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)}});
+    const dict=current.verb.dict,rid=current.id;
+    const prevVS=(state.verbStats?.[dict]?.[rid])||{seen:0,incorrect:0};
+    const newVerbStats={...state.verbStats,[dict]:{...(state.verbStats?.[dict]||{}),[rid]:{seen:prevVS.seen+1,incorrect:prevVS.incorrect+(ok?0:1)}}};
+    setState({...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)}});
     setWasCorrect(ok);setPhase('reviewing');
   }
 
@@ -696,7 +710,7 @@ function SRSLevelView({state,verbs}){
 // ============================================================================
 // VERBS VIEW
 // ============================================================================
-function VerbsView({customVerbs,setCustomVerbs,geminiKey}){
+function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
   const[showAdd,setShowAdd]=useState(false);
   const[query,setQuery]=useState('');
   const[addPhase,setAddPhase]=useState('idle');
@@ -840,7 +854,7 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey}){
       <button onClick={resetAdd} className="mt-3 text-xs text-stone-400 hover:text-stone-600 block">Cancel</button>
     </div>)}
 
-    <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden"><table className="w-full text-sm"><thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider"><tr><th className="px-4 py-2 text-left font-medium">Verb</th><th className="px-4 py-2 text-left font-medium">Reading</th><th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Meaning</th><th className="px-4 py-2 text-left font-medium">Group</th><th className="px-4 py-2"></th></tr></thead><tbody>{[...STARTER_VERBS,...customVerbs].map((v,i)=>(<tr key={v.dict} className="border-t border-stone-100"><td className="px-4 py-2 font-medium" lang="ja">{v.dict}</td><td className="px-4 py-2 text-stone-600" lang="ja">{v.reading}</td><td className="px-4 py-2 text-stone-500 hidden sm:table-cell">{v.meaning}</td><td className="px-4 py-2 text-xs text-stone-500">{groupLabel[v.group]}</td><td className="px-4 py-2 text-right">{i>=STARTER_VERBS.length&&<button onClick={()=>setCustomVerbs(customVerbs.filter(c=>c.dict!==v.dict))} className="text-stone-400 hover:text-rose-600 transition"><IconTrash className="w-4 h-4"/></button>}</td></tr>))}</tbody></table></div>
+    <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden"><table className="w-full text-sm"><thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider"><tr><th className="px-4 py-2 text-left font-medium">Verb</th><th className="px-4 py-2 text-left font-medium">Reading</th><th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Meaning</th><th className="px-4 py-2 text-left font-medium">Group</th><th className="px-4 py-2"></th></tr></thead><tbody>{[...STARTER_VERBS,...customVerbs].map((v,i)=>{const vvs=state?.verbStats?.[v.dict]||{};const totalSeen=Object.values(vvs).reduce((s,x)=>s+x.seen,0);const totalIncorrect=Object.values(vvs).reduce((s,x)=>s+x.incorrect,0);const acc=totalSeen>0?Math.round((totalSeen-totalIncorrect)/totalSeen*100):null;return(<tr key={v.dict} className="border-t border-stone-100"><td className="px-4 py-2 font-medium" lang="ja">{v.dict}</td><td className="px-4 py-2 text-stone-600" lang="ja">{v.reading}</td><td className="px-4 py-2 text-stone-500 hidden sm:table-cell">{v.meaning}</td><td className="px-4 py-2 text-xs"><div className="text-stone-500">{groupLabel[v.group]}</div>{acc!==null&&<div className={`mt-0.5 ${acc>=80?'text-emerald-600':acc>=50?'text-amber-600':'text-rose-600'}`}>{totalSeen} seen · {acc}%</div>}</td><td className="px-4 py-2 text-right">{i>=STARTER_VERBS.length&&<button onClick={()=>setCustomVerbs(customVerbs.filter(c=>c.dict!==v.dict))} className="text-stone-400 hover:text-rose-600 transition"><IconTrash className="w-4 h-4"/></button>}</td></tr>);})}</tbody></table></div>
   </div>);
 }
 
@@ -864,11 +878,11 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,syncConfig,setS
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:2,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes},customVerbs}),[state,customVerbs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:2,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{}},customVerbs}),[state,customVerbs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function reset(){setState({...defaultState(),enabledTypes:state.enabledTypes});setConfirmReset(false);}
   async function copyExport(){try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(exportData);setCopyOk(true);setTimeout(()=>setCopyOk(false),2000);}}catch{}}
-  function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState({cards:data.state.cards,enabledTypes:Array.isArray(data.state.enabledTypes)?data.state.enabledTypes:state.enabledTypes,session:{reviewed:0,correct:0}});if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
+  function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState({cards:data.state.cards,enabledTypes:Array.isArray(data.state.enabledTypes)?data.state.enabledTypes:state.enabledTypes,verbStats:data.state.verbStats||{},session:{reviewed:0,correct:0}});if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
   const statusColor=syncStatus.kind==='error'?'text-rose-700 bg-rose-50 border-rose-200':syncStatus.kind==='syncing'?'text-amber-700 bg-amber-50 border-amber-200':syncStatus.kind==='ok'?'text-emerald-700 bg-emerald-50 border-emerald-200':'text-stone-600 bg-stone-50 border-stone-200';
 
   return(<div className="space-y-4">
