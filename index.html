@@ -137,6 +137,7 @@ const WORD_GROUP_OPTIONS=[
   {id:'godan',label:'う-verb'},
   {id:'suru',label:'する'},
   {id:'kuru',label:'来る'},
+  {id:'irregular-adjective',label:'irregular adj'},
   {id:'i-adjective',label:'い-adj'},
   {id:'na-adjective',label:'な-adj'},
 ];
@@ -174,7 +175,7 @@ const GRAMMAR_LESSONS=[
   {id:'te-form',title:'Te-form joins actions',forms:['te-form','adj-te-form'],body:'Use the te-form to connect actions, make requests, and build helper patterns like ている. Godan verbs change by final kana group; adjectives use くて or で.',examples:[['食べる','食べて','食べてください。'],['読む','読んで','本を読んでいます。'],['静か','静かで','静かで便利です。']]},
   {id:'potential',title:'Potential means ability',forms:['potential'],body:'Ichidan verbs add られる, godan verbs shift to the え-row and add る, する becomes できる, and 来る becomes 来られる. Potential verbs usually mark the thing you can do with が in careful Japanese.',examples:[['食べる','食べられる','寿司が食べられます。'],['書く','書ける','漢字が書けます。'],['する','できる','予約ができます。']]},
   {id:'passive-causative',title:'Passive and causative change roles',forms:['passive','causative','causative-passive','short-causative-passive'],body:'Passive means the subject receives an action. Causative means someone makes or lets another person act. Causative-passive means someone is made to do something. Godan verbs also have a shorter spoken causative-passive such as 待たされる.',examples:[['待つ','待たされる','駅で待たされました。'],['書く','書かせる','先生が名前を書かせました。'],['褒める','褒められる','先生に褒められました。']]},
-  {id:'adjectives',title:'Adjectives conjugate like predicates',forms:['adj-plain-past','adj-plain-negative','adj-te-form','adj-adverb'],body:'い-adjectives drop い and use かった, くない, くて, and く. な-adjectives behave more like nouns with だ/です, だった, ではない, で, な, and に.',examples:[['高い','高かった','昨日は高かったです。'],['便利','便利ではない','この駅は便利ではありません。'],['早い','早く','早く起きます。']]},
+  {id:'adjectives',title:'Adjectives conjugate like predicates',forms:['adj-plain-past','adj-plain-negative','adj-te-form','adj-adverb'],body:'い-adjectives drop い and use かった, くない, くて, and く. The common irregular adjective いい conjugates from よい, so it becomes よかった and よくない. な-adjectives behave more like nouns with だ/です, だった, ではない, で, な, and に.',examples:[['いい','よかった','昨日はよかったです。'],['高い','高かった','昨日は高かったです。'],['便利','便利ではない','この駅は便利ではありません。']]},
   {id:'conditionals',title:'Conditionals choose nuance',forms:['conditional-ba','conditional-tara','negative-conditional-tara','adj-conditional','adj-tara','adj-negative-tara'],body:'ば often feels rule-like or prerequisite-like. たら is broad and works for if/when. Negative たら uses the plain past negative plus ら, such as 使わなかったら.',examples:[['行く','行けば','駅に行けば分かります。'],['食べる','食べなかったら','食べなかったら、教えてください。'],['安い','安くなかったら','安くなかったら買いません。']]}
 ];
 const SHADOW_SCENARIOS=[
@@ -210,7 +211,10 @@ function getWordMeta(word){
   if(word?.lesson)embedded.lesson=Number(word.lesson)||null;
   return{jlpt:'N3',lesson:null,...(WORD_META[word?.dict]||{}),...embedded};
 }
+function isIrregularAdjective(word){return !!(word&&word.group==='i-adjective'&&(word.irregular||word.reading==='いい'||word.reading==='かっこいい'||word.dict==='いい'||word.dict==='良い'));}
 function wordKind(word){return isAdjective(word)?word.group:'verb';}
+function wordGroupId(word){return isIrregularAdjective(word)?'irregular-adjective':word.group;}
+function classifyGroupId(word){return wordGroupId(word);}
 function wordKey(word){return`${word.group}:${word.dict}`;}
 function filterWordsForPrefs(words,prefs=DEFAULT_PREFS,wordLists=[]){
   const levels=prefs.jlptLevels&&prefs.jlptLevels.length?prefs.jlptLevels:JLPT_LEVELS;
@@ -219,7 +223,7 @@ function filterWordsForPrefs(words,prefs=DEFAULT_PREFS,wordLists=[]){
   const lessonFilter=Array.isArray(prefs.genkiLessons)&&prefs.genkiLessons.length&&prefs.genkiLessons.length<GENKI_LESSONS.length?new Set(prefs.genkiLessons.map(Number)):null;
   const selectedLists=prefs.wordListIds&&prefs.wordListIds.length?prefs.wordListIds:[];
   const allowedKeys=selectedLists.length?new Set(wordLists.filter(l=>selectedLists.includes(l.id)).flatMap(l=>l.wordKeys||[])):null;
-  return words.filter(w=>{const meta=getWordMeta(w);return levels.includes(meta.jlpt)&&types.includes(wordKind(w))&&groups.includes(w.group)&&(!lessonFilter||lessonFilter.has(meta.lesson))&&(!allowedKeys||allowedKeys.has(wordKey(w)));});
+  return words.filter(w=>{const meta=getWordMeta(w);return levels.includes(meta.jlpt)&&types.includes(wordKind(w))&&groups.includes(wordGroupId(w))&&(!lessonFilter||lessonFilter.has(meta.lesson))&&(!allowedKeys||allowedKeys.has(wordKey(w)));});
 }
 
 const CONJ_TYPES=[
@@ -605,7 +609,7 @@ function isAdjective(item){return item.group==='i-adjective'||item.group==='na-a
 // ============================================================================
 // EXPLANATION ENGINE
 // ============================================================================
-const GROUP_NAMES={ichidan:'an ichidan verb (る-verb / Group 2)',godan:'a godan verb (う-verb / Group 1)',suru:'irregular (the verb する, Group 3)',kuru:'irregular (the verb 来る, Group 3)','i-adjective':'an い-adjective','na-adjective':'a な-adjective'};
+const GROUP_NAMES={ichidan:'an ichidan verb (る-verb / Group 2)',godan:'a godan verb (う-verb / Group 1)',suru:'irregular (the verb する, Group 3)',kuru:'irregular (the verb 来る, Group 3)','irregular-adjective':'an irregular い-adjective','i-adjective':'an い-adjective','na-adjective':'a な-adjective'};
 
 function explainConjugation(verb,type){
   const{reading,group,dict}=verb;
@@ -623,7 +627,7 @@ function explainConjugation(verb,type){
 function explainAdjective(adj,type){
   const result=conjugateAdjective(adj,type);
   const stem=adjectiveStem(adj);
-  const intro=`${adj.dict} (${adj.reading}) is ${GROUP_NAMES[adj.group]}.`;
+  const intro=`${adj.dict} (${adj.reading}) is ${GROUP_NAMES[classifyGroupId(adj)]||GROUP_NAMES[adj.group]}.`;
   let rule='',derivation=result,note='';
   if(adj.group==='i-adjective'){
     const irregular=adj.irregular||adj.reading==='いい'||adj.reading==='かっこいい';
@@ -1195,7 +1199,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,autoAdvanceCorrect:false,autoAiExplainErrors:false,englishHints:'show',practiceFocus:'balanced',skipDuplicateForms:true,trickQuestions:false,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordGroups:['ichidan','godan','suru','kuru','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,autoAdvanceCorrect:false,autoAiExplainErrors:false,englishHints:'show',practiceFocus:'balanced',skipDuplicateForms:true,trickQuestions:false,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordGroups:['ichidan','godan','suru','kuru','irregular-adjective','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -1415,7 +1419,10 @@ function scriptModeFromDisplay(ds){
 function mergePracticePrefs(prefs){
   const source=prefs||{};
   const displayScripts=source.displayScripts?{...DEFAULT_PREFS.displayScripts,...source.displayScripts}:resolveDisplayScripts(source);
-  return{...DEFAULT_PREFS,...source,displayScripts};
+  let wordGroups=Array.isArray(source.wordGroups)?[...source.wordGroups]:DEFAULT_PREFS.wordGroups;
+  const oldAllGroups=['ichidan','godan','suru','kuru','i-adjective','na-adjective'];
+  if(Array.isArray(source.wordGroups)&&oldAllGroups.every(id=>source.wordGroups.includes(id))&&!wordGroups.includes('irregular-adjective'))wordGroups=[...wordGroups,'irregular-adjective'];
+  return{...DEFAULT_PREFS,...source,displayScripts,wordGroups};
 }
 function formDisplay(kana,prefs=DEFAULT_PREFS){
   const ds=resolveDisplayScripts(prefs);
@@ -2679,6 +2686,7 @@ const CLASSIFY_OPTIONS=[
   {id:'godan',label:'う-verb',hint:'The final kana shifts across あ/い/え/お rows.'},
   {id:'suru',label:'する',hint:'Irregular する pattern.'},
   {id:'kuru',label:'来る',hint:'Irregular 来る pattern.'},
+  {id:'irregular-adjective',label:'irregular い-adjective',hint:'いい keeps its present form but conjugates from よい.'},
   {id:'i-adjective',label:'い-adjective',hint:'Usually ends in い and conjugates like 高い → 高かった.'},
   {id:'na-adjective',label:'な-adjective',hint:'Takes な before nouns and uses だ/です as a predicate.'},
 ];
@@ -2687,6 +2695,7 @@ function classifyHint(word){
   if(word.group==='godan')return `${word.reading} is godan: the final ${word.reading.slice(-1)} shifts rows, as in ${conjugate(word,'plain-negative')}.`;
   if(word.group==='suru')return 'する is irregular: する, した, しない, して, できる.';
   if(word.group==='kuru')return '来る is irregular: くる, きた, こない, きて.';
+  if(isIrregularAdjective(word))return `${word.reading} is an irregular い-adjective: present stays ${word.reading}, but other forms use よ, as in ${conjugateAdjective(word,'adj-plain-past')} and ${conjugateAdjective(word,'adj-plain-negative')}.`;
   if(word.group==='i-adjective')return `${word.reading} conjugates as an い-adjective: ${conjugateAdjective(word,'adj-plain-past')}, ${conjugateAdjective(word,'adj-plain-negative')}.`;
   return `${word.reading} is a な-adjective: ${conjugateAdjective(word,'adj-attributive')} + noun, or ${conjugateAdjective(word,'adj-polite-present')}.`;
 }
@@ -2827,18 +2836,19 @@ function ClassificationView({state,setState,words,practicePrefs,wordLists=[],gem
   useEffect(()=>{setAiText('');setAiErr('');setAiLoading(false);},[current?.dict,current?.group,result?.chosen]);
   if(!filtered.length)return(<div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No words match the current filters.</div>);
   if(!current)return null;
-  const allowed=CLASSIFY_OPTIONS.filter(o=>filtered.some(w=>w.group===o.id)||o.id===current.group);
+  const correctGroup=classifyGroupId(current);
+  const allowed=CLASSIFY_OPTIONS.filter(o=>filtered.some(w=>classifyGroupId(w)===o.id)||o.id===correctGroup);
   const stats=state.classify||defaultState().classify;
   const groupRows=CLASSIFY_OPTIONS.map(o=>{
     const row=stats.byGroup?.[o.id]||{attempted:0,correct:0};
     const accuracy=row.attempted?Math.round(row.correct/row.attempted*100):0;
-    return{...o,...row,accuracy,inDeck:filtered.some(w=>w.group===o.id)};
+    return{...o,...row,accuracy,inDeck:filtered.some(w=>classifyGroupId(w)===o.id)};
   }).filter(row=>row.inDeck);
   function choose(group){
     if(result)return;
-    const ok=group===current.group;
-    const prev=stats.byGroup?.[current.group]||{attempted:0,correct:0};
-    setState({...state,classify:{attempted:(stats.attempted||0)+1,correct:(stats.correct||0)+(ok?1:0),byGroup:{...(stats.byGroup||{}),[current.group]:{attempted:prev.attempted+1,correct:prev.correct+(ok?1:0)}}},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)});
+    const ok=group===correctGroup;
+    const prev=stats.byGroup?.[correctGroup]||{attempted:0,correct:0};
+    setState({...state,classify:{attempted:(stats.attempted||0)+1,correct:(stats.correct||0)+(ok?1:0),byGroup:{...(stats.byGroup||{}),[correctGroup]:{attempted:prev.attempted+1,correct:prev.correct+(ok?1:0)}}},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)});
     setResult({ok,chosen:group});
   }
   function next(){
@@ -2850,7 +2860,7 @@ function ClassificationView({state,setState,words,practicePrefs,wordLists=[],gem
     if(!geminiKey||!current)return;
     setAiLoading(true);setAiErr('');setAiText('');
     try{
-      const label=CLASSIFY_OPTIONS.find(o=>o.id===current.group)?.label||current.group;
+      const label=CLASSIFY_OPTIONS.find(o=>o.id===correctGroup)?.label||correctGroup;
       const chosen=result?.chosen?(CLASSIFY_OPTIONS.find(o=>o.id===result.chosen)?.label||result.chosen):'not answered';
       const sampleTypes=isAdjective(current)?['adj-plain-past','adj-plain-negative']:['polite-present','plain-negative'];
       const samples=sampleTypes.map(id=>`${TYPE_LABEL[id]||id}: ${conjugateItem(current,id)}`).join(', ');
@@ -2875,11 +2885,11 @@ function ClassificationView({state,setState,words,practicePrefs,wordLists=[],gem
           <div className="text-[11px] text-stone-400 mt-1">JLPT {getWordMeta(current).jlpt}{getWordMeta(current).lesson?` · Genki L${getWordMeta(current).lesson}`:''}</div>
         </div>
         <div className="grid sm:grid-cols-3 gap-2">
-          {allowed.map(o=>(<button key={o.id} onClick={()=>choose(o.id)} disabled={!!result} className={`px-3 py-3 rounded-xl border text-sm font-medium transition ${result&&o.id===current.group?'bg-emerald-50 border-emerald-300 text-emerald-800':result&&o.id===result.chosen&&!result.ok?'bg-rose-50 border-rose-300 text-rose-800':'bg-white border-stone-200 hover:border-indigo-400 hover:bg-indigo-50'}`}>{o.label}</button>))}
+          {allowed.map(o=>(<button key={o.id} onClick={()=>choose(o.id)} disabled={!!result} className={`px-3 py-3 rounded-xl border text-sm font-medium transition ${result&&o.id===correctGroup?'bg-emerald-50 border-emerald-300 text-emerald-800':result&&o.id===result.chosen&&!result.ok?'bg-rose-50 border-rose-300 text-rose-800':'bg-white border-stone-200 hover:border-indigo-400 hover:bg-indigo-50'}`}>{o.label}</button>))}
         </div>
         {result&&(
           <div className={`mt-4 rounded-xl border p-4 ${result.ok?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
-            <div className={`font-medium text-sm ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Correct.':'Not quite.'} <span className="font-normal">It is {CLASSIFY_OPTIONS.find(o=>o.id===current.group)?.label}.</span></div>
+            <div className={`font-medium text-sm ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Correct.':'Not quite.'} <span className="font-normal">It is {CLASSIFY_OPTIONS.find(o=>o.id===correctGroup)?.label}.</span></div>
             <div className="text-sm text-stone-700 mt-2">{classifyHint(current)}</div>
             <div className="grid sm:grid-cols-2 gap-2 mt-3">
               <button onClick={explainClassificationWithAI} disabled={!geminiKey||aiLoading} className="py-2 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium inline-flex items-center justify-center gap-1.5"><IconSpark className="w-4 h-4"/>{aiLoading?'Explaining...':'AI why'}</button>
@@ -5148,7 +5158,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
             <label className="text-xs text-stone-500 block">Word groups</label>
             <span className="text-[11px] text-stone-400">{selectedWordGroups.length}/{WORD_GROUP_OPTIONS.length}</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">{WORD_GROUP_OPTIONS.map(o=>(<button key={o.id} onClick={()=>togglePref('wordGroups',o.id,WORD_GROUP_OPTIONS.map(x=>x.id))} className={`px-3 py-2 rounded-lg text-sm border transition ${selectedWordGroups.includes(o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">{WORD_GROUP_OPTIONS.map(o=>(<button key={o.id} onClick={()=>togglePref('wordGroups',o.id,WORD_GROUP_OPTIONS.map(x=>x.id))} className={`px-3 py-2 rounded-lg text-sm border transition ${selectedWordGroups.includes(o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
           <p className="text-[11px] text-stone-400 mt-1">Refines every drill and review deck after JLPT, lesson, and word-list filters.</p>
         </div>
       </div>
