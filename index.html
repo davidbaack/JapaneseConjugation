@@ -1126,7 +1126,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,autoAdvanceCorrect:false,autoAiExplainErrors:false,practiceFocus:'balanced',skipDuplicateForms:true,trickQuestions:false,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordGroups:['ichidan','godan','suru','kuru','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,autoAdvanceCorrect:false,autoAiExplainErrors:false,englishHints:'show',practiceFocus:'balanced',skipDuplicateForms:true,trickQuestions:false,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordGroups:['ichidan','godan','suru','kuru','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -1530,6 +1530,10 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const[wasCorrect,setWasCorrect]=useState(false);
   const[chatOpen,setChatOpen]=useState(false);
   const[showPromptText,setShowPromptText]=useState(false);
+  const[showEnglishHint,setShowEnglishHint]=useState(false);
+  const[aiHintText,setAiHintText]=useState('');
+  const[aiHintLoading,setAiHintLoading]=useState(false);
+  const[aiHintErr,setAiHintErr]=useState('');
   const[coachRevealed,setCoachRevealed]=useState(0);
   const[endAt,setEndAt]=useState(null);
   const[now,setNow]=useState(Date.now());
@@ -1549,6 +1553,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   useEffect(()=>{if(current&&practiceWords.length&&!practiceWords.some(w=>w.dict===current.verb.dict&&w.group===current.verb.group)){setCurrent(null);setAnswer('');setPhase('answering');}},[practiceWords,current]);
   useEffect(()=>{if(phase==='answering'&&inputRef.current)inputRef.current.focus();},[current,phase]);
   useEffect(()=>{setShowPromptText(!listeningPrompt);},[current?.id,listeningPrompt]);
+  useEffect(()=>{setShowEnglishHint(false);setAiHintText('');setAiHintErr('');setAiHintLoading(false);},[current?.id,practicePrefs.englishHints]);
   useEffect(()=>{if(current&&phase==='answering'&&listeningPrompt&&promptAudioText)speakJapanese(promptAudioText,0.85,practicePrefs.voiceURI);},[current?.id,phase,listeningPrompt,promptAudioText,practicePrefs.voiceURI]);
   useEffect(()=>{if(current&&phase==='reviewing'&&practicePrefs.autoSpeak)speakJapanese(conjugateItem(current.verb,current.type),0.9,practicePrefs.voiceURI);},[current,phase,practicePrefs.autoSpeak,practicePrefs.voiceURI]);
   useEffect(()=>{setCoachRevealed(0);},[current?.id,practicePrefs.answerMode]);
@@ -1572,6 +1577,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const expectedView=reverseDrill?promptDisplay(current.verb,null,practicePrefs):formDisplay(expected,practicePrefs);
   const promptEnglish=reverseDrill?englishForForm(current.verb,current.type):englishForForm(current.verb,promptType);
   const targetEnglish=reverseDrill?englishForForm(current.verb,null):englishForForm(current.verb,current.type);
+  const englishHintsHidden=(practicePrefs.englishHints||DEFAULT_PREFS.englishHints)==='hidden';
   const typeInfo=getTypeInfo(current.type);
   const reviewExplanation=phase==='reviewing'?(reverseDrill?explainReversePrompt(current.verb,current.type):explainItem(current.verb,current.type)):null;
   const explanation=!wasCorrect?reviewExplanation:null;
@@ -1588,6 +1594,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const reviewSetComplete=reviewLimit>0&&reviewsDone>=reviewLimit;
   const timeLeft=endAt?Math.max(0,Math.ceil((endAt-now)/1000)):null;
   const hidePromptText=listeningPrompt&&phase==='answering'&&!showPromptText;
+  const hideEnglishHint=englishHintsHidden&&phase==='answering'&&!showEnglishHint;
   const coachPreview=toHiragana(answer);
   const coachProgress=toHiraganaProgress(answer);
   const preview=coachPreview;
@@ -1600,6 +1607,17 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const liveWrongIndex=liveCells.findIndex(c=>c.state==='wrong'||c.state==='extra');
   const liveMatched=liveCells.filter(c=>c.state==='correct').length;
   const liveStatus=liveWrongIndex>=0?(liveCells[liveWrongIndex].state==='extra'?'Extra kana after the answer.':`Kana ${liveWrongIndex+1} does not match yet.`):preview===expected?'Complete match. Press Enter.':`${Math.min(liveMatched,expectedKanaCount)}/${expectedKanaCount} kana matched.`;
+
+  async function generateAIClue(){
+    if(!current||!geminiKey)return;
+    setAiHintLoading(true);setAiHintErr('');setAiHintText('');
+    try{
+      const prompt=`Give one concise non-answer clue for this Japanese conjugation drill. Do NOT reveal the exact answer "${expected}" and do not spell out the full transformed form.\n\nBase word: ${current.verb.dict} (${current.verb.reading})\nMeaning: ${current.verb.meaning}\nClass: ${GROUP_NAMES[current.verb.group]||current.verb.group}\nTask: ${reverseDrill?`identify the dictionary form from ${typeInfo.label} ${sourceForm}`:`transform ${promptFormLabel(current.verb,promptType)} to ${typeInfo.label}`}\n\nInclude one semantic hint and one rule cue. Keep it under 30 words.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,220,0.25,aiSystemFromPrefs(practicePrefs,'You give safe study hints for Japanese conjugation quizzes. Never reveal the exact answer.'));
+      setAiHintText(reply);
+    }catch(e){setAiHintErr(e.message||'AI clue failed.');}
+    setAiHintLoading(false);
+  }
 
   function submit(choiceValue){
     if(autoAdvanceRef.current){clearTimeout(autoAdvanceRef.current);autoAdvanceRef.current=null;}
@@ -1669,8 +1687,21 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
           {promptType&&!hidePromptText&&<div className="text-xs text-stone-400">Base: <span lang="ja">{current.verb.dict}</span>{current.verb.dict!==current.verb.reading&&<span lang="ja"> · {current.verb.reading}</span>}</div>}
           {noChangePrompt&&!hidePromptText&&<div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-[11px] font-medium">Trick: no change needed</div>}
           {reverseDrill&&!hidePromptText&&<div className="text-xs text-stone-400">Answer with the dictionary form.</div>}
-          <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
-          {targetEnglish&&targetEnglish!==promptEnglish&&<div className="mt-1 text-xs text-indigo-600">Target meaning: <span className="font-medium">{targetEnglish}</span></div>}
+          {hideEnglishHint?(
+            <div className="mt-3 max-w-md mx-auto rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-500">
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <span>English hint hidden until review.</span>
+                <button onClick={()=>setShowEnglishHint(true)} className="px-2 py-1 rounded-lg border border-stone-200 bg-white hover:bg-stone-100 text-stone-700">Show hint</button>
+                <button onClick={generateAIClue} disabled={!geminiKey||aiHintLoading} className="px-2 py-1 rounded-lg border border-indigo-200 bg-white hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 inline-flex items-center gap-1"><IconSpark className="w-3.5 h-3.5"/>{aiHintLoading?'Thinking...':'AI clue'}</button>
+              </div>
+              {aiHintText&&<div className="mt-2 text-stone-700 leading-relaxed">{aiHintText}</div>}
+              {aiHintErr&&<div className="mt-2 text-rose-600">{aiHintErr}</div>}
+            </div>
+          ):<>
+            <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
+            {targetEnglish&&targetEnglish!==promptEnglish&&<div className="mt-1 text-xs text-indigo-600">Target meaning: <span className="font-medium">{targetEnglish}</span></div>}
+            {aiHintText&&phase==='answering'&&<div className="mt-2 text-xs text-stone-500 max-w-md mx-auto rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">{aiHintText}</div>}
+          </>}
           <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[current.verb.group]} · {wordType}</div>
           <div className="text-[11px] text-stone-400 mt-1">JLPT {getWordMeta(current.verb).jlpt}{getWordMeta(current.verb).lesson?` · Genki L${getWordMeta(current.verb).lesson}`:''}</div>
         </div>
@@ -1684,7 +1715,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
               </div>
               {practicePrefs.answerMode==='choice'?(
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {reverseDrill?choices.map(w=>{const cv=promptDisplay(w,null,practicePrefs);return <button key={wordKey(w)} onClick={()=>submit(w.dict)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition"><ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1"/><div className="mt-1 text-xs text-stone-500">{w.meaning}</div></button>;}):choices.map(c=>{const cv=formDisplay(c,practicePrefs);return <button key={c} onClick={()=>submit(c)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition"><ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1"/></button>;})}
+                  {reverseDrill?choices.map(w=>{const cv=promptDisplay(w,null,practicePrefs);return <button key={wordKey(w)} onClick={()=>submit(w.dict)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition"><ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1"/>{!hideEnglishHint&&<div className="mt-1 text-xs text-stone-500">{w.meaning}</div>}</button>;}):choices.map(c=>{const cv=formDisplay(c,practicePrefs);return <button key={c} onClick={()=>submit(c)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition"><ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1"/></button>;})}
                 </div>
               ):practicePrefs.answerMode==='guided'?(
                 <>
@@ -4427,7 +4458,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:38,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,reference:state.reference,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:39,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,reference:state.reference,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -4504,6 +4535,11 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
         <div>
           <label className="text-xs text-stone-500 block mb-1">Duplicate answers</label>
           <div className="grid grid-cols-2 gap-2">{[{id:true,label:'Skip'},{id:false,label:'Keep'}].map(o=><button key={String(o.id)} onClick={()=>setPracticePrefs({...practicePrefs,skipDuplicateForms:o.id})} className={`px-3 py-2 rounded-lg text-sm border transition ${((practicePrefs.skipDuplicateForms!==false)===o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>)}</div>
+        </div>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">English hints</label>
+          <div className="grid grid-cols-2 gap-2">{[{id:'show',label:'Show'},{id:'hidden',label:'Hide'}].map(o=><button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,englishHints:o.id})} className={`px-3 py-2 rounded-lg text-sm border transition ${((practicePrefs.englishHints||DEFAULT_PREFS.englishHints)===o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>)}</div>
+          <p className="text-[11px] text-stone-400 mt-1">Hidden mode can still ask Gemini for a non-answer clue.</p>
         </div>
         <div>
           <label className="text-xs text-stone-500 block mb-1">Theme</label>
