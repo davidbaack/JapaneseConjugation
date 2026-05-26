@@ -855,10 +855,10 @@ function ContextExamplePanel({item,type,geminiKey,practicePrefs=DEFAULT_PREFS}){
 // ============================================================================
 const DAY=86400000;
 function localDateKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*DAY);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
+function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},mock:{taken:0,bestPct:0,lastPct:0,lastScore:0,lastTotal:0,lastAt:null,bySkill:{}},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
 function mergeState(saved,sessionOverride){
   const base=defaultState();
-  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,mock:(saved&&saved.mock)||base.mock,daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
   if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
     merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
   }
@@ -1153,7 +1153,7 @@ function App(){
           </div>
         </header>
         <nav className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','rush','endings','classify','meaning','mistakes','shadow','lessons','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
+          {['study','rush','endings','classify','meaning','mock','mistakes','shadow','lessons','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
             <button key={t} onClick={()=>setTab(t)} className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
@@ -1162,6 +1162,7 @@ function App(){
         {tab==='endings'&&<EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
         {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='meaning'&&<MeaningView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
+        {tab==='mock'&&<MockTestView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
         {tab==='shadow'&&<ShadowView state={state} setState={setState} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='lessons'&&<LessonsView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
@@ -1623,6 +1624,189 @@ function RushView({state,setState,verbs,practicePrefs=DEFAULT_PREFS,wordLists=[]
         <div className="bg-white rounded-2xl border border-stone-200 p-5">
           <h3 className="font-medium mb-3">Rush log</h3>
           {!recent.length?<div className="text-sm text-stone-500 py-8 text-center">No attempts yet.</div>:<div className="space-y-2">{recent.map((r,i)=><div key={i} className={`rounded-xl border px-3 py-2 ${r.ok?'border-emerald-200 bg-emerald-50':'border-rose-200 bg-rose-50'}`}><div className="flex items-center justify-between gap-2"><span className="text-xs text-stone-500">{r.type}</span><span className={`text-xs font-semibold ${r.ok?'text-emerald-700':'text-rose-700'}`}>{r.ok?'OK':'MISS'}</span></div><div className="mt-1 text-sm" lang="ja">{r.prompt} → {r.expected}</div><div className="text-xs text-stone-500 mt-1">You: <span lang="ja">{r.answer}</span></div></div>)}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// MOCK TEST VIEW
+// ============================================================================
+function choiceListForForms(item,type,words){
+  const expected=conjugateItem(item,type);
+  const set=new Set([expected]);
+  for(const t of shuffled(compatibleTypes(item))){const v=conjugateItem(item,t.id);if(v&&v!==expected)set.add(v);if(set.size>=4)break;}
+  for(const w of shuffled(words.filter(w=>w.group===item.group))){const v=conjugateItem(w,type);if(v&&v!==expected)set.add(v);if(set.size>=4)break;}
+  return shuffled([...set].slice(0,4)).map(v=>({key:v,label:v,lang:'ja',kind:'form'}));
+}
+function choiceListForMeaning(item,words){
+  const seen=new Set([item.meaning]);
+  const choices=[{key:item.meaning,label:item.meaning,kind:'text'}];
+  for(const w of shuffled(words)){if(!w.meaning||seen.has(w.meaning))continue;seen.add(w.meaning);choices.push({key:w.meaning,label:w.meaning,kind:'text'});if(choices.length>=4)break;}
+  return shuffled(choices);
+}
+function choiceListForWord(item,words){
+  const key=wordKey(item),seen=new Set([key]);
+  const choices=[{key,label:item.dict,sub:item.dict!==item.reading?item.reading:'',lang:'ja',kind:'word'}];
+  for(const w of shuffled(words)){const k=wordKey(w);if(seen.has(k))continue;seen.add(k);choices.push({key:k,label:w.dict,sub:w.dict!==w.reading?w.reading:'',lang:'ja',kind:'word'});if(choices.length>=4)break;}
+  return shuffled(choices);
+}
+function choiceListForGroup(item,words){
+  const present=new Set(words.map(w=>w.group));
+  const opts=CLASSIFY_OPTIONS.filter(o=>present.has(o.id)||o.id===item.group);
+  return opts.map(o=>({key:o.id,label:o.label,sub:o.hint,kind:'text'}));
+}
+function buildMockQuestions(words,state,practicePrefs=DEFAULT_PREFS,wordLists=[],count=12){
+  const filtered=filterWordsForPrefs(words,practicePrefs,wordLists);
+  const enabled=state.enabledTypes&&state.enabledTypes.length?state.enabledTypes:ALL_CARD_TYPES.map(t=>t.id);
+  const conjWords=filtered.filter(w=>compatibleTypes(w).some(t=>enabled.includes(t.id)));
+  const kinds=[];
+  if(conjWords.length)kinds.push('conjugation');
+  if(filtered.length>=2)kinds.push('meaning','recognition','classify');
+  const questions=[];
+  for(let i=0;i<count&&kinds.length;i++){
+    const kind=shuffled(kinds)[0];
+    const pool=kind==='conjugation'?conjWords:filtered;
+    const item=shuffled(pool)[0];
+    if(!item)continue;
+    if(kind==='conjugation'){
+      const types=compatibleTypes(item).filter(t=>enabled.includes(t.id));
+      const type=shuffled(types)[0];
+      const answer=conjugateItem(item,type.id);
+      questions.push({id:`mock-${i}-${kind}-${wordKey(item)}-${type.id}`,kind,skill:'Conjugation',item,type:type.id,answerKey:answer,answerLabel:answer,choices:choiceListForForms(item,type.id,filtered),prompt:'Choose the requested conjugated form.',note:explainItem(item,type.id).rule||getTypeInfo(type.id).hint});
+    }else if(kind==='meaning'){
+      questions.push({id:`mock-${i}-${kind}-${wordKey(item)}`,kind,skill:'Vocabulary meaning',item,answerKey:item.meaning,answerLabel:item.meaning,choices:choiceListForMeaning(item,filtered),prompt:'Choose the English meaning.',note:`${item.dict} means ${item.meaning}.`});
+    }else if(kind==='recognition'){
+      questions.push({id:`mock-${i}-${kind}-${wordKey(item)}`,kind,skill:'English to Japanese',item,answerKey:wordKey(item),answerLabel:item.dict,choices:choiceListForWord(item,filtered),prompt:'Choose the Japanese word.',note:`${item.meaning} is ${item.dict}${item.dict!==item.reading?` (${item.reading})`:''}.`});
+    }else{
+      questions.push({id:`mock-${i}-${kind}-${wordKey(item)}`,kind,skill:'Word classification',item,answerKey:item.group,answerLabel:CLASSIFY_OPTIONS.find(o=>o.id===item.group)?.label||item.group,choices:choiceListForGroup(item,filtered),prompt:'Choose the word type.',note:classifyHint(item)});
+    }
+  }
+  return questions;
+}
+function mockSkillBreakdown(questions,answers){
+  const by={};
+  for(const q of questions){
+    const s=by[q.skill]||{attempted:0,correct:0};
+    s.attempted++;if(answers[q.id]===q.answerKey)s.correct++;
+    by[q.skill]=s;
+  }
+  return by;
+}
+function MockTestView({state,setState,words,practicePrefs=DEFAULT_PREFS,wordLists=[]}){
+  const stats=state.mock||defaultState().mock;
+  const[phase,setPhase]=useState('intro');
+  const[questions,setQuestions]=useState([]);
+  const[index,setIndex]=useState(0);
+  const[answers,setAnswers]=useState({});
+  const[result,setResult]=useState(null);
+  const filtered=useMemo(()=>filterWordsForPrefs(words,practicePrefs,wordLists),[words,practicePrefs,wordLists]);
+  const current=questions[index]||null;
+  const selected=current&&Object.prototype.hasOwnProperty.call(answers,current.id)?answers[current.id]:null;
+  const currentCorrect=!!current&&selected===current.answerKey;
+  const answeredCount=Object.keys(answers).length;
+  function start(){
+    const qs=buildMockQuestions(words,state,practicePrefs,wordLists,12);
+    setQuestions(qs);setAnswers({});setIndex(0);setResult(null);setPhase(qs.length?'taking':'intro');
+  }
+  function choose(key){if(!current||selected!==null)return;setAnswers({...answers,[current.id]:key});}
+  function finish(nextAnswers=answers){
+    const breakdown=mockSkillBreakdown(questions,nextAnswers);
+    const correct=questions.filter(q=>nextAnswers[q.id]===q.answerKey).length;
+    const pct=questions.length?Math.round(correct/questions.length*100):0;
+    let mistakes=state.mistakes||[];
+    for(const q of questions){
+      if(q.kind!=='conjugation'||nextAnswers[q.id]===q.answerKey)continue;
+      const picked=q.choices.find(c=>c.key===nextAnswers[q.id]);
+      mistakes=recordMistake(mistakes,q.item,q.type,null,picked?.label||'',q.answerKey);
+    }
+    const prior=state.mock||defaultState().mock;
+    const bySkill={...(prior.bySkill||{})};
+    for(const [skill,s] of Object.entries(breakdown)){
+      const prev=bySkill[skill]||{attempted:0,correct:0};
+      bySkill[skill]={attempted:prev.attempted+s.attempted,correct:prev.correct+s.correct,lastPct:s.attempted?Math.round(s.correct/s.attempted*100):0};
+    }
+    setState({...state,mistakes,mock:{...prior,taken:(prior.taken||0)+1,bestPct:Math.max(prior.bestPct||0,pct),lastPct:pct,lastScore:correct,lastTotal:questions.length,lastAt:Date.now(),bySkill}});
+    setResult({correct,total:questions.length,pct,breakdown});
+    setPhase('results');
+  }
+  function next(){
+    if(!current)return;
+    if(index>=questions.length-1)finish();
+    else setIndex(index+1);
+  }
+  function renderChoice(c){
+    if(c.kind==='form'){
+      const view=formDisplay(c.label,practicePrefs);
+      return <ScriptDisplay view={view} className="text-xl font-medium" subClassName="text-xs text-stone-500 mt-1"/>;
+    }
+    return <><div className="text-base font-medium" lang={c.lang||'en'}>{c.label}</div>{c.sub&&<div className="text-xs text-stone-500 mt-1" lang={c.lang||'en'}>{c.sub}</div>}</>;
+  }
+  const Stat=({label,value})=><div className="bg-white rounded-xl border border-stone-200 p-4"><div className="text-2xl font-semibold tabular-nums">{value}</div><div className="text-xs text-stone-500">{label}</div></div>;
+  if(phase==='intro')return(
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Stat label="Mocks taken" value={stats.taken||0}/>
+        <Stat label="Last score" value={(stats.lastPct||0)+'%'}/>
+        <Stat label="Best score" value={(stats.bestPct||0)+'%'}/>
+        <Stat label="Filtered words" value={filtered.length}/>
+      </div>
+      <div className="bg-white rounded-2xl border border-stone-200 p-6">
+        <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">JLPT-style check</div>
+        <h3 className="text-2xl font-semibold mt-1">Mixed mini mock</h3>
+        <p className="text-sm text-stone-600 mt-3 leading-relaxed">Take a 12-question diagnostic across conjugation, vocabulary meaning, Japanese recognition, and word classification. Wrong conjugation answers are saved to Mistakes so the mock turns into targeted review.</p>
+        <button onClick={start} disabled={!filtered.length} className="mt-5 w-full py-3 bg-stone-800 hover:bg-stone-900 disabled:opacity-40 text-white rounded-xl font-medium">Start mock test</button>
+      </div>
+      {!!Object.keys(stats.bySkill||{}).length&&<div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-3">Skill history</h3><div className="space-y-2">{Object.entries(stats.bySkill||{}).map(([skill,s])=>{const pct=s.attempted?Math.round(s.correct/s.attempted*100):0;return <div key={skill} className="rounded-xl border border-stone-200 px-3 py-2"><div className="flex items-center justify-between gap-2"><span className="text-sm font-medium">{skill}</span><span className="text-xs text-stone-500">{s.correct}/{s.attempted} · {pct}%</span></div><div className="mt-2 h-1.5 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{width:pct+'%'}}/></div></div>;})}</div></div>}
+    </div>
+  );
+  if(phase==='results'&&result){
+    const weakest=Object.entries(result.breakdown).sort((a,b)=>(a[1].correct/a[1].attempted)-(b[1].correct/b[1].attempted))[0];
+    return(
+      <div className="space-y-4">
+        <div className="bg-white rounded-2xl border border-stone-200 p-6 text-center">
+          <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Mock complete</div>
+          <div className="text-5xl font-semibold mt-2 tabular-nums">{result.pct}%</div>
+          <div className="text-sm text-stone-500 mt-2">{result.correct}/{result.total} correct{weakest?` · focus next: ${weakest[0]}`:''}</div>
+          <button onClick={start} className="mt-5 px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-xl font-medium">Retake</button>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">{Object.entries(result.breakdown).map(([skill,s])=>{const pct=s.attempted?Math.round(s.correct/s.attempted*100):0;return <div key={skill} className="bg-white rounded-xl border border-stone-200 p-4"><div className="flex items-center justify-between"><span className="font-medium">{skill}</span><span className="text-sm text-stone-500">{s.correct}/{s.attempted}</span></div><div className="mt-2 h-2 bg-stone-100 rounded-full overflow-hidden"><div className={`h-full ${pct>=80?'bg-emerald-500':pct>=50?'bg-amber-500':'bg-rose-500'}`} style={{width:pct+'%'}}/></div></div>;})}</div>
+      </div>
+    );
+  }
+  if(!current)return <div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No mock questions available for the current filters.</div>;
+  const promptView=current.kind==='conjugation'||current.kind==='meaning'||current.kind==='classify'?promptDisplay(current.item,null,practicePrefs):null;
+  return(
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+        <div className="px-5 py-4 border-b border-stone-100">
+          <div className="flex items-center justify-between gap-3 text-sm"><span className="font-medium">Question {index+1}/{questions.length}</span><span className="text-xs text-indigo-600">{current.skill}</span></div>
+          <div className="mt-3 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{width:((index+1)/questions.length*100)+'%'}}/></div>
+        </div>
+        <div className="p-5">
+          <div className="text-xs uppercase tracking-wider text-stone-400 font-medium mb-2">{current.prompt}</div>
+          {current.kind==='recognition'?(
+            <div className="text-3xl sm:text-4xl font-semibold text-center py-6">{current.item.meaning}</div>
+          ):(
+            <div className="text-center py-5"><ScriptDisplay view={promptView} className="text-4xl sm:text-5xl font-medium" subClassName="text-sm text-stone-500 mt-1"/>{current.kind==='conjugation'&&<div className="mt-3 text-sm text-stone-500">Target: {TYPE_LABEL[current.type]}</div>}</div>
+          )}
+          <div className="grid sm:grid-cols-2 gap-2 mt-4">
+            {current.choices.map(c=>{
+              const picked=selected===c.key,correct=c.key===current.answerKey;
+              const cls=selected!==null&&correct?'bg-emerald-50 border-emerald-300 text-emerald-800':selected!==null&&picked&&!correct?'bg-rose-50 border-rose-300 text-rose-800':'bg-white border-stone-200 hover:border-indigo-400 hover:bg-indigo-50';
+              return <button key={c.key} onClick={()=>choose(c.key)} disabled={selected!==null} className={`min-h-16 px-3 py-3 rounded-xl border text-center transition ${cls}`}>{renderChoice(c)}</button>;
+            })}
+          </div>
+          {selected!==null&&(
+            <div className={`mt-4 rounded-xl border p-4 ${currentCorrect?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
+              <div className={`text-sm font-medium ${currentCorrect?'text-emerald-800':'text-rose-800'}`}>{currentCorrect?'Correct.':'Not quite.'}</div>
+              <div className="mt-1 text-sm text-stone-700">Answer: <span lang="ja">{current.answerLabel}</span></div>
+              <div className="mt-2 text-sm text-stone-600">{current.note}</div>
+              <button onClick={next} autoFocus className="w-full mt-3 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-sm font-medium">{index>=questions.length-1?'Finish mock':'Next'}</button>
+            </div>
+          )}
+          <div className="mt-3 text-center text-xs text-stone-400">{answeredCount}/{questions.length} answered</div>
         </div>
       </div>
     </div>
@@ -2715,7 +2899,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:20,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,meaning:state.meaning,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:21,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
