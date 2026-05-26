@@ -748,6 +748,108 @@ function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey,practice
   );
 }
 
+function contextSentenceFor(item,type){
+  const form=conjugateItem(item,type);
+  const label=(TYPE_LABEL[type]||type).toLowerCase();
+  if(isAdjective(item)){
+    const place='この場所';
+    const M={
+      'adj-plain-present':[`${place}は${form}。`,'This place is described with the target adjective.'],
+      'adj-plain-past':[`昨日は${form}。`,'Yesterday it was described with the target adjective.'],
+      'adj-plain-negative':[`${place}は${form}。`,'This place is not described that way.'],
+      'adj-plain-past-negative':[`昨日は${form}。`,'Yesterday it was not described that way.'],
+      'adj-polite-present':[`${place}は${form}。`,'Polite sentence using the adjective.'],
+      'adj-polite-past':[`昨日は${form}。`,'Polite past sentence using the adjective.'],
+      'adj-polite-negative':[`${place}は${form}。`,'Polite negative sentence using the adjective.'],
+      'adj-polite-past-negative':[`昨日は${form}。`,'Polite past-negative sentence using the adjective.'],
+      'adj-te-form':[`${form}、便利です。`,'Connects the adjective to another description.'],
+      'adj-adverb':[`${form}話してください。`,'Uses the adverbial form before a verb.'],
+      'adj-attributive':[`${form}場所です。`,'Uses the adjective before a noun.'],
+      'adj-conditional':[`${form}、行きます。`,'Uses the conditional before a result.'],
+      'adj-tara':[`${form}、行きます。`,'Uses the tara conditional before a result.'],
+      'adj-sou':[`${form}です。`,'Looks or seems that way.'],
+      'adj-sugiru':[`${form}ので、困ります。`,'Too much of that quality causes a problem.'],
+      'adj-naru':[`だんだん${form}。`,'Shows a change into that state.']
+    };
+    const picked=M[type]||[`${place}は${form}。`,`Short context using the ${label} form.`];
+    return{ja:picked[0],en:picked[1],form,label};
+  }
+  const M={
+    'plain-present':[`毎日、${form}。`,'I do this every day.'],
+    'plain-past':[`昨日、${form}。`,'I did this yesterday.'],
+    'plain-negative':[`今日は${form}。`,'I will not do this today.'],
+    'plain-past-negative':[`昨日は${form}。`,'I did not do this yesterday.'],
+    'polite-present':[`毎日、${form}。`,'Polite sentence for doing this every day.'],
+    'polite-past':[`昨日、${form}。`,'Polite sentence for doing this yesterday.'],
+    'polite-negative':[`今日は${form}。`,'Polite sentence for not doing this today.'],
+    'polite-past-negative':[`昨日は${form}。`,'Polite sentence for not doing this yesterday.'],
+    'masu-stem':[`${form}ながら、音楽を聞きます。`,'Uses the stem with ながら for doing two things together.'],
+    'polite-volitional':[`一緒に${form}。`,'Polite invitation to do this together.'],
+    'polite-te':[`${form}、少し休みます。`,'Polite connective before the next action.'],
+    'polite-conditional-tara':[`${form}、教えてください。`,'Polite if/when sentence.'],
+    'te-form':[`${form}、少し休みます。`,'Connects this action to another action.'],
+    'potential':[`ここで${form}。`,'Says this can be done here.'],
+    'potential-negative':[`今は${form}。`,'Says this cannot be done now.'],
+    'volitional':[`明日、${form}。`,"Let's do this tomorrow."],
+    'conditional-tara':[`${form}、教えてください。`,'If or when this happens, please tell me.'],
+    'conditional-ba':[`${form}、上手になります。`,'If you do this, you improve.'],
+    'conditional-nara':[`${form}、今がいいです。`,'If doing this, now is good.'],
+    'conjectural':[`たぶん${form}。`,'Probably does this.'],
+    'imperative':[`今すぐ${form}。`,'Blunt command form.'],
+    'passive':[`友だちに${form}。`,'Passive context with another person involved.'],
+    'passive-negative':[`友だちに${form}。`,'Negative passive context.'],
+    'causative':[`先生は学生に${form}。`,'Someone makes or lets a student do it.'],
+    'causative-negative':[`先生は学生に${form}。`,'Someone does not make or let a student do it.'],
+    'causative-passive':[`学生は先生に${form}。`,'A student is made to do it.'],
+    'desiderative':[`今、${form}。`,'I want to do this now.'],
+    'progressive':[`今、${form}。`,'This is happening now.'],
+    'negative-te':[`${form}、待ってください。`,'Please wait without doing this.'],
+    'prohibition':[`ここで${form}。`,'Do not do this here.'],
+    'request-kudasai':[`すみません、${form}。`,'Excuse me, please do this.'],
+    'negative-request':[`ここで${form}。`,'Please do not do this here.'],
+    'permission':[`ここで${form}。`,'It is okay to do this here.'],
+    'obligation':[`明日までに${form}。`,'This must be done by tomorrow.']
+  };
+  const picked=M[type]||[`短い文で${form}を使います。`,`Short context using the ${label} form.`];
+  return{ja:picked[0],en:picked[1],form,label};
+}
+
+function ContextExamplePanel({item,type,geminiKey,practicePrefs=DEFAULT_PREFS}){
+  const example=useMemo(()=>contextSentenceFor(item,type),[item,type]);
+  const[aiText,setAiText]=useState('');
+  const[loading,setLoading]=useState(false);
+  const[err,setErr]=useState('');
+  useEffect(()=>{setAiText('');setErr('');setLoading(false);},[item?.dict,type]);
+  async function generate(){
+    if(!geminiKey||!item)return;
+    setLoading(true);setErr('');setAiText('');
+    try{
+      const prompt=`Create two short natural Japanese example sentences using exactly this conjugated form: ${example.form}\nBase word: ${item.dict} (${item.reading})\nMeaning: ${item.meaning}\nForm: ${TYPE_LABEL[type]||type}\nReturn each sentence with a brief English meaning and one tiny usage note. Keep it beginner-friendly.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,700,0.35,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
+      setAiText(reply.trim());
+    }catch(e){setErr(e.message);}
+    setLoading(false);
+  }
+  return(
+    <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-indigo-700 font-medium">In context</div>
+          <div className="mt-1 text-lg text-stone-900" lang="ja">{example.ja}</div>
+          <div className="mt-1 text-xs text-indigo-900/80">{example.en}</div>
+        </div>
+        <button onClick={()=>speakJapanese(example.ja,0.85,practicePrefs.voiceURI)} className="px-2.5 py-2 rounded-lg border border-indigo-200 bg-white/70 hover:bg-white text-indigo-700"><IconVolume className="w-4 h-4"/></button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button onClick={generate} disabled={!geminiKey||loading} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5"><IconSpark className="w-4 h-4"/>{loading?'Writing...':'AI examples'}</button>
+        {!geminiKey&&<div className="text-xs text-indigo-900/60 self-center">Add a Gemini key for natural examples.</div>}
+      </div>
+      {err&&<div className="mt-2 text-sm text-rose-600">{err}</div>}
+      {aiText&&<div className="mt-3 rounded-lg border border-indigo-100 bg-white/80 px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{aiText}</div>}
+    </div>
+  );
+}
+
 // ============================================================================
 // SRS
 // ============================================================================
@@ -1334,6 +1436,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                   <ScriptDisplay view={expectedView} className={`text-xl mt-2 ${wasCorrect?'text-emerald-900':'text-rose-900'}`} subClassName="text-xs text-stone-500 mt-1"/>
                 </div>
               </div>
+              <ContextExamplePanel item={current.verb} type={current.type} geminiKey={geminiKey} practicePrefs={practicePrefs}/>
               {!wasCorrect&&explanation&&(
                 <div className="mt-4 pt-4 border-t border-rose-200 space-y-2.5">
                   <div className="text-xs uppercase tracking-wider text-rose-700 font-medium">Why it's <span lang="ja" className="normal-case tracking-normal">{expected}</span></div>
@@ -2612,7 +2715,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:19,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,meaning:state.meaning,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:20,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,meaning:state.meaning,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
