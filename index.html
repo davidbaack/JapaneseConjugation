@@ -1071,7 +1071,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,practiceFocus:'balanced',skipDuplicateForms:true,trickQuestions:false,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordGroups:['ichidan','godan','suru','kuru','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,autoAdvanceCorrect:false,practiceFocus:'balanced',skipDuplicateForms:true,trickQuestions:false,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordGroups:['ichidan','godan','suru','kuru','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -1396,6 +1396,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const[now,setNow]=useState(Date.now());
   const[reviewBase,setReviewBase]=useState(state.session.reviewed||0);
   const inputRef=useRef(null);
+  const autoAdvanceRef=useRef(null);
   const enabledTypes=state.enabledTypes.length>0?state.enabledTypes:['plain-past'];
   const practiceWords=useMemo(()=>filterWordsForPrefs(verbs,practicePrefs,wordLists),[verbs,practicePrefs,wordLists]);
   const listeningPrompt=!!practicePrefs.listeningPrompt;
@@ -1423,6 +1424,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
     const id=setInterval(()=>setNow(Date.now()),500);
     return()=>clearInterval(id);
   },[endAt]);
+  useEffect(()=>()=>{if(autoAdvanceRef.current)clearTimeout(autoAdvanceRef.current);},[]);
 
   if(!current)return(<div className="bg-white rounded-2xl border border-stone-200 p-12 text-center"><p className="text-stone-600 mb-2">No cards available</p><p className="text-xs text-stone-400">Enable conjugation types in Settings.</p></div>);
 
@@ -1458,6 +1460,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const liveStatus=liveWrongIndex>=0?(liveCells[liveWrongIndex].state==='extra'?'Extra kana after the answer.':`Kana ${liveWrongIndex+1} does not match yet.`):preview===expected?'Complete match. Press Enter.':`${Math.min(liveMatched,expectedKanaCount)}/${expectedKanaCount} kana matched.`;
 
   function submit(choiceValue){
+    if(autoAdvanceRef.current){clearTimeout(autoAdvanceRef.current);autoAdvanceRef.current=null;}
     if(phase==='reviewing'){
       setChatOpen(false);setAnswer('');setCoachRevealed(0);setPhase('answering');
       if(!reviewSetComplete)setCurrent(selectNext(state,practiceWords,enabledTypes,current.id,practicePrefs));
@@ -1472,8 +1475,18 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
     const prevVS=(state.verbStats?.[dict]?.[rid])||{seen:0,incorrect:0};
     const newVerbStats={...state.verbStats,[dict]:{...(state.verbStats?.[dict]||{}),[rid]:{seen:prevVS.seen+1,incorrect:prevVS.incorrect+(ok?0:1)}}};
     const nextMistakes=ok?state.mistakes:recordMistake(state.mistakes,current.verb,current.type,reverseDrill?current.type:promptType,reverseDrill?raw.trim():normalized,expected);
-    setState({...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,mistakes:nextMistakes,session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)});
+    const nextState={...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,mistakes:nextMistakes,session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)};
+    setState(nextState);
     setWasCorrect(ok);setPhase('reviewing');
+    const reviewWillComplete=reviewLimit>0&&reviewsDone+1>=reviewLimit;
+    if(ok&&practicePrefs.autoAdvanceCorrect&&!reviewWillComplete){
+      autoAdvanceRef.current=setTimeout(()=>{
+        autoAdvanceRef.current=null;
+        if(endAt&&Date.now()>=endAt)return;
+        setChatOpen(false);setAnswer('');setCoachRevealed(0);setPhase('answering');
+        setCurrent(selectNext(nextState,practiceWords,enabledTypes,current.id,practicePrefs));
+      },850);
+    }
   }
 
   const card=state.cards[current.id];
@@ -1576,6 +1589,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                   <div className={`text-sm font-medium ${wasCorrect?'text-emerald-800':'text-rose-800'}`}>{wasCorrect?'Correct!':'Not quite.'}</div>
                   {!wasCorrect&&<div className="text-xs text-rose-700 mt-1">You wrote: <span lang="ja">{reverseDrill?(answer.trim()||'(empty)'):(toHiragana(answer)||'(empty)')}</span></div>}
                   <ScriptDisplay view={expectedView} className={`text-xl mt-2 ${wasCorrect?'text-emerald-900':'text-rose-900'}`} subClassName="text-xs text-stone-500 mt-1"/>
+                  {wasCorrect&&practicePrefs.autoAdvanceCorrect&&<div className="text-xs text-emerald-700 mt-2">Next card coming up...</div>}
                 </div>
               </div>
               <ContextExamplePanel item={current.verb} type={current.type} geminiKey={geminiKey} practicePrefs={practicePrefs}/>
@@ -3815,7 +3829,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:29,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:30,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -3900,6 +3914,9 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
         </div>
         <div className="flex items-end">
           <button onClick={()=>setPracticePrefs({...practicePrefs,autoSpeak:!practicePrefs.autoSpeak})} className={`w-full px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.autoSpeak?'bg-indigo-600 text-white border-indigo-600':'bg-white border-stone-200 hover:border-stone-300'}`}><IconVolume className="w-4 h-4 inline-block mr-1.5"/>Speak answers</button>
+        </div>
+        <div className="flex items-end">
+          <button onClick={()=>setPracticePrefs({...practicePrefs,autoAdvanceCorrect:!practicePrefs.autoAdvanceCorrect})} className={`w-full px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center gap-1.5 ${practicePrefs.autoAdvanceCorrect?'bg-indigo-600 text-white border-indigo-600':'bg-white border-stone-200 hover:border-stone-300'}`}><IconRefresh className="w-4 h-4"/>Auto next</button>
         </div>
         <div className="flex items-end">
           <button onClick={()=>setPracticePrefs({...practicePrefs,listeningPrompt:!practicePrefs.listeningPrompt})} className={`w-full px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.listeningPrompt?'bg-indigo-600 text-white border-indigo-600':'bg-white border-stone-200 hover:border-stone-300'}`}><IconVolume className="w-4 h-4 inline-block mr-1.5"/>Listening prompt</button>
