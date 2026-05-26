@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>動詞ドリル · Verb Drill</title>
+  <title>Conjugation Dojo · Japanese Verbs and Adjectives</title>
+  <meta name="theme-color" content="#312e81"/>
+  <link rel="manifest" href="./manifest.webmanifest"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -27,6 +29,10 @@ const IconRefresh=(p)=><Icon {...p} d={<><polyline points="1 4 1 10 7 10"/><path
 const IconFlame=(p)=><Icon {...p} d={<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>}/>;
 const IconCloud=(p)=><Icon {...p} d={<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>}/>;
 const IconChat=(p)=><Icon {...p} d={<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>}/>;
+const IconBook=(p)=><Icon {...p} d={<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/></>}/>;
+const IconVolume=(p)=><Icon {...p} d={<><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></>}/>;
+const IconSpark=(p)=><Icon {...p} d={<><path d="M12 3l1.7 5.2L19 10l-5.3 1.8L12 17l-1.7-5.2L5 10l5.3-1.8L12 3z"/><path d="M19 15l.7 2.1L22 18l-2.3.9L19 21l-.7-2.1L16 18l2.3-.9L19 15z"/></>}/>;
+const IconList=(p)=><Icon {...p} d={<><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>}/>;
 
 // ============================================================================
 // VERB DATA
@@ -64,6 +70,33 @@ const STARTER_VERBS=[
   {dict:'来る',reading:'くる',meaning:'to come',group:'kuru'},
 ];
 
+const STARTER_ADJECTIVES=[
+  {dict:'いい',reading:'いい',meaning:'good',group:'i-adjective',irregular:true},
+  {dict:'大きい',reading:'おおきい',meaning:'big',group:'i-adjective'},
+  {dict:'小さい',reading:'ちいさい',meaning:'small',group:'i-adjective'},
+  {dict:'新しい',reading:'あたらしい',meaning:'new',group:'i-adjective'},
+  {dict:'古い',reading:'ふるい',meaning:'old',group:'i-adjective'},
+  {dict:'高い',reading:'たかい',meaning:'tall / expensive',group:'i-adjective'},
+  {dict:'安い',reading:'やすい',meaning:'cheap',group:'i-adjective'},
+  {dict:'難しい',reading:'むずかしい',meaning:'difficult',group:'i-adjective'},
+  {dict:'易しい',reading:'やさしい',meaning:'easy / kind',group:'i-adjective'},
+  {dict:'暑い',reading:'あつい',meaning:'hot weather',group:'i-adjective'},
+  {dict:'寒い',reading:'さむい',meaning:'cold weather',group:'i-adjective'},
+  {dict:'楽しい',reading:'たのしい',meaning:'fun',group:'i-adjective'},
+  {dict:'忙しい',reading:'いそがしい',meaning:'busy',group:'i-adjective'},
+  {dict:'おいしい',reading:'おいしい',meaning:'delicious',group:'i-adjective'},
+  {dict:'静か',reading:'しずか',meaning:'quiet',group:'na-adjective'},
+  {dict:'元気',reading:'げんき',meaning:'healthy / energetic',group:'na-adjective'},
+  {dict:'便利',reading:'べんり',meaning:'convenient',group:'na-adjective'},
+  {dict:'有名',reading:'ゆうめい',meaning:'famous',group:'na-adjective'},
+  {dict:'好き',reading:'すき',meaning:'liked',group:'na-adjective'},
+  {dict:'嫌い',reading:'きらい',meaning:'disliked',group:'na-adjective'},
+  {dict:'上手',reading:'じょうず',meaning:'skillful',group:'na-adjective'},
+  {dict:'下手',reading:'へた',meaning:'unskillful',group:'na-adjective'},
+  {dict:'きれい',reading:'きれい',meaning:'pretty / clean',group:'na-adjective'},
+  {dict:'大切',reading:'たいせつ',meaning:'important',group:'na-adjective'},
+];
+
 const CONJ_TYPES=[
   {id:'plain-present',label:'Plain Present',sub:'辞書形',hint:'dictionary form'},
   {id:'plain-past',label:'Plain Past',sub:'た形',hint:'~た / ~だ'},
@@ -81,9 +114,34 @@ const CONJ_TYPES=[
   {id:'imperative',label:'Imperative',sub:'命令形',hint:'do ~!'},
   {id:'passive',label:'Passive',sub:'受身形',hint:'be ~ed'},
   {id:'causative',label:'Causative',sub:'使役形',hint:'make / let ~'},
+  {id:'causative-passive',label:'Causative Passive',sub:'使役受身形',hint:'be made to ~'},
+  {id:'desiderative',label:'Tai-form',sub:'たい形',hint:'want to ~'},
+  {id:'progressive',label:'Progressive',sub:'ている',hint:'is / has been ~ing'},
+  {id:'negative-te',label:'Negative Te',sub:'ないで',hint:'without doing ~'},
+  {id:'prohibition',label:'Prohibition',sub:'禁止形',hint:'do not ~!'},
 ];
+const ADJ_TYPES=[
+  {id:'adj-plain-present',label:'Adj. Plain Present',sub:'普通形',hint:'is ~'},
+  {id:'adj-plain-past',label:'Adj. Plain Past',sub:'過去形',hint:'was ~'},
+  {id:'adj-plain-negative',label:'Adj. Plain Negative',sub:'否定形',hint:'is not ~'},
+  {id:'adj-plain-past-negative',label:'Adj. Past Negative',sub:'過去否定',hint:'was not ~'},
+  {id:'adj-polite-present',label:'Adj. Polite Present',sub:'です',hint:'is ~ politely'},
+  {id:'adj-polite-past',label:'Adj. Polite Past',sub:'でした',hint:'was ~ politely'},
+  {id:'adj-polite-negative',label:'Adj. Polite Negative',sub:'ではありません',hint:'is not ~ politely'},
+  {id:'adj-polite-past-negative',label:'Adj. Polite Past Negative',sub:'ではありませんでした',hint:'was not ~ politely'},
+  {id:'adj-te-form',label:'Adj. Te-form',sub:'て形',hint:'and / so'},
+  {id:'adj-adverb',label:'Adverbial',sub:'副詞形',hint:'~ly'},
+  {id:'adj-attributive',label:'Noun Modifier',sub:'連体形',hint:'~ noun'},
+  {id:'adj-conditional',label:'Adj. Conditional',sub:'ば / なら',hint:'if it is ~'},
+  {id:'adj-tara',label:'Adj. たら',sub:'条件形',hint:'if / when it is ~'},
+  {id:'adj-sou',label:'Looks Like',sub:'そう',hint:'looks ~'},
+  {id:'adj-sugiru',label:'Too Much',sub:'すぎる',hint:'too ~'},
+  {id:'adj-naru',label:'Become',sub:'なる',hint:'becomes ~'},
+];
+const ALL_CARD_TYPES=[...CONJ_TYPES,...ADJ_TYPES];
 const TYPE_LABEL={};
-for(const t of CONJ_TYPES)TYPE_LABEL[t.id]=t.label;
+for(const t of ALL_CARD_TYPES)TYPE_LABEL[t.id]=t.label;
+function getTypeInfo(id){return ALL_CARD_TYPES.find(t=>t.id===id)||{id,label:id,sub:'',hint:''};}
 
 // ============================================================================
 // ROMAJI → HIRAGANA
@@ -138,17 +196,96 @@ const TE_END={く:'いて',ぐ:'いで',す:'して',つ:'って',う:'って',�
 
 function conjugate(verb,type){
   const{reading,group}=verb;
-  if(group==='ichidan'){const stem=reading.slice(0,-1);const M={'plain-present':reading,'plain-past':stem+'た','plain-negative':stem+'ない','plain-past-negative':stem+'なかった','polite-present':stem+'ます','polite-past':stem+'ました','polite-negative':stem+'ません','polite-past-negative':stem+'ませんでした','te-form':stem+'て','potential':stem+'られる','volitional':stem+'よう','conditional-tara':stem+'たら','conditional-ba':stem+'れば','imperative':stem+'ろ','passive':stem+'られる','causative':stem+'させる'};return M[type]||'';}
-  if(group==='godan'){const stem=reading.slice(0,-1),last=reading.slice(-1);let pastEnd=PAST_END[last],teEnd=TE_END[last];if(reading==='いく'||reading.endsWith('いく')){pastEnd='った';teEnd='って';}if(reading==='ある'){if(type==='plain-negative')return'ない';if(type==='plain-past-negative')return'なかった';}const M={'plain-present':reading,'plain-past':stem+pastEnd,'plain-negative':stem+A_ROW[last]+'ない','plain-past-negative':stem+A_ROW[last]+'なかった','polite-present':stem+I_ROW[last]+'ます','polite-past':stem+I_ROW[last]+'ました','polite-negative':stem+I_ROW[last]+'ません','polite-past-negative':stem+I_ROW[last]+'ませんでした','te-form':stem+teEnd,'potential':stem+E_ROW[last]+'る','volitional':stem+O_ROW[last]+'う','conditional-tara':stem+pastEnd+'ら','conditional-ba':stem+E_ROW[last]+'ば','imperative':stem+E_ROW[last],'passive':stem+A_ROW[last]+'れる','causative':stem+A_ROW[last]+'せる'};return M[type]||'';}
-  if(group==='suru'){const stem=reading.endsWith('する')?reading.slice(0,-2):'';const M={'plain-present':'する','plain-past':'した','plain-negative':'しない','plain-past-negative':'しなかった','polite-present':'します','polite-past':'しました','polite-negative':'しません','polite-past-negative':'しませんでした','te-form':'して','potential':'できる','volitional':'しよう','conditional-tara':'したら','conditional-ba':'すれば','imperative':'しろ','passive':'される','causative':'させる'};return stem+(M[type]||'');}
-  if(group==='kuru'){const stem=reading.endsWith('くる')?reading.slice(0,-2):'';const M={'plain-present':'くる','plain-past':'きた','plain-negative':'こない','plain-past-negative':'こなかった','polite-present':'きます','polite-past':'きました','polite-negative':'きません','polite-past-negative':'きませんでした','te-form':'きて','potential':'こられる','volitional':'こよう','conditional-tara':'きたら','conditional-ba':'くれば','imperative':'こい','passive':'こられる','causative':'こさせる'};return stem+(M[type]||'');}
+  if(group==='ichidan'){
+    const stem=reading.slice(0,-1);
+    const te=stem+'て',neg=stem+'ない',past=stem+'た';
+    const M={
+      'plain-present':reading,'plain-past':past,'plain-negative':neg,'plain-past-negative':stem+'なかった',
+      'polite-present':stem+'ます','polite-past':stem+'ました','polite-negative':stem+'ません','polite-past-negative':stem+'ませんでした',
+      'te-form':te,'potential':stem+'られる','volitional':stem+'よう','conditional-tara':past+'ら','conditional-ba':stem+'れば',
+      'imperative':stem+'ろ','passive':stem+'られる','causative':stem+'させる','causative-passive':stem+'させられる',
+      'desiderative':stem+'たい','progressive':te+'いる','negative-te':neg+'で','prohibition':reading+'な'
+    };
+    return M[type]||'';
+  }
+  if(group==='godan'){
+    const stem=reading.slice(0,-1),last=reading.slice(-1);
+    let pastEnd=PAST_END[last],teEnd=TE_END[last];
+    if(reading==='いく'||reading.endsWith('いく')){pastEnd='った';teEnd='って';}
+    const neg=reading==='ある'?'ない':stem+A_ROW[last]+'ない';
+    const pastNeg=reading==='ある'?'なかった':stem+A_ROW[last]+'なかった';
+    const te=stem+teEnd,past=stem+pastEnd;
+    const M={
+      'plain-present':reading,'plain-past':past,'plain-negative':neg,'plain-past-negative':pastNeg,
+      'polite-present':stem+I_ROW[last]+'ます','polite-past':stem+I_ROW[last]+'ました','polite-negative':stem+I_ROW[last]+'ません','polite-past-negative':stem+I_ROW[last]+'ませんでした',
+      'te-form':te,'potential':stem+E_ROW[last]+'る','volitional':stem+O_ROW[last]+'う','conditional-tara':past+'ら','conditional-ba':stem+E_ROW[last]+'ば',
+      'imperative':stem+E_ROW[last],'passive':stem+A_ROW[last]+'れる','causative':stem+A_ROW[last]+'せる','causative-passive':stem+A_ROW[last]+'せられる',
+      'desiderative':stem+I_ROW[last]+'たい','progressive':te+'いる','negative-te':neg+'で','prohibition':reading+'な'
+    };
+    return M[type]||'';
+  }
+  if(group==='suru'){
+    const stem=reading.endsWith('する')?reading.slice(0,-2):'';
+    const M={
+      'plain-present':'する','plain-past':'した','plain-negative':'しない','plain-past-negative':'しなかった',
+      'polite-present':'します','polite-past':'しました','polite-negative':'しません','polite-past-negative':'しませんでした',
+      'te-form':'して','potential':'できる','volitional':'しよう','conditional-tara':'したら','conditional-ba':'すれば',
+      'imperative':'しろ','passive':'される','causative':'させる','causative-passive':'させられる',
+      'desiderative':'したい','progressive':'している','negative-te':'しないで','prohibition':'するな'
+    };
+    return stem+(M[type]||'');
+  }
+  if(group==='kuru'){
+    const stem=reading.endsWith('くる')?reading.slice(0,-2):'';
+    const M={
+      'plain-present':'くる','plain-past':'きた','plain-negative':'こない','plain-past-negative':'こなかった',
+      'polite-present':'きます','polite-past':'きました','polite-negative':'きません','polite-past-negative':'きませんでした',
+      'te-form':'きて','potential':'こられる','volitional':'こよう','conditional-tara':'きたら','conditional-ba':'くれば',
+      'imperative':'こい','passive':'こられる','causative':'こさせる','causative-passive':'こさせられる',
+      'desiderative':'きたい','progressive':'きている','negative-te':'こないで','prohibition':'くるな'
+    };
+    return stem+(M[type]||'');
+  }
   return'';
 }
+
+function adjectiveStem(adj){
+  const reading=adj.reading;
+  if(adj.irregular||reading==='いい'||reading==='かっこいい')return reading.slice(0,-2)+'よ';
+  return reading.endsWith('い')?reading.slice(0,-1):reading;
+}
+function conjugateAdjective(adj,type){
+  const{reading,group}=adj;
+  if(group==='i-adjective'){
+    const stem=adjectiveStem(adj);
+    const past=stem+'かった',neg=stem+'くない',pastNeg=stem+'くなかった';
+    const M={
+      'adj-plain-present':reading,'adj-plain-past':past,'adj-plain-negative':neg,'adj-plain-past-negative':pastNeg,
+      'adj-polite-present':reading+'です','adj-polite-past':past+'です','adj-polite-negative':neg+'です','adj-polite-past-negative':pastNeg+'です',
+      'adj-te-form':stem+'くて','adj-adverb':stem+'く','adj-attributive':reading,'adj-conditional':stem+'ければ',
+      'adj-tara':past+'ら','adj-sou':stem+'そう','adj-sugiru':stem+'すぎる','adj-naru':stem+'くなる'
+    };
+    return M[type]||'';
+  }
+  if(group==='na-adjective'){
+    const stem=reading.replace(/な$/,'');
+    const M={
+      'adj-plain-present':stem+'だ','adj-plain-past':stem+'だった','adj-plain-negative':stem+'ではない','adj-plain-past-negative':stem+'ではなかった',
+      'adj-polite-present':stem+'です','adj-polite-past':stem+'でした','adj-polite-negative':stem+'ではありません','adj-polite-past-negative':stem+'ではありませんでした',
+      'adj-te-form':stem+'で','adj-adverb':stem+'に','adj-attributive':stem+'な','adj-conditional':stem+'なら',
+      'adj-tara':stem+'だったら','adj-sou':stem+'そう','adj-sugiru':stem+'すぎる','adj-naru':stem+'になる'
+    };
+    return M[type]||'';
+  }
+  return'';
+}
+function conjugateItem(item,type){return item.group==='i-adjective'||item.group==='na-adjective'?conjugateAdjective(item,type):conjugate(item,type);}
+function isAdjective(item){return item.group==='i-adjective'||item.group==='na-adjective';}
 
 // ============================================================================
 // EXPLANATION ENGINE
 // ============================================================================
-const GROUP_NAMES={ichidan:'an ichidan verb (る-verb / Group 2)',godan:'a godan verb (う-verb / Group 1)',suru:'irregular (the verb する, Group 3)',kuru:'irregular (the verb 来る, Group 3)'};
+const GROUP_NAMES={ichidan:'an ichidan verb (る-verb / Group 2)',godan:'a godan verb (う-verb / Group 1)',suru:'irregular (the verb する, Group 3)',kuru:'irregular (the verb 来る, Group 3)','i-adjective':'an い-adjective','na-adjective':'a な-adjective'};
 
 function explainConjugation(verb,type){
   const{reading,group,dict}=verb;
@@ -163,6 +300,68 @@ function explainConjugation(verb,type){
   return{intro,rule,derivation,note};
 }
 
+function explainAdjective(adj,type){
+  const result=conjugateAdjective(adj,type);
+  const stem=adjectiveStem(adj);
+  const intro=`${adj.dict} (${adj.reading}) is ${GROUP_NAMES[adj.group]}.`;
+  let rule='',derivation=result,note='';
+  if(adj.group==='i-adjective'){
+    const irregular=adj.irregular||adj.reading==='いい'||adj.reading==='かっこいい';
+    const M={
+      'adj-plain-present':['Dictionary form.',result],
+      'adj-plain-past':['Drop い, add かった.',`${stem} + かった = ${result}`],
+      'adj-plain-negative':['Drop い, add くない.',`${stem} + くない = ${result}`],
+      'adj-plain-past-negative':['Drop い, add くなかった.',`${stem} + くなかった = ${result}`],
+      'adj-polite-present':['Add です to the dictionary form.',`${adj.reading} + です = ${result}`],
+      'adj-polite-past':['Make the plain past, then add です.',`${stem} + かった + です = ${result}`],
+      'adj-polite-negative':['Make the plain negative, then add です.',`${stem} + くない + です = ${result}`],
+      'adj-polite-past-negative':['Make the plain past negative, then add です.',`${stem} + くなかった + です = ${result}`],
+      'adj-te-form':['Drop い, add くて.',`${stem} + くて = ${result}`],
+      'adj-adverb':['Drop い, add く.',`${stem} + く = ${result}`],
+      'adj-attributive':['Use the dictionary form before a noun.',result],
+      'adj-conditional':['Drop い, add ければ.',`${stem} + ければ = ${result}`],
+      'adj-tara':['Plain past + ら.',`${stem} + かった + ら = ${result}`],
+      'adj-sou':['Drop い, add そう.',`${stem} + そう = ${result}`],
+      'adj-sugiru':['Drop い, add すぎる.',`${stem} + すぎる = ${result}`],
+      'adj-naru':['Drop い, add くなる.',`${stem} + くなる = ${result}`]
+    };
+    [rule,derivation]=M[type]||['',result];
+    if(irregular)note='いい and かっこいい conjugate from よい, so the stem becomes よ.';
+  }else{
+    const s=adj.reading.replace(/な$/,'');
+    const M={
+      'adj-plain-present':['Add だ for the plain predicative form.',`${s} + だ = ${result}`],
+      'adj-plain-past':['Add だった.',`${s} + だった = ${result}`],
+      'adj-plain-negative':['Add ではない.',`${s} + ではない = ${result}`],
+      'adj-plain-past-negative':['Add ではなかった.',`${s} + ではなかった = ${result}`],
+      'adj-polite-present':['Add です.',`${s} + です = ${result}`],
+      'adj-polite-past':['Add でした.',`${s} + でした = ${result}`],
+      'adj-polite-negative':['Add ではありません.',`${s} + ではありません = ${result}`],
+      'adj-polite-past-negative':['Add ではありませんでした.',`${s} + ではありませんでした = ${result}`],
+      'adj-te-form':['Use で to connect clauses.',`${s} + で = ${result}`],
+      'adj-adverb':['Add に for the adverbial form.',`${s} + に = ${result}`],
+      'adj-attributive':['Add な before a noun.',`${s} + な = ${result}`],
+      'adj-conditional':['Use なら for the common conditional.',`${s} + なら = ${result}`],
+      'adj-tara':['Plain past + ら.',`${s} + だった + ら = ${result}`],
+      'adj-sou':['Add そう.',`${s} + そう = ${result}`],
+      'adj-sugiru':['Add すぎる.',`${s} + すぎる = ${result}`],
+      'adj-naru':['Add になる.',`${s} + になる = ${result}`]
+    };
+    [rule,derivation]=M[type]||['',result];
+  }
+  return{intro,rule,derivation,note};
+}
+function explainItem(item,type){
+  if(isAdjective(item))return explainAdjective(item,type);
+  const e=explainConjugation(item,type);
+  if(!e.rule&&type==='causative-passive')e.rule=item.group==='godan'?'Use the あ-row stem, then add せられる.':'Use the causative stem and add られる.';
+  if(!e.rule&&type==='desiderative')e.rule=item.group==='godan'?'Use the い-row stem, then add たい.':'Use the verb stem, then add たい.';
+  if(!e.rule&&type==='progressive')e.rule='Use the te-form, then add いる.';
+  if(!e.rule&&type==='negative-te')e.rule='Use the plain negative form, then add で.';
+  if(!e.rule&&type==='prohibition')e.rule='Use the dictionary form, then add な for a blunt prohibition.';
+  return e;
+}
+
 function diagnose(verb,type,userAnswer){
   const got=toHiragana(userAnswer);
   if(!got)return'';
@@ -170,11 +369,21 @@ function diagnose(verb,type,userAnswer){
   for(const g of['ichidan','godan'].filter(g=>g!==verb.group)){try{const alt=conjugate({...verb,group:g},type);if(alt===got)return`You conjugated this as a ${g==='ichidan'?'る-verb':'う-verb'}, but ${verb.dict} is ${verb.group==='ichidan'?'ichidan':verb.group==='godan'?'godan':'irregular'}.`;}catch{}}
   return'';
 }
+function diagnoseItem(item,type,userAnswer){
+  if(!isAdjective(item))return diagnose(item,type,userAnswer);
+  const got=toHiragana(userAnswer);
+  if(!got)return'';
+  for(const t of ADJ_TYPES){if(t.id===type)continue;if(conjugateAdjective(item,t.id)===got)return`That's the ${t.label.toLowerCase()} form, but this card asks for ${getTypeInfo(type).label.toLowerCase()}.`;}
+  const other=item.group==='i-adjective'?'na-adjective':'i-adjective';
+  try{if(conjugateAdjective({...item,group:other},type)===got)return`You used the ${other==='i-adjective'?'い-adjective':'な-adjective'} pattern, but ${item.dict} is ${GROUP_NAMES[item.group]}.`;}catch{}
+  return'';
+}
 
 // ============================================================================
 // AI (Gemini)
 // ============================================================================
 const AI_SYSTEM=`You are a friendly Japanese language teacher helping a student who just got a verb conjugation wrong. The student can read hiragana and katakana but struggles with kanji. Always write Japanese in hiragana/katakana with romaji in brackets after it, e.g. たべた [tabeta]. Be warm, encouraging, and concise — 2 to 3 short paragraphs at most. Focus on the specific rule missed and give one extra example.`;
+const AI_COACH_SYSTEM=`You are a concise Japanese conjugation and sentence coach. Analyze verbs and adjectives in context, identify conjugation mistakes, explain the rule, give a natural corrected sentence, and finish with one tiny practice prompt. Keep Japanese readable for learners by adding romaji after key forms.`;
 
 function geminiText(d){
   const parts=d.candidates?.[0]?.content?.parts||[];
@@ -204,11 +413,11 @@ function extractJSON(text){
   return null;
 }
 
-async function callGemini(contents,apiKey,maxTokens=600,temp=0.7){
+async function callGemini(contents,apiKey,maxTokens=600,temp=0.7,systemText=AI_SYSTEM){
   if(!apiKey)throw new Error('No Gemini API key — add it in Settings.');
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({contents,systemInstruction:{parts:[{text:AI_SYSTEM}]},generationConfig:{maxOutputTokens:maxTokens,temperature:temp}})});
+     body:JSON.stringify({contents,systemInstruction:{parts:[{text:systemText}]},generationConfig:{maxOutputTokens:maxTokens,temperature:temp}})});
   const d=await r.json();
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
   return geminiText(d);
@@ -244,8 +453,9 @@ async function getSuggestedVerb(existingVerbs,apiKey){
 }
 
 function buildContext(verb,type,userAnswer,expected,explanation){
-  const ti=CONJ_TYPES.find(t=>t.id===type);
-  return`I'm studying Japanese and just got this wrong.\n\nVerb: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: ${ti.label} (${ti.hint})\nMy answer: ${toHiragana(userAnswer)||'(blank)'}\nCorrect: ${expected}\n\nAuto-explanation: ${explanation.intro} ${explanation.rule}${explanation.derivation&&explanation.derivation!==expected?'\nStep: '+explanation.derivation:''}${explanation.note?'\nNote: '+explanation.note:''}\n\nHelp me understand why the answer is ${expected} and where I went wrong. Always show romaji.`;
+  const ti=getTypeInfo(type);
+  const label=isAdjective(verb)?'Adjective':'Verb';
+  return`I'm studying Japanese and just got this wrong.\n\n${label}: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: ${ti.label} (${ti.hint})\nMy answer: ${toHiragana(userAnswer)||'(blank)'}\nCorrect: ${expected}\n\nAuto-explanation: ${explanation.intro} ${explanation.rule}${explanation.derivation&&explanation.derivation!==expected?'\nStep: '+explanation.derivation:''}${explanation.note?'\nNote: '+explanation.note:''}\n\nHelp me understand why the answer is ${expected} and where I went wrong. Always show romaji.`;
 }
 
 function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey}){
@@ -313,7 +523,30 @@ function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey}){
 // SRS
 // ============================================================================
 const DAY=86400000;
-function defaultState(){return{cards:{},verbStats:{},enabledTypes:CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),session:{reviewed:0,correct:0}};}
+function localDateKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*DAY);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function defaultState(){return{cards:{},verbStats:{},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0}};}
+function mergeState(saved,sessionOverride){
+  const base=defaultState();
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},daily:(saved&&saved.daily)||base.daily,session:sessionOverride||base.session};
+  if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
+    merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
+  }
+  return merged;
+}
+function bumpDaily(daily,correct,dailyGoal){
+  const today=localDateKey(),yesterday=localDateKey(-1);
+  let d=daily||{};
+  if(d.date!==today){
+    const keepGoalStreak=d.date===yesterday&&d.goalHit;
+    d={date:today,count:0,goalHit:false,goalStreak:keepGoalStreak?(d.goalStreak||0):0,bestGoalStreak:d.bestGoalStreak||0,currentAnswerStreak:0,bestAnswerStreak:d.bestAnswerStreak||0};
+  }
+  const count=(d.count||0)+1;
+  const wasGoalHit=!!d.goalHit;
+  const goalHit=count>=dailyGoal;
+  const goalStreak=(d.goalStreak||0)+(!wasGoalHit&&goalHit?1:0);
+  const currentAnswerStreak=correct?(d.currentAnswerStreak||0)+1:0;
+  return{...d,count,goalHit,goalStreak,bestGoalStreak:Math.max(d.bestGoalStreak||0,goalStreak),currentAnswerStreak,bestAnswerStreak:Math.max(d.bestAnswerStreak||0,currentAnswerStreak)};
+}
 function gradeCard(card,correct){
   const now=Date.now();
   if(!card)card={ease:2.5,interval:0,reps:0,nextReview:0,correct:0,incorrect:0,lastSeen:0};
@@ -385,6 +618,15 @@ const RULES=(()=>{
       verbFilter:(verbs)=>verbs.filter(v=>v.reading.endsWith('いく')),
     });
   }
+  const adjShort={'i-adjective':'い-adj','na-adjective':'な-adj'};
+  for(const g of['i-adjective','na-adjective']){
+    for(const t of ADJ_TYPES){
+      rules.push({
+        id:`${g}|${t.id}`,group:g,type:t.id,label:adjShort[g],
+        verbFilter:(words)=>words.filter(w=>w.group===g),
+      });
+    }
+  }
   return rules;
 })();
 
@@ -393,10 +635,11 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
+const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji'};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
-function saveAll(state,customVerbs,syncConfig,lastSyncedAt,geminiKey=''){
-  try{localStorage.setItem(STORAGE_KEY,JSON.stringify({state,customVerbs,syncConfig,lastSyncedAt,geminiKey}));}catch{}
+function saveAll(state,customVerbs,customAdjectives,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify({state,customVerbs,customAdjectives,syncConfig,lastSyncedAt,geminiKey,practicePrefs}));}catch{}
 }
 
 // ============================================================================
@@ -414,6 +657,8 @@ function App(){
   const[tab,setTab]=useState('study');
   const[state,setState]=useState(defaultState);
   const[customVerbs,setCustomVerbs]=useState([]);
+  const[customAdjectives,setCustomAdjectives]=useState([]);
+  const[practicePrefs,setPracticePrefs]=useState(DEFAULT_PREFS);
   const[syncConfig,setSyncConfig]=useState(DEFAULT_SYNC);
   const[syncStatus,setSyncStatus]=useState({kind:'idle',message:'',at:null});
   const[geminiKey,setGeminiKey]=useState('');
@@ -425,8 +670,10 @@ function App(){
     const local=loadAll();
     let cfg=DEFAULT_SYNC;
     if(local){
-      if(local.state)setState({...defaultState(),...local.state,session:{reviewed:0,correct:0}});
+      if(local.state)setState(mergeState(local.state,{reviewed:0,correct:0}));
       if(Array.isArray(local.customVerbs))setCustomVerbs(local.customVerbs);
+      if(Array.isArray(local.customAdjectives))setCustomAdjectives(local.customAdjectives);
+      if(local.practicePrefs)setPracticePrefs({...DEFAULT_PREFS,...local.practicePrefs});
       if(local.syncConfig){cfg={...DEFAULT_SYNC,...local.syncConfig};setSyncConfig(cfg);}
       if(typeof local.lastSyncedAt==='number')lastSyncedAtRef.current=local.lastSyncedAt;
       if(local.geminiKey)setGeminiKey(local.geminiKey);
@@ -437,8 +684,10 @@ function App(){
         if(cloud&&cloud.data){
           const cloudAt=cloud.updated_at?new Date(cloud.updated_at).getTime():0;
           if(cloudAt>lastSyncedAtRef.current){
-            if(cloud.data.state)setState({...defaultState(),...cloud.data.state,session:{reviewed:0,correct:0}});
+            if(cloud.data.state)setState(mergeState(cloud.data.state,{reviewed:0,correct:0}));
             if(Array.isArray(cloud.data.customVerbs))setCustomVerbs(cloud.data.customVerbs);
+            if(Array.isArray(cloud.data.customAdjectives))setCustomAdjectives(cloud.data.customAdjectives);
+            if(cloud.data.practicePrefs)setPracticePrefs({...DEFAULT_PREFS,...cloud.data.practicePrefs});
             lastSyncedAtRef.current=cloudAt;setSyncStatus({kind:'ok',message:'Restored from cloud',at:cloudAt});
           }else{setSyncStatus({kind:'ok',message:'Up to date',at:lastSyncedAtRef.current});}
         }else{setSyncStatus({kind:'ok',message:'New cloud row — will upload',at:null});}
@@ -449,16 +698,16 @@ function App(){
 
   useEffect(()=>{
     if(!hydrated)return;
-    saveAll(state,customVerbs,syncConfig,lastSyncedAtRef.current,geminiKey);
+    saveAll(state,customVerbs,customAdjectives,syncConfig,lastSyncedAtRef.current,geminiKey,practicePrefs);
     if(syncConfig.enabled&&syncReady(syncConfig)){
       if(pushTimer.current)clearTimeout(pushTimer.current);
       pushTimer.current=setTimeout(async()=>{
         setSyncStatus(s=>({...s,kind:'syncing',message:'Saving to cloud…'}));
-        try{await cloudUpsert(syncConfig,{state,customVerbs});const now=Date.now();lastSyncedAtRef.current=now;saveAll(state,customVerbs,syncConfig,now,geminiKey);setSyncStatus({kind:'ok',message:'Saved to cloud',at:now});}
+        try{await cloudUpsert(syncConfig,{state,customVerbs,customAdjectives,practicePrefs});const now=Date.now();lastSyncedAtRef.current=now;saveAll(state,customVerbs,customAdjectives,syncConfig,now,geminiKey,practicePrefs);setSyncStatus({kind:'ok',message:'Saved to cloud',at:now});}
         catch(e){setSyncStatus({kind:'error',message:e.message||'Push failed',at:null});}
       },2000);
     }
-  },[state,customVerbs,syncConfig,geminiKey,hydrated]);
+  },[state,customVerbs,customAdjectives,syncConfig,geminiKey,practicePrefs,hydrated]);
 
   async function syncNow(){
     if(!syncReady(syncConfig))return;
@@ -467,37 +716,47 @@ function App(){
       const cloud=await cloudFetch(syncConfig);
       const cloudAt=cloud&&cloud.updated_at?new Date(cloud.updated_at).getTime():0;
       if(cloud&&cloud.data&&cloudAt>lastSyncedAtRef.current){
-        if(cloud.data.state)setState({...defaultState(),...cloud.data.state,session:state.session});
+        if(cloud.data.state)setState(mergeState(cloud.data.state,state.session));
         if(Array.isArray(cloud.data.customVerbs))setCustomVerbs(cloud.data.customVerbs);
+        if(Array.isArray(cloud.data.customAdjectives))setCustomAdjectives(cloud.data.customAdjectives);
+        if(cloud.data.practicePrefs)setPracticePrefs({...DEFAULT_PREFS,...cloud.data.practicePrefs});
         lastSyncedAtRef.current=cloudAt;setSyncStatus({kind:'ok',message:'Pulled from cloud',at:cloudAt});
       }else{
-        await cloudUpsert(syncConfig,{state,customVerbs});const now=Date.now();lastSyncedAtRef.current=now;setSyncStatus({kind:'ok',message:'Pushed to cloud',at:now});
+        await cloudUpsert(syncConfig,{state,customVerbs,customAdjectives,practicePrefs});const now=Date.now();lastSyncedAtRef.current=now;setSyncStatus({kind:'ok',message:'Pushed to cloud',at:now});
       }
     }catch(e){setSyncStatus({kind:'error',message:e.message||'Sync failed',at:null});}
   }
 
   const allVerbs=useMemo(()=>[...STARTER_VERBS,...customVerbs],[customVerbs]);
+  const allAdjectives=useMemo(()=>[...STARTER_ADJECTIVES,...customAdjectives],[customAdjectives]);
+  const allWords=useMemo(()=>[...allVerbs,...allAdjectives],[allVerbs,allAdjectives]);
+  const daily=state.daily||defaultState().daily;
+  const dailyPct=Math.min(100,Math.round((daily.count/(practicePrefs.dailyGoal||10))*100));
 
   return(
     <div className="min-h-screen bg-stone-50 text-stone-800" style={{fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif'}}>
-      <div className="max-w-2xl mx-auto px-4 py-3 sm:py-6">
+      <div className="max-w-4xl mx-auto px-4 py-3 sm:py-6">
         <header className="mb-4 sm:mb-6 flex items-center justify-between">
-          <div><h1 className="text-xl font-semibold tracking-tight">動詞 <span className="text-stone-400 font-normal">·</span> Verb Drill</h1><p className="text-xs text-stone-500 mt-0.5">Spaced repetition for Japanese conjugation</p></div>
+          <div><h1 className="text-xl font-semibold tracking-tight">動詞と形容詞 <span className="text-stone-400 font-normal">·</span> Conjugation Dojo</h1><p className="text-xs text-stone-500 mt-0.5">Spaced repetition, reference tables, and AI coaching</p></div>
           <div className="text-xs text-stone-500 text-right">
             <div>{state.session.correct}/{state.session.reviewed} this session</div>
+            <div className="mt-1 flex items-center justify-end gap-2"><span>{daily.count}/{practicePrefs.dailyGoal} today</span><span className="inline-block w-14 h-1.5 bg-stone-200 rounded-full overflow-hidden"><span className="block h-full bg-indigo-500" style={{width:dailyPct+'%'}}/></span></div>
+            {!!daily.goalStreak&&<div className="text-amber-600 mt-0.5">{daily.goalStreak} day goal streak</div>}
             {syncConfig.enabled&&(<div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind==='error'?'text-rose-500':syncStatus.kind==='syncing'?'text-amber-500':'text-emerald-600'}`}><IconCloud className="w-3 h-3"/><span>{syncStatus.kind==='syncing'?'syncing':syncStatus.kind==='error'?'sync error':'synced'}</span></div>)}
           </div>
         </header>
-        <nav className="flex gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','stats','levels','verbs','settings'].map(t=>(
+        <nav className="grid grid-cols-3 sm:grid-cols-7 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
+          {['study','reference','coach','stats','levels','verbs','settings'].map(t=>(
             <button key={t} onClick={()=>setTab(t)} className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
-        {tab==='study'&&<StudyView state={state} setState={setState} verbs={allVerbs} geminiKey={geminiKey}/>}
-        {tab==='stats'&&<StatsView state={state} verbs={allVerbs}/>}
-        {tab==='levels'&&<SRSLevelView state={state} verbs={allVerbs}/>}
+        {tab==='study'&&<StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
+        {tab==='reference'&&<ReferenceView verbs={allVerbs} adjectives={allAdjectives} geminiKey={geminiKey}/>}
+        {tab==='coach'&&<CoachView geminiKey={geminiKey}/>}
+        {tab==='stats'&&<StatsView state={state} verbs={allWords}/>}
+        {tab==='levels'&&<SRSLevelView state={state} verbs={allWords}/>}
         {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} geminiKey={geminiKey} state={state}/>}
-        {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey}/>}
+        {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs}/>}
       </div>
     </div>
   );
@@ -506,7 +765,23 @@ function App(){
 // ============================================================================
 // STUDY VIEW
 // ============================================================================
-function StudyView({state,setState,verbs,geminiKey}){
+function speakJapanese(text){
+  if(!window.speechSynthesis||!text)return;
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='ja-JP';u.rate=0.9;
+  window.speechSynthesis.speak(u);
+}
+function shuffled(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function makeChoices(current,verbs){
+  const expected=conjugateItem(current.verb,current.type);
+  const types=isAdjective(current.verb)?ADJ_TYPES:CONJ_TYPES;
+  const set=new Set([expected]);
+  for(const t of shuffled(types)){const v=conjugateItem(current.verb,t.id);if(v&&v!==expected)set.add(v);if(set.size>=4)break;}
+  for(const v of shuffled(verbs.filter(v=>v.group===current.verb.group))){const x=conjugateItem(v,current.type);if(x&&x!==expected)set.add(x);if(set.size>=4)break;}
+  return shuffled([...set].slice(0,4));
+}
+function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS}){
   const[current,setCurrent]=useState(null);
   const[answer,setAnswer]=useState('');
   const[phase,setPhase]=useState('answering');
@@ -517,22 +792,28 @@ function StudyView({state,setState,verbs,geminiKey}){
 
   useEffect(()=>{if(current===null){setCurrent(selectNext(state,verbs,enabledTypes,null));}},[current]);
   useEffect(()=>{if(phase==='answering'&&inputRef.current)inputRef.current.focus();},[current,phase]);
+  useEffect(()=>{if(current&&phase==='reviewing'&&practicePrefs.autoSpeak)speakJapanese(conjugateItem(current.verb,current.type));},[current,phase,practicePrefs.autoSpeak]);
 
   if(!current)return(<div className="bg-white rounded-2xl border border-stone-200 p-12 text-center"><p className="text-stone-600 mb-2">No cards available</p><p className="text-xs text-stone-400">Enable conjugation types in Settings.</p></div>);
 
-  const expected=conjugate(current.verb,current.type);
-  const typeInfo=CONJ_TYPES.find(t=>t.id===current.type);
-  const explanation=phase==='reviewing'&&!wasCorrect?explainConjugation(current.verb,current.type):null;
-  const diagnostic=phase==='reviewing'&&!wasCorrect?diagnose(current.verb,current.type,answer):'';
+  const expected=conjugateItem(current.verb,current.type);
+  const typeInfo=getTypeInfo(current.type);
+  const explanation=phase==='reviewing'&&!wasCorrect?explainItem(current.verb,current.type):null;
+  const diagnostic=phase==='reviewing'&&!wasCorrect?diagnoseItem(current.verb,current.type,answer):'';
+  const choices=makeChoices(current,verbs);
+  const wordType=isAdjective(current.verb)?'Adjective':'Verb';
 
-  function submit(){
+  function submit(choiceValue){
     if(phase==='reviewing'){setChatOpen(false);setCurrent(selectNext(state,verbs,enabledTypes,current.id));setAnswer('');setPhase('answering');return;}
-    if(!answer.trim())return;
-    const ok=toHiragana(answer)===expected;
+    const raw=choiceValue!==undefined?choiceValue:answer;
+    if(!raw.trim())return;
+    const normalized=choiceValue!==undefined?raw:toHiragana(raw);
+    const ok=normalized===expected;
+    if(choiceValue!==undefined)setAnswer(raw);
     const dict=current.verb.dict,rid=current.id;
     const prevVS=(state.verbStats?.[dict]?.[rid])||{seen:0,incorrect:0};
     const newVerbStats={...state.verbStats,[dict]:{...(state.verbStats?.[dict]||{}),[rid]:{seen:prevVS.seen+1,incorrect:prevVS.incorrect+(ok?0:1)}}};
-    setState({...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)}});
+    setState({...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)});
     setWasCorrect(ok);setPhase('reviewing');
   }
 
@@ -549,10 +830,10 @@ function StudyView({state,setState,verbs,geminiKey}){
           </div>
         </div>
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center">
-          <div className="text-4xl sm:text-5xl font-medium mb-2" lang="ja">{current.verb.dict}</div>
-          {current.verb.dict!==current.verb.reading&&<div className="text-base text-stone-500" lang="ja">{current.verb.reading}</div>}
+          <div className="text-4xl sm:text-5xl font-medium mb-2" lang="ja">{practicePrefs.scriptMode==='hiragana'?current.verb.reading:current.verb.dict}</div>
+          {practicePrefs.scriptMode!=='hiragana'&&current.verb.dict!==current.verb.reading&&<div className="text-base text-stone-500" lang="ja">{current.verb.reading}</div>}
           <div className="text-sm text-stone-400 mt-2 italic">{current.verb.meaning}</div>
-          <div className="text-xs text-stone-400 mt-1">{current.verb.group==='ichidan'&&'る-verb (Group 2)'}{current.verb.group==='godan'&&'う-verb (Group 1)'}{(current.verb.group==='suru'||current.verb.group==='kuru')&&'Irregular (Group 3)'}</div>
+          <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[current.verb.group]} · {wordType}</div>
         </div>
         <div className="px-4 pb-4 sm:px-6 sm:pb-6">
           {phase==='answering'?(
@@ -562,11 +843,19 @@ function StudyView({state,setState,verbs,geminiKey}){
                 <span className="text-xs text-indigo-400">· {current.ruleLabel}</span>
                 <span className="text-xs text-stone-400">{typeInfo.sub&&(typeInfo.sub+' · ')}{typeInfo.hint}</span>
               </div>
-              <input ref={inputRef} type="text" value={answer} onChange={e=>setAnswer(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();submit();}}}
-                placeholder="Type romaji or kana…" className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none transition"
-                lang="ja" autoComplete="off" autoCorrect="off" spellCheck="false"/>
-              {answer&&preview!==answer&&<div className="mt-2 text-center text-sm text-stone-500" lang="ja">→ {preview}</div>}
-              <button onClick={submit} disabled={!answer.trim()} className="w-full mt-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40">Check (Enter)</button>
+              {practicePrefs.answerMode==='choice'?(
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {choices.map(c=>(<button key={c} onClick={()=>submit(c)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition" lang="ja">{c}</button>))}
+                </div>
+              ):(
+                <>
+                  <input ref={inputRef} type="text" value={answer} onChange={e=>setAnswer(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();submit();}}}
+                    placeholder="Type romaji or kana…" className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none transition"
+                    lang="ja" autoComplete="off" autoCorrect="off" spellCheck="false"/>
+                  {answer&&preview!==answer&&<div className="mt-2 text-center text-sm text-stone-500" lang="ja">→ {preview}</div>}
+                  <button onClick={submit} disabled={!answer.trim()} className="w-full mt-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40">Check (Enter)</button>
+                </>
+              )}
             </>
           ):(
             <div className={`rounded-xl p-4 ${wasCorrect?'bg-emerald-50 border border-emerald-200':'bg-rose-50 border border-rose-200'}`}>
@@ -602,7 +891,7 @@ function StudyView({state,setState,verbs,geminiKey}){
           )}
         </div>
       </div>
-      <div className="text-center text-xs text-stone-400">Tip: type romaji like <span className="font-mono text-stone-500">tabeta</span> or kana <span lang="ja" className="text-stone-500">たべた</span></div>
+      <div className="text-center text-xs text-stone-400">Tip: type romaji like <span className="font-mono text-stone-500">tabeta</span>, use kana <span lang="ja" className="text-stone-500">たべた</span>, or switch to multiple choice in Settings.</div>
     </div>
   );
 }
@@ -620,7 +909,7 @@ function StatsView({state,verbs}){
 // SRS LEVELS VIEW
 // ============================================================================
 function SRSLevelView({state,verbs}){
-  const enabledTypes=state.enabledTypes.length>0?state.enabledTypes:CONJ_TYPES.map(t=>t.id);
+  const enabledTypes=state.enabledTypes.length>0?state.enabledTypes:ALL_CARD_TYPES.map(t=>t.id);
 
   const ruleLevel=useMemo(()=>{const m={};for(const r of RULES)m[r.id]=getCardLevel(state.cards[r.id]);return m;},[state]);
 
@@ -631,14 +920,14 @@ function SRSLevelView({state,verbs}){
   },[ruleLevel,enabledTypes,verbs]);
   const totalCards=levelCounts.reduce((s,c)=>s+c,0)||1;
 
-  const byType=useMemo(()=>CONJ_TYPES
+  const byType=useMemo(()=>ALL_CARD_TYPES
     .filter(t=>enabledTypes.includes(t.id))
     .map(t=>({typeObj:t,rules:RULES.filter(r=>r.type===t.id&&r.verbFilter(verbs).length>0)}))
     .filter(row=>row.rules.length>0)
   ,[enabledTypes,verbs]);
 
-  const COL_KEYS=['ichidan','godan','suru','kuru','exception-いく'];
-  const COL_HEADS=['る-verb','う-verb','する','来る','行く'];
+  const COL_KEYS=['ichidan','godan','suru','kuru','exception-いく','i-adjective','na-adjective'];
+  const COL_HEADS=['る','う','する','来る','行く','い形','な形'];
 
   return(
     <div className="space-y-4">
@@ -703,6 +992,122 @@ function SRSLevelView({state,verbs}){
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// REFERENCE + AI COACH
+// ============================================================================
+function formRows(item){
+  const types=isAdjective(item)?ADJ_TYPES:CONJ_TYPES;
+  return types.map(t=>({type:t,answer:conjugateItem(item,t.id),explanation:explainItem(item,t.id)}));
+}
+function searchWords(query,words){
+  const q=query.trim().toLowerCase();
+  if(!q)return words;
+  const h=toHiragana(q);
+  return words.filter(w=>{
+    if(w.dict.includes(query)||w.reading.includes(h)||w.meaning.toLowerCase().includes(q)||GROUP_NAMES[w.group].toLowerCase().includes(q))return true;
+    return formRows(w).some(r=>r.answer===h||r.answer.includes(h));
+  });
+}
+function ReferenceView({verbs,adjectives,geminiKey}){
+  const[query,setQuery]=useState('');
+  const[selected,setSelected]=useState(null);
+  const[aiText,setAiText]=useState('');
+  const[aiLoading,setAiLoading]=useState(false);
+  const[aiErr,setAiErr]=useState('');
+  const words=useMemo(()=>[...verbs,...adjectives],[verbs,adjectives]);
+  const matches=useMemo(()=>searchWords(query,words),[query,words]);
+  useEffect(()=>{if(!selected||!words.some(w=>w.dict===selected.dict))setSelected(matches[0]||words[0]||null);},[matches,words,selected]);
+  const rows=selected?formRows(selected):[];
+  async function generateExamples(){
+    if(!selected||!geminiKey)return;
+    setAiLoading(true);setAiErr('');setAiText('');
+    try{
+      const prompt=`Create three short learner-friendly example sentences for ${selected.dict} (${selected.reading}, ${selected.meaning}, ${GROUP_NAMES[selected.group]}). Include one common mistake to avoid. Focus on conjugation.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,900,0.4,AI_COACH_SYSTEM);
+      setAiText(reply);
+    }catch(e){setAiErr(e.message);}
+    setAiLoading(false);
+  }
+  if(!selected)return(<div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No words available.</div>);
+  return(
+    <div className="grid lg:grid-cols-[280px_1fr] gap-4">
+      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+        <div className="p-3 border-b border-stone-100">
+          <div className="relative">
+            <IconList className="w-4 h-4 absolute left-3 top-2.5 text-stone-400"/>
+            <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search word or form" className="w-full pl-9 pr-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none" autoCorrect="off" spellCheck="false"/>
+          </div>
+        </div>
+        <div className="max-h-[560px] overflow-y-auto divide-y divide-stone-50">
+          {matches.map(w=>(<button key={`${w.group}:${w.dict}`} onClick={()=>setSelected(w)} className={`w-full text-left px-4 py-3 transition ${selected.dict===w.dict&&selected.group===w.group?'bg-indigo-50':'hover:bg-stone-50'}`}>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-medium text-stone-800" lang="ja">{w.dict}</span>
+              <span className="text-[11px] text-stone-400">{isAdjective(w)?'adj':'verb'}</span>
+            </div>
+            <div className="text-xs text-stone-500" lang="ja">{w.reading}</div>
+            <div className="text-xs text-stone-400 truncate">{w.meaning}</div>
+          </button>))}
+        </div>
+      </div>
+      <div className="space-y-4">
+        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-4xl font-medium" lang="ja">{selected.dict}</div>
+              {selected.dict!==selected.reading&&<div className="text-stone-500 mt-1" lang="ja">{selected.reading}</div>}
+              <div className="text-sm text-stone-500 italic mt-2">{selected.meaning}</div>
+              <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[selected.group]}</div>
+            </div>
+            <button onClick={()=>speakJapanese(selected.reading)} className="p-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-500" title="Speak"><IconVolume className="w-4 h-4"/></button>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider"><tr><th className="px-4 py-2 text-left font-medium">Form</th><th className="px-4 py-2 text-left font-medium">Answer</th><th className="px-4 py-2 text-left font-medium hidden md:table-cell">Rule</th></tr></thead>
+            <tbody>{rows.map(r=>(<tr key={r.type.id} className="border-t border-stone-100"><td className="px-4 py-2"><div className="font-medium">{r.type.label}</div><div className="text-xs text-stone-400">{r.type.hint}</div></td><td className="px-4 py-2 text-lg" lang="ja">{r.answer}</td><td className="px-4 py-2 text-xs text-stone-500 hidden md:table-cell">{r.explanation.rule}</td></tr>))}</tbody>
+          </table>
+        </div>
+        <div className="bg-white rounded-2xl border border-stone-200 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium"><IconSpark className="w-4 h-4 text-indigo-600"/>AI examples</div>
+            <button onClick={generateExamples} disabled={!geminiKey||aiLoading} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm">{aiLoading?'Thinking…':'Generate'}</button>
+          </div>
+          {!geminiKey&&<div className="mt-2 text-xs text-stone-400">Add a Gemini API key in Settings.</div>}
+          {aiErr&&<div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
+          {aiText&&<div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{aiText}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CoachView({geminiKey}){
+  const[text,setText]=useState('');
+  const[result,setResult]=useState('');
+  const[loading,setLoading]=useState(false);
+  const[err,setErr]=useState('');
+  async function run(){
+    if(!text.trim()||!geminiKey)return;
+    setLoading(true);setErr('');setResult('');
+    try{
+      const prompt=`Analyze this Japanese sentence or conjugation attempt:\n\n${text}\n\nIdentify verb/adjective conjugations, correct any mistakes, explain the most important rule, and give one short follow-up drill.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1200,0.3,AI_COACH_SYSTEM);
+      setResult(reply);
+    }catch(e){setErr(e.message);}
+    setLoading(false);
+  }
+  return(
+    <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
+      <div className="flex items-center gap-2"><IconSpark className="w-4 h-4 text-indigo-600"/><h3 className="font-medium">AI sentence coach</h3></div>
+      <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="昨日、映画を見ます。 / I want to say: I was made to wait…" className="w-full min-h-32 px-3 py-2 border border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none" lang="ja" autoCorrect="off" spellCheck="false"/>
+      <button onClick={run} disabled={!text.trim()||!geminiKey||loading} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium">{loading?'Checking…':'Check with AI'}</button>
+      {!geminiKey&&<div className="text-xs text-stone-400 text-center">Add a Gemini API key in Settings.</div>}
+      {err&&<div className="text-sm text-rose-600">{err}</div>}
+      {result&&<div className="border-t border-stone-100 pt-4 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{result}</div>}
     </div>
   );
 }
@@ -861,7 +1266,7 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
 // ============================================================================
 // SETTINGS VIEW
 // ============================================================================
-function SettingsView({state,setState,customVerbs,setCustomVerbs,syncConfig,setSyncConfig,syncStatus,syncNow,geminiKey,setGeminiKey}){
+function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,syncConfig,setSyncConfig,syncStatus,syncNow,geminiKey,setGeminiKey,practicePrefs,setPracticePrefs}){
   const[confirmReset,setConfirmReset]=useState(false);
   const[exportOpen,setExportOpen]=useState(false);
   const[importOpen,setImportOpen]=useState(false);
@@ -878,15 +1283,35 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,syncConfig,setS
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:2,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{}},customVerbs}),[state,customVerbs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:3,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},daily:state.daily},customVerbs,customAdjectives,practicePrefs}),[state,customVerbs,customAdjectives,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function reset(){setState({...defaultState(),enabledTypes:state.enabledTypes});setConfirmReset(false);}
   async function copyExport(){try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(exportData);setCopyOk(true);setTimeout(()=>setCopyOk(false),2000);}}catch{}}
-  function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState({cards:data.state.cards,enabledTypes:Array.isArray(data.state.enabledTypes)?data.state.enabledTypes:state.enabledTypes,verbStats:data.state.verbStats||{},session:{reviewed:0,correct:0}});if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
+  function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState(mergeState(data.state,{reviewed:0,correct:0}));if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);if(Array.isArray(data.customAdjectives))setCustomAdjectives(data.customAdjectives);if(data.practicePrefs)setPracticePrefs({...DEFAULT_PREFS,...data.practicePrefs});setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
   const statusColor=syncStatus.kind==='error'?'text-rose-700 bg-rose-50 border-rose-200':syncStatus.kind==='syncing'?'text-amber-700 bg-amber-50 border-amber-200':syncStatus.kind==='ok'?'text-emerald-700 bg-emerald-50 border-emerald-200':'text-stone-600 bg-stone-50 border-stone-200';
 
   return(<div className="space-y-4">
-    <div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-1">Conjugation types in scope</h3><p className="text-xs text-stone-500 mb-4">Toggle which conjugations to drill.</p><div className="space-y-2">{CONJ_TYPES.map(t=>{const on=state.enabledTypes.includes(t.id);return(<div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-stone-50"><div><div className="text-sm font-medium">{t.label}</div><div className="text-xs text-stone-500">{t.sub&&(t.sub+' · ')}{t.hint}</div></div><button onClick={()=>toggle(t.id)} className={`relative w-10 h-6 rounded-full transition flex-shrink-0 ${on?'bg-indigo-600':'bg-stone-300'}`}><span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on?'translate-x-4':''}`}/></button></div>);})}</div></div>
+    <div className="bg-white rounded-2xl border border-stone-200 p-5">
+      <h3 className="font-medium mb-3">Practice mode</h3>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Answer mode</label>
+          <div className="flex gap-2">{[{id:'input',label:'Free input'},{id:'choice',label:'Multiple choice'}].map(o=>(<button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,answerMode:o.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.answerMode===o.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
+        </div>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Script</label>
+          <div className="flex gap-2">{[{id:'kanji',label:'Kanji + kana'},{id:'hiragana',label:'Hiragana'}].map(o=>(<button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,scriptMode:o.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.scriptMode===o.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
+        </div>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Daily goal</label>
+          <input type="number" min="1" max="200" value={practicePrefs.dailyGoal} onChange={e=>setPracticePrefs({...practicePrefs,dailyGoal:Math.max(1,Number(e.target.value)||10)})} className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/>
+        </div>
+        <div className="flex items-end">
+          <button onClick={()=>setPracticePrefs({...practicePrefs,autoSpeak:!practicePrefs.autoSpeak})} className={`w-full px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.autoSpeak?'bg-indigo-600 text-white border-indigo-600':'bg-white border-stone-200 hover:border-stone-300'}`}><IconVolume className="w-4 h-4 inline-block mr-1.5"/>Speak answers</button>
+        </div>
+      </div>
+    </div>
+    <div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-1">Conjugation types in scope</h3><p className="text-xs text-stone-500 mb-4">Toggle which conjugations to drill.</p><div className="space-y-2">{ALL_CARD_TYPES.map(t=>{const on=state.enabledTypes.includes(t.id);return(<div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-stone-50"><div><div className="text-sm font-medium">{t.label}</div><div className="text-xs text-stone-500">{t.sub&&(t.sub+' · ')}{t.hint}</div></div><button onClick={()=>toggle(t.id)} className={`relative w-10 h-6 rounded-full transition flex-shrink-0 ${on?'bg-indigo-600':'bg-stone-300'}`}><span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on?'translate-x-4':''}`}/></button></div>);})}</div></div>
 
     <div className="bg-white rounded-2xl border border-stone-200 p-5">
       <h3 className="font-medium mb-1 flex items-center gap-2"><IconChat className="w-4 h-4 text-indigo-600"/>AI Chat (Gemini)</h3>
@@ -913,6 +1338,9 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,syncConfig,setS
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+if('serviceWorker' in navigator&&location.protocol!=='file:'){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
 </script>
 </body>
 </html>
