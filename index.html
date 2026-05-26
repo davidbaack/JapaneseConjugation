@@ -3241,6 +3241,7 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
   const[aiText,setAiText]=useState('');
   const[aiLoading,setAiLoading]=useState(false);
   const[aiErr,setAiErr]=useState('');
+  const[copyTableOk,setCopyTableOk]=useState(false);
   const[lookupAiText,setLookupAiText]=useState('');
   const[lookupAiLoading,setLookupAiLoading]=useState(false);
   const[lookupAiErr,setLookupAiErr]=useState('');
@@ -3251,6 +3252,23 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
   useEffect(()=>{setLookupAiText('');setLookupAiErr('');},[query]);
   const rows=selected?formRows(selected):[];
   const selectedView=selected?promptDisplay(selected,null,practicePrefs):null;
+  useEffect(()=>{setCopyTableOk(false);},[selected?.dict,selected?.group]);
+  async function copyTable(){
+    if(!selected||!rows.length)return;
+    const header=['Word','Reading','Meaning','Group','Form','Answer','Romaji','Rule'].join('\t');
+    const body=rows.map(r=>[selected.dict,selected.reading,selected.meaning,GROUP_NAMES[selected.group]||selected.group,r.type.label,r.answer,kanaToRomaji(r.answer),r.explanation.rule].join('\t'));
+    const text=[header,...body].join('\n');
+    try{
+      let copied=false;
+      if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);copied=true;}
+      else{
+        const area=document.createElement('textarea');
+        area.value=text;area.setAttribute('readonly','');area.style.position='fixed';area.style.left='-9999px';
+        document.body.appendChild(area);area.select();copied=document.execCommand('copy');document.body.removeChild(area);
+      }
+      if(copied){setCopyTableOk(true);setTimeout(()=>setCopyTableOk(false),1800);}
+    }catch(e){}
+  }
   async function generateExamples(){
     if(!selected||!geminiKey)return;
     setAiLoading(true);setAiErr('');setAiText('');
@@ -3317,7 +3335,10 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
               <div className="text-sm text-stone-500 italic mt-2">{selected.meaning}</div>
               <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[selected.group]}</div>
             </div>
-            <button onClick={()=>speakJapanese(selected.reading,0.9,practicePrefs.voiceURI)} className="p-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-500" title="Speak"><IconVolume className="w-4 h-4"/></button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button onClick={copyTable} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-600 text-sm inline-flex items-center gap-1.5"><IconList className="w-4 h-4"/>{copyTableOk?'Copied':'Copy table'}</button>
+              <button onClick={()=>speakJapanese(selected.reading,0.9,practicePrefs.voiceURI)} className="p-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-500" title="Speak"><IconVolume className="w-4 h-4"/></button>
+            </div>
           </div>
         </div>
         <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
@@ -4014,7 +4035,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:35,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:36,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
