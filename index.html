@@ -855,10 +855,10 @@ function ContextExamplePanel({item,type,geminiKey,practicePrefs=DEFAULT_PREFS}){
 // ============================================================================
 const DAY=86400000;
 function localDateKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*DAY);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},mock:{taken:0,bestPct:0,lastPct:0,lastScore:0,lastTotal:0,lastAt:null,bySkill:{}},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
+function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},ambient:{sessions:0,played:0,lastAt:null},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},mock:{taken:0,bestPct:0,lastPct:0,lastScore:0,lastTotal:0,lastAt:null,bySkill:{}},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
 function mergeState(saved,sessionOverride){
   const base=defaultState();
-  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,mock:(saved&&saved.mock)||base.mock,daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,ambient:(saved&&saved.ambient)||base.ambient,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,mock:(saved&&saved.mock)||base.mock,daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
   if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
     merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
   }
@@ -1164,7 +1164,7 @@ function App(){
         {tab==='meaning'&&<MeaningView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
         {tab==='mock'&&<MockTestView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
-        {tab==='shadow'&&<ShadowView state={state} setState={setState} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
+        {tab==='shadow'&&<ShadowView state={state} setState={setState} words={allWords} wordLists={wordLists} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='lessons'&&<LessonsView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='reference'&&<ReferenceView verbs={allVerbs} adjectives={allAdjectives} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='coach'&&<CoachView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
@@ -2333,7 +2333,101 @@ function MistakesView({state,setState,practicePrefs}){
   );
 }
 
-function ShadowView({state,setState,geminiKey,practicePrefs}){
+function buildAmbientDeck(words,state,practicePrefs=DEFAULT_PREFS,wordLists=[],mode='smart',count=18){
+  const filtered=filterWordsForPrefs(words,practicePrefs,wordLists);
+  const enabled=state.enabledTypes&&state.enabledTypes.length?state.enabledTypes:ALL_CARD_TYPES.map(t=>t.id);
+  const cards=[];
+  for(const rule of RULES){
+    if(!enabled.includes(rule.type))continue;
+    const pool=rule.verbFilter(filtered);
+    if(!pool.length)continue;
+    const item=shuffled(pool)[0];
+    const form=conjugateItem(item,rule.type);
+    if(!form)continue;
+    const card=state.cards?.[rule.id];
+    const due=card&&card.nextReview<=Date.now();
+    const fresh=!card;
+    const weak=ruleWeakScore(state,rule.id);
+    const score=mode==='all'?Math.random():weak*3+(due?4:0)+(fresh?1:0)+(card?.incorrect||0);
+    cards.push({id:`${rule.id}|${wordKey(item)}`,item,type:rule.type,ruleLabel:rule.label,form,example:contextSentenceFor(item,rule.type),score,due,fresh,weak});
+  }
+  const sorted=mode==='all'?shuffled(cards):cards.sort((a,b)=>b.score-a.score||a.ruleLabel.localeCompare(b.ruleLabel));
+  return sorted.slice(0,count);
+}
+function AmbientReviewPanel({state,setState,words,practicePrefs=DEFAULT_PREFS,wordLists=[]}){
+  const[mode,setMode]=useState('smart');
+  const[index,setIndex]=useState(0);
+  const[playing,setPlaying]=useState(false);
+  const[rate,setRate]=useState(0.82);
+  const[showEnglish,setShowEnglish]=useState(true);
+  const timerRef=useRef(null);
+  const ambient=state.ambient||defaultState().ambient;
+  const deck=useMemo(()=>buildAmbientDeck(words,state,practicePrefs,wordLists,mode,18),[words,state.cards,state.mistakes,state.enabledTypes,state.verbStats,practicePrefs,wordLists,mode]);
+  const current=deck[index%Math.max(1,deck.length)]||null;
+  useEffect(()=>{setIndex(0);setPlaying(false);},[mode,practicePrefs.wordListIds,practicePrefs.jlptLevels,practicePrefs.wordTypes,practicePrefs.genkiLessons]);
+  useEffect(()=>()=>{if(timerRef.current)clearTimeout(timerRef.current);},[]);
+  useEffect(()=>{
+    if(timerRef.current){clearTimeout(timerRef.current);timerRef.current=null;}
+    if(!playing||!current)return undefined;
+    let cancelled=false;
+    speakJapanese(current.example.ja,rate,practicePrefs.voiceURI,()=>{
+      if(cancelled)return;
+      bumpPlayed();
+      timerRef.current=setTimeout(()=>{timerRef.current=null;if(!cancelled)setIndex(i=>(i+1)%deck.length);},1200);
+    });
+    return()=>{cancelled=true;if(timerRef.current){clearTimeout(timerRef.current);timerRef.current=null;}};
+  },[playing,index,current?.id,rate,practicePrefs.voiceURI]);
+  function bumpPlayed(){
+    setState(s=>{const a=s.ambient||defaultState().ambient;return{...s,ambient:{...a,played:(a.played||0)+1,lastAt:Date.now()}};});
+  }
+  function startStop(){
+    if(!deck.length)return;
+    if(playing){setPlaying(false);if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel();return;}
+    setState(s=>{const a=s.ambient||defaultState().ambient;return{...s,ambient:{...a,sessions:(a.sessions||0)+1,lastAt:Date.now()}};});
+    setPlaying(true);
+  }
+  function next(){
+    if(!deck.length)return;
+    bumpPlayed();setIndex(i=>(i+1)%deck.length);
+  }
+  if(!deck.length)return(<div className="bg-white rounded-2xl border border-stone-200 p-5 text-center text-stone-500">No ambient review items match the current filters.</div>);
+  const view=current?promptDisplay(current.item,null,practicePrefs):null;
+  const formView=current?formDisplay(current.form,practicePrefs):null;
+  return(
+    <div className="bg-white rounded-2xl border border-stone-200 p-5">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div><h3 className="font-medium flex items-center gap-2"><IconVolume className="w-4 h-4 text-indigo-600"/>Ambient review playlist</h3><p className="text-xs text-stone-500">{ambient.played||0} exposures · {ambient.sessions||0} sessions</p></div>
+        <button onClick={startStop} className={`px-3 py-2 rounded-lg text-sm font-medium ${playing?'bg-rose-600 hover:bg-rose-700 text-white':'bg-stone-800 hover:bg-stone-900 text-white'}`}>{playing?'Stop':'Play'}</button>
+      </div>
+      <div className="rounded-2xl bg-stone-50 border border-stone-200 p-5 text-center">
+        <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium mb-2">{current.ruleLabel} · {TYPE_LABEL[current.type]}</div>
+        <ScriptDisplay view={view} className="text-3xl sm:text-4xl font-medium" subClassName="text-sm text-stone-500 mt-1"/>
+        <div className="mt-3 text-sm text-stone-500 italic">{current.item.meaning}</div>
+        <div className="my-4 h-px bg-stone-200"/>
+        <ScriptDisplay view={formView} className="text-2xl font-semibold" subClassName="text-xs text-stone-500 mt-1"/>
+        <div className="mt-3 text-lg leading-relaxed" lang="ja">{current.example.ja}</div>
+        {showEnglish&&<div className="mt-2 text-sm text-stone-500">{current.example.en}</div>}
+      </div>
+      <div className="grid sm:grid-cols-[1fr_auto] gap-3 mt-4 items-center">
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Playlist speed · {rate.toFixed(2)}x</label>
+          <input type="range" min="0.55" max="1.1" step="0.05" value={rate} onChange={e=>setRate(Number(e.target.value))} className="w-full"/>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <div className="grid grid-cols-2 gap-1 p-1 bg-stone-100 rounded-lg">
+            {[{id:'smart',label:'Smart'},{id:'all',label:'All'}].map(o=><button key={o.id} onClick={()=>setMode(o.id)} className={`px-2 py-1.5 rounded-md text-xs font-medium transition ${mode===o.id?'bg-white text-indigo-700 shadow-sm':'text-stone-500 hover:text-stone-800'}`}>{o.label}</button>)}
+          </div>
+          <button onClick={()=>speakJapanese(current.example.ja,rate,practicePrefs.voiceURI)} className="px-3 py-2 rounded-lg text-sm border border-stone-200 hover:bg-stone-50">Speak</button>
+          <button onClick={()=>setShowEnglish(!showEnglish)} className="px-3 py-2 rounded-lg text-sm border border-stone-200 hover:bg-stone-50">{showEnglish?'Hide EN':'Show EN'}</button>
+          <button onClick={next} className="px-3 py-2 rounded-lg text-sm border border-stone-200 hover:bg-stone-50">Next</button>
+        </div>
+      </div>
+      <div className="mt-3 text-xs text-stone-400 text-center">Smart mode prioritizes weak, due, and fresh conjugation cards from your current filters.</div>
+    </div>
+  );
+}
+
+function ShadowView({state,setState,words=[],wordLists=[],geminiKey,practicePrefs}){
   const[selectedId,setSelectedId]=useState(SHADOW_SCENARIOS[0]?.id||'');
   const[lineIdx,setLineIdx]=useState(0);
   const[rate,setRate]=useState(0.85);
@@ -2473,6 +2567,7 @@ function ShadowView({state,setState,geminiKey,practicePrefs}){
         {customScenario&&<div className="p-3 bg-amber-50 border-t border-amber-100"><div className="text-xs uppercase tracking-wider text-amber-700 font-medium">AI dialogue</div><div className="font-medium text-sm text-stone-800 mt-1">{customScenario.title}</div></div>}
       </div>
       <div className="space-y-4">
+        <AmbientReviewPanel state={state} setState={setState} words={words} practicePrefs={practicePrefs} wordLists={wordLists}/>
         <div className="bg-white rounded-2xl border border-stone-200 p-5">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">{scenario.level} · {scenario.focus}</div><h3 className="text-2xl font-semibold mt-1">{scenario.title}</h3></div>
@@ -2976,7 +3071,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:21,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:22,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
