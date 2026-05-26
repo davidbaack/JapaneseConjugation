@@ -2749,6 +2749,17 @@ function scannerContext(text,index,length){
   const start=Math.max(0,index-18),end=Math.min(raw.length,index+length+18);
   return `${start>0?'...':''}${raw.slice(start,end)}${end<raw.length?'...':''}`;
 }
+function scannerSentenceContext(text,index,length){
+  const raw=String(text||'');
+  if(!raw)return'';
+  const left=raw.slice(0,Math.max(0,index));
+  const rightStart=Math.min(raw.length,index+length);
+  const stops=['。','！','？','!','?','\n'];
+  let start=0,end=raw.length;
+  for(const stop of stops){const pos=left.lastIndexOf(stop);if(pos>=start)start=pos+1;}
+  for(const stop of stops){const pos=raw.indexOf(stop,rightStart);if(pos!==-1&&pos+1<end)end=pos+1;}
+  return raw.slice(start,end).trim()||scannerContext(text,index,length);
+}
 function scannerMatchId(match){return match?`${match.key}|${match.type?.id||'dictionary'}|${match.surface}|${match.index}`:'';}
 function buildScannerReaderSegments(text,matches){
   const raw=String(text||'');
@@ -2896,15 +2907,20 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
   const[fileErr,setFileErr]=useState('');
   const[imagePreview,setImagePreview]=useState('');
   const[readerMatchId,setReaderMatchId]=useState('');
+  const[readerAiText,setReaderAiText]=useState('');
+  const[readerAiErr,setReaderAiErr]=useState('');
+  const[readerAiLoading,setReaderAiLoading]=useState(false);
   const matches=useMemo(()=>findTextScannerMatches(text,words),[text,words]);
   const uniqueWords=useMemo(()=>uniqueScannerWords(matches),[matches]);
   const readerSegments=useMemo(()=>buildScannerReaderSegments(text,matches),[text,matches]);
   const selectedReaderMatch=readerMatchId?matches.find(m=>scannerMatchId(m)===readerMatchId):null;
   const readerDetail=selectedReaderMatch||readerSegments.find(s=>s.kind==='match')?.match||null;
+  const readerContext=readerDetail?scannerSentenceContext(text,readerDetail.index,readerDetail.surface.length):'';
   const visibleMatches=matches.slice(0,80);
   const formCount=matches.filter(m=>m.kind==='form').length;
   const selectedIds=practicePrefs.wordListIds||[];
   useEffect(()=>{if(readerMatchId&&!matches.some(m=>scannerMatchId(m)===readerMatchId))setReaderMatchId('');},[readerMatchId,matches]);
+  useEffect(()=>{setReaderAiText('');setReaderAiErr('');},[readerMatchId,text]);
   async function importSourceFile(event){
     const file=event.target.files?.[0];
     if(event.target)event.target.value='';
@@ -2958,7 +2974,7 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
     finally{setFileLoading(false);}
   }
   function clearScanner(){
-    setText('');setMsg('');setAiRows([]);setAiErr('');setFileErr('');setImagePreview('');setReaderMatchId('');
+    setText('');setMsg('');setAiRows([]);setAiErr('');setFileErr('');setImagePreview('');setReaderMatchId('');setReaderAiText('');setReaderAiErr('');
   }
   function createListFromKeys(keys,name){
     const clean=[...new Set(keys)].filter(Boolean);
@@ -2986,6 +3002,16 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
       if(!rows.length)setAiErr('AI did not return any valid verb or adjective rows.');
     }catch(e){setAiErr(e.message||'AI extraction failed.');}
     setAiLoading(false);
+  }
+  async function explainReaderContext(){
+    if(!readerDetail||!geminiKey)return;
+    setReaderAiLoading(true);setReaderAiErr('');setReaderAiText('');
+    try{
+      const prompt=`Explain this Japanese word in context for a conjugation learner.\n\nSentence/context: ${readerContext}\nSurface form: ${readerDetail.surface}\nReading: ${readerDetail.reading||readerDetail.word.reading}\nDictionary form: ${readerDetail.word.dict} (${readerDetail.word.reading})\nMeaning in my list: ${readerDetail.word.meaning}\nDetected form: ${readerDetail.label}\nGroup: ${GROUP_NAMES[readerDetail.word.group]||readerDetail.word.group}\n\nGive a concise answer with: the best contextual meaning, why this conjugation/form is used, one natural English translation of the sentence, and one tiny follow-up drill.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,900,0.25,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
+      setReaderAiText(reply);
+    }catch(e){setReaderAiErr(e.message||'AI context lookup failed.');}
+    setReaderAiLoading(false);
   }
   function addAIWords(){
     if(!aiRows.length)return;
@@ -3063,6 +3089,15 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
               <div className="text-sm font-medium">Dictionary form</div>
               <div className="text-xs text-stone-500 mt-1">Base word match from the scanned text.</div>
             </>}
+          </div>
+          <div className="md:col-span-2 rounded-xl border border-stone-200 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-medium"><IconSpark className="w-4 h-4 text-indigo-600"/>Context lookup</div>
+              <button onClick={explainReaderContext} disabled={!geminiKey||readerAiLoading} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm">{readerAiLoading?'Checking...':'AI explain'}</button>
+            </div>
+            {!geminiKey&&<div className="mt-2 text-xs text-stone-400">Add a Gemini API key in Settings for context-aware meanings and grammar notes.</div>}
+            {readerAiErr&&<div className="mt-2 text-sm text-rose-600">{readerAiErr}</div>}
+            {readerAiText&&<div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{readerAiText}</div>}
           </div>
         </div>}
       </div>}
