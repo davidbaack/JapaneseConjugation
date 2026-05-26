@@ -109,6 +109,27 @@ const WORD_META={
   いい:{jlpt:'N5',lesson:5},大きい:{jlpt:'N5',lesson:5},小さい:{jlpt:'N5',lesson:5},新しい:{jlpt:'N5',lesson:5},古い:{jlpt:'N5',lesson:5},高い:{jlpt:'N5',lesson:5},安い:{jlpt:'N5',lesson:5},難しい:{jlpt:'N5',lesson:5},易しい:{jlpt:'N5',lesson:5},暑い:{jlpt:'N5',lesson:5},寒い:{jlpt:'N5',lesson:5},楽しい:{jlpt:'N5',lesson:5},忙しい:{jlpt:'N5',lesson:5},おいしい:{jlpt:'N5',lesson:5},
   静か:{jlpt:'N5',lesson:5},元気:{jlpt:'N5',lesson:1},便利:{jlpt:'N5',lesson:10},有名:{jlpt:'N5',lesson:5},好き:{jlpt:'N5',lesson:5},嫌い:{jlpt:'N5',lesson:5},上手:{jlpt:'N5',lesson:5},下手:{jlpt:'N5',lesson:5},きれい:{jlpt:'N5',lesson:5},大切:{jlpt:'N4',lesson:14}
 };
+const VOCAB_PACKS=[
+  {id:'n5-motion',name:'N5 Motion Verbs',desc:'Everyday movement and classroom verbs.',words:[
+    {dict:'歩く',reading:'あるく',meaning:'to walk',group:'godan'},{dict:'入る',reading:'はいる',meaning:'to enter',group:'godan'},{dict:'出す',reading:'だす',meaning:'to take out / submit',group:'godan'},{dict:'座る',reading:'すわる',meaning:'to sit',group:'godan'},{dict:'止まる',reading:'とまる',meaning:'to stop',group:'godan'},{dict:'乗る',reading:'のる',meaning:'to ride',group:'godan'},{dict:'降りる',reading:'おりる',meaning:'to get off',group:'ichidan'},{dict:'会う',reading:'あう',meaning:'to meet',group:'godan'},{dict:'送る',reading:'おくる',meaning:'to send / escort',group:'godan'},{dict:'急ぐ',reading:'いそぐ',meaning:'to hurry',group:'godan'}
+  ]},
+  {id:'n5-daily',name:'N5 Daily Life',desc:'High-frequency verbs for home, school, and errands.',words:[
+    {dict:'洗う',reading:'あらう',meaning:'to wash',group:'godan'},{dict:'借りる',reading:'かりる',meaning:'to borrow',group:'ichidan'},{dict:'貸す',reading:'かす',meaning:'to lend',group:'godan'},{dict:'返す',reading:'かえす',meaning:'to return something',group:'godan'},{dict:'忘れる',reading:'わすれる',meaning:'to forget',group:'ichidan'},{dict:'始める',reading:'はじめる',meaning:'to begin',group:'ichidan'},{dict:'終わる',reading:'おわる',meaning:'to end',group:'godan'},{dict:'勉強する',reading:'べんきょうする',meaning:'to study',group:'suru'},{dict:'練習する',reading:'れんしゅうする',meaning:'to practice',group:'suru'},{dict:'料理する',reading:'りょうりする',meaning:'to cook',group:'suru'}
+  ]},
+  {id:'n4-core',name:'N4 Core Verbs',desc:'Useful intermediate verbs with common godan/ichidan traps.',words:[
+    {dict:'選ぶ',reading:'えらぶ',meaning:'to choose',group:'godan'},{dict:'直す',reading:'なおす',meaning:'to fix',group:'godan'},{dict:'治る',reading:'なおる',meaning:'to heal',group:'godan'},{dict:'間違える',reading:'まちがえる',meaning:'to make a mistake',group:'ichidan'},{dict:'調べる',reading:'しらべる',meaning:'to investigate / look up',group:'ichidan'},{dict:'説明する',reading:'せつめいする',meaning:'to explain',group:'suru'},{dict:'予約する',reading:'よやくする',meaning:'to reserve',group:'suru'},{dict:'運転する',reading:'うんてんする',meaning:'to drive',group:'suru'},{dict:'壊す',reading:'こわす',meaning:'to break something',group:'godan'},{dict:'壊れる',reading:'こわれる',meaning:'to break',group:'ichidan'}
+  ]},
+  {id:'adjectives-core',name:'Core Adjectives',desc:'Common い and な adjectives for adjective conjugation drills.',words:[
+    {dict:'早い',reading:'はやい',meaning:'early / fast',group:'i-adjective'},{dict:'遅い',reading:'おそい',meaning:'late / slow',group:'i-adjective'},{dict:'強い',reading:'つよい',meaning:'strong',group:'i-adjective'},{dict:'弱い',reading:'よわい',meaning:'weak',group:'i-adjective'},{dict:'長い',reading:'ながい',meaning:'long',group:'i-adjective'},{dict:'短い',reading:'みじかい',meaning:'short',group:'i-adjective'},{dict:'簡単',reading:'かんたん',meaning:'simple',group:'na-adjective'},{dict:'複雑',reading:'ふくざつ',meaning:'complex',group:'na-adjective'},{dict:'安全',reading:'あんぜん',meaning:'safe',group:'na-adjective'},{dict:'危険',reading:'きけん',meaning:'dangerous',group:'na-adjective'}
+  ]}
+];
+const GRAMMAR_LESSONS=[
+  {id:'te-form',title:'Te-form joins actions',forms:['te-form','adj-te-form'],body:'Use the te-form to connect actions, make requests, and build helper patterns like ている. Godan verbs change by final kana group; adjectives use くて or で.',examples:[['食べる','食べて','食べてください。'],['読む','読んで','本を読んでいます。'],['静か','静かで','静かで便利です。']]},
+  {id:'potential',title:'Potential means ability',forms:['potential'],body:'Ichidan verbs add られる, godan verbs shift to the え-row and add る, する becomes できる, and 来る becomes 来られる. Potential verbs usually mark the thing you can do with が in careful Japanese.',examples:[['食べる','食べられる','寿司が食べられます。'],['書く','書ける','漢字が書けます。'],['する','できる','予約ができます。']]},
+  {id:'passive-causative',title:'Passive and causative change roles',forms:['passive','causative','causative-passive'],body:'Passive means the subject receives an action. Causative means someone makes or lets another person act. Causative-passive means someone is made to do something.',examples:[['待つ','待たされる','駅で待たされました。'],['書く','書かせる','先生が名前を書かせました。'],['褒める','褒められる','先生に褒められました。']]},
+  {id:'adjectives',title:'Adjectives conjugate like predicates',forms:['adj-plain-past','adj-plain-negative','adj-te-form','adj-adverb'],body:'い-adjectives drop い and use かった, くない, くて, and く. な-adjectives behave more like nouns with だ/です, だった, ではない, で, な, and に.',examples:[['高い','高かった','昨日は高かったです。'],['便利','便利ではない','この駅は便利ではありません。'],['早い','早く','早く起きます。']]},
+  {id:'conditionals',title:'Conditionals choose nuance',forms:['conditional-ba','conditional-tara','adj-conditional','adj-tara'],body:'ば often feels rule-like or prerequisite-like. たら is broad and works for if/when. Adjectives use ければ for い-adjectives and なら for な-adjectives.',examples:[['行く','行けば','駅に行けば分かります。'],['食べる','食べたら','食べたら、出かけましょう。'],['安い','安ければ','安ければ買います。']]}
+];
 function getWordMeta(word){return{jlpt:'N3',lesson:null,...(WORD_META[word.dict]||{})};}
 function wordKind(word){return isAdjective(word)?word.group:'verb';}
 function wordKey(word){return`${word.group}:${word.dict}`;}
@@ -797,14 +818,15 @@ function App(){
             {syncConfig.enabled&&(<div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind==='error'?'text-rose-500':syncStatus.kind==='syncing'?'text-amber-500':'text-emerald-600'}`}><IconCloud className="w-3 h-3"/><span>{syncStatus.kind==='syncing'?'syncing':syncStatus.kind==='error'?'sync error':'synced'}</span></div>)}
           </div>
         </header>
-        <nav className="grid grid-cols-3 sm:grid-cols-10 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','classify','mistakes','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
+        <nav className="grid grid-cols-3 sm:grid-cols-11 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
+          {['study','classify','mistakes','lessons','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
             <button key={t} onClick={()=>setTab(t)} className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
         {tab==='study'&&<StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
+        {tab==='lessons'&&<LessonsView geminiKey={geminiKey}/>}
         {tab==='reference'&&<ReferenceView verbs={allVerbs} adjectives={allAdjectives} geminiKey={geminiKey}/>}
         {tab==='coach'&&<CoachView geminiKey={geminiKey}/>}
         {tab==='stats'&&<StatsView state={state} verbs={allWords}/>}
@@ -1226,6 +1248,48 @@ function MistakesView({state,setState,practicePrefs}){
   );
 }
 
+function LessonsView({geminiKey}){
+  const[selectedId,setSelectedId]=useState(GRAMMAR_LESSONS[0]?.id||'');
+  const[aiText,setAiText]=useState('');
+  const[loading,setLoading]=useState(false);
+  const[err,setErr]=useState('');
+  const lesson=GRAMMAR_LESSONS.find(l=>l.id===selectedId)||GRAMMAR_LESSONS[0];
+  async function expandLesson(){
+    if(!lesson||!geminiKey)return;
+    setLoading(true);setErr('');setAiText('');
+    try{
+      const prompt=`Expand this Japanese conjugation lesson for a self-study app. Lesson: ${lesson.title}. Core explanation: ${lesson.body}. Forms: ${lesson.forms.join(', ')}. Give a concise explanation, 3 fresh examples, 2 common mistakes, and a mini quiz with answers.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1400,0.35,AI_COACH_SYSTEM);
+      setAiText(reply);
+    }catch(e){setErr(e.message);}
+    setLoading(false);
+  }
+  return(
+    <div className="grid lg:grid-cols-[280px_1fr] gap-4">
+      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+        <div className="p-4 border-b border-stone-100"><h3 className="font-medium">Lesson path</h3><p className="text-xs text-stone-500">Short grammar notes tied to drill forms.</p></div>
+        <div className="divide-y divide-stone-50">{GRAMMAR_LESSONS.map(l=>(<button key={l.id} onClick={()=>{setSelectedId(l.id);setAiText('');setErr('');}} className={`w-full text-left px-4 py-3 transition ${lesson?.id===l.id?'bg-indigo-50':'hover:bg-stone-50'}`}><div className="font-medium text-stone-800">{l.title}</div><div className="text-xs text-stone-400">{l.forms.map(f=>getTypeInfo(f).label).join(', ')}</div></button>))}</div>
+      </div>
+      {lesson&&<div className="space-y-4">
+        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Grammar lesson</div><h3 className="text-2xl font-semibold mt-1">{lesson.title}</h3></div>
+            <button onClick={expandLesson} disabled={!geminiKey||loading} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm flex items-center gap-1.5"><IconSpark className="w-4 h-4"/>{loading?'Expanding…':'AI expand'}</button>
+          </div>
+          <p className="text-sm text-stone-700 leading-relaxed mt-4">{lesson.body}</p>
+          <div className="flex flex-wrap gap-2 mt-4">{lesson.forms.map(f=><span key={f} className="text-xs px-2 py-1 rounded-lg bg-stone-100 text-stone-600">{getTypeInfo(f).label}</span>)}</div>
+        </div>
+        <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+          <table className="w-full text-sm"><thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider"><tr><th className="px-4 py-2 text-left font-medium">Base</th><th className="px-4 py-2 text-left font-medium">Form</th><th className="px-4 py-2 text-left font-medium">Example</th></tr></thead><tbody>{lesson.examples.map((ex,i)=><tr key={i} className="border-t border-stone-100"><td className="px-4 py-2" lang="ja">{ex[0]}</td><td className="px-4 py-2 text-lg" lang="ja">{ex[1]}</td><td className="px-4 py-2" lang="ja">{ex[2]}</td></tr>)}</tbody></table>
+        </div>
+        {!geminiKey&&<div className="text-xs text-center text-stone-400">Add a Gemini key in Settings for expanded lessons and mini quizzes.</div>}
+        {err&&<div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{err}</div>}
+        {aiText&&<div className="bg-white rounded-2xl border border-stone-200 p-5 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{aiText}</div>}
+      </div>}
+    </div>
+  );
+}
+
 function formRows(item){
   const types=isAdjective(item)?ADJ_TYPES:CONJ_TYPES;
   return types.map(t=>({type:t,answer:conjugateItem(item,t.id),explanation:explainItem(item,t.id)}));
@@ -1398,6 +1462,20 @@ function ListsView({words,customVerbs,setCustomVerbs,customAdjectives,setCustomA
     setWordLists(wordLists.map(l=>l.id===active.id?{...l,wordKeys:[...keys]}:l));
     setImportText('');setMsg(`Imported ${rows.length} row${rows.length===1?'':'s'} into ${active.name}.`);
   }
+  function importPack(pack){
+    let list=wordLists.find(l=>l.id==='pack-'+pack.id);
+    const id=list?.id||'pack-'+pack.id;
+    let verbs=customVerbs,adjs=customAdjectives,keys=new Set(list?.wordKeys||[]);
+    for(const w of pack.words){
+      if(isAdjective(w))adjs=addUniqueWord(adjs,w);else verbs=addUniqueWord(verbs,w);
+      keys.add(wordKey(w));
+    }
+    if(list)setWordLists(wordLists.map(l=>l.id===id?{...l,name:pack.name,wordKeys:[...keys]}:l));
+    else setWordLists([...wordLists,{id,name:pack.name,wordKeys:[...keys]}]);
+    setCustomVerbs(verbs);setCustomAdjectives(adjs);setActiveId(id);
+    if(!selectedIds.includes(id))setPracticePrefs({...practicePrefs,wordListIds:[...selectedIds,id]});
+    setMsg(`Imported ${pack.words.length} words from ${pack.name}.`);
+  }
   return(
     <div className="grid lg:grid-cols-[280px_1fr] gap-4">
       <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
@@ -1413,6 +1491,18 @@ function ListsView({words,customVerbs,setCustomVerbs,customAdjectives,setCustomA
         </div>
       </div>
       <div className="space-y-4">
+        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <h3 className="font-medium mb-1">Built-in packs</h3>
+          <p className="text-xs text-stone-500 mb-3">Seed drills with curated JLPT-style packs, then edit them as normal lists.</p>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {VOCAB_PACKS.map(pack=><div key={pack.id} className="border border-stone-200 rounded-xl p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div><div className="font-medium text-sm">{pack.name}</div><div className="text-xs text-stone-500 mt-0.5">{pack.desc}</div><div className="text-[11px] text-stone-400 mt-1">{pack.words.length} words</div></div>
+                <button onClick={()=>importPack(pack)} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs">Import</button>
+              </div>
+            </div>)}
+          </div>
+        </div>
         <div className="bg-white rounded-2xl border border-stone-200 p-5">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div><h3 className="font-medium">{active?active.name:'No list selected'}</h3><p className="text-xs text-stone-500">Add starter/custom words, then enable lists as drill scopes.</p></div>
