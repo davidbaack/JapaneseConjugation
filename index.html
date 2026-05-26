@@ -60,6 +60,7 @@ const IconMic=(p)=><Icon {...p} d={<><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 
 const IconSpark=(p)=><Icon {...p} d={<><path d="M12 3l1.7 5.2L19 10l-5.3 1.8L12 17l-1.7-5.2L5 10l5.3-1.8L12 3z"/><path d="M19 15l.7 2.1L22 18l-2.3.9L19 21l-.7-2.1L16 18l2.3-.9L19 15z"/></>}/>;
 const IconList=(p)=><Icon {...p} d={<><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>}/>;
 const IconStar=(p)=><Icon {...p} d={<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>}/>;
+const IconPen=(p)=><Icon {...p} d={<><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></>}/>;
 
 // ============================================================================
 // VERB DATA
@@ -3300,6 +3301,36 @@ function kanjiDictionaryLinks(ch){
     {id:`takoboto-${ch}`,label:'Takoboto',url:`https://takoboto.jp/?q=${q}`}
   ];
 }
+function kanjiStrokeFileName(ch){
+  const cp=String(ch||'').codePointAt(0);
+  return cp?`${cp.toString(16).padStart(5,'0')}.svg`:'';
+}
+function kanjiStrokeLinks(ch){
+  const file=kanjiStrokeFileName(ch);
+  const links=[
+    {id:`jisho-stroke-${ch}`,label:'Jisho',url:`https://jisho.org/search/${encodeURIComponent(`${ch} #kanji`)}`}
+  ];
+  if(file)links.unshift({id:`kanjivg-${ch}`,label:'KanjiVG',url:`https://kanjivg.tagaini.net/viewer.html?file=${file}`});
+  return links;
+}
+function writingPracticeUnits(item){
+  const kanji=kanjiCharsFor(item?.dict);
+  if(kanji.length)return kanji.map(ch=>({ch,type:'kanji',links:kanjiStrokeLinks(ch)}));
+  return splitJapaneseMorae(item?.reading||item?.dict||'').slice(0,8).map(ch=>({
+    ch,
+    type:'kana',
+    links:[{id:`jisho-kana-${ch}`,label:'Jisho',url:`https://jisho.org/search/${encodeURIComponent(ch)}`}]
+  }));
+}
+function writingDrillSteps(item,units=[]){
+  const chars=units.map(u=>u.ch).join(' + ');
+  const reading=item?.reading||item?.dict||'the word';
+  return[
+    `Trace ${chars||reading} twice while saying ${reading}.`,
+    `Cover the model, write it once, then compare the balance and endings.`,
+    `Write one conjugated form from the table so the okurigana stays attached.`
+  ];
+}
 function pronunciationPracticeForms(item){
   const ids=isAdjective(item)?['adj-plain-present','adj-plain-negative','adj-plain-past','adj-te-form','adj-polite-present']:['plain-present','plain-negative','plain-past','te-form','polite-present','potential'];
   const seen=new Set();
@@ -3363,6 +3394,9 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
   const[kanjiText,setKanjiText]=useState('');
   const[kanjiLoading,setKanjiLoading]=useState(false);
   const[kanjiErr,setKanjiErr]=useState('');
+  const[writingText,setWritingText]=useState('');
+  const[writingLoading,setWritingLoading]=useState(false);
+  const[writingErr,setWritingErr]=useState('');
   const[favoriteMsg,setFavoriteMsg]=useState('');
   const words=useMemo(()=>[...verbs,...adjectives],[verbs,adjectives]);
   const reference=normalizeReferenceState(state.reference);
@@ -3376,6 +3410,8 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
   const selectedMorae=selected?splitJapaneseMorae(selected.reading):[];
   const pronunciationForms=selected?pronunciationPracticeForms(selected):[];
   const selectedKanji=selected?kanjiCharsFor(selected.dict):[];
+  const writingUnits=selected?writingPracticeUnits(selected):[];
+  const writingDrill=selected?writingDrillSteps(selected,writingUnits):[];
   const dictionaryLinks=selected?referenceDictionaryLinks(selected):[];
   const masteredRows=rows.filter(r=>r.progress.status==='mastered').length;
   const dueRows=rows.filter(r=>r.progress.status==='due').length;
@@ -3385,6 +3421,7 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
   useEffect(()=>{setCopyTableOk(false);},[selected?.dict,selected?.group]);
   useEffect(()=>{setAccentText('');setAccentErr('');},[selected?.dict,selected?.group]);
   useEffect(()=>{setKanjiText('');setKanjiErr('');},[selected?.dict,selected?.group]);
+  useEffect(()=>{setWritingText('');setWritingErr('');},[selected?.dict,selected?.group]);
   useEffect(()=>{setFavoriteMsg('');},[selected?.dict,selected?.group]);
   function updateReference(fn){setState(prev=>({...prev,reference:fn(prev.reference)}));}
   function rememberSearch(q=query){updateReference(ref=>referenceWithSearch(ref,q));}
@@ -3474,6 +3511,17 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
       setKanjiText(reply);
     }catch(e){setKanjiErr(e.message||'Kanji insight failed.');}
     setKanjiLoading(false);
+  }
+  async function generateWritingGuide(){
+    if(!selected||!geminiKey)return;
+    setWritingLoading(true);setWritingErr('');setWritingText('');
+    try{
+      const chars=writingUnits.map(u=>`${u.ch} (${u.type})`).join(', ')||'none';
+      const prompt=`Create a compact handwriting practice note for this Japanese conjugation reference entry.\n\nWord: ${selected.dict}\nReading: ${selected.reading}\nMeaning: ${selected.meaning}\nClass: ${GROUP_NAMES[selected.group]||selected.group}\nWriting units shown in the app: ${chars}\n\nInclude: per-character stroke-order attention points, likely radical/component or shape cues when useful, how the kana/okurigana ending connects to conjugation, a 30-second writing drill using one conjugated form, and one caution about verifying exact stroke order in the linked reference. If exact stroke order or component history is uncertain, say so clearly. Keep it practical and short.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,950,0.2,aiSystemFromPrefs(practicePrefs,'You are a careful Japanese handwriting coach. Be honest about uncertainty, avoid invented etymology, and turn dictionary entries into practical writing drills.'));
+      setWritingText(reply);
+    }catch(e){setWritingErr(e.message||'Writing guide failed.');}
+    setWritingLoading(false);
   }
   if(!selected)return(<div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No words available.</div>);
   return(
@@ -3566,6 +3614,32 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
           {!geminiKey&&<div className="mt-2 text-xs text-stone-400">Add a Gemini key for kanji meaning, readings, and okurigana notes.</div>}
           {kanjiErr&&<div className="mt-2 text-sm text-rose-600">{kanjiErr}</div>}
           {kanjiText&&<div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{kanjiText}</div>}
+        </div>
+        <div className="bg-white rounded-2xl border border-stone-200 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium"><IconPen className="w-4 h-4 text-indigo-600"/>Stroke & writing</div>
+            <button onClick={generateWritingGuide} disabled={!geminiKey||writingLoading} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5"><IconSpark className="w-4 h-4"/>{writingLoading?'Guiding...':'AI writing'}</button>
+          </div>
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {writingUnits.map((unit,i)=><div key={`${unit.ch}-${i}`} className="rounded-xl border border-stone-200 bg-stone-50 p-2">
+              <div className="relative aspect-square rounded-lg bg-white border border-stone-200 overflow-hidden flex items-center justify-center">
+                <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-stone-200"/>
+                <div className="absolute inset-y-0 left-1/2 border-l border-dashed border-stone-200"/>
+                <div className="relative text-5xl sm:text-4xl font-medium text-stone-800 leading-none" lang="ja">{unit.ch}</div>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-stone-400">{unit.type}</span>
+                <div className="flex flex-wrap justify-end gap-1">{unit.links.map(link=><a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-indigo-600 hover:text-indigo-800">{link.label}</a>)}</div>
+              </div>
+            </div>)}
+          </div>
+          <div className="mt-3 grid sm:grid-cols-3 gap-2">
+            {writingDrill.map((step,i)=><div key={step} className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs leading-relaxed text-stone-600"><span className="font-medium text-stone-800">{i+1}.</span> {step}</div>)}
+          </div>
+          <div className="mt-2 text-xs text-stone-400">KanjiVG opens animated stroke data when available; Jisho is included as a second kanji reference. For kana-only words, use the grid as a trace-and-cover drill.</div>
+          {!geminiKey&&<div className="mt-2 text-xs text-stone-400">Add a Gemini key for writing mnemonics and stroke-order cautions.</div>}
+          {writingErr&&<div className="mt-2 text-sm text-rose-600">{writingErr}</div>}
+          {writingText&&<div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{writingText}</div>}
         </div>
         <div className="bg-white rounded-2xl border border-stone-200 p-4">
           <div className="flex items-center justify-between gap-3">
