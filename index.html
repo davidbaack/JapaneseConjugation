@@ -1574,6 +1574,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const[aiHintLoading,setAiHintLoading]=useState(false);
   const[aiHintErr,setAiHintErr]=useState('');
   const[coachRevealed,setCoachRevealed]=useState(0);
+  const[revealedMiss,setRevealedMiss]=useState(false);
   const[endAt,setEndAt]=useState(null);
   const[now,setNow]=useState(Date.now());
   const[reviewBase,setReviewBase]=useState(state.session.reviewed||0);
@@ -1596,6 +1597,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   useEffect(()=>{if(current&&phase==='answering'&&listeningPrompt&&promptAudioText)speakJapanese(promptAudioText,0.85,practicePrefs.voiceURI);},[current?.id,phase,listeningPrompt,promptAudioText,practicePrefs.voiceURI]);
   useEffect(()=>{if(current&&phase==='reviewing'&&practicePrefs.autoSpeak)speakJapanese(conjugateItem(current.verb,current.type),0.9,practicePrefs.voiceURI);},[current,phase,practicePrefs.autoSpeak,practicePrefs.voiceURI]);
   useEffect(()=>{setCoachRevealed(0);},[current?.id,practicePrefs.answerMode]);
+  useEffect(()=>{if(phase==='answering')setRevealedMiss(false);},[current?.id,phase]);
   useEffect(()=>{setReviewBase(state.session.reviewed||0);},[practicePrefs.reviewLimit]);
   useEffect(()=>{
     if(practicePrefs.durationSec>0)setEndAt(Date.now()+practicePrefs.durationSec*1000);
@@ -1620,7 +1622,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const typeInfo=getTypeInfo(current.type);
   const reviewExplanation=phase==='reviewing'?(reverseDrill?explainReversePrompt(current.verb,current.type):explainItem(current.verb,current.type)):null;
   const explanation=!wasCorrect?reviewExplanation:null;
-  const diagnostic=phase==='reviewing'&&!wasCorrect&&!reverseDrill?diagnoseItem(current.verb,current.type,answer):'';
+  const diagnostic=phase==='reviewing'&&!wasCorrect&&!reverseDrill&&!revealedMiss?diagnoseItem(current.verb,current.type,answer):'';
   const choices=reverseDrill?makeReverseChoices(current,practiceWords):makeChoices(current,practiceWords);
   const wordType=isAdjective(current.verb)?'Adjective':'Verb';
   const noChangePrompt=!reverseDrill&&promptType===current.type;
@@ -1662,7 +1664,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   function submit(choiceValue){
     if(autoAdvanceRef.current){clearTimeout(autoAdvanceRef.current);autoAdvanceRef.current=null;}
     if(phase==='reviewing'){
-      setChatOpen(false);setAnswer('');setCoachRevealed(0);setPhase('answering');
+      setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setPhase('answering');
       if(!reviewSetComplete)setCurrent(selectNext(state,practiceWords,enabledTypes,current.id,practicePrefs));
       return;
     }
@@ -1675,16 +1677,16 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
     const prevVS=(state.verbStats?.[dict]?.[rid])||{seen:0,incorrect:0};
     const newVerbStats={...state.verbStats,[dict]:{...(state.verbStats?.[dict]||{}),[rid]:{seen:prevVS.seen+1,incorrect:prevVS.incorrect+(ok?0:1)}}};
     const nextMistakes=ok?state.mistakes:recordMistake(state.mistakes,current.verb,current.type,reverseDrill?current.type:promptType,reverseDrill?raw.trim():normalized,expected);
-    const nextState={...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,mistakes:nextMistakes,session:{reviewed:state.session.reviewed+1,correct:state.session.correct+(ok?1:0)},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)};
+    const nextState={...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,mistakes:nextMistakes,session:{...(state.session||{}),reviewed:(state.session?.reviewed||0)+1,correct:(state.session?.correct||0)+(ok?1:0)},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)};
     setState(nextState);
     setChatOpen(!ok&&!!geminiKey&&!!practicePrefs.autoAiExplainErrors);
-    setWasCorrect(ok);setPhase('reviewing');
+    setRevealedMiss(false);setWasCorrect(ok);setPhase('reviewing');
     const reviewWillComplete=reviewLimit>0&&reviewsDone+1>=reviewLimit;
     if(ok&&practicePrefs.autoAdvanceCorrect&&!reviewWillComplete){
       autoAdvanceRef.current=setTimeout(()=>{
         autoAdvanceRef.current=null;
         if(endAt&&Date.now()>=endAt)return;
-        setChatOpen(false);setAnswer('');setCoachRevealed(0);setPhase('answering');
+        setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setPhase('answering');
         setCurrent(selectNext(nextState,practiceWords,enabledTypes,current.id,practicePrefs));
       },850);
     }
@@ -1694,8 +1696,19 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
     if(autoAdvanceRef.current){clearTimeout(autoAdvanceRef.current);autoAdvanceRef.current=null;}
     const nextState={...state,session:{...(state.session||{}),skipped:(state.session?.skipped||0)+1}};
     setState(nextState);
-    setChatOpen(false);setAnswer('');setCoachRevealed(0);setPhase('answering');setWasCorrect(false);
+    setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setPhase('answering');setWasCorrect(false);
     setCurrent(selectNext(nextState,practiceWords,enabledTypes,current.id,practicePrefs));
+  }
+  function revealAnswer(){
+    if(!current||phase!=='answering')return;
+    if(autoAdvanceRef.current){clearTimeout(autoAdvanceRef.current);autoAdvanceRef.current=null;}
+    const dict=current.verb.dict,rid=current.id;
+    const prevVS=(state.verbStats?.[dict]?.[rid])||{seen:0,incorrect:0};
+    const newVerbStats={...state.verbStats,[dict]:{...(state.verbStats?.[dict]||{}),[rid]:{seen:prevVS.seen+1,incorrect:prevVS.incorrect+1}}};
+    const nextMistakes=recordMistake(state.mistakes,current.verb,current.type,reverseDrill?current.type:promptType,'(revealed)',expected);
+    const nextState={...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],false)},verbStats:newVerbStats,mistakes:nextMistakes,session:{...(state.session||{}),reviewed:(state.session?.reviewed||0)+1,correct:state.session?.correct||0},daily:bumpDaily(state.daily,false,practicePrefs.dailyGoal||10)};
+    setState(nextState);
+    setAnswer('');setChatOpen(!!geminiKey&&!!practicePrefs.autoAiExplainErrors);setRevealedMiss(true);setWasCorrect(false);setPhase('reviewing');
   }
 
   const card=state.cards[current.id];
@@ -1766,7 +1779,10 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {reverseDrill?choices.map(w=>{const cv=promptDisplay(w,null,practicePrefs);return <button key={wordKey(w)} onClick={()=>submit(w.dict)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition"><ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1"/>{!hideEnglishHint&&<div className="mt-1 text-xs text-stone-500">{w.meaning}</div>}</button>;}):choices.map(c=>{const cv=formDisplay(c,practicePrefs);return <button key={c} onClick={()=>submit(c)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition"><ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1"/></button>;})}
                   </div>
-                  <button onClick={skipCurrent} className="w-full mt-3 py-2.5 border border-stone-200 hover:bg-stone-50 text-stone-600 rounded-xl font-medium transition">Skip without penalty</button>
+                  <div className="grid sm:grid-cols-2 gap-2 mt-3">
+                    <button onClick={revealAnswer} className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition">I don't know</button>
+                    <button onClick={skipCurrent} className="py-2.5 border border-stone-200 hover:bg-stone-50 text-stone-600 rounded-xl font-medium transition">Skip without penalty</button>
+                  </div>
                 </>
               ):practicePrefs.answerMode==='guided'?(
                 <>
@@ -1783,9 +1799,10 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                     placeholder={reverseDrill?'Type dictionary form...':'Type romaji or kana...'} className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none transition"
                     lang="ja" autoComplete="off" autoCorrect="off" spellCheck="false"/>
                   {answer&&coachPreview!==answer&&<div className="mt-2 text-center text-sm text-stone-500" lang="ja">→ {coachPreview}</div>}
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-2 mt-3">
-                    <button onClick={()=>submit()} disabled={!answer.trim()} className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40">Check (Enter)</button>
+                  <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto_auto] gap-2 mt-3">
+                    <button onClick={()=>submit()} disabled={!answer.trim()} className="col-span-2 sm:col-span-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40">Check (Enter)</button>
                     <button onClick={()=>setCoachRevealed(Math.min(expectedKanaCount,Math.max(coachRevealed,coachTypedCount)+1))} disabled={coachRevealed>=expectedKanaCount||phase!=='answering'} className="px-3 py-2.5 border border-stone-200 hover:bg-white disabled:opacity-40 rounded-xl text-sm text-stone-600">Hint</button>
+                    <button onClick={revealAnswer} className="px-3 py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm text-amber-800">Reveal</button>
                     <button onClick={skipCurrent} className="px-3 py-2.5 border border-stone-200 hover:bg-white rounded-xl text-sm text-stone-600">Skip</button>
                   </div>
                 </>
@@ -1804,8 +1821,9 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                     </div>
                     <div className={`mt-2 text-xs text-center ${liveWrongIndex>=0?'text-rose-700':preview===expected?'text-emerald-700':'text-stone-500'}`}>{liveStatus}</div>
                   </div>}
-                  <div className="grid grid-cols-[1fr_auto] gap-2 mt-3">
-                    <button onClick={()=>submit()} disabled={!answer.trim()} className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40">Check (Enter)</button>
+                  <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto] gap-2 mt-3">
+                    <button onClick={()=>submit()} disabled={!answer.trim()} className="col-span-2 sm:col-span-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40">Check (Enter)</button>
+                    <button onClick={revealAnswer} className="px-3 py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition">Reveal</button>
                     <button onClick={skipCurrent} className="px-3 py-2.5 border border-stone-200 hover:bg-stone-50 text-stone-600 rounded-xl font-medium transition">Skip</button>
                   </div>
                 </>
@@ -1817,7 +1835,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                 <div className={`mt-0.5 flex-shrink-0 ${wasCorrect?'text-emerald-600':'text-rose-600'}`}>{wasCorrect?<IconCheck className="w-5 h-5"/>:<IconX className="w-5 h-5"/>}</div>
                 <div className="flex-1">
                   <div className={`text-sm font-medium ${wasCorrect?'text-emerald-800':'text-rose-800'}`}>{wasCorrect?'Correct!':'Not quite.'}</div>
-                  {!wasCorrect&&<div className="text-xs text-rose-700 mt-1">You wrote: <span lang="ja">{reverseDrill?(answer.trim()||'(empty)'):(toHiragana(answer)||'(empty)')}</span></div>}
+                  {!wasCorrect&&<div className="text-xs text-rose-700 mt-1">{revealedMiss?"You chose: I don't know":'You wrote:'} {!revealedMiss&&<span lang="ja">{reverseDrill?(answer.trim()||'(empty)'):(toHiragana(answer)||'(empty)')}</span>}</div>}
                   <ScriptDisplay view={expectedView} className={`text-xl mt-2 ${wasCorrect?'text-emerald-900':'text-rose-900'}`} subClassName="text-xs text-stone-500 mt-1"/>
                   <div className={`text-xs mt-1 ${wasCorrect?'text-emerald-700':'text-rose-700'}`}>{targetEnglish}</div>
                   {wasCorrect&&practicePrefs.autoAdvanceCorrect&&<div className="text-xs text-emerald-700 mt-2">Next card coming up...</div>}
@@ -1846,7 +1864,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                       <IconChat className="w-4 h-4"/> Ask Gemini why
                     </button>
                   ):(
-                    <ChatPanel verb={current.verb} type={current.type} userAnswer={answer} expected={expected} explanation={explanation} geminiKey={geminiKey} practicePrefs={practicePrefs} taskOverride={taskOverride}/>
+                    <ChatPanel verb={current.verb} type={current.type} userAnswer={revealedMiss?'(revealed)':answer} expected={expected} explanation={explanation} geminiKey={geminiKey} practicePrefs={practicePrefs} taskOverride={taskOverride}/>
                   )):(
                     <div className="text-xs text-stone-400 text-center pt-1">Add a Gemini API key in Settings to enable AI chat.</div>
                   )}
