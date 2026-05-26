@@ -2196,6 +2196,35 @@ function srsStatsFor(state,verbs){
   return{totalReviews,totalCorrect,acc:totalReviews>0?Math.round((totalCorrect/totalReviews)*100):0,due,learning,mastered,fresh,leeches:leeches.slice(0,10),total};
 }
 function pct(correct,attempted){return attempted?Math.round(correct/attempted*100):0;}
+function formAccuracyRows(state,verbs){
+  const enabled=state.enabledTypes&&state.enabledTypes.length?state.enabledTypes:ALL_CARD_TYPES.map(t=>t.id);
+  const cards=state.cards||{};
+  const now=Date.now();
+  return ALL_CARD_TYPES
+    .filter(t=>enabled.includes(t.id))
+    .map(t=>{
+      const rules=RULES.filter(r=>r.type===t.id&&r.verbFilter(verbs).length>0);
+      let correct=0,incorrect=0,due=0,fresh=0;
+      for(const rule of rules){
+        const card=cards[rule.id];
+        if(!card){fresh++;continue;}
+        correct+=card.correct||0;
+        incorrect+=card.incorrect||0;
+        if(card.nextReview<=now)due++;
+      }
+      const attempted=correct+incorrect;
+      return{type:t,rules:rules.length,correct,incorrect,attempted,accuracy:pct(correct,attempted),due,fresh};
+    })
+    .filter(row=>row.rules>0)
+    .sort((a,b)=>{
+      const aUntried=a.attempted?0:1;
+      const bUntried=b.attempted?0:1;
+      if(aUntried!==bUntried)return aUntried-bUntried;
+      if(a.attempted&&b.attempted&&a.accuracy!==b.accuracy)return a.accuracy-b.accuracy;
+      if(a.incorrect!==b.incorrect)return b.incorrect-a.incorrect;
+      return a.type.label.localeCompare(b.type.label);
+    });
+}
 function skillRadarScores(state,verbs){
   const srs=srsStatsFor(state,verbs);
   const meaning=state.meaning||defaultState().meaning;
@@ -2217,6 +2246,8 @@ function skillRadarScores(state,verbs){
 function StatsView({state,verbs,geminiKey,practicePrefs=DEFAULT_PREFS}){
   const stats=useMemo(()=>srsStatsFor(state,verbs),[state,verbs]);
   const radar=useMemo(()=>skillRadarScores(state,verbs),[state,verbs]);
+  const formRows=useMemo(()=>formAccuracyRows(state,verbs),[state,verbs]);
+  const weakestForms=formRows.filter(row=>row.attempted>0).slice(0,8);
   const weakest=radar.slice().sort((a,b)=>a.score-b.score)[0];
   const[aiText,setAiText]=useState('');
   const[aiLoading,setAiLoading]=useState(false);
@@ -2226,8 +2257,9 @@ function StatsView({state,verbs,geminiKey,practicePrefs=DEFAULT_PREFS}){
     setAiLoading(true);setAiText('');setAiErr('');
     try{
       const radarText=radar.map(r=>`${r.label}: ${r.score}% (${r.detail})`).join('\n');
+      const formText=weakestForms.map(row=>`${row.type.label}: ${row.accuracy}% (${row.correct}/${row.attempted}, ${row.incorrect} misses)`).join('\n')||'No form accuracy data yet';
       const leechText=stats.leeches.map(l=>`${l.rule.label} ${TYPE_LABEL[l.rule.type]}: ${l.card.incorrect} misses`).join('\n')||'No leeches yet';
-      const prompt=`Create a focused Japanese conjugation study plan from these app stats.\n\nSkill radar:\n${radarText}\n\nWeak cards:\n${leechText}\n\nGive a 7-day plan with one tiny daily drill, what to do in this app, and one success metric per day. Be concise and practical.`;
+      const prompt=`Create a focused Japanese conjugation study plan from these app stats.\n\nSkill radar:\n${radarText}\n\nForm accuracy:\n${formText}\n\nWeak cards:\n${leechText}\n\nGive a 7-day plan with one tiny daily drill, what to do in this app, and one success metric per day. Be concise and practical.`;
       const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1200,0.35,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
       setAiText(reply.trim());
     }catch(e){setAiErr(e.message);}
@@ -2255,6 +2287,37 @@ function StatsView({state,verbs,geminiKey,practicePrefs=DEFAULT_PREFS}){
           <div className="text-4xl font-semibold tabular-nums">{stats.acc}%</div>
           <div className="h-2 bg-stone-100 rounded-full overflow-hidden mt-3"><div className="h-full bg-emerald-500 transition-all" style={{width:stats.acc+'%'}}/></div>
           <div className="text-xs text-stone-500 mt-2">{stats.totalCorrect} correct / {stats.totalReviews} reviews / {stats.total} rules</div>
+        </div>
+      </div>
+      <div className="bg-white rounded-2xl border border-stone-200 p-5">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h3 className="font-medium">Form accuracy</h3>
+            <p className="text-xs text-stone-500">Lowest practiced forms first. Untried forms stay visible at the bottom.</p>
+          </div>
+          <div className="text-xs text-stone-400 tabular-nums flex-shrink-0">{formRows.filter(row=>row.attempted>0).length}/{formRows.length} practiced</div>
+        </div>
+        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+          {formRows.map(row=>{const has=row.attempted>0;const tone=!has?'bg-stone-300':row.accuracy>=80?'bg-emerald-500':row.accuracy>=50?'bg-amber-500':'bg-rose-500';return(
+            <div key={row.type.id} className="rounded-xl border border-stone-200 px-3 py-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-stone-800 truncate">{row.type.label}</div>
+                  <div className="text-xs text-stone-500 truncate">{row.type.hint}</div>
+                </div>
+                <div className="text-right text-xs text-stone-500 flex-shrink-0">
+                  <div className="font-semibold text-stone-800 tabular-nums">{has?`${row.accuracy}%`:'new'}</div>
+                  <div className="tabular-nums">{row.correct}/{row.attempted}</div>
+                </div>
+              </div>
+              <div className="mt-2 h-1.5 bg-stone-100 rounded-full overflow-hidden"><div className={`h-full ${tone} transition-all`} style={{width:(has?row.accuracy:0)+'%'}}/></div>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-stone-400">
+                <span>{row.incorrect} miss{row.incorrect===1?'':'es'}</span>
+                <span>{row.due} due</span>
+                {row.fresh>0&&<span>{row.fresh} new rule{row.fresh===1?'':'s'}</span>}
+              </div>
+            </div>
+          );})}
         </div>
       </div>
       <div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-3 flex items-center gap-2"><IconFlame className="w-4 h-4 text-rose-500"/>Leeches</h3>{stats.leeches.length===0?<p className="text-sm text-stone-500">No leeches yet!</p>:<ul className="space-y-2">{stats.leeches.map(l=>(<li key={l.id} className="flex items-center justify-between py-1.5 px-2 hover:bg-stone-50 rounded-lg"><div><span className="font-medium text-stone-700">{l.rule.label}</span><span className="text-xs text-stone-400 ml-2">{TYPE_LABEL[l.rule.type]}</span></div><div className="text-xs text-rose-600">{l.card.incorrect} miss{l.card.incorrect===1?'':'es'}</div></li>))}</ul>}</div>
@@ -3941,7 +4004,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:33,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:34,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
