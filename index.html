@@ -920,10 +920,15 @@ function ContextExamplePanel({item,type,geminiKey,practicePrefs=DEFAULT_PREFS}){
 // ============================================================================
 const DAY=86400000;
 function localDateKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*DAY);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},ambient:{sessions:0,played:0,lastAt:null},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},mock:{taken:0,bestPct:0,lastPct:0,lastScore:0,lastTotal:0,lastAt:null,bySkill:{}},reader:{sessions:0,chars:0,encounters:0,wordSeen:{},lastAt:null},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
+function normalizeReferenceState(ref={}){
+  const recentSearches=Array.isArray(ref.recentSearches)?ref.recentSearches.map(s=>String(s||'').trim()).filter(Boolean).slice(0,12):[];
+  const history=Array.isArray(ref.history)?ref.history.filter(w=>w&&w.dict&&w.reading&&w.group).map(w=>({dict:w.dict,reading:w.reading,meaning:w.meaning||'',group:w.group,lastAt:w.lastAt||Date.now(),count:w.count||1})).slice(0,24):[];
+  return{recentSearches,history};
+}
+function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},ambient:{sessions:0,played:0,lastAt:null},game:{played:0,bestScore:0,bestCombo:0},onbin:{attempted:0,correct:0,hints:0,streak:0,bestStreak:0,byPattern:{}},meaning:{attempted:0,correct:0,byWord:{}},mock:{taken:0,bestPct:0,lastPct:0,lastScore:0,lastTotal:0,lastAt:null,bySkill:{}},reader:{sessions:0,chars:0,encounters:0,wordSeen:{},lastAt:null},reference:normalizeReferenceState(),enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
 function mergeState(saved,sessionOverride){
   const base=defaultState();
-  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,ambient:(saved&&saved.ambient)||base.ambient,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,mock:(saved&&saved.mock)||base.mock,reader:{...base.reader,...((saved&&saved.reader)||{}),wordSeen:((saved&&saved.reader&&saved.reader.wordSeen)||{})},daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,ambient:(saved&&saved.ambient)||base.ambient,game:(saved&&saved.game)||base.game,onbin:(saved&&saved.onbin)||base.onbin,meaning:(saved&&saved.meaning)||base.meaning,mock:(saved&&saved.mock)||base.mock,reader:{...base.reader,...((saved&&saved.reader)||{}),wordSeen:((saved&&saved.reader&&saved.reader.wordSeen)||{})},reference:normalizeReferenceState(saved&&saved.reference),daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
   if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
     merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
   }
@@ -1270,7 +1275,7 @@ function App(){
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
         {tab==='shadow'&&<ShadowView state={state} setState={setState} words={allWords} wordLists={wordLists} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='lessons'&&<LessonsView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
-        {tab==='reference'&&<ReferenceView verbs={allVerbs} adjectives={allAdjectives} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
+        {tab==='reference'&&<ReferenceView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='coach'&&<CoachView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='stats'&&<StatsView state={state} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='levels'&&<SRSLevelView state={state} verbs={allWords}/>}
@@ -3243,7 +3248,24 @@ function scannerInlineDataFromDataURL(dataUrl,file={}){
   if(!m)throw new Error('Could not prepare that file.');
   return{inlineData:{mimeType:file.type||m[1]||'application/octet-stream',data:m[2]}};
 }
-function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS}){
+function referenceWordSnapshot(word){
+  return{dict:word.dict,reading:word.reading,meaning:word.meaning||'',group:word.group,lastAt:Date.now()};
+}
+function referenceWithSearch(reference,query){
+  const q=String(query||'').trim();
+  if(!q)return normalizeReferenceState(reference);
+  const ref=normalizeReferenceState(reference);
+  return{...ref,recentSearches:[q,...ref.recentSearches.filter(s=>s!==q)].slice(0,12)};
+}
+function referenceWithHistory(reference,word){
+  if(!word)return normalizeReferenceState(reference);
+  const ref=normalizeReferenceState(reference);
+  const key=wordKey(word);
+  const prior=ref.history.find(w=>wordKey(w)===key);
+  const fresh={...referenceWordSnapshot(word),count:(prior?.count||0)+1};
+  return{...ref,history:[fresh,...ref.history.filter(w=>wordKey(w)!==key)].slice(0,24)};
+}
+function ReferenceView({state,setState,verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS}){
   const[query,setQuery]=useState('');
   const[selected,setSelected]=useState(null);
   const[aiText,setAiText]=useState('');
@@ -3254,6 +3276,8 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
   const[lookupAiLoading,setLookupAiLoading]=useState(false);
   const[lookupAiErr,setLookupAiErr]=useState('');
   const words=useMemo(()=>[...verbs,...adjectives],[verbs,adjectives]);
+  const reference=normalizeReferenceState(state.reference);
+  const historyWords=reference.history.map(h=>words.find(w=>wordKey(w)===wordKey(h))||h);
   const matches=useMemo(()=>searchWords(query,words),[query,words]);
   const lookupMatches=useMemo(()=>formLookupCandidates(query,words),[query,words]);
   useEffect(()=>{if(!selected||!words.some(w=>w.dict===selected.dict))setSelected(matches[0]||words[0]||null);},[matches,words,selected]);
@@ -3261,6 +3285,15 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
   const rows=selected?formRows(selected):[];
   const selectedView=selected?promptDisplay(selected,null,practicePrefs):null;
   useEffect(()=>{setCopyTableOk(false);},[selected?.dict,selected?.group]);
+  function updateReference(fn){setState(prev=>({...prev,reference:fn(prev.reference)}));}
+  function rememberSearch(q=query){updateReference(ref=>referenceWithSearch(ref,q));}
+  function chooseReferenceWord(word,q=query){
+    setSelected(word);
+    if(String(q||'').trim())rememberSearch(q);
+    updateReference(ref=>referenceWithHistory(ref,word));
+  }
+  function clearReferenceMemory(){updateReference(()=>normalizeReferenceState());}
+  function isSelectedWord(word){return !!(selected&&word&&selected.dict===word.dict&&selected.group===word.group);}
   async function copyTable(){
     if(!selected||!rows.length)return;
     const header=['Word','Reading','Meaning','Group','Form','Answer','Romaji','Rule'].join('\t');
@@ -3305,12 +3338,27 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
         <div className="p-3 border-b border-stone-100">
           <div className="relative">
             <IconList className="w-4 h-4 absolute left-3 top-2.5 text-stone-400"/>
-            <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search word or form" className="w-full pl-9 pr-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none" autoCorrect="off" spellCheck="false"/>
+            <input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&query.trim())rememberSearch(query);}} placeholder="Search word or form" className="w-full pl-9 pr-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none" autoCorrect="off" spellCheck="false"/>
           </div>
+          {!query.trim()&&(reference.recentSearches.length||historyWords.length)?<div className="mt-3 border-t border-stone-100 pt-3 space-y-3">
+            {reference.recentSearches.length>0&&<div>
+              <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-wider text-stone-500"><span>Recent searches</span><button onClick={clearReferenceMemory} className="normal-case tracking-normal text-stone-400 hover:text-stone-700">Clear</button></div>
+              <div className="mt-2 flex flex-wrap gap-1.5">{reference.recentSearches.map(s=><button key={s} onClick={()=>setQuery(s)} className="px-2 py-1 rounded-lg border border-stone-200 hover:bg-stone-50 text-xs text-stone-600 truncate max-w-full">{s}</button>)}</div>
+            </div>}
+            {historyWords.length>0&&<div>
+              <div className="text-xs uppercase tracking-wider text-stone-500 mb-2">Lookup history</div>
+              <div className="space-y-1.5">{historyWords.slice(0,6).map(w=>{const wv=promptDisplay(w,null,practicePrefs);return <button key={wordKey(w)} onClick={()=>chooseReferenceWord(w,'')} className={`w-full text-left px-2 py-2 rounded-lg border transition ${isSelectedWord(w)?'border-indigo-200 bg-indigo-50':'border-stone-100 hover:border-stone-200 hover:bg-stone-50'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0"><ScriptDisplay view={wv} className="text-sm font-medium truncate" subClassName="text-[11px] text-stone-400 truncate"/><div className="text-xs text-stone-500 truncate">{w.meaning}</div></div>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-500 flex-shrink-0">x{w.count||1}</span>
+                </div>
+              </button>;})}</div>
+            </div>}
+          </div>:null}
           {query.trim()&&<div className="mt-3 border-t border-stone-100 pt-3">
             <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-wider text-stone-500"><span>Reverse lookup</span><span>{lookupMatches.length?`${lookupMatches.length} hit${lookupMatches.length===1?'':'s'}`:'no exact hit'}</span></div>
             {lookupMatches.length>0?<div className="mt-2 space-y-1.5">
-              {lookupMatches.slice(0,5).map(m=>{const av=formDisplay(m.answer,practicePrefs);const bv=promptDisplay(m.word,null,practicePrefs);return <button key={`${wordKey(m.word)}-${m.type.id}-${m.matchKind}`} onClick={()=>setSelected(m.word)} className={`w-full text-left px-2 py-2 rounded-lg border transition ${selected.dict===m.word.dict&&selected.group===m.word.group?'border-indigo-200 bg-indigo-50':'border-stone-100 hover:border-stone-200 hover:bg-stone-50'}`}>
+              {lookupMatches.slice(0,5).map(m=>{const av=formDisplay(m.answer,practicePrefs);const bv=promptDisplay(m.word,null,practicePrefs);return <button key={`${wordKey(m.word)}-${m.type.id}-${m.matchKind}`} onClick={()=>chooseReferenceWord(m.word)} className={`w-full text-left px-2 py-2 rounded-lg border transition ${isSelectedWord(m.word)?'border-indigo-200 bg-indigo-50':'border-stone-100 hover:border-stone-200 hover:bg-stone-50'}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div><ScriptDisplay view={av} className="text-sm font-medium" subClassName="text-[11px] text-stone-400"/><div className="text-[11px] text-stone-500 mt-0.5">{m.type.label}</div></div>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${m.matchKind==='exact'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}`}>{m.matchKind}</span>
@@ -3326,7 +3374,7 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
           </div>}
         </div>
         <div className="max-h-[560px] overflow-y-auto divide-y divide-stone-50">
-            {matches.map(w=>{const wv=promptDisplay(w,null,practicePrefs);return <button key={`${w.group}:${w.dict}`} onClick={()=>setSelected(w)} className={`w-full text-left px-4 py-3 transition ${selected.dict===w.dict&&selected.group===w.group?'bg-indigo-50':'hover:bg-stone-50'}`}>
+            {matches.map(w=>{const wv=promptDisplay(w,null,practicePrefs);return <button key={`${w.group}:${w.dict}`} onClick={()=>chooseReferenceWord(w)} className={`w-full text-left px-4 py-3 transition ${isSelectedWord(w)?'bg-indigo-50':'hover:bg-stone-50'}`}>
             <div className="flex items-baseline justify-between gap-2">
               <div className="font-medium text-stone-800"><ScriptDisplay view={wv} className="" subClassName="text-xs text-stone-500"/></div>
               <span className="text-[11px] text-stone-400">{isAdjective(w)?'adj':'verb'}</span>
@@ -4043,7 +4091,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:37,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:38,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,reference:state.reference,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
