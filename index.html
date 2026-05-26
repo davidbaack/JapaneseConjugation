@@ -232,6 +232,9 @@ const CONJ_TYPES=[
   {id:'causative-negative',label:'Causative Negative',sub:'',hint:'not make / let ~'},
   {id:'causative-passive',label:'Causative Passive',sub:'使役受身形',hint:'be made to ~'},
   {id:'desiderative',label:'Tai-form',sub:'たい形',hint:'want to ~'},
+  {id:'desiderative-negative',label:'Tai Negative',sub:'たくない',hint:'do not want to ~'},
+  {id:'desiderative-past',label:'Tai Past',sub:'たかった',hint:'wanted to ~'},
+  {id:'desiderative-past-negative',label:'Tai Past Negative',sub:'たくなかった',hint:'did not want to ~'},
   {id:'progressive',label:'Progressive',sub:'ている',hint:'is / has been ~ing'},
   {id:'negative-te',label:'Negative Te',sub:'ないで',hint:'without doing ~'},
   {id:'prohibition',label:'Prohibition',sub:'禁止形',hint:'do not ~!'},
@@ -262,7 +265,7 @@ const ADJ_TYPES=[
 const ALL_CARD_TYPES=[...CONJ_TYPES,...ADJ_TYPES];
 const TYPE_PACKS=[
   {id:'basics',label:'Basics',hint:'Past, negative, polite, and te-form foundations.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','te-form','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form']},
-  {id:'everyday',label:'Everyday',hint:'Common conversation forms for requests, ability, desire, and conditionals.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','masu-stem','te-form','potential','potential-negative','volitional','polite-volitional','conditional-tara','negative-conditional-tara','conditional-ba','desiderative','progressive','request-kudasai','permission','obligation','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form','adj-adverb','adj-conditional','adj-tara','adj-negative-tara','adj-sou','adj-naru']},
+  {id:'everyday',label:'Everyday',hint:'Common conversation forms for requests, ability, desire, and conditionals.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','masu-stem','te-form','potential','potential-negative','volitional','polite-volitional','conditional-tara','negative-conditional-tara','conditional-ba','desiderative','desiderative-negative','desiderative-past','desiderative-past-negative','progressive','request-kudasai','permission','obligation','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form','adj-adverb','adj-conditional','adj-tara','adj-negative-tara','adj-sou','adj-naru']},
   {id:'advanced',label:'Advanced',hint:'Passive, causative, commands, conjecture, and nuanced connectors.',typeIds:['polite-te','polite-conditional-tara','conditional-nara','conjectural','imperative','passive','passive-negative','causative','causative-negative','causative-passive','negative-te','prohibition','negative-request','adj-attributive','adj-sugiru']},
   {id:'all',label:'All forms',hint:'Enable every verb and adjective form in the app.',typeIds:ALL_CARD_TYPES.map(t=>t.id)}
 ];
@@ -441,8 +444,21 @@ function onbinTailFor(verb,targetType){
   return expected.startsWith(stem)?expected.slice(stem.length):expected;
 }
 
+function desiderativeStem(verb){
+  const{reading,group}=verb;
+  if(group==='ichidan')return reading.slice(0,-1);
+  if(group==='godan'){const last=reading.slice(-1);return reading.slice(0,-1)+I_ROW[last];}
+  if(group==='suru')return(reading.endsWith('する')?reading.slice(0,-2):'')+'し';
+  if(group==='kuru')return(reading.endsWith('くる')?reading.slice(0,-2):'')+'き';
+  return reading;
+}
+
 function conjugate(verb,type){
   const{reading,group}=verb;
+  if(type==='desiderative')return desiderativeStem(verb)+'たい';
+  if(type==='desiderative-negative')return desiderativeStem(verb)+'たくない';
+  if(type==='desiderative-past')return desiderativeStem(verb)+'たかった';
+  if(type==='desiderative-past-negative')return desiderativeStem(verb)+'たくなかった';
   if(group==='ichidan'){
     const stem=reading.slice(0,-1);
     const te=stem+'て',neg=stem+'ない',past=stem+'た';
@@ -628,7 +644,10 @@ function explainItem(item,type){
     'request-kudasai':'Use the te-form, then add ください.',
     'negative-request':'Use the negative te-form, then add ください.',
     'permission':'Use the te-form, then add もいい.',
-    'obligation':'Use the negative stem before い, then add ければならない.'
+    'obligation':'Use the negative stem before い, then add ければならない.',
+    'desiderative-negative':'Use the たい form, then conjugate たい like an い-adjective: たい → たくない.',
+    'desiderative-past':'Use the たい form, then conjugate たい like an い-adjective: たい → たかった.',
+    'desiderative-past-negative':'Use the たい form, then conjugate たい like an い-adjective: たい → たくなかった.'
   };
   if(!e.rule&&common[type])e.rule=common[type];
   if(!e.rule&&type==='causative-passive')e.rule=item.group==='godan'?'Use the あ-row stem, then add せられる.':'Use the causative stem and add られる.';
@@ -870,6 +889,9 @@ function contextSentenceFor(item,type){
     'causative-negative':[`先生は学生に${form}。`,'Someone does not make or let a student do it.'],
     'causative-passive':[`学生は先生に${form}。`,'A student is made to do it.'],
     'desiderative':[`今、${form}。`,'I want to do this now.'],
+    'desiderative-negative':[`今は${form}。`,'I do not want to do this now.'],
+    'desiderative-past':[`昨日、${form}。`,'I wanted to do this yesterday.'],
+    'desiderative-past-negative':[`昨日は${form}。`,'I did not want to do this yesterday.'],
     'progressive':[`今、${form}。`,'This is happening now.'],
     'negative-te':[`${form}、待ってください。`,'Please wait without doing this.'],
     'prohibition':[`ここで${form}。`,'Do not do this here.'],
@@ -1442,6 +1464,9 @@ function englishForForm(item,type){
     'causative-negative':`not make/let someone ${action}`,
     'causative-passive':`be made to ${action}`,
     'desiderative':`want to ${action}`,
+    'desiderative-negative':`do not want to ${action}`,
+    'desiderative-past':`wanted to ${action}`,
+    'desiderative-past-negative':`did not want to ${action}`,
     'progressive':mapActionMeaning(item.meaning,a=>`be ${gerund(a)}`),
     'negative-te':mapActionMeaning(item.meaning,a=>`without ${gerund(a)}`),
     'prohibition':`do not ${action}!`,
