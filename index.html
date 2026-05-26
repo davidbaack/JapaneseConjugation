@@ -1010,6 +1010,31 @@ function selectNext(state,verbs,enabledTypes,lastRuleId,prefs=DEFAULT_PREFS){
   const verb=pickVerb(chosen.candidates,chosen.rule.id,state.verbStats);
   return{id:chosen.rule.id,verb,type:chosen.rule.type,card:state.cards[chosen.rule.id],ruleLabel:chosen.rule.label};
 }
+function buildPracticePoolSummary(state,words,prefs=DEFAULT_PREFS,wordLists=[]){
+  const filtered=filterWordsForPrefs(words,prefs,wordLists);
+  const enabled=enabledTypeIdsFor(state.enabledTypes);
+  const now=Date.now();
+  const activeTypes=new Set();
+  const activeRules=[];
+  let prompts=0;
+  for(const rule of RULES){
+    if(!enabled.includes(rule.type))continue;
+    const candidates=rule.verbFilter(filtered).filter(item=>!isRedundantPracticeType(item,rule.type,enabled,prefs));
+    if(!candidates.length)continue;
+    prompts+=candidates.length;
+    activeTypes.add(rule.type);
+    activeRules.push(rule);
+  }
+  let due=0,fresh=0,weak=0,mastered=0;
+  for(const rule of activeRules){
+    const card=(state.cards||{})[rule.id];
+    if(!card)fresh++;
+    else if(card.nextReview<=now)due++;
+    if(ruleWeakScore(state,rule.id)>0)weak++;
+    if(card&&card.reps>0&&getCardLevel(card)>=4)mastered++;
+  }
+  return{words:filtered.length,prompts,forms:activeTypes.size,rules:activeRules.length,due,fresh,weak,mastered};
+}
 function pickVerb(candidates,ruleId,verbStats){
   const vs=verbStats||{};
   const withS=candidates.map(v=>{const s=(vs[v.dict]||{})[ruleId]||{seen:0,incorrect:0};return{v,seen:s.seen,incorrect:s.incorrect};});
@@ -3830,7 +3855,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:31,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:32,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -3865,10 +3890,31 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
   const weakPackIds=weakTypeIdsForState(state,state.enabledTypes);
   const typePacks=[...TYPE_PACKS,{id:'weak',label:'Weak mix',hint:'Uses your misses and SRS history to pick forms worth isolating.',typeIds:weakPackIds}];
   const enabledKey=[...state.enabledTypes].sort().join('|');
+  const settingsWords=useMemo(()=>[...STARTER_VERBS,...customVerbs,...STARTER_ADJECTIVES,...customAdjectives],[customVerbs,customAdjectives]);
+  const poolSummary=useMemo(()=>buildPracticePoolSummary(state,settingsWords,practicePrefs,wordLists),[state,settingsWords,practicePrefs,wordLists]);
 
   return(<div className="space-y-4">
     <div className="bg-white rounded-2xl border border-stone-200 p-5">
       <h3 className="font-medium mb-3">Practice mode</h3>
+      <div className={`mb-4 border-y py-3 ${poolSummary.prompts?'border-stone-100':'border-amber-200 bg-amber-50/60 -mx-2 px-2 rounded-xl'}`}>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div className="text-xs uppercase tracking-wider text-stone-500 font-medium">Question pool</div>
+          {!poolSummary.prompts&&<div className="text-xs text-amber-700">No available prompts</div>}
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
+          {[
+            ['Prompts',poolSummary.prompts],
+            ['Words',poolSummary.words],
+            ['Forms',poolSummary.forms],
+            ['Due',poolSummary.due],
+            ['New',poolSummary.fresh],
+            ['Weak',poolSummary.weak],
+          ].map(([label,value])=><div key={label} className="min-w-0">
+            <div className="text-lg font-semibold tabular-nums text-stone-800">{value}</div>
+            <div className="text-[11px] text-stone-400">{label}</div>
+          </div>)}
+        </div>
+      </div>
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-stone-500 block mb-1">Answer mode</label>
