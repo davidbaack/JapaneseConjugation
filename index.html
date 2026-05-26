@@ -99,6 +99,7 @@ const STARTER_ADJECTIVES=[
 ];
 
 const JLPT_LEVELS=['N5','N4','N3','N2','N1'];
+const GENKI_LESSONS=Array.from({length:23},(_,i)=>i+1);
 const WORD_TYPE_OPTIONS=[
   {id:'verb',label:'Verbs'},
   {id:'i-adjective',label:'い-adjectives'},
@@ -159,9 +160,10 @@ function wordKey(word){return`${word.group}:${word.dict}`;}
 function filterWordsForPrefs(words,prefs=DEFAULT_PREFS,wordLists=[]){
   const levels=prefs.jlptLevels&&prefs.jlptLevels.length?prefs.jlptLevels:JLPT_LEVELS;
   const types=prefs.wordTypes&&prefs.wordTypes.length?prefs.wordTypes:WORD_TYPE_OPTIONS.map(o=>o.id);
+  const lessonFilter=Array.isArray(prefs.genkiLessons)&&prefs.genkiLessons.length&&prefs.genkiLessons.length<GENKI_LESSONS.length?new Set(prefs.genkiLessons.map(Number)):null;
   const selectedLists=prefs.wordListIds&&prefs.wordListIds.length?prefs.wordListIds:[];
   const allowedKeys=selectedLists.length?new Set(wordLists.filter(l=>selectedLists.includes(l.id)).flatMap(l=>l.wordKeys||[])):null;
-  return words.filter(w=>levels.includes(getWordMeta(w).jlpt)&&types.includes(wordKind(w))&&(!allowedKeys||allowedKeys.has(wordKey(w))));
+  return words.filter(w=>{const meta=getWordMeta(w);return levels.includes(meta.jlpt)&&types.includes(wordKind(w))&&(!lessonFilter||lessonFilter.has(meta.lesson))&&(!allowedKeys||allowedKeys.has(wordKey(w)));});
 }
 
 const CONJ_TYPES=[
@@ -830,7 +832,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -2318,12 +2320,18 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:11,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:12,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
     const next=cur.includes(id)?cur.filter(x=>x!==id):[...cur,id];
     setPracticePrefs({...practicePrefs,[key]:next.length?next:allIds});
+  }
+  function setGenkiLessons(ids){const clean=[...new Set(ids.map(Number))].filter(n=>GENKI_LESSONS.includes(n)).sort((a,b)=>a-b);setPracticePrefs({...practicePrefs,genkiLessons:clean.length===GENKI_LESSONS.length?[]:clean});}
+  function toggleGenkiLesson(n){
+    const selected=Array.isArray(practicePrefs.genkiLessons)&&practicePrefs.genkiLessons.length?practicePrefs.genkiLessons:GENKI_LESSONS;
+    const next=selected.includes(n)?selected.filter(x=>x!==n):[...selected,n];
+    setGenkiLessons(next.length?next:GENKI_LESSONS);
   }
   function toggleDisplayScript(id){
     const current=resolveDisplayScripts(practicePrefs);
@@ -2336,6 +2344,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
   function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState(mergeState(data.state,{reviewed:0,correct:0}));if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);if(Array.isArray(data.customAdjectives))setCustomAdjectives(data.customAdjectives);if(Array.isArray(data.wordLists))setWordLists(data.wordLists);if(data.practicePrefs)setPracticePrefs(mergePracticePrefs(data.practicePrefs));setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
   const statusColor=syncStatus.kind==='error'?'text-rose-700 bg-rose-50 border-rose-200':syncStatus.kind==='syncing'?'text-amber-700 bg-amber-50 border-amber-200':syncStatus.kind==='ok'?'text-emerald-700 bg-emerald-50 border-emerald-200':'text-stone-600 bg-stone-50 border-stone-200';
   const displayScripts=resolveDisplayScripts(practicePrefs);
+  const selectedGenkiLessons=Array.isArray(practicePrefs.genkiLessons)&&practicePrefs.genkiLessons.length?practicePrefs.genkiLessons:GENKI_LESSONS;
 
   return(<div className="space-y-4">
     <div className="bg-white rounded-2xl border border-stone-200 p-5">
@@ -2376,6 +2385,18 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
         <div>
           <label className="text-xs text-stone-500 block mb-1">JLPT levels</label>
           <div className="flex gap-1">{JLPT_LEVELS.map(l=>(<button key={l} onClick={()=>togglePref('jlptLevels',l,JLPT_LEVELS)} className={`flex-1 px-2 py-2 rounded-lg text-xs border transition ${(practicePrefs.jlptLevels||JLPT_LEVELS).includes(l)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{l}</button>))}</div>
+        </div>
+        <div className="sm:col-span-2">
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <label className="text-xs text-stone-500 block">Genki lessons</label>
+            <div className="flex gap-1">
+              <button onClick={()=>setGenkiLessons(GENKI_LESSONS)} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 hover:bg-stone-50">All</button>
+              <button onClick={()=>setGenkiLessons(GENKI_LESSONS.filter(n=>n<=12))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 hover:bg-stone-50">I</button>
+              <button onClick={()=>setGenkiLessons(GENKI_LESSONS.filter(n=>n>=13))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 hover:bg-stone-50">II</button>
+            </div>
+          </div>
+          <div className="grid grid-cols-6 sm:grid-cols-[repeat(12,minmax(0,1fr))] gap-1">{GENKI_LESSONS.map(n=><button key={n} onClick={()=>toggleGenkiLesson(n)} className={`px-2 py-2 rounded-lg text-xs border transition ${selectedGenkiLessons.includes(n)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>L{n}</button>)}</div>
+          <p className="text-[11px] text-stone-400 mt-1">Textbook filtering works together with JLPT, word type, and study-list filters.</p>
         </div>
         <div className="sm:col-span-2">
           <label className="text-xs text-stone-500 block mb-1">Word types</label>
