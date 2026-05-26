@@ -130,6 +130,28 @@ const GRAMMAR_LESSONS=[
   {id:'adjectives',title:'Adjectives conjugate like predicates',forms:['adj-plain-past','adj-plain-negative','adj-te-form','adj-adverb'],body:'い-adjectives drop い and use かった, くない, くて, and く. な-adjectives behave more like nouns with だ/です, だった, ではない, で, な, and に.',examples:[['高い','高かった','昨日は高かったです。'],['便利','便利ではない','この駅は便利ではありません。'],['早い','早く','早く起きます。']]},
   {id:'conditionals',title:'Conditionals choose nuance',forms:['conditional-ba','conditional-tara','adj-conditional','adj-tara'],body:'ば often feels rule-like or prerequisite-like. たら is broad and works for if/when. Adjectives use ければ for い-adjectives and なら for な-adjectives.',examples:[['行く','行けば','駅に行けば分かります。'],['食べる','食べたら','食べたら、出かけましょう。'],['安い','安ければ','安ければ買います。']]}
 ];
+const SHADOW_SCENARIOS=[
+  {id:'cafe',title:'Cafe Request',level:'N5',focus:'te-form',lines:[
+    {speaker:'A',ja:'すみません、メニューを見せてください。',en:'Excuse me, please show me the menu.'},
+    {speaker:'B',ja:'はい、どうぞ。おすすめはこのケーキです。',en:'Sure, here you go. This cake is the recommendation.'},
+    {speaker:'A',ja:'じゃあ、コーヒーとケーキをください。',en:'Then coffee and cake, please.'}
+  ]},
+  {id:'station',title:'At the Station',level:'N5',focus:'potential',lines:[
+    {speaker:'A',ja:'この電車で東京に行けますか。',en:'Can I go to Tokyo on this train?'},
+    {speaker:'B',ja:'はい、行けます。でも次の駅で乗り換えてください。',en:'Yes, you can. But please transfer at the next station.'},
+    {speaker:'A',ja:'分かりました。ありがとうございます。',en:'Got it. Thank you.'}
+  ]},
+  {id:'work',title:'Workplace Favor',level:'N4',focus:'causative-passive',lines:[
+    {speaker:'A',ja:'昨日、急に残業させられました。',en:'Yesterday I was suddenly made to work overtime.'},
+    {speaker:'B',ja:'大変でしたね。今日は早く帰れますか。',en:'That sounds rough. Can you go home early today?'},
+    {speaker:'A',ja:'はい、今日は早く帰りたいです。',en:'Yes, today I want to go home early.'}
+  ]},
+  {id:'weather',title:'Weather and Plans',level:'N5',focus:'adjectives',lines:[
+    {speaker:'A',ja:'今日は暑くて、少し疲れました。',en:'Today is hot, so I got a little tired.'},
+    {speaker:'B',ja:'じゃあ、静かなカフェで休みましょう。',en:'Then let’s rest at a quiet cafe.'},
+    {speaker:'A',ja:'いいですね。涼しくなったら散歩します。',en:'Sounds good. When it gets cooler, I’ll take a walk.'}
+  ]}
+];
 function getWordMeta(word){return{jlpt:'N3',lesson:null,...(WORD_META[word.dict]||{})};}
 function wordKind(word){return isAdjective(word)?word.group:'verb';}
 function wordKey(word){return`${word.group}:${word.dict}`;}
@@ -583,10 +605,10 @@ function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey}){
 // ============================================================================
 const DAY=86400000;
 function localDateKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*DAY);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function defaultState(){return{cards:{},verbStats:{},mistakes:[],enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
+function defaultState(){return{cards:{},verbStats:{},mistakes:[],shadow:{attempted:0,totalRating:0,byScenario:{}},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
 function mergeState(saved,sessionOverride){
   const base=defaultState();
-  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},mistakes:Array.isArray(saved&&saved.mistakes)?saved.mistakes:[],shadow:(saved&&saved.shadow)||base.shadow,daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
   if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
     merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
   }
@@ -818,14 +840,15 @@ function App(){
             {syncConfig.enabled&&(<div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind==='error'?'text-rose-500':syncStatus.kind==='syncing'?'text-amber-500':'text-emerald-600'}`}><IconCloud className="w-3 h-3"/><span>{syncStatus.kind==='syncing'?'syncing':syncStatus.kind==='error'?'sync error':'synced'}</span></div>)}
           </div>
         </header>
-        <nav className="grid grid-cols-3 sm:grid-cols-11 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','classify','mistakes','lessons','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
+        <nav className="grid grid-cols-3 sm:grid-cols-12 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
+          {['study','classify','mistakes','shadow','lessons','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
             <button key={t} onClick={()=>setTab(t)} className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
         {tab==='study'&&<StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
+        {tab==='shadow'&&<ShadowView state={state} setState={setState} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='lessons'&&<LessonsView geminiKey={geminiKey}/>}
         {tab==='reference'&&<ReferenceView verbs={allVerbs} adjectives={allAdjectives} geminiKey={geminiKey}/>}
         {tab==='coach'&&<CoachView geminiKey={geminiKey}/>}
@@ -842,11 +865,11 @@ function App(){
 // ============================================================================
 // STUDY VIEW
 // ============================================================================
-function speakJapanese(text){
+function speakJapanese(text,rate=0.9){
   if(!window.speechSynthesis||!text)return;
   window.speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(text);
-  u.lang='ja-JP';u.rate=0.9;
+  u.lang='ja-JP';u.rate=rate;
   window.speechSynthesis.speak(u);
 }
 function shuffled(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
@@ -1243,6 +1266,87 @@ function MistakesView({state,setState,practicePrefs}){
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ShadowView({state,setState,geminiKey,practicePrefs}){
+  const[selectedId,setSelectedId]=useState(SHADOW_SCENARIOS[0]?.id||'');
+  const[lineIdx,setLineIdx]=useState(0);
+  const[rate,setRate]=useState(0.85);
+  const[loop,setLoop]=useState(false);
+  const[showEnglish,setShowEnglish]=useState(true);
+  const[customScenario,setCustomScenario]=useState(null);
+  const[topic,setTopic]=useState('');
+  const[aiErr,setAiErr]=useState('');
+  const[loading,setLoading]=useState(false);
+  const scenario=customScenario||SHADOW_SCENARIOS.find(s=>s.id===selectedId)||SHADOW_SCENARIOS[0];
+  const line=scenario.lines[Math.min(lineIdx,scenario.lines.length-1)];
+  const shadow=state.shadow||defaultState().shadow;
+  const avg=shadow.attempted?Math.round((shadow.totalRating/shadow.attempted)*10)/10:0;
+  useEffect(()=>setLineIdx(0),[selectedId,customScenario]);
+  function playCurrent(){if(line)speakJapanese(line.ja,rate);}
+  function nextLine(){setLineIdx(i=>(i+1)%scenario.lines.length);}
+  function rateLine(rating){
+    const key=scenario.id;
+    const prev=shadow.byScenario?.[key]||{attempted:0,totalRating:0};
+    setState({...state,shadow:{attempted:(shadow.attempted||0)+1,totalRating:(shadow.totalRating||0)+rating,byScenario:{...(shadow.byScenario||{}),[key]:{attempted:prev.attempted+1,totalRating:prev.totalRating+rating,lastRating:rating,lastAt:Date.now()}}},daily:bumpDaily(state.daily,true,practicePrefs.dailyGoal||10)});
+    if(!loop)nextLine();else playCurrent();
+  }
+  async function generateScenario(){
+    if(!geminiKey)return;
+    setLoading(true);setAiErr('');
+    try{
+      const prompt=`Create a short Japanese shadowing dialogue for conjugation practice. Topic: ${topic||'daily life'}. Use 3 to 5 lines. Include useful verb/adjective conjugations naturally. Return ONLY JSON: {"title":"...","level":"N5/N4/N3","focus":"conjugation focus","lines":[{"speaker":"A","ja":"Japanese sentence","en":"English translation"}]}`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1200,0.5,AI_COACH_SYSTEM);
+      const data=extractJSON(reply);
+      if(!data||!Array.isArray(data.lines)||!data.lines.length)throw new Error('AI did not return a valid dialogue');
+      setCustomScenario({id:'ai-'+Date.now(),title:data.title||'AI Dialogue',level:data.level||'Custom',focus:data.focus||'conversation',lines:data.lines.slice(0,6).map((l,i)=>({speaker:l.speaker||String.fromCharCode(65+i%2),ja:l.ja||'',en:l.en||''})).filter(l=>l.ja)});
+    }catch(e){setAiErr(e.message);}
+    setLoading(false);
+  }
+  if(!scenario)return null;
+  return(
+    <div className="grid lg:grid-cols-[280px_1fr] gap-4">
+      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+        <div className="p-4 border-b border-stone-100"><h3 className="font-medium">Shadowing</h3><p className="text-xs text-stone-500">{shadow.attempted||0} lines rated · avg {avg||'-'}</p></div>
+        <div className="divide-y divide-stone-50">{SHADOW_SCENARIOS.map(s=><button key={s.id} onClick={()=>{setCustomScenario(null);setSelectedId(s.id);}} className={`w-full text-left px-4 py-3 transition ${!customScenario&&selectedId===s.id?'bg-indigo-50':'hover:bg-stone-50'}`}><div className="font-medium text-stone-800">{s.title}</div><div className="text-xs text-stone-400">{s.level} · {s.focus}</div></button>)}</div>
+        {customScenario&&<div className="p-3 bg-amber-50 border-t border-amber-100"><div className="text-xs uppercase tracking-wider text-amber-700 font-medium">AI dialogue</div><div className="font-medium text-sm text-stone-800 mt-1">{customScenario.title}</div></div>}
+      </div>
+      <div className="space-y-4">
+        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">{scenario.level} · {scenario.focus}</div><h3 className="text-2xl font-semibold mt-1">{scenario.title}</h3></div>
+            <button onClick={playCurrent} className="p-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-600" title="Play line"><IconVolume className="w-5 h-5"/></button>
+          </div>
+          <div className="rounded-2xl bg-stone-50 border border-stone-200 p-5 min-h-48 flex flex-col justify-center">
+            <div className="text-xs text-stone-400 mb-3">Line {lineIdx+1}/{scenario.lines.length} · Speaker {line.speaker}</div>
+            <div className="text-3xl sm:text-4xl leading-relaxed font-medium" lang="ja">{line.ja}</div>
+            {showEnglish&&<div className="text-sm text-stone-500 mt-4">{line.en}</div>}
+          </div>
+          <div className="grid sm:grid-cols-[1fr_auto] gap-3 mt-4 items-center">
+            <div>
+              <label className="text-xs text-stone-500 block mb-1">Playback speed · {rate.toFixed(2)}x</label>
+              <input type="range" min="0.55" max="1.2" step="0.05" value={rate} onChange={e=>setRate(Number(e.target.value))} className="w-full"/>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={()=>setLoop(!loop)} className={`px-3 py-2 rounded-lg text-sm border ${loop?'bg-indigo-600 text-white border-indigo-600':'border-stone-200 hover:bg-stone-50'}`}>Loop</button>
+              <button onClick={()=>setShowEnglish(!showEnglish)} className="px-3 py-2 rounded-lg text-sm border border-stone-200 hover:bg-stone-50">{showEnglish?'Hide EN':'Show EN'}</button>
+              <button onClick={nextLine} className="px-3 py-2 rounded-lg text-sm border border-stone-200 hover:bg-stone-50">Next</button>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-4">
+            {[1,2,3].map(r=><button key={r} onClick={()=>rateLine(r)} className="py-2 rounded-xl border border-stone-200 hover:border-indigo-300 hover:bg-indigo-50 text-sm">{r===1?'Hard':r===2?'Okay':'Clear'}</button>)}
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <h3 className="font-medium mb-1 flex items-center gap-2"><IconSpark className="w-4 h-4 text-indigo-600"/>AI dialogue generator</h3>
+          <p className="text-xs text-stone-500 mb-3">Generate short scenarios around conjugations you want to hear in context.</p>
+          <div className="flex gap-2"><input value={topic} onChange={e=>setTopic(e.target.value)} placeholder="restaurant, apology, making plans…" className="min-w-0 flex-1 px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/><button onClick={generateScenario} disabled={!geminiKey||loading} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm">{loading?'…':'Generate'}</button></div>
+          {!geminiKey&&<div className="mt-2 text-xs text-stone-400">Add a Gemini key in Settings.</div>}
+          {aiErr&&<div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
+        </div>
       </div>
     </div>
   );
@@ -1699,7 +1803,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:6,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:7,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
