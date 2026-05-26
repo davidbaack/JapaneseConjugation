@@ -10,7 +10,32 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>body{background:#fafaf9;margin:0;}</style>
+  <style>
+    body{background:#fafaf9;margin:0;}
+    body.theme-light{color-scheme:light;}
+    body.theme-dark{background:#11100f;color:#e7e5e4;color-scheme:dark;}
+    .theme-dark .bg-stone-50{background:#11100f!important;}
+    .theme-dark .bg-white{background:#1c1917!important;}
+    .theme-dark .bg-stone-100{background:#292524!important;}
+    .theme-dark .bg-stone-200{background:#3f3a36!important;}
+    .theme-dark .bg-indigo-50{background:#24213a!important;}
+    .theme-dark .bg-amber-50{background:#2b2112!important;}
+    .theme-dark .bg-emerald-50{background:#10261e!important;}
+    .theme-dark .bg-rose-50{background:#2b1518!important;}
+    .theme-dark .text-stone-800,.theme-dark .text-stone-700{color:#f5f5f4!important;}
+    .theme-dark .text-stone-600{color:#d6d3d1!important;}
+    .theme-dark .text-stone-500{color:#a8a29e!important;}
+    .theme-dark .text-stone-400{color:#78716c!important;}
+    .theme-dark .border-stone-100{border-color:#292524!important;}
+    .theme-dark .border-stone-200,.theme-dark .border-stone-300{border-color:#44403c!important;}
+    .theme-dark input,.theme-dark select,.theme-dark textarea{background:#141312!important;color:#f5f5f4!important;border-color:#44403c!important;}
+    .theme-dark input::placeholder,.theme-dark textarea::placeholder{color:#78716c!important;}
+    .theme-dark option,.theme-dark optgroup{background:#1c1917;color:#f5f5f4;}
+    .theme-dark .hover\:bg-stone-50:hover,.theme-dark .hover\:bg-stone-100:hover{background:#292524!important;}
+    .theme-dark .hover\:border-stone-300:hover{border-color:#57534e!important;}
+    .theme-dark .divide-stone-50>*+*{border-color:#292524!important;}
+    .theme-dark audio{filter:invert(.9) hue-rotate(180deg);}
+  </style>
 </head>
 <body>
   <div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;color:#78716c;">Loading…</div></div>
@@ -832,11 +857,18 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,voiceURI:'',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,voiceURI:'',theme:'system',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify({state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey,practicePrefs}));}catch{}
+}
+function getSystemTheme(){
+  if(typeof window==='undefined'||!window.matchMedia)return'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+}
+function resolveThemePreference(theme='system',systemTheme=getSystemTheme()){
+  return theme==='dark'||theme==='light'?theme:systemTheme;
 }
 
 // ============================================================================
@@ -861,6 +893,7 @@ function App(){
   const[syncStatus,setSyncStatus]=useState({kind:'idle',message:'',at:null});
   const[geminiKey,setGeminiKey]=useState('');
   const[speechVoices,setSpeechVoices]=useState([]);
+  const[systemTheme,setSystemTheme]=useState(getSystemTheme);
   const[hydrated,setHydrated]=useState(false);
   const pushTimer=useRef(null);
   const lastSyncedAtRef=useRef(0);
@@ -921,6 +954,25 @@ function App(){
     return()=>{cancelled=true;clearTimeout(retry);if(synth.onvoiceschanged===loadVoices)synth.onvoiceschanged=null;};
   },[]);
 
+  useEffect(()=>{
+    if(typeof window==='undefined'||!window.matchMedia)return;
+    const mql=window.matchMedia('(prefers-color-scheme: dark)');
+    const update=()=>setSystemTheme(mql.matches?'dark':'light');
+    update();
+    if(mql.addEventListener)mql.addEventListener('change',update);
+    else if(mql.addListener)mql.addListener(update);
+    return()=>{if(mql.removeEventListener)mql.removeEventListener('change',update);else if(mql.removeListener)mql.removeListener(update);};
+  },[]);
+
+  const resolvedTheme=resolveThemePreference(practicePrefs.theme,systemTheme);
+  useEffect(()=>{
+    if(typeof document==='undefined')return;
+    document.body.classList.toggle('theme-dark',resolvedTheme==='dark');
+    document.body.classList.toggle('theme-light',resolvedTheme!=='dark');
+    const meta=document.querySelector('meta[name="theme-color"]');
+    if(meta)meta.setAttribute('content',resolvedTheme==='dark'?'#11100f':'#312e81');
+  },[resolvedTheme]);
+
   async function syncNow(){
     if(!syncReady(syncConfig))return;
     setSyncStatus({kind:'syncing',message:'Syncing…',at:null});
@@ -976,7 +1028,7 @@ function App(){
         {tab==='levels'&&<SRSLevelView state={state} verbs={allWords}/>}
         {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} geminiKey={geminiKey} state={state}/>}
         {tab==='lists'&&<ListsView words={allWords} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs}/>}
-        {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices}/>}
+        {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme}/>}
       </div>
     </div>
   );
@@ -2350,7 +2402,7 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
 // ============================================================================
 // SETTINGS VIEW
 // ============================================================================
-function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,wordLists,setWordLists,syncConfig,setSyncConfig,syncStatus,syncNow,geminiKey,setGeminiKey,practicePrefs,setPracticePrefs,speechVoices=[]}){
+function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,wordLists,setWordLists,syncConfig,setSyncConfig,syncStatus,syncNow,geminiKey,setGeminiKey,practicePrefs,setPracticePrefs,speechVoices=[],resolvedTheme='light'}){
   const[confirmReset,setConfirmReset]=useState(false);
   const[exportOpen,setExportOpen]=useState(false);
   const[importOpen,setImportOpen]=useState(false);
@@ -2367,7 +2419,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:13,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:14,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -2401,6 +2453,10 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
         <div>
           <label className="text-xs text-stone-500 block mb-1">Answer mode</label>
           <div className="flex gap-2">{[{id:'input',label:'Free input'},{id:'choice',label:'Multiple choice'}].map(o=>(<button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,answerMode:o.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.answerMode===o.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
+        </div>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Theme</label>
+          <div className="grid grid-cols-3 gap-2">{[{id:'light',label:'Light'},{id:'dark',label:'Dark'},{id:'system',label:`System${resolvedTheme==='dark'?' dark':' light'}`}].map(o=>(<button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,theme:o.id})} className={`px-3 py-2 rounded-lg text-sm border transition ${((practicePrefs.theme||'system')===o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
         </div>
         <div>
           <label className="text-xs text-stone-500 block mb-1">Display scripts</label>
