@@ -2771,6 +2771,30 @@ function parseScannerAIWords(text){
     return{dict,reading,meaning,group,evidence:String(row.evidence||row.surface||'').trim()};
   }).filter(Boolean);
 }
+const SCANNER_TEXT_EXT=/\.(txt|md|csv|tsv|srt|vtt|json|html?)$/i;
+function isScannerTextFile(file){return!!file&&(String(file.type||'').startsWith('text/')||SCANNER_TEXT_EXT.test(file.name||''));}
+function isScannerImageFile(file){return!!file&&String(file.type||'').startsWith('image/');}
+function readScannerFileAsText(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||''));
+    reader.onerror=()=>reject(new Error('Could not read that file.'));
+    reader.readAsText(file);
+  });
+}
+function readScannerFileAsDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||''));
+    reader.onerror=()=>reject(new Error('Could not read that image.'));
+    reader.readAsDataURL(file);
+  });
+}
+function scannerInlineDataFromDataURL(dataUrl,file={}){
+  const m=String(dataUrl||'').match(/^data:([^;,]+);base64,(.*)$/);
+  if(!m)throw new Error('Could not prepare that image.');
+  return{inlineData:{mimeType:file.type||m[1]||'image/jpeg',data:m[2]}};
+}
 function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS}){
   const[query,setQuery]=useState('');
   const[selected,setSelected]=useState(null);
@@ -2849,11 +2873,51 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
   const[aiRows,setAiRows]=useState([]);
   const[aiLoading,setAiLoading]=useState(false);
   const[aiErr,setAiErr]=useState('');
+  const[fileLoading,setFileLoading]=useState(false);
+  const[fileErr,setFileErr]=useState('');
+  const[imagePreview,setImagePreview]=useState('');
   const matches=useMemo(()=>findTextScannerMatches(text,words),[text,words]);
   const uniqueWords=useMemo(()=>uniqueScannerWords(matches),[matches]);
   const visibleMatches=matches.slice(0,80);
   const formCount=matches.filter(m=>m.kind==='form').length;
   const selectedIds=practicePrefs.wordListIds||[];
+  async function importSourceFile(event){
+    const file=event.target.files?.[0];
+    if(event.target)event.target.value='';
+    if(!file)return;
+    setFileErr('');setMsg('');
+    if(isScannerTextFile(file)){
+      try{
+        const content=(await readScannerFileAsText(file)).trim();
+        if(!content){setFileErr('No text found in that file.');return;}
+        setText(prev=>prev.trim()?`${prev.trim()}\n\n${content}`:content);
+        setAiRows([]);setAiErr('');
+        setImagePreview('');
+        setMsg(`Imported ${file.name}.`);
+      }catch(e){setFileErr(e.message||'Could not read that file.');}
+      return;
+    }
+    if(!isScannerImageFile(file)){setFileErr('Choose an image or text file.');return;}
+    if(!geminiKey){setFileErr('Add a Gemini API key in Settings to scan images.');return;}
+    setFileLoading(true);setAiRows([]);setAiErr('');
+    try{
+      const dataUrl=await readScannerFileAsDataURL(file);
+      setImagePreview(dataUrl);
+      const prompt=`Read the Japanese text in this image and extract verbs/adjectives for conjugation practice.\n\nReturn ONLY JSON with this shape:\n{"text":"full Japanese text in natural reading order","words":[{"dict":"dictionary form in Japanese","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective","evidence":"surface form seen in the image"}]}\n\nInclude useful conjugation-practice words even when the image shows conjugated forms.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt},scannerInlineDataFromDataURL(dataUrl,file)]}],geminiKey,2200,0.1,'You are a careful Japanese OCR and grammar extraction assistant. Return only valid JSON.');
+      const data=extractJSON(reply);
+      const ocrText=String(data?.text||data?.ocrText||data?.japanese||'').trim();
+      const rows=parseScannerAIWords(data||reply);
+      if(ocrText)setText(prev=>prev.trim()?`${prev.trim()}\n\n${ocrText}`:ocrText);
+      if(rows.length)setAiRows(rows);
+      if(!ocrText&&!rows.length)setFileErr('No Japanese text found in that image.');
+      else setMsg(`Scanned ${file.name}${rows.length?` and found ${rows.length} AI candidate${rows.length===1?'':'s'}.`:'.'}`);
+    }catch(e){setFileErr(e.message||'Image scan failed.');}
+    finally{setFileLoading(false);}
+  }
+  function clearScanner(){
+    setText('');setMsg('');setAiRows([]);setAiErr('');setFileErr('');setImagePreview('');
+  }
   function createListFromKeys(keys,name){
     const clean=[...new Set(keys)].filter(Boolean);
     if(!clean.length){setMsg('No matched words yet.');return null;}
@@ -2914,6 +2978,16 @@ function ScannerView({words,customVerbs,setCustomVerbs,customAdjectives,setCusto
           <button onClick={createKnownList} disabled={!uniqueWords.length} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm flex items-center gap-1.5"><IconList className="w-4 h-4"/>Create list</button>
         </div>
         <textarea value={text} onChange={e=>{setText(e.target.value);setMsg('');}} placeholder="昨日、静かなカフェで本を読んで、ケーキを食べました。" className="w-full min-h-40 px-3 py-2 border border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none" lang="ja" autoCorrect="off" spellCheck="false"/>
+        <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2 mt-3 items-end">
+          <label className="block">
+            <span className="text-xs text-stone-500 block mb-1">Photo/text source</span>
+            <input type="file" accept="image/*,.txt,.md,.csv,.tsv,.srt,.vtt" capture="environment" onChange={importSourceFile} disabled={fileLoading} className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-stone-100 file:text-stone-700"/>
+          </label>
+          <button onClick={clearScanner} disabled={!text&&!imagePreview&&!aiRows.length} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 disabled:opacity-40 rounded-lg text-sm">Clear</button>
+        </div>
+        {fileLoading&&<div className="mt-2 text-sm text-indigo-600">Reading source...</div>}
+        {fileErr&&<div className="mt-2 text-sm text-rose-600">{fileErr}</div>}
+        {imagePreview&&<div className="mt-3 overflow-hidden rounded-xl border border-stone-200 bg-stone-50"><img src={imagePreview} alt="Imported source preview" className="max-h-56 w-full object-contain"/></div>}
         <div className="grid grid-cols-3 gap-2 mt-3 text-center">
           <div className="rounded-xl bg-stone-50 border border-stone-200 px-3 py-2"><div className="text-2xl font-semibold tabular-nums">{matches.length}</div><div className="text-xs text-stone-500">matches</div></div>
           <div className="rounded-xl bg-stone-50 border border-stone-200 px-3 py-2"><div className="text-2xl font-semibold tabular-nums">{uniqueWords.length}</div><div className="text-xs text-stone-500">words</div></div>
