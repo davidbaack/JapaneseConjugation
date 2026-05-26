@@ -4359,8 +4359,11 @@ function CoachView({state,setState,words=[],wordLists=[],geminiKey,practicePrefs
   const[challengeLoading,setChallengeLoading]=useState(false);
   const[challengeErr,setChallengeErr]=useState('');
   const[grading,setGrading]=useState(false);
+  const[listening,setListening]=useState(false);
+  const[speechErr,setSpeechErr]=useState('');
   const production=state.production||defaultState().production;
   const productionPct=production.attempted?Math.round((production.correct||0)/(production.attempted||1)*100):0;
+  const canDictate=typeof window!=='undefined'&&Boolean(window.SpeechRecognition||window.webkitSpeechRecognition);
   const challengeSeeds=useMemo(()=>buildProductionSeeds(state,words,practicePrefs,wordLists,10),[state.cards,state.mistakes,state.enabledTypes,state.verbStats,words,practicePrefs,wordLists]);
   async function run(){
     if(!text.trim()||!geminiKey)return;
@@ -4374,7 +4377,7 @@ function CoachView({state,setState,words=[],wordLists=[],geminiKey,practicePrefs
   }
   async function generateChallenge(){
     if(!geminiKey||!challengeSeeds.length)return;
-    setChallengeLoading(true);setChallengeErr('');setChallengeFeedback(null);setChallengeAnswer('');
+    setChallengeLoading(true);setChallengeErr('');setSpeechErr('');setChallengeFeedback(null);setChallengeAnswer('');
     try{
       const seedLines=challengeSeeds.map((s,i)=>`${i+1}. ${s.word.dict} (${s.word.reading}) - ${s.word.meaning}; ${GROUP_NAMES[s.word.group]||s.word.group}; required form ${s.type.label}: ${s.answer}`).join('\n');
       const prompt=`Create one Japanese sentence production challenge for a conjugation learner.\n\nChoose exactly one seed from this list and require the learner to use its required conjugated form in a natural sentence:\n${seedLines}\n\nReturn ONLY JSON:\n{"seedIndex":1,"englishPrompt":"English sentence the learner should produce","hint":"short non-answer cue","modelJapanese":"one natural model answer using the required form"}\n\nKeep the English prompt short and concrete. Do not ask for a literal word-for-word translation.`;
@@ -4395,6 +4398,20 @@ function CoachView({state,setState,words=[],wordLists=[],geminiKey,practicePrefs
       });
     }catch(e){setChallengeErr(e.message||'Challenge generation failed.');}
     setChallengeLoading(false);
+  }
+  function dictateChallengeAnswer(){
+    if(!canDictate){setSpeechErr('Speech input needs a browser with Japanese speech recognition support.');return;}
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const sr=new SpeechRecognition();
+    sr.lang='ja-JP';sr.interimResults=false;sr.maxAlternatives=1;
+    sr.onstart=()=>{setListening(true);setSpeechErr('');};
+    sr.onresult=e=>{
+      const transcript=Array.from(e.results||[]).map(r=>r[0]?.transcript||'').join('').trim();
+      if(transcript)setChallengeAnswer(prev=>prev.trim()?`${prev.trim()} ${transcript}`:transcript);
+    };
+    sr.onerror=e=>{if(e.error!=='aborted')setSpeechErr('Speech recognition could not produce Japanese text.');};
+    sr.onend=()=>setListening(false);
+    try{sr.start();}catch(e){setListening(false);setSpeechErr(e.message||'Could not start speech input.');}
   }
   async function gradeChallenge(){
     if(!challenge||!challengeAnswer.trim()||!geminiKey)return;
@@ -4445,7 +4462,12 @@ function CoachView({state,setState,words=[],wordLists=[],geminiKey,practicePrefs
           <div className="mt-2 text-xs text-indigo-900/80">Required: <span lang="ja">{challenge.expected}</span> · {challenge.typeLabel} of <span lang="ja">{challenge.word.dict}</span></div>
           <div className="mt-1 text-xs text-stone-500">Hint: {challenge.hint}</div>
           <textarea value={challengeAnswer} onChange={e=>setChallengeAnswer(e.target.value)} placeholder="日本語で答えてください…" className="mt-3 w-full min-h-24 px-3 py-2 border border-indigo-100 rounded-xl focus:border-indigo-500 focus:outline-none bg-white" lang="ja" autoCorrect="off" spellCheck="false"/>
-          <button onClick={gradeChallenge} disabled={!challengeAnswer.trim()||grading} className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium">{grading?'Grading…':'Grade production'}</button>
+          <div className="grid sm:grid-cols-[auto_1fr] gap-2 mt-3">
+            <button onClick={dictateChallengeAnswer} disabled={!canDictate||listening} className="px-3 py-2 border border-indigo-200 hover:bg-white disabled:opacity-40 rounded-xl text-sm text-indigo-700 inline-flex items-center justify-center gap-1.5"><IconMic className="w-4 h-4"/>{listening?'Listening…':'Speak answer'}</button>
+            <button onClick={gradeChallenge} disabled={!challengeAnswer.trim()||grading} className="py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium">{grading?'Grading…':'Grade production'}</button>
+          </div>
+          {!canDictate&&<div className="mt-2 text-xs text-stone-400">Speech input appears in browsers with Japanese speech recognition.</div>}
+          {speechErr&&<div className="mt-2 text-xs text-rose-600">{speechErr}</div>}
           {challenge.model&&<button onClick={()=>speakJapanese(challenge.model,0.85,practicePrefs.voiceURI)} className="w-full mt-2 py-2 border border-indigo-200 hover:bg-white rounded-xl text-sm text-indigo-700 inline-flex items-center justify-center gap-1.5"><IconVolume className="w-4 h-4"/>Hear model answer</button>}
         </div>}
         {challengeErr&&<div className="text-sm text-rose-600">{challengeErr}</div>}
