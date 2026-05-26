@@ -183,7 +183,8 @@ async function callGemini(contents,apiKey,maxTokens=600,temp=0.7){
      body:JSON.stringify({contents,systemInstruction:{parts:[{text:AI_SYSTEM}]},generationConfig:{maxOutputTokens:maxTokens,temperature:temp}})});
   const d=await r.json();
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
-  return d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+  const parts=d.candidates?.[0]?.content?.parts||[];
+  return parts.find(p=>!p.thought)?.text||parts[0]?.text||'';
 }
 
 async function lookupVerbWithGemini(query,apiKey){
@@ -194,10 +195,11 @@ async function lookupVerbWithGemini(query,apiKey){
      body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:150,temperature:0.1}})});
   const d=await r.json();
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
-  const text=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+  const lparts=d.candidates?.[0]?.content?.parts||[];
+  const text=lparts.find(p=>!p.thought)?.text||lparts[0]?.text||'';
   const jsonMatch=text.match(/\{[\s\S]*\}/);
   if(!jsonMatch)throw new Error('Unexpected AI response — try a different input');
-  const result=JSON.parse(jsonMatch[0]);
+  let result;try{result=JSON.parse(jsonMatch[0]);}catch{throw new Error('Unexpected AI response — try a different input');}
   if(!result.dict||!result.reading||!result.meaning||!['ichidan','godan','suru','kuru'].includes(result.group))
     throw new Error('Unexpected AI response — try a different input');
   return result;
@@ -211,10 +213,11 @@ async function getSuggestedVerb(existingVerbs,apiKey){
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:200,temperature:0.9}})});
   const d=await r.json();
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
-  const text=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+  const sparts=d.candidates?.[0]?.content?.parts||[];
+  const text=sparts.find(p=>!p.thought)?.text||sparts[0]?.text||'';
   const jsonMatch=text.match(/\{[\s\S]*\}/);
   if(!jsonMatch)throw new Error('Unexpected AI response');
-  const result=JSON.parse(jsonMatch[0]);
+  let result;try{result=JSON.parse(jsonMatch[0]);}catch{throw new Error('Unexpected AI response');}
   if(!result.dict||!result.reading||!result.meaning||!['ichidan','godan','suru','kuru'].includes(result.group))throw new Error('Unexpected AI response');
   return result;
 }
