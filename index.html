@@ -2700,6 +2700,37 @@ function surfaceFormFor(item,typeId){
   if(readingStem&&answer.startsWith(readingStem))return dictStem+answer.slice(readingStem.length);
   return answer;
 }
+function compactLookupText(s){return String(s||'').normalize('NFKC').replace(/[、。！？\s'"「」『』（）()\[\]{}]/g,'').toLowerCase();}
+function lookupVariantValues(value){
+  const raw=String(value||'').trim();
+  if(!raw)return[];
+  return[raw,compactLookupText(raw),kanaToRomaji(raw).toLowerCase()].filter(Boolean);
+}
+function formLookupCandidates(query,words){
+  const raw=String(query||'').trim();
+  if(!raw)return[];
+  const queryVariants=new Set([raw,compactLookupText(raw),toHiragana(raw),compactLookupText(toHiragana(raw)),raw.toLowerCase().replace(/\s+/g,'')].filter(Boolean));
+  const allowContext=/[\u3040-\u30ff\u3400-\u9fff]/.test(raw);
+  const exact=[],context=[],seen=new Set();
+  for(const word of words){
+    for(const row of formRows(word)){
+      const surface=surfaceFormFor(word,row.type.id);
+      const variants=[...lookupVariantValues(row.answer),...lookupVariantValues(surface)];
+      const key=`${wordKey(word)}|${row.type.id}|${row.answer}`;
+      const exactHit=variants.find(v=>queryVariants.has(v));
+      const contextHit=allowContext&&!exactHit&&variants.find(v=>{
+        const min=/^[a-z]+$/.test(v)?4:2;
+        return v.length>=min&&[...queryVariants].some(q=>q.length>v.length&&q.includes(v));
+      });
+      if((exactHit||contextHit)&&!seen.has(key)){
+        seen.add(key);
+        (exactHit?exact:context).push({word,type:row.type,answer:row.answer,surface:surface||row.answer,explanation:row.explanation,matchKind:exactHit?'exact':'in context',hitText:exactHit||contextHit||row.answer});
+      }
+    }
+  }
+  const chosen=exact.length?exact:context.filter((m,_,arr)=>!arr.some(other=>other!==m&&other.hitText.length>m.hitText.length&&other.hitText.includes(m.hitText)));
+  return chosen.sort((a,b)=>(a.matchKind===b.matchKind?0:a.matchKind==='exact'?-1:1)||b.hitText.length-a.hitText.length||b.answer.length-a.answer.length).slice(0,12);
+}
 function scannerCandidatesForWord(word){
   const seen=new Set(),candidates=[];
   function add(surface,type=null,kind='form',reading=''){
@@ -2871,9 +2902,14 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
   const[aiText,setAiText]=useState('');
   const[aiLoading,setAiLoading]=useState(false);
   const[aiErr,setAiErr]=useState('');
+  const[lookupAiText,setLookupAiText]=useState('');
+  const[lookupAiLoading,setLookupAiLoading]=useState(false);
+  const[lookupAiErr,setLookupAiErr]=useState('');
   const words=useMemo(()=>[...verbs,...adjectives],[verbs,adjectives]);
   const matches=useMemo(()=>searchWords(query,words),[query,words]);
+  const lookupMatches=useMemo(()=>formLookupCandidates(query,words),[query,words]);
   useEffect(()=>{if(!selected||!words.some(w=>w.dict===selected.dict))setSelected(matches[0]||words[0]||null);},[matches,words,selected]);
+  useEffect(()=>{setLookupAiText('');setLookupAiErr('');},[query]);
   const rows=selected?formRows(selected):[];
   const selectedView=selected?promptDisplay(selected,null,practicePrefs):null;
   async function generateExamples(){
@@ -2886,6 +2922,17 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
     }catch(e){setAiErr(e.message);}
     setAiLoading(false);
   }
+  async function explainLookup(){
+    if(!query.trim()||!geminiKey||!lookupMatches.length)return;
+    setLookupAiLoading(true);setLookupAiErr('');setLookupAiText('');
+    try{
+      const candidates=lookupMatches.slice(0,6).map((m,i)=>`${i+1}. ${m.surface} / ${m.answer} = ${m.word.dict} (${m.word.reading}), ${m.type.label}, ${GROUP_NAMES[m.word.group]}, ${m.word.meaning}, ${m.matchKind}`).join('\n');
+      const prompt=`A Japanese learner searched this conjugated form or sentence fragment: "${query}".\n\nLocal reverse-conjugation candidates:\n${candidates}\n\nRank the likely intended candidate, explain the conjugation rule briefly, mention any ambiguity, and give one tiny practice prompt.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,900,0.25,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
+      setLookupAiText(reply);
+    }catch(e){setLookupAiErr(e.message||'AI lookup failed.');}
+    setLookupAiLoading(false);
+  }
   if(!selected)return(<div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No words available.</div>);
   return(
     <div className="grid lg:grid-cols-[280px_1fr] gap-4">
@@ -2895,6 +2942,23 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
             <IconList className="w-4 h-4 absolute left-3 top-2.5 text-stone-400"/>
             <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search word or form" className="w-full pl-9 pr-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none" autoCorrect="off" spellCheck="false"/>
           </div>
+          {query.trim()&&<div className="mt-3 border-t border-stone-100 pt-3">
+            <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-wider text-stone-500"><span>Reverse lookup</span><span>{lookupMatches.length?`${lookupMatches.length} hit${lookupMatches.length===1?'':'s'}`:'no exact hit'}</span></div>
+            {lookupMatches.length>0?<div className="mt-2 space-y-1.5">
+              {lookupMatches.slice(0,5).map(m=>{const av=formDisplay(m.answer,practicePrefs);const bv=promptDisplay(m.word,null,practicePrefs);return <button key={`${wordKey(m.word)}-${m.type.id}-${m.matchKind}`} onClick={()=>setSelected(m.word)} className={`w-full text-left px-2 py-2 rounded-lg border transition ${selected.dict===m.word.dict&&selected.group===m.word.group?'border-indigo-200 bg-indigo-50':'border-stone-100 hover:border-stone-200 hover:bg-stone-50'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div><ScriptDisplay view={av} className="text-sm font-medium" subClassName="text-[11px] text-stone-400"/><div className="text-[11px] text-stone-500 mt-0.5">{m.type.label}</div></div>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${m.matchKind==='exact'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}`}>{m.matchKind}</span>
+                </div>
+                <div className="mt-1 text-xs text-stone-500 truncate"><span className="font-medium text-stone-700" lang={bv.lang}>{bv.main}</span>{bv.sub&&<span className="text-stone-400"> ({bv.sub})</span>} · {m.word.meaning}</div>
+                <div className="mt-1 text-[11px] text-stone-400">{m.explanation.rule}</div>
+              </button>;})}
+            </div>:<div className="mt-2 text-xs text-stone-400">No local form match yet. Try a dictionary form, romaji, or paste the sentence into Scanner.</div>}
+            <button onClick={explainLookup} disabled={!geminiKey||lookupAiLoading||!lookupMatches.length} className="mt-2 w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center justify-center gap-1.5"><IconSpark className="w-4 h-4"/>{lookupAiLoading?'Ranking...':'AI disambiguate'}</button>
+            {!geminiKey&&<div className="mt-1 text-[11px] text-stone-400 text-center">Add a Gemini key for contextual ranking.</div>}
+            {lookupAiErr&&<div className="mt-2 text-xs text-rose-600">{lookupAiErr}</div>}
+            {lookupAiText&&<div className="mt-2 text-xs leading-relaxed whitespace-pre-wrap text-stone-700">{lookupAiText}</div>}
+          </div>}
         </div>
         <div className="max-h-[560px] overflow-y-auto divide-y divide-stone-50">
             {matches.map(w=>{const wv=promptDisplay(w,null,practicePrefs);return <button key={`${w.group}:${w.dict}`} onClick={()=>setSelected(w)} className={`w-full text-left px-4 py-3 transition ${selected.dict===w.dict&&selected.group===w.group?'bg-indigo-50':'hover:bg-stone-50'}`}>
