@@ -272,6 +272,16 @@ const TYPE_PACKS=[
 const TYPE_LABEL={};
 for(const t of ALL_CARD_TYPES)TYPE_LABEL[t.id]=t.label;
 function getTypeInfo(id){return ALL_CARD_TYPES.find(t=>t.id===id)||{id,label:id,sub:'',hint:''};}
+const TYPE_PREVIEW_VERBS=[
+  {dict:'食べる',reading:'たべる',meaning:'to eat',group:'ichidan'},
+  {dict:'書く',reading:'かく',meaning:'to write',group:'godan'}
+];
+const TYPE_PREVIEW_ADJECTIVES=[
+  {dict:'高い',reading:'たかい',meaning:'expensive',group:'i-adjective'},
+  {dict:'静か',reading:'しずか',meaning:'quiet',group:'na-adjective'}
+];
+function typePreviewItems(typeId){return ADJ_TYPES.some(t=>t.id===typeId)?TYPE_PREVIEW_ADJECTIVES:TYPE_PREVIEW_VERBS;}
+function typePreviewValues(typeId){return typePreviewItems(typeId).map(item=>({item,answer:conjugateItem(item,typeId)})).filter(x=>x.answer);}
 function compatibleTypes(item){return isAdjective(item)?ADJ_TYPES:CONJ_TYPES;}
 function isTypeCompatible(item,typeId){return compatibleTypes(item).some(t=>t.id===typeId);}
 function enabledTypeIdsFor(enabledTypeIds){return enabledTypeIds&&enabledTypeIds.length?enabledTypeIds:ALL_CARD_TYPES.map(t=>t.id);}
@@ -4721,6 +4731,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
   const[syncForm,setSyncForm]=useState({url:syncConfig.url,anonKey:syncConfig.anonKey,syncId:syncConfig.syncId});
   const[localGeminiKey,setLocalGeminiKey]=useState(geminiKey);
   const[geminiMsg,setGeminiMsg]=useState('');
+  const[typeSearch,setTypeSearch]=useState('');
 
   useEffect(()=>setSyncForm({url:syncConfig.url,anonKey:syncConfig.anonKey,syncId:syncConfig.syncId}),[syncConfig.url,syncConfig.anonKey,syncConfig.syncId]);
   useEffect(()=>setLocalGeminiKey(geminiKey),[geminiKey]);
@@ -4764,6 +4775,14 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
   const enabledKey=[...state.enabledTypes].sort().join('|');
   const settingsWords=useMemo(()=>[...STARTER_VERBS,...customVerbs,...STARTER_ADJECTIVES,...customAdjectives],[customVerbs,customAdjectives]);
   const poolSummary=useMemo(()=>buildPracticePoolSummary(state,settingsWords,practicePrefs,wordLists),[state,settingsWords,practicePrefs,wordLists]);
+  const typeNeedle=typeSearch.trim().toLowerCase();
+  const typeNeedleKana=compactLookupText(toHiragana(typeSearch));
+  const visibleCardTypes=ALL_CARD_TYPES.filter(t=>{
+    if(!typeNeedle)return true;
+    const hay=[t.id,t.label,t.sub,t.hint].join(' ').toLowerCase();
+    const kanaHay=compactLookupText(`${t.sub} ${t.hint}`);
+    return hay.includes(typeNeedle)||kanaHay.includes(typeNeedleKana)||kanaToRomaji(t.sub||'').toLowerCase().includes(typeNeedle);
+  });
 
   return(<div className="space-y-4">
     <div className="bg-white rounded-2xl border border-stone-200 p-5">
@@ -4909,7 +4928,16 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
           <div className="text-xs text-stone-500 mt-1">{pack.hint}</div>
         </button>;})}
       </div>
-      <div className="space-y-2">{ALL_CARD_TYPES.map(t=>{const on=state.enabledTypes.includes(t.id);return(<div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-stone-50"><div><div className="text-sm font-medium">{t.label}</div><div className="text-xs text-stone-500">{t.sub&&(t.sub+' · ')}{t.hint}</div></div><button onClick={()=>toggle(t.id)} className={`relative w-10 h-6 rounded-full transition flex-shrink-0 ${on?'bg-indigo-600':'bg-stone-300'}`}><span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on?'translate-x-4':''}`}/></button></div>);})}</div>
+      <div className="mb-3 grid sm:grid-cols-[1fr_auto] gap-2 items-center">
+        <input value={typeSearch} onChange={e=>setTypeSearch(e.target.value)} placeholder="Search forms, e.g. passive, たい, ba..." className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/>
+        <div className="text-xs text-stone-400 tabular-nums text-right">{visibleCardTypes.length}/{ALL_CARD_TYPES.length} forms</div>
+      </div>
+      <div className="space-y-2">{visibleCardTypes.map(t=>{const on=state.enabledTypes.includes(t.id),previews=typePreviewValues(t.id);return(<div key={t.id} className="grid sm:grid-cols-[minmax(0,1fr)_minmax(14rem,auto)_auto] gap-3 items-center py-2 px-3 rounded-lg hover:bg-stone-50">
+        <div className="min-w-0"><div className="text-sm font-medium">{t.label}</div><div className="text-xs text-stone-500">{t.sub&&(t.sub+' · ')}{t.hint}</div></div>
+        <div className="grid grid-cols-2 gap-2">{previews.map(p=>{const view=formDisplay(p.answer,practicePrefs);return <div key={`${t.id}-${p.item.dict}`} className="min-w-0 rounded-lg border border-stone-200 bg-white px-2 py-1.5"><div className="text-[11px] text-stone-400 truncate" lang="ja">{p.item.dict}</div><ScriptDisplay view={view} className="text-sm font-medium truncate" subClassName="text-[11px] text-stone-400 truncate"/></div>;})}</div>
+        <button onClick={()=>toggle(t.id)} className={`relative w-10 h-6 rounded-full transition flex-shrink-0 justify-self-end ${on?'bg-indigo-600':'bg-stone-300'}`} title={`${on?'Disable':'Enable'} ${t.label}`}><span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on?'translate-x-4':''}`}/></button>
+      </div>);})}</div>
+      {!visibleCardTypes.length&&<div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500 text-center">No forms match that search.</div>}
     </div>
 
     <div className="bg-white rounded-2xl border border-stone-200 p-5">
