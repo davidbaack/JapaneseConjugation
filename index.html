@@ -246,6 +246,12 @@ const ADJ_TYPES=[
   {id:'adj-naru',label:'Become',sub:'なる',hint:'becomes ~'},
 ];
 const ALL_CARD_TYPES=[...CONJ_TYPES,...ADJ_TYPES];
+const TYPE_PACKS=[
+  {id:'basics',label:'Basics',hint:'Past, negative, polite, and te-form foundations.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','te-form','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form']},
+  {id:'everyday',label:'Everyday',hint:'Common conversation forms for requests, ability, desire, and conditionals.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','masu-stem','te-form','potential','potential-negative','volitional','polite-volitional','conditional-tara','conditional-ba','desiderative','progressive','request-kudasai','permission','obligation','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form','adj-adverb','adj-conditional','adj-tara','adj-sou','adj-naru']},
+  {id:'advanced',label:'Advanced',hint:'Passive, causative, commands, conjecture, and nuanced connectors.',typeIds:['polite-te','polite-conditional-tara','conditional-nara','conjectural','imperative','passive','passive-negative','causative','causative-negative','causative-passive','negative-te','prohibition','negative-request','adj-attributive','adj-sugiru']},
+  {id:'all',label:'All forms',hint:'Enable every verb and adjective form in the app.',typeIds:ALL_CARD_TYPES.map(t=>t.id)}
+];
 const TYPE_LABEL={};
 for(const t of ALL_CARD_TYPES)TYPE_LABEL[t.id]=t.label;
 function getTypeInfo(id){return ALL_CARD_TYPES.find(t=>t.id===id)||{id,label:id,sub:'',hint:''};}
@@ -903,6 +909,19 @@ function ruleWeakScore(state,ruleId){
   const verbStats=Object.values(state.verbStats||{}).map(vs=>vs[ruleId]).filter(Boolean);
   const verbMisses=verbStats.reduce((sum,s)=>sum+(s.incorrect||0),0);
   return (card.incorrect||0)*2+missRate*4+unresolved*3+verbMisses;
+}
+function weakTypeIdsForState(state,fallbackIds=[]){
+  const scores=new Map();
+  for(const rule of RULES){
+    const score=ruleWeakScore(state,rule.id);
+    if(score>0)scores.set(rule.type,(scores.get(rule.type)||0)+score);
+  }
+  for(const m of state.mistakes||[]){
+    if(!m.resolved&&m.type)scores.set(m.type,(scores.get(m.type)||0)+(m.count||1)*4);
+  }
+  const ranked=[...scores.entries()].filter(([id])=>ALL_CARD_TYPES.some(t=>t.id===id)).sort((a,b)=>b[1]-a[1]).map(([id])=>id);
+  if(ranked.length)return ranked.slice(0,12);
+  return(fallbackIds.length?fallbackIds:TYPE_PACKS[0].typeIds).filter(id=>ALL_CARD_TYPES.some(t=>t.id===id));
 }
 function pickWeakWeighted(pool,state){
   const scored=pool.map(p=>({...p,weakScore:ruleWeakScore(state,p.rule.id)}));
@@ -3726,7 +3745,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:25,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:26,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -3745,6 +3764,11 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
     if(!next.kanji&&!next.kana&&!next.romaji)next[id]=true;
     setPracticePrefs({...practicePrefs,displayScripts:next,scriptMode:scriptModeFromDisplay(next)});
   }
+  function applyTypePack(ids){
+    const valid=new Set(ALL_CARD_TYPES.map(t=>t.id));
+    const clean=[...new Set((ids||[]).filter(id=>valid.has(id)))];
+    if(clean.length)setState({...state,enabledTypes:clean});
+  }
   function reset(){setState({...defaultState(),enabledTypes:state.enabledTypes});setConfirmReset(false);}
   async function copyExport(){try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(exportData);setCopyOk(true);setTimeout(()=>setCopyOk(false),2000);}}catch{}}
   function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState(mergeState(data.state,{reviewed:0,correct:0}));if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);if(Array.isArray(data.customAdjectives))setCustomAdjectives(data.customAdjectives);if(Array.isArray(data.wordLists))setWordLists(data.wordLists);if(data.practicePrefs)setPracticePrefs(mergePracticePrefs(data.practicePrefs));setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
@@ -3752,6 +3776,9 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
   const displayScripts=resolveDisplayScripts(practicePrefs);
   const selectedGenkiLessons=Array.isArray(practicePrefs.genkiLessons)&&practicePrefs.genkiLessons.length?practicePrefs.genkiLessons:GENKI_LESSONS;
   const selectedVoiceAvailable=!practicePrefs.voiceURI||speechVoices.some(v=>v.voiceURI===practicePrefs.voiceURI);
+  const weakPackIds=weakTypeIdsForState(state,state.enabledTypes);
+  const typePacks=[...TYPE_PACKS,{id:'weak',label:'Weak mix',hint:'Uses your misses and SRS history to pick forms worth isolating.',typeIds:weakPackIds}];
+  const enabledKey=[...state.enabledTypes].sort().join('|');
 
   return(<div className="space-y-4">
     <div className="bg-white rounded-2xl border border-stone-200 p-5">
@@ -3846,7 +3873,17 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
         </div>
       </div>
     </div>
-    <div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-1">Conjugation types in scope</h3><p className="text-xs text-stone-500 mb-4">Toggle which conjugations to drill.</p><div className="space-y-2">{ALL_CARD_TYPES.map(t=>{const on=state.enabledTypes.includes(t.id);return(<div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-stone-50"><div><div className="text-sm font-medium">{t.label}</div><div className="text-xs text-stone-500">{t.sub&&(t.sub+' · ')}{t.hint}</div></div><button onClick={()=>toggle(t.id)} className={`relative w-10 h-6 rounded-full transition flex-shrink-0 ${on?'bg-indigo-600':'bg-stone-300'}`}><span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on?'translate-x-4':''}`}/></button></div>);})}</div></div>
+    <div className="bg-white rounded-2xl border border-stone-200 p-5">
+      <h3 className="font-medium mb-1">Conjugation types in scope</h3>
+      <p className="text-xs text-stone-500 mb-4">Toggle individual forms, or apply a form pack.</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+        {typePacks.map(pack=>{const packKey=[...pack.typeIds].sort().join('|'),active=packKey===enabledKey;return <button key={pack.id} onClick={()=>applyTypePack(pack.typeIds)} className={`text-left rounded-xl border px-3 py-3 transition ${active?'bg-indigo-50 border-indigo-200':'bg-stone-50 border-stone-200 hover:bg-white hover:border-indigo-200'}`}>
+          <div className="flex items-center justify-between gap-2"><div className="text-sm font-medium text-stone-800">{pack.label}</div><div className={`text-[11px] px-1.5 py-0.5 rounded-full ${active?'bg-indigo-600 text-white':'bg-white text-stone-500 border border-stone-200'}`}>{pack.typeIds.length}</div></div>
+          <div className="text-xs text-stone-500 mt-1">{pack.hint}</div>
+        </button>;})}
+      </div>
+      <div className="space-y-2">{ALL_CARD_TYPES.map(t=>{const on=state.enabledTypes.includes(t.id);return(<div key={t.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-stone-50"><div><div className="text-sm font-medium">{t.label}</div><div className="text-xs text-stone-500">{t.sub&&(t.sub+' · ')}{t.hint}</div></div><button onClick={()=>toggle(t.id)} className={`relative w-10 h-6 rounded-full transition flex-shrink-0 ${on?'bg-indigo-600':'bg-stone-300'}`}><span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on?'translate-x-4':''}`}/></button></div>);})}</div>
+    </div>
 
     <div className="bg-white rounded-2xl border border-stone-200 p-5">
       <h3 className="font-medium mb-1 flex items-center gap-2"><IconChat className="w-4 h-4 text-indigo-600"/>AI Chat (Gemini)</h3>
