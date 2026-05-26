@@ -173,7 +173,7 @@ const AI_LIST_TARGETS=['N5','N4','N3','N2','N1','Genki','Travel','Work'];
 const GRAMMAR_LESSONS=[
   {id:'te-form',title:'Te-form joins actions',forms:['te-form','adj-te-form'],body:'Use the te-form to connect actions, make requests, and build helper patterns like ている. Godan verbs change by final kana group; adjectives use くて or で.',examples:[['食べる','食べて','食べてください。'],['読む','読んで','本を読んでいます。'],['静か','静かで','静かで便利です。']]},
   {id:'potential',title:'Potential means ability',forms:['potential'],body:'Ichidan verbs add られる, godan verbs shift to the え-row and add る, する becomes できる, and 来る becomes 来られる. Potential verbs usually mark the thing you can do with が in careful Japanese.',examples:[['食べる','食べられる','寿司が食べられます。'],['書く','書ける','漢字が書けます。'],['する','できる','予約ができます。']]},
-  {id:'passive-causative',title:'Passive and causative change roles',forms:['passive','causative','causative-passive'],body:'Passive means the subject receives an action. Causative means someone makes or lets another person act. Causative-passive means someone is made to do something.',examples:[['待つ','待たされる','駅で待たされました。'],['書く','書かせる','先生が名前を書かせました。'],['褒める','褒められる','先生に褒められました。']]},
+  {id:'passive-causative',title:'Passive and causative change roles',forms:['passive','causative','causative-passive','short-causative-passive'],body:'Passive means the subject receives an action. Causative means someone makes or lets another person act. Causative-passive means someone is made to do something. Godan verbs also have a shorter spoken causative-passive such as 待たされる.',examples:[['待つ','待たされる','駅で待たされました。'],['書く','書かせる','先生が名前を書かせました。'],['褒める','褒められる','先生に褒められました。']]},
   {id:'adjectives',title:'Adjectives conjugate like predicates',forms:['adj-plain-past','adj-plain-negative','adj-te-form','adj-adverb'],body:'い-adjectives drop い and use かった, くない, くて, and く. な-adjectives behave more like nouns with だ/です, だった, ではない, で, な, and に.',examples:[['高い','高かった','昨日は高かったです。'],['便利','便利ではない','この駅は便利ではありません。'],['早い','早く','早く起きます。']]},
   {id:'conditionals',title:'Conditionals choose nuance',forms:['conditional-ba','conditional-tara','negative-conditional-tara','adj-conditional','adj-tara','adj-negative-tara'],body:'ば often feels rule-like or prerequisite-like. たら is broad and works for if/when. Negative たら uses the plain past negative plus ら, such as 使わなかったら.',examples:[['行く','行けば','駅に行けば分かります。'],['食べる','食べなかったら','食べなかったら、教えてください。'],['安い','安くなかったら','安くなかったら買いません。']]}
 ];
@@ -250,6 +250,7 @@ const CONJ_TYPES=[
   {id:'causative',label:'Causative',sub:'使役形',hint:'make / let ~'},
   {id:'causative-negative',label:'Causative Negative',sub:'',hint:'not make / let ~'},
   {id:'causative-passive',label:'Causative Passive',sub:'使役受身形',hint:'be made to ~'},
+  {id:'short-causative-passive',label:'Short Causative Passive',sub:'縮約使役受身',hint:'colloquial be made to ~'},
   {id:'desiderative',label:'Tai-form',sub:'たい形',hint:'want to ~'},
   {id:'desiderative-negative',label:'Tai Negative',sub:'たくない',hint:'do not want to ~'},
   {id:'desiderative-past',label:'Tai Past',sub:'たかった',hint:'wanted to ~'},
@@ -285,7 +286,7 @@ const ALL_CARD_TYPES=[...CONJ_TYPES,...ADJ_TYPES];
 const TYPE_PACKS=[
   {id:'basics',label:'Basics',hint:'Past, negative, polite, and te-form foundations.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','te-form','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form']},
   {id:'everyday',label:'Everyday',hint:'Common conversation forms for requests, ability, desire, and conditionals.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','masu-stem','te-form','potential','potential-negative','volitional','polite-volitional','conditional-tara','negative-conditional-tara','conditional-ba','desiderative','desiderative-negative','desiderative-past','desiderative-past-negative','progressive','request-kudasai','permission','obligation','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form','adj-adverb','adj-conditional','adj-tara','adj-negative-tara','adj-sou','adj-naru']},
-  {id:'advanced',label:'Advanced',hint:'Passive, causative, commands, conjecture, and nuanced connectors.',typeIds:['polite-te','polite-conditional-tara','conditional-nara','conjectural','imperative','passive','passive-negative','causative','causative-negative','causative-passive','negative-te','prohibition','negative-request','adj-attributive','adj-sugiru']},
+  {id:'advanced',label:'Advanced',hint:'Passive, causative, commands, conjecture, and nuanced connectors.',typeIds:['polite-te','polite-conditional-tara','conditional-nara','conjectural','imperative','passive','passive-negative','causative','causative-negative','causative-passive','short-causative-passive','negative-te','prohibition','negative-request','adj-attributive','adj-sugiru']},
   {id:'all',label:'All forms',hint:'Enable every verb and adjective form in the app.',typeIds:ALL_CARD_TYPES.map(t=>t.id)}
 ];
 const TYPE_LABEL={};
@@ -485,9 +486,19 @@ function desiderativeStem(verb){
   if(group==='kuru')return(reading.endsWith('くる')?reading.slice(0,-2):'')+'き';
   return reading;
 }
+function shortCausativePassive(verb){
+  const{reading,group}=verb;
+  if(group==='godan'){
+    const stem=reading.slice(0,-1),last=reading.slice(-1);
+    return stem+A_ROW[last]+'される';
+  }
+  if(group==='kuru')return(reading.endsWith('くる')?reading.slice(0,-2):'')+'こさされる';
+  return'';
+}
 
 function conjugate(verb,type){
   const{reading,group}=verb;
+  if(type==='short-causative-passive')return shortCausativePassive(verb);
   if(type==='desiderative')return desiderativeStem(verb)+'たい';
   if(type==='desiderative-negative')return desiderativeStem(verb)+'たくない';
   if(type==='desiderative-past')return desiderativeStem(verb)+'たかった';
@@ -602,9 +613,9 @@ function explainConjugation(verb,type){
   const intro=`${dict} (${reading}) is ${GROUP_NAMES[group]}.`;
   let rule='',derivation=result,note='';
   if(group==='ichidan'){const M={'plain-present':['Dictionary form.',result],'plain-past':['Drop る, add た.',`${stem} + た = ${result}`],'plain-negative':['Drop る, add ない.',`${stem} + ない = ${result}`],'plain-past-negative':['Drop る, add なかった.',`${stem} + なかった = ${result}`],'polite-present':['Drop る, add ます.',`${stem} + ます = ${result}`],'polite-past':['Drop る, add ました.',`${stem} + ました = ${result}`],'polite-negative':['Drop る, add ません.',`${stem} + ません = ${result}`],'polite-past-negative':['Drop る, add ませんでした.',`${stem} + ませんでした = ${result}`],'te-form':['Drop る, add て.',`${stem} + て = ${result}`],'potential':['Drop る, add られる.',`${stem} + られる = ${result}`],'volitional':['Drop る, add よう.',`${stem} + よう = ${result}`],'conditional-tara':['Past form + ら.',`${stem} + たら = ${result}`],'negative-conditional-tara':['Plain past negative + ら.',`${stem} + なかった + ら = ${result}`],'conditional-ba':['Drop る, add れば.',`${stem} + れば = ${result}`],'imperative':['Drop る, add ろ.',`${stem} + ろ = ${result}`],'passive':['Drop る, add られる.',`${stem} + られる = ${result}`],'causative':['Drop る, add させる.',`${stem} + させる = ${result}`]};[rule,derivation]=M[type]||['',result];}
-  else if(group==='godan'){const isIku=reading==='いく'||reading.endsWith('いく');const ikuNote=isIku?' Note: 行く is irregular — past/te use った/って.':'';const pEnd=isIku?'った':PAST_END[last];const teEnd=isIku?'って':TE_END[last];const negPast=conjugate(verb,'plain-past-negative');const M={'plain-present':['Dictionary form.',result],'plain-past':[`Past: く→いた, ぐ→いだ, す→した, つ/う/る→った, ぬ/ぶ/む→んだ.${ikuNote}`,`${stem} + ${pEnd} = ${result}`],'plain-negative':[`あ-row (う→わ!) + ない.`,`${stem} + ${A_ROW[last]} + ない = ${result}`],'plain-past-negative':[`あ-row + なかった.`,`${stem} + ${A_ROW[last]} + なかった = ${result}`],'polite-present':[`い-row + ます.`,`${stem} + ${I_ROW[last]} + ます = ${result}`],'polite-past':[`い-row + ました.`,`${stem} + ${I_ROW[last]} + ました = ${result}`],'polite-negative':[`い-row + ません.`,`${stem} + ${I_ROW[last]} + ません = ${result}`],'polite-past-negative':[`い-row + ませんでした.`,`${stem} + ${I_ROW[last]} + ませんでした = ${result}`],'te-form':[`Te mirrors past with て/で: く→いて, ぐ→いで, す→して, つ/う/る→って, ぬ/ぶ/む→んで.${ikuNote}`,`${stem} + ${teEnd} = ${result}`],'potential':[`え-row + る.`,`${stem} + ${E_ROW[last]} + る = ${result}`],'volitional':[`お-row + う.`,`${stem} + ${O_ROW[last]} + う = ${result}`],'conditional-tara':['Past form + ら.',`${stem} + ${pEnd} + ら = ${result}`],'negative-conditional-tara':['Plain past negative + ら; う-ending verbs use わ.',`${negPast} + ら = ${result}`],'conditional-ba':[`え-row + ば.`,`${stem} + ${E_ROW[last]} + ば = ${result}`],'imperative':[`え-row (blunt).`,`${stem} + ${E_ROW[last]} = ${result}`],'passive':[`あ-row + れる.`,`${stem} + ${A_ROW[last]} + れる = ${result}`],'causative':[`あ-row + せる.`,`${stem} + ${A_ROW[last]} + せる = ${result}`]};[rule,derivation]=M[type]||['',result];if(/[いきしちにひみりぎじぢびぴえけせてねへめれげぜでべぺ]る$/.test(reading)){note=`Trap: ${dict} looks ichidan but is godan.`;}}
+  else if(group==='godan'){const isIku=reading==='いく'||reading.endsWith('いく');const ikuNote=isIku?' Note: 行く is irregular — past/te use った/って.':'';const pEnd=isIku?'った':PAST_END[last];const teEnd=isIku?'って':TE_END[last];const negPast=conjugate(verb,'plain-past-negative');const M={'plain-present':['Dictionary form.',result],'plain-past':[`Past: く→いた, ぐ→いだ, す→した, つ/う/る→った, ぬ/ぶ/む→んだ.${ikuNote}`,`${stem} + ${pEnd} = ${result}`],'plain-negative':[`あ-row (う→わ!) + ない.`,`${stem} + ${A_ROW[last]} + ない = ${result}`],'plain-past-negative':[`あ-row + なかった.`,`${stem} + ${A_ROW[last]} + なかった = ${result}`],'polite-present':[`い-row + ます.`,`${stem} + ${I_ROW[last]} + ます = ${result}`],'polite-past':[`い-row + ました.`,`${stem} + ${I_ROW[last]} + ました = ${result}`],'polite-negative':[`い-row + ません.`,`${stem} + ${I_ROW[last]} + ません = ${result}`],'polite-past-negative':[`い-row + ませんでした.`,`${stem} + ${I_ROW[last]} + ませんでした = ${result}`],'te-form':[`Te mirrors past with て/で: く→いて, ぐ→いで, す→して, つ/う/る→って, ぬ/ぶ/む→んで.${ikuNote}`,`${stem} + ${teEnd} = ${result}`],'potential':[`え-row + る.`,`${stem} + ${E_ROW[last]} + る = ${result}`],'volitional':[`お-row + う.`,`${stem} + ${O_ROW[last]} + う = ${result}`],'conditional-tara':['Past form + ら.',`${stem} + ${pEnd} + ら = ${result}`],'negative-conditional-tara':['Plain past negative + ら; う-ending verbs use わ.',`${negPast} + ら = ${result}`],'conditional-ba':[`え-row + ば.`,`${stem} + ${E_ROW[last]} + ば = ${result}`],'imperative':[`え-row (blunt).`,`${stem} + ${E_ROW[last]} = ${result}`],'passive':[`あ-row + れる.`,`${stem} + ${A_ROW[last]} + れる = ${result}`],'causative':[`あ-row + せる.`,`${stem} + ${A_ROW[last]} + せる = ${result}`],'short-causative-passive':[`Short causative-passive: あ-row + される.`,`${stem} + ${A_ROW[last]} + される = ${result}`]};[rule,derivation]=M[type]||['',result];if(/[いきしちにひみりぎじぢびぴえけせてねへめれげぜでべぺ]る$/.test(reading)){note=`Trap: ${dict} looks ichidan but is godan.`;}if(type==='short-causative-passive'&&last==='す'){note='す-ending verbs often prefer the regular させられる form in careful Japanese; this short form is colloquial.';}}
   else if(group==='suru'){const compound=reading.endsWith('する')&&reading!=='する'?reading.slice(0,-2):'';const M={'plain-present':'Dictionary form.','plain-past':'する → した (irregular).','plain-negative':'する → しない.','plain-past-negative':'する → しなかった.','polite-present':'する → します.','polite-past':'する → しました.','polite-negative':'する → しません.','polite-past-negative':'する → しませんでした.','te-form':'する → して.','potential':'Special: する → できる.','volitional':'する → しよう.','conditional-tara':'する → したら.','negative-conditional-tara':'する → しなかったら.','conditional-ba':'する → すれば.','imperative':'する → しろ.','passive':'する → される.','causative':'する → させる.'};rule=M[type]||'';derivation=compound?`${compound} + (する conjugated) = ${result}`:result;}
-  else if(group==='kuru'){const M={'plain-present':'来る (くる).','plain-past':'来る → 来た (きた). く→き.','plain-negative':'来る → 来ない (こない). く→こ.','plain-past-negative':'来る → 来なかった. く→こ.','polite-present':'来る → 来ます (きます). く→き.','polite-past':'来る → 来ました. く→き.','polite-negative':'来る → 来ません. く→き.','polite-past-negative':'来る → 来ませんでした. く→き.','te-form':'来る → 来て (きて). く→き.','potential':'来る → 来られる (こられる). く→こ.','volitional':'来る → 来よう (こよう). く→こ.','conditional-tara':'来る → 来たら (きたら). く→き.','negative-conditional-tara':'来る → 来なかったら (こなかったら). く→こ.','conditional-ba':'来る → 来れば (くれば). く stays.','imperative':'来る → 来い (こい). く→こ.','passive':'来る → 来られる. く→こ.','causative':'来る → 来させる. く→こ.'};rule=`${dict} is irregular: く shifts to き (polite/past/te) or こ (negative/potential/volitional).`;note=M[type]||'';}
+  else if(group==='kuru'){const M={'plain-present':'来る (くる).','plain-past':'来る → 来た (きた). く→き.','plain-negative':'来る → 来ない (こない). く→こ.','plain-past-negative':'来る → 来なかった. く→こ.','polite-present':'来る → 来ます (きます). く→き.','polite-past':'来る → 来ました. く→き.','polite-negative':'来る → 来ません. く→き.','polite-past-negative':'来る → 来ませんでした. く→き.','te-form':'来る → 来て (きて). く→き.','potential':'来る → 来られる (こられる). く→こ.','volitional':'来る → 来よう (こよう). く→こ.','conditional-tara':'来る → 来たら (きたら). く→き.','negative-conditional-tara':'来る → 来なかったら (こなかったら). く→こ.','conditional-ba':'来る → 来れば (くれば). く stays.','imperative':'来る → 来い (こい). く→こ.','passive':'来る → 来られる. く→こ.','causative':'来る → 来させる. く→こ.','short-causative-passive':'Short spoken form: 来さされる (こさされる).'};rule=`${dict} is irregular: く shifts to き (polite/past/te) or こ (negative/potential/volitional).`;note=M[type]||'';}
   return{intro,rule,derivation,note};
 }
 
@@ -684,6 +695,7 @@ function explainItem(item,type){
   };
   if(!e.rule&&common[type])e.rule=common[type];
   if(!e.rule&&type==='causative-passive')e.rule=item.group==='godan'?'Use the あ-row stem, then add せられる.':'Use the causative stem and add られる.';
+  if(!e.rule&&type==='short-causative-passive')e.rule=item.group==='godan'?'Use the あ-row stem, then add される for the shorter spoken causative-passive.':'Use 来さされる for the shorter spoken form of 来る.';
   if(!e.rule&&type==='desiderative')e.rule=item.group==='godan'?'Use the い-row stem, then add たい.':'Use the verb stem, then add たい.';
   if(!e.rule&&type==='progressive')e.rule='Use the te-form, then add いる.';
   if(!e.rule&&type==='negative-te')e.rule='Use the plain negative form, then add で.';
@@ -921,6 +933,7 @@ function contextSentenceFor(item,type){
     'causative':[`先生は学生に${form}。`,'Someone makes or lets a student do it.'],
     'causative-negative':[`先生は学生に${form}。`,'Someone does not make or let a student do it.'],
     'causative-passive':[`学生は先生に${form}。`,'A student is made to do it.'],
+    'short-causative-passive':[`学生は先生に${form}。`,'A student is made to do it, using the shorter spoken form.'],
     'desiderative':[`今、${form}。`,'I want to do this now.'],
     'desiderative-negative':[`今は${form}。`,'I do not want to do this now.'],
     'desiderative-past':[`昨日、${form}。`,'I wanted to do this yesterday.'],
@@ -1496,6 +1509,7 @@ function englishForForm(item,type){
     'causative':`make/let someone ${action}`,
     'causative-negative':`not make/let someone ${action}`,
     'causative-passive':`be made to ${action}`,
+    'short-causative-passive':`be made to ${action} (short spoken form)`,
     'desiderative':`want to ${action}`,
     'desiderative-negative':`do not want to ${action}`,
     'desiderative-past':`wanted to ${action}`,
