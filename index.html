@@ -173,19 +173,32 @@ const CONJ_TYPES=[
   {id:'polite-past',label:'Polite Past',sub:'',hint:'~ました'},
   {id:'polite-negative',label:'Polite Negative',sub:'',hint:'~ません'},
   {id:'polite-past-negative',label:'Polite Past Negative',sub:'',hint:'~ませんでした'},
+  {id:'masu-stem',label:'Masu Stem',sub:'連用形',hint:'pre-ます stem'},
+  {id:'polite-volitional',label:'Polite Volitional',sub:'ましょう',hint:"let's ~ politely"},
+  {id:'polite-te',label:'Polite Te-form',sub:'まして',hint:'polite connective'},
+  {id:'polite-conditional-tara',label:'Polite たら',sub:'ましたら',hint:'if / when politely'},
   {id:'te-form',label:'Te-form',sub:'て形',hint:'~て / ~で'},
   {id:'potential',label:'Potential',sub:'可能形',hint:'can / be able to'},
+  {id:'potential-negative',label:'Potential Negative',sub:'',hint:'cannot ~'},
   {id:'volitional',label:'Volitional',sub:'意向形',hint:"let's ~"},
   {id:'conditional-tara',label:'Conditional たら',sub:'',hint:'if / when'},
   {id:'conditional-ba',label:'Conditional ば',sub:'',hint:'if'},
+  {id:'conditional-nara',label:'Conditional なら',sub:'',hint:'if it is that ~'},
+  {id:'conjectural',label:'Conjectural',sub:'だろう',hint:'probably ~'},
   {id:'imperative',label:'Imperative',sub:'命令形',hint:'do ~!'},
   {id:'passive',label:'Passive',sub:'受身形',hint:'be ~ed'},
+  {id:'passive-negative',label:'Passive Negative',sub:'',hint:'not be ~ed'},
   {id:'causative',label:'Causative',sub:'使役形',hint:'make / let ~'},
+  {id:'causative-negative',label:'Causative Negative',sub:'',hint:'not make / let ~'},
   {id:'causative-passive',label:'Causative Passive',sub:'使役受身形',hint:'be made to ~'},
   {id:'desiderative',label:'Tai-form',sub:'たい形',hint:'want to ~'},
   {id:'progressive',label:'Progressive',sub:'ている',hint:'is / has been ~ing'},
   {id:'negative-te',label:'Negative Te',sub:'ないで',hint:'without doing ~'},
   {id:'prohibition',label:'Prohibition',sub:'禁止形',hint:'do not ~!'},
+  {id:'request-kudasai',label:'Request',sub:'てください',hint:'please ~'},
+  {id:'negative-request',label:'Negative Request',sub:'ないでください',hint:'please do not ~'},
+  {id:'permission',label:'Permission',sub:'てもいい',hint:'may ~'},
+  {id:'obligation',label:'Obligation',sub:'なければならない',hint:'must ~'},
 ];
 const ADJ_TYPES=[
   {id:'adj-plain-present',label:'Adj. Plain Present',sub:'普通形',hint:'is ~'},
@@ -262,6 +275,7 @@ function toHiragana(s){
 }
 const HIRAGANA_TO_ROMAJI={};
 for(const [rom,kana] of Object.entries(ROMAJI_MAP)){if(!HIRAGANA_TO_ROMAJI[kana])HIRAGANA_TO_ROMAJI[kana]=rom;}
+HIRAGANA_TO_ROMAJI['ん']='n';
 function kanaToRomaji(s){
   if(!s)return'';
   const hira=String(s).normalize('NFKC').replace(/[\u30A1-\u30F6]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0x60));
@@ -304,9 +318,12 @@ function conjugate(verb,type){
     const M={
       'plain-present':reading,'plain-past':past,'plain-negative':neg,'plain-past-negative':stem+'なかった',
       'polite-present':stem+'ます','polite-past':stem+'ました','polite-negative':stem+'ません','polite-past-negative':stem+'ませんでした',
-      'te-form':te,'potential':stem+'られる','volitional':stem+'よう','conditional-tara':past+'ら','conditional-ba':stem+'れば',
-      'imperative':stem+'ろ','passive':stem+'られる','causative':stem+'させる','causative-passive':stem+'させられる',
-      'desiderative':stem+'たい','progressive':te+'いる','negative-te':neg+'で','prohibition':reading+'な'
+      'masu-stem':stem,'polite-volitional':stem+'ましょう','polite-te':stem+'まして','polite-conditional-tara':stem+'ましたら',
+      'te-form':te,'potential':stem+'られる','potential-negative':stem+'られない','volitional':stem+'よう','conditional-tara':past+'ら','conditional-ba':stem+'れば',
+      'conditional-nara':reading+'なら','conjectural':reading+'だろう','imperative':stem+'ろ','passive':stem+'られる','passive-negative':stem+'られない',
+      'causative':stem+'させる','causative-negative':stem+'させない','causative-passive':stem+'させられる',
+      'desiderative':stem+'たい','progressive':te+'いる','negative-te':neg+'で','prohibition':reading+'な',
+      'request-kudasai':te+'ください','negative-request':neg+'でください','permission':te+'もいい','obligation':neg.slice(0,-1)+'ければならない'
     };
     return M[type]||'';
   }
@@ -316,13 +333,16 @@ function conjugate(verb,type){
     if(reading==='いく'||reading.endsWith('いく')){pastEnd='った';teEnd='って';}
     const neg=reading==='ある'?'ない':stem+A_ROW[last]+'ない';
     const pastNeg=reading==='ある'?'なかった':stem+A_ROW[last]+'なかった';
-    const te=stem+teEnd,past=stem+pastEnd;
+    const te=stem+teEnd,past=stem+pastEnd,iStem=stem+I_ROW[last],aStem=stem+A_ROW[last],eStem=stem+E_ROW[last],oStem=stem+O_ROW[last];
     const M={
       'plain-present':reading,'plain-past':past,'plain-negative':neg,'plain-past-negative':pastNeg,
-      'polite-present':stem+I_ROW[last]+'ます','polite-past':stem+I_ROW[last]+'ました','polite-negative':stem+I_ROW[last]+'ません','polite-past-negative':stem+I_ROW[last]+'ませんでした',
-      'te-form':te,'potential':stem+E_ROW[last]+'る','volitional':stem+O_ROW[last]+'う','conditional-tara':past+'ら','conditional-ba':stem+E_ROW[last]+'ば',
-      'imperative':stem+E_ROW[last],'passive':stem+A_ROW[last]+'れる','causative':stem+A_ROW[last]+'せる','causative-passive':stem+A_ROW[last]+'せられる',
-      'desiderative':stem+I_ROW[last]+'たい','progressive':te+'いる','negative-te':neg+'で','prohibition':reading+'な'
+      'polite-present':iStem+'ます','polite-past':iStem+'ました','polite-negative':iStem+'ません','polite-past-negative':iStem+'ませんでした',
+      'masu-stem':iStem,'polite-volitional':iStem+'ましょう','polite-te':iStem+'まして','polite-conditional-tara':iStem+'ましたら',
+      'te-form':te,'potential':eStem+'る','potential-negative':eStem+'ない','volitional':oStem+'う','conditional-tara':past+'ら','conditional-ba':eStem+'ば',
+      'conditional-nara':reading+'なら','conjectural':reading+'だろう','imperative':eStem,'passive':aStem+'れる','passive-negative':aStem+'れない',
+      'causative':aStem+'せる','causative-negative':aStem+'せない','causative-passive':aStem+'せられる',
+      'desiderative':iStem+'たい','progressive':te+'いる','negative-te':neg+'で','prohibition':reading+'な',
+      'request-kudasai':te+'ください','negative-request':neg+'でください','permission':te+'もいい','obligation':neg.slice(0,-1)+'ければならない'
     };
     return M[type]||'';
   }
@@ -331,9 +351,12 @@ function conjugate(verb,type){
     const M={
       'plain-present':'する','plain-past':'した','plain-negative':'しない','plain-past-negative':'しなかった',
       'polite-present':'します','polite-past':'しました','polite-negative':'しません','polite-past-negative':'しませんでした',
-      'te-form':'して','potential':'できる','volitional':'しよう','conditional-tara':'したら','conditional-ba':'すれば',
-      'imperative':'しろ','passive':'される','causative':'させる','causative-passive':'させられる',
-      'desiderative':'したい','progressive':'している','negative-te':'しないで','prohibition':'するな'
+      'masu-stem':'し','polite-volitional':'しましょう','polite-te':'しまして','polite-conditional-tara':'しましたら',
+      'te-form':'して','potential':'できる','potential-negative':'できない','volitional':'しよう','conditional-tara':'したら','conditional-ba':'すれば',
+      'conditional-nara':'するなら','conjectural':'するだろう','imperative':'しろ','passive':'される','passive-negative':'されない',
+      'causative':'させる','causative-negative':'させない','causative-passive':'させられる',
+      'desiderative':'したい','progressive':'している','negative-te':'しないで','prohibition':'するな',
+      'request-kudasai':'してください','negative-request':'しないでください','permission':'してもいい','obligation':'しなければならない'
     };
     return stem+(M[type]||'');
   }
@@ -342,9 +365,12 @@ function conjugate(verb,type){
     const M={
       'plain-present':'くる','plain-past':'きた','plain-negative':'こない','plain-past-negative':'こなかった',
       'polite-present':'きます','polite-past':'きました','polite-negative':'きません','polite-past-negative':'きませんでした',
-      'te-form':'きて','potential':'こられる','volitional':'こよう','conditional-tara':'きたら','conditional-ba':'くれば',
-      'imperative':'こい','passive':'こられる','causative':'こさせる','causative-passive':'こさせられる',
-      'desiderative':'きたい','progressive':'きている','negative-te':'こないで','prohibition':'くるな'
+      'masu-stem':'き','polite-volitional':'きましょう','polite-te':'きまして','polite-conditional-tara':'きましたら',
+      'te-form':'きて','potential':'こられる','potential-negative':'こられない','volitional':'こよう','conditional-tara':'きたら','conditional-ba':'くれば',
+      'conditional-nara':'くるなら','conjectural':'くるだろう','imperative':'こい','passive':'こられる','passive-negative':'こられない',
+      'causative':'こさせる','causative-negative':'こさせない','causative-passive':'こさせられる',
+      'desiderative':'きたい','progressive':'きている','negative-te':'こないで','prohibition':'くるな',
+      'request-kudasai':'きてください','negative-request':'こないでください','permission':'きてもいい','obligation':'こなければならない'
     };
     return stem+(M[type]||'');
   }
@@ -456,6 +482,22 @@ function explainAdjective(adj,type){
 function explainItem(item,type){
   if(isAdjective(item))return explainAdjective(item,type);
   const e=explainConjugation(item,type);
+  const common={
+    'masu-stem':'Use the stem that appears before ます.',
+    'polite-volitional':'Use the ます stem, then add ましょう.',
+    'polite-te':'Use the ます stem, then add まして.',
+    'polite-conditional-tara':'Use the polite past ました, then add ら.',
+    'potential-negative':'Make the potential form, then make it negative.',
+    'conditional-nara':'Use the dictionary form, then add なら.',
+    'conjectural':'Use the dictionary form, then add だろう.',
+    'passive-negative':'Make the passive form, then make it negative.',
+    'causative-negative':'Make the causative form, then make it negative.',
+    'request-kudasai':'Use the te-form, then add ください.',
+    'negative-request':'Use the negative te-form, then add ください.',
+    'permission':'Use the te-form, then add もいい.',
+    'obligation':'Use the negative stem before い, then add ければならない.'
+  };
+  if(!e.rule&&common[type])e.rule=common[type];
   if(!e.rule&&type==='causative-passive')e.rule=item.group==='godan'?'Use the あ-row stem, then add せられる.':'Use the causative stem and add られる.';
   if(!e.rule&&type==='desiderative')e.rule=item.group==='godan'?'Use the い-row stem, then add たい.':'Use the verb stem, then add たい.';
   if(!e.rule&&type==='progressive')e.rule='Use the te-form, then add いる.';
