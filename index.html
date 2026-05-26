@@ -597,6 +597,16 @@ function diagnoseItem(item,type,userAnswer){
 const AI_SYSTEM=`You are a friendly Japanese language teacher helping a student who just got a verb conjugation wrong. The student can read hiragana and katakana but struggles with kanji. Always write Japanese in hiragana/katakana with romaji in brackets after it, e.g. たべた [tabeta]. Be warm, encouraging, and concise — 2 to 3 short paragraphs at most. Focus on the specific rule missed and give one extra example.`;
 const AI_COACH_SYSTEM=`You are a concise Japanese conjugation and sentence coach. Analyze verbs and adjectives in context, identify conjugation mistakes, explain the rule, give a natural corrected sentence, and finish with one tiny practice prompt. Keep Japanese readable for learners by adding romaji after key forms.`;
 
+const AI_FEEDBACK_LEVELS=[
+  {id:'beginner',label:'Beginner',prompt:'Use plain English, short sentences, kana plus romaji for every key Japanese form, and no more than one new grammar term at a time.'},
+  {id:'expert',label:'Expert JP',prompt:'Give compact, Japanese-heavy feedback. Use Japanese grammar terms when useful, include romaji only after the most important forms, and challenge the learner with one harder contrast.'}
+];
+const AI_GUIDE_TONES=[
+  {id:'sensei',label:'Calm',prompt:'Sound like a patient teacher: warm, precise, and encouraging without being wordy.'},
+  {id:'coach',label:'Coach',prompt:'Sound like an energetic study coach: upbeat, direct, and momentum-building.'},
+  {id:'direct',label:'Direct',prompt:'Sound like a concise examiner: minimal praise, clear correction, and one exact next action.'}
+];
+
 function geminiText(d){
   const parts=d.candidates?.[0]?.content?.parts||[];
   return(parts.find(p=>!p.thought)||parts[0])?.text||'';
@@ -634,6 +644,11 @@ async function callGemini(contents,apiKey,maxTokens=600,temp=0.7,systemText=AI_S
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);
   return geminiText(d);
 }
+function aiSystemFromPrefs(prefs=DEFAULT_PREFS,base=AI_SYSTEM){
+  const level=AI_FEEDBACK_LEVELS.find(o=>o.id===(prefs.aiFeedbackLevel||DEFAULT_PREFS.aiFeedbackLevel))||AI_FEEDBACK_LEVELS[0];
+  const tone=AI_GUIDE_TONES.find(o=>o.id===(prefs.aiGuideTone||DEFAULT_PREFS.aiGuideTone))||AI_GUIDE_TONES[0];
+  return `${base}\n\nFeedback depth: ${level.prompt}\nGuide voice: ${tone.prompt}`;
+}
 
 async function lookupVerbWithGemini(query,apiKey){
   if(!apiKey)throw new Error('No Gemini API key set');
@@ -664,28 +679,30 @@ async function getSuggestedVerb(existingVerbs,apiKey){
   return result;
 }
 
-function buildContext(verb,type,userAnswer,expected,explanation){
+function buildContext(verb,type,userAnswer,expected,explanation,prefs=DEFAULT_PREFS){
   const ti=getTypeInfo(type);
   const label=isAdjective(verb)?'Adjective':'Verb';
-  return`I'm studying Japanese and just got this wrong.\n\n${label}: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: ${ti.label} (${ti.hint})\nMy answer: ${toHiragana(userAnswer)||'(blank)'}\nCorrect: ${expected}\n\nAuto-explanation: ${explanation.intro} ${explanation.rule}${explanation.derivation&&explanation.derivation!==expected?'\nStep: '+explanation.derivation:''}${explanation.note?'\nNote: '+explanation.note:''}\n\nHelp me understand why the answer is ${expected} and where I went wrong. Always show romaji.`;
+  const feedbackNote=(prefs.aiFeedbackLevel||DEFAULT_PREFS.aiFeedbackLevel)==='expert'?'Use the configured Expert JP feedback style; romaji only for the most important forms.':'Use the configured Beginner feedback style; show romaji for key forms.';
+  return`I'm studying Japanese and just got this wrong.\n\n${label}: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: ${ti.label} (${ti.hint})\nMy answer: ${toHiragana(userAnswer)||'(blank)'}\nCorrect: ${expected}\n\nAuto-explanation: ${explanation.intro} ${explanation.rule}${explanation.derivation&&explanation.derivation!==expected?'\nStep: '+explanation.derivation:''}${explanation.note?'\nNote: '+explanation.note:''}\n\nHelp me understand why the answer is ${expected} and where I went wrong. ${feedbackNote}`;
 }
 
-function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey}){
+function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey,practicePrefs=DEFAULT_PREFS}){
   const[apiHistory,setApiHistory]=useState([]);
   const[display,setDisplay]=useState([]);
   const[input,setInput]=useState('');
   const[loading,setLoading]=useState(true);
   const endRef=useRef(null);
-  const context=useMemo(()=>buildContext(verb,type,userAnswer,expected,explanation),[]);
+  const context=useMemo(()=>buildContext(verb,type,userAnswer,expected,explanation,practicePrefs),[verb,type,userAnswer,expected,explanation,practicePrefs.aiFeedbackLevel]);
+  const systemText=useMemo(()=>aiSystemFromPrefs(practicePrefs,AI_SYSTEM),[practicePrefs.aiFeedbackLevel,practicePrefs.aiGuideTone]);
 
   useEffect(()=>{
     const init=[{role:'user',content:context}];
     const geminiMsgs=init.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
-    callGemini(geminiMsgs,geminiKey)
+    callGemini(geminiMsgs,geminiKey,600,0.7,systemText)
       .then(reply=>{setApiHistory([...init,{role:'assistant',content:reply}]);setDisplay([{role:'assistant',content:reply}]);})
       .catch(e=>setDisplay([{role:'assistant',content:`Error: ${e.message}`}]))
       .finally(()=>setLoading(false));
-  },[]);
+  },[context,geminiKey,systemText]);
 
   useEffect(()=>{endRef.current?.scrollIntoView({behavior:'smooth'});},[display,loading]);
 
@@ -697,7 +714,7 @@ function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey}){
     const newApi=[...apiHistory,{role:'user',content:txt}];
     try{
       const geminiMsgs=newApi.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
-      const reply=await callGemini(geminiMsgs,geminiKey);
+      const reply=await callGemini(geminiMsgs,geminiKey,600,0.7,systemText);
       setApiHistory([...newApi,{role:'assistant',content:reply}]);
       setDisplay([...newDisplay,{role:'assistant',content:reply}]);
     }catch(e){setDisplay([...newDisplay,{role:'assistant',content:`Error: ${e.message}`}]);}
@@ -857,7 +874,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,voiceURI:'',theme:'system',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -1021,9 +1038,9 @@ function App(){
         {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
         {tab==='shadow'&&<ShadowView state={state} setState={setState} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
-        {tab==='lessons'&&<LessonsView geminiKey={geminiKey}/>}
+        {tab==='lessons'&&<LessonsView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='reference'&&<ReferenceView verbs={allVerbs} adjectives={allAdjectives} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
-        {tab==='coach'&&<CoachView geminiKey={geminiKey}/>}
+        {tab==='coach'&&<CoachView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='stats'&&<StatsView state={state} verbs={allWords}/>}
         {tab==='levels'&&<SRSLevelView state={state} verbs={allWords}/>}
         {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} geminiKey={geminiKey} state={state}/>}
@@ -1253,7 +1270,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                       <IconChat className="w-4 h-4"/> Ask Gemini why
                     </button>
                   ):(
-                    <ChatPanel verb={current.verb} type={current.type} userAnswer={answer} expected={expected} explanation={explanation} geminiKey={geminiKey}/>
+                    <ChatPanel verb={current.verb} type={current.type} userAnswer={answer} expected={expected} explanation={explanation} geminiKey={geminiKey} practicePrefs={practicePrefs}/>
                   )):(
                     <div className="text-xs text-stone-400 text-center pt-1">Add a Gemini API key in Settings to enable AI chat.</div>
                   )}
@@ -1481,7 +1498,7 @@ function EndingsView({state,setState,verbs,practicePrefs=DEFAULT_PREFS,wordLists
     setAiLoading(true);setAiTip('');setAiErr('');
     try{
       const promptText=`Create one short memorable learner mnemonic for this Japanese conjugation sound-change pattern.\nVerb: ${current.dict} (${current.reading}, ${current.meaning})\nTarget: ${target==='te-form'?'te-form':'plain past / ta-form'}\nPattern: ${pattern.label}\nRule: ${pattern.cue}\nCorrect answer: ${expected}\nKeep it under 35 words, friendly, and include the Japanese ending.`;
-      const reply=await callGemini([{role:'user',parts:[{text:promptText}]}],geminiKey,350,0.45,AI_COACH_SYSTEM);
+      const reply=await callGemini([{role:'user',parts:[{text:promptText}]}],geminiKey,350,0.45,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
       setAiTip(reply.trim());
     }catch(e){setAiErr(e.message);}
     setAiLoading(false);
@@ -1890,7 +1907,7 @@ function ShadowView({state,setState,geminiKey,practicePrefs}){
     setFeedbackLoading(true);setAiFeedback('');setRecordErr('');
     try{
       const prompt=`Give concise Japanese speaking feedback for a shadowing line.\nTarget: ${line.ja}\nEnglish: ${line.en}\nSpeech-recognition transcript: ${transcript}\nSimilarity score: ${transcriptScore ?? 'n/a'}\n\nFocus on likely missing words, rhythm, and one concrete retry tip.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,700,0.35,AI_COACH_SYSTEM);
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,700,0.35,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
       setAiFeedback(reply);
     }catch(e){setRecordErr(e.message);}
     setFeedbackLoading(false);
@@ -1900,7 +1917,7 @@ function ShadowView({state,setState,geminiKey,practicePrefs}){
     setLoading(true);setAiErr('');
     try{
       const prompt=`Create a short Japanese shadowing dialogue for conjugation practice. Topic: ${topic||'daily life'}. Use 3 to 5 lines. Include useful verb/adjective conjugations naturally. Return ONLY JSON: {"title":"...","level":"N5/N4/N3","focus":"conjugation focus","lines":[{"speaker":"A","ja":"Japanese sentence","en":"English translation"}]}`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1200,0.5,AI_COACH_SYSTEM);
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1200,0.5,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
       const data=extractJSON(reply);
       if(!data||!Array.isArray(data.lines)||!data.lines.length)throw new Error('AI did not return a valid dialogue');
       setCustomScenario({id:'ai-'+Date.now(),title:data.title||'AI Dialogue',level:data.level||'Custom',focus:data.focus||'conversation',lines:data.lines.slice(0,6).map((l,i)=>({speaker:l.speaker||String.fromCharCode(65+i%2),ja:l.ja||'',en:l.en||''})).filter(l=>l.ja)});
@@ -1969,7 +1986,7 @@ function ShadowView({state,setState,geminiKey,practicePrefs}){
   );
 }
 
-function LessonsView({geminiKey}){
+function LessonsView({geminiKey,practicePrefs=DEFAULT_PREFS}){
   const[selectedId,setSelectedId]=useState(GRAMMAR_LESSONS[0]?.id||'');
   const[aiText,setAiText]=useState('');
   const[loading,setLoading]=useState(false);
@@ -1980,7 +1997,7 @@ function LessonsView({geminiKey}){
     setLoading(true);setErr('');setAiText('');
     try{
       const prompt=`Expand this Japanese conjugation lesson for a self-study app. Lesson: ${lesson.title}. Core explanation: ${lesson.body}. Forms: ${lesson.forms.join(', ')}. Give a concise explanation, 3 fresh examples, 2 common mistakes, and a mini quiz with answers.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1400,0.35,AI_COACH_SYSTEM);
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1400,0.35,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
       setAiText(reply);
     }catch(e){setErr(e.message);}
     setLoading(false);
@@ -2040,7 +2057,7 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
     setAiLoading(true);setAiErr('');setAiText('');
     try{
       const prompt=`Create three short learner-friendly example sentences for ${selected.dict} (${selected.reading}, ${selected.meaning}, ${GROUP_NAMES[selected.group]}). Include one common mistake to avoid. Focus on conjugation.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,900,0.4,AI_COACH_SYSTEM);
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,900,0.4,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
       setAiText(reply);
     }catch(e){setAiErr(e.message);}
     setAiLoading(false);
@@ -2096,7 +2113,7 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
   );
 }
 
-function CoachView({geminiKey}){
+function CoachView({geminiKey,practicePrefs=DEFAULT_PREFS}){
   const[text,setText]=useState('');
   const[result,setResult]=useState('');
   const[loading,setLoading]=useState(false);
@@ -2106,7 +2123,7 @@ function CoachView({geminiKey}){
     setLoading(true);setErr('');setResult('');
     try{
       const prompt=`Analyze this Japanese sentence or conjugation attempt:\n\n${text}\n\nIdentify verb/adjective conjugations, correct any mistakes, explain the most important rule, and give one short follow-up drill.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1200,0.3,AI_COACH_SYSTEM);
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1200,0.3,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
       setResult(reply);
     }catch(e){setErr(e.message);}
     setLoading(false);
@@ -2419,7 +2436,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:14,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:15,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -2528,6 +2545,16 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
       <div><label className="text-xs text-stone-500 block mb-1">Gemini API key</label>
         <input type="password" value={localGeminiKey} onChange={e=>setLocalGeminiKey(e.target.value)} placeholder="AIza..." autoCorrect="off" autoCapitalize="off" spellCheck="false"
           className="w-full px-3 py-2 text-sm font-mono border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
+      <div className="grid sm:grid-cols-2 gap-3 mt-3">
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">AI feedback</label>
+          <div className="grid grid-cols-2 gap-2">{AI_FEEDBACK_LEVELS.map(o=><button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,aiFeedbackLevel:o.id})} className={`px-3 py-2 rounded-lg text-sm border transition ${((practicePrefs.aiFeedbackLevel||DEFAULT_PREFS.aiFeedbackLevel)===o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>)}</div>
+        </div>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Guide tone</label>
+          <div className="grid grid-cols-3 gap-2">{AI_GUIDE_TONES.map(o=><button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,aiGuideTone:o.id})} className={`px-3 py-2 rounded-lg text-sm border transition ${((practicePrefs.aiGuideTone||DEFAULT_PREFS.aiGuideTone)===o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>)}</div>
+        </div>
+      </div>
       <div className="flex gap-2 mt-3">
         <button onClick={()=>{setGeminiKey(localGeminiKey.trim());setGeminiMsg('Saved!');setTimeout(()=>setGeminiMsg(''),2000);}} disabled={!localGeminiKey.trim()}
           className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Save key</button>
