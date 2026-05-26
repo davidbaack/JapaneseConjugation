@@ -1541,7 +1541,8 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const promptEnglish=reverseDrill?englishForForm(current.verb,current.type):englishForForm(current.verb,promptType);
   const targetEnglish=reverseDrill?englishForForm(current.verb,null):englishForForm(current.verb,current.type);
   const typeInfo=getTypeInfo(current.type);
-  const explanation=phase==='reviewing'&&!wasCorrect?(reverseDrill?explainReversePrompt(current.verb,current.type):explainItem(current.verb,current.type)):null;
+  const reviewExplanation=phase==='reviewing'?(reverseDrill?explainReversePrompt(current.verb,current.type):explainItem(current.verb,current.type)):null;
+  const explanation=!wasCorrect?reviewExplanation:null;
   const diagnostic=phase==='reviewing'&&!wasCorrect&&!reverseDrill?diagnoseItem(current.verb,current.type,answer):'';
   const choices=reverseDrill?makeReverseChoices(current,practiceWords):makeChoices(current,practiceWords);
   const wordType=isAdjective(current.verb)?'Adjective':'Verb';
@@ -1705,6 +1706,15 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                 </div>
               </div>
               <ContextExamplePanel item={current.verb} type={current.type} geminiKey={geminiKey} practicePrefs={practicePrefs}/>
+              {wasCorrect&&reviewExplanation&&(
+                <div className="mt-4 pt-4 border-t border-emerald-200 space-y-2.5">
+                  <div className="text-xs uppercase tracking-wider text-emerald-700 font-medium">Why this is right</div>
+                  <div className="text-sm text-stone-700 leading-relaxed">{reviewExplanation.intro}</div>
+                  {reviewExplanation.rule&&<div className="text-sm text-stone-700 leading-relaxed">{reviewExplanation.rule}</div>}
+                  {reviewExplanation.derivation&&reviewExplanation.derivation!==expected&&<div className="text-base text-center bg-white/70 rounded-lg px-3 py-2 text-stone-900" lang="ja">{reviewExplanation.derivation}</div>}
+                  {reviewExplanation.note&&<div className="text-xs text-stone-600 italic bg-stone-50/80 rounded-lg px-3 py-2 border border-stone-200">{reviewExplanation.note}</div>}
+                </div>
+              )}
               {!wasCorrect&&explanation&&(
                 <div className="mt-4 pt-4 border-t border-rose-200 space-y-2.5">
                   <div className="text-xs uppercase tracking-wider text-rose-700 font-medium">Why it's <span lang="ja" className="normal-case tracking-normal">{expected}</span></div>
@@ -4004,7 +4014,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:34,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:35,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
