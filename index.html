@@ -175,7 +175,7 @@ const AI_LIST_TARGETS=['N5','N4','N3','N2','N1','Genki','Travel','Work'];
 const GRAMMAR_LESSONS=[
   {id:'te-form',title:'Te-form joins actions',forms:['te-form','adj-te-form'],body:'Use the te-form to connect actions, make requests, and build helper patterns like ている. Godan verbs change by final kana group; adjectives use くて or で.',examples:[['食べる','食べて','食べてください。'],['読む','読んで','本を読んでいます。'],['静か','静かで','静かで便利です。']]},
   {id:'potential',title:'Potential means ability',forms:['potential','potential-past','potential-past-negative','potential-polite-past','potential-polite-past-negative'],body:'Ichidan verbs add られる, godan verbs shift to the え-row and add る, する becomes できる, and 来る becomes 来られる. Potential verbs end in る, so they can keep conjugating like ichidan verbs: できる, できた, できなかった, できました, できませんでした.',examples:[['食べる','食べられました','寿司が食べられました。'],['書く','書けました','漢字が書けました。'],['する','できませんでした','予約ができませんでした。']]},
-  {id:'passive-causative',title:'Passive and causative change roles',forms:['passive','passive-past','passive-polite-past','causative','causative-past','causative-polite-past','causative-passive','causative-passive-polite-past-negative','short-causative-passive'],body:'Passive means the subject receives an action. Causative means someone makes or lets another person act. Causative-passive means someone is made to do something. These derived る forms can also take plain and polite past endings, such as 褒められた, 褒められました, 待たされなかった, and 待たされませんでした.',examples:[['待つ','待たされました','駅で待たされました。'],['書く','書かせました','先生が名前を書かせました。'],['褒める','褒められました','先生に褒められました。']]},
+  {id:'passive-causative',title:'Passive and causative change roles',forms:['passive','passive-past','passive-polite-past','causative','causative-past','causative-polite-past','short-causative','short-causative-past','causative-passive','causative-passive-polite-past-negative','short-causative-passive'],body:'Passive means the subject receives an action. Causative means someone makes or lets another person act. Causative-passive means someone is made to do something. These derived forms can also keep conjugating, such as 褒められました, 書かせました, 書かした, 待たされなかった, and 待たされませんでした.',examples:[['待つ','待たされました','駅で待たされました。'],['書く','書かした','先生は学生に名前を書かしました。'],['褒める','褒められました','先生に褒められました。']]},
   {id:'keigo',title:'Keigo changes social direction',forms:['honorific','honorific-polite','humble','humble-polite'],body:'Honorific forms raise someone else\'s action; humble forms lower your own action. Many common verbs have special replacements like 召し上がる, ご覧になる, いらっしゃる, いただく, and 参る. When there is no special replacement, use patterns such as お読みになる and お読みする.',examples:[['読む','お読みになります','先生は資料をお読みになります。'],['食べる','召し上がります','先生は昼ご飯を召し上がります。'],['見る','拝見します','資料を拝見します。']]},
   {id:'adjectives',title:'Adjectives conjugate like predicates',forms:['adj-plain-past','adj-plain-negative','adj-te-form','adj-adverb'],body:'い-adjectives drop い and use かった, くない, くて, and く. The common irregular adjective いい conjugates from よい, so it becomes よかった and よくない. な-adjectives behave more like nouns with だ/です, だった, ではない, で, な, and に.',examples:[['いい','よかった','昨日はよかったです。'],['高い','高かった','昨日は高かったです。'],['便利','便利ではない','この駅は便利ではありません。']]},
   {id:'conditionals',title:'Conditionals choose nuance',forms:['conditional-ba','negative-conditional-ba','potential-conditional-ba','potential-negative-conditional-ba','conditional-tara','negative-conditional-tara','adj-conditional','adj-negative-conditional','adj-tara','adj-negative-tara'],body:'ば often feels rule-like or prerequisite-like. たら is broad and works for if/when. Negative ば turns ない into なければ, so stacked forms like できる become できれば and できない becomes できなければ.',examples:[['行く','行けば','駅に行けば分かります。'],['できる','できなければ','できなければ、手伝ってください。'],['安い','安くなければ','安くなければ買いません。']]}
@@ -284,6 +284,16 @@ const CONJ_TYPES=[
   {id:'causative-past-negative',label:'Causative Past Negative',sub:'使役なかった',hint:'did not make / let ~'},
   {id:'causative-conditional-ba',label:'Causative ば',sub:'使役ば',hint:'if make / let ~'},
   {id:'causative-negative-conditional-ba',label:'Causative Negative ば',sub:'使役なければ',hint:'if not make / let ~'},
+  {id:'short-causative',label:'Short Causative',sub:'縮約使役',hint:'colloquial make / let ~'},
+  {id:'short-causative-polite',label:'Short Causative Polite',sub:'縮約使役ます',hint:'colloquial make / let ~ politely'},
+  {id:'short-causative-negative',label:'Short Causative Negative',sub:'縮約使役ない',hint:'colloquial not make / let ~'},
+  {id:'short-causative-polite-negative',label:'Short Causative Polite Negative',sub:'縮約使役ません',hint:'colloquial not make / let ~ politely'},
+  {id:'short-causative-past',label:'Short Causative Past',sub:'縮約使役た',hint:'colloquial made / let ~'},
+  {id:'short-causative-polite-past',label:'Short Causative Polite Past',sub:'縮約使役ました',hint:'colloquial made / let ~ politely'},
+  {id:'short-causative-past-negative',label:'Short Causative Past Negative',sub:'縮約使役なかった',hint:'colloquial did not make / let ~'},
+  {id:'short-causative-polite-past-negative',label:'Short Causative Polite Past Negative',sub:'縮約使役ませんでした',hint:'colloquial did not make / let ~ politely'},
+  {id:'short-causative-conditional-ba',label:'Short Causative ば',sub:'縮約使役ば',hint:'colloquial if make / let ~'},
+  {id:'short-causative-negative-conditional-ba',label:'Short Causative Negative ば',sub:'縮約使役なければ',hint:'colloquial if not make / let ~'},
   {id:'causative-passive',label:'Causative Passive',sub:'使役受身形',hint:'be made to ~'},
   {id:'causative-passive-polite',label:'Causative Passive Polite',sub:'使役受身ます',hint:'be made to ~ politely'},
   {id:'causative-passive-polite-past',label:'Causative Passive Polite Past',sub:'使役受身ました',hint:'was made to ~ politely'},
@@ -342,10 +352,10 @@ const ALL_CARD_TYPES=[...CONJ_TYPES,...ADJ_TYPES];
 const TYPE_PACKS=[
   {id:'basics',label:'Basics',hint:'Past, negative, polite, and te-form foundations.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','te-form','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form']},
   {id:'everyday',label:'Everyday',hint:'Common conversation forms for requests, ability, desire, and conditionals.',typeIds:['plain-past','plain-negative','plain-past-negative','polite-present','polite-past','polite-negative','polite-past-negative','masu-stem','te-form','potential','potential-polite','potential-negative','potential-polite-negative','potential-polite-past','potential-polite-past-negative','potential-past','potential-past-negative','potential-conditional-ba','potential-negative-conditional-ba','volitional','polite-volitional','conditional-tara','negative-conditional-tara','conditional-ba','negative-conditional-ba','desiderative','desiderative-negative','desiderative-past','desiderative-past-negative','progressive','request-kudasai','permission','obligation','adj-plain-past','adj-plain-negative','adj-plain-past-negative','adj-polite-present','adj-polite-past','adj-polite-negative','adj-polite-past-negative','adj-te-form','adj-adverb','adj-conditional','adj-negative-conditional','adj-tara','adj-negative-tara','adj-sou','adj-naru']},
-  {id:'advanced',label:'Advanced',hint:'Passive, causative, commands, conjecture, and nuanced connectors.',typeIds:['polite-te','polite-conditional-tara','honorific','honorific-polite','humble','humble-polite','conditional-nara','conjectural','imperative','passive','passive-polite','passive-negative','passive-polite-negative','passive-polite-past','passive-polite-past-negative','passive-past','passive-past-negative','passive-conditional-ba','passive-negative-conditional-ba','causative','causative-polite','causative-negative','causative-polite-negative','causative-polite-past','causative-polite-past-negative','causative-past','causative-past-negative','causative-conditional-ba','causative-negative-conditional-ba','causative-passive','causative-passive-polite','causative-passive-polite-past','causative-passive-past','causative-passive-negative','causative-passive-polite-negative','causative-passive-polite-past-negative','causative-passive-past-negative','causative-passive-conditional-ba','causative-passive-negative-conditional-ba','short-causative-passive','short-causative-passive-polite','short-causative-passive-polite-past','short-causative-passive-past','short-causative-passive-negative','short-causative-passive-polite-negative','short-causative-passive-polite-past-negative','short-causative-passive-past-negative','short-causative-passive-conditional-ba','short-causative-passive-negative-conditional-ba','negative-te','negative-te-connective','prohibition','negative-request','adj-attributive','adj-negative-te-form','adj-sugiru']},
+  {id:'advanced',label:'Advanced',hint:'Passive, causative, commands, conjecture, and nuanced connectors.',typeIds:['polite-te','polite-conditional-tara','honorific','honorific-polite','humble','humble-polite','conditional-nara','conjectural','imperative','passive','passive-polite','passive-negative','passive-polite-negative','passive-polite-past','passive-polite-past-negative','passive-past','passive-past-negative','passive-conditional-ba','passive-negative-conditional-ba','causative','causative-polite','causative-negative','causative-polite-negative','causative-polite-past','causative-polite-past-negative','causative-past','causative-past-negative','causative-conditional-ba','causative-negative-conditional-ba','short-causative','short-causative-polite','short-causative-negative','short-causative-polite-negative','short-causative-past','short-causative-polite-past','short-causative-past-negative','short-causative-polite-past-negative','short-causative-conditional-ba','short-causative-negative-conditional-ba','causative-passive','causative-passive-polite','causative-passive-polite-past','causative-passive-past','causative-passive-negative','causative-passive-polite-negative','causative-passive-polite-past-negative','causative-passive-past-negative','causative-passive-conditional-ba','causative-passive-negative-conditional-ba','short-causative-passive','short-causative-passive-polite','short-causative-passive-polite-past','short-causative-passive-past','short-causative-passive-negative','short-causative-passive-polite-negative','short-causative-passive-polite-past-negative','short-causative-passive-past-negative','short-causative-passive-conditional-ba','short-causative-passive-negative-conditional-ba','negative-te','negative-te-connective','prohibition','negative-request','adj-attributive','adj-negative-te-form','adj-sugiru']},
   {id:'all',label:'All forms',hint:'Enable every verb and adjective form in the app.',typeIds:ALL_CARD_TYPES.map(t=>t.id)}
 ];
-const INTRODUCED_DEFAULT_TYPE_IDS=['potential-polite-past','potential-polite-past-negative','passive-polite-past','passive-polite-past-negative','causative-polite-past','causative-polite-past-negative','causative-passive-polite-past','causative-passive-polite-past-negative','short-causative-passive-polite-past','short-causative-passive-polite-past-negative','honorific','honorific-polite','humble','humble-polite'];
+const INTRODUCED_DEFAULT_TYPE_IDS=['potential-polite-past','potential-polite-past-negative','passive-polite-past','passive-polite-past-negative','causative-polite-past','causative-polite-past-negative','causative-passive-polite-past','causative-passive-polite-past-negative','short-causative-passive-polite-past','short-causative-passive-polite-past-negative','honorific','honorific-polite','humble','humble-polite','short-causative','short-causative-polite','short-causative-negative','short-causative-polite-negative','short-causative-past','short-causative-polite-past','short-causative-past-negative','short-causative-polite-past-negative','short-causative-conditional-ba','short-causative-negative-conditional-ba'];
 const TYPE_LABEL={};
 for(const t of ALL_CARD_TYPES)TYPE_LABEL[t.id]=t.label;
 function getTypeInfo(id){return ALL_CARD_TYPES.find(t=>t.id===id)||{id,label:id,sub:'',hint:''};}
@@ -553,6 +563,21 @@ function shortCausativePassive(verb){
   if(group==='kuru')return(reading.endsWith('くる')?reading.slice(0,-2):'')+'こさされる';
   return'';
 }
+function shortCausative(verb){
+  const{reading,group}=verb;
+  if(group==='ichidan')return reading.slice(0,-1)+'さす';
+  if(group==='godan'){
+    const last=reading.slice(-1),stem=reading.slice(0,-1);
+    return stem+A_ROW[last]+'す';
+  }
+  if(group==='suru')return(reading.endsWith('する')?reading.slice(0,-2):'')+'さす';
+  if(group==='kuru')return(reading.endsWith('くる')?reading.slice(0,-2):'')+'こさす';
+  return'';
+}
+function conjugateShortCausative(verb,targetType){
+  const form=shortCausative(verb);
+  return form?conjugate({reading:form,dict:form,meaning:verb.meaning,group:'godan'},targetType):'';
+}
 const KEIGO_SPECIALS={
   たべる:{honorific:'めしあがる',humble:'いただく'},
   のむ:{honorific:'めしあがる',humble:'いただく'},
@@ -638,6 +663,8 @@ function conjugate(verb,type){
   if(type==='humble')return keigoForm(verb,'humble');
   if(type==='honorific-polite')return politeKeigoForm(keigoForm(verb,'honorific'));
   if(type==='humble-polite')return politeKeigoForm(keigoForm(verb,'humble'));
+  const shortCausativeBase={'short-causative':'plain-present','short-causative-polite':'polite-present','short-causative-negative':'plain-negative','short-causative-polite-negative':'polite-negative','short-causative-past':'plain-past','short-causative-polite-past':'polite-past','short-causative-past-negative':'plain-past-negative','short-causative-polite-past-negative':'polite-past-negative','short-causative-conditional-ba':'conditional-ba','short-causative-negative-conditional-ba':'negative-conditional-ba'}[type];
+  if(shortCausativeBase)return conjugateShortCausative(verb,shortCausativeBase);
   const politeBase={'potential-polite':'potential','passive-polite':'passive','causative-polite':'causative','causative-passive-polite':'causative-passive','short-causative-passive-polite':'short-causative-passive'}[type];
   if(politeBase)return politeRuForm(conjugate(verb,politeBase));
   const politePastBase={'potential-polite-past':'potential','passive-polite-past':'passive','causative-polite-past':'causative','causative-passive-polite-past':'causative-passive','short-causative-passive-polite-past':'short-causative-passive'}[type];
@@ -877,6 +904,16 @@ function explainItem(item,type){
     'causative-past-negative':'Make the causative form, then replace final る with なかった.',
     'causative-conditional-ba':'Make the causative form, then replace final る with れば.',
     'causative-negative-conditional-ba':'Make the causative negative form, then replace ない with なければ.',
+    'short-causative':'Use the colloquial short causative: あ-row + す for godan verbs, or replace させる with さす.',
+    'short-causative-polite':'Make the short causative, then conjugate that す-ending form with ます.',
+    'short-causative-negative':'Make the short causative, then conjugate that す-ending form with ない.',
+    'short-causative-polite-negative':'Make the short causative, then conjugate that す-ending form with ません.',
+    'short-causative-past':'Make the short causative, then conjugate that す-ending form with た.',
+    'short-causative-polite-past':'Make the short causative, then conjugate that す-ending form with ました.',
+    'short-causative-past-negative':'Make the short causative, then conjugate that す-ending form with なかった.',
+    'short-causative-polite-past-negative':'Make the short causative, then conjugate that す-ending form with ませんでした.',
+    'short-causative-conditional-ba':'Make the short causative, then conjugate that す-ending form with ば.',
+    'short-causative-negative-conditional-ba':'Make the short causative negative, then replace ない with なければ.',
     'causative-passive-polite':'Make the causative-passive form, then replace final る with ます.',
     'causative-passive-polite-past':'Make the causative-passive form, then replace final る with ました.',
     'causative-passive-past':'Make the causative-passive form, then replace final る with た.',
@@ -1174,6 +1211,16 @@ function contextSentenceFor(item,type){
     'causative-past-negative':[`昨日、先生は学生に${form}。`,'Someone did not make or let a student do it yesterday.'],
     'causative-conditional-ba':[`先生が学生に${form}、練習になります。`,'If someone makes or lets a student do it, it becomes practice.'],
     'causative-negative-conditional-ba':[`先生が学生に${form}、学生は自分でします。`,'If someone does not make or let a student do it, the student does it alone.'],
+    'short-causative':[`先生は学生に${form}。`,'Colloquial sentence where someone makes or lets a student do it.'],
+    'short-causative-polite':[`先生は学生に${form}。`,'Colloquial polite sentence where someone makes or lets a student do it.'],
+    'short-causative-negative':[`先生は学生に${form}。`,'Colloquial sentence where someone does not make or let a student do it.'],
+    'short-causative-polite-negative':[`先生は学生に${form}。`,'Colloquial polite sentence where someone does not make or let a student do it.'],
+    'short-causative-past':[`昨日、先生は学生に${form}。`,'Colloquial sentence where someone made or let a student do it yesterday.'],
+    'short-causative-polite-past':[`昨日、先生は学生に${form}。`,'Colloquial polite sentence where someone made or let a student do it yesterday.'],
+    'short-causative-past-negative':[`昨日、先生は学生に${form}。`,'Colloquial sentence where someone did not make or let a student do it yesterday.'],
+    'short-causative-polite-past-negative':[`昨日、先生は学生に${form}。`,'Colloquial polite sentence where someone did not make or let a student do it yesterday.'],
+    'short-causative-conditional-ba':[`先生が学生に${form}、練習になります。`,'Colloquial if-sentence for making or letting someone do it.'],
+    'short-causative-negative-conditional-ba':[`先生が学生に${form}、学生は自分でします。`,'Colloquial if-sentence for not making or letting someone do it.'],
     'causative-passive':[`学生は先生に${form}。`,'A student is made to do it.'],
     'causative-passive-polite':[`学生は先生に${form}。`,'Politely says a student is made to do it.'],
     'causative-passive-polite-past':[`昨日、学生は先生に${form}。`,'Politely says a student was made to do it yesterday.'],
@@ -1810,6 +1857,16 @@ function englishForForm(item,type){
     'causative-past-negative':`did not make/let someone ${action}`,
     'causative-conditional-ba':`if someone makes/lets someone ${action}`,
     'causative-negative-conditional-ba':`if someone does not make/let someone ${action}`,
+    'short-causative':`make/let someone ${action} (short spoken form)`,
+    'short-causative-polite':`make/let someone ${action} (short spoken polite form)`,
+    'short-causative-negative':`not make/let someone ${action} (short spoken form)`,
+    'short-causative-polite-negative':`not make/let someone ${action} (short spoken polite form)`,
+    'short-causative-past':`made/let someone ${action} (short spoken form)`,
+    'short-causative-polite-past':`made/let someone ${action} (short spoken polite form)`,
+    'short-causative-past-negative':`did not make/let someone ${action} (short spoken form)`,
+    'short-causative-polite-past-negative':`did not make/let someone ${action} (short spoken polite form)`,
+    'short-causative-conditional-ba':`if someone makes/lets someone ${action} (short spoken form)`,
+    'short-causative-negative-conditional-ba':`if someone does not make/let someone ${action} (short spoken form)`,
     'causative-passive':`be made to ${action}`,
     'causative-passive-polite':`be made to ${action} (polite)`,
     'causative-passive-polite-past':`was made to ${action} (polite)`,
