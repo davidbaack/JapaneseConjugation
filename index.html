@@ -1000,7 +1000,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,practiceFocus:'balanced',voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',drillDirection:'forward',autoSpeak:false,listeningPrompt:false,practiceFocus:'balanced',voiceURI:'',theme:'system',aiFeedbackLevel:'beginner',aiGuideTone:'sensei',dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,reviewLimit:0,jlptLevels:['N5','N4','N3','N2','N1'],genkiLessons:[],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -1321,6 +1321,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const[coachRevealed,setCoachRevealed]=useState(0);
   const[endAt,setEndAt]=useState(null);
   const[now,setNow]=useState(Date.now());
+  const[reviewBase,setReviewBase]=useState(state.session.reviewed||0);
   const inputRef=useRef(null);
   const enabledTypes=state.enabledTypes.length>0?state.enabledTypes:['plain-past'];
   const practiceWords=useMemo(()=>filterWordsForPrefs(verbs,practicePrefs,wordLists),[verbs,practicePrefs,wordLists]);
@@ -1338,6 +1339,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   useEffect(()=>{if(current&&phase==='answering'&&listeningPrompt&&promptAudioText)speakJapanese(promptAudioText,0.85,practicePrefs.voiceURI);},[current?.id,phase,listeningPrompt,promptAudioText,practicePrefs.voiceURI]);
   useEffect(()=>{if(current&&phase==='reviewing'&&practicePrefs.autoSpeak)speakJapanese(conjugateItem(current.verb,current.type),0.9,practicePrefs.voiceURI);},[current,phase,practicePrefs.autoSpeak,practicePrefs.voiceURI]);
   useEffect(()=>{setCoachRevealed(0);},[current?.id,practicePrefs.answerMode]);
+  useEffect(()=>{setReviewBase(state.session.reviewed||0);},[practicePrefs.reviewLimit]);
   useEffect(()=>{
     if(practicePrefs.durationSec>0)setEndAt(Date.now()+practicePrefs.durationSec*1000);
     else setEndAt(null);
@@ -1363,6 +1365,9 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const taskHint=reverseDrill?'answer with dictionary form':typeInfo.hint;
   const taskSub=reverseDrill?'辞書形':typeInfo.sub;
   const taskOverride=reverseDrill?`Reverse drill: identify the dictionary form from ${typeInfo.label} (${sourceForm})`:'';
+  const reviewLimit=Number(practicePrefs.reviewLimit||0);
+  const reviewsDone=Math.max(0,(state.session.reviewed||0)-reviewBase);
+  const reviewSetComplete=reviewLimit>0&&reviewsDone>=reviewLimit;
   const timeLeft=endAt?Math.max(0,Math.ceil((endAt-now)/1000)):null;
   const hidePromptText=listeningPrompt&&phase==='answering'&&!showPromptText;
   const coachPreview=toHiragana(answer);
@@ -1373,7 +1378,11 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const coachStatus=coachWrongIndex>=0?`Kana ${coachWrongIndex+1} should be ${coachCells[coachWrongIndex].expected}.`:coachPreview===expected?'Complete match. Press Enter.':coachTypedCount>expectedKanaCount?'Extra kana after the answer.':`${Math.min(coachTypedCount,expectedKanaCount)}/${expectedKanaCount} kana matched.`;
 
   function submit(choiceValue){
-    if(phase==='reviewing'){setChatOpen(false);setCurrent(selectNext(state,practiceWords,enabledTypes,current.id,practicePrefs));setAnswer('');setCoachRevealed(0);setPhase('answering');return;}
+    if(phase==='reviewing'){
+      setChatOpen(false);setAnswer('');setCoachRevealed(0);setPhase('answering');
+      if(!reviewSetComplete)setCurrent(selectNext(state,practiceWords,enabledTypes,current.id,practicePrefs));
+      return;
+    }
     const raw=choiceValue!==undefined?choiceValue:answer;
     if(!raw.trim())return;
     const normalized=choiceValue!==undefined?raw:toHiragana(raw);
@@ -1389,12 +1398,14 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
 
   const preview=toHiragana(answer);
   const card=state.cards[current.id];
-  if(timeLeft===0)return(
+  if((reviewSetComplete&&phase==='answering')||timeLeft===0)return(
     <div className="bg-white rounded-2xl border border-stone-200 p-8 text-center">
-      <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium mb-2">Timed drill complete</div>
+      <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium mb-2">{reviewSetComplete?'Review set complete':'Timed drill complete'}</div>
       <div className="text-4xl font-semibold text-stone-900 mb-2">{state.session.correct}/{state.session.reviewed}</div>
-      <div className="text-sm text-stone-500 mb-5">Session accuracy: {state.session.reviewed?Math.round(state.session.correct/state.session.reviewed*100):0}%</div>
-      <button onClick={()=>{setEndAt(Date.now()+(practicePrefs.durationSec||60)*1000);setNow(Date.now());setCurrent(selectNext(state,practiceWords,enabledTypes,current.id,practicePrefs));setAnswer('');setPhase('answering');}} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium">Restart timed drill</button>
+      <div className="text-sm text-stone-500 mb-1">Session accuracy: {state.session.reviewed?Math.round(state.session.correct/state.session.reviewed*100):0}%</div>
+      {reviewLimit>0&&<div className="text-xs text-stone-400 mb-5">{Math.min(reviewsDone,reviewLimit)}/{reviewLimit} cards in this set</div>}
+      {!reviewLimit&&<div className="mb-5"/>}
+      <button onClick={()=>{setReviewBase(state.session.reviewed||0);setEndAt(practicePrefs.durationSec>0?Date.now()+practicePrefs.durationSec*1000:null);setNow(Date.now());setCurrent(selectNext(state,practiceWords,enabledTypes,current.id,practicePrefs));setAnswer('');setPhase('answering');}} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium">{reviewSetComplete?'Start another set':'Restart timed drill'}</button>
     </div>
   );
 
@@ -1404,7 +1415,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
         <div className="px-4 pt-3 pb-2 sm:px-6 sm:pt-5 sm:pb-3 border-b border-stone-100">
           <div className="flex items-baseline justify-between">
             <div><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">{taskLabel}<span className="text-indigo-400 font-normal normal-case tracking-normal ml-1.5">· {current.ruleLabel}</span></div><div className="text-xs text-stone-400 mt-0.5">{taskSub&&(taskSub+' · ')}{taskHint}</div></div>
-            <div className="text-xs text-stone-400 text-right">{timeLeft!==null&&<div className="text-indigo-600 font-medium">{Math.floor(timeLeft/60)}:{String(timeLeft%60).padStart(2,'0')}</div>}<div>{card?(fmtInterval(card.interval)+' · ease '+card.ease.toFixed(1)):'new'}</div></div>
+            <div className="text-xs text-stone-400 text-right">{timeLeft!==null&&<div className="text-indigo-600 font-medium">{Math.floor(timeLeft/60)}:{String(timeLeft%60).padStart(2,'0')}</div>}{reviewLimit>0&&<div className="text-indigo-600 font-medium">{Math.min(reviewsDone,reviewLimit)}/{reviewLimit} set</div>}<div>{card?(fmtInterval(card.interval)+' · ease '+card.ease.toFixed(1)):'new'}</div></div>
           </div>
         </div>
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center">
@@ -3715,7 +3726,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:24,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:25,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,ambient:state.ambient,game:state.game,onbin:state.onbin,meaning:state.meaning,mock:state.mock,reader:state.reader,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -3805,6 +3816,13 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
           <select value={practicePrefs.durationSec||0} onChange={e=>setPracticePrefs({...practicePrefs,durationSec:Number(e.target.value)})} className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none">
             <option value="0">Infinite</option><option value="30">30 seconds</option><option value="60">60 seconds</option><option value="120">120 seconds</option><option value="180">180 seconds</option>
           </select>
+        </div>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Review set</label>
+          <select value={practicePrefs.reviewLimit||0} onChange={e=>setPracticePrefs({...practicePrefs,reviewLimit:Number(e.target.value)})} className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none">
+            <option value="0">Open ended</option><option value="10">10 cards</option><option value="20">20 cards</option><option value="30">30 cards</option><option value="40">40 cards</option><option value="50">50 cards</option>
+          </select>
+          <p className="text-[11px] text-stone-400 mt-1">Stops Study after a fixed set; timed drill can still run at the same time.</p>
         </div>
         <div>
           <label className="text-xs text-stone-500 block mb-1">JLPT levels</label>
