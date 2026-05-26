@@ -2158,12 +2158,13 @@ function MockTestView({state,setState,words,practicePrefs=DEFAULT_PREFS,wordList
     setQuestions(qs);setAnswers({});setIndex(0);setResult(null);setAiText('');setAiErr('');setAiLoading(false);setPhase(qs.length?'taking':'intro');
   }
   function choose(key){if(!current||selected!==null)return;setAnswers({...answers,[current.id]:key});}
-  function finish(nextAnswers=answers){
-    const breakdown=mockSkillBreakdown(questions,nextAnswers);
-    const correct=questions.filter(q=>nextAnswers[q.id]===q.answerKey).length;
-    const pct=questions.length?Math.round(correct/questions.length*100):0;
+  function finish(nextAnswers=answers,finishedQuestions=questions){
+    const tested=finishedQuestions.length?finishedQuestions:questions;
+    const breakdown=mockSkillBreakdown(tested,nextAnswers);
+    const correct=tested.filter(q=>nextAnswers[q.id]===q.answerKey).length;
+    const pct=tested.length?Math.round(correct/tested.length*100):0;
     let mistakes=state.mistakes||[];
-    for(const q of questions){
+    for(const q of tested){
       if(q.kind!=='conjugation'||nextAnswers[q.id]===q.answerKey)continue;
       const picked=q.choices.find(c=>c.key===nextAnswers[q.id]);
       mistakes=recordMistake(mistakes,q.item,q.type,null,picked?.label||'',q.answerKey);
@@ -2174,16 +2175,22 @@ function MockTestView({state,setState,words,practicePrefs=DEFAULT_PREFS,wordList
       const prev=bySkill[skill]||{attempted:0,correct:0};
       bySkill[skill]={attempted:prev.attempted+s.attempted,correct:prev.correct+s.correct,lastPct:s.attempted?Math.round(s.correct/s.attempted*100):0};
     }
-    setState({...state,mistakes,mock:{...prior,taken:(prior.taken||0)+1,bestPct:Math.max(prior.bestPct||0,pct),lastPct:pct,lastScore:correct,lastTotal:questions.length,lastAt:Date.now(),bySkill}});
-    setResult({correct,total:questions.length,pct,breakdown});
+    setState({...state,mistakes,mock:{...prior,taken:(prior.taken||0)+1,bestPct:Math.max(prior.bestPct||0,pct),lastPct:pct,lastScore:correct,lastTotal:tested.length,lastAt:Date.now(),bySkill}});
+    setResult({correct,total:tested.length,pct,breakdown,stopped:tested.length<questions.length,questions:tested});
     setPhase('results');
+  }
+  function finishNow(){
+    const answered=questions.filter(q=>Object.prototype.hasOwnProperty.call(answers,q.id));
+    if(!answered.length){setQuestions([]);setAnswers({});setIndex(0);setPhase('intro');return;}
+    finish(answers,answered);
   }
   async function generateMockReview(){
     if(!result||!geminiKey)return;
     setAiLoading(true);setAiErr('');setAiText('');
     try{
+      const reviewedQuestions=result.questions||questions;
       const skillLines=Object.entries(result.breakdown).map(([skill,s])=>`${skill}: ${s.correct}/${s.attempted}`).join('\n');
-      const misses=questions.filter(q=>answers[q.id]!==q.answerKey).slice(0,10).map(q=>`${q.skill}: ${q.item.dict} (${q.item.reading}) — expected ${q.answerLabel}; note: ${q.note}`).join('\n')||'None';
+      const misses=reviewedQuestions.filter(q=>answers[q.id]!==q.answerKey).slice(0,10).map(q=>`${q.skill}: ${q.item.dict} (${q.item.reading}) — expected ${q.answerLabel}; note: ${q.note}`).join('\n')||'None';
       const prompt=`Create a concise post-test study review for a Japanese conjugation app.\n\nScore: ${result.correct}/${result.total} (${result.pct}%)\nSkill breakdown:\n${skillLines}\nMissed or weak examples:\n${misses}\n\nGive: the top 2 weak areas, one concrete next drill inside the app, one rule reminder, and a tiny 5-minute study plan. Be encouraging but specific.`;
       const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1000,0.25,aiSystemFromPrefs(practicePrefs,'You are a practical Japanese conjugation coach. Turn test results into focused next actions without inventing details.'));
       setAiText(reply);
@@ -2232,9 +2239,9 @@ function MockTestView({state,setState,words,practicePrefs=DEFAULT_PREFS,wordList
     return(
       <div className="space-y-4">
         <div className="bg-white rounded-2xl border border-stone-200 p-6 text-center">
-          <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Mock complete</div>
+          <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">{result.stopped?'Mock stopped':'Mock complete'}</div>
           <div className="text-5xl font-semibold mt-2 tabular-nums">{result.pct}%</div>
-          <div className="text-sm text-stone-500 mt-2">{result.correct}/{result.total} correct{weakest?` · focus next: ${weakest[0]}`:''}</div>
+          <div className="text-sm text-stone-500 mt-2">{result.correct}/{result.total} correct{result.stopped?' · scored answered questions only':''}{weakest?` · focus next: ${weakest[0]}`:''}</div>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <button onClick={generateMockReview} disabled={!geminiKey||aiLoading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium inline-flex items-center gap-1.5"><IconSpark className="w-4 h-4"/>{aiLoading?'Reviewing...':'AI review'}</button>
             <button onClick={start} className="px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-xl font-medium">Retake</button>
@@ -2253,7 +2260,7 @@ function MockTestView({state,setState,words,practicePrefs=DEFAULT_PREFS,wordList
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-stone-100">
-          <div className="flex items-center justify-between gap-3 text-sm"><span className="font-medium">Question {index+1}/{questions.length}</span><span className="text-xs text-indigo-600">{current.skill}</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><span className="font-medium">Question {index+1}/{questions.length}</span><div className="flex flex-wrap items-center justify-end gap-2"><span className="text-xs text-indigo-600">{current.skill}</span><button onClick={finishNow} disabled={!answeredCount} className="px-2 py-1 rounded-lg border border-stone-200 hover:bg-stone-50 disabled:opacity-40 text-xs text-stone-500">Finish now</button></div></div>
           <div className="mt-3 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{width:((index+1)/questions.length*100)+'%'}}/></div>
         </div>
         <div className="p-5">
