@@ -830,7 +830,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
+const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji',displayScripts:{kanji:true,kana:true,romaji:false},furigana:true,promptForm:'dictionary',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],wordTypes:['verb','i-adjective','na-adjective'],wordListIds:[]};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,wordLists,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -993,7 +993,11 @@ function scriptModeFromDisplay(ds){
   if(!ds.kanji&&!ds.kana&&ds.romaji)return'romaji';
   return'kanji';
 }
-function mergePracticePrefs(prefs){return{...DEFAULT_PREFS,...(prefs||{}),displayScripts:{...DEFAULT_PREFS.displayScripts,...((prefs&&prefs.displayScripts)||{})}};}
+function mergePracticePrefs(prefs){
+  const source=prefs||{};
+  const displayScripts=source.displayScripts?{...DEFAULT_PREFS.displayScripts,...source.displayScripts}:resolveDisplayScripts(source);
+  return{...DEFAULT_PREFS,...source,displayScripts};
+}
 function formDisplay(kana,prefs=DEFAULT_PREFS){
   const ds=resolveDisplayScripts(prefs);
   const rom=kanaToRomaji(kana);
@@ -1007,11 +1011,19 @@ function promptDisplay(item,promptType,prefs=DEFAULT_PREFS){
   const kanji=promptType?null:item.dict;
   const rom=kanaToRomaji(kana);
   const main=ds.kanji&&kanji?kanji:(ds.kana||!ds.romaji?kana:rom);
+  const ruby=!!prefs.furigana&&ds.kanji&&ds.kana&&kanji&&main===kanji&&kanji!==kana?kana:'';
   const sub=[];
   if(ds.kanji&&kanji&&main!==kanji)sub.push(kanji);
-  if(ds.kana&&main!==kana)sub.push(kana);
+  if(ds.kana&&main!==kana&&!ruby)sub.push(kana);
   if(ds.romaji&&main!==rom)sub.push(rom);
-  return{main,sub:sub.join(' · '),lang:main===rom?'en':'ja'};
+  return{main,sub:sub.join(' · '),ruby,lang:main===rom?'en':'ja'};
+}
+function ScriptDisplay({view,className='',subClassName='text-sm text-stone-500 mt-1'}){
+  if(!view)return null;
+  return(<>
+    <div className={className} lang={view.lang}>{view.ruby?<ruby>{view.main}<rt>{view.ruby}</rt></ruby>:view.main}</div>
+    {view.sub&&<div className={subClassName}>{view.sub}</div>}
+  </>);
 }
 function editDistance(a,b){
   a=normalizeJapaneseText(a);b=normalizeJapaneseText(b);
@@ -1112,8 +1124,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
         </div>
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center">
           <div className="text-xs uppercase tracking-wider text-stone-400 font-medium mb-2">From {promptFormLabel(current.verb,promptType)}</div>
-          <div className="text-4xl sm:text-5xl font-medium mb-2" lang={promptView.lang}>{promptView.main}</div>
-          {promptView.sub&&<div className="text-base text-stone-500">{promptView.sub}</div>}
+          <ScriptDisplay view={promptView} className="text-4xl sm:text-5xl font-medium mb-2" subClassName="text-base text-stone-500"/>
           {promptType&&<div className="text-xs text-stone-400">Base: <span lang="ja">{current.verb.dict}</span>{current.verb.dict!==current.verb.reading&&<span lang="ja"> · {current.verb.reading}</span>}</div>}
           <div className="text-sm text-stone-400 mt-2 italic">{current.verb.meaning}</div>
           <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[current.verb.group]} · {wordType}</div>
@@ -1129,7 +1140,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
               </div>
               {practicePrefs.answerMode==='choice'?(
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {choices.map(c=>{const cv=formDisplay(c,practicePrefs);return <button key={c} onClick={()=>submit(c)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition" lang={cv.lang}><span>{cv.main}</span>{cv.sub&&<span className="block text-xs text-stone-400 mt-1">{cv.sub}</span>}</button>;})}
+                  {choices.map(c=>{const cv=formDisplay(c,practicePrefs);return <button key={c} onClick={()=>submit(c)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition"><ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1"/></button>;})}
                 </div>
               ):(
                 <>
@@ -1148,8 +1159,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
                 <div className="flex-1">
                   <div className={`text-sm font-medium ${wasCorrect?'text-emerald-800':'text-rose-800'}`}>{wasCorrect?'Correct!':'Not quite.'}</div>
                   {!wasCorrect&&<div className="text-xs text-rose-700 mt-1">You wrote: <span lang="ja">{toHiragana(answer)||'(empty)'}</span></div>}
-                  <div className={`text-xl mt-2 ${wasCorrect?'text-emerald-900':'text-rose-900'}`} lang={expectedView.lang}>{expectedView.main}</div>
-                  {expectedView.sub&&<div className="text-xs text-stone-500 mt-1">{expectedView.sub}</div>}
+                  <ScriptDisplay view={expectedView} className={`text-xl mt-2 ${wasCorrect?'text-emerald-900':'text-rose-900'}`} subClassName="text-xs text-stone-500 mt-1"/>
                 </div>
               </div>
               {!wasCorrect&&explanation&&(
@@ -1317,8 +1327,7 @@ function RushView({state,setState,verbs,practicePrefs=DEFAULT_PREFS,wordLists=[]
               <div className="absolute left-5 right-5 transition-transform duration-100" style={{transform:`translateY(${fall}px)`}}>
                 <div className="rounded-2xl bg-white text-stone-900 shadow-xl p-5 border border-stone-200">
                   <div className="flex items-center justify-between gap-3 text-xs text-stone-500 mb-3"><span>{promptLabel} → {round.type.label}</span><span>Wave {wave}</span></div>
-                  <div className="text-3xl sm:text-4xl font-semibold leading-relaxed" lang={round.prompt.lang}>{round.prompt.main}</div>
-                  {round.prompt.sub&&<div className="mt-1 text-sm text-stone-500">{round.prompt.sub}</div>}
+                  <ScriptDisplay view={round.prompt} className="text-3xl sm:text-4xl font-semibold leading-relaxed" subClassName="mt-1 text-sm text-stone-500"/>
                   <div className="mt-2 text-sm text-stone-500">{round.item.meaning}</div>
                   <div className="mt-1 text-xs text-stone-400">{GROUP_NAMES[round.item.group]}</div>
                 </div>
@@ -1415,8 +1424,7 @@ function EndingsView({state,setState,verbs,practicePrefs=DEFAULT_PREFS,wordLists
           </div>
           <div className="rounded-2xl bg-stone-50 border border-stone-200 p-5 text-center">
             <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium mb-2">Choose the ending tail</div>
-            <div className="text-4xl sm:text-5xl font-semibold" lang={prompt.lang}>{prompt.main}</div>
-            {prompt.sub&&<div className="text-sm text-stone-500 mt-1">{prompt.sub}</div>}
+            <ScriptDisplay view={prompt} className="text-4xl sm:text-5xl font-semibold" subClassName="text-sm text-stone-500 mt-1"/>
             <div className="mt-2 text-sm text-stone-500">{current.meaning}</div>
             <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white border border-stone-200 px-3 py-1 text-xs text-stone-600"><span>{pattern.label}</span><span className="text-stone-300">|</span><span>{pattern.cue}</span></div>
           </div>
@@ -1429,7 +1437,7 @@ function EndingsView({state,setState,verbs,practicePrefs=DEFAULT_PREFS,wordLists
             {result&&<button onClick={()=>next()} autoFocus className="ml-auto px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-lg text-sm font-medium">Next</button>}
           </div>
           {hintChars>0&&<div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-xl tracking-widest" lang="ja">{hint}</div>}
-          {result&&<div className={`mt-4 rounded-xl border p-4 ${result.ok?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}><div className={`text-sm font-medium ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Clean sound change.':'Different ending pattern.'}</div><div className="text-2xl mt-1" lang={expectedView.lang}>{expectedView.main}</div>{expectedView.sub&&<div className="text-xs text-stone-500 mt-1">{expectedView.sub}</div>}<div className="text-sm text-stone-700 mt-2">{pattern.cue}</div></div>}
+          {result&&<div className={`mt-4 rounded-xl border p-4 ${result.ok?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}><div className={`text-sm font-medium ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Clean sound change.':'Different ending pattern.'}</div><ScriptDisplay view={expectedView} className="text-2xl mt-1" subClassName="text-xs text-stone-500 mt-1"/><div className="text-sm text-stone-700 mt-2">{pattern.cue}</div></div>}
           {aiErr&&<div className="mt-3 text-sm text-rose-600">{aiErr}</div>}
           {aiTip&&<div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-900 leading-relaxed">{aiTip}</div>}
         </div>
@@ -1593,8 +1601,7 @@ function ClassificationView({state,setState,words,practicePrefs,wordLists=[]}){
           <div className="text-xs text-stone-500 text-right"><div>{stats.correct}/{stats.attempted}</div><div>{acc}% accuracy</div></div>
         </div>
         <div className="text-center py-5">
-          <div className="text-5xl font-medium mb-2" lang={currentView.lang}>{currentView.main}</div>
-          {currentView.sub&&<div className="text-stone-500">{currentView.sub}</div>}
+          <ScriptDisplay view={currentView} className="text-5xl font-medium mb-2" subClassName="text-stone-500"/>
           <div className="text-sm text-stone-400 italic mt-2">{current.meaning}</div>
           <div className="text-[11px] text-stone-400 mt-1">JLPT {getWordMeta(current).jlpt}{getWordMeta(current).lesson?` · Genki L${getWordMeta(current).lesson}`:''}</div>
         </div>
@@ -1665,8 +1672,7 @@ function MistakesView({state,setState,practicePrefs}){
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Retest missed card</div>
-                <div className="text-4xl font-medium mt-2" lang={activePromptView.lang}>{activePromptView.main}</div>
-                {activePromptView.sub&&<div className="text-stone-500 mt-1">{activePromptView.sub}</div>}
+                <ScriptDisplay view={activePromptView} className="text-4xl font-medium mt-2" subClassName="text-stone-500 mt-1"/>
                 {active.promptType&&<div className="text-xs text-stone-400 mt-1">Base: <span lang="ja">{active.dict}</span> · {promptFormLabel(activeItem,active.promptType)}</div>}
                 <div className="text-sm text-stone-500 italic mt-2">{active.meaning}</div>
                 <div className="text-xs text-stone-400 mt-1">Answer with {getTypeInfo(active.type).label}</div>
@@ -1681,8 +1687,7 @@ function MistakesView({state,setState,practicePrefs}){
             {result&&(
               <div className={`rounded-xl border p-4 ${result.ok?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
                 <div className={`text-sm font-medium ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Resolved.':'Still needs work.'}</div>
-                <div className="text-xl mt-2" lang={activeExpectedView.lang}>{activeExpectedView.main}</div>
-                {activeExpectedView.sub&&<div className="text-xs text-stone-500 mt-1">{activeExpectedView.sub}</div>}
+                <ScriptDisplay view={activeExpectedView} className="text-xl mt-2" subClassName="text-xs text-stone-500 mt-1"/>
                 {!result.ok&&<div className="mt-3 text-sm text-stone-700">{explainItem(result.item,active.type).rule}</div>}
               </div>
             )}
@@ -1950,23 +1955,20 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
           </div>
         </div>
         <div className="max-h-[560px] overflow-y-auto divide-y divide-stone-50">
-          {matches.map(w=>(<button key={`${w.group}:${w.dict}`} onClick={()=>setSelected(w)} className={`w-full text-left px-4 py-3 transition ${selected.dict===w.dict&&selected.group===w.group?'bg-indigo-50':'hover:bg-stone-50'}`}>
+            {matches.map(w=>{const wv=promptDisplay(w,null,practicePrefs);return <button key={`${w.group}:${w.dict}`} onClick={()=>setSelected(w)} className={`w-full text-left px-4 py-3 transition ${selected.dict===w.dict&&selected.group===w.group?'bg-indigo-50':'hover:bg-stone-50'}`}>
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-medium text-stone-800" lang="ja">{w.dict}</span>
+              <div className="font-medium text-stone-800"><ScriptDisplay view={wv} className="" subClassName="text-xs text-stone-500"/></div>
               <span className="text-[11px] text-stone-400">{isAdjective(w)?'adj':'verb'}</span>
             </div>
-            <div className="text-xs text-stone-500" lang="ja">{w.reading}</div>
-            {resolveDisplayScripts(practicePrefs).romaji&&<div className="text-xs text-stone-400">{kanaToRomaji(w.reading)}</div>}
             <div className="text-xs text-stone-400 truncate">{w.meaning}</div>
-          </button>))}
+          </button>;})}
         </div>
       </div>
       <div className="space-y-4">
         <div className="bg-white rounded-2xl border border-stone-200 p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-4xl font-medium" lang={selectedView.lang}>{selectedView.main}</div>
-              {selectedView.sub&&<div className="text-stone-500 mt-1">{selectedView.sub}</div>}
+              <ScriptDisplay view={selectedView} className="text-4xl font-medium" subClassName="text-stone-500 mt-1"/>
               <div className="text-sm text-stone-500 italic mt-2">{selected.meaning}</div>
               <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[selected.group]}</div>
             </div>
@@ -1976,7 +1978,7 @@ function ReferenceView({verbs,adjectives,geminiKey,practicePrefs=DEFAULT_PREFS})
         <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider"><tr><th className="px-4 py-2 text-left font-medium">Form</th><th className="px-4 py-2 text-left font-medium">Answer</th><th className="px-4 py-2 text-left font-medium hidden md:table-cell">Rule</th></tr></thead>
-            <tbody>{rows.map(r=>{const rv=formDisplay(r.answer,practicePrefs);return <tr key={r.type.id} className="border-t border-stone-100"><td className="px-4 py-2"><div className="font-medium">{r.type.label}</div><div className="text-xs text-stone-400">{r.type.hint}</div></td><td className="px-4 py-2"><div className="text-lg" lang={rv.lang}>{rv.main}</div>{rv.sub&&<div className="text-xs text-stone-400">{rv.sub}</div>}</td><td className="px-4 py-2 text-xs text-stone-500 hidden md:table-cell">{r.explanation.rule}</td></tr>;})}</tbody>
+            <tbody>{rows.map(r=>{const rv=formDisplay(r.answer,practicePrefs);return <tr key={r.type.id} className="border-t border-stone-100"><td className="px-4 py-2"><div className="font-medium">{r.type.label}</div><div className="text-xs text-stone-400">{r.type.hint}</div></td><td className="px-4 py-2"><ScriptDisplay view={rv} className="text-lg" subClassName="text-xs text-stone-400"/></td><td className="px-4 py-2 text-xs text-stone-500 hidden md:table-cell">{r.explanation.rule}</td></tr>;})}</tbody>
           </table>
         </div>
         <div className="bg-white rounded-2xl border border-stone-200 p-4">
@@ -2316,7 +2318,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:10,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:11,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},mistakes:state.mistakes||[],shadow:state.shadow,game:state.game,onbin:state.onbin,daily:state.daily,classify:state.classify},customVerbs,customAdjectives,wordLists,practicePrefs}),[state,customVerbs,customAdjectives,wordLists,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
   function togglePref(key,id,allIds){
     const cur=practicePrefs[key]||allIds;
@@ -2333,6 +2335,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
   async function copyExport(){try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(exportData);setCopyOk(true);setTimeout(()=>setCopyOk(false),2000);}}catch{}}
   function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState(mergeState(data.state,{reviewed:0,correct:0}));if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);if(Array.isArray(data.customAdjectives))setCustomAdjectives(data.customAdjectives);if(Array.isArray(data.wordLists))setWordLists(data.wordLists);if(data.practicePrefs)setPracticePrefs(mergePracticePrefs(data.practicePrefs));setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
   const statusColor=syncStatus.kind==='error'?'text-rose-700 bg-rose-50 border-rose-200':syncStatus.kind==='syncing'?'text-amber-700 bg-amber-50 border-amber-200':syncStatus.kind==='ok'?'text-emerald-700 bg-emerald-50 border-emerald-200':'text-stone-600 bg-stone-50 border-stone-200';
+  const displayScripts=resolveDisplayScripts(practicePrefs);
 
   return(<div className="space-y-4">
     <div className="bg-white rounded-2xl border border-stone-200 p-5">
@@ -2344,7 +2347,8 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
         </div>
         <div>
           <label className="text-xs text-stone-500 block mb-1">Display scripts</label>
-          <div className="grid grid-cols-3 gap-2">{[{id:'kanji',label:'Kanji'},{id:'kana',label:'Kana'},{id:'romaji',label:'Romaji'}].map(o=>{const ds=resolveDisplayScripts(practicePrefs);return <button key={o.id} onClick={()=>toggleDisplayScript(o.id)} className={`px-3 py-2 rounded-lg text-sm border transition ${ds[o.id]?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>;})}</div>
+          <div className="grid grid-cols-3 gap-2">{[{id:'kanji',label:'Kanji'},{id:'kana',label:'Kana'},{id:'romaji',label:'Romaji'}].map(o=><button key={o.id} onClick={()=>toggleDisplayScript(o.id)} className={`px-3 py-2 rounded-lg text-sm border transition ${displayScripts[o.id]?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>)}</div>
+          <button onClick={()=>setPracticePrefs({...practicePrefs,furigana:practicePrefs.furigana===false})} disabled={!(displayScripts.kanji&&displayScripts.kana)} className={`mt-2 w-full px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 ${practicePrefs.furigana!==false&&displayScripts.kanji&&displayScripts.kana?'bg-indigo-600 text-white border-indigo-600':'bg-white border-stone-200 hover:border-stone-300'}`}>Furigana {practicePrefs.furigana!==false?'on':'off'}</button>
         </div>
         <div className="sm:col-span-2">
           <label className="text-xs text-stone-500 block mb-1">Prompt form</label>
