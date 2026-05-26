@@ -709,15 +709,22 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey}){
   const[verbSugg,setVerbSugg]=useState(null);
   const[suggLoading,setSuggLoading]=useState(false);
   const[suggErr,setSuggErr]=useState('');
+  const suggGen=useRef(0);
 
   const allVerbs=useMemo(()=>[...STARTER_VERBS,...customVerbs],[customVerbs]);
 
   async function fetchSugg(verbs){
+    const gen=++suggGen.current;
     const vlist=verbs||allVerbs;
     setSuggLoading(true);setSuggErr('');setVerbSugg(null);
-    try{const r=await getSuggestedVerb(vlist,geminiKey);setVerbSugg(r);}
-    catch(e){setSuggErr(e.message);}
-    finally{setSuggLoading(false);}
+    try{
+      const r=await getSuggestedVerb(vlist,geminiKey);
+      if(gen!==suggGen.current)return;
+      if(vlist.some(v=>v.dict===r.dict)){setSuggErr('Suggestion was already in your list — try again');return;}
+      setVerbSugg(r);
+    }
+    catch(e){if(gen===suggGen.current)setSuggErr(e.message);}
+    finally{if(gen===suggGen.current)setSuggLoading(false);}
   }
 
   useEffect(()=>{if(geminiKey)fetchSugg();},[geminiKey]);
