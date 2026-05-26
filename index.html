@@ -327,12 +327,15 @@ const ROMAJI_MAP={
   a:'あ',i:'い',u:'う',e:'え',o:'お',
 };
 const ROMAJI_PREFIXES=new Set(Object.keys(ROMAJI_MAP).flatMap(k=>Array.from({length:k.length-1},(_,i)=>k.slice(0,i+1))));
+const ROMAJI_LONG_VOWELS={'ā':'aa','â':'aa','ī':'ii','î':'ii','ū':'uu','û':'uu','ē':'ee','ê':'ee','ō':'ou','ô':'ou','Ā':'aa','Â':'aa','Ī':'ii','Î':'ii','Ū':'uu','Û':'uu','Ē':'ee','Ê':'ee','Ō':'ou','Ô':'ou'};
+function normalizeRomajiInput(s){return String(s||'').normalize('NFKC').replace(/[āâīîūûēêōôĀÂĪÎŪÛĒÊŌÔ]/g,ch=>ROMAJI_LONG_VOWELS[ch]||ch);}
 function toHiragana(s){
   if(!s)return'';
-  s=s.toLowerCase().trim();
+  s=normalizeRomajiInput(s).toLowerCase().trim();
   let out='',i=0;
   while(i<s.length){
     const ch=s[i];
+    if(ch==="'"||ch==='’'||ch==='ʼ'){i++;continue;}
     if(ch.charCodeAt(0)>127){out+=ch;i++;continue;}
     if(/\s/.test(ch)){i++;continue;}
     if(ch==='n'){const nx=s[i+1];if(nx===undefined||nx==='n'||!/[aiueoy]/.test(nx)){out+='ん';i++;continue;}}
@@ -345,10 +348,11 @@ function toHiragana(s){
 }
 function toHiraganaProgress(s){
   if(!s)return'';
-  s=s.toLowerCase().trim();
+  s=normalizeRomajiInput(s).toLowerCase().trim();
   let out='',i=0;
   while(i<s.length){
     const ch=s[i];
+    if(ch==="'"||ch==='’'||ch==='ʼ'){i++;continue;}
     if(ch.charCodeAt(0)>127){out+=ch;i++;continue;}
     if(/\s/.test(ch)){i++;continue;}
     if(ch==='n'){
