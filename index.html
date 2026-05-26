@@ -97,6 +97,26 @@ const STARTER_ADJECTIVES=[
   {dict:'大切',reading:'たいせつ',meaning:'important',group:'na-adjective'},
 ];
 
+const JLPT_LEVELS=['N5','N4','N3','N2','N1'];
+const WORD_TYPE_OPTIONS=[
+  {id:'verb',label:'Verbs'},
+  {id:'i-adjective',label:'い-adjectives'},
+  {id:'na-adjective',label:'な-adjectives'},
+];
+const WORD_META={
+  食べる:{jlpt:'N5',lesson:3},見る:{jlpt:'N5',lesson:3},寝る:{jlpt:'N5',lesson:3},起きる:{jlpt:'N5',lesson:3},出る:{jlpt:'N5',lesson:4},教える:{jlpt:'N5',lesson:7},覚える:{jlpt:'N4',lesson:11},着る:{jlpt:'N5',lesson:10},開ける:{jlpt:'N5',lesson:13},閉める:{jlpt:'N5',lesson:13},
+  行く:{jlpt:'N5',lesson:3},書く:{jlpt:'N5',lesson:3},話す:{jlpt:'N5',lesson:3},待つ:{jlpt:'N5',lesson:6},死ぬ:{jlpt:'N4',lesson:15},遊ぶ:{jlpt:'N5',lesson:7},飲む:{jlpt:'N5',lesson:3},取る:{jlpt:'N5',lesson:8},買う:{jlpt:'N5',lesson:3},泳ぐ:{jlpt:'N5',lesson:6},読む:{jlpt:'N5',lesson:3},立つ:{jlpt:'N5',lesson:8},走る:{jlpt:'N4',lesson:12},帰る:{jlpt:'N5',lesson:3},聞く:{jlpt:'N5',lesson:3},持つ:{jlpt:'N5',lesson:7},使う:{jlpt:'N5',lesson:10},作る:{jlpt:'N5',lesson:7},する:{jlpt:'N5',lesson:3},来る:{jlpt:'N5',lesson:3},
+  いい:{jlpt:'N5',lesson:5},大きい:{jlpt:'N5',lesson:5},小さい:{jlpt:'N5',lesson:5},新しい:{jlpt:'N5',lesson:5},古い:{jlpt:'N5',lesson:5},高い:{jlpt:'N5',lesson:5},安い:{jlpt:'N5',lesson:5},難しい:{jlpt:'N5',lesson:5},易しい:{jlpt:'N5',lesson:5},暑い:{jlpt:'N5',lesson:5},寒い:{jlpt:'N5',lesson:5},楽しい:{jlpt:'N5',lesson:5},忙しい:{jlpt:'N5',lesson:5},おいしい:{jlpt:'N5',lesson:5},
+  静か:{jlpt:'N5',lesson:5},元気:{jlpt:'N5',lesson:1},便利:{jlpt:'N5',lesson:10},有名:{jlpt:'N5',lesson:5},好き:{jlpt:'N5',lesson:5},嫌い:{jlpt:'N5',lesson:5},上手:{jlpt:'N5',lesson:5},下手:{jlpt:'N5',lesson:5},きれい:{jlpt:'N5',lesson:5},大切:{jlpt:'N4',lesson:14}
+};
+function getWordMeta(word){return{jlpt:'N3',lesson:null,...(WORD_META[word.dict]||{})};}
+function wordKind(word){return isAdjective(word)?word.group:'verb';}
+function filterWordsForPrefs(words,prefs=DEFAULT_PREFS){
+  const levels=prefs.jlptLevels&&prefs.jlptLevels.length?prefs.jlptLevels:JLPT_LEVELS;
+  const types=prefs.wordTypes&&prefs.wordTypes.length?prefs.wordTypes:WORD_TYPE_OPTIONS.map(o=>o.id);
+  return words.filter(w=>levels.includes(getWordMeta(w).jlpt)&&types.includes(wordKind(w)));
+}
+
 const CONJ_TYPES=[
   {id:'plain-present',label:'Plain Present',sub:'辞書形',hint:'dictionary form'},
   {id:'plain-past',label:'Plain Past',sub:'た形',hint:'~た / ~だ'},
@@ -524,10 +544,10 @@ function ChatPanel({verb,type,userAnswer,expected,explanation,geminiKey}){
 // ============================================================================
 const DAY=86400000;
 function localDateKey(offsetDays=0){const d=new Date(Date.now()+offsetDays*DAY);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function defaultState(){return{cards:{},verbStats:{},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0}};}
+function defaultState(){return{cards:{},verbStats:{},enabledTypes:[...CONJ_TYPES.filter(t=>t.id!=='plain-present').map(t=>t.id),...ADJ_TYPES.filter(t=>t.id!=='adj-plain-present').map(t=>t.id)],session:{reviewed:0,correct:0},daily:{date:localDateKey(),count:0,goalHit:false,goalStreak:0,bestGoalStreak:0,currentAnswerStreak:0,bestAnswerStreak:0},classify:{attempted:0,correct:0,byGroup:{}}};}
 function mergeState(saved,sessionOverride){
   const base=defaultState();
-  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},daily:(saved&&saved.daily)||base.daily,session:sessionOverride||base.session};
+  const merged={...base,...(saved||{}),verbStats:(saved&&saved.verbStats)||{},daily:(saved&&saved.daily)||base.daily,classify:(saved&&saved.classify)||base.classify,session:sessionOverride||base.session};
   if(saved&&Array.isArray(saved.enabledTypes)&&!saved.enabledTypes.some(id=>id.startsWith('adj-'))){
     merged.enabledTypes=[...saved.enabledTypes,...base.enabledTypes.filter(id=>id.startsWith('adj-'))];
   }
@@ -635,7 +655,7 @@ const RULES=(()=>{
 // ============================================================================
 const STORAGE_KEY='jp-verb-srs-v2';
 const DEFAULT_SYNC={url:'',anonKey:'',syncId:'',enabled:false};
-const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji'};
+const DEFAULT_PREFS={answerMode:'input',autoSpeak:false,dailyGoal:10,scriptMode:'kanji',durationSec:0,jlptLevels:['N5','N4','N3','N2','N1'],wordTypes:['verb','i-adjective','na-adjective']};
 
 function loadAll(){try{const raw=localStorage.getItem(STORAGE_KEY);if(!raw)return null;return JSON.parse(raw);}catch{return null;}}
 function saveAll(state,customVerbs,customAdjectives,syncConfig,lastSyncedAt,geminiKey='',practicePrefs=DEFAULT_PREFS){
@@ -745,12 +765,13 @@ function App(){
             {syncConfig.enabled&&(<div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind==='error'?'text-rose-500':syncStatus.kind==='syncing'?'text-amber-500':'text-emerald-600'}`}><IconCloud className="w-3 h-3"/><span>{syncStatus.kind==='syncing'?'syncing':syncStatus.kind==='error'?'sync error':'synced'}</span></div>)}
           </div>
         </header>
-        <nav className="grid grid-cols-3 sm:grid-cols-7 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','reference','coach','stats','levels','verbs','settings'].map(t=>(
+        <nav className="grid grid-cols-4 sm:grid-cols-8 gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
+          {['study','classify','reference','coach','stats','levels','verbs','settings'].map(t=>(
             <button key={t} onClick={()=>setTab(t)} className={`flex-1 py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
         {tab==='study'&&<StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
+        {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs}/>}
         {tab==='reference'&&<ReferenceView verbs={allVerbs} adjectives={allAdjectives} geminiKey={geminiKey}/>}
         {tab==='coach'&&<CoachView geminiKey={geminiKey}/>}
         {tab==='stats'&&<StatsView state={state} verbs={allWords}/>}
@@ -787,12 +808,26 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS})
   const[phase,setPhase]=useState('answering');
   const[wasCorrect,setWasCorrect]=useState(false);
   const[chatOpen,setChatOpen]=useState(false);
+  const[endAt,setEndAt]=useState(null);
+  const[now,setNow]=useState(Date.now());
   const inputRef=useRef(null);
   const enabledTypes=state.enabledTypes.length>0?state.enabledTypes:['plain-past'];
+  const practiceWords=useMemo(()=>filterWordsForPrefs(verbs,practicePrefs),[verbs,practicePrefs]);
 
-  useEffect(()=>{if(current===null){setCurrent(selectNext(state,verbs,enabledTypes,null));}},[current]);
+  useEffect(()=>{if(current===null){setCurrent(selectNext(state,practiceWords,enabledTypes,null));}},[current,practiceWords,enabledTypes]);
+  useEffect(()=>{if(current&&practiceWords.length&&!practiceWords.some(w=>w.dict===current.verb.dict&&w.group===current.verb.group)){setCurrent(null);setAnswer('');setPhase('answering');}},[practiceWords,current]);
   useEffect(()=>{if(phase==='answering'&&inputRef.current)inputRef.current.focus();},[current,phase]);
   useEffect(()=>{if(current&&phase==='reviewing'&&practicePrefs.autoSpeak)speakJapanese(conjugateItem(current.verb,current.type));},[current,phase,practicePrefs.autoSpeak]);
+  useEffect(()=>{
+    if(practicePrefs.durationSec>0)setEndAt(Date.now()+practicePrefs.durationSec*1000);
+    else setEndAt(null);
+    setNow(Date.now());
+  },[practicePrefs.durationSec]);
+  useEffect(()=>{
+    if(!endAt)return;
+    const id=setInterval(()=>setNow(Date.now()),500);
+    return()=>clearInterval(id);
+  },[endAt]);
 
   if(!current)return(<div className="bg-white rounded-2xl border border-stone-200 p-12 text-center"><p className="text-stone-600 mb-2">No cards available</p><p className="text-xs text-stone-400">Enable conjugation types in Settings.</p></div>);
 
@@ -800,11 +835,12 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS})
   const typeInfo=getTypeInfo(current.type);
   const explanation=phase==='reviewing'&&!wasCorrect?explainItem(current.verb,current.type):null;
   const diagnostic=phase==='reviewing'&&!wasCorrect?diagnoseItem(current.verb,current.type,answer):'';
-  const choices=makeChoices(current,verbs);
+  const choices=makeChoices(current,practiceWords);
   const wordType=isAdjective(current.verb)?'Adjective':'Verb';
+  const timeLeft=endAt?Math.max(0,Math.ceil((endAt-now)/1000)):null;
 
   function submit(choiceValue){
-    if(phase==='reviewing'){setChatOpen(false);setCurrent(selectNext(state,verbs,enabledTypes,current.id));setAnswer('');setPhase('answering');return;}
+    if(phase==='reviewing'){setChatOpen(false);setCurrent(selectNext(state,practiceWords,enabledTypes,current.id));setAnswer('');setPhase('answering');return;}
     const raw=choiceValue!==undefined?choiceValue:answer;
     if(!raw.trim())return;
     const normalized=choiceValue!==undefined?raw:toHiragana(raw);
@@ -819,6 +855,14 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS})
 
   const preview=toHiragana(answer);
   const card=state.cards[current.id];
+  if(timeLeft===0)return(
+    <div className="bg-white rounded-2xl border border-stone-200 p-8 text-center">
+      <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium mb-2">Timed drill complete</div>
+      <div className="text-4xl font-semibold text-stone-900 mb-2">{state.session.correct}/{state.session.reviewed}</div>
+      <div className="text-sm text-stone-500 mb-5">Session accuracy: {state.session.reviewed?Math.round(state.session.correct/state.session.reviewed*100):0}%</div>
+      <button onClick={()=>{setEndAt(Date.now()+(practicePrefs.durationSec||60)*1000);setNow(Date.now());setCurrent(selectNext(state,practiceWords,enabledTypes,current.id));setAnswer('');setPhase('answering');}} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium">Restart timed drill</button>
+    </div>
+  );
 
   return(
     <div className="space-y-4">
@@ -826,7 +870,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS})
         <div className="px-4 pt-3 pb-2 sm:px-6 sm:pt-5 sm:pb-3 border-b border-stone-100">
           <div className="flex items-baseline justify-between">
             <div><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">{typeInfo.label}<span className="text-indigo-400 font-normal normal-case tracking-normal ml-1.5">· {current.ruleLabel}</span></div><div className="text-xs text-stone-400 mt-0.5">{typeInfo.sub&&(typeInfo.sub+' · ')}{typeInfo.hint}</div></div>
-            <div className="text-xs text-stone-400">{card?(fmtInterval(card.interval)+' · ease '+card.ease.toFixed(1)):'new'}</div>
+            <div className="text-xs text-stone-400 text-right">{timeLeft!==null&&<div className="text-indigo-600 font-medium">{Math.floor(timeLeft/60)}:{String(timeLeft%60).padStart(2,'0')}</div>}<div>{card?(fmtInterval(card.interval)+' · ease '+card.ease.toFixed(1)):'new'}</div></div>
           </div>
         </div>
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center">
@@ -834,6 +878,7 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS})
           {practicePrefs.scriptMode!=='hiragana'&&current.verb.dict!==current.verb.reading&&<div className="text-base text-stone-500" lang="ja">{current.verb.reading}</div>}
           <div className="text-sm text-stone-400 mt-2 italic">{current.verb.meaning}</div>
           <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[current.verb.group]} · {wordType}</div>
+          <div className="text-[11px] text-stone-400 mt-1">JLPT {getWordMeta(current.verb).jlpt}{getWordMeta(current.verb).lesson?` · Genki L${getWordMeta(current.verb).lesson}`:''}</div>
         </div>
         <div className="px-4 pb-4 sm:px-6 sm:pb-6">
           {phase==='answering'?(
@@ -999,6 +1044,73 @@ function SRSLevelView({state,verbs}){
 // ============================================================================
 // REFERENCE + AI COACH
 // ============================================================================
+const CLASSIFY_OPTIONS=[
+  {id:'ichidan',label:'る-verb',hint:'Drop る and attach endings directly.'},
+  {id:'godan',label:'う-verb',hint:'The final kana shifts across あ/い/え/お rows.'},
+  {id:'suru',label:'する',hint:'Irregular する pattern.'},
+  {id:'kuru',label:'来る',hint:'Irregular 来る pattern.'},
+  {id:'i-adjective',label:'い-adjective',hint:'Usually ends in い and conjugates like 高い → 高かった.'},
+  {id:'na-adjective',label:'な-adjective',hint:'Takes な before nouns and uses だ/です as a predicate.'},
+];
+function classifyHint(word){
+  if(word.group==='ichidan')return `${word.reading} is ichidan: remove る to make forms like ${conjugate(word,'polite-present')}.`;
+  if(word.group==='godan')return `${word.reading} is godan: the final ${word.reading.slice(-1)} shifts rows, as in ${conjugate(word,'plain-negative')}.`;
+  if(word.group==='suru')return 'する is irregular: する, した, しない, して, できる.';
+  if(word.group==='kuru')return '来る is irregular: くる, きた, こない, きて.';
+  if(word.group==='i-adjective')return `${word.reading} conjugates as an い-adjective: ${conjugateAdjective(word,'adj-plain-past')}, ${conjugateAdjective(word,'adj-plain-negative')}.`;
+  return `${word.reading} is a な-adjective: ${conjugateAdjective(word,'adj-attributive')} + noun, or ${conjugateAdjective(word,'adj-polite-present')}.`;
+}
+function ClassificationView({state,setState,words,practicePrefs}){
+  const filtered=useMemo(()=>filterWordsForPrefs(words,practicePrefs),[words,practicePrefs]);
+  const[current,setCurrent]=useState(null);
+  const[result,setResult]=useState(null);
+  useEffect(()=>{if(!current&&filtered.length)setCurrent(filtered[Math.floor(Math.random()*filtered.length)]);},[current,filtered]);
+  useEffect(()=>{if(current&&filtered.length&&!filtered.some(w=>w.dict===current.dict&&w.group===current.group)){setCurrent(null);setResult(null);}},[filtered,current]);
+  if(!filtered.length)return(<div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No words match the current filters.</div>);
+  if(!current)return null;
+  const allowed=CLASSIFY_OPTIONS.filter(o=>filtered.some(w=>w.group===o.id)||o.id===current.group);
+  const stats=state.classify||defaultState().classify;
+  function choose(group){
+    if(result)return;
+    const ok=group===current.group;
+    const prev=stats.byGroup?.[current.group]||{attempted:0,correct:0};
+    setState({...state,classify:{attempted:(stats.attempted||0)+1,correct:(stats.correct||0)+(ok?1:0),byGroup:{...(stats.byGroup||{}),[current.group]:{attempted:prev.attempted+1,correct:prev.correct+(ok?1:0)}}},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)});
+    setResult({ok,chosen:group});
+  }
+  function next(){
+    setResult(null);
+    const pool=filtered.length>1?filtered.filter(w=>w.dict!==current.dict||w.group!==current.group):filtered;
+    setCurrent(pool[Math.floor(Math.random()*pool.length)]);
+  }
+  const acc=stats.attempted?Math.round(stats.correct/stats.attempted*100):0;
+  return(
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-stone-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div><h3 className="font-medium">Classification drill</h3><p className="text-xs text-stone-500">Practice the group recognition step before conjugating.</p></div>
+          <div className="text-xs text-stone-500 text-right"><div>{stats.correct}/{stats.attempted}</div><div>{acc}% accuracy</div></div>
+        </div>
+        <div className="text-center py-5">
+          <div className="text-5xl font-medium mb-2" lang="ja">{practicePrefs.scriptMode==='hiragana'?current.reading:current.dict}</div>
+          {practicePrefs.scriptMode!=='hiragana'&&current.dict!==current.reading&&<div className="text-stone-500" lang="ja">{current.reading}</div>}
+          <div className="text-sm text-stone-400 italic mt-2">{current.meaning}</div>
+          <div className="text-[11px] text-stone-400 mt-1">JLPT {getWordMeta(current).jlpt}{getWordMeta(current).lesson?` · Genki L${getWordMeta(current).lesson}`:''}</div>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-2">
+          {allowed.map(o=>(<button key={o.id} onClick={()=>choose(o.id)} disabled={!!result} className={`px-3 py-3 rounded-xl border text-sm font-medium transition ${result&&o.id===current.group?'bg-emerald-50 border-emerald-300 text-emerald-800':result&&o.id===result.chosen&&!result.ok?'bg-rose-50 border-rose-300 text-rose-800':'bg-white border-stone-200 hover:border-indigo-400 hover:bg-indigo-50'}`}>{o.label}</button>))}
+        </div>
+        {result&&(
+          <div className={`mt-4 rounded-xl border p-4 ${result.ok?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
+            <div className={`font-medium text-sm ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Correct.':'Not quite.'} <span className="font-normal">It is {CLASSIFY_OPTIONS.find(o=>o.id===current.group)?.label}.</span></div>
+            <div className="text-sm text-stone-700 mt-2">{classifyHint(current)}</div>
+            <button onClick={next} autoFocus className="w-full mt-3 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-sm font-medium">Next</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function formRows(item){
   const types=isAdjective(item)?ADJ_TYPES:CONJ_TYPES;
   return types.map(t=>({type:t,answer:conjugateItem(item,t.id),explanation:explainItem(item,t.id)}));
@@ -1283,8 +1395,13 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
 
   const formReady=!!(syncForm.url.trim()&&syncForm.anonKey.trim()&&syncForm.syncId.trim());
   function saveCfg(enabled){setSyncConfig({url:syncForm.url.trim().replace(/\/+$/,''),anonKey:syncForm.anonKey.trim(),syncId:syncForm.syncId.trim(),enabled:enabled!==undefined?enabled:syncConfig.enabled});}
-  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:3,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},daily:state.daily},customVerbs,customAdjectives,practicePrefs}),[state,customVerbs,customAdjectives,practicePrefs]);
+  const exportData=useMemo(()=>JSON.stringify({format:'jp-verb-srs',version:4,exportedAt:new Date().toISOString(),state:{cards:state.cards,enabledTypes:state.enabledTypes,verbStats:state.verbStats||{},daily:state.daily,classify:state.classify},customVerbs,customAdjectives,practicePrefs}),[state,customVerbs,customAdjectives,practicePrefs]);
   function toggle(id){const has=state.enabledTypes.includes(id);setState({...state,enabledTypes:has?state.enabledTypes.filter(t=>t!==id):[...state.enabledTypes,id]});}
+  function togglePref(key,id,allIds){
+    const cur=practicePrefs[key]||allIds;
+    const next=cur.includes(id)?cur.filter(x=>x!==id):[...cur,id];
+    setPracticePrefs({...practicePrefs,[key]:next.length?next:allIds});
+  }
   function reset(){setState({...defaultState(),enabledTypes:state.enabledTypes});setConfirmReset(false);}
   async function copyExport(){try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(exportData);setCopyOk(true);setTimeout(()=>setCopyOk(false),2000);}}catch{}}
   function doImport(){setImportErr('');try{const data=JSON.parse(importText.trim());if(data.format!=='jp-verb-srs')throw new Error("doesn't look like a verb-drill backup");if(!data.state||typeof data.state.cards!=='object')throw new Error('missing card data');setState(mergeState(data.state,{reviewed:0,correct:0}));if(Array.isArray(data.customVerbs))setCustomVerbs(data.customVerbs);if(Array.isArray(data.customAdjectives))setCustomAdjectives(data.customAdjectives);if(data.practicePrefs)setPracticePrefs({...DEFAULT_PREFS,...data.practicePrefs});setImportText('');setImportOpen(false);setMsg('Restored!');setTimeout(()=>setMsg(''),3000);}catch(e){setImportErr('Invalid: '+(e.message||'parse failed'));}}
@@ -1308,6 +1425,20 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
         </div>
         <div className="flex items-end">
           <button onClick={()=>setPracticePrefs({...practicePrefs,autoSpeak:!practicePrefs.autoSpeak})} className={`w-full px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.autoSpeak?'bg-indigo-600 text-white border-indigo-600':'bg-white border-stone-200 hover:border-stone-300'}`}><IconVolume className="w-4 h-4 inline-block mr-1.5"/>Speak answers</button>
+        </div>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Timed drill</label>
+          <select value={practicePrefs.durationSec||0} onChange={e=>setPracticePrefs({...practicePrefs,durationSec:Number(e.target.value)})} className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none">
+            <option value="0">Infinite</option><option value="30">30 seconds</option><option value="60">60 seconds</option><option value="120">120 seconds</option><option value="180">180 seconds</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">JLPT levels</label>
+          <div className="flex gap-1">{JLPT_LEVELS.map(l=>(<button key={l} onClick={()=>togglePref('jlptLevels',l,JLPT_LEVELS)} className={`flex-1 px-2 py-2 rounded-lg text-xs border transition ${(practicePrefs.jlptLevels||JLPT_LEVELS).includes(l)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{l}</button>))}</div>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs text-stone-500 block mb-1">Word types</label>
+          <div className="grid grid-cols-3 gap-2">{WORD_TYPE_OPTIONS.map(o=>(<button key={o.id} onClick={()=>togglePref('wordTypes',o.id,WORD_TYPE_OPTIONS.map(x=>x.id))} className={`px-3 py-2 rounded-lg text-sm border transition ${(practicePrefs.wordTypes||WORD_TYPE_OPTIONS.map(x=>x.id)).includes(o.id)?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
         </div>
       </div>
     </div>
