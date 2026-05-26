@@ -147,17 +147,26 @@ const WORD_META={
   静か:{jlpt:'N5',lesson:5},元気:{jlpt:'N5',lesson:1},便利:{jlpt:'N5',lesson:10},有名:{jlpt:'N5',lesson:5},好き:{jlpt:'N5',lesson:5},嫌い:{jlpt:'N5',lesson:5},上手:{jlpt:'N5',lesson:5},下手:{jlpt:'N5',lesson:5},きれい:{jlpt:'N5',lesson:5},大切:{jlpt:'N4',lesson:14}
 };
 const VOCAB_PACKS=[
-  {id:'n5-motion',name:'N5 Motion Verbs',desc:'Everyday movement and classroom verbs.',words:[
+  {id:'n5-motion',name:'N5 Motion Verbs',level:'N5',desc:'Everyday movement and classroom verbs.',words:[
     {dict:'歩く',reading:'あるく',meaning:'to walk',group:'godan'},{dict:'入る',reading:'はいる',meaning:'to enter',group:'godan'},{dict:'出す',reading:'だす',meaning:'to take out / submit',group:'godan'},{dict:'座る',reading:'すわる',meaning:'to sit',group:'godan'},{dict:'止まる',reading:'とまる',meaning:'to stop',group:'godan'},{dict:'乗る',reading:'のる',meaning:'to ride',group:'godan'},{dict:'降りる',reading:'おりる',meaning:'to get off',group:'ichidan'},{dict:'会う',reading:'あう',meaning:'to meet',group:'godan'},{dict:'送る',reading:'おくる',meaning:'to send / escort',group:'godan'},{dict:'急ぐ',reading:'いそぐ',meaning:'to hurry',group:'godan'}
   ]},
-  {id:'n5-daily',name:'N5 Daily Life',desc:'High-frequency verbs for home, school, and errands.',words:[
+  {id:'n5-daily',name:'N5 Daily Life',level:'N5',desc:'High-frequency verbs for home, school, and errands.',words:[
     {dict:'洗う',reading:'あらう',meaning:'to wash',group:'godan'},{dict:'借りる',reading:'かりる',meaning:'to borrow',group:'ichidan'},{dict:'貸す',reading:'かす',meaning:'to lend',group:'godan'},{dict:'返す',reading:'かえす',meaning:'to return something',group:'godan'},{dict:'忘れる',reading:'わすれる',meaning:'to forget',group:'ichidan'},{dict:'始める',reading:'はじめる',meaning:'to begin',group:'ichidan'},{dict:'終わる',reading:'おわる',meaning:'to end',group:'godan'},{dict:'勉強する',reading:'べんきょうする',meaning:'to study',group:'suru'},{dict:'練習する',reading:'れんしゅうする',meaning:'to practice',group:'suru'},{dict:'料理する',reading:'りょうりする',meaning:'to cook',group:'suru'}
   ]},
-  {id:'n4-core',name:'N4 Core Verbs',desc:'Useful intermediate verbs with common godan/ichidan traps.',words:[
+  {id:'n4-core',name:'N4 Core Verbs',level:'N4',desc:'Useful intermediate verbs with common godan/ichidan traps.',words:[
     {dict:'選ぶ',reading:'えらぶ',meaning:'to choose',group:'godan'},{dict:'直す',reading:'なおす',meaning:'to fix',group:'godan'},{dict:'治る',reading:'なおる',meaning:'to heal',group:'godan'},{dict:'間違える',reading:'まちがえる',meaning:'to make a mistake',group:'ichidan'},{dict:'調べる',reading:'しらべる',meaning:'to investigate / look up',group:'ichidan'},{dict:'説明する',reading:'せつめいする',meaning:'to explain',group:'suru'},{dict:'予約する',reading:'よやくする',meaning:'to reserve',group:'suru'},{dict:'運転する',reading:'うんてんする',meaning:'to drive',group:'suru'},{dict:'壊す',reading:'こわす',meaning:'to break something',group:'godan'},{dict:'壊れる',reading:'こわれる',meaning:'to break',group:'ichidan'}
   ]},
-  {id:'adjectives-core',name:'Core Adjectives',desc:'Common い and な adjectives for adjective conjugation drills.',words:[
+  {id:'adjectives-core',name:'Core Adjectives',level:'N5',desc:'Common い and な adjectives for adjective conjugation drills.',words:[
     {dict:'早い',reading:'はやい',meaning:'early / fast',group:'i-adjective'},{dict:'遅い',reading:'おそい',meaning:'late / slow',group:'i-adjective'},{dict:'強い',reading:'つよい',meaning:'strong',group:'i-adjective'},{dict:'弱い',reading:'よわい',meaning:'weak',group:'i-adjective'},{dict:'長い',reading:'ながい',meaning:'long',group:'i-adjective'},{dict:'短い',reading:'みじかい',meaning:'short',group:'i-adjective'},{dict:'簡単',reading:'かんたん',meaning:'simple',group:'na-adjective'},{dict:'複雑',reading:'ふくざつ',meaning:'complex',group:'na-adjective'},{dict:'安全',reading:'あんぜん',meaning:'safe',group:'na-adjective'},{dict:'危険',reading:'きけん',meaning:'dangerous',group:'na-adjective'}
+  ]},
+  {id:'n3-practical',name:'N3 Practical Mix',level:'N3',desc:'Everyday intermediate verbs and adjectives for longer sentences.',words:[
+    {dict:'比べる',reading:'くらべる',meaning:'to compare',group:'ichidan'},{dict:'減る',reading:'へる',meaning:'to decrease',group:'godan'},{dict:'増える',reading:'ふえる',meaning:'to increase',group:'ichidan'},{dict:'続く',reading:'つづく',meaning:'to continue',group:'godan'},{dict:'続ける',reading:'つづける',meaning:'to continue something',group:'ichidan'},{dict:'決める',reading:'きめる',meaning:'to decide',group:'ichidan'},{dict:'決まる',reading:'きまる',meaning:'to be decided',group:'godan'},{dict:'伝える',reading:'つたえる',meaning:'to convey',group:'ichidan'},{dict:'参加する',reading:'さんかする',meaning:'to participate',group:'suru'},{dict:'準備する',reading:'じゅんびする',meaning:'to prepare',group:'suru'},{dict:'詳しい',reading:'くわしい',meaning:'detailed / knowledgeable',group:'i-adjective'},{dict:'深い',reading:'ふかい',meaning:'deep',group:'i-adjective'},{dict:'必要',reading:'ひつよう',meaning:'necessary',group:'na-adjective'},{dict:'特別',reading:'とくべつ',meaning:'special',group:'na-adjective'}
+  ]},
+  {id:'n2-work-society',name:'N2 Work & Society',level:'N2',desc:'Formal, workplace, and social-issue vocabulary with harder patterns.',words:[
+    {dict:'扱う',reading:'あつかう',meaning:'to handle / treat',group:'godan'},{dict:'認める',reading:'みとめる',meaning:'to recognize / approve',group:'ichidan'},{dict:'断る',reading:'ことわる',meaning:'to refuse',group:'godan'},{dict:'述べる',reading:'のべる',meaning:'to state',group:'ichidan'},{dict:'影響する',reading:'えいきょうする',meaning:'to influence',group:'suru'},{dict:'発展する',reading:'はってんする',meaning:'to develop',group:'suru'},{dict:'解決する',reading:'かいけつする',meaning:'to solve',group:'suru'},{dict:'提出する',reading:'ていしゅつする',meaning:'to submit',group:'suru'},{dict:'補う',reading:'おぎなう',meaning:'to supplement',group:'godan'},{dict:'改善する',reading:'かいぜんする',meaning:'to improve',group:'suru'},{dict:'具体的',reading:'ぐたいてき',meaning:'concrete / specific',group:'na-adjective'},{dict:'積極的',reading:'せっきょくてき',meaning:'proactive',group:'na-adjective'},{dict:'正確',reading:'せいかく',meaning:'accurate',group:'na-adjective'},{dict:'激しい',reading:'はげしい',meaning:'intense',group:'i-adjective'}
+  ]},
+  {id:'n1-nuance',name:'N1 Nuance Verbs',level:'N1',desc:'Advanced written-style verbs and precise adjectives for upper-level drills.',words:[
+    {dict:'試みる',reading:'こころみる',meaning:'to attempt',group:'ichidan'},{dict:'伴う',reading:'ともなう',meaning:'to accompany / involve',group:'godan'},{dict:'損なう',reading:'そこなう',meaning:'to harm / impair',group:'godan'},{dict:'促す',reading:'うながす',meaning:'to urge / prompt',group:'godan'},{dict:'覆す',reading:'くつがえす',meaning:'to overturn',group:'godan'},{dict:'滞る',reading:'とどこおる',meaning:'to be delayed / stagnate',group:'godan'},{dict:'免れる',reading:'まぬがれる',meaning:'to escape / avoid',group:'ichidan'},{dict:'衰える',reading:'おとろえる',meaning:'to decline / weaken',group:'ichidan'},{dict:'執着する',reading:'しゅうちゃくする',meaning:'to cling to / obsess over',group:'suru'},{dict:'把握する',reading:'はあくする',meaning:'to grasp / understand',group:'suru'},{dict:'著しい',reading:'いちじるしい',meaning:'remarkable / striking',group:'i-adjective'},{dict:'乏しい',reading:'とぼしい',meaning:'scarce / poor',group:'i-adjective'},{dict:'曖昧',reading:'あいまい',meaning:'ambiguous',group:'na-adjective'},{dict:'厳密',reading:'げんみつ',meaning:'strict / precise',group:'na-adjective'}
   ]}
 ];
 const AI_LIST_TARGETS=['N5','N4','N3','N2','N1','Genki','Travel','Work'];
@@ -190,7 +199,17 @@ const SHADOW_SCENARIOS=[
     {speaker:'A',ja:'いいですね。涼しくなったら散歩します。',en:'Sounds good. When it gets cooler, I’ll take a walk.'}
   ]}
 ];
-function getWordMeta(word){return{jlpt:'N3',lesson:null,...(WORD_META[word.dict]||{})};}
+function normalizeJlptLevel(value){
+  const m=String(value||'').trim().toUpperCase().match(/^N[1-5]$/);
+  return m?m[0]:null;
+}
+function getWordMeta(word){
+  const embedded={};
+  const jlpt=normalizeJlptLevel(word?.jlpt||word?.level);
+  if(jlpt)embedded.jlpt=jlpt;
+  if(word?.lesson)embedded.lesson=Number(word.lesson)||null;
+  return{jlpt:'N3',lesson:null,...(WORD_META[word?.dict]||{}),...embedded};
+}
 function wordKind(word){return isAdjective(word)?word.group:'verb';}
 function wordKey(word){return`${word.group}:${word.dict}`;}
 function filterWordsForPrefs(words,prefs=DEFAULT_PREFS,wordLists=[]){
@@ -3485,7 +3504,8 @@ function parseScannerAIWords(text){
     const key=`${group}:${dict}`;
     if(seen.has(key))return null;
     seen.add(key);
-    return{dict,reading,meaning,group,evidence:String(row.evidence||row.surface||'').trim()};
+    const jlpt=normalizeJlptLevel(row.jlpt||row.level);
+    return{dict,reading,meaning,group,evidence:String(row.evidence||row.surface||'').trim(),...(jlpt?{jlpt}:{})};
   }).filter(Boolean);
 }
 const SCANNER_TEXT_EXT=/\.(txt|md|csv|tsv|srt|vtt|json|html?)$/i;
@@ -4341,7 +4361,9 @@ function parseWordRows(text){
     if(!group)return null;
     const reading=toHiragana(cols[1]);
     if(!isAllKana(reading))return null;
-    return{dict:cols[0],reading,meaning:cols[2],group};
+    const jlpt=normalizeJlptLevel(cols[5]||cols[4]);
+    const lesson=Number(cols[6]||'')||null;
+    return{dict:cols[0],reading,meaning:cols[2],group,...(jlpt?{jlpt}:{}),...(lesson?{lesson}:{})};
   }).filter(Boolean);
 }
 function addUniqueWord(list,word){return list.some(w=>w.dict===word.dict&&w.group===word.group)?list:[...list,word];}
@@ -4449,7 +4471,8 @@ function ListsView({words,customVerbs,setCustomVerbs,customAdjectives,setCustomA
     let list=wordLists.find(l=>l.id==='pack-'+pack.id);
     const id=list?.id||'pack-'+pack.id;
     let verbs=customVerbs,adjs=customAdjectives,keys=new Set(list?.wordKeys||[]);
-    for(const w of pack.words){
+    const packWords=pack.words.map(w=>({...w,jlpt:normalizeJlptLevel(w.jlpt)||normalizeJlptLevel(pack.level)||getWordMeta(w).jlpt}));
+    for(const w of packWords){
       if(isAdjective(w))adjs=addUniqueWord(adjs,w);else verbs=addUniqueWord(verbs,w);
       keys.add(wordKey(w));
     }
@@ -4457,7 +4480,7 @@ function ListsView({words,customVerbs,setCustomVerbs,customAdjectives,setCustomA
     else setWordLists([...wordLists,{id,name:pack.name,wordKeys:[...keys]}]);
     setCustomVerbs(verbs);setCustomAdjectives(adjs);setActiveId(id);
     if(!selectedIds.includes(id))setPracticePrefs({...practicePrefs,wordListIds:[...selectedIds,id]});
-    setMsg(`Imported ${pack.words.length} words from ${pack.name}.`);
+    setMsg(`Imported ${packWords.length} words from ${pack.name}.`);
   }
   async function generateAIList(){
     if(!geminiKey)return;
@@ -4466,7 +4489,7 @@ function ListsView({words,customVerbs,setCustomVerbs,customAdjectives,setCustomA
     const avoid=words.filter(w=>activeSeen.has(wordKey(w))).slice(0,80).map(w=>`${w.dict} (${w.reading}, ${GROUP_NAMES[w.group]||w.group})`).join(', ');
     setAiLoading(true);setAiErr('');setAiRows([]);setMsg('');
     try{
-      const prompt=`Build a targeted Japanese conjugation drill list.\n\nTarget level/course: ${aiTarget}\nTopic or situation: ${aiTopic||'general daily life'}\nDesired size: ${count} words\nAvoid words already in the active list when possible: ${avoid||'none'}\n\nReturn ONLY JSON with this exact shape:\n{"words":[{"dict":"Japanese dictionary form or adjective stem","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective","reason":"why this is useful for conjugation practice"}]}\n\nUse real, common learner-appropriate words. Mix verbs and adjectives when useful. Prefer words that exercise different conjugation patterns. JLPT labels are community estimates, so be practical instead of pretending official certainty.`;
+      const prompt=`Build a targeted Japanese conjugation drill list.\n\nTarget level/course: ${aiTarget}\nTopic or situation: ${aiTopic||'general daily life'}\nDesired size: ${count} words\nAvoid words already in the active list when possible: ${avoid||'none'}\n\nReturn ONLY JSON with this exact shape:\n{"words":[{"dict":"Japanese dictionary form or adjective stem","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective","jlpt":"N5|N4|N3|N2|N1","reason":"why this is useful for conjugation practice"}]}\n\nUse real, common learner-appropriate words. Mix verbs and adjectives when useful. Prefer words that exercise different conjugation patterns. JLPT labels are community estimates, so be practical instead of pretending official certainty.`;
       const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1800,0.25,aiSystemFromPrefs(practicePrefs,'You create accurate Japanese study lists for conjugation practice. Return valid JSON only. Do not invent readings or impossible groups.'));
       const rows=parseScannerAIWords(reply).slice(0,count);
       if(!rows.length)throw new Error('AI did not return valid verb/adjective rows.');
@@ -4528,7 +4551,7 @@ function ListsView({words,customVerbs,setCustomVerbs,customAdjectives,setCustomA
           <div className="grid sm:grid-cols-2 gap-2">
             {VOCAB_PACKS.map(pack=><div key={pack.id} className="border border-stone-200 rounded-xl p-3">
               <div className="flex items-start justify-between gap-2">
-                <div><div className="font-medium text-sm">{pack.name}</div><div className="text-xs text-stone-500 mt-0.5">{pack.desc}</div><div className="text-[11px] text-stone-400 mt-1">{pack.words.length} words</div></div>
+                <div><div className="font-medium text-sm">{pack.name}</div><div className="text-xs text-stone-500 mt-0.5">{pack.desc}</div><div className="text-[11px] text-stone-400 mt-1">{pack.level?`JLPT ${pack.level} · `:''}{pack.words.length} words</div></div>
                 <button onClick={()=>importPack(pack)} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs">Import</button>
               </div>
             </div>)}
