@@ -76,6 +76,8 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const [aiHintText, setAiHintText] = useState('');
   const [aiHintLoading, setAiHintLoading] = useState(false);
   const [aiHintErr, setAiHintErr] = useState('');
+  const [aiTypingHint, setAiTypingHint] = useState('');
+  const [aiTypingHintLoading, setAiTypingHintLoading] = useState(false);
   const [coachRevealed, setCoachRevealed] = useState(0);
   const [revealedMiss, setRevealedMiss] = useState(false);
   const [reviewChoiceLabel, setReviewChoiceLabel] = useState('');
@@ -409,6 +411,27 @@ Keep it concise and clear.`;
     setAiHintLoading(false);
   }
 
+  async function generateTypingHint() {
+    if (!current || !geminiKey || !answer.trim()) return;
+    setAiTypingHintLoading(true);
+    setAiTypingHint('');
+    const typedKana = toHiragana(answer) || answer;
+    try {
+      const prompt = `A student is conjugating a Japanese verb and needs targeted guidance.\n\nBase word: ${current.verb.dict} (${current.verb.reading}), meaning: "${current.verb.meaning}"\nVerb class: ${GROUP_NAMES[current.verb.group] || current.verb.group}\nTask: transform to ${typeInfo.label}${taskSub ? ` (${taskSub})` : ''}\nStudent typed so far: "${typedKana}"\n\nDo NOT reveal the correct answer. Give one short targeted hint (under 20 words) about what to fix or add next based specifically on what they've typed.`;
+      const reply = await callGemini(
+        [{ role: 'user', parts: [{ text: prompt }] }],
+        geminiKey,
+        120,
+        0.3,
+        aiSystemFromPrefs(practicePrefs, 'You help students learn Japanese conjugation. Never reveal the full correct answer.')
+      );
+      setAiTypingHint(reply);
+    } catch (e) {
+      // silently fail — no error shown for inline hint
+    }
+    setAiTypingHintLoading(false);
+  }
+
   function submit(choiceValue) {
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
@@ -422,6 +445,8 @@ Keep it concise and clear.`;
       setReviewChoiceLabel('');
       setSelfCheckOpen(false);
       setTypoGuard(null);
+      setAiTypingHint('');
+      setAiTypingHintLoading(false);
       setPhase('answering');
       if (!reviewSetComplete) {
         setCurrent(selectNext(state, practiceWords, enabledTypes, current.id, practicePrefs));
@@ -487,6 +512,8 @@ Keep it concise and clear.`;
         setReviewChoiceLabel('');
         setSelfCheckOpen(false);
         setTypoGuard(null);
+        setAiTypingHint('');
+        setAiTypingHintLoading(false);
         setPhase('answering');
         setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
       }, 850);
@@ -508,6 +535,8 @@ Keep it concise and clear.`;
     setReviewChoiceLabel('');
     setSelfCheckOpen(false);
     setTypoGuard(null);
+    setAiTypingHint('');
+    setAiTypingHintLoading(false);
     setPhase('answering');
     setWasCorrect(false);
     setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
@@ -569,6 +598,8 @@ Keep it concise and clear.`;
         setReviewChoiceLabel('');
         setSelfCheckOpen(false);
         setTypoGuard(null);
+        setAiTypingHint('');
+        setAiTypingHintLoading(false);
         setPhase('answering');
         setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
       }, 850);
@@ -1030,6 +1061,23 @@ Keep it concise and clear.`;
                         Skip
                       </button>
                     </div>
+                    {geminiKey && !reverseDrill && (
+                      <div className="mt-2 flex flex-col items-center gap-1.5">
+                        <button
+                          onClick={generateTypingHint}
+                          disabled={!answer.trim() || aiTypingHintLoading}
+                          className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 inline-flex items-center gap-1 transition"
+                        >
+                          <IconSpark className="w-3 h-3" />
+                          {aiTypingHintLoading ? 'Thinking…' : 'Hint on my progress'}
+                        </button>
+                        {aiTypingHint && (
+                          <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
+                            {aiTypingHint}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
@@ -1121,6 +1169,23 @@ Keep it concise and clear.`;
                         Skip
                       </button>
                     </div>
+                    {geminiKey && !reverseDrill && (
+                      <div className="mt-2 flex flex-col items-center gap-1.5">
+                        <button
+                          onClick={generateTypingHint}
+                          disabled={!answer.trim() || aiTypingHintLoading}
+                          className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 inline-flex items-center gap-1 transition"
+                        >
+                          <IconSpark className="w-3 h-3" />
+                          {aiTypingHintLoading ? 'Thinking…' : 'Hint on my progress'}
+                        </button>
+                        {aiTypingHint && (
+                          <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
+                            {aiTypingHint}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </>
