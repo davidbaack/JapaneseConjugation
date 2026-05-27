@@ -2632,6 +2632,8 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   const[aiHintErr,setAiHintErr]=useState('');
   const[coachRevealed,setCoachRevealed]=useState(0);
   const[revealedMiss,setRevealedMiss]=useState(false);
+  const[reviewChoiceLabel,setReviewChoiceLabel]=useState('');
+  const[selfCheckOpen,setSelfCheckOpen]=useState(false);
   const[typoGuard,setTypoGuard]=useState(null);
   const[endAt,setEndAt]=useState(null);
   const[now,setNow]=useState(Date.now());
@@ -2656,7 +2658,8 @@ function StudyView({state,setState,verbs,geminiKey,practicePrefs=DEFAULT_PREFS,w
   useEffect(()=>{if(current&&phase==='answering'&&listeningPrompt&&promptAudioText)speakJapanese(promptAudioText,0.85,practicePrefs.voiceURI);},[current?.id,phase,listeningPrompt,promptAudioText,practicePrefs.voiceURI]);
   useEffect(()=>{if(current&&phase==='reviewing'&&practicePrefs.autoSpeak)speakJapanese(conjugateItem(current.verb,current.type),0.9,practicePrefs.voiceURI);},[current,phase,practicePrefs.autoSpeak,practicePrefs.voiceURI]);
   useEffect(()=>{setCoachRevealed(0);},[current?.id,practicePrefs.answerMode]);
-  useEffect(()=>{if(phase==='answering')setRevealedMiss(false);},[current?.id,phase]);
+  useEffect(()=>{if(phase==='answering'){setRevealedMiss(false);setReviewChoiceLabel('');}},[current?.id,phase]);
+  useEffect(()=>{setSelfCheckOpen(false);},[current?.id,phase,practicePrefs.answerMode]);
   useEffect(()=>{setTypoGuard(null);},[current?.id,phase]);
   useEffect(()=>{setReviewBase(state.session.reviewed||0);},[practicePrefs.reviewLimit]);
   useEffect(()=>{
@@ -2790,7 +2793,7 @@ Keep it concise and clear.`;
   function submit(choiceValue){
     if(autoAdvanceRef.current){clearTimeout(autoAdvanceRef.current);autoAdvanceRef.current=null;}
     if(phase==='reviewing'){
-      setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setTypoGuard(null);setPhase('answering');
+      setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setReviewChoiceLabel('');setSelfCheckOpen(false);setTypoGuard(null);setPhase('answering');
       if(!reviewSetComplete)setCurrent(selectNext(state,practiceWords,enabledTypes,current.id,practicePrefs));
       return;
     }
@@ -2808,13 +2811,13 @@ Keep it concise and clear.`;
     const nextState={...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,mistakes:nextMistakes,session:{...(state.session||{}),reviewed:(state.session?.reviewed||0)+1,correct:(state.session?.correct||0)+(ok?1:0)},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)};
     setState(nextState);
     setChatOpen(!ok&&!!geminiKey&&!!practicePrefs.autoAiExplainErrors);
-    setRevealedMiss(false);setWasCorrect(ok);setPhase('reviewing');
+    setReviewChoiceLabel('');setRevealedMiss(false);setSelfCheckOpen(false);setWasCorrect(ok);setPhase('reviewing');
     const reviewWillComplete=reviewLimit>0&&reviewsDone+1>=reviewLimit;
     if(ok&&practicePrefs.autoAdvanceCorrect&&!reviewWillComplete){
       autoAdvanceRef.current=setTimeout(()=>{
         autoAdvanceRef.current=null;
         if(endAt&&Date.now()>=endAt)return;
-        setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setTypoGuard(null);setPhase('answering');
+        setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setReviewChoiceLabel('');setSelfCheckOpen(false);setTypoGuard(null);setPhase('answering');
         setCurrent(selectNext(nextState,practiceWords,enabledTypes,current.id,practicePrefs));
       },850);
     }
@@ -2824,8 +2827,28 @@ Keep it concise and clear.`;
     if(autoAdvanceRef.current){clearTimeout(autoAdvanceRef.current);autoAdvanceRef.current=null;}
     const nextState={...state,session:{...(state.session||{}),skipped:(state.session?.skipped||0)+1}};
     setState(nextState);
-    setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setTypoGuard(null);setPhase('answering');setWasCorrect(false);
+    setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setReviewChoiceLabel('');setSelfCheckOpen(false);setTypoGuard(null);setPhase('answering');setWasCorrect(false);
     setCurrent(selectNext(nextState,practiceWords,enabledTypes,current.id,practicePrefs));
+  }
+  function gradeSelfCheck(ok,label){
+    if(!current||phase!=='answering')return;
+    if(autoAdvanceRef.current){clearTimeout(autoAdvanceRef.current);autoAdvanceRef.current=null;}
+    const dict=current.verb.dict,rid=current.id;
+    const prevVS=(state.verbStats?.[dict]?.[rid])||{seen:0,incorrect:0};
+    const newVerbStats={...state.verbStats,[dict]:{...(state.verbStats?.[dict]||{}),[rid]:{seen:prevVS.seen+1,incorrect:prevVS.incorrect+(ok?0:1)}}};
+    const nextMistakes=ok?state.mistakes:recordMistake(state.mistakes,current.verb,current.type,reverseDrill?current.type:promptType,`self-check: ${label}`,expected);
+    const nextState={...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],ok)},verbStats:newVerbStats,mistakes:nextMistakes,session:{...(state.session||{}),reviewed:(state.session?.reviewed||0)+1,correct:(state.session?.correct||0)+(ok?1:0)},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)};
+    setState(nextState);
+    setAnswer('');setTypoGuard(null);setReviewChoiceLabel(label);setRevealedMiss(!ok);setSelfCheckOpen(false);setChatOpen(!ok&&!!geminiKey&&!!practicePrefs.autoAiExplainErrors);setWasCorrect(ok);setPhase('reviewing');
+    const reviewWillComplete=reviewLimit>0&&reviewsDone+1>=reviewLimit;
+    if(ok&&practicePrefs.autoAdvanceCorrect&&!reviewWillComplete){
+      autoAdvanceRef.current=setTimeout(()=>{
+        autoAdvanceRef.current=null;
+        if(endAt&&Date.now()>=endAt)return;
+        setChatOpen(false);setAnswer('');setCoachRevealed(0);setRevealedMiss(false);setReviewChoiceLabel('');setSelfCheckOpen(false);setTypoGuard(null);setPhase('answering');
+        setCurrent(selectNext(nextState,practiceWords,enabledTypes,current.id,practicePrefs));
+      },850);
+    }
   }
   function revealAnswer(){
     if(!current||phase!=='answering')return;
@@ -2836,7 +2859,7 @@ Keep it concise and clear.`;
     const nextMistakes=recordMistake(state.mistakes,current.verb,current.type,reverseDrill?current.type:promptType,'(revealed)',expected);
     const nextState={...state,cards:{...state.cards,[rid]:gradeCard(state.cards[rid],false)},verbStats:newVerbStats,mistakes:nextMistakes,session:{...(state.session||{}),reviewed:(state.session?.reviewed||0)+1,correct:state.session?.correct||0},daily:bumpDaily(state.daily,false,practicePrefs.dailyGoal||10)};
     setState(nextState);
-    setAnswer('');setTypoGuard(null);setChatOpen(!!geminiKey&&!!practicePrefs.autoAiExplainErrors);setRevealedMiss(true);setWasCorrect(false);setPhase('reviewing');
+    setAnswer('');setTypoGuard(null);setChatOpen(!!geminiKey&&!!practicePrefs.autoAiExplainErrors);setReviewChoiceLabel("I don't know");setSelfCheckOpen(false);setRevealedMiss(true);setWasCorrect(false);setPhase('reviewing');
   }
 
   const card=state.cards[current.id];
@@ -2923,7 +2946,33 @@ Keep it concise and clear.`;
                 <div className="font-medium">Almost - possible typo.</div>
                 <div className="text-xs mt-0.5">{typoGuard.detail}</div>
               </div>}
-              {practicePrefs.answerMode==='choice'?(
+              {practicePrefs.answerMode==='self-check'?(
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="text-xs uppercase tracking-wider text-indigo-600 font-semibold mb-2">Self-check deck</div>
+                  {!selfCheckOpen?(
+                    <>
+                      <p className="text-sm text-stone-600 mb-3">Say or write the answer on your own, then reveal it and grade honestly.</p>
+                      <div className="grid sm:grid-cols-2 gap-2">
+                        <button onClick={()=>setSelfCheckOpen(true)} className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition">Reveal answer</button>
+                        <button onClick={skipCurrent} className="py-2.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 rounded-xl font-medium transition">Skip without penalty</button>
+                      </div>
+                    </>
+                  ):(
+                    <>
+                      <div className="rounded-xl bg-white border border-stone-200 px-3 py-3">
+                        <div className="text-[11px] uppercase tracking-wider text-stone-400 mb-1">Answer</div>
+                        <ScriptDisplay view={expectedView} word={current.verb} type={current.type} colorHighlight={practicePrefs.colorCodeConjugations !== false} className="text-2xl font-semibold" subClassName="text-xs text-stone-500 mt-1"/>
+                        <div className="text-xs text-stone-500 mt-2">{targetEnglish}</div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mt-3">
+                        <button onClick={()=>gradeSelfCheck(true,'Remembered')} className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition">Remembered</button>
+                        <button onClick={()=>gradeSelfCheck(false,'Unsure')} className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-sm font-medium transition">Unsure</button>
+                        <button onClick={()=>gradeSelfCheck(false,'Missed')} className="py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-xl text-sm font-medium transition">Missed</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ):practicePrefs.answerMode==='choice'?(
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {reverseDrill?choices.map(w=>{const cv=promptDisplay(w,null,practicePrefs);return <button key={wordKey(w)} onClick={()=>submit(w.dict)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition"><ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1"/>{!hideEnglishHint&&<div className="mt-1 text-xs text-stone-500">{w.meaning}</div>}</button>;}):choices.map(c=>{const cv=formDisplay(c,practicePrefs);return <button key={c} onClick={()=>submit(c)} className="min-h-14 px-3 py-3 border-2 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50 rounded-xl text-xl transition"><ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1"/></button>;})}
@@ -2985,7 +3034,7 @@ Keep it concise and clear.`;
                 <div className={`mt-0.5 flex-shrink-0 ${wasCorrect?'text-emerald-600':'text-rose-600'}`}>{wasCorrect?<IconCheck className="w-5 h-5"/>:<IconX className="w-5 h-5"/>}</div>
                 <div className="flex-1">
                   <div className={`text-sm font-medium ${wasCorrect?'text-emerald-800':'text-rose-800'}`}>{wasCorrect?'Correct!':'Not quite.'}</div>
-                  {!wasCorrect&&<div className="text-xs text-rose-700 mt-1">{revealedMiss?"You chose: I don't know":'You wrote:'} {!revealedMiss&&<span lang="ja">{reverseDrill?(answer.trim()||'(empty)'):(toHiragana(answer)||'(empty)')}</span>}</div>}
+                  {!wasCorrect&&<div className="text-xs text-rose-700 mt-1">{reviewChoiceLabel?`You chose: ${reviewChoiceLabel}`:revealedMiss?"You chose: I don't know":'You wrote:'} {!revealedMiss&&!reviewChoiceLabel&&<span lang="ja">{reverseDrill?(answer.trim()||'(empty)'):(toHiragana(answer)||'(empty)')}</span>}</div>}
                   <ScriptDisplay view={expectedView} word={current.verb} type={current.type} colorHighlight={practicePrefs.colorCodeConjugations !== false} className={`text-xl mt-2 ${wasCorrect?'text-emerald-900':'text-rose-900'}`} subClassName="text-xs text-stone-500 mt-1"/>
                   <div className={`text-xs mt-1 ${wasCorrect?'text-emerald-700':'text-rose-700'}`}>{targetEnglish}</div>
                   <PitchAccentSection word={current.verb} kanaText={expected} geminiKey={geminiKey} practicePrefs={practicePrefs}/>
@@ -6302,7 +6351,7 @@ function SettingsView({state,setState,customVerbs,setCustomVerbs,customAdjective
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-stone-500 block mb-1">Answer mode</label>
-          <div className="grid grid-cols-3 gap-2">{[{id:'input',label:'Free input'},{id:'guided',label:'Guided kana'},{id:'choice',label:'Choices'}].map(o=>(<button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,answerMode:o.id})} className={`px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.answerMode===o.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">{[{id:'input',label:'Free input'},{id:'guided',label:'Guided kana'},{id:'choice',label:'Choices'},{id:'self-check',label:'Self-check'}].map(o=>(<button key={o.id} onClick={()=>setPracticePrefs({...practicePrefs,answerMode:o.id})} className={`px-3 py-2 rounded-lg text-sm border transition ${practicePrefs.answerMode===o.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>))}</div>
         </div>
         <div>
           <label className="text-xs text-stone-500 block mb-1">Drill mode</label>
