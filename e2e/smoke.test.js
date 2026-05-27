@@ -61,4 +61,20 @@ test.describe('App page-load smoke tests', () => {
 
     expect(failedRequests, `Server errors: ${failedRequests.join('\n')}`).toHaveLength(0);
   });
+
+  test('no same-origin static assets return 404', async ({ page }) => {
+    // Catches wrong base paths, missing files, and broken asset references —
+    // the class of bug that passes locally but breaks on a subdirectory deployment.
+    const notFound = [];
+    page.on('response', response => {
+      if (response.status() === 404 && new URL(response.url()).hostname === 'localhost') {
+        notFound.push(response.url());
+      }
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    expect(notFound, `404s: ${notFound.join('\n')}`).toHaveLength(0);
+  });
 });
