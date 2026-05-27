@@ -1,0 +1,230 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { IconCloud } from './components/Icons.jsx';
+import {
+  defaultState,
+  getSystemTheme,
+  resolveThemePreference,
+  loadAll,
+  saveAll,
+  syncReady,
+  cloudFetch,
+  cloudUpsert,
+  mergeState
+} from './utils/storage.js';
+import { DEFAULT_PREFS, DEFAULT_SYNC } from './data/defaults.js';
+import { getJapaneseVoices } from './utils/speech.js';
+import { mergePracticePrefs } from './utils/display.js';
+import { STARTER_VERBS, STARTER_ADJECTIVES } from './data/starterWords.js';
+
+// Views
+import StudyView from './views/StudyView.jsx';
+import RushView from './views/RushView.jsx';
+import EndingsView from './views/EndingsView.jsx';
+import ClassificationView from './views/ClassificationView.jsx';
+import MistakesView from './views/MistakesView.jsx';
+import StatsView from './views/StatsView.jsx';
+import SRSLevelView from './views/SRSLevelView.jsx';
+import LibraryView from './views/LibraryView.jsx';
+import SettingsView from './views/SettingsView.jsx';
+
+export default function App() {
+  const [tab, setTab] = useState('study');
+  const [state, setState] = useState(defaultState);
+  const [customVerbs, setCustomVerbs] = useState([]);
+  const [customAdjectives, setCustomAdjectives] = useState([]);
+  const [wordLists, setWordLists] = useState([]);
+  const [practicePrefs, setPracticePrefs] = useState(DEFAULT_PREFS);
+  const [syncConfig, setSyncConfig] = useState(DEFAULT_SYNC);
+  const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
+  const [geminiKey, setGeminiKey] = useState('');
+  const [speechVoices, setSpeechVoices] = useState([]);
+  const [systemTheme, setSystemTheme] = useState(getSystemTheme);
+  const [hydrated, setHydrated] = useState(false);
+  const pushTimer = useRef(null);
+  const lastSyncedAtRef = useRef(0);
+
+  useEffect(() => {
+    const local = loadAll();
+    let cfg = DEFAULT_SYNC;
+    if (local) {
+      if (local.state) setState(mergeState(local.state, { reviewed: 0, correct: 0 }));
+      if (Array.isArray(local.customVerbs)) setCustomVerbs(local.customVerbs);
+      if (Array.isArray(local.customAdjectives)) setCustomAdjectives(local.customAdjectives);
+      if (Array.isArray(local.wordLists)) setWordLists(local.wordLists);
+      if (local.practicePrefs) setPracticePrefs(mergePracticePrefs(local.practicePrefs));
+      if (local.syncConfig) {
+        cfg = { ...DEFAULT_SYNC, ...local.syncConfig };
+        setSyncConfig(cfg);
+      }
+      if (typeof local.lastSyncedAt === 'number') lastSyncedAtRef.current = local.lastSyncedAt;
+      if (local.geminiKey) setGeminiKey(local.geminiKey);
+    }
+    if (cfg.enabled && syncReady(cfg)) {
+      setSyncStatus({ kind: 'syncing', message: 'Checking cloud…', at: null });
+      cloudFetch(cfg).then(cloud => {
+        if (cloud && cloud.data) {
+          const cloudAt = cloud.updated_at ? new Date(cloud.updated_at).getTime() : 0;
+          if (cloudAt > lastSyncedAtRef.current) {
+            if (cloud.data.state) setState(mergeState(cloud.data.state, { reviewed: 0, correct: 0 }));
+            if (Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);
+            if (Array.isArray(cloud.data.customAdjectives)) setCustomAdjectives(cloud.data.customAdjectives);
+            if (Array.isArray(cloud.data.wordLists)) setWordLists(cloud.data.wordLists);
+            if (cloud.data.practicePrefs) setPracticePrefs(mergePracticePrefs(cloud.data.practicePrefs));
+            lastSyncedAtRef.current = cloudAt;
+            setSyncStatus({ kind: 'ok', message: 'Restored from cloud', at: cloudAt });
+          } else {
+            setSyncStatus({ kind: 'ok', message: 'Up to date', at: lastSyncedAtRef.current });
+          }
+        } else {
+          setSyncStatus({ kind: 'ok', message: 'New cloud row — will upload', at: null });
+        }
+      }).catch(e => setSyncStatus({ kind: 'error', message: e.message || 'Cloud unreachable', at: null }));
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    saveAll(state, customVerbs, customAdjectives, wordLists, syncConfig, lastSyncedAtRef.current, geminiKey, practicePrefs);
+    if (syncConfig.enabled && syncReady(syncConfig)) {
+      if (pushTimer.current) clearTimeout(pushTimer.current);
+      pushTimer.current = setTimeout(async () => {
+        setSyncStatus(s => ({ ...s, kind: 'syncing', message: 'Saving to cloud…' }));
+        try {
+          await cloudUpsert(syncConfig, { state, customVerbs, customAdjectives, wordLists, practicePrefs });
+          const now = Date.now();
+          lastSyncedAtRef.current = now;
+          saveAll(state, customVerbs, customAdjectives, wordLists, syncConfig, now, geminiKey, practicePrefs);
+          setSyncStatus({ kind: 'ok', message: 'Saved to cloud', at: now });
+        } catch (e) {
+          setSyncStatus({ kind: 'error', message: e.message || 'Push failed', at: null });
+        }
+      }, 2000);
+    }
+  }, [state, customVerbs, customAdjectives, wordLists, syncConfig, geminiKey, practicePrefs, hydrated]);
+
+  useEffect(() => {
+    const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
+    if (!synth) return;
+    let cancelled = false;
+    function loadVoices() {
+      if (!cancelled) setSpeechVoices(getJapaneseVoices());
+    }
+    loadVoices();
+    const retry = setTimeout(loadVoices, 400);
+    synth.onvoiceschanged = loadVoices;
+    return () => {
+      cancelled = true;
+      clearTimeout(retry);
+      if (synth.onvoiceschanged === loadVoices) synth.onvoiceschanged = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = () => setSystemTheme(mql.matches ? 'dark' : 'light');
+    update();
+    if (mql.addEventListener) mql.addEventListener('change', update);
+    else if (mql.addListener) mql.addListener(update);
+    return () => {
+      if (mql.removeEventListener) mql.removeEventListener('change', update);
+      else if (mql.removeListener) mql.removeListener(update);
+    };
+  }, []);
+
+  const resolvedTheme = resolveThemePreference(practicePrefs.theme, systemTheme);
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.classList.toggle('theme-dark', resolvedTheme === 'dark');
+    document.body.classList.toggle('theme-light', resolvedTheme !== 'dark');
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', resolvedTheme === 'dark' ? '#11100f' : '#312e81');
+  }, [resolvedTheme]);
+
+  async function syncNow() {
+    if (!syncReady(syncConfig)) return;
+    setSyncStatus({ kind: 'syncing', message: 'Syncing…', at: null });
+    try {
+      const cloud = await cloudFetch(syncConfig);
+      const cloudAt = cloud && cloud.updated_at ? new Date(cloud.updated_at).getTime() : 0;
+      if (cloud && cloud.data && cloudAt > lastSyncedAtRef.current) {
+        if (cloud.data.state) setState(mergeState(cloud.data.state, state.session));
+        if (Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);
+        if (Array.isArray(cloud.data.customAdjectives)) setCustomAdjectives(cloud.data.customAdjectives);
+        if (Array.isArray(cloud.data.wordLists)) setWordLists(cloud.data.wordLists);
+        if (cloud.data.practicePrefs) setPracticePrefs(mergePracticePrefs(cloud.data.practicePrefs));
+        lastSyncedAtRef.current = cloudAt;
+        setSyncStatus({ kind: 'ok', message: 'Pulled from cloud', at: cloudAt });
+      } else {
+        await cloudUpsert(syncConfig, { state, customVerbs, customAdjectives, wordLists, practicePrefs });
+        const now = Date.now();
+        lastSyncedAtRef.current = now;
+        setSyncStatus({ kind: 'ok', message: 'Pushed to cloud', at: now });
+      }
+    } catch (e) {
+      setSyncStatus({ kind: 'error', message: e.message || 'Sync failed', at: null });
+    }
+  }
+
+  const allVerbs = useMemo(() => [...STARTER_VERBS, ...customVerbs], [customVerbs]);
+  const allAdjectives = useMemo(() => [...STARTER_ADJECTIVES, ...customAdjectives], [customAdjectives]);
+  const allWords = useMemo(() => [...allVerbs, ...allAdjectives], [allVerbs, allAdjectives]);
+  const daily = state.daily || defaultState().daily;
+  const dailyPct = Math.min(100, Math.round((daily.count / (practicePrefs.dailyGoal || 10)) * 100));
+
+  return (
+    <div className="min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-800 dark:text-stone-200 transition-colors duration-200" style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif' }}>
+      <div className="max-w-4xl mx-auto px-4 py-3 sm:py-6">
+        <header className="mb-4 sm:mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-105">
+              動詞と形容詞 <span className="text-stone-400 font-normal">·</span> Conjugation Dojo
+            </h1>
+            <p className="text-xs text-stone-500 mt-0.5">Spaced repetition, reference tables, and AI coaching</p>
+          </div>
+          <div className="text-xs text-stone-500 text-right">
+            <div>{state.session.correct}/{state.session.reviewed} this session</div>
+            <div className="mt-1 flex items-center justify-end gap-2">
+              <span>{daily.count}/{practicePrefs.dailyGoal} today</span>
+              <span className="inline-block w-14 h-1.5 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden">
+                <span className="block h-full bg-indigo-500" style={{ width: dailyPct + '%' }} />
+              </span>
+            </div>
+            {!!daily.goalStreak && <div className="text-amber-600 dark:text-amber-400 mt-0.5">{daily.goalStreak} day goal streak</div>}
+            {syncConfig.enabled && (
+              <div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind === 'error' ? 'text-rose-500' : syncStatus.kind === 'syncing' ? 'text-amber-500' : 'text-emerald-600'}`}>
+                <IconCloud className="w-3 h-3" />
+                <span>{syncStatus.kind === 'syncing' ? 'syncing' : syncStatus.kind === 'error' ? 'sync error' : 'synced'}</span>
+              </div>
+            )}
+          </div>
+        </header>
+        <nav className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
+          {['study', 'rush', 'classify', 'endings', 'mistakes', 'levels', 'stats', 'library', 'settings'].map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
+                tab === t
+                  ? 'bg-stone-800 dark:bg-stone-700 text-white font-semibold'
+                  : 'text-stone-605 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </nav>
+        {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
+        {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
+        {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
+        {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
+        {tab === 'mistakes' && <MistakesView state={state} setState={setState} practicePrefs={practicePrefs} />}
+        {tab === 'stats' && <StatsView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab} wordLists={wordLists} setWordLists={setWordLists} />}
+        {tab === 'levels' && <SRSLevelView state={state} verbs={allWords} />}
+        {tab === 'library' && <LibraryView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey} setTab={setTab} />}
+        {tab === 'settings' && <SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme} />}
+      </div>
+    </div>
+  );
+}

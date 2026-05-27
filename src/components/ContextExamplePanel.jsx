@@ -1,0 +1,59 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { IconVolume, IconSpark } from './Icons.jsx';
+import { contextSentenceFor } from '../utils/conjugator.js';
+import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
+import { TYPE_LABEL } from '../data/conjugationTypes.js';
+import { speakJapanese } from '../utils/speech.js';
+import { DEFAULT_PREFS } from '../data/defaults.js';
+
+export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEFAULT_PREFS }) {
+  const example = useMemo(() => contextSentenceFor(item, type), [item, type]);
+  const [aiText, setAiText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    setAiText('');
+    setErr('');
+    setLoading(false);
+  }, [item?.dict, type]);
+
+  async function generate() {
+    if (!geminiKey || !item) return;
+    setLoading(true);
+    setErr('');
+    setAiText('');
+    try {
+      const prompt = `Create two short natural Japanese example sentences using exactly this conjugated form: ${example.form}\nBase word: ${item.dict} (${item.reading})\nMeaning: ${item.meaning}\nForm: ${TYPE_LABEL[type] || type}\nReturn each sentence with a brief English meaning and one tiny usage note. Keep it beginner-friendly.`;
+      const reply = await callGemini([{ role: 'user', parts: [{ text: prompt }] }], geminiKey, 700, 0.35, aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM));
+      setAiText(reply.trim());
+    } catch (e) {
+      setErr(e.message);
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-indigo-700 font-medium">In context</div>
+          <div className="mt-1 text-lg text-stone-900" lang="ja">{example.ja}</div>
+          <div className="mt-1 text-xs text-indigo-900/80">{example.en}</div>
+        </div>
+        <button onClick={() => speakJapanese(example.ja, 0.85, practicePrefs.voiceURI)} className="px-2.5 py-2 rounded-lg border border-indigo-200 bg-white/70 hover:bg-white text-indigo-700">
+          <IconVolume className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button onClick={generate} disabled={!geminiKey || loading} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5">
+          <IconSpark className="w-4 h-4" />
+          {loading ? 'Writing...' : 'AI examples'}
+        </button>
+        {!geminiKey && <div className="text-xs text-indigo-900/60 self-center">Add a Gemini key for natural examples.</div>}
+      </div>
+      {err && <div className="mt-2 text-sm text-rose-600">{err}</div>}
+      {aiText && <div className="mt-3 rounded-lg border border-indigo-100 bg-white/80 px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{aiText}</div>}
+    </div>
+  );
+}

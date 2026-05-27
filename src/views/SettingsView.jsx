@@ -1,0 +1,966 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  IconVolume,
+  IconRefresh,
+  IconPen,
+  IconSpark,
+  IconChat,
+  IconCloud
+} from '../components/Icons.jsx';
+import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import {
+  STARTER_VERBS,
+  STARTER_ADJECTIVES,
+  JLPT_LEVELS,
+  GENKI_LESSONS,
+  WORD_TYPE_OPTIONS,
+  WORD_GROUP_OPTIONS
+} from '../data/starterWords.js';
+import {
+  ALL_CARD_TYPES,
+  TYPE_PACKS,
+  CONJ_TYPES,
+  ADJ_TYPES
+} from '../data/conjugationTypes.js';
+import {
+  AI_FEEDBACK_LEVELS,
+  AI_GUIDE_TONES
+} from '../utils/gemini.js';
+import {
+  toHiragana,
+  kanaToRomaji
+} from '../utils/romaji.js';
+import {
+  typePreviewValues,
+  isAdjective
+} from '../utils/conjugator.js';
+import {
+  buildPracticePoolSummary,
+  weakTypeIdsForState,
+  defaultState,
+  mergeState
+} from '../utils/storage.js';
+import {
+  formDisplay,
+  mergePracticePrefs,
+  resolveDisplayScripts,
+  scriptModeFromDisplay
+} from '../utils/display.js';
+import { speakJapanese } from '../utils/speech.js';
+import { DEFAULT_PREFS } from '../data/defaults.js';
+
+function compactLookupText(s) {
+  return String(s || '').normalize('NFKC').replace(/[、。！？\s'"「」『』（）()\[\]{}]/g, '').toLowerCase();
+}
+
+export default function SettingsView({
+  state,
+  setState,
+  customVerbs,
+  setCustomVerbs,
+  customAdjectives,
+  setCustomAdjectives,
+  wordLists,
+  setWordLists,
+  syncConfig,
+  setSyncConfig,
+  syncStatus,
+  syncNow,
+  geminiKey,
+  setGeminiKey,
+  practicePrefs,
+  setPracticePrefs,
+  speechVoices = [],
+  resolvedTheme = 'light'
+}) {
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importErr, setImportErr] = useState('');
+  const [msg, setMsg] = useState('');
+  const [copyOk, setCopyOk] = useState(false);
+  const [syncForm, setSyncForm] = useState({ url: syncConfig.url, anonKey: syncConfig.anonKey, syncId: syncConfig.syncId });
+  const [localGeminiKey, setLocalGeminiKey] = useState(geminiKey);
+  const [geminiMsg, setGeminiMsg] = useState('');
+  const [typeSearch, setTypeSearch] = useState('');
+
+  useEffect(() => {
+    setSyncForm({ url: syncConfig.url, anonKey: syncConfig.anonKey, syncId: syncConfig.syncId });
+  }, [syncConfig.url, syncConfig.anonKey, syncConfig.syncId]);
+
+  useEffect(() => {
+    setLocalGeminiKey(geminiKey);
+  }, [geminiKey]);
+
+  const formReady = !!(syncForm.url.trim() && syncForm.anonKey.trim() && syncForm.syncId.trim());
+
+  function saveCfg(enabled) {
+    setSyncConfig({
+      url: syncForm.url.trim().replace(/\/+$/, ''),
+      anonKey: syncForm.anonKey.trim(),
+      syncId: syncForm.syncId.trim(),
+      enabled: enabled !== undefined ? enabled : syncConfig.enabled
+    });
+  }
+
+  const exportData = useMemo(() => {
+    return JSON.stringify({
+      format: 'jp-verb-srs',
+      version: 39,
+      exportedAt: new Date().toISOString(),
+      state: {
+        cards: state.cards,
+        enabledTypes: state.enabledTypes,
+        verbStats: state.verbStats || {},
+        mistakes: state.mistakes || [],
+        shadow: state.shadow,
+        ambient: state.ambient,
+        game: state.game,
+        onbin: state.onbin,
+        meaning: state.meaning,
+        mock: state.mock,
+        reader: state.reader,
+        production: state.production || defaultState().production,
+        reference: state.reference,
+        daily: state.daily,
+        classify: state.classify
+      },
+      customVerbs,
+      customAdjectives,
+      wordLists,
+      practicePrefs
+    });
+  }, [state, customVerbs, customAdjectives, wordLists, practicePrefs]);
+
+  function toggle(id) {
+    const has = state.enabledTypes.includes(id);
+    setState({
+      ...state,
+      enabledTypes: has ? state.enabledTypes.filter(t => t !== id) : [...state.enabledTypes, id]
+    });
+  }
+
+  function togglePref(key, id, allIds) {
+    const cur = practicePrefs[key] || allIds;
+    const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+    setPracticePrefs({ ...practicePrefs, [key]: next.length ? next : allIds });
+  }
+
+  function setGenkiLessons(ids) {
+    const clean = [...new Set(ids.map(Number))].filter(n => GENKI_LESSONS.includes(n)).sort((a, b) => a - b);
+    setPracticePrefs({ ...practicePrefs, genkiLessons: clean.length === GENKI_LESSONS.length ? [] : clean });
+  }
+
+  function toggleGenkiLesson(n) {
+    const selected = Array.isArray(practicePrefs.genkiLessons) && practicePrefs.genkiLessons.length ? practicePrefs.genkiLessons : GENKI_LESSONS;
+    const next = selected.includes(n) ? selected.filter(x => x !== n) : [...selected, n];
+    setGenkiLessons(next.length ? next : GENKI_LESSONS);
+  }
+
+  function toggleDisplayScript(id) {
+    const current = resolveDisplayScripts(practicePrefs);
+    const next = { ...current, [id]: !current[id] };
+    if (!next.kanji && !next.kana && !next.romaji) next[id] = true;
+    setPracticePrefs({ ...practicePrefs, displayScripts: next, scriptMode: scriptModeFromDisplay(next) });
+  }
+
+  function applyTypePack(ids) {
+    const valid = new Set(ALL_CARD_TYPES.map(t => t.id));
+    const clean = [...new Set((ids || []).filter(id => valid.has(id)))];
+    if (clean.length) setState({ ...state, enabledTypes: clean });
+  }
+
+  function reset() {
+    setState({ ...defaultState(), enabledTypes: state.enabledTypes });
+    setConfirmReset(false);
+  }
+
+  async function copyExport() {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(exportData);
+        setCopyOk(true);
+        setTimeout(() => setCopyOk(false), 2000);
+      }
+    } catch (e) {}
+  }
+
+  function doImport() {
+    setImportErr('');
+    try {
+      const data = JSON.parse(importText.trim());
+      if (data.format !== 'jp-verb-srs') throw new Error("doesn't look like a verb-drill backup");
+      if (!data.state || typeof data.state.cards !== 'object') throw new Error('missing card data');
+      setState(mergeState(data.state, { reviewed: 0, correct: 0 }));
+      if (Array.isArray(data.customVerbs)) setCustomVerbs(data.customVerbs);
+      if (Array.isArray(data.customAdjectives)) setCustomAdjectives(data.customAdjectives);
+      if (Array.isArray(data.wordLists)) setWordLists(data.wordLists);
+      if (data.practicePrefs) setPracticePrefs(mergePracticePrefs(data.practicePrefs));
+      setImportText('');
+      setImportOpen(false);
+      setMsg('Restored!');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (e) {
+      setImportErr('Invalid: ' + (e.message || 'parse failed'));
+    }
+  }
+
+  const statusColor = syncStatus.kind === 'error'
+    ? 'text-rose-700 bg-rose-50 border-rose-250 dark:bg-rose-955/20 dark:border-rose-900'
+    : syncStatus.kind === 'syncing'
+      ? 'text-amber-700 bg-amber-50 border-amber-250 dark:bg-amber-955/20 dark:border-amber-900'
+      : syncStatus.kind === 'ok'
+        ? 'text-emerald-700 bg-emerald-50 border-emerald-250 dark:bg-emerald-955/20 dark:border-emerald-900'
+        : 'text-stone-600 bg-stone-50 border-stone-250 dark:bg-stone-950 dark:border-stone-850';
+
+  const displayScripts = resolveDisplayScripts(practicePrefs);
+  const selectedGenkiLessons = Array.isArray(practicePrefs.genkiLessons) && practicePrefs.genkiLessons.length ? practicePrefs.genkiLessons : GENKI_LESSONS;
+  const selectedWordGroups = practicePrefs.wordGroups && practicePrefs.wordGroups.length ? practicePrefs.wordGroups : WORD_GROUP_OPTIONS.map(x => x.id);
+  const selectedVoiceAvailable = !practicePrefs.voiceURI || speechVoices.some(v => v.voiceURI === practicePrefs.voiceURI);
+  const weakPackIds = weakTypeIdsForState(state, state.enabledTypes);
+  const typePacks = [...TYPE_PACKS, { id: 'weak', label: 'Weak mix', hint: 'Uses your misses and SRS history to pick forms worth isolating.', typeIds: weakPackIds }];
+  const enabledKey = [...state.enabledTypes].sort().join('|');
+  const settingsWords = useMemo(() => [...STARTER_VERBS, ...customVerbs, ...STARTER_ADJECTIVES, ...customAdjectives], [customVerbs, customAdjectives]);
+  const poolSummary = useMemo(() => buildPracticePoolSummary(state, settingsWords, practicePrefs, wordLists), [state, settingsWords, practicePrefs, wordLists]);
+  const typeNeedle = typeSearch.trim().toLowerCase();
+  const typeNeedleKana = compactLookupText(toHiragana(typeSearch));
+  const visibleCardTypes = ALL_CARD_TYPES.filter(t => {
+    if (!typeNeedle) return true;
+    const hay = [t.id, t.label, t.sub, t.hint].join(' ').toLowerCase();
+    const kanaHay = compactLookupText(`${t.sub} ${t.hint}`);
+    return hay.includes(typeNeedle) || kanaHay.includes(typeNeedleKana) || kanaToRomaji(t.sub || '').toLowerCase().includes(typeNeedle);
+  });
+
+  return (
+    <div className="space-y-4 text-left">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+        <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Practice mode</h3>
+        <div className={`mb-4 border-y py-3 ${poolSummary.prompts ? 'border-stone-100 dark:border-stone-850' : 'border-amber-200 bg-amber-50/60 dark:bg-amber-955/20 -mx-2 px-2 rounded-xl'}`}>
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="text-xs uppercase tracking-wider text-stone-500 font-medium">Question pool</div>
+            {!poolSummary.prompts && <div className="text-xs text-amber-700 dark:text-amber-400">No available prompts</div>}
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
+            {[
+              ['Prompts', poolSummary.prompts],
+              ['Words', poolSummary.words],
+              ['Forms', poolSummary.forms],
+              ['Due', poolSummary.due],
+              ['New', poolSummary.fresh],
+              ['Weak', poolSummary.weak],
+            ].map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <div className="text-lg font-semibold tabular-nums text-stone-800 dark:text-stone-200">{value}</div>
+                <div className="text-[11px] text-stone-400">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Answer mode</label>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+              {[{ id: 'input', label: 'Free input' }, { id: 'guided', label: 'Guided kana' }, { id: 'choice', label: 'Choices' }, { id: 'self-check', label: 'Self-check' }].map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, answerMode: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    practicePrefs.answerMode === o.id
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Drill mode</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[{ id: 'word', label: 'Word only' }, { id: 'sentence', label: 'Sentence context' }].map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, drillMode: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    ((practicePrefs.drillMode || 'word') === o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Study direction</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[{ id: 'forward', label: 'Conjugate' }, { id: 'reverse', label: 'Reverse' }, { id: 'mixed', label: 'Mixed' }].map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, drillDirection: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    ((practicePrefs.drillDirection || DEFAULT_PREFS.drillDirection) === o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-1">Reverse shows a conjugated form and asks for the dictionary form.</p>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Practice focus</label>
+            <div className="flex gap-2">
+              {[{ id: 'balanced', label: 'Balanced' }, { id: 'weak', label: 'Weak spots' }].map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, practiceFocus: o.id })}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${
+                    ((practicePrefs.practiceFocus || 'balanced') === o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Duplicate answers</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[{ id: true, label: 'Skip' }, { id: false, label: 'Keep' }].map(o => (
+                <button
+                  key={String(o.id)}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, skipDuplicateForms: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    ((practicePrefs.skipDuplicateForms !== false) === o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">English hints</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[{ id: 'show', label: 'Show' }, { id: 'hidden', label: 'Hide' }].map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, englishHints: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    ((practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-1">Hidden mode can still ask Gemini for a non-answer clue.</p>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Theme</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }, { id: 'system', label: `System${resolvedTheme === 'dark' ? ' dark' : ' light'}` }].map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, theme: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    ((practicePrefs.theme || 'system') === o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Display scripts</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[{ id: 'kanji', label: 'Kanji' }, { id: 'kana', label: 'Kana' }, { id: 'romaji', label: 'Romaji' }].map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => toggleDisplayScript(o.id)}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    displayScripts[o.id]
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPracticePrefs({ ...practicePrefs, furigana: practicePrefs.furigana === false })}
+              disabled={!(displayScripts.kanji && displayScripts.kana)}
+              className={`mt-2 w-full px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 ${
+                practicePrefs.furigana !== false && displayScripts.kanji && displayScripts.kana
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              Furigana {practicePrefs.furigana !== false ? 'on' : 'off'}
+            </button>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs text-stone-500 block mb-1">Prompt form</label>
+            <select
+              value={practicePrefs.promptForm || 'dictionary'}
+              onChange={e => setPracticePrefs({ ...practicePrefs, promptForm: e.target.value })}
+              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="dictionary">Dictionary form</option>
+              <option value="random">Random compatible source form</option>
+              <optgroup label="Verb source forms">
+                {CONJ_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </optgroup>
+              <optgroup label="Adjective source forms">
+                {ADJ_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </optgroup>
+            </select>
+            <div className="mt-2 grid sm:grid-cols-[1fr_auto] gap-2 items-center">
+              <p className="text-[11px] text-stone-400">Practice transformations like て-form → passive; incompatible sources fall back to dictionary form.</p>
+              <button
+                onClick={() => setPracticePrefs({ ...practicePrefs, trickQuestions: !practicePrefs.trickQuestions })}
+                className={`px-3 py-2 rounded-lg text-sm border transition ${
+                  practicePrefs.trickQuestions
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                }`}
+              >
+                Trick questions {practicePrefs.trickQuestions ? 'on' : 'off'}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Daily goal</label>
+            <input
+              type="number"
+              min="1"
+              max="200"
+              value={practicePrefs.dailyGoal}
+              onChange={e => setPracticePrefs({ ...practicePrefs, dailyGoal: Math.max(1, Number(e.target.value) || 10) })}
+              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => setPracticePrefs({ ...practicePrefs, autoSpeak: !practicePrefs.autoSpeak })}
+              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
+                practicePrefs.autoSpeak
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              <IconVolume className="w-4 h-4 inline-block mr-1.5" />
+              Speak answers
+            </button>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => setPracticePrefs({ ...practicePrefs, autoAdvanceCorrect: !practicePrefs.autoAdvanceCorrect })}
+              className={`w-full px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center gap-1.5 ${
+                practicePrefs.autoAdvanceCorrect
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              <IconRefresh className="w-4 h-4" />
+              Auto next
+            </button>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => setPracticePrefs({ ...practicePrefs, listeningPrompt: !practicePrefs.listeningPrompt })}
+              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
+                practicePrefs.listeningPrompt
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              <IconVolume className="w-4 h-4 inline-block mr-1.5" />
+              Listening prompt
+            </button>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => setPracticePrefs({ ...practicePrefs, colorCodeConjugations: practicePrefs.colorCodeConjugations === false })}
+              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
+                practicePrefs.colorCodeConjugations !== false
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              <IconPen className="w-4 h-4 inline-block mr-1.5" />
+              Color segments
+            </button>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs text-stone-500 block mb-1">Japanese voice</label>
+            <div className="flex gap-2">
+              <select
+                value={practicePrefs.voiceURI || ''}
+                onChange={e => setPracticePrefs({ ...practicePrefs, voiceURI: e.target.value })}
+                className="flex-1 min-w-0 px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="">Auto Japanese voice</option>
+                {!selectedVoiceAvailable && <option value={practicePrefs.voiceURI}>Selected voice unavailable</option>}
+                {speechVoices.map((v, i) => (
+                  <option key={v.voiceURI || `${v.name}-${i}`} value={v.voiceURI}>
+                    {v.name} - {v.lang}
+                    {v.localService ? ' - local' : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => speakJapanese('食べてください', 0.85, practicePrefs.voiceURI)}
+                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm flex items-center gap-1.5"
+              >
+                <IconVolume className="w-4 h-4" />
+                Test
+              </button>
+            </div>
+            {speechVoices.length === 0 && <p className="text-[11px] text-stone-400 mt-1">Japanese voices appear after the browser loads speech voices.</p>}
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Timed drill</label>
+            <select
+              value={practicePrefs.durationSec || 0}
+              onChange={e => setPracticePrefs({ ...practicePrefs, durationSec: Number(e.target.value) })}
+              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-205 rounded-lg focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="0">Infinite</option>
+              <option value="30">30 seconds</option>
+              <option value="60">60 seconds</option>
+              <option value="120">120 seconds</option>
+              <option value="180">180 seconds</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Review set</label>
+            <select
+              value={practicePrefs.reviewLimit || 0}
+              onChange={e => setPracticePrefs({ ...practicePrefs, reviewLimit: Number(e.target.value) })}
+              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-205 rounded-lg focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="0">Open ended</option>
+              <option value="10">10 cards</option>
+              <option value="20">20 cards</option>
+              <option value="30">30 cards</option>
+              <option value="40">40 cards</option>
+              <option value="50">50 cards</option>
+            </select>
+            <p className="text-[11px] text-stone-400 mt-1">Stops Study after a fixed set; timed drill can still run at the same time.</p>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">JLPT levels</label>
+            <div className="flex gap-1">
+              {JLPT_LEVELS.map(l => (
+                <button
+                  key={l}
+                  onClick={() => togglePref('jlptLevels', l, JLPT_LEVELS)}
+                  className={`flex-1 px-2 py-2 rounded-lg text-xs border transition ${
+                    (practicePrefs.jlptLevels || JLPT_LEVELS).includes(l)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="sm:col-span-2">
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <label className="text-xs text-stone-500 block">Genki lessons</label>
+              <div className="flex gap-1">
+                <button onClick={() => setGenkiLessons(GENKI_LESSONS)} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">All</button>
+                <button onClick={() => setGenkiLessons(GENKI_LESSONS.filter(n => n <= 12))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">I</button>
+                <button onClick={() => setGenkiLessons(GENKI_LESSONS.filter(n => n >= 13))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">II</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-6 sm:grid-cols-[repeat(12,minmax(0,1fr))] gap-1">
+              {GENKI_LESSONS.map(n => (
+                <button
+                  key={n}
+                  onClick={() => toggleGenkiLesson(n)}
+                  className={`px-2 py-2 rounded-lg text-xs border transition ${
+                    selectedGenkiLessons.includes(n)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  L{n}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-1">Textbook filtering works together with JLPT, word type, and study-list filters.</p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs text-stone-500 block mb-1">Word types</label>
+            <div className="grid grid-cols-3 gap-2">
+              {WORD_TYPE_OPTIONS.map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => togglePref('wordTypes', o.id, WORD_TYPE_OPTIONS.map(x => x.id))}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    (practicePrefs.wordTypes || WORD_TYPE_OPTIONS.map(x => x.id)).includes(o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="sm:col-span-2">
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <label className="text-xs text-stone-500 block">Word groups</label>
+              <span className="text-[11px] text-stone-400">{selectedWordGroups.length}/{WORD_GROUP_OPTIONS.length}</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+              {WORD_GROUP_OPTIONS.map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => togglePref('wordGroups', o.id, WORD_GROUP_OPTIONS.map(x => x.id))}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    selectedWordGroups.includes(o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-1">Refines every drill and review deck after JLPT, lesson, and word-list filters.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+        <h3 className="font-medium mb-1 text-stone-850 dark:text-stone-200">Conjugation types in scope</h3>
+        <p className="text-xs text-stone-500 mb-4">Toggle individual forms, or apply a form pack.</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+          {typePacks.map(pack => {
+            const packKey = [...pack.typeIds].sort().join('|');
+            const active = packKey === enabledKey;
+            return (
+              <button
+                key={pack.id}
+                onClick={() => applyTypePack(pack.typeIds)}
+                className={`text-left rounded-xl border px-3 py-3 transition ${
+                  active
+                    ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900 text-stone-900 dark:text-stone-100'
+                    : 'bg-stone-50 dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-800 dark:text-stone-300 hover:bg-white dark:hover:bg-stone-900 hover:border-indigo-200'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium text-stone-800 dark:text-stone-200">{pack.label}</div>
+                  <div className={`text-[11px] px-1.5 py-0.5 rounded-full ${active ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700'}`}>
+                    {pack.typeIds.length}
+                  </div>
+                </div>
+                <div className="text-xs text-stone-500 mt-1">{pack.hint}</div>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mb-3 grid sm:grid-cols-[1fr_auto] gap-2 items-center">
+          <input
+            value={typeSearch}
+            onChange={e => setTypeSearch(e.target.value)}
+            placeholder="Search forms, e.g. passive, たい, ba..."
+            className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+          />
+          <div className="text-xs text-stone-400 tabular-nums text-right">{visibleCardTypes.length}/{ALL_CARD_TYPES.length} forms</div>
+        </div>
+        <div className="space-y-2">
+          {visibleCardTypes.map(t => {
+            const on = state.enabledTypes.includes(t.id);
+            const previews = typePreviewValues(t.id);
+            return (
+              <div key={t.id} className="grid sm:grid-cols-[minmax(0,1fr)_minmax(14rem,auto)_auto] gap-3 items-center py-2 px-3 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-950">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-stone-850 dark:text-stone-200">{t.label}</div>
+                  <div className="text-xs text-stone-500">{t.sub && (t.sub + ' · ')}{t.hint}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {previews.map(p => {
+                    const view = formDisplay(p.answer, practicePrefs, p.item, t.id);
+                    return (
+                      <div key={`${t.id}-${p.item.dict}`} className="min-w-0 rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 px-2 py-1.5">
+                        <div className="text-[11px] text-stone-400 truncate" lang="ja">{p.item.dict}</div>
+                        <ScriptDisplay view={view} className="text-sm font-medium truncate text-stone-800 dark:text-stone-200" subClassName="text-[11px] text-stone-400 truncate" />
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => toggle(t.id)}
+                  className={`relative w-10 h-6 rounded-full transition flex-shrink-0 justify-self-end ${on ? 'bg-indigo-600' : 'bg-stone-300 dark:bg-stone-700'}`}
+                  title={`${on ? 'Disable' : 'Enable'} ${t.label}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on ? 'translate-x-4' : ''}`} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        {!visibleCardTypes.length && (
+          <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4 text-sm text-stone-500 text-center">
+            No forms match that search.
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+        <h3 className="font-medium mb-1 flex items-center gap-2 text-stone-850 dark:text-stone-200">
+          <IconChat className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          AI Chat (Gemini)
+        </h3>
+        <p className="text-xs text-stone-500 mb-3">Powers AI miss coaching, "Ask Gemini why", and AI verb lookup. Free key at <span className="text-indigo-600 dark:text-indigo-400 font-medium">aistudio.google.com</span></p>
+        <div>
+          <label className="text-xs text-stone-500 block mb-1">Gemini API key</label>
+          <input
+            type="password"
+            value={localGeminiKey}
+            onChange={e => setLocalGeminiKey(e.target.value)}
+            placeholder="AIza..."
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
+            className="w-full px-3 py-2 text-sm font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+          />
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3 mt-3">
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">AI feedback</label>
+            <div className="grid grid-cols-2 gap-2">
+              {AI_FEEDBACK_LEVELS.map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, aiFeedbackLevel: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    ((practicePrefs.aiFeedbackLevel || DEFAULT_PREFS.aiFeedbackLevel) === o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Guide tone</label>
+            <div className="grid grid-cols-3 gap-2">
+              {AI_GUIDE_TONES.map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, aiGuideTone: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    ((practicePrefs.aiGuideTone || DEFAULT_PREFS.aiGuideTone) === o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              onClick={() => setPracticePrefs({ ...practicePrefs, autoAiExplainErrors: !practicePrefs.autoAiExplainErrors })}
+              className={`w-full px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center gap-1.5 ${
+                practicePrefs.autoAiExplainErrors
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              <IconSpark className="w-4 h-4" />
+              AI on misses
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={() => { setGeminiKey(localGeminiKey.trim()); setGeminiMsg('Saved!'); setTimeout(() => setGeminiMsg(''), 2000); }}
+            disabled={!localGeminiKey.trim()}
+            className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
+          >
+            Save key
+          </button>
+          {geminiKey && <button onClick={() => { setGeminiKey(''); setLocalGeminiKey(''); }} className="px-3 py-2 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm">Clear</button>}
+        </div>
+        {geminiMsg && <div className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">{geminiMsg}</div>}
+        {geminiKey && !geminiMsg && <div className="mt-2 text-xs text-emerald-700 dark:text-emerald-400">✓ Key saved — AI features active</div>}
+      </div>
+
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+        <h3 className="font-medium mb-1 flex items-center gap-2 text-stone-850 dark:text-stone-200">
+          <IconCloud className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          Cloud sync (Supabase)
+        </h3>
+        <p className="text-xs text-stone-500 mb-3">Same values on every device to stay in sync.</p>
+        {(syncStatus.message || syncConfig.enabled) && (
+          <div className={`mb-3 text-xs rounded-lg border px-3 py-2 ${statusColor}`}>
+            <div className="flex items-center justify-between">
+              <span>{syncStatus.message || (syncConfig.enabled ? 'Enabled' : 'Disabled')}</span>
+              {syncStatus.at && <span>{new Date(syncStatus.at).toLocaleTimeString()}</span>}
+            </div>
+          </div>
+        )}
+        <div className="space-y-2">
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Project URL</label>
+            <input
+              type="text"
+              value={syncForm.url}
+              onChange={e => setSyncForm({ ...syncForm, url: e.target.value })}
+              placeholder="https://xxxxx.supabase.co"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
+              className="w-full px-3 py-2 text-sm font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">anon / public key</label>
+            <input
+              type="password"
+              value={syncForm.anonKey}
+              onChange={e => setSyncForm({ ...syncForm, anonKey: e.target.value })}
+              placeholder="eyJ..."
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
+              className="w-full px-3 py-2 text-sm font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Sync ID <span className="text-stone-400 font-normal">(same on every device)</span></label>
+            <input
+              type="text"
+              value={syncForm.syncId}
+              onChange={e => setSyncForm({ ...syncForm, syncId: e.target.value })}
+              placeholder="my-japan-2026-xyz"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
+              className="w-full px-3 py-2 text-sm font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+            />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-3">
+          {!syncConfig.enabled ? (
+            <button onClick={() => saveCfg(true)} disabled={!formReady} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Enable sync</button>
+          ) : (
+            <>
+              <button onClick={() => { saveCfg(true); syncNow(); }} disabled={!formReady} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Sync now</button>
+              <button onClick={() => saveCfg(false)} className="px-3 py-2 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm">Disable</button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+        <h3 className="font-medium mb-1 text-stone-850 dark:text-stone-200">Backup & restore</h3>
+        <p className="text-xs text-stone-500 mb-3">Manual JSON transfer without cloud sync.</p>
+        {msg && <div className="mb-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-250 rounded-lg px-3 py-2">{msg}</div>}
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setExportOpen(!exportOpen); setImportOpen(false); }}
+            className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
+              exportOpen
+                ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850'
+            }`}
+          >
+            Export
+          </button>
+          <button
+            onClick={() => { setImportOpen(!importOpen); setExportOpen(false); setImportErr(''); }}
+            className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
+              importOpen
+                ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850'
+            }`}
+          >
+            Import
+          </button>
+        </div>
+        {exportOpen && (
+          <div className="mt-3 space-y-2">
+            <textarea
+              readOnly
+              value={exportData}
+              onFocus={e => e.target.select()}
+              className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg"
+            />
+            <button onClick={copyExport} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">
+              {copyOk ? '✓ Copied' : 'Copy to clipboard'}
+            </button>
+          </div>
+        )}
+        {importOpen && (
+          <div className="mt-3 space-y-2">
+            <textarea
+              value={importText}
+              onChange={e => { setImportText(e.target.value); setImportErr(''); }}
+              placeholder="Paste backup JSON…"
+              className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-250 rounded-lg focus:border-indigo-500 focus:outline-none"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
+            />
+            {importErr && <div className="text-sm text-rose-600">{importErr}</div>}
+            <p className="text-xs text-rose-600 dark:text-rose-400">⚠ Restoring replaces current progress.</p>
+            <button
+              onClick={doImport}
+              disabled={!importText.trim()}
+              className="w-full py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
+            >
+              Restore
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+        <h3 className="font-medium mb-1 text-stone-850 dark:text-stone-200">Reset progress</h3>
+        <p className="text-xs text-stone-500 mb-3">Clear all SRS state. Custom verbs and settings stay.</p>
+        {!confirmReset ? (
+          <button
+            onClick={() => setConfirmReset(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm text-stone-700 dark:text-stone-300"
+          >
+            <IconRefresh className="w-4 h-4" />
+            Reset all progress
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button onClick={reset} className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm">Yes, reset</button>
+            <button onClick={() => setConfirmReset(false)} className="px-3 py-1.5 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm">Cancel</button>
+          </div>
+        )}
+      </div>
+      <div className="text-xs text-stone-400 text-center pt-2">Progress saves automatically to your browser.</div>
+    </div>
+  );
+}

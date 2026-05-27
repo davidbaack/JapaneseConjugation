@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+body {
+  background: #fafaf9;
+  margin: 0;
+}
+
+body.theme-light {
+  color-scheme: light;
+}
+
+body.theme-dark {
+  background: #11100f;
+  color: #e7e5e4;
+  color-scheme: dark;
+}
+
+.theme-dark .bg-stone-50 {
+  background: #11100f !important;
+}
+
+.theme-dark .bg-white {
+  background: #1c1917 !important;
+}
+
+.theme-dark .bg-stone-100 {
+  background: #292524 !important;
+}
+
+.theme-dark .bg-stone-200 {
+  background: #3f3a36 !important;
+}
+
+.theme-dark .bg-indigo-50 {
+  background: #24213a !important;
+}
+
+.theme-dark .bg-amber-50 {
+  background: #2b2112 !important;
+}
+
+.theme-dark .bg-emerald-50 {
+  background: #10261e !important;
+}
+
+.theme-dark .bg-rose-50 {
+  background: #2b1518 !important;
+}
+
+.theme-dark .text-stone-800,
+.theme-dark .text-stone-700 {
+  color: #f5f5f4 !important;
+}
+
+.theme-dark .text-stone-600 {
+  color: #d6d3d1 !important;
+}
+
+.theme-dark .text-stone-500 {
+  color: #a8a29e !important;
+}
+
+.theme-dark .text-stone-400 {
+  color: #78716c !important;
+}
+
+.theme-dark .border-stone-100 {
+  border-color: #292524 !important;
+}
+
+.theme-dark .border-stone-200,
+.theme-dark .border-stone-300 {
+  border-color: #44403c !important;
+}
+
+.theme-dark input,
+.theme-dark select,
+.theme-dark textarea {
+  background: #141312 !important;
+  color: #f5f5f4 !important;
+  border-color: #44403c !important;
+}
+
+.theme-dark input::placeholder,
+.theme-dark textarea::placeholder {
+  color: #78716c !important;
+}
+
+.theme-dark option,
+.theme-dark optgroup {
+  background: #1c1917;
+  color: #f5f5f4;
+}
+
+.theme-dark .hover\:bg-stone-50:hover,
+.theme-dark .hover\:bg-stone-100:hover {
+  background: #292524 !important;
+}
+
+.theme-dark .hover\:border-stone-300:hover {
+  border-color: #57534e !important;
+}
+
+.theme-dark .divide-stone-50 > * + * {
+  border-color: #292524 !important;
+}
+
+.theme-dark audio {
+  filter: invert(0.9) hue-rotate(180deg);
+}
