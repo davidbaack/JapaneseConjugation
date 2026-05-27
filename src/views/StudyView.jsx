@@ -799,9 +799,11 @@ Keep it concise and clear.`;
             </>
           )}
 
-          <div className="text-xs text-stone-400 mt-1">
-            {GROUP_NAMES[current.verb.group]} · {wordType}
-          </div>
+          {phase === 'reviewing' && (
+            <div className="text-xs text-stone-400 mt-1">
+              {GROUP_NAMES[current.verb.group]} · {wordType}
+            </div>
+          )}
           <div className="text-[11px] text-stone-400 mt-1">
             JLPT {getWordMeta(current.verb).jlpt}
             {getWordMeta(current.verb).lesson ? ` · Genki L${getWordMeta(current.verb).lesson}` : ''}
