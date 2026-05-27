@@ -2911,7 +2911,9 @@ Keep it concise and clear.`;
           )}
           <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[current.verb.group]} · {wordType}</div>
           <div className="text-[11px] text-stone-400 mt-1">JLPT {getWordMeta(current.verb).jlpt}{getWordMeta(current.verb).lesson?` · Genki L${getWordMeta(current.verb).lesson}`:''}</div>
-          <div className="mt-4 flex flex-col gap-1">
+          {phase==='answering'?(
+            <>
+              <div className="mt-4 flex flex-col gap-1">
             <div className="flex items-center justify-center gap-2">
                 <span className="text-xs uppercase tracking-wider text-indigo-600 font-semibold">{typeInfo.label}</span>
                 <span className="text-xs text-indigo-400">· {current.ruleLabel}</span>
@@ -2975,6 +2977,7 @@ Keep it concise and clear.`;
                   </div>
                 </>
               )}
+              </div>
             </>
           ):(
             <div className={`rounded-xl p-4 ${wasCorrect?'bg-emerald-50 border border-emerald-200':'bg-rose-50 border border-rose-200'}`}>
@@ -4443,7 +4446,27 @@ function LessonsView({geminiKey,practicePrefs=DEFAULT_PREFS}){
   const[aiText,setAiText]=useState('');
   const[loading,setLoading]=useState(false);
   const[err,setErr]=useState('');
+  const[ruleQuery,setRuleQuery]=useState('');
+  const[ruleAiText,setRuleAiText]=useState('');
+  const[ruleAiTitle,setRuleAiTitle]=useState('');
+  const[ruleAiLoading,setRuleAiLoading]=useState('');
+  const[ruleAiErr,setRuleAiErr]=useState('');
   const lesson=GRAMMAR_LESSONS.find(l=>l.id===selectedId)||GRAMMAR_LESSONS[0];
+  const ruleRows=useMemo(()=>{
+    const q=ruleQuery.trim().toLowerCase();
+    const h=compactLookupText(toHiragana(ruleQuery));
+    return ALL_CARD_TYPES.map(type=>{
+      const previews=typePreviewValues(type.id).slice(0,2);
+      const primary=previews[0];
+      const explanation=primary?explainItem(primary.item,type.id):{rule:type.hint,derivation:'',note:''};
+      return{type,previews,rule:explanation.rule||type.hint||'',note:explanation.note||''};
+    }).filter(row=>{
+      if(!q)return true;
+      const hay=[row.type.id,row.type.label,row.type.sub,row.type.hint,row.rule,row.note].join(' ').toLowerCase();
+      const kanaHay=compactLookupText(`${row.type.sub||''} ${row.rule||''} ${row.note||''}`);
+      return hay.includes(q)||kanaHay.includes(h)||kanaToRomaji(row.type.sub||'').toLowerCase().includes(q);
+    });
+  },[ruleQuery]);
   async function expandLesson(){
     if(!lesson||!geminiKey)return;
     setLoading(true);setErr('');setAiText('');
@@ -4453,6 +4476,17 @@ function LessonsView({geminiKey,practicePrefs=DEFAULT_PREFS}){
       setAiText(reply);
     }catch(e){setErr(e.message);}
     setLoading(false);
+  }
+  async function expandRule(row){
+    if(!row||!geminiKey)return;
+    setRuleAiLoading(row.type.id);setRuleAiErr('');setRuleAiText('');setRuleAiTitle(row.type.label);
+    try{
+      const examples=row.previews.map(p=>`${p.item.dict} (${p.item.reading}) -> ${p.answer}`).join('; ')||'No local examples available';
+      const prompt=`Create a compact Japanese conjugation micro-drill for this form.\n\nForm: ${row.type.label}\nJapanese label: ${row.type.sub||'(none)'}\nHint: ${row.type.hint||''}\nRule: ${row.rule||''}\nLocal examples: ${examples}\n\nGive: 1 plain-English rule, 2 fresh examples, 1 contrast with a commonly confused form, and a 3-question mini quiz with answers. Keep it concise and learner-facing.`;
+      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1100,0.3,aiSystemFromPrefs(practicePrefs,'You are a careful Japanese conjugation teacher. Give accurate compact rule drills and do not invent impossible forms.'));
+      setRuleAiText(reply);
+    }catch(e){setRuleAiErr(e.message||'AI rule drill failed.');}
+    setRuleAiLoading('');
   }
   return(
     <div className="grid lg:grid-cols-[280px_1fr] gap-4">
@@ -4471,6 +4505,34 @@ function LessonsView({geminiKey,practicePrefs=DEFAULT_PREFS}){
         </div>
         <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
           <table className="w-full text-sm"><thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider"><tr><th className="px-4 py-2 text-left font-medium">Base</th><th className="px-4 py-2 text-left font-medium">Form</th><th className="px-4 py-2 text-left font-medium">Example</th></tr></thead><tbody>{lesson.examples.map((ex,i)=><tr key={i} className="border-t border-stone-100"><td className="px-4 py-2" lang="ja">{ex[0]}</td><td className="px-4 py-2 text-lg" lang="ja">{ex[1]}</td><td className="px-4 py-2" lang="ja">{ex[2]}</td></tr>)}</tbody></table>
+        </div>
+        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+          <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-start mb-4">
+            <div><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Rule lookup</div><h3 className="text-xl font-semibold mt-1">All conjugation rules</h3><p className="text-xs text-stone-500 mt-1">Search every verb and adjective form by name, ending, or rule text.</p></div>
+            <div className="text-xs text-stone-400 tabular-nums text-right">{ruleRows.length}/{ALL_CARD_TYPES.length} forms</div>
+          </div>
+          <input value={ruleQuery} onChange={e=>{setRuleQuery(e.target.value);setRuleAiErr('');}} placeholder="Search passive, て, たい, なさい..." className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none" autoCorrect="off" spellCheck="false"/>
+          <div className="mt-3 divide-y divide-stone-100">
+            {ruleRows.slice(0,36).map(row=><div key={row.type.id} className="py-3 grid md:grid-cols-[minmax(0,1fr)_minmax(14rem,1.15fr)_auto] gap-3 items-start">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-stone-800">{row.type.label}</div>
+                <div className="text-xs text-stone-500">{row.type.sub&&(row.type.sub+' · ')}{row.type.hint}</div>
+                {row.note&&<div className="text-[11px] text-stone-400 mt-1">{row.note}</div>}
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm text-stone-700 leading-relaxed">{row.rule||'Use the table examples to inspect this form.'}</div>
+                {!!row.previews.length&&<div className="mt-2 grid sm:grid-cols-2 gap-2">
+                  {row.previews.map(p=>{const view=formDisplay(p.answer,practicePrefs,p.item,row.type.id);return <div key={`${row.type.id}-${p.item.dict}`} className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-1.5 min-w-0"><div className="text-[11px] text-stone-400 truncate" lang="ja">{p.item.dict}</div><ScriptDisplay view={view} word={p.item} type={row.type.id} className="text-sm font-medium truncate" subClassName="text-[11px] text-stone-400 truncate"/></div>;})}
+                </div>}
+              </div>
+              <button onClick={()=>expandRule(row)} disabled={!geminiKey||!!ruleAiLoading} className="px-3 py-2 rounded-lg text-sm border border-indigo-200 hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 inline-flex items-center justify-center gap-1.5"><IconSpark className="w-4 h-4"/>{ruleAiLoading===row.type.id?'Drilling...':'AI drill'}</button>
+            </div>)}
+          </div>
+          {ruleRows.length>36&&<div className="mt-3 text-xs text-stone-400 text-center">Showing first 36 matches. Narrow the search to find a specific form.</div>}
+          {!ruleRows.length&&<div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500 text-center">No rules match that search.</div>}
+          {ruleAiErr&&<div className="mt-3 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{ruleAiErr}</div>}
+          {ruleAiText&&<div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm leading-relaxed whitespace-pre-wrap text-stone-700"><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium mb-2">{ruleAiTitle} micro drill</div>{ruleAiText}</div>}
+          {!geminiKey&&<div className="mt-3 text-xs text-stone-400 text-center">Add a Gemini key in Settings to generate mini drills for individual rules.</div>}
         </div>
         {!geminiKey&&<div className="text-xs text-center text-stone-400">Add a Gemini key in Settings for expanded lessons and mini quizzes.</div>}
         {err&&<div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{err}</div>}
