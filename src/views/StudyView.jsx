@@ -671,20 +671,27 @@ Keep it concise and clear.`;
 
   return (
     <div className="space-y-4">
+      <div className="sticky top-0 z-20 flex justify-center py-2 bg-stone-50/95 dark:bg-stone-950/95 backdrop-blur-sm">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
+          <span className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+            {taskLabel}
+          </span>
+          {taskSub && (
+            <span className="text-sm text-indigo-500 dark:text-indigo-400 font-medium" lang="ja">
+              {taskSub}
+            </span>
+          )}
+          {current.ruleLabel && (
+            <span className="text-xs text-indigo-400 dark:text-indigo-500">· {current.ruleLabel}</span>
+          )}
+        </div>
+      </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
         <div className="px-4 pt-3 pb-2 sm:px-6 sm:pt-5 sm:pb-3 border-b border-stone-100 dark:border-stone-800">
           <div className="flex items-baseline justify-between">
-            <div>
-              <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium">
-                {taskLabel}
-                <span className="text-indigo-400 font-normal normal-case tracking-normal ml-1.5">
-                  · {current.ruleLabel}
-                </span>
-              </div>
-              <div className="text-xs text-stone-400 mt-0.5">
-                {taskSub && taskSub + ' · '}
-                {taskHint}
-              </div>
+            <div className="text-xs text-stone-400">
+              {taskSub && taskSub + ' · '}
+              {taskHint}
             </div>
             <div className="text-xs text-stone-400 text-right">
               {timeLeft !== null && (
@@ -812,13 +819,6 @@ Keep it concise and clear.`;
           <div className="mt-4 flex flex-col gap-1">
             {phase === 'answering' ? (
               <>
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold">
-                    {typeInfo.label}
-                  </span>
-                  <span className="text-xs text-indigo-400">· {current.ruleLabel}</span>
-                </div>
-
                 {typoGuard && (
                   <div className="mb-3 rounded-xl border border-amber-250 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
                     <div className="font-medium">Almost - possible typo.</div>
