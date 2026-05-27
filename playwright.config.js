@@ -6,7 +6,7 @@ export default defineConfig({
   retries: 0,
   use: {
     headless: true,
-    baseURL: 'http://localhost:4173',
+    baseURL: 'http://localhost:4173/JapaneseConjugation/',
   },
   projects: [
     {
