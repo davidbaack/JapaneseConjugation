@@ -13,7 +13,8 @@ import {
   JLPT_LEVELS,
   WORD_TYPE_OPTIONS,
   WORD_GROUP_OPTIONS,
-  GENKI_LESSONS
+  GENKI_LESSONS,
+  MINNA_LESSONS
 } from '../data/starterWords.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
@@ -30,7 +31,8 @@ export function getWordMeta(word){
   const jlpt=normalizeJlptLevel(word?.jlpt||word?.level);
   if(jlpt)embedded.jlpt=jlpt;
   if(word?.lesson)embedded.lesson=Number(word.lesson)||null;
-  return{jlpt:'N3',lesson:null,...(WORD_META[word?.dict] || {}),...embedded};
+  if(word?.minnaLesson)embedded.minnaLesson=Number(word.minnaLesson)||null;
+  return{jlpt:'N3',lesson:null,minnaLesson:null,...(WORD_META[word?.dict] || {}),...embedded};
 }
 
 export function isIrregularAdjective(word){
@@ -58,14 +60,18 @@ export function filterWordsForPrefs(words,prefs=DEFAULT_PREFS,wordLists=[]){
   const types=prefs.wordTypes&&prefs.wordTypes.length?prefs.wordTypes:WORD_TYPE_OPTIONS.map(o=>o.id);
   const groups=prefs.wordGroups&&prefs.wordGroups.length?prefs.wordGroups:WORD_GROUP_OPTIONS.map(o=>o.id);
   const lessonFilter=Array.isArray(prefs.genkiLessons)&&prefs.genkiLessons.length&&prefs.genkiLessons.length<GENKI_LESSONS.length?new Set(prefs.genkiLessons.map(Number)):null;
+  const minnaFilter=Array.isArray(prefs.minnaLessons)&&prefs.minnaLessons.length&&prefs.minnaLessons.length<MINNA_LESSONS.length?new Set(prefs.minnaLessons.map(Number)):null;
   const selectedLists=prefs.wordListIds&&prefs.wordListIds.length?prefs.wordListIds:[];
   const allowedKeys=selectedLists.length?new Set(wordLists.filter(l=>selectedLists.includes(l.id)).flatMap(l=>l.wordKeys||[])):null;
   return words.filter(w=>{
     const meta=getWordMeta(w);
+    const passesLesson=!lessonFilter&&!minnaFilter
+      ||(lessonFilter&&lessonFilter.has(meta.lesson))
+      ||(minnaFilter&&minnaFilter.has(meta.minnaLesson));
     return levels.includes(meta.jlpt) &&
            types.includes(wordKind(w)) &&
            groups.includes(wordGroupId(w)) &&
-           (!lessonFilter||lessonFilter.has(meta.lesson)) &&
+           passesLesson &&
            (!allowedKeys||allowedKeys.has(wordKey(w)));
   });
 }
