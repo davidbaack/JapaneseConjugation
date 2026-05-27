@@ -710,24 +710,6 @@ Keep it concise and clear.`;
 
   return (
     <div className="space-y-4">
-      <div className="sticky top-0 z-20 flex justify-center py-2 bg-stone-50/95 dark:bg-stone-950/95 backdrop-blur-sm">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
-          <span className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-            {taskLabel}
-          </span>
-          {taskSub && (
-            <span className="text-sm text-indigo-500 dark:text-indigo-400 font-medium" lang="ja">
-              {taskSub}
-            </span>
-          )}
-          {taskHint && (
-            <span className="hidden sm:inline text-xs text-indigo-400 dark:text-indigo-500">· {taskHint}</span>
-          )}
-          {current.ruleLabel && (
-            <span className="text-xs text-indigo-400 dark:text-indigo-500">· {current.ruleLabel}</span>
-          )}
-        </div>
-      </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center">
           <div className="flex items-start justify-between mb-3">
@@ -855,14 +837,23 @@ Keep it concise and clear.`;
           <div className="mt-4 flex flex-col gap-1">
             {phase === 'answering' ? (
               <>
-                <div className="flex items-center gap-2 mb-3 text-xs">
-                  <span className="h-px flex-1 bg-stone-100 dark:bg-stone-800" />
-                  <span className="text-stone-500 dark:text-stone-400 font-medium shrink-0">
-                    {taskLabel}
-                    {taskSub && <> · <span lang="ja">{taskSub}</span></>}
-                    {taskHint && ` · ${taskHint}`}
-                  </span>
-                  <span className="h-px flex-1 bg-stone-100 dark:bg-stone-800" />
+                <div className="flex justify-center mb-3">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
+                    <span className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                      {taskLabel}
+                    </span>
+                    {taskSub && (
+                      <span className="text-sm text-indigo-500 dark:text-indigo-400 font-medium" lang="ja">
+                        {taskSub}
+                      </span>
+                    )}
+                    {taskHint && (
+                      <span className="text-xs text-indigo-400 dark:text-indigo-500">· {taskHint}</span>
+                    )}
+                    {current.ruleLabel && (
+                      <span className="text-xs text-indigo-400 dark:text-indigo-500">· {current.ruleLabel}</span>
+                    )}
+                  </div>
                 </div>
                 {typoGuard && (
                   <div className="mb-3 rounded-xl border border-amber-250 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
