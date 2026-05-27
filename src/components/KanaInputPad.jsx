@@ -42,7 +42,7 @@ export default function KanaInputPad({ open, onToggle, onInsert, onBackspace, on
         </div>
       )}
       {open && (
-        <div className="mt-2 rounded-2xl border border-stone-200 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950">
+        <div className="mt-2 rounded-2xl border border-stone-200 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950 w-fit mx-auto">
           <div className="space-y-1.5" lang="ja">
             {KANA_PAD_ROWS.map((row, rowIndex) => (
               <div key={rowIndex} className="flex flex-wrap gap-1">
