@@ -1041,7 +1041,7 @@ Keep it concise and clear.`;
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            answer.trim() ? submit() : skipCurrent();
+                            if (answer.trim()) submit();
                           } else if (e.key === 'Escape') {
                             e.preventDefault();
                             skipCurrent();
@@ -1127,7 +1127,7 @@ Keep it concise and clear.`;
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            answer.trim() ? submit() : skipCurrent();
+                            if (answer.trim()) submit();
                           } else if (e.key === 'Escape') {
                             e.preventDefault();
                             skipCurrent();
@@ -1428,7 +1428,7 @@ Keep it concise and clear.`;
         <span lang="ja" className="text-stone-550 dark:text-stone-450">
           たべた
         </span>
-        , or press Enter on a blank answer / Esc to skip without penalty.
+        , or press Esc to skip without penalty.
       </div>
     </div>
   );
