@@ -37,6 +37,10 @@ import { DEFAULT_PREFS } from '../data/defaults.js';
 function kanaCoachCells(expected, input, revealed = 0) {
   const target = Array.from(expected || '');
   const typed = Array.from(toHiraganaProgress(input || ''));
+  // Trailing 'n' is held pending in progress mode; commit it as 'ん' when context confirms it
+  if (typed.length < target.length && target[typed.length] === 'ん' && /n$/i.test((input || '').trimEnd())) {
+    typed.push('ん');
+  }
   const cells = target.map((expectedKana, i) => {
     const got = typed[i] || '';
     const hinted = !got && i < revealed;
