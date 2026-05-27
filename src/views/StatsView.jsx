@@ -236,7 +236,7 @@ export default function StatsView({
       const reply = await callGemini(
         [{ role: 'user', parts: [{ text: prompt }] }],
         geminiKey,
-        1200,
+        2500,
         0.35,
         aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM)
       );
