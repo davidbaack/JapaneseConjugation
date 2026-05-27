@@ -420,12 +420,12 @@ Keep it concise and clear.`;
   }
 
   async function generateTypingHint() {
-    if (!current || !geminiKey || !answer.trim()) return;
+    if (!current || !geminiKey) return;
     setAiTypingHintLoading(true);
     setAiTypingHint('');
     const typedKana = toHiragana(answer) || answer;
     try {
-      const prompt = `A student is conjugating a Japanese verb and needs targeted guidance.\n\nBase word: ${current.verb.dict} (${current.verb.reading}), meaning: "${current.verb.meaning}"\nVerb class: ${GROUP_NAMES[current.verb.group] || current.verb.group}\nTask: transform to ${typeInfo.label}${taskSub ? ` (${taskSub})` : ''}\nStudent typed so far: "${typedKana}"\n\nDo NOT reveal the correct answer. Give one short targeted hint (under 20 words) about what to fix or add next based specifically on what they've typed.`;
+      const prompt = `A student is conjugating a Japanese verb and needs targeted guidance.\n\nBase word: ${current.verb.dict} (${current.verb.reading}), meaning: "${current.verb.meaning}"\nVerb class: ${GROUP_NAMES[current.verb.group] || current.verb.group}\nTask: transform to ${typeInfo.label}${taskSub ? ` (${taskSub})` : ''}${typedKana ? `\nStudent typed so far: "${typedKana}"` : '\nStudent has not typed anything yet.'}\n\nDo NOT reveal the correct answer. Give one short targeted hint (under 20 words) about where to start or what to fix next.`;
       const reply = await callGemini(
         [{ role: 'user', parts: [{ text: prompt }] }],
         geminiKey,
