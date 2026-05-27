@@ -874,7 +874,7 @@ export default function ReferenceViewSub({
                           onClick={() => setScratchIndex(i)}
                           className={`px-2 py-1 rounded-lg border text-[11px] transition ${
                             scratchCandidate.group === c.group
-                              ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-200 dark:text-stone-900 dark:border-stone-200'
+                              ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:text-white dark:border-indigo-600'
                               : 'bg-white border-indigo-100 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:text-stone-400'
                           }`}
                         >

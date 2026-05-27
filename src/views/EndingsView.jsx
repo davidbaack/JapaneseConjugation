@@ -184,7 +184,7 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
                   }}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     target === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-200 dark:text-stone-900 dark:border-stone-200'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:text-white dark:border-indigo-600'
                       : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-750 dark:text-stone-300'
                   }`}
                 >

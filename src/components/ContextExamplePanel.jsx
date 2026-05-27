@@ -34,12 +34,12 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
+    <div className="mt-4 rounded-xl border border-indigo-100 dark:border-indigo-900/40 bg-indigo-50 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wider text-indigo-700 font-medium">In context</div>
-          <div className="mt-1 text-lg text-stone-900" lang="ja">{example.ja}</div>
-          <div className="mt-1 text-xs text-indigo-900/80">{example.en}</div>
+          <div className="text-xs uppercase tracking-wider text-indigo-700 dark:text-indigo-300 font-medium">In context</div>
+          <div className="mt-1 text-lg text-stone-900 dark:text-stone-100" lang="ja">{example.ja}</div>
+          <div className="mt-1 text-xs text-indigo-900/80 dark:text-indigo-300/90">{example.en}</div>
         </div>
         <button onClick={() => speakJapanese(example.ja, 0.85, practicePrefs.voiceURI)} className="px-2.5 py-2 rounded-lg border border-indigo-200 bg-white/70 hover:bg-white text-indigo-700">
           <IconVolume className="w-4 h-4" />
@@ -50,10 +50,10 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
           <IconSpark className="w-4 h-4" />
           {loading ? 'Writing...' : 'AI examples'}
         </button>
-        {!geminiKey && <div className="text-xs text-indigo-900/60 self-center">Add a Gemini key for natural examples.</div>}
+        {!geminiKey && <div className="text-xs text-indigo-900/60 dark:text-indigo-300/60 self-center">Add a Gemini key for natural examples.</div>}
       </div>
       {err && <div className="mt-2 text-sm text-rose-600">{err}</div>}
-      {aiText && <div className="mt-3 rounded-lg border border-indigo-100 bg-white/80 px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{aiText}</div>}
+      {aiText && <div className="mt-3 rounded-lg border border-indigo-100 dark:border-indigo-900/40 bg-white/80 dark:bg-stone-800/80 px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-700 dark:text-stone-200">{aiText}</div>}
     </div>
   );
 }

@@ -207,7 +207,7 @@ export default function App() {
               onClick={() => setTab(t)}
               className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
                 tab === t
-                  ? 'bg-stone-800 dark:bg-stone-700 text-white font-semibold'
+                  ? 'bg-stone-800 dark:bg-indigo-700 text-white font-semibold'
                   : 'text-stone-605 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
               }`}
             >

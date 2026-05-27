@@ -267,7 +267,7 @@ export default function SettingsView({
                   onClick={() => setPracticePrefs({ ...practicePrefs, answerMode: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     practicePrefs.answerMode === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -285,7 +285,7 @@ export default function SettingsView({
                   onClick={() => setPracticePrefs({ ...practicePrefs, drillMode: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     ((practicePrefs.drillMode || 'word') === o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -303,7 +303,7 @@ export default function SettingsView({
                   onClick={() => setPracticePrefs({ ...practicePrefs, drillDirection: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     ((practicePrefs.drillDirection || DEFAULT_PREFS.drillDirection) === o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -322,7 +322,7 @@ export default function SettingsView({
                   onClick={() => setPracticePrefs({ ...practicePrefs, practiceFocus: o.id })}
                   className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${
                     ((practicePrefs.practiceFocus || 'balanced') === o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -340,7 +340,7 @@ export default function SettingsView({
                   onClick={() => setPracticePrefs({ ...practicePrefs, skipDuplicateForms: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     ((practicePrefs.skipDuplicateForms !== false) === o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -358,7 +358,7 @@ export default function SettingsView({
                   onClick={() => setPracticePrefs({ ...practicePrefs, englishHints: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     ((practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -377,7 +377,7 @@ export default function SettingsView({
                   onClick={() => setPracticePrefs({ ...practicePrefs, theme: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     ((practicePrefs.theme || 'system') === o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -395,7 +395,7 @@ export default function SettingsView({
                   onClick={() => toggleDisplayScript(o.id)}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     displayScripts[o.id]
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -574,7 +574,7 @@ export default function SettingsView({
                   onClick={() => togglePref('jlptLevels', l, JLPT_LEVELS)}
                   className={`flex-1 px-2 py-2 rounded-lg text-xs border transition ${
                     (practicePrefs.jlptLevels || JLPT_LEVELS).includes(l)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -599,7 +599,7 @@ export default function SettingsView({
                   onClick={() => toggleGenkiLesson(n)}
                   className={`px-2 py-2 rounded-lg text-xs border transition ${
                     selectedGenkiLessons.includes(n)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -618,7 +618,7 @@ export default function SettingsView({
                   onClick={() => togglePref('wordTypes', o.id, WORD_TYPE_OPTIONS.map(x => x.id))}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     (practicePrefs.wordTypes || WORD_TYPE_OPTIONS.map(x => x.id)).includes(o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -639,7 +639,7 @@ export default function SettingsView({
                   onClick={() => togglePref('wordGroups', o.id, WORD_GROUP_OPTIONS.map(x => x.id))}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     selectedWordGroups.includes(o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -757,7 +757,7 @@ export default function SettingsView({
                   onClick={() => setPracticePrefs({ ...practicePrefs, aiFeedbackLevel: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     ((practicePrefs.aiFeedbackLevel || DEFAULT_PREFS.aiFeedbackLevel) === o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -775,7 +775,7 @@ export default function SettingsView({
                   onClick={() => setPracticePrefs({ ...practicePrefs, aiGuideTone: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     ((practicePrefs.aiGuideTone || DEFAULT_PREFS.aiGuideTone) === o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
@@ -888,7 +888,7 @@ export default function SettingsView({
             onClick={() => { setExportOpen(!exportOpen); setImportOpen(false); }}
             className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
               exportOpen
-                ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                 : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850'
             }`}
           >
@@ -898,7 +898,7 @@ export default function SettingsView({
             onClick={() => { setImportOpen(!importOpen); setExportOpen(false); setImportErr(''); }}
             className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
               importOpen
-                ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                 : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850'
             }`}
           >

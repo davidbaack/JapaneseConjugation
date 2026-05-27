@@ -205,7 +205,7 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
                 onClick={() => setMode(o.id)}
                 className={`px-2 py-1.5 rounded-md text-xs font-medium transition ${
                   mode === o.id
-                    ? 'bg-white dark:bg-stone-800 text-indigo-700 dark:text-indigo-300 shadow-sm'
+                    ? 'bg-white dark:bg-stone-600 text-indigo-700 dark:text-white shadow-sm'
                     : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-300'
                 }`}
               >

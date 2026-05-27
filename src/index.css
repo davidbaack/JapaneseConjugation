@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.theme-dark, .theme-dark *));
+
 body {
   background: #fafaf9;
   margin: 0;

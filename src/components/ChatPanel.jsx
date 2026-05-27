@@ -64,11 +64,11 @@ export function ChatPanel({ verb, type, userAnswer, expected, explanation, gemin
         <IconChat className="w-3.5 h-3.5" />
         Chat with Gemini
       </div>
-      <div className="space-y-2 max-h-56 overflow-y-auto pb-1">
+      <div className="space-y-2 max-h-96 overflow-y-auto pb-1">
         {loading && !display.length && <div className="text-sm text-stone-400 italic px-3 py-2 animate-pulse">Gemini is thinking…</div>}
         {display.map((m, i) => (
           <div key={i} style={{ whiteSpace: 'pre-wrap' }}
-            className={`text-sm px-3 py-2 rounded-lg leading-relaxed ${m.role === 'assistant' ? 'bg-white border border-stone-200 text-stone-800' : 'bg-indigo-50 border border-indigo-100 text-indigo-900 ml-6 text-right'}`}>
+            className={`text-sm px-3 py-2 rounded-lg leading-relaxed ${m.role === 'assistant' ? 'bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-100' : 'bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/50 text-indigo-900 dark:text-indigo-200 ml-6 text-right'}`}>
             {m.content}
           </div>
         ))}

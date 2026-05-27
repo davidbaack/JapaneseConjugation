@@ -31,7 +31,7 @@ export default function KanaInputPad({ open, onToggle, onInsert, onBackspace, on
           onClick={onToggle}
           className={`px-3 py-1.5 rounded-lg border text-sm inline-flex items-center gap-1.5 transition ${
             open
-              ? 'bg-stone-800 border-stone-800 text-white dark:bg-stone-200 dark:border-stone-200 dark:text-stone-900'
+              ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
               : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
           }`}
         >

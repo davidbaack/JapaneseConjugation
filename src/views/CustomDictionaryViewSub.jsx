@@ -286,7 +286,7 @@ export default function CustomDictionaryViewSub({
                           onClick={() => setMf({ ...mf, group: g.id })}
                           className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${
                             mf.group === g.id
-                              ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                              ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                               : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                           }`}
                         >
@@ -299,7 +299,7 @@ export default function CustomDictionaryViewSub({
                           onClick={() => setMf({ ...mf, group: g.id })}
                           className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${
                             mf.group === g.id
-                              ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                              ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                               : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                           }`}
                         >

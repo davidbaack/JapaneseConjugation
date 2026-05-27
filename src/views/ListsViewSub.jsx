@@ -303,7 +303,7 @@ export default function ListsViewSub({
                     onClick={() => toggleActiveFilter(l.id)}
                     className={`flex-1 px-2 py-1.5 rounded-lg text-xs border ${
                       selectedIds.includes(l.id)
-                        ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                        ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                         : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850'
                     }`}
                   >
@@ -367,7 +367,7 @@ export default function ListsViewSub({
                     onClick={() => setAiTarget(target)}
                     className={`px-2.5 py-1.5 rounded-lg border text-xs transition ${
                       aiTarget === target
-                        ? 'bg-stone-800 text-white border-stone-800 dark:bg-stone-700 dark:border-stone-700'
+                        ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                         : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                     }`}
                   >
