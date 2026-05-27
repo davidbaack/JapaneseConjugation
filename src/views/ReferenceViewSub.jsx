@@ -19,6 +19,7 @@ import {
   conjugateAdjective,
   isIrregularAdjective
 } from '../utils/conjugator.js';
+import { CONJ_TYPES, ADJ_TYPES } from '../data/conjugationTypes.js';
 import {
   normalizeReferenceState,
   referenceProgressFor,
@@ -980,6 +981,7 @@ export default function ReferenceViewSub({
           </div>
         )}
 
+        {selected && (
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5 text-left">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-4">
             <div className="min-w-0">
@@ -1048,6 +1050,7 @@ export default function ReferenceViewSub({
             {favoriteMsg && <span className="text-emerald-650 dark:text-emerald-450">{favoriteMsg}</span>}
           </div>
         </div>
+        )}
 
         {transitivePair && (
           <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5 text-left">
