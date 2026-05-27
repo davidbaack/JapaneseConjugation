@@ -49,6 +49,8 @@ import {
 import { speakJapanese } from '../utils/speech.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
+const POLITE_FORM_IDS = ALL_CARD_TYPES.filter(t => t.id.includes('polite') || t.label.toLowerCase().includes('polite')).map(t => t.id);
+
 function compactLookupText(s) {
   return String(s || '').normalize('NFKC').replace(/[、。！？\s'"「」『』（）()\[\]{}]/g, '').toLowerCase();
 }
@@ -171,6 +173,14 @@ export default function SettingsView({
     if (clean.length) setState({ ...state, enabledTypes: clean });
   }
 
+  function toggleAllPolite() {
+    if (allPoliteOn) {
+      setState({ ...state, enabledTypes: state.enabledTypes.filter(id => !POLITE_FORM_IDS.includes(id)) });
+    } else {
+      setState({ ...state, enabledTypes: [...new Set([...state.enabledTypes, ...POLITE_FORM_IDS])] });
+    }
+  }
+
   function reset() {
     setState({ ...defaultState(), enabledTypes: state.enabledTypes });
     setConfirmReset(false);
@@ -231,6 +241,9 @@ export default function SettingsView({
     const kanaHay = compactLookupText(`${t.sub} ${t.hint}`);
     return hay.includes(typeNeedle) || kanaHay.includes(typeNeedleKana) || kanaToRomaji(t.sub || '').toLowerCase().includes(typeNeedle);
   });
+
+  const enabledPoliteCount = POLITE_FORM_IDS.filter(id => state.enabledTypes.includes(id)).length;
+  const allPoliteOn = enabledPoliteCount === POLITE_FORM_IDS.length;
 
   return (
     <div className="space-y-4 text-left">
@@ -679,6 +692,26 @@ export default function SettingsView({
               </button>
             );
           })}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <button
+            onClick={toggleAllPolite}
+            title={allPoliteOn ? 'Disable all polite (ます/です) forms' : 'Enable all polite (ます/です) forms'}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+              allPoliteOn
+                ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                : enabledPoliteCount > 0
+                  ? 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-950/50'
+                  : 'bg-white dark:bg-stone-950 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-800 hover:border-indigo-300 dark:hover:border-indigo-700'
+            }`}
+          >
+            Polite forms
+            <span className={`tabular-nums px-1.5 py-0.5 rounded-full text-[10px] ${
+              allPoliteOn ? 'bg-white/20 text-white' : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
+            }`}>
+              {enabledPoliteCount}/{POLITE_FORM_IDS.length}
+            </span>
+          </button>
         </div>
         <div className="mb-3 grid sm:grid-cols-[1fr_auto] gap-2 items-center">
           <input
