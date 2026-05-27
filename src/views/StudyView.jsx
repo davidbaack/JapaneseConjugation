@@ -712,23 +712,26 @@ Keep it concise and clear.`;
     <div className="space-y-4">
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center">
-          {(timeLeft !== null || reviewLimit > 0 || !!sessionSkipped) && (
-            <div className="flex justify-end mb-3">
-              <div className="text-xs text-stone-400 text-right shrink-0">
-                {timeLeft !== null && (
-                  <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-                    {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-                  </div>
-                )}
-                {reviewLimit > 0 && (
-                  <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-                    {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} set
-                  </div>
-                )}
-                {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
+          <div className="flex justify-end mb-3">
+            <div className="text-xs text-stone-400 text-right shrink-0">
+              {timeLeft !== null && (
+                <div className="text-indigo-600 dark:text-indigo-400 font-medium">
+                  {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                </div>
+              )}
+              {reviewLimit > 0 && (
+                <div className="text-indigo-600 dark:text-indigo-400 font-medium">
+                  {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} set
+                </div>
+              )}
+              {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
+              <div>
+                JLPT {getWordMeta(current.verb).jlpt}
+                {getWordMeta(current.verb).lesson ? ` · Genki L${getWordMeta(current.verb).lesson}` : ''}
+                {getWordMeta(current.verb).minnaLesson ? ` · Minna L${getWordMeta(current.verb).minnaLesson}` : ''}
               </div>
             </div>
-          )}
+          </div>
           {hidePromptText ? (
             <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
               <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-3">
@@ -827,11 +830,6 @@ Keep it concise and clear.`;
               {GROUP_NAMES[current.verb.group]} · {wordType}
             </div>
           )}
-          <div className="text-[11px] text-stone-400 mt-1">
-            JLPT {getWordMeta(current.verb).jlpt}
-            {getWordMeta(current.verb).lesson ? ` · Genki L${getWordMeta(current.verb).lesson}` : ''}
-          </div>
-
           <div className="mt-4 flex flex-col gap-1">
             {phase === 'answering' ? (
               <>
