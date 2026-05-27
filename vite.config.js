@@ -7,5 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss()
-  ]
+  ],
+  test: {
+    environment: 'node',
+    include: ['src/__tests__/**/*.test.js'],
+    globals: true,
+  }
 })

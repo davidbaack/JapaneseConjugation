@@ -118,7 +118,8 @@ export function localDateKey(offsetDays = 0) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function normalizeReferenceState(ref = {}) {
+export function normalizeReferenceState(ref = null) {
+  if (!ref) ref = {};
   const recentSearches = Array.isArray(ref.recentSearches)
     ? ref.recentSearches.map(s => String(s || '').trim()).filter(Boolean).slice(0, 12)
     : [];
@@ -188,7 +189,7 @@ export function mergeState(saved, sessionOverride) {
       wordSeen: (saved && saved.reader && saved.reader.wordSeen) || {}
     },
     production: (saved && saved.production) || base.production,
-    reference: normalizeReferenceState(saved && saved.reference),
+    reference: normalizeReferenceState(saved && saved.reference ? saved.reference : null),
     daily: (saved && saved.daily) || base.daily,
     classify: (saved && saved.classify) || base.classify,
     session: sessionOverride || base.session

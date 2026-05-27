@@ -1,0 +1,330 @@
+import { describe, it, expect } from 'vitest';
+import { conjugate, conjugateAdjective, conjugateItem } from '../utils/conjugator.js';
+
+// ─── Test verbs ───────────────────────────────────────────────────────────────
+const TABERU  = { dict: '食べる',  reading: 'たべる',  meaning: 'to eat',   group: 'ichidan' };
+const KAKU    = { dict: '書く',    reading: 'かく',    meaning: 'to write', group: 'godan' };
+const HANASU  = { dict: '話す',    reading: 'はなす',  meaning: 'to speak', group: 'godan' };
+const MATSU   = { dict: '待つ',    reading: 'まつ',    meaning: 'to wait',  group: 'godan' };
+const NOMU    = { dict: '飲む',    reading: 'のむ',    meaning: 'to drink', group: 'godan' };
+const KAEРУ   = { dict: '買う',    reading: 'かう',    meaning: 'to buy',   group: 'godan' };
+const OYOGU   = { dict: '泳ぐ',    reading: 'およぐ',  meaning: 'to swim',  group: 'godan' };
+const SHINU   = { dict: '死ぬ',    reading: 'しぬ',    meaning: 'to die',   group: 'godan' };
+const IKU     = { dict: '行く',    reading: 'いく',    meaning: 'to go',    group: 'godan' };
+const SURU    = { dict: 'する',    reading: 'する',    meaning: 'to do',    group: 'suru'  };
+const BENKYOU = { dict: '勉強する', reading: 'べんきょうする', meaning: 'to study', group: 'suru' };
+const KURU    = { dict: '来る',    reading: 'くる',    meaning: 'to come',  group: 'kuru'  };
+
+// ─── Test adjectives ──────────────────────────────────────────────────────────
+const TAKAI   = { dict: '高い',  reading: 'たかい', meaning: 'expensive', group: 'i-adjective' };
+const II      = { dict: 'いい',  reading: 'いい',   meaning: 'good',      group: 'i-adjective', irregular: true };
+const SHIZUKA = { dict: '静か',  reading: 'しずか', meaning: 'quiet',     group: 'na-adjective' };
+
+// ─── Ichidan verb (食べる) ────────────────────────────────────────────────────
+describe('ichidan verb: 食べる', () => {
+  it('plain forms', () => {
+    expect(conjugate(TABERU, 'plain-present')).toBe('たべる');
+    expect(conjugate(TABERU, 'plain-past')).toBe('たべた');
+    expect(conjugate(TABERU, 'plain-negative')).toBe('たべない');
+    expect(conjugate(TABERU, 'plain-past-negative')).toBe('たべなかった');
+  });
+
+  it('polite forms', () => {
+    expect(conjugate(TABERU, 'polite-present')).toBe('たべます');
+    expect(conjugate(TABERU, 'polite-past')).toBe('たべました');
+    expect(conjugate(TABERU, 'polite-negative')).toBe('たべません');
+    expect(conjugate(TABERU, 'polite-past-negative')).toBe('たべませんでした');
+  });
+
+  it('te-form and related', () => {
+    expect(conjugate(TABERU, 'te-form')).toBe('たべて');
+    expect(conjugate(TABERU, 'negative-te')).toBe('たべないで');
+    expect(conjugate(TABERU, 'request-kudasai')).toBe('たべてください');
+  });
+
+  it('potential forms', () => {
+    expect(conjugate(TABERU, 'potential')).toBe('たべられる');
+    expect(conjugate(TABERU, 'potential-negative')).toBe('たべられない');
+    expect(conjugate(TABERU, 'potential-polite')).toBe('たべられます');
+    expect(conjugate(TABERU, 'potential-past')).toBe('たべられた');
+    expect(conjugate(TABERU, 'potential-past-negative')).toBe('たべられなかった');
+  });
+
+  it('volitional and conditional', () => {
+    expect(conjugate(TABERU, 'volitional')).toBe('たべよう');
+    expect(conjugate(TABERU, 'polite-volitional')).toBe('たべましょう');
+    expect(conjugate(TABERU, 'conditional-tara')).toBe('たべたら');
+    expect(conjugate(TABERU, 'conditional-ba')).toBe('たべれば');
+    expect(conjugate(TABERU, 'conditional-nara')).toBe('たべるなら');
+    expect(conjugate(TABERU, 'negative-conditional-tara')).toBe('たべなかったら');
+    expect(conjugate(TABERU, 'negative-conditional-ba')).toBe('たべなければ');
+  });
+
+  it('passive, causative, causative-passive', () => {
+    expect(conjugate(TABERU, 'passive')).toBe('たべられる');
+    expect(conjugate(TABERU, 'causative')).toBe('たべさせる');
+    expect(conjugate(TABERU, 'causative-passive')).toBe('たべさせられる');
+  });
+
+  it('desiderative forms', () => {
+    expect(conjugate(TABERU, 'desiderative')).toBe('たべたい');
+    expect(conjugate(TABERU, 'desiderative-polite')).toBe('たべたいです');
+    expect(conjugate(TABERU, 'desiderative-negative')).toBe('たべたくない');
+    expect(conjugate(TABERU, 'desiderative-past')).toBe('たべたかった');
+  });
+
+  it('progressive forms', () => {
+    expect(conjugate(TABERU, 'progressive')).toBe('たべている');
+    expect(conjugate(TABERU, 'progressive-polite')).toBe('たべています');
+    expect(conjugate(TABERU, 'progressive-negative')).toBe('たべていない');
+    expect(conjugate(TABERU, 'progressive-past')).toBe('たべていた');
+  });
+
+  it('misc forms', () => {
+    expect(conjugate(TABERU, 'imperative')).toBe('たべろ');
+    expect(conjugate(TABERU, 'prohibition')).toBe('たべるな');
+    expect(conjugate(TABERU, 'permission')).toBe('たべてもいい');
+    expect(conjugate(TABERU, 'obligation')).toBe('たべなければならない');
+    expect(conjugate(TABERU, 'conjectural')).toBe('たべるだろう');
+    expect(conjugate(TABERU, 'masu-stem')).toBe('たべ');
+    expect(conjugate(TABERU, 'negative-zu')).toBe('たべず');
+    expect(conjugate(TABERU, 'negative-zuni')).toBe('たべずに');
+  });
+});
+
+// ─── Godan く verb (書く) ────────────────────────────────────────────────────
+describe('godan verb く: 書く', () => {
+  it('plain forms', () => {
+    expect(conjugate(KAKU, 'plain-past')).toBe('かいた');
+    expect(conjugate(KAKU, 'plain-negative')).toBe('かかない');
+    expect(conjugate(KAKU, 'te-form')).toBe('かいて');
+  });
+
+  it('polite forms', () => {
+    expect(conjugate(KAKU, 'polite-present')).toBe('かきます');
+    expect(conjugate(KAKU, 'polite-past')).toBe('かきました');
+  });
+
+  it('potential and volitional', () => {
+    expect(conjugate(KAKU, 'potential')).toBe('かける');
+    expect(conjugate(KAKU, 'volitional')).toBe('かこう');
+  });
+});
+
+// ─── Godan す verb (話す) ────────────────────────────────────────────────────
+describe('godan verb す: 話す', () => {
+  it('key forms', () => {
+    expect(conjugate(HANASU, 'plain-past')).toBe('はなした');
+    expect(conjugate(HANASU, 'te-form')).toBe('はなして');
+    expect(conjugate(HANASU, 'plain-negative')).toBe('はなさない');
+    expect(conjugate(HANASU, 'polite-present')).toBe('はなします');
+    expect(conjugate(HANASU, 'potential')).toBe('はなせる');
+    expect(conjugate(HANASU, 'passive')).toBe('はなされる');
+    expect(conjugate(HANASU, 'causative')).toBe('はなさせる');
+  });
+});
+
+// ─── Godan つ verb (待つ) ────────────────────────────────────────────────────
+describe('godan verb つ: 待つ', () => {
+  it('key forms', () => {
+    expect(conjugate(MATSU, 'plain-past')).toBe('まった');
+    expect(conjugate(MATSU, 'te-form')).toBe('まって');
+    expect(conjugate(MATSU, 'plain-negative')).toBe('またない');
+    expect(conjugate(MATSU, 'potential')).toBe('まてる');
+  });
+});
+
+// ─── Godan む verb (飲む) ────────────────────────────────────────────────────
+describe('godan verb む: 飲む', () => {
+  it('key forms', () => {
+    expect(conjugate(NOMU, 'plain-past')).toBe('のんだ');
+    expect(conjugate(NOMU, 'te-form')).toBe('のんで');
+    expect(conjugate(NOMU, 'plain-negative')).toBe('のまない');
+  });
+});
+
+// ─── Godan う verb (買う) ────────────────────────────────────────────────────
+describe('godan verb う: 買う', () => {
+  it('key forms', () => {
+    expect(conjugate(KAEРУ, 'plain-past')).toBe('かった');
+    expect(conjugate(KAEРУ, 'te-form')).toBe('かって');
+    expect(conjugate(KAEРУ, 'plain-negative')).toBe('かわない');
+  });
+});
+
+// ─── Godan ぐ verb (泳ぐ) ────────────────────────────────────────────────────
+describe('godan verb ぐ: 泳ぐ', () => {
+  it('key forms', () => {
+    expect(conjugate(OYOGU, 'plain-past')).toBe('およいだ');
+    expect(conjugate(OYOGU, 'te-form')).toBe('およいで');
+    expect(conjugate(OYOGU, 'plain-negative')).toBe('およがない');
+  });
+});
+
+// ─── Godan ぬ verb (死ぬ) ────────────────────────────────────────────────────
+describe('godan verb ぬ: 死ぬ', () => {
+  it('key forms', () => {
+    expect(conjugate(SHINU, 'plain-past')).toBe('しんだ');
+    expect(conjugate(SHINU, 'te-form')).toBe('しんで');
+    expect(conjugate(SHINU, 'plain-negative')).toBe('しなない');
+  });
+});
+
+// ─── Godan 行く irregular past/te ─────────────────────────────────────────────
+describe('godan irregular: 行く', () => {
+  it('uses った for past (not いた)', () => {
+    expect(conjugate(IKU, 'plain-past')).toBe('いった');
+    expect(conjugate(IKU, 'te-form')).toBe('いって');
+  });
+
+  it('negative is regular', () => {
+    expect(conjugate(IKU, 'plain-negative')).toBe('いかない');
+  });
+});
+
+// ─── Suru verb ───────────────────────────────────────────────────────────────
+describe('suru verb: する', () => {
+  it('plain forms', () => {
+    expect(conjugate(SURU, 'plain-present')).toBe('する');
+    expect(conjugate(SURU, 'plain-past')).toBe('した');
+    expect(conjugate(SURU, 'plain-negative')).toBe('しない');
+    expect(conjugate(SURU, 'plain-past-negative')).toBe('しなかった');
+  });
+
+  it('polite forms', () => {
+    expect(conjugate(SURU, 'polite-present')).toBe('します');
+    expect(conjugate(SURU, 'polite-past')).toBe('しました');
+    expect(conjugate(SURU, 'polite-negative')).toBe('しません');
+  });
+
+  it('te-form and potential', () => {
+    expect(conjugate(SURU, 'te-form')).toBe('して');
+    expect(conjugate(SURU, 'potential')).toBe('できる');
+  });
+
+  it('passive and causative', () => {
+    expect(conjugate(SURU, 'passive')).toBe('される');
+    expect(conjugate(SURU, 'causative')).toBe('させる');
+  });
+
+  it('volitional and imperative', () => {
+    expect(conjugate(SURU, 'volitional')).toBe('しよう');
+    expect(conjugate(SURU, 'imperative')).toBe('しろ');
+  });
+});
+
+// ─── Compound suru verb (勉強する) ───────────────────────────────────────────
+describe('compound suru verb: 勉強する', () => {
+  it('prepends compound stem', () => {
+    expect(conjugate(BENKYOU, 'plain-past')).toBe('べんきょうした');
+    expect(conjugate(BENKYOU, 'polite-present')).toBe('べんきょうします');
+    expect(conjugate(BENKYOU, 'te-form')).toBe('べんきょうして');
+    expect(conjugate(BENKYOU, 'potential')).toBe('べんきょうできる');
+  });
+});
+
+// ─── Kuru verb ───────────────────────────────────────────────────────────────
+describe('kuru verb: 来る', () => {
+  it('plain forms', () => {
+    expect(conjugate(KURU, 'plain-present')).toBe('くる');
+    expect(conjugate(KURU, 'plain-past')).toBe('きた');
+    expect(conjugate(KURU, 'plain-negative')).toBe('こない');
+    expect(conjugate(KURU, 'plain-past-negative')).toBe('こなかった');
+  });
+
+  it('polite forms', () => {
+    expect(conjugate(KURU, 'polite-present')).toBe('きます');
+    expect(conjugate(KURU, 'polite-past')).toBe('きました');
+    expect(conjugate(KURU, 'polite-negative')).toBe('きません');
+  });
+
+  it('te-form and potential', () => {
+    expect(conjugate(KURU, 'te-form')).toBe('きて');
+    expect(conjugate(KURU, 'potential')).toBe('こられる');
+  });
+
+  it('volitional and imperative', () => {
+    expect(conjugate(KURU, 'volitional')).toBe('こよう');
+    expect(conjugate(KURU, 'imperative')).toBe('こい');
+  });
+});
+
+// ─── I-adjective (高い) ───────────────────────────────────────────────────────
+describe('i-adjective: 高い', () => {
+  it('plain forms', () => {
+    expect(conjugateAdjective(TAKAI, 'adj-plain-present')).toBe('たかい');
+    expect(conjugateAdjective(TAKAI, 'adj-plain-past')).toBe('たかかった');
+    expect(conjugateAdjective(TAKAI, 'adj-plain-negative')).toBe('たかくない');
+    expect(conjugateAdjective(TAKAI, 'adj-plain-past-negative')).toBe('たかくなかった');
+  });
+
+  it('polite forms', () => {
+    expect(conjugateAdjective(TAKAI, 'adj-polite-present')).toBe('たかいです');
+    expect(conjugateAdjective(TAKAI, 'adj-polite-past')).toBe('たかかったです');
+    expect(conjugateAdjective(TAKAI, 'adj-polite-negative')).toBe('たかくないです');
+  });
+
+  it('derivational forms', () => {
+    expect(conjugateAdjective(TAKAI, 'adj-te-form')).toBe('たかくて');
+    expect(conjugateAdjective(TAKAI, 'adj-adverb')).toBe('たかく');
+    expect(conjugateAdjective(TAKAI, 'adj-conditional')).toBe('たかければ');
+    expect(conjugateAdjective(TAKAI, 'adj-tara')).toBe('たかかったら');
+    expect(conjugateAdjective(TAKAI, 'adj-sou')).toBe('たかそう');
+    expect(conjugateAdjective(TAKAI, 'adj-sugiru')).toBe('たかすぎる');
+    expect(conjugateAdjective(TAKAI, 'adj-naru')).toBe('たかくなる');
+  });
+});
+
+// ─── Irregular i-adjective (いい) ─────────────────────────────────────────────
+describe('irregular i-adjective: いい', () => {
+  it('uses よ stem for all inflected forms', () => {
+    expect(conjugateAdjective(II, 'adj-plain-past')).toBe('よかった');
+    expect(conjugateAdjective(II, 'adj-plain-negative')).toBe('よくない');
+    expect(conjugateAdjective(II, 'adj-plain-past-negative')).toBe('よくなかった');
+    expect(conjugateAdjective(II, 'adj-polite-present')).toBe('いいです');
+    expect(conjugateAdjective(II, 'adj-te-form')).toBe('よくて');
+    expect(conjugateAdjective(II, 'adj-adverb')).toBe('よく');
+  });
+});
+
+// ─── Na-adjective (静か) ──────────────────────────────────────────────────────
+describe('na-adjective: 静か', () => {
+  it('plain forms', () => {
+    expect(conjugateAdjective(SHIZUKA, 'adj-plain-present')).toBe('しずかだ');
+    expect(conjugateAdjective(SHIZUKA, 'adj-plain-past')).toBe('しずかだった');
+    expect(conjugateAdjective(SHIZUKA, 'adj-plain-negative')).toBe('しずかではない');
+    expect(conjugateAdjective(SHIZUKA, 'adj-plain-past-negative')).toBe('しずかではなかった');
+  });
+
+  it('polite forms', () => {
+    expect(conjugateAdjective(SHIZUKA, 'adj-polite-present')).toBe('しずかです');
+    expect(conjugateAdjective(SHIZUKA, 'adj-polite-past')).toBe('しずかでした');
+    expect(conjugateAdjective(SHIZUKA, 'adj-polite-negative')).toBe('しずかではありません');
+    expect(conjugateAdjective(SHIZUKA, 'adj-polite-past-negative')).toBe('しずかではありませんでした');
+  });
+
+  it('derivational forms', () => {
+    expect(conjugateAdjective(SHIZUKA, 'adj-te-form')).toBe('しずかで');
+    expect(conjugateAdjective(SHIZUKA, 'adj-adverb')).toBe('しずかに');
+    expect(conjugateAdjective(SHIZUKA, 'adj-attributive')).toBe('しずかな');
+    expect(conjugateAdjective(SHIZUKA, 'adj-sou')).toBe('しずかそう');
+    expect(conjugateAdjective(SHIZUKA, 'adj-naru')).toBe('しずかになる');
+  });
+});
+
+// ─── conjugateItem dispatch ───────────────────────────────────────────────────
+describe('conjugateItem', () => {
+  it('routes verbs to conjugate', () => {
+    expect(conjugateItem(TABERU, 'plain-past')).toBe('たべた');
+    expect(conjugateItem(SURU, 'te-form')).toBe('して');
+  });
+
+  it('routes adjectives to conjugateAdjective', () => {
+    expect(conjugateItem(TAKAI, 'adj-plain-past')).toBe('たかかった');
+    expect(conjugateItem(SHIZUKA, 'adj-adverb')).toBe('しずかに');
+  });
+
+  it('returns empty string for unknown type', () => {
+    expect(conjugateItem(TABERU, 'nonexistent-type')).toBe('');
+  });
+});

@@ -4,3 +4,5 @@ dist-ssr
 *.local
 temp-vite
 .DS_Store
+test-results
+playwright-report
