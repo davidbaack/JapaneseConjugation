@@ -63,6 +63,8 @@ export const JLPT_LEVELS = ['N5','N4','N3','N2','N1'];
 
 export const GENKI_LESSONS = Array.from({length:23},(_,i)=>i+1);
 
+export const MINNA_LESSONS = Array.from({length:50},(_,i)=>i+1);
+
 export const WORD_TYPE_OPTIONS = [
   {id:'verb',label:'Verbs'},
   {id:'i-adjective',label:'い-adjectives'},
@@ -80,8 +82,8 @@ export const WORD_GROUP_OPTIONS = [
 ];
 
 export const WORD_META = {
-  食べる:{jlpt:'N5',lesson:3},見る:{jlpt:'N5',lesson:3},寝る:{jlpt:'N5',lesson:3},起きる:{jlpt:'N5',lesson:3},出る:{jlpt:'N5',lesson:4},教える:{jlpt:'N5',lesson:7},覚える:{jlpt:'N4',lesson:11},着る:{jlpt:'N5',lesson:10},開ける:{jlpt:'N5',lesson:13},閉める:{jlpt:'N5',lesson:13},
-  行く:{jlpt:'N5',lesson:3},書く:{jlpt:'N5',lesson:3},話す:{jlpt:'N5',lesson:3},待つ:{jlpt:'N5',lesson:6},死ぬ:{jlpt:'N4',lesson:15},遊ぶ:{jlpt:'N5',lesson:7},飲む:{jlpt:'N5',lesson:3},取る:{jlpt:'N5',lesson:8},買う:{jlpt:'N5',lesson:3},泳ぐ:{jlpt:'N5',lesson:6},読む:{jlpt:'N5',lesson:3},立つ:{jlpt:'N5',lesson:8},走る:{jlpt:'N4',lesson:12},帰る:{jlpt:'N5',lesson:3},聞く:{jlpt:'N5',lesson:3},持つ:{jlpt:'N5',lesson:7},使う:{jlpt:'N5',lesson:10},作る:{jlpt:'N5',lesson:7},する:{jlpt:'N5',lesson:3},来る:{jlpt:'N5',lesson:3},
-  いい:{jlpt:'N5',lesson:5},かっこいい:{jlpt:'N5',lesson:5},大きい:{jlpt:'N5',lesson:5},小さい:{jlpt:'N5',lesson:5},新しい:{jlpt:'N5',lesson:5},古い:{jlpt:'N5',lesson:5},高い:{jlpt:'N5',lesson:5},安い:{jlpt:'N5',lesson:5},難しい:{jlpt:'N5',lesson:5},易しい:{jlpt:'N5',lesson:5},暑い:{jlpt:'N5',lesson:5},寒い:{jlpt:'N5',lesson:5},楽しい:{jlpt:'N5',lesson:5},忙しい:{jlpt:'N5',lesson:5},おいしい:{jlpt:'N5',lesson:5},
-  静か:{jlpt:'N5',lesson:5},元気:{jlpt:'N5',lesson:1},便利:{jlpt:'N5',lesson:10},有名:{jlpt:'N5',lesson:5},好き:{jlpt:'N5',lesson:5},嫌い:{jlpt:'N5',lesson:5},上手:{jlpt:'N5',lesson:5},下手:{jlpt:'N5',lesson:5},きれい:{jlpt:'N5',lesson:5},大切:{jlpt:'N4',lesson:14}
+  食べる:{jlpt:'N5',lesson:3,minnaLesson:6},見る:{jlpt:'N5',lesson:3,minnaLesson:6},寝る:{jlpt:'N5',lesson:3,minnaLesson:6},起きる:{jlpt:'N5',lesson:3,minnaLesson:6},出る:{jlpt:'N5',lesson:4,minnaLesson:9},教える:{jlpt:'N5',lesson:7,minnaLesson:12},覚える:{jlpt:'N4',lesson:11,minnaLesson:18},着る:{jlpt:'N5',lesson:10,minnaLesson:16},開ける:{jlpt:'N5',lesson:13,minnaLesson:20},閉める:{jlpt:'N5',lesson:13,minnaLesson:20},
+  行く:{jlpt:'N5',lesson:3,minnaLesson:6},書く:{jlpt:'N5',lesson:3,minnaLesson:7},話す:{jlpt:'N5',lesson:3,minnaLesson:7},待つ:{jlpt:'N5',lesson:6,minnaLesson:8},死ぬ:{jlpt:'N4',lesson:15,minnaLesson:23},遊ぶ:{jlpt:'N5',lesson:7,minnaLesson:10},飲む:{jlpt:'N5',lesson:3,minnaLesson:6},取る:{jlpt:'N5',lesson:8,minnaLesson:8},買う:{jlpt:'N5',lesson:3,minnaLesson:7},泳ぐ:{jlpt:'N5',lesson:6,minnaLesson:16},読む:{jlpt:'N5',lesson:3,minnaLesson:7},立つ:{jlpt:'N5',lesson:8,minnaLesson:14},走る:{jlpt:'N4',lesson:12,minnaLesson:21},帰る:{jlpt:'N5',lesson:3,minnaLesson:6},聞く:{jlpt:'N5',lesson:3,minnaLesson:6},持つ:{jlpt:'N5',lesson:7,minnaLesson:8},使う:{jlpt:'N5',lesson:10,minnaLesson:8},作る:{jlpt:'N5',lesson:7,minnaLesson:10},する:{jlpt:'N5',lesson:3,minnaLesson:6},来る:{jlpt:'N5',lesson:3,minnaLesson:6},
+  いい:{jlpt:'N5',lesson:5,minnaLesson:9},かっこいい:{jlpt:'N5',lesson:5,minnaLesson:9},大きい:{jlpt:'N5',lesson:5,minnaLesson:9},小さい:{jlpt:'N5',lesson:5,minnaLesson:9},新しい:{jlpt:'N5',lesson:5,minnaLesson:9},古い:{jlpt:'N5',lesson:5,minnaLesson:9},高い:{jlpt:'N5',lesson:5,minnaLesson:9},安い:{jlpt:'N5',lesson:5,minnaLesson:9},難しい:{jlpt:'N5',lesson:5,minnaLesson:9},易しい:{jlpt:'N5',lesson:5,minnaLesson:9},暑い:{jlpt:'N5',lesson:5,minnaLesson:9},寒い:{jlpt:'N5',lesson:5,minnaLesson:9},楽しい:{jlpt:'N5',lesson:5,minnaLesson:9},忙しい:{jlpt:'N5',lesson:5,minnaLesson:14},おいしい:{jlpt:'N5',lesson:5,minnaLesson:9},
+  静か:{jlpt:'N5',lesson:5,minnaLesson:10},元気:{jlpt:'N5',lesson:1,minnaLesson:1},便利:{jlpt:'N5',lesson:10,minnaLesson:25},有名:{jlpt:'N5',lesson:5,minnaLesson:10},好き:{jlpt:'N5',lesson:5,minnaLesson:10},嫌い:{jlpt:'N5',lesson:5,minnaLesson:25},上手:{jlpt:'N5',lesson:5,minnaLesson:10},下手:{jlpt:'N5',lesson:5,minnaLesson:10},きれい:{jlpt:'N5',lesson:5,minnaLesson:10},大切:{jlpt:'N4',lesson:14,minnaLesson:25}
 };

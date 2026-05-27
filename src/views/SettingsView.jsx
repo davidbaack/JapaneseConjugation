@@ -13,6 +13,7 @@ import {
   STARTER_ADJECTIVES,
   JLPT_LEVELS,
   GENKI_LESSONS,
+  MINNA_LESSONS,
   WORD_TYPE_OPTIONS,
   WORD_GROUP_OPTIONS
 } from '../data/starterWords.js';
@@ -158,6 +159,17 @@ export default function SettingsView({
     setGenkiLessons(next.length ? next : GENKI_LESSONS);
   }
 
+  function setMinnaLessons(ids) {
+    const clean = [...new Set(ids.map(Number))].filter(n => MINNA_LESSONS.includes(n)).sort((a, b) => a - b);
+    setPracticePrefs({ ...practicePrefs, minnaLessons: clean.length === MINNA_LESSONS.length ? [] : clean });
+  }
+
+  function toggleMinnaLesson(n) {
+    const selected = Array.isArray(practicePrefs.minnaLessons) && practicePrefs.minnaLessons.length ? practicePrefs.minnaLessons : MINNA_LESSONS;
+    const next = selected.includes(n) ? selected.filter(x => x !== n) : [...selected, n];
+    setMinnaLessons(next.length ? next : MINNA_LESSONS);
+  }
+
   function toggleDisplayScript(id) {
     const current = resolveDisplayScripts(practicePrefs);
     const next = { ...current, [id]: !current[id] };
@@ -216,6 +228,7 @@ export default function SettingsView({
 
   const displayScripts = resolveDisplayScripts(practicePrefs);
   const selectedGenkiLessons = Array.isArray(practicePrefs.genkiLessons) && practicePrefs.genkiLessons.length ? practicePrefs.genkiLessons : GENKI_LESSONS;
+  const selectedMinnaLessons = Array.isArray(practicePrefs.minnaLessons) && practicePrefs.minnaLessons.length ? practicePrefs.minnaLessons : MINNA_LESSONS;
   const selectedWordGroups = practicePrefs.wordGroups && practicePrefs.wordGroups.length ? practicePrefs.wordGroups : WORD_GROUP_OPTIONS.map(x => x.id);
   const selectedVoiceAvailable = !practicePrefs.voiceURI || speechVoices.some(v => v.voiceURI === practicePrefs.voiceURI);
   const weakPackIds = weakTypeIdsForState(state, state.enabledTypes);
@@ -608,6 +621,32 @@ export default function SettingsView({
               ))}
             </div>
             <p className="text-[11px] text-stone-400 mt-1">Textbook filtering works together with JLPT, word type, and study-list filters.</p>
+          </div>
+          <div className="sm:col-span-2">
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <label className="text-xs text-stone-500 block">みんなの日本語 lessons</label>
+              <div className="flex gap-1">
+                <button onClick={() => setMinnaLessons(MINNA_LESSONS)} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">All</button>
+                <button onClick={() => setMinnaLessons(MINNA_LESSONS.filter(n => n <= 25))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">I</button>
+                <button onClick={() => setMinnaLessons(MINNA_LESSONS.filter(n => n >= 26))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">II</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-6 sm:grid-cols-[repeat(13,minmax(0,1fr))] gap-1">
+              {MINNA_LESSONS.map(n => (
+                <button
+                  key={n}
+                  onClick={() => toggleMinnaLesson(n)}
+                  className={`px-2 py-2 rounded-lg text-xs border transition ${
+                    selectedMinnaLessons.includes(n)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  L{n}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-1">Selecting lessons from both textbooks returns words matching either (OR). Works with JLPT, word type, and study-list filters.</p>
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-stone-500 block mb-1">Word types</label>
