@@ -156,7 +156,7 @@ export default function ClassificationView({ state, setState, words, practicePre
               {stats.correct || 0}/{stats.attempted || 0}
             </div>
             <div>{realAcc}% accuracy</div>
-            <div className="text-[11px] text-stone-400 mt-1">
+            <div className="text-[9px] text-stone-400 mt-1">
               JLPT {getWordMeta(current).jlpt}
               {getWordMeta(current).lesson ? ` · Genki L${getWordMeta(current).lesson}` : ''}
               {getWordMeta(current).minnaLesson ? ` · Minna L${getWordMeta(current).minnaLesson}` : ''}

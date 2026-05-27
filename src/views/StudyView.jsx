@@ -726,7 +726,7 @@ Keep it concise and clear.`;
                   </div>
                 )}
                 {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
-                <div>
+                <div className="text-[9px]">
                   JLPT {getWordMeta(current.verb).jlpt}
                   {getWordMeta(current.verb).lesson ? ` · Genki L${getWordMeta(current.verb).lesson}` : ''}
                   {getWordMeta(current.verb).minnaLesson ? ` · Minna L${getWordMeta(current.verb).minnaLesson}` : ''}
@@ -734,7 +734,7 @@ Keep it concise and clear.`;
               </div>
             </div>
           ) : (
-            <div className="absolute top-4 right-4 sm:top-8 sm:right-6 text-right text-[11px] text-stone-400">
+            <div className="absolute top-4 right-4 sm:top-8 sm:right-6 text-right text-[9px] text-stone-400">
               JLPT {getWordMeta(current.verb).jlpt}
               {getWordMeta(current.verb).lesson ? ` · Genki L${getWordMeta(current.verb).lesson}` : ''}
               {getWordMeta(current.verb).minnaLesson ? ` · Minna L${getWordMeta(current.verb).minnaLesson}` : ''}
