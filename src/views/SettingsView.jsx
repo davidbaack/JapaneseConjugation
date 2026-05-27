@@ -280,8 +280,8 @@ export default function SettingsView({
             <label className="text-xs text-stone-500 block mb-1">Kana match display</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'none', label: 'No feedback' },
-                { id: 'color', label: 'Colors only' },
+                { id: 'none', label: 'None' },
+                { id: 'color', label: 'Colors' },
                 { id: 'color-count', label: 'Colors + count' }
               ].map(o => (
                 <button
@@ -297,7 +297,7 @@ export default function SettingsView({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-stone-400 mt-1">Controls real-time kana cell feedback while typing in input and guided modes.</p>
+            <p className="text-[11px] text-stone-400 mt-1">Colored cells appear after submitting, not while typing.</p>
           </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Drill mode</label>

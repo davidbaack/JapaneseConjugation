@@ -355,28 +355,12 @@ Keep it concise and clear.`;
   const coachProgress = toHiraganaProgress(answer);
   const preview = coachPreview;
   const coachCells = practicePrefs.answerMode === 'guided' ? kanaCoachCells(expected, answer, coachRevealed) : [];
-  const coachWrongIndex = coachCells.findIndex(c => c.state === 'wrong');
   const coachTypedCount = Array.from(coachProgress).length;
   const expectedKanaCount = Array.from(expected).length;
-  const coachStatus =
-    coachWrongIndex >= 0
-      ? `Kana ${coachWrongIndex + 1} should be ${coachCells[coachWrongIndex].expected}.`
-      : coachPreview === expected
-        ? 'Complete match. Press Enter.'
-        : coachTypedCount > expectedKanaCount
-          ? 'Extra kana after the answer.'
-          : `${Math.min(coachTypedCount, expectedKanaCount)}/${expectedKanaCount} kana matched.`;
   const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill && answer ? kanaCoachCells(expected, answer, 0) : [];
-  const liveWrongIndex = liveCells.findIndex(c => c.state === 'wrong' || c.state === 'extra');
-  const liveMatched = liveCells.filter(c => c.state === 'correct').length;
-  const liveStatus =
-    liveWrongIndex >= 0
-      ? liveCells[liveWrongIndex].state === 'extra'
-        ? 'Extra kana after the answer.'
-        : `Kana ${liveWrongIndex + 1} does not match yet.`
-      : preview === expected
-        ? 'Complete match. Press Enter.'
-        : `${Math.min(liveMatched, expectedKanaCount)}/${expectedKanaCount} kana matched.`;
+  const reviewKanaCells = ['input', 'guided'].includes(practicePrefs.answerMode) && !reverseDrill && kanaMatchDisplay !== 'none'
+    ? kanaCoachCells(expected, answer, practicePrefs.answerMode === 'guided' ? coachRevealed : 0)
+    : [];
 
   async function generateAIClue() {
     if (!current || !geminiKey) return;
@@ -939,16 +923,9 @@ Keep it concise and clear.`;
                     <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3 mb-3">
                       <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
                         {coachCells.map((cell, i) => {
-                          const cls =
-                            kanaMatchDisplay === 'none'
-                              ? 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300'
-                              : cell.state === 'correct'
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
-                                : cell.state === 'wrong' || cell.state === 'extra'
-                                  ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
-                                  : cell.state === 'hint'
-                                    ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-805 dark:text-amber-300'
-                                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                          const cls = cell.state === 'empty'
+                            ? 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300'
+                            : 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300';
                           return (
                             <div
                               key={i}
@@ -958,16 +935,6 @@ Keep it concise and clear.`;
                             </div>
                           );
                         })}
-                      </div>
-                      {kanaMatchDisplay === 'color-count' && (
-                        <div
-                          className={`mt-2 text-xs text-center ${
-                            coachWrongIndex >= 0 ? 'text-rose-700' : coachPreview === expected ? 'text-emerald-700' : 'text-stone-500'
-                          }`}
-                        >
-                          {coachStatus}
-                        </div>
-                      )}
                     </div>
                     <input
                       ref={inputRef}
@@ -1080,12 +1047,9 @@ Keep it concise and clear.`;
                       <div className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">
                         <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
                           {liveCells.map((cell, i) => {
-                            const cls =
-                              cell.state === 'correct'
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
-                                : cell.state === 'wrong' || cell.state === 'extra'
-                                  ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
-                                  : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                            const cls = cell.state === 'empty'
+                              ? 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300'
+                              : 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300';
                             return (
                               <div
                                 key={i}
@@ -1096,15 +1060,6 @@ Keep it concise and clear.`;
                             );
                           })}
                         </div>
-                        {kanaMatchDisplay === 'color-count' && (
-                          <div
-                            className={`mt-2 text-xs text-center ${
-                              liveWrongIndex >= 0 ? 'text-rose-700' : preview === expected ? 'text-emerald-700' : 'text-stone-500'
-                            }`}
-                          >
-                            {liveStatus}
-                          </div>
-                        )}
                       </div>
                     )}
                     <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto] gap-2 mt-3">
@@ -1156,6 +1111,35 @@ Keep it concise and clear.`;
                           <span lang="ja" className="font-semibold">
                             {reverseDrill ? answer.trim() || '(empty)' : toHiragana(answer) || '(empty)'}
                           </span>
+                        )}
+                      </div>
+                    )}
+                    {reviewKanaCells.length > 0 && (
+                      <div className="mt-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50 p-2">
+                        <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                          {reviewKanaCells.map((cell, i) => {
+                            const cls =
+                              cell.state === 'correct'
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
+                                : cell.state === 'wrong' || cell.state === 'extra'
+                                  ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
+                                  : cell.state === 'hint'
+                                    ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
+                                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                            return (
+                              <div
+                                key={i}
+                                className={`w-8 h-9 sm:w-9 sm:h-10 rounded-lg border flex items-center justify-center text-base font-medium tabular-nums ${cls}`}
+                              >
+                                {cell.shown || '·'}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {kanaMatchDisplay === 'color-count' && (
+                          <div className={`mt-1 text-xs text-center ${wasCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {reviewKanaCells.filter(c => c.state === 'correct').length}/{expectedKanaCount} kana matched
+                          </div>
                         )}
                       </div>
                     )}
