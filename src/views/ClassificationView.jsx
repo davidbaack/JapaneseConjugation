@@ -150,6 +150,7 @@ export default function ClassificationView({ state, setState, words, practicePre
           <div>
             <h3 className="font-medium text-stone-950 dark:text-stone-50">Classification drill</h3>
             <p className="text-xs text-stone-500">Practice the group recognition step before conjugating.</p>
+            <div className="text-[9px] text-stone-400 mt-1">JLPT {getWordMeta(current).jlpt}</div>
           </div>
           <div className="text-xs text-stone-500 text-right">
             <div>
@@ -157,9 +158,10 @@ export default function ClassificationView({ state, setState, words, practicePre
             </div>
             <div>{realAcc}% accuracy</div>
             <div className="text-[9px] text-stone-400 mt-1">
-              JLPT {getWordMeta(current).jlpt}
-              {getWordMeta(current).lesson ? ` · Genki L${getWordMeta(current).lesson}` : ''}
-              {getWordMeta(current).minnaLesson ? ` · Minna L${getWordMeta(current).minnaLesson}` : ''}
+              {[
+                getWordMeta(current).lesson && `Genki L${getWordMeta(current).lesson}`,
+                getWordMeta(current).minnaLesson && `Minna L${getWordMeta(current).minnaLesson}`,
+              ].filter(Boolean).join(' · ')}
             </div>
           </div>
         </div>

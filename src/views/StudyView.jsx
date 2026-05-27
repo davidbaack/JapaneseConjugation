@@ -712,6 +712,9 @@ Keep it concise and clear.`;
     <div className="space-y-4">
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">
+          <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
+            JLPT {getWordMeta(current.verb).jlpt}
+          </div>
           {(timeLeft !== null || reviewLimit > 0 || !!sessionSkipped) ? (
             <div className="flex justify-end mb-3">
               <div className="text-xs text-stone-400 text-right shrink-0">
@@ -727,17 +730,19 @@ Keep it concise and clear.`;
                 )}
                 {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
                 <div className="text-[9px]">
-                  JLPT {getWordMeta(current.verb).jlpt}
-                  {getWordMeta(current.verb).lesson ? ` · Genki L${getWordMeta(current.verb).lesson}` : ''}
-                  {getWordMeta(current.verb).minnaLesson ? ` · Minna L${getWordMeta(current.verb).minnaLesson}` : ''}
+                  {[
+                    getWordMeta(current.verb).lesson && `Genki L${getWordMeta(current.verb).lesson}`,
+                    getWordMeta(current.verb).minnaLesson && `Minna L${getWordMeta(current.verb).minnaLesson}`,
+                  ].filter(Boolean).join(' · ')}
                 </div>
               </div>
             </div>
           ) : (
             <div className="absolute top-4 right-4 sm:top-8 sm:right-6 text-right text-[9px] text-stone-400">
-              JLPT {getWordMeta(current.verb).jlpt}
-              {getWordMeta(current.verb).lesson ? ` · Genki L${getWordMeta(current.verb).lesson}` : ''}
-              {getWordMeta(current.verb).minnaLesson ? ` · Minna L${getWordMeta(current.verb).minnaLesson}` : ''}
+              {[
+                getWordMeta(current.verb).lesson && `Genki L${getWordMeta(current.verb).lesson}`,
+                getWordMeta(current.verb).minnaLesson && `Minna L${getWordMeta(current.verb).minnaLesson}`,
+              ].filter(Boolean).join(' · ')}
             </div>
           )}
           {hidePromptText ? (
@@ -820,11 +825,6 @@ Keep it concise and clear.`;
           ) : (
             <>
               <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
-              {targetEnglish && targetEnglish !== promptEnglish && (
-                <div className="mt-1 text-xs text-indigo-650 dark:text-indigo-455">
-                  Target meaning: <span className="font-medium">{targetEnglish}</span>
-                </div>
-              )}
               {aiHintText && phase === 'answering' && (
                 <div className="mt-2 text-xs text-stone-500 max-w-md mx-auto rounded-lg border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2">
                   {aiHintText}
@@ -851,9 +851,11 @@ Keep it concise and clear.`;
                         {taskSub}
                       </span>
                     )}
-                    {taskHint && (
+                    {targetEnglish && targetEnglish !== promptEnglish ? (
+                      <span className="text-xs text-indigo-400 dark:text-indigo-500">· {targetEnglish}</span>
+                    ) : taskHint ? (
                       <span className="text-xs text-indigo-400 dark:text-indigo-500">· {taskHint}</span>
-                    )}
+                    ) : null}
                     {current.ruleLabel && (
                       <span className="text-xs text-indigo-400 dark:text-indigo-500">· {current.ruleLabel}</span>
                     )}
