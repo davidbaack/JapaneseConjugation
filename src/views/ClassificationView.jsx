@@ -156,15 +156,16 @@ export default function ClassificationView({ state, setState, words, practicePre
               {stats.correct || 0}/{stats.attempted || 0}
             </div>
             <div>{realAcc}% accuracy</div>
+            <div className="text-[11px] text-stone-400 mt-1">
+              JLPT {getWordMeta(current).jlpt}
+              {getWordMeta(current).lesson ? ` · Genki L${getWordMeta(current).lesson}` : ''}
+              {getWordMeta(current).minnaLesson ? ` · Minna L${getWordMeta(current).minnaLesson}` : ''}
+            </div>
           </div>
         </div>
         <div className="text-center py-5">
           <ScriptDisplay view={currentView} className="text-5xl font-medium mb-2 text-stone-900 dark:text-stone-50" subClassName="text-stone-500" />
           <div className="text-sm text-stone-400 italic mt-2">{current.meaning}</div>
-          <div className="text-[11px] text-stone-400 mt-1">
-            JLPT {getWordMeta(current).jlpt}
-            {getWordMeta(current).lesson ? ` · Genki L${getWordMeta(current).lesson}` : ''}
-          </div>
         </div>
         <div className="grid sm:grid-cols-3 gap-2">
           {allowed.map(o => (
