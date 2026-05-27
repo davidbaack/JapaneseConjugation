@@ -712,25 +712,23 @@ Keep it concise and clear.`;
     <div className="space-y-4">
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center">
-          <div className="flex items-start justify-between mb-3">
-            <div className="text-xs uppercase tracking-wider text-stone-400 font-medium text-left">
-              {reverseDrill ? `From ${typeInfo.label} → Dictionary form` : `From ${promptFormLabel(current.verb, promptType)}`}
+          {(timeLeft !== null || reviewLimit > 0 || !!sessionSkipped) && (
+            <div className="flex justify-end mb-3">
+              <div className="text-xs text-stone-400 text-right shrink-0">
+                {timeLeft !== null && (
+                  <div className="text-indigo-600 dark:text-indigo-400 font-medium">
+                    {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                  </div>
+                )}
+                {reviewLimit > 0 && (
+                  <div className="text-indigo-600 dark:text-indigo-400 font-medium">
+                    {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} set
+                  </div>
+                )}
+                {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
+              </div>
             </div>
-            <div className="text-xs text-stone-400 text-right shrink-0 ml-3">
-              {timeLeft !== null && (
-                <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-                  {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-                </div>
-              )}
-              {reviewLimit > 0 && (
-                <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-                  {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} set
-                </div>
-              )}
-              {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
-              <div>{card ? fmtInterval(card.interval) + ' · ease ' + card.ease.toFixed(1) : 'new'}</div>
-            </div>
-          </div>
+          )}
           {hidePromptText ? (
             <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
               <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-3">
