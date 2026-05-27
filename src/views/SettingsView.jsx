@@ -156,7 +156,9 @@ export default function SettingsView({
   }
 
   function toggleGenkiLesson(n) {
-    const selected = Array.isArray(practicePrefs.genkiLessons) && practicePrefs.genkiLessons.length ? practicePrefs.genkiLessons : GENKI_LESSONS;
+    const selected = practicePrefs.genkiLessons === null
+      ? []
+      : (Array.isArray(practicePrefs.genkiLessons) && practicePrefs.genkiLessons.length ? practicePrefs.genkiLessons : GENKI_LESSONS);
     const next = selected.includes(n) ? selected.filter(x => x !== n) : [...selected, n];
     setGenkiLessons(next.length ? next : GENKI_LESSONS);
   }
@@ -167,7 +169,9 @@ export default function SettingsView({
   }
 
   function toggleMinnaLesson(n) {
-    const selected = Array.isArray(practicePrefs.minnaLessons) && practicePrefs.minnaLessons.length ? practicePrefs.minnaLessons : MINNA_LESSONS;
+    const selected = practicePrefs.minnaLessons === null
+      ? []
+      : (Array.isArray(practicePrefs.minnaLessons) && practicePrefs.minnaLessons.length ? practicePrefs.minnaLessons : MINNA_LESSONS);
     const next = selected.includes(n) ? selected.filter(x => x !== n) : [...selected, n];
     setMinnaLessons(next.length ? next : MINNA_LESSONS);
   }
@@ -237,8 +241,8 @@ export default function SettingsView({
         : 'text-stone-600 bg-stone-50 border-stone-250 dark:bg-stone-950 dark:border-stone-850';
 
   const displayScripts = resolveDisplayScripts(practicePrefs);
-  const selectedGenkiLessons = Array.isArray(practicePrefs.genkiLessons) && practicePrefs.genkiLessons.length ? practicePrefs.genkiLessons : GENKI_LESSONS;
-  const selectedMinnaLessons = Array.isArray(practicePrefs.minnaLessons) && practicePrefs.minnaLessons.length ? practicePrefs.minnaLessons : MINNA_LESSONS;
+  const selectedGenkiLessons = practicePrefs.genkiLessons === null ? [] : (Array.isArray(practicePrefs.genkiLessons) && practicePrefs.genkiLessons.length ? practicePrefs.genkiLessons : GENKI_LESSONS);
+  const selectedMinnaLessons = practicePrefs.minnaLessons === null ? [] : (Array.isArray(practicePrefs.minnaLessons) && practicePrefs.minnaLessons.length ? practicePrefs.minnaLessons : MINNA_LESSONS);
   const selectedWordGroups = practicePrefs.wordGroups && practicePrefs.wordGroups.length ? practicePrefs.wordGroups : WORD_GROUP_OPTIONS.map(x => x.id);
   const selectedVoiceAvailable = !practicePrefs.voiceURI || speechVoices.some(v => v.voiceURI === practicePrefs.voiceURI);
   const weakPackIds = weakTypeIdsForState(state, state.enabledTypes);
@@ -636,6 +640,7 @@ export default function SettingsView({
             <div className="flex items-center justify-between gap-3 mb-1">
               <label className="text-xs text-stone-500 block">Genki lessons</label>
               <div className="flex gap-1">
+                <button onClick={() => setPracticePrefs({ ...practicePrefs, genkiLessons: null })} className={`px-2 py-1 rounded-md text-[11px] border transition ${practicePrefs.genkiLessons === null ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850'}`}>None</button>
                 <button onClick={() => setGenkiLessons(GENKI_LESSONS)} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">All</button>
                 <button onClick={() => setGenkiLessons(GENKI_LESSONS.filter(n => n <= 12))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">I</button>
                 <button onClick={() => setGenkiLessons(GENKI_LESSONS.filter(n => n >= 13))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">II</button>
@@ -662,6 +667,7 @@ export default function SettingsView({
             <div className="flex items-center justify-between gap-3 mb-1">
               <label className="text-xs text-stone-500 block">みんなの日本語 lessons</label>
               <div className="flex gap-1">
+                <button onClick={() => setPracticePrefs({ ...practicePrefs, minnaLessons: null })} className={`px-2 py-1 rounded-md text-[11px] border transition ${practicePrefs.minnaLessons === null ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850'}`}>None</button>
                 <button onClick={() => setMinnaLessons(MINNA_LESSONS)} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">All</button>
                 <button onClick={() => setMinnaLessons(MINNA_LESSONS.filter(n => n <= 25))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">I</button>
                 <button onClick={() => setMinnaLessons(MINNA_LESSONS.filter(n => n >= 26))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">II</button>
