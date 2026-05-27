@@ -310,7 +310,7 @@ export default function StatsView({
           )}
           {aiErr && <div className="mt-3 text-sm text-rose-600">{aiErr}</div>}
           {aiText && (
-            <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-sm text-indigo-950 dark:text-indigo-305 leading-relaxed whitespace-pre-wrap">
+            <div className="mt-4 rounded-xl border border-indigo-100 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-sm text-indigo-950 dark:text-indigo-100 leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto">
               {aiText}
             </div>
           )}
