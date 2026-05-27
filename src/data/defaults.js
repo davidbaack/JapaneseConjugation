@@ -30,6 +30,5 @@ export const DEFAULT_PREFS = {
   wordGroups: ['ichidan','godan','suru','kuru','irregular-adjective','i-adjective','na-adjective'],
   wordListIds: [],
   drillMode: 'word',
-  colorCodeConjugations: true,
-  kanaMatchDisplay: 'color-count'
+  colorCodeConjugations: true
 };

@@ -320,7 +320,6 @@ Keep it concise and clear.`;
   const promptEnglish = reverseDrill ? englishForForm(current.verb, current.type) : englishForForm(current.verb, promptType);
   const targetEnglish = reverseDrill ? englishForForm(current.verb, null) : englishForForm(current.verb, current.type);
   const englishHintsHidden = (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden';
-  const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
   const typeInfo = getTypeInfo(current.type);
   const reviewExplanation =
     phase === 'reviewing'
@@ -358,7 +357,7 @@ Keep it concise and clear.`;
   const coachTypedCount = Array.from(coachProgress).length;
   const expectedKanaCount = Array.from(expected).length;
   const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill && answer ? kanaCoachCells(expected, answer, 0) : [];
-  const reviewKanaCells = ['input', 'guided'].includes(practicePrefs.answerMode) && !reverseDrill && kanaMatchDisplay !== 'none'
+  const reviewKanaCells = ['input', 'guided'].includes(practicePrefs.answerMode) && !reverseDrill
     ? kanaCoachCells(expected, answer, practicePrefs.answerMode === 'guided' ? coachRevealed : 0)
     : [];
 
@@ -1043,7 +1042,7 @@ Keep it concise and clear.`;
                       onSubmit={() => submit()}
                       canSubmit={!!answer.trim()}
                     />
-                    {!!liveCells.length && kanaMatchDisplay !== 'none' && (
+                    {!!liveCells.length && (
                       <div className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">
                         <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
                           {liveCells.map((cell, i) => {
@@ -1136,11 +1135,9 @@ Keep it concise and clear.`;
                             );
                           })}
                         </div>
-                        {kanaMatchDisplay === 'color-count' && (
-                          <div className={`mt-1 text-xs text-center ${wasCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
-                            {reviewKanaCells.filter(c => c.state === 'correct').length}/{expectedKanaCount} kana matched
-                          </div>
-                        )}
+                        <div className={`mt-1 text-xs text-center ${wasCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          {reviewKanaCells.filter(c => c.state === 'correct').length}/{expectedKanaCount} kana matched
+                        </div>
                       </div>
                     )}
                     <ScriptDisplay
