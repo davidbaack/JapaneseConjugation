@@ -332,7 +332,7 @@ export default function SettingsView({
             </div>
           </div>
           <div>
-            <label className="text-xs text-stone-500 block mb-1">Duplicate answers</label>
+            <label className="text-xs text-stone-500 block mb-1">Identical forms</label>
             <div className="grid grid-cols-2 gap-2">
               {[{ id: true, label: 'Skip' }, { id: false, label: 'Keep' }].map(o => (
                 <button
