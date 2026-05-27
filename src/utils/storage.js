@@ -424,7 +424,7 @@ export function fmtInterval(d) {
 }
 
 export const SRS_LEVELS = [
-  { id: 0, name: 'Uncut', sub: 'Not started', bg: 'bg-stone-100', text: 'text-stone-500', border: 'border-stone-200', dot: 'bg-stone-400' },
+  { id: 0, name: 'Raw', sub: 'Not started', bg: 'bg-stone-100', text: 'text-stone-500', border: 'border-stone-200', dot: 'bg-stone-400' },
   { id: 1, name: 'Shard', sub: '1–3 day intervals', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', dot: 'bg-sky-400' },
   { id: 2, name: 'Crystal', sub: '4–13 day intervals', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', dot: 'bg-indigo-500' },
   { id: 3, name: 'Gem', sub: '2–8 week intervals', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', dot: 'bg-teal-500' },
