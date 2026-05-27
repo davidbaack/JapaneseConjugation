@@ -326,6 +326,7 @@ Keep it concise and clear.`;
   const promptEnglish = reverseDrill ? englishForForm(current.verb, current.type) : englishForForm(current.verb, promptType);
   const targetEnglish = reverseDrill ? englishForForm(current.verb, null) : englishForForm(current.verb, current.type);
   const englishHintsHidden = (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden';
+  const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
   const typeInfo = getTypeInfo(current.type);
   const reviewExplanation =
     phase === 'reviewing'
@@ -382,6 +383,9 @@ Keep it concise and clear.`;
       : preview === expected
         ? 'Complete match. Press Enter.'
         : `${Math.min(liveMatched, expectedKanaCount)}/${expectedKanaCount} kana matched.`;
+  const reviewKanaCells = ['input', 'guided'].includes(practicePrefs.answerMode) && !reverseDrill
+    ? kanaCoachCells(expected, answer, practicePrefs.answerMode === 'guided' ? coachRevealed : 0)
+    : [];
 
   async function generateAIClue() {
     if (!current || !geminiKey) return;
@@ -974,13 +978,17 @@ Keep it concise and clear.`;
                       <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
                         {coachCells.map((cell, i) => {
                           const cls =
-                            cell.state === 'correct'
-                              ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
-                              : cell.state === 'wrong' || cell.state === 'extra'
-                                ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
-                                : cell.state === 'hint'
-                                  ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-805 dark:text-amber-300'
-                                  : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                            kanaMatchDisplay === 'none'
+                              ? cell.state === 'empty'
+                                ? 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300'
+                                : 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
+                              : cell.state === 'correct'
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
+                                : cell.state === 'wrong' || cell.state === 'extra'
+                                  ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
+                                  : cell.state === 'hint'
+                                    ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-805 dark:text-amber-300'
+                                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
                           return (
                             <div
                               key={i}
@@ -991,13 +999,15 @@ Keep it concise and clear.`;
                           );
                         })}
                       </div>
-                      <div
-                        className={`mt-2 text-xs text-center ${
-                          coachWrongIndex >= 0 ? 'text-rose-700' : coachPreview === expected ? 'text-emerald-700' : 'text-stone-500'
-                        }`}
-                      >
-                        {coachStatus}
-                      </div>
+                      {kanaMatchDisplay === 'color-count' && (
+                        <div
+                          className={`mt-2 text-xs text-center ${
+                            coachWrongIndex >= 0 ? 'text-rose-700' : coachPreview === expected ? 'text-emerald-700' : 'text-stone-500'
+                          }`}
+                        >
+                          {coachStatus}
+                        </div>
+                      )}
                       {geminiKey && !reverseDrill && answer && (
                         <div className="mt-2 flex flex-col items-center gap-1">
                           <button
@@ -1153,7 +1163,7 @@ Keep it concise and clear.`;
                       canSubmit={!!answer.trim()}
                       noToggle
                     />
-                    {!!liveCells.length && (
+                    {!!liveCells.length && kanaMatchDisplay !== 'none' && (
                       <div className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">
                         <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
                           {liveCells.map((cell, i) => {
@@ -1173,13 +1183,15 @@ Keep it concise and clear.`;
                             );
                           })}
                         </div>
-                        <div
-                          className={`mt-2 text-xs text-center ${
-                            liveWrongIndex >= 0 ? 'text-rose-700' : preview === expected ? 'text-emerald-700' : 'text-stone-500'
-                          }`}
-                        >
-                          {liveStatus}
-                        </div>
+                        {kanaMatchDisplay === 'color-count' && (
+                          <div
+                            className={`mt-2 text-xs text-center ${
+                              liveWrongIndex >= 0 ? 'text-rose-700' : preview === expected ? 'text-emerald-700' : 'text-stone-500'
+                            }`}
+                          >
+                            {liveStatus}
+                          </div>
+                        )}
                         {geminiKey && !reverseDrill && (
                           <div className="mt-2 flex flex-col items-center gap-1">
                             <button
@@ -1249,6 +1261,33 @@ Keep it concise and clear.`;
                             {reverseDrill ? answer.trim() || '(empty)' : toHiragana(answer) || '(empty)'}
                           </span>
                         )}
+                      </div>
+                    )}
+                    {reviewKanaCells.length > 0 && (
+                      <div className="mt-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50 p-2">
+                        <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                          {reviewKanaCells.map((cell, i) => {
+                            const cls =
+                              cell.state === 'correct'
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
+                                : cell.state === 'wrong' || cell.state === 'extra'
+                                  ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
+                                  : cell.state === 'hint'
+                                    ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
+                                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                            return (
+                              <div
+                                key={i}
+                                className={`w-8 h-9 sm:w-9 sm:h-10 rounded-lg border flex items-center justify-center text-base font-medium tabular-nums ${cls}`}
+                              >
+                                {cell.shown || '·'}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className={`mt-1 text-xs text-center ${wasCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          {reviewKanaCells.filter(c => c.state === 'correct').length}/{expectedKanaCount} kana matched
+                        </div>
                       </div>
                     )}
                     <ScriptDisplay
