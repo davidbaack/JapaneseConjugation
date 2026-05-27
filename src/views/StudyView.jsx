@@ -998,6 +998,23 @@ Keep it concise and clear.`;
                       >
                         {coachStatus}
                       </div>
+                      {geminiKey && !reverseDrill && answer && (
+                        <div className="mt-2 flex flex-col items-center gap-1">
+                          <button
+                            onClick={generateTypingHint}
+                            disabled={aiTypingHintLoading}
+                            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 inline-flex items-center gap-1 transition"
+                          >
+                            <IconSpark className="w-3 h-3" />
+                            {aiTypingHintLoading ? 'Thinking…' : 'Hint'}
+                          </button>
+                          {aiTypingHint && (
+                            <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
+                              {aiTypingHint}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <input
@@ -1080,23 +1097,6 @@ Keep it concise and clear.`;
                         Skip
                       </button>
                     </div>
-                    {geminiKey && !reverseDrill && (
-                      <div className="mt-2 flex flex-col items-center gap-1.5">
-                        <button
-                          onClick={generateTypingHint}
-                          disabled={!answer.trim() || aiTypingHintLoading}
-                          className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 inline-flex items-center gap-1 transition"
-                        >
-                          <IconSpark className="w-3 h-3" />
-                          {aiTypingHintLoading ? 'Thinking…' : 'Hint on my progress'}
-                        </button>
-                        {aiTypingHint && (
-                          <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
-                            {aiTypingHint}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </>
                 ) : (
                   <>
@@ -1180,6 +1180,23 @@ Keep it concise and clear.`;
                         >
                           {liveStatus}
                         </div>
+                        {geminiKey && !reverseDrill && (
+                          <div className="mt-2 flex flex-col items-center gap-1">
+                            <button
+                              onClick={generateTypingHint}
+                              disabled={aiTypingHintLoading}
+                              className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 inline-flex items-center gap-1 transition"
+                            >
+                              <IconSpark className="w-3 h-3" />
+                              {aiTypingHintLoading ? 'Thinking…' : 'Hint'}
+                            </button>
+                            {aiTypingHint && (
+                              <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
+                                {aiTypingHint}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto] gap-2 mt-3">
@@ -1203,23 +1220,6 @@ Keep it concise and clear.`;
                         Skip
                       </button>
                     </div>
-                    {geminiKey && !reverseDrill && (
-                      <div className="mt-2 flex flex-col items-center gap-1.5">
-                        <button
-                          onClick={generateTypingHint}
-                          disabled={!answer.trim() || aiTypingHintLoading}
-                          className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 inline-flex items-center gap-1 transition"
-                        >
-                          <IconSpark className="w-3 h-3" />
-                          {aiTypingHintLoading ? 'Thinking…' : 'Hint on my progress'}
-                        </button>
-                        {aiTypingHint && (
-                          <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
-                            {aiTypingHint}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </>
                 )}
               </>
