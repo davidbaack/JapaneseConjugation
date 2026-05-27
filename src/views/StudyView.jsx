@@ -720,19 +720,21 @@ Keep it concise and clear.`;
               {taskSub}
             </span>
           )}
+          {taskHint && (
+            <span className="hidden sm:inline text-xs text-indigo-400 dark:text-indigo-500">· {taskHint}</span>
+          )}
           {current.ruleLabel && (
             <span className="text-xs text-indigo-400 dark:text-indigo-500">· {current.ruleLabel}</span>
           )}
         </div>
       </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
-        <div className="px-4 pt-3 pb-2 sm:px-6 sm:pt-5 sm:pb-3 border-b border-stone-100 dark:border-stone-800">
-          <div className="flex items-baseline justify-between">
-            <div className="text-xs text-stone-400">
-              {taskSub && taskSub + ' · '}
-              {taskHint}
+        <div className="px-4 py-4 sm:px-6 sm:py-8 text-center">
+          <div className="flex items-start justify-between mb-3">
+            <div className="text-xs uppercase tracking-wider text-stone-400 font-medium text-left">
+              {reverseDrill ? `From ${typeInfo.label} → Dictionary form` : `From ${promptFormLabel(current.verb, promptType)}`}
             </div>
-            <div className="text-xs text-stone-400 text-right">
+            <div className="text-xs text-stone-400 text-right shrink-0 ml-3">
               {timeLeft !== null && (
                 <div className="text-indigo-600 dark:text-indigo-400 font-medium">
                   {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
@@ -746,11 +748,6 @@ Keep it concise and clear.`;
               {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
               <div>{card ? fmtInterval(card.interval) + ' · ease ' + card.ease.toFixed(1) : 'new'}</div>
             </div>
-          </div>
-        </div>
-        <div className="px-4 py-4 sm:px-6 sm:py-8 text-center">
-          <div className="text-xs uppercase tracking-wider text-stone-400 font-medium mb-2">
-            {reverseDrill ? `From ${typeInfo.label} → Dictionary form` : `From ${promptFormLabel(current.verb, promptType)}`}
           </div>
           {hidePromptText ? (
             <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
@@ -858,6 +855,15 @@ Keep it concise and clear.`;
           <div className="mt-4 flex flex-col gap-1">
             {phase === 'answering' ? (
               <>
+                <div className="flex items-center gap-2 mb-3 text-xs">
+                  <span className="h-px flex-1 bg-stone-100 dark:bg-stone-800" />
+                  <span className="text-stone-500 dark:text-stone-400 font-medium shrink-0">
+                    {taskLabel}
+                    {taskSub && <> · <span lang="ja">{taskSub}</span></>}
+                    {taskHint && ` · ${taskHint}`}
+                  </span>
+                  <span className="h-px flex-1 bg-stone-100 dark:bg-stone-800" />
+                </div>
                 {typoGuard && (
                   <div className="mb-3 rounded-xl border border-amber-250 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
                     <div className="font-medium">Almost - possible typo.</div>
