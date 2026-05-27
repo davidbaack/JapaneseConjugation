@@ -42,7 +42,7 @@ export default function KanaInputPad({ open, onToggle, onInsert, onBackspace, on
         </div>
       )}
       {open && (
-        <div className="mt-2 rounded-2xl border border-stone-200 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950 w-fit mx-auto">
+        <div className="mt-2 rounded-2xl border border-stone-200 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950 max-w-xs mx-auto">
           <div className="space-y-1.5" lang="ja">
             {KANA_PAD_ROWS.map((row, rowIndex) => (
               <div key={rowIndex} className="flex flex-wrap gap-1">
@@ -51,7 +51,7 @@ export default function KanaInputPad({ open, onToggle, onInsert, onBackspace, on
                     key={kana}
                     type="button"
                     onClick={() => onInsert(kana)}
-                    className="w-9 h-11 rounded-lg border border-stone-200 bg-white hover:bg-indigo-50 hover:border-indigo-200 text-base font-medium text-stone-800 dark:border-stone-800 dark:bg-stone-900 dark:hover:bg-indigo-950 dark:hover:border-indigo-800 dark:text-stone-200 transition"
+                    className="w-8 h-10 rounded-lg border border-stone-200 bg-white hover:bg-indigo-50 hover:border-indigo-200 text-base font-medium text-stone-800 dark:border-stone-800 dark:bg-stone-900 dark:hover:bg-indigo-950 dark:hover:border-indigo-800 dark:text-stone-200 transition"
                   >
                     {kana}
                   </button>

@@ -1082,33 +1082,35 @@ Keep it concise and clear.`;
                       canSubmit={!!answer.trim()}
                       noToggle
                     />
-                    <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto_auto] gap-2 mt-3">
+                    <div className="mt-3 space-y-2">
                       <button
                         onClick={() => submit()}
                         disabled={!answer.trim()}
-                        className="col-span-2 sm:col-span-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40"
+                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40"
                       >
                         Check (Enter)
                       </button>
-                      <button
-                        onClick={() => setCoachRevealed(Math.min(expectedKanaCount, Math.max(coachRevealed, coachTypedCount) + 1))}
-                        disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
-                        className="px-3 py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
-                      >
-                        Hint
-                      </button>
-                      <button
-                        onClick={revealAnswer}
-                        className="px-3 py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm text-amber-800"
-                      >
-                        Reveal
-                      </button>
-                      <button
-                        onClick={skipCurrent}
-                        className="px-3 py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 rounded-xl text-sm"
-                      >
-                        Skip
-                      </button>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() => setCoachRevealed(Math.min(expectedKanaCount, Math.max(coachRevealed, coachTypedCount) + 1))}
+                          disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
+                          className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
+                        >
+                          Hint
+                        </button>
+                        <button
+                          onClick={revealAnswer}
+                          className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm text-amber-800"
+                        >
+                          Reveal
+                        </button>
+                        <button
+                          onClick={skipCurrent}
+                          className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 rounded-xl text-sm"
+                        >
+                          Skip
+                        </button>
+                      </div>
                     </div>
                   </>
                 ) : (
@@ -1197,35 +1199,37 @@ Keep it concise and clear.`;
                         )}
                       </div>
                     )}
-                    <div className={`grid gap-2 mt-3 ${geminiKey && !reverseDrill ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]'}`}>
+                    <div className="mt-3 space-y-2">
                       <button
                         onClick={() => submit()}
                         disabled={!answer.trim()}
-                        className="col-span-2 sm:col-span-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40"
+                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40"
                       >
                         Check (Enter)
                       </button>
-                      {geminiKey && !reverseDrill && (
+                      <div className={`grid gap-2 ${geminiKey && !reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                        {geminiKey && !reverseDrill && (
+                          <button
+                            onClick={generateTypingHint}
+                            disabled={aiTypingHintLoading}
+                            className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition disabled:opacity-40"
+                          >
+                            {aiTypingHintLoading ? '…' : 'Hint'}
+                          </button>
+                        )}
                         <button
-                          onClick={generateTypingHint}
-                          disabled={aiTypingHintLoading}
-                          className="px-3 py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition disabled:opacity-40"
+                          onClick={revealAnswer}
+                          className="py-2.5 border border-amber-205 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
                         >
-                          {aiTypingHintLoading ? '…' : 'Hint'}
+                          Reveal
                         </button>
-                      )}
-                      <button
-                        onClick={revealAnswer}
-                        className="px-3 py-2.5 border border-amber-205 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
-                      >
-                        Reveal
-                      </button>
-                      <button
-                        onClick={skipCurrent}
-                        className="px-3 py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-105 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-                      >
-                        Skip
-                      </button>
+                        <button
+                          onClick={skipCurrent}
+                          className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-105 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
+                        >
+                          Skip
+                        </button>
+                      </div>
                     </div>
                     {aiTypingHint && (
                       <div className="mt-2 rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
