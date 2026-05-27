@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { IconCheck, IconX, IconVolume, IconSpark, IconChat } from '../components/Icons.jsx';
+import { IconCheck, IconX, IconVolume, IconSpark, IconChat, IconPen } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
 import { PitchAccentSection } from '../components/PitchAccent.jsx';
@@ -37,6 +37,10 @@ import { DEFAULT_PREFS } from '../data/defaults.js';
 function kanaCoachCells(expected, input, revealed = 0) {
   const target = Array.from(expected || '');
   const typed = Array.from(toHiraganaProgress(input || ''));
+  // Trailing 'n' is held pending in progress mode; commit it as 'ん' when context confirms it
+  if (typed.length < target.length && target[typed.length] === 'ん' && /n$/i.test((input || '').trimEnd())) {
+    typed.push('ん');
+  }
   const cells = target.map((expectedKana, i) => {
     const got = typed[i] || '';
     const hinted = !got && i < revealed;
@@ -76,6 +80,8 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const [aiHintText, setAiHintText] = useState('');
   const [aiHintLoading, setAiHintLoading] = useState(false);
   const [aiHintErr, setAiHintErr] = useState('');
+  const [aiTypingHint, setAiTypingHint] = useState('');
+  const [aiTypingHintLoading, setAiTypingHintLoading] = useState(false);
   const [coachRevealed, setCoachRevealed] = useState(0);
   const [revealedMiss, setRevealedMiss] = useState(false);
   const [reviewChoiceLabel, setReviewChoiceLabel] = useState('');
@@ -413,6 +419,27 @@ Keep it concise and clear.`;
     setAiHintLoading(false);
   }
 
+  async function generateTypingHint() {
+    if (!current || !geminiKey || !answer.trim()) return;
+    setAiTypingHintLoading(true);
+    setAiTypingHint('');
+    const typedKana = toHiragana(answer) || answer;
+    try {
+      const prompt = `A student is conjugating a Japanese verb and needs targeted guidance.\n\nBase word: ${current.verb.dict} (${current.verb.reading}), meaning: "${current.verb.meaning}"\nVerb class: ${GROUP_NAMES[current.verb.group] || current.verb.group}\nTask: transform to ${typeInfo.label}${taskSub ? ` (${taskSub})` : ''}\nStudent typed so far: "${typedKana}"\n\nDo NOT reveal the correct answer. Give one short targeted hint (under 20 words) about what to fix or add next based specifically on what they've typed.`;
+      const reply = await callGemini(
+        [{ role: 'user', parts: [{ text: prompt }] }],
+        geminiKey,
+        120,
+        0.3,
+        aiSystemFromPrefs(practicePrefs, 'You help students learn Japanese conjugation. Never reveal the full correct answer.')
+      );
+      setAiTypingHint(reply);
+    } catch (e) {
+      // silently fail — no error shown for inline hint
+    }
+    setAiTypingHintLoading(false);
+  }
+
   function submit(choiceValue) {
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
@@ -426,6 +453,8 @@ Keep it concise and clear.`;
       setReviewChoiceLabel('');
       setSelfCheckOpen(false);
       setTypoGuard(null);
+      setAiTypingHint('');
+      setAiTypingHintLoading(false);
       setPhase('answering');
       if (!reviewSetComplete) {
         setCurrent(selectNext(state, practiceWords, enabledTypes, current.id, practicePrefs));
@@ -491,6 +520,8 @@ Keep it concise and clear.`;
         setReviewChoiceLabel('');
         setSelfCheckOpen(false);
         setTypoGuard(null);
+        setAiTypingHint('');
+        setAiTypingHintLoading(false);
         setPhase('answering');
         setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
       }, 850);
@@ -512,6 +543,8 @@ Keep it concise and clear.`;
     setReviewChoiceLabel('');
     setSelfCheckOpen(false);
     setTypoGuard(null);
+    setAiTypingHint('');
+    setAiTypingHintLoading(false);
     setPhase('answering');
     setWasCorrect(false);
     setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
@@ -573,6 +606,8 @@ Keep it concise and clear.`;
         setReviewChoiceLabel('');
         setSelfCheckOpen(false);
         setTypoGuard(null);
+        setAiTypingHint('');
+        setAiTypingHintLoading(false);
         setPhase('answering');
         setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
       }, 850);
@@ -973,31 +1008,62 @@ Keep it concise and clear.`;
                           {coachStatus}
                         </div>
                       )}
+                      {geminiKey && !reverseDrill && answer && (
+                        <div className="mt-2 flex flex-col items-center gap-1">
+                          <button
+                            onClick={generateTypingHint}
+                            disabled={aiTypingHintLoading}
+                            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 inline-flex items-center gap-1 transition"
+                          >
+                            <IconSpark className="w-3 h-3" />
+                            {aiTypingHintLoading ? 'Thinking…' : 'Hint'}
+                          </button>
+                          {aiTypingHint && (
+                            <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
+                              {aiTypingHint}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={answer}
-                      onChange={e => {
-                        setTypoGuard(null);
-                        setAnswer(e.target.value);
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          answer.trim() ? submit() : skipCurrent();
-                        } else if (e.key === 'Escape') {
-                          e.preventDefault();
-                          skipCurrent();
-                        }
-                      }}
-                      placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-                      className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
-                      lang="ja"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      spellCheck="false"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={answer}
+                        onChange={e => {
+                          setTypoGuard(null);
+                          setAnswer(e.target.value);
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            answer.trim() ? submit() : skipCurrent();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            skipCurrent();
+                          }
+                        }}
+                        placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
+                        className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
+                        lang="ja"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setKanaPadOpen(v => !v)}
+                        className={`shrink-0 px-3 py-1.5 rounded-lg border text-sm inline-flex items-center gap-1.5 transition ${
+                          kanaPadOpen
+                            ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
+                            : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
+                        }`}
+                      >
+                        <IconPen className="w-4 h-4" />
+                        Kana pad
+                      </button>
+                    </div>
                     {answer && coachPreview !== answer && (
                       <div className="mt-2 text-center text-sm text-stone-500" lang="ja">
                         → {coachPreview}
@@ -1011,6 +1077,7 @@ Keep it concise and clear.`;
                       onClear={clearAnswerText}
                       onSubmit={() => submit()}
                       canSubmit={!!answer.trim()}
+                      noToggle
                     />
                     <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto_auto] gap-2 mt-3">
                       <button
@@ -1043,30 +1110,44 @@ Keep it concise and clear.`;
                   </>
                 ) : (
                   <>
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={answer}
-                      onChange={e => {
-                        setTypoGuard(null);
-                        setAnswer(e.target.value);
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          answer.trim() ? submit() : skipCurrent();
-                        } else if (e.key === 'Escape') {
-                          e.preventDefault();
-                          skipCurrent();
-                        }
-                      }}
-                      placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-                      className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
-                      lang="ja"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      spellCheck="false"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={answer}
+                        onChange={e => {
+                          setTypoGuard(null);
+                          setAnswer(e.target.value);
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            answer.trim() ? submit() : skipCurrent();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            skipCurrent();
+                          }
+                        }}
+                        placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
+                        className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
+                        lang="ja"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setKanaPadOpen(v => !v)}
+                        className={`shrink-0 px-3 py-1.5 rounded-lg border text-sm inline-flex items-center gap-1.5 transition ${
+                          kanaPadOpen
+                            ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
+                            : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
+                        }`}
+                      >
+                        <IconPen className="w-4 h-4" />
+                        Kana pad
+                      </button>
+                    </div>
                     {answer && preview !== answer && (
                       <div className="mt-2 text-center text-sm text-stone-500" lang="ja">
                         → {preview}
@@ -1080,6 +1161,7 @@ Keep it concise and clear.`;
                       onClear={clearAnswerText}
                       onSubmit={() => submit()}
                       canSubmit={!!answer.trim()}
+                      noToggle
                     />
                     {!!liveCells.length && kanaMatchDisplay !== 'none' && (
                       <div className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">
@@ -1108,6 +1190,23 @@ Keep it concise and clear.`;
                             }`}
                           >
                             {liveStatus}
+                          </div>
+                        )}
+                        {geminiKey && !reverseDrill && (
+                          <div className="mt-2 flex flex-col items-center gap-1">
+                            <button
+                              onClick={generateTypingHint}
+                              disabled={aiTypingHintLoading}
+                              className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 inline-flex items-center gap-1 transition"
+                            >
+                              <IconSpark className="w-3 h-3" />
+                              {aiTypingHintLoading ? 'Thinking…' : 'Hint'}
+                            </button>
+                            {aiTypingHint && (
+                              <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
+                                {aiTypingHint}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

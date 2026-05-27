@@ -13,6 +13,7 @@ import {
   STARTER_ADJECTIVES,
   JLPT_LEVELS,
   GENKI_LESSONS,
+  MINNA_LESSONS,
   WORD_TYPE_OPTIONS,
   WORD_GROUP_OPTIONS
 } from '../data/starterWords.js';
@@ -48,6 +49,8 @@ import {
 } from '../utils/display.js';
 import { speakJapanese } from '../utils/speech.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+
+const POLITE_FORM_IDS = ALL_CARD_TYPES.filter(t => t.id.includes('polite') || t.label.toLowerCase().includes('polite')).map(t => t.id);
 
 function compactLookupText(s) {
   return String(s || '').normalize('NFKC').replace(/[、。！？\s'"「」『』（）()\[\]{}]/g, '').toLowerCase();
@@ -158,6 +161,17 @@ export default function SettingsView({
     setGenkiLessons(next.length ? next : GENKI_LESSONS);
   }
 
+  function setMinnaLessons(ids) {
+    const clean = [...new Set(ids.map(Number))].filter(n => MINNA_LESSONS.includes(n)).sort((a, b) => a - b);
+    setPracticePrefs({ ...practicePrefs, minnaLessons: clean.length === MINNA_LESSONS.length ? [] : clean });
+  }
+
+  function toggleMinnaLesson(n) {
+    const selected = Array.isArray(practicePrefs.minnaLessons) && practicePrefs.minnaLessons.length ? practicePrefs.minnaLessons : MINNA_LESSONS;
+    const next = selected.includes(n) ? selected.filter(x => x !== n) : [...selected, n];
+    setMinnaLessons(next.length ? next : MINNA_LESSONS);
+  }
+
   function toggleDisplayScript(id) {
     const current = resolveDisplayScripts(practicePrefs);
     const next = { ...current, [id]: !current[id] };
@@ -169,6 +183,14 @@ export default function SettingsView({
     const valid = new Set(ALL_CARD_TYPES.map(t => t.id));
     const clean = [...new Set((ids || []).filter(id => valid.has(id)))];
     if (clean.length) setState({ ...state, enabledTypes: clean });
+  }
+
+  function toggleAllPolite() {
+    if (allPoliteOn) {
+      setState({ ...state, enabledTypes: state.enabledTypes.filter(id => !POLITE_FORM_IDS.includes(id)) });
+    } else {
+      setState({ ...state, enabledTypes: [...new Set([...state.enabledTypes, ...POLITE_FORM_IDS])] });
+    }
   }
 
   function reset() {
@@ -216,6 +238,7 @@ export default function SettingsView({
 
   const displayScripts = resolveDisplayScripts(practicePrefs);
   const selectedGenkiLessons = Array.isArray(practicePrefs.genkiLessons) && practicePrefs.genkiLessons.length ? practicePrefs.genkiLessons : GENKI_LESSONS;
+  const selectedMinnaLessons = Array.isArray(practicePrefs.minnaLessons) && practicePrefs.minnaLessons.length ? practicePrefs.minnaLessons : MINNA_LESSONS;
   const selectedWordGroups = practicePrefs.wordGroups && practicePrefs.wordGroups.length ? practicePrefs.wordGroups : WORD_GROUP_OPTIONS.map(x => x.id);
   const selectedVoiceAvailable = !practicePrefs.voiceURI || speechVoices.some(v => v.voiceURI === practicePrefs.voiceURI);
   const weakPackIds = weakTypeIdsForState(state, state.enabledTypes);
@@ -231,6 +254,9 @@ export default function SettingsView({
     const kanaHay = compactLookupText(`${t.sub} ${t.hint}`);
     return hay.includes(typeNeedle) || kanaHay.includes(typeNeedleKana) || kanaToRomaji(t.sub || '').toLowerCase().includes(typeNeedle);
   });
+
+  const enabledPoliteCount = POLITE_FORM_IDS.filter(id => state.enabledTypes.includes(id)).length;
+  const allPoliteOn = enabledPoliteCount === POLITE_FORM_IDS.length;
 
   return (
     <div className="space-y-4 text-left">
@@ -633,6 +659,32 @@ export default function SettingsView({
             <p className="text-[11px] text-stone-400 mt-1">Textbook filtering works together with JLPT, word type, and study-list filters.</p>
           </div>
           <div className="sm:col-span-2">
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <label className="text-xs text-stone-500 block">みんなの日本語 lessons</label>
+              <div className="flex gap-1">
+                <button onClick={() => setMinnaLessons(MINNA_LESSONS)} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">All</button>
+                <button onClick={() => setMinnaLessons(MINNA_LESSONS.filter(n => n <= 25))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">I</button>
+                <button onClick={() => setMinnaLessons(MINNA_LESSONS.filter(n => n >= 26))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">II</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-6 sm:grid-cols-[repeat(13,minmax(0,1fr))] gap-1">
+              {MINNA_LESSONS.map(n => (
+                <button
+                  key={n}
+                  onClick={() => toggleMinnaLesson(n)}
+                  className={`px-2 py-2 rounded-lg text-xs border transition ${
+                    selectedMinnaLessons.includes(n)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  L{n}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-1">Selecting lessons from both textbooks returns words matching either (OR). Works with JLPT, word type, and study-list filters.</p>
+          </div>
+          <div className="sm:col-span-2">
             <label className="text-xs text-stone-500 block mb-1">Word types</label>
             <div className="grid grid-cols-3 gap-2">
               {WORD_TYPE_OPTIONS.map(o => (
@@ -702,6 +754,26 @@ export default function SettingsView({
               </button>
             );
           })}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <button
+            onClick={toggleAllPolite}
+            title={allPoliteOn ? 'Disable all polite (ます/です) forms' : 'Enable all polite (ます/です) forms'}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+              allPoliteOn
+                ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                : enabledPoliteCount > 0
+                  ? 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-950/50'
+                  : 'bg-white dark:bg-stone-950 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-800 hover:border-indigo-300 dark:hover:border-indigo-700'
+            }`}
+          >
+            Polite forms
+            <span className={`tabular-nums px-1.5 py-0.5 rounded-full text-[10px] ${
+              allPoliteOn ? 'bg-white/20 text-white' : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
+            }`}>
+              {enabledPoliteCount}/{POLITE_FORM_IDS.length}
+            </span>
+          </button>
         </div>
         <div className="mb-3 grid sm:grid-cols-[1fr_auto] gap-2 items-center">
           <input

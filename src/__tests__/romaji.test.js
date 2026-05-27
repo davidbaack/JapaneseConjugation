@@ -115,6 +115,16 @@ describe('toHiraganaProgress', () => {
   it('returns empty for empty input', () => {
     expect(toHiraganaProgress('')).toBe('');
   });
+
+  it('holds trailing n as pending (ambiguous without following character)', () => {
+    // trailing 'n' alone is held pending — caller must resolve with context
+    expect(toHiraganaProgress('n')).toBe('');
+    expect(toHiraganaProgress('kikimasen')).toBe('ききませ');
+  });
+
+  it('converts n followed by consonant to ん mid-word', () => {
+    expect(toHiraganaProgress('kenko')).toBe('けんこ');
+  });
 });
 
 describe('isAllKana', () => {

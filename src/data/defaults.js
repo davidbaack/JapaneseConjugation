@@ -26,6 +26,7 @@ export const DEFAULT_PREFS = {
   reviewLimit: 0,
   jlptLevels: ['N5','N4','N3','N2','N1'],
   genkiLessons: [],
+  minnaLessons: [],
   wordTypes: ['verb','i-adjective','na-adjective'],
   wordGroups: ['ichidan','godan','suru','kuru','irregular-adjective','i-adjective','na-adjective'],
   wordListIds: [],
