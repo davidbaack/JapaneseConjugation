@@ -1195,26 +1195,9 @@ Keep it concise and clear.`;
                             {liveStatus}
                           </div>
                         )}
-                        {geminiKey && !reverseDrill && (
-                          <div className="mt-2 flex flex-col items-center gap-1">
-                            <button
-                              onClick={generateTypingHint}
-                              disabled={aiTypingHintLoading}
-                              className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 inline-flex items-center gap-1 transition"
-                            >
-                              <IconSpark className="w-3 h-3" />
-                              {aiTypingHintLoading ? 'Thinking…' : 'Hint'}
-                            </button>
-                            {aiTypingHint && (
-                              <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
-                                {aiTypingHint}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     )}
-                    <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto] gap-2 mt-3">
+                    <div className={`grid gap-2 mt-3 ${geminiKey && !reverseDrill ? 'grid-cols-2 sm:grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-2 sm:grid-cols-[1fr_auto_auto]'}`}>
                       <button
                         onClick={() => submit()}
                         disabled={!answer.trim()}
@@ -1222,6 +1205,15 @@ Keep it concise and clear.`;
                       >
                         Check (Enter)
                       </button>
+                      {geminiKey && !reverseDrill && (
+                        <button
+                          onClick={generateTypingHint}
+                          disabled={aiTypingHintLoading}
+                          className="px-3 py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition disabled:opacity-40"
+                        >
+                          {aiTypingHintLoading ? '…' : 'Hint'}
+                        </button>
+                      )}
                       <button
                         onClick={revealAnswer}
                         className="px-3 py-2.5 border border-amber-205 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
@@ -1235,6 +1227,11 @@ Keep it concise and clear.`;
                         Skip
                       </button>
                     </div>
+                    {aiTypingHint && (
+                      <div className="mt-2 rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
+                        {aiTypingHint}
+                      </div>
+                    )}
                   </>
                 )}
               </>
