@@ -172,40 +172,6 @@ const VOCAB_PACKS=[
   ]}
 ];
 const AI_LIST_TARGETS=['N5','N4','N3','N2','N1','Genki','Travel','Work'];
-const GRAMMAR_LESSONS=[
-  {id:'te-form',title:'Te-form joins actions',forms:['te-form','adj-te-form'],body:'Use the te-form to connect actions, make requests, and build helper patterns like ている. Godan verbs change by final kana group; adjectives use くて or で.',examples:[['食べる','食べて','食べてください。'],['読む','読んで','本を読んでいます。'],['静か','静かで','静かで便利です。']]},
-  {id:'commands',title:'Commands choose force',forms:['command-nasai','imperative','request-kudasai','prohibition','negative-request'],body:'なさい uses the masu-stem plus なさい for a firm instruction, common from parents, teachers, signs, or test prompts. It is gentler than the blunt imperative, but still a command, so use てください or ないでください when you need an actual request.',examples:[['食べる','食べなさい','野菜を食べなさい。'],['書く','書きなさい','名前を書きなさい。'],['する','しなさい','静かにしなさい。']]},
-  {id:'progressive-aspect',title:'Progressive tracks ongoing state',forms:['progressive','progressive-polite','progressive-negative','progressive-polite-negative','progressive-past','progressive-polite-past','progressive-past-negative','progressive-polite-past-negative'],body:'Use the te-form plus いる to show an ongoing action, a repeated habit, or a resulting state. Then conjugate いる itself: ている, ています, ていない, ていません, ていた, ていました, ていなかった, and ていませんでした.',examples:[['食べる','食べています','今、食べています。'],['読む','読んでいません','まだ読んでいません。'],['する','していました','昨日の夜、勉強していました。']]},
-  {id:'negative-connectors',title:'Negative connectors choose tone',forms:['negative-te','negative-te-connective','negative-zu','negative-zuni'],body:'ないで is the everyday way to say without doing. なくて connects a negative cause or state. ず and ずに are more formal written alternatives: use the ない stem plus ず, with する becoming せず and 来る becoming こず.',examples:[['食べる','食べずに','朝ご飯を食べずに出かけました。'],['書く','書かず','名前を書かず、提出しました。'],['する','せずに','予約せずに行きました。']]},
-  {id:'desire',title:'Tai-form keeps conjugating',forms:['desiderative','desiderative-polite','desiderative-negative','desiderative-polite-negative','desiderative-past','desiderative-polite-past','desiderative-past-negative','desiderative-polite-past-negative'],body:'たい attaches to the masu-stem to say want to do. After that, it behaves like an い-adjective: たい, たくない, たかった, and たくなかった. In polite speech, add です to each of those adjective-like endings.',examples:[['食べる','食べたいです','寿司を食べたいです。'],['行く','行きたくないです','今日は行きたくないです。'],['する','したくなかったです','昨日は勉強したくなかったです。']]},
-  {id:'potential',title:'Potential means ability',forms:['potential','potential-past','potential-past-negative','potential-polite-past','potential-polite-past-negative'],body:'Ichidan verbs add られる, godan verbs shift to the え-row and add る, する becomes できる, and 来る becomes 来られる. Potential verbs end in る, so they can keep conjugating like ichidan verbs: できる, できた, できなかった, できました, できませんでした.',examples:[['食べる','食べられました','寿司が食べられました。'],['書く','書けました','漢字が書けました。'],['する','できませんでした','予約ができませんでした。']]},
-  {id:'passive-causative',title:'Passive and causative change roles',forms:['passive','passive-past','passive-polite-past','causative','causative-past','causative-polite-past','short-causative','short-causative-past','causative-passive','causative-passive-polite-past-negative','short-causative-passive'],body:'Passive means the subject receives an action. Causative means someone makes or lets another person act. Causative-passive means someone is made to do something. These derived forms can also keep conjugating, such as 褒められました, 書かせました, 書かした, 待たされなかった, and 待たされませんでした.',examples:[['待つ','待たされました','駅で待たされました。'],['書く','書かした','先生は学生に名前を書かしました。'],['褒める','褒められました','先生に褒められました。']]},
-  {id:'keigo',title:'Keigo changes social direction',forms:['honorific','honorific-polite','humble','humble-polite'],body:'Honorific forms raise someone else\'s action; humble forms lower your own action. Many common verbs have special replacements like 召し上がる, ご覧になる, いらっしゃる, いただく, and 参る. When there is no special replacement, use patterns such as お読みになる and お読みする.',examples:[['読む','お読みになります','先生は資料をお読みになります。'],['食べる','召し上がります','先生は昼ご飯を召し上がります。'],['見る','拝見します','資料を拝見します。']]},
-  {id:'adjectives',title:'Adjectives conjugate like predicates',forms:['adj-plain-past','adj-plain-negative','adj-te-form','adj-adverb'],body:'い-adjectives drop い and use かった, くない, くて, and く. The common irregular adjective いい conjugates from よい, so it becomes よかった and よくない. な-adjectives behave more like nouns with だ/です, だった, ではない, で, な, and に.',examples:[['いい','よかった','昨日はよかったです。'],['高い','高かった','昨日は高かったです。'],['便利','便利ではない','この駅は便利ではありません。']]},
-  {id:'conditionals',title:'Conditionals choose nuance',forms:['conditional-ba','negative-conditional-ba','potential-conditional-ba','potential-negative-conditional-ba','conditional-tara','negative-conditional-tara','adj-conditional','adj-negative-conditional','adj-tara','adj-negative-tara'],body:'ば often feels rule-like or prerequisite-like. たら is broad and works for if/when. Negative ば turns ない into なければ, so stacked forms like できる become できれば and できない becomes できなければ.',examples:[['行く','行けば','駅に行けば分かります。'],['できる','できなければ','できなければ、手伝ってください。'],['安い','安くなければ','安くなければ買いません。']]}
-];
-const SHADOW_SCENARIOS=[
-  {id:'cafe',title:'Cafe Request',level:'N5',focus:'te-form',lines:[
-    {speaker:'A',ja:'すみません、メニューを見せてください。',en:'Excuse me, please show me the menu.'},
-    {speaker:'B',ja:'はい、どうぞ。おすすめはこのケーキです。',en:'Sure, here you go. This cake is the recommendation.'},
-    {speaker:'A',ja:'じゃあ、コーヒーとケーキをください。',en:'Then coffee and cake, please.'}
-  ]},
-  {id:'station',title:'At the Station',level:'N5',focus:'potential',lines:[
-    {speaker:'A',ja:'この電車で東京に行けますか。',en:'Can I go to Tokyo on this train?'},
-    {speaker:'B',ja:'はい、行けます。でも次の駅で乗り換えてください。',en:'Yes, you can. But please transfer at the next station.'},
-    {speaker:'A',ja:'分かりました。ありがとうございます。',en:'Got it. Thank you.'}
-  ]},
-  {id:'work',title:'Workplace Favor',level:'N4',focus:'causative-passive',lines:[
-    {speaker:'A',ja:'昨日、急に残業させられました。',en:'Yesterday I was suddenly made to work overtime.'},
-    {speaker:'B',ja:'大変でしたね。今日は早く帰れますか。',en:'That sounds rough. Can you go home early today?'},
-    {speaker:'A',ja:'はい、今日は早く帰りたいです。',en:'Yes, today I want to go home early.'}
-  ]},
-  {id:'weather',title:'Weather and Plans',level:'N5',focus:'adjectives',lines:[
-    {speaker:'A',ja:'今日は暑くて、少し疲れました。',en:'Today is hot, so I got a little tired.'},
-    {speaker:'B',ja:'じゃあ、静かなカフェで休みましょう。',en:'Then let’s rest at a quiet cafe.'},
-    {speaker:'A',ja:'いいですね。涼しくなったら散歩します。',en:'Sounds good. When it gets cooler, I’ll take a walk.'}
-  ]}
-];
 function normalizeJlptLevel(value){
   const m=String(value||'').trim().toUpperCase().match(/^N[1-5]$/);
   return m?m[0]:null;
@@ -1594,9 +1560,12 @@ function aiSystemFromPrefs(prefs=DEFAULT_PREFS,base=AI_SYSTEM){
   return `${base}\n\nFeedback depth: ${level.prompt}\nGuide voice: ${tone.prompt}`;
 }
 
-async function lookupVerbWithGemini(query,apiKey){
+async function lookupWordWithGemini(query,apiKey,isAdj=false){
   if(!apiKey)throw new Error('No Gemini API key set');
-  const prompt=`Look up this Japanese verb: "${query}"\n\nReturn ONLY a JSON object (no markdown, no extra text):\n{"dict":"kanji/kana dictionary form","reading":"hiragana only","meaning":"English meaning starting with to","group":"ichidan or godan or suru or kuru"}\n\nIf the input is English or romaji, find the most common Japanese verb for that meaning.`;
+  const typeStr = isAdj ? 'adjective' : 'verb';
+  const groupOptions = isAdj ? 'i-adjective or na-adjective' : 'ichidan or godan or suru or kuru';
+  const meaningStr = isAdj ? 'English meaning' : 'English meaning starting with to';
+  const prompt=`Look up this Japanese ${typeStr}: "${query}"\n\nReturn ONLY a JSON object (no markdown, no extra text):\n{"dict":"kanji/kana dictionary form or stem","reading":"hiragana only","meaning":"${meaningStr}","group":"${groupOptions}"}\n\nIf the input is English or romaji, find the most common Japanese ${typeStr} for that meaning.`;
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
      body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1024,temperature:0.1,thinkingConfig:{thinkingBudget:0}}})});
@@ -1609,10 +1578,12 @@ async function lookupVerbWithGemini(query,apiKey){
   return result;
 }
 
-async function getSuggestedVerb(existingVerbs,apiKey){
+async function getSuggestedWord(existing,apiKey,isAdj=false){
   if(!apiKey)throw new Error('No Gemini API key set');
-  const list=existingVerbs.map(v=>`${v.dict} (${v.reading}) — ${v.meaning} [${v.group}]`).join('\n');
-  const prompt=`I'm learning Japanese verb conjugation with an SRS app. Here are the ${existingVerbs.length} verbs I'm already studying:\n\n${list}\n\nBased on my current vocabulary, suggest ONE new verb to add next. Consider JLPT frequency, useful patterns I haven't covered, and what learners at this level typically need. Do NOT suggest any verb already in my list.\n\nReturn ONLY a JSON object (no markdown):\n{"dict":"e.g. 始める","reading":"e.g. はじめる","meaning":"e.g. to begin","group":"ichidan or godan or suru or kuru","reason":"One sentence explaining why this is a good next verb for me."}`;
+  const typeStr = isAdj ? 'adjective' : 'verb';
+  const groupOptions = isAdj ? 'i-adjective or na-adjective' : 'ichidan or godan or suru or kuru';
+  const list=existing.map(v=>`${v.dict} (${v.reading}) — ${v.meaning} [${v.group}]`).join('\n');
+  const prompt=`I'm learning Japanese ${typeStr} conjugation with an SRS app. Here are the ${existing.length} ${typeStr}s I'm already studying:\n\n${list}\n\nBased on my current vocabulary, suggest ONE new ${typeStr} to add next. Consider JLPT frequency, useful patterns I haven't covered, and what learners at this level typically need. Do NOT suggest any ${typeStr} already in my list.\n\nReturn ONLY a JSON object (no markdown):\n{"dict":"e.g. dict form","reading":"e.g. hiragana reading","meaning":"e.g. English meaning","group":"${groupOptions}","reason":"One sentence explaining why this is a good next ${typeStr} for me."}`;
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1024,temperature:0.9,thinkingConfig:{thinkingBudget:0}}})});
   const d=await r.json();
@@ -2244,7 +2215,7 @@ function App(){
           </div>
         </header>
         <nav className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white rounded-xl border border-stone-200">
-          {['study','rush','endings','classify','meaning','mock','scanner','mistakes','shadow','lessons','reference','coach','stats','levels','verbs','lists','settings'].map(t=>(
+          {['study','rush','classify','endings','mistakes','levels','stats','library','settings'].map(t=>(
             <button key={t} onClick={()=>setTab(t)} className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${tab===t?'bg-stone-800 text-white':'text-stone-600 hover:bg-stone-100'}`}>{t}</button>
           ))}
         </nav>
@@ -2252,18 +2223,10 @@ function App(){
         {tab==='rush'&&<RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists}/>}
         {tab==='endings'&&<EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
         {tab==='classify'&&<ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
-        {tab==='meaning'&&<MeaningView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
-        {tab==='mock'&&<MockTestView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey}/>}
-        {tab==='scanner'&&<ScannerView state={state} setState={setState} words={allWords} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey}/>}
         {tab==='mistakes'&&<MistakesView state={state} setState={setState} practicePrefs={practicePrefs}/>}
-        {tab==='shadow'&&<ShadowView state={state} setState={setState} words={allWords} wordLists={wordLists} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
-        {tab==='lessons'&&<LessonsView geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
-        {tab==='reference'&&<ReferenceView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} wordLists={wordLists} setWordLists={setWordLists} geminiKey={geminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab}/>}
-        {tab==='coach'&&<CoachView state={state} setState={setState} words={allWords} wordLists={wordLists} geminiKey={geminiKey} practicePrefs={practicePrefs}/>}
         {tab==='stats'&&<StatsView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab} wordLists={wordLists} setWordLists={setWordLists}/>}
         {tab==='levels'&&<SRSLevelView state={state} verbs={allWords}/>}
-        {tab==='verbs'&&<VerbsView customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} geminiKey={geminiKey} state={state}/>}
-        {tab==='lists'&&<ListsView words={allWords} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey}/>}
+        {tab==='library'&&<LibraryView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey} setTab={setTab}/>}
         {tab==='settings'&&<SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme}/>}
       </div>
     </div>
@@ -3379,161 +3342,6 @@ function mockCountForOption(option,filtered){
   if(option==='all')return Math.max(1,filtered.length);
   return Number(option)||10;
 }
-function MockTestView({state,setState,words,practicePrefs=DEFAULT_PREFS,wordLists=[],geminiKey}){
-  const stats=state.mock||defaultState().mock;
-  const[phase,setPhase]=useState('intro');
-  const[questionCountOpt,setQuestionCountOpt]=useState('10');
-  const[questions,setQuestions]=useState([]);
-  const[index,setIndex]=useState(0);
-  const[answers,setAnswers]=useState({});
-  const[result,setResult]=useState(null);
-  const[aiText,setAiText]=useState('');
-  const[aiLoading,setAiLoading]=useState(false);
-  const[aiErr,setAiErr]=useState('');
-  const filtered=useMemo(()=>filterWordsForPrefs(words,practicePrefs,wordLists),[words,practicePrefs,wordLists]);
-  const targetCount=mockCountForOption(questionCountOpt,filtered);
-  const current=questions[index]||null;
-  const selected=current&&Object.prototype.hasOwnProperty.call(answers,current.id)?answers[current.id]:null;
-  const currentCorrect=!!current&&selected===current.answerKey;
-  const answeredCount=Object.keys(answers).length;
-  function start(){
-    const qs=buildMockQuestions(words,state,practicePrefs,wordLists,targetCount);
-    setQuestions(qs);setAnswers({});setIndex(0);setResult(null);setAiText('');setAiErr('');setAiLoading(false);setPhase(qs.length?'taking':'intro');
-  }
-  function choose(key){if(!current||selected!==null)return;setAnswers({...answers,[current.id]:key});}
-  function finish(nextAnswers=answers,finishedQuestions=questions){
-    const tested=finishedQuestions.length?finishedQuestions:questions;
-    const breakdown=mockSkillBreakdown(tested,nextAnswers);
-    const correct=tested.filter(q=>nextAnswers[q.id]===q.answerKey).length;
-    const pct=tested.length?Math.round(correct/tested.length*100):0;
-    let mistakes=state.mistakes||[];
-    for(const q of tested){
-      if(q.kind!=='conjugation'||nextAnswers[q.id]===q.answerKey)continue;
-      const picked=q.choices.find(c=>c.key===nextAnswers[q.id]);
-      mistakes=recordMistake(mistakes,q.item,q.type,null,picked?.label||'',q.answerKey);
-    }
-    const prior=state.mock||defaultState().mock;
-    const bySkill={...(prior.bySkill||{})};
-    for(const [skill,s] of Object.entries(breakdown)){
-      const prev=bySkill[skill]||{attempted:0,correct:0};
-      bySkill[skill]={attempted:prev.attempted+s.attempted,correct:prev.correct+s.correct,lastPct:s.attempted?Math.round(s.correct/s.attempted*100):0};
-    }
-    setState({...state,mistakes,mock:{...prior,taken:(prior.taken||0)+1,bestPct:Math.max(prior.bestPct||0,pct),lastPct:pct,lastScore:correct,lastTotal:tested.length,lastAt:Date.now(),bySkill}});
-    setResult({correct,total:tested.length,pct,breakdown,stopped:tested.length<questions.length,questions:tested});
-    setPhase('results');
-  }
-  function finishNow(){
-    const answered=questions.filter(q=>Object.prototype.hasOwnProperty.call(answers,q.id));
-    if(!answered.length){setQuestions([]);setAnswers({});setIndex(0);setPhase('intro');return;}
-    finish(answers,answered);
-  }
-  async function generateMockReview(){
-    if(!result||!geminiKey)return;
-    setAiLoading(true);setAiErr('');setAiText('');
-    try{
-      const reviewedQuestions=result.questions||questions;
-      const skillLines=Object.entries(result.breakdown).map(([skill,s])=>`${skill}: ${s.correct}/${s.attempted}`).join('\n');
-      const misses=reviewedQuestions.filter(q=>answers[q.id]!==q.answerKey).slice(0,10).map(q=>`${q.skill}: ${q.item.dict} (${q.item.reading}) — expected ${q.answerLabel}; note: ${q.note}`).join('\n')||'None';
-      const prompt=`Create a concise post-test study review for a Japanese conjugation app.\n\nScore: ${result.correct}/${result.total} (${result.pct}%)\nSkill breakdown:\n${skillLines}\nMissed or weak examples:\n${misses}\n\nGive: the top 2 weak areas, one concrete next drill inside the app, one rule reminder, and a tiny 5-minute study plan. Be encouraging but specific.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1000,0.25,aiSystemFromPrefs(practicePrefs,'You are a practical Japanese conjugation coach. Turn test results into focused next actions without inventing details.'));
-      setAiText(reply);
-    }catch(e){setAiErr(e.message||'AI review failed.');}
-    setAiLoading(false);
-  }
-  function next(){
-    if(!current)return;
-    if(index>=questions.length-1)finish();
-    else setIndex(index+1);
-  }
-  function renderChoice(c){
-    if(c.kind==='form'){
-      const view=formDisplay(c.label,practicePrefs);
-      return <ScriptDisplay view={view} className="text-xl font-medium" subClassName="text-xs text-stone-500 mt-1"/>;
-    }
-    return <><div className="text-base font-medium" lang={c.lang||'en'}>{c.label}</div>{c.sub&&<div className="text-xs text-stone-500 mt-1" lang={c.lang||'en'}>{c.sub}</div>}</>;
-  }
-  const Stat=({label,value})=><div className="bg-white rounded-xl border border-stone-200 p-4"><div className="text-2xl font-semibold tabular-nums">{value}</div><div className="text-xs text-stone-500">{label}</div></div>;
-  if(phase==='intro')return(
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat label="Mocks taken" value={stats.taken||0}/>
-        <Stat label="Last score" value={(stats.lastPct||0)+'%'}/>
-        <Stat label="Best score" value={(stats.bestPct||0)+'%'}/>
-        <Stat label="Filtered words" value={filtered.length}/>
-      </div>
-      <div className="bg-white rounded-2xl border border-stone-200 p-6">
-        <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">JLPT-style check</div>
-        <h3 className="text-2xl font-semibold mt-1">Mixed mini mock</h3>
-        <p className="text-sm text-stone-600 mt-3 leading-relaxed">Take a mixed diagnostic across conjugation, vocabulary meaning, Japanese recognition, and word classification. Wrong conjugation answers are saved to Mistakes so the mock turns into targeted review.</p>
-        <div className="mt-5">
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <label className="text-xs text-stone-500">Questions</label>
-            <span className="text-[11px] text-stone-400">{questionCountOpt==='all'?`${targetCount} filtered words`:`${targetCount} questions`}</span>
-          </div>
-          <div className="grid grid-cols-4 gap-2">{MOCK_COUNT_OPTIONS.map(o=><button key={o.id} onClick={()=>setQuestionCountOpt(o.id)} className={`px-3 py-2 rounded-lg text-sm border transition ${questionCountOpt===o.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>)}</div>
-        </div>
-        <button onClick={start} disabled={!filtered.length} className="mt-5 w-full py-3 bg-stone-800 hover:bg-stone-900 disabled:opacity-40 text-white rounded-xl font-medium">Start mock test</button>
-      </div>
-      {!!Object.keys(stats.bySkill||{}).length&&<div className="bg-white rounded-2xl border border-stone-200 p-5"><h3 className="font-medium mb-3">Skill history</h3><div className="space-y-2">{Object.entries(stats.bySkill||{}).map(([skill,s])=>{const pct=s.attempted?Math.round(s.correct/s.attempted*100):0;return <div key={skill} className="rounded-xl border border-stone-200 px-3 py-2"><div className="flex items-center justify-between gap-2"><span className="text-sm font-medium">{skill}</span><span className="text-xs text-stone-500">{s.correct}/{s.attempted} · {pct}%</span></div><div className="mt-2 h-1.5 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{width:pct+'%'}}/></div></div>;})}</div></div>}
-    </div>
-  );
-  if(phase==='results'&&result){
-    const weakest=Object.entries(result.breakdown).sort((a,b)=>(a[1].correct/a[1].attempted)-(b[1].correct/b[1].attempted))[0];
-    return(
-      <div className="space-y-4">
-        <div className="bg-white rounded-2xl border border-stone-200 p-6 text-center">
-          <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">{result.stopped?'Mock stopped':'Mock complete'}</div>
-          <div className="text-5xl font-semibold mt-2 tabular-nums">{result.pct}%</div>
-          <div className="text-sm text-stone-500 mt-2">{result.correct}/{result.total} correct{result.stopped?' · scored answered questions only':''}{weakest?` · focus next: ${weakest[0]}`:''}</div>
-          <div className="mt-5 flex flex-wrap justify-center gap-2">
-            <button onClick={generateMockReview} disabled={!geminiKey||aiLoading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium inline-flex items-center gap-1.5"><IconSpark className="w-4 h-4"/>{aiLoading?'Reviewing...':'AI review'}</button>
-            <button onClick={start} className="px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-xl font-medium">Retake</button>
-          </div>
-          {!geminiKey&&<div className="mt-2 text-xs text-stone-400">Add a Gemini key in Settings for post-test coaching.</div>}
-          {aiErr&&<div className="mt-3 text-sm text-rose-600">{aiErr}</div>}
-          {aiText&&<div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-left text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">{aiText}</div>}
-        </div>
-        <div className="grid sm:grid-cols-2 gap-3">{Object.entries(result.breakdown).map(([skill,s])=>{const pct=s.attempted?Math.round(s.correct/s.attempted*100):0;return <div key={skill} className="bg-white rounded-xl border border-stone-200 p-4"><div className="flex items-center justify-between"><span className="font-medium">{skill}</span><span className="text-sm text-stone-500">{s.correct}/{s.attempted}</span></div><div className="mt-2 h-2 bg-stone-100 rounded-full overflow-hidden"><div className={`h-full ${pct>=80?'bg-emerald-500':pct>=50?'bg-amber-500':'bg-rose-500'}`} style={{width:pct+'%'}}/></div></div>;})}</div>
-      </div>
-    );
-  }
-  if(!current)return <div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No mock questions available for the current filters.</div>;
-  const promptView=current.kind==='conjugation'||current.kind==='meaning'||current.kind==='classify'?promptDisplay(current.item,null,practicePrefs):null;
-  return(
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-stone-100">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><span className="font-medium">Question {index+1}/{questions.length}</span><div className="flex flex-wrap items-center justify-end gap-2"><span className="text-xs text-indigo-600">{current.skill}</span><button onClick={finishNow} disabled={!answeredCount} className="px-2 py-1 rounded-lg border border-stone-200 hover:bg-stone-50 disabled:opacity-40 text-xs text-stone-500">Finish now</button></div></div>
-          <div className="mt-3 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{width:((index+1)/questions.length*100)+'%'}}/></div>
-        </div>
-        <div className="p-5">
-          <div className="text-xs uppercase tracking-wider text-stone-400 font-medium mb-2">{current.prompt}</div>
-          {current.kind==='recognition'?(
-            <div className="text-3xl sm:text-4xl font-semibold text-center py-6">{current.item.meaning}</div>
-          ):(
-            <div className="text-center py-5"><ScriptDisplay view={promptView} className="text-4xl sm:text-5xl font-medium" subClassName="text-sm text-stone-500 mt-1"/>{current.kind==='conjugation'&&<div className="mt-3 text-sm text-stone-500">Target: {TYPE_LABEL[current.type]}</div>}</div>
-          )}
-          <div className="grid sm:grid-cols-2 gap-2 mt-4">
-            {current.choices.map(c=>{
-              const picked=selected===c.key,correct=c.key===current.answerKey;
-              const cls=selected!==null&&correct?'bg-emerald-50 border-emerald-300 text-emerald-800':selected!==null&&picked&&!correct?'bg-rose-50 border-rose-300 text-rose-800':'bg-white border-stone-200 hover:border-indigo-400 hover:bg-indigo-50';
-              return <button key={c.key} onClick={()=>choose(c.key)} disabled={selected!==null} className={`min-h-16 px-3 py-3 rounded-xl border text-center transition ${cls}`}>{renderChoice(c)}</button>;
-            })}
-          </div>
-          {selected!==null&&(
-            <div className={`mt-4 rounded-xl border p-4 ${currentCorrect?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
-              <div className={`text-sm font-medium ${currentCorrect?'text-emerald-800':'text-rose-800'}`}>{currentCorrect?'Correct.':'Not quite.'}</div>
-              <div className="mt-1 text-sm text-stone-700">Answer: <span lang="ja">{current.answerLabel}</span></div>
-              <div className="mt-2 text-sm text-stone-600">{current.note}</div>
-              <button onClick={next} autoFocus className="w-full mt-3 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-sm font-medium">{index>=questions.length-1?'Finish mock':'Next'}</button>
-            </div>
-          )}
-          <div className="mt-3 text-center text-xs text-stone-400">{answeredCount}/{questions.length} answered</div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ============================================================================
 // ENDINGS VIEW
@@ -3999,94 +3807,6 @@ function meaningChoiceWords(current,words){
   }
   return shuffled(choices);
 }
-function MeaningView({state,setState,words,practicePrefs,wordLists=[],geminiKey}){
-  const filtered=useMemo(()=>filterWordsForPrefs(words,practicePrefs,wordLists),[words,practicePrefs,wordLists]);
-  const[mode,setMode]=useState('jp-en');
-  const[current,setCurrent]=useState(null);
-  const[result,setResult]=useState(null);
-  const[aiTip,setAiTip]=useState('');
-  const[aiLoading,setAiLoading]=useState(false);
-  const[aiErr,setAiErr]=useState('');
-  const aiRequestRef=useRef(0);
-  const choices=useMemo(()=>current?meaningChoiceWords(current,filtered):[],[current,filtered]);
-  useEffect(()=>{if(!current&&filtered.length)setCurrent(filtered[Math.floor(Math.random()*filtered.length)]);},[current,filtered]);
-  useEffect(()=>{if(current&&filtered.length&&!filtered.some(w=>w.dict===current.dict&&w.group===current.group)){setCurrent(null);setResult(null);}},[filtered,current]);
-  useEffect(()=>{setResult(null);setAiTip('');setAiErr('');aiRequestRef.current++;setAiLoading(false);},[current,mode]);
-  if(!filtered.length)return(<div className="bg-white rounded-2xl border border-stone-200 p-8 text-center text-stone-500">No words match the current filters.</div>);
-  if(!current)return null;
-  const stats=state.meaning||defaultState().meaning;
-  const acc=stats.attempted?Math.round(stats.correct/stats.attempted*100):0;
-  const currentView=promptDisplay(current,null,practicePrefs);
-  function choose(choice){
-    if(result)return;
-    const ok=choice.dict===current.dict&&choice.group===current.group;
-    const key=`${current.group}|${current.dict}|${mode}`;
-    const prev=stats.byWord?.[key]||{attempted:0,correct:0};
-    setState({...state,meaning:{attempted:(stats.attempted||0)+1,correct:(stats.correct||0)+(ok?1:0),byWord:{...(stats.byWord||{}),[key]:{attempted:prev.attempted+1,correct:prev.correct+(ok?1:0),lastAt:Date.now()}}},daily:bumpDaily(state.daily,ok,practicePrefs.dailyGoal||10)});
-    setResult({ok,choice});
-  }
-  function next(){
-    setResult(null);setAiTip('');setAiErr('');aiRequestRef.current++;setAiLoading(false);
-    const pool=filtered.length>1?filtered.filter(w=>w.dict!==current.dict||w.group!==current.group):filtered;
-    setCurrent(pool[Math.floor(Math.random()*pool.length)]);
-  }
-  async function generateMeaningHook(){
-    if(!geminiKey||!current)return;
-    const requestId=++aiRequestRef.current;
-    setAiLoading(true);setAiTip('');setAiErr('');
-    try{
-      const promptText=`Create one short memory hook for this Japanese vocabulary item.\nWord: ${current.dict} (${current.reading})\nMeaning: ${current.meaning}\nType: ${GROUP_NAMES[current.group]||current.group}\nKeep it under 45 words. Include a usage nuance or contrast only if it helps the learner remember the meaning.`;
-      const reply=await callGemini([{role:'user',parts:[{text:promptText}]}],geminiKey,350,0.45,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
-      if(aiRequestRef.current===requestId)setAiTip(reply.trim());
-    }catch(e){if(aiRequestRef.current===requestId)setAiErr(e.message);}
-    if(aiRequestRef.current===requestId)setAiLoading(false);
-  }
-  return(
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-stone-200 p-5">
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div><h3 className="font-medium">Meaning drill</h3><p className="text-xs text-stone-500">Reinforce vocabulary while you practice conjugation words.</p></div>
-          <div className="text-xs text-stone-500 text-right"><div>{stats.correct}/{stats.attempted}</div><div>{acc}% accuracy</div></div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 mb-4">{[{id:'jp-en',label:'JP -> meaning'},{id:'en-jp',label:'Meaning -> JP'}].map(o=><button key={o.id} onClick={()=>{setMode(o.id);setResult(null);}} className={`px-3 py-2 rounded-lg text-sm border transition ${mode===o.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{o.label}</button>)}</div>
-        <div className="text-center py-5 rounded-2xl bg-stone-50 border border-stone-200">
-          {mode==='jp-en'?(
-            <>
-              <ScriptDisplay view={currentView} className="text-5xl font-medium mb-2" subClassName="text-stone-500"/>
-              <button onClick={()=>speakJapanese(current.reading,0.9,practicePrefs.voiceURI)} className="mt-2 px-3 py-2 border border-stone-200 hover:bg-white rounded-lg text-sm text-stone-600 inline-flex items-center gap-1.5"><IconVolume className="w-4 h-4"/>Speak</button>
-            </>
-          ):(
-            <div className="text-3xl sm:text-4xl font-semibold text-stone-800 px-4">{current.meaning}</div>
-          )}
-          <div className="text-[11px] text-stone-400 mt-3">JLPT {getWordMeta(current).jlpt}{getWordMeta(current).lesson?` · Genki L${getWordMeta(current).lesson}`:''}</div>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-2 mt-4">
-          {choices.map(c=>{
-            const isCorrect=c.dict===current.dict&&c.group===current.group;
-            const chosen=result&&result.choice.dict===c.dict&&result.choice.group===c.group;
-            const cls=result&&isCorrect?'bg-emerald-50 border-emerald-300 text-emerald-800':result&&chosen&&!result.ok?'bg-rose-50 border-rose-300 text-rose-800':'bg-white border-stone-200 hover:border-indigo-400 hover:bg-indigo-50';
-            return mode==='jp-en'
-              ? <button key={`${c.group}|${c.dict}`} onClick={()=>choose(c)} disabled={!!result} className={`min-h-14 px-3 py-3 rounded-xl border text-sm font-medium transition ${cls}`}>{c.meaning}</button>
-              : <button key={`${c.group}|${c.dict}`} onClick={()=>choose(c)} disabled={!!result} className={`min-h-14 px-3 py-3 rounded-xl border transition ${cls}`}><ScriptDisplay view={promptDisplay(c,null,practicePrefs)} className="text-xl font-medium" subClassName="text-xs text-stone-500 mt-1"/></button>;
-          })}
-        </div>
-        {result&&(
-          <div className={`mt-4 rounded-xl border p-4 ${result.ok?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
-            <div className={`text-sm font-medium ${result.ok?'text-emerald-800':'text-rose-800'}`}>{result.ok?'Correct.':'Not quite.'}</div>
-            <div className="mt-2 flex items-baseline justify-center gap-2 flex-wrap"><span className="text-2xl font-medium" lang="ja">{current.dict}</span>{current.dict!==current.reading&&<span className="text-sm text-stone-500" lang="ja">{current.reading}</span>}<span className="text-sm text-stone-500 italic">{current.meaning}</span></div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button onClick={generateMeaningHook} disabled={!geminiKey||aiLoading} className="flex-1 min-w-[9rem] py-2 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium inline-flex items-center justify-center gap-1.5"><IconSpark className="w-4 h-4"/>{aiLoading?'Thinking...':'AI memory hook'}</button>
-              <button onClick={next} autoFocus className="flex-1 min-w-[7rem] py-2 px-3 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-sm font-medium">Next</button>
-            </div>
-            {!geminiKey&&<div className="mt-2 text-xs text-stone-400 text-center">Add a Gemini key in Settings for memory hooks.</div>}
-            {aiErr&&<div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
-            {aiTip&&<div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-900 leading-relaxed">{aiTip}</div>}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 function ClassificationView({state,setState,words,practicePrefs,wordLists=[],geminiKey}){
   const filtered=useMemo(()=>filterWordsForPrefs(words,practicePrefs,wordLists),[words,practicePrefs,wordLists]);
   const[current,setCurrent]=useState(null);
@@ -4352,301 +4072,6 @@ function AmbientReviewPanel({state,setState,words,practicePrefs=DEFAULT_PREFS,wo
         </div>
       </div>
       <div className="mt-3 text-xs text-stone-400 text-center">Smart mode prioritizes weak, due, and fresh conjugation cards from your current filters.</div>
-    </div>
-  );
-}
-
-function ShadowView({state,setState,words=[],wordLists=[],geminiKey,practicePrefs}){
-  const[selectedId,setSelectedId]=useState(SHADOW_SCENARIOS[0]?.id||'');
-  const[lineIdx,setLineIdx]=useState(0);
-  const[rate,setRate]=useState(0.85);
-  const[loopMode,setLoopMode]=useState('off');
-  const[showEnglish,setShowEnglish]=useState(true);
-  const[customScenario,setCustomScenario]=useState(null);
-  const[topic,setTopic]=useState('');
-  const[aiErr,setAiErr]=useState('');
-  const[loading,setLoading]=useState(false);
-  const[recording,setRecording]=useState(false);
-  const[recordedUrl,setRecordedUrl]=useState('');
-  const[transcript,setTranscript]=useState('');
-  const[recordErr,setRecordErr]=useState('');
-  const[aiFeedback,setAiFeedback]=useState('');
-  const[feedbackLoading,setFeedbackLoading]=useState(false);
-  const recorderRef=useRef(null);
-  const streamRef=useRef(null);
-  const chunksRef=useRef([]);
-  const recognitionRef=useRef(null);
-  const loopTimerRef=useRef(null);
-  const scenario=customScenario||SHADOW_SCENARIOS.find(s=>s.id===selectedId)||SHADOW_SCENARIOS[0];
-  const line=scenario.lines[Math.min(lineIdx,scenario.lines.length-1)];
-  const shadow=state.shadow||defaultState().shadow;
-  const avg=shadow.attempted?Math.round((shadow.totalRating/shadow.attempted)*10)/10:0;
-  const canTranscribeSpeech=Boolean(window.SpeechRecognition||window.webkitSpeechRecognition);
-  const transcriptScore=speechSimilarity(line?.ja,transcript);
-  useEffect(()=>setLineIdx(0),[selectedId,customScenario]);
-  useEffect(()=>{
-    stopRecordingSession(false,false);
-    setRecording(false);setTranscript('');setRecordErr('');setAiFeedback('');
-    setRecordedUrl(url=>{if(url)URL.revokeObjectURL(url);return '';});
-  },[lineIdx,selectedId,customScenario]);
-  useEffect(()=>()=>{if(recordedUrl)URL.revokeObjectURL(recordedUrl);},[recordedUrl]);
-  useEffect(()=>()=>{stopRecordingSession(false,false);clearLoopTimer();},[]);
-  useEffect(()=>{
-    clearLoopTimer();
-    if(loopMode==='off'||!line)return undefined;
-    let cancelled=false;
-    const playLoop=()=>{
-      if(cancelled)return;
-      playCurrent(()=>{
-        if(cancelled)return;
-        loopTimerRef.current=setTimeout(()=>{
-          loopTimerRef.current=null;
-          if(cancelled)return;
-          if(loopMode==='playlist')setLineIdx(i=>(i+1)%scenario.lines.length);
-          else playLoop();
-        },900);
-      });
-    };
-    playLoop();
-    return()=>{cancelled=true;clearLoopTimer();};
-  },[loopMode,lineIdx,scenario.id,rate,practicePrefs.voiceURI]);
-  function clearLoopTimer(){if(loopTimerRef.current){clearTimeout(loopTimerRef.current);loopTimerRef.current=null;}}
-  function playCurrent(onEnd=null){if(line)speakJapanese(line.ja,rate,practicePrefs.voiceURI,onEnd);}
-  function nextLine(){clearLoopTimer();setLineIdx(i=>(i+1)%scenario.lines.length);}
-  function rateLine(rating){
-    const key=scenario.id;
-    const prev=shadow.byScenario?.[key]||{attempted:0,totalRating:0,totalSpeechScore:0,speechAttempts:0};
-    const hasScore=transcriptScore!==null;
-    setState({...state,shadow:{attempted:(shadow.attempted||0)+1,totalRating:(shadow.totalRating||0)+rating,byScenario:{...(shadow.byScenario||{}),[key]:{attempted:prev.attempted+1,totalRating:prev.totalRating+rating,totalSpeechScore:(prev.totalSpeechScore||0)+(hasScore?transcriptScore:0),speechAttempts:(prev.speechAttempts||0)+(hasScore?1:0),lastSpeechScore:hasScore?transcriptScore:prev.lastSpeechScore,lastTranscript:transcript||prev.lastTranscript,lastRating:rating,lastAt:Date.now()}}},daily:bumpDaily(state.daily,true,practicePrefs.dailyGoal||10)});
-    if(loopMode!=='line')nextLine();
-  }
-  async function startRecording(){
-    setRecordErr('');setTranscript('');setAiFeedback('');
-    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){setRecordErr('Recording is not supported in this browser.');return;}
-    try{
-      setRecordedUrl(url=>{if(url)URL.revokeObjectURL(url);return '';});
-      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-      streamRef.current=stream;
-      chunksRef.current=[];
-      const rec=new MediaRecorder(stream);
-      recorderRef.current=rec;
-      rec.ondataavailable=e=>{if(e.data.size)chunksRef.current.push(e.data);};
-      rec.onstop=()=>{if(chunksRef.current.length){const blob=new Blob(chunksRef.current,{type:'audio/webm'});setRecordedUrl(URL.createObjectURL(blob));}stream.getTracks().forEach(t=>t.stop());if(streamRef.current===stream)streamRef.current=null;recorderRef.current=null;};
-      const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-      if(SpeechRecognition){
-        const sr=new SpeechRecognition();
-        sr.lang='ja-JP';sr.interimResults=false;sr.maxAlternatives=1;
-        sr.onresult=e=>setTranscript(e.results?.[0]?.[0]?.transcript||'');
-        sr.onerror=e=>{if(e.error!=='no-speech')setRecordErr('Speech recognition could not produce a transcript. You can still replay your recording.');};
-        recognitionRef.current=sr;
-        try{sr.start();}catch{}
-      }
-      rec.start();setRecording(true);
-    }catch(e){
-      streamRef.current?.getTracks().forEach(t=>t.stop());
-      streamRef.current=null;recorderRef.current=null;setRecording(false);
-      setRecordErr(e.message||'Could not start recording.');
-    }
-  }
-  function stopRecordingSession(markStopped=true,saveClip=true){
-    try{recognitionRef.current?.stop();}catch{}
-    recognitionRef.current=null;
-    const rec=recorderRef.current;
-    const stream=streamRef.current;
-    if(rec&&rec.state!=='inactive'){
-      if(!saveClip)rec.onstop=()=>{stream?.getTracks().forEach(t=>t.stop());};
-      rec.stop();
-    }else{
-      stream?.getTracks().forEach(t=>t.stop());
-    }
-    if(!saveClip){recorderRef.current=null;streamRef.current=null;}
-    if(markStopped)setRecording(false);
-  }
-  function stopRecording(){
-    stopRecordingSession(true,true);
-  }
-  async function getPronunciationFeedback(){
-    if(!geminiKey||!transcript.trim())return;
-    setFeedbackLoading(true);setAiFeedback('');setRecordErr('');
-    try{
-      const prompt=`Give concise Japanese speaking feedback for a shadowing line.\nTarget: ${line.ja}\nEnglish: ${line.en}\nSpeech-recognition transcript: ${transcript}\nSimilarity score: ${transcriptScore ?? 'n/a'}\n\nFocus on likely missing words, rhythm, and one concrete retry tip.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,700,0.35,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
-      setAiFeedback(reply);
-    }catch(e){setRecordErr(e.message);}
-    setFeedbackLoading(false);
-  }
-  async function generateScenario(){
-    if(!geminiKey)return;
-    setLoading(true);setAiErr('');
-    try{
-      const prompt=`Create a short Japanese shadowing dialogue for conjugation practice. Topic: ${topic||'daily life'}. Use 3 to 5 lines. Include useful verb/adjective conjugations naturally. Return ONLY JSON: {"title":"...","level":"N5/N4/N3","focus":"conjugation focus","lines":[{"speaker":"A","ja":"Japanese sentence","en":"English translation"}]}`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1200,0.5,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
-      const data=extractJSON(reply);
-      if(!data||!Array.isArray(data.lines)||!data.lines.length)throw new Error('AI did not return a valid dialogue');
-      setCustomScenario({id:'ai-'+Date.now(),title:data.title||'AI Dialogue',level:data.level||'Custom',focus:data.focus||'conversation',lines:data.lines.slice(0,6).map((l,i)=>({speaker:l.speaker||String.fromCharCode(65+i%2),ja:l.ja||'',en:l.en||''})).filter(l=>l.ja)});
-    }catch(e){setAiErr(e.message);}
-    setLoading(false);
-  }
-  if(!scenario)return null;
-  return(
-    <div className="grid lg:grid-cols-[280px_1fr] gap-4">
-      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-        <div className="p-4 border-b border-stone-100"><h3 className="font-medium">Shadowing</h3><p className="text-xs text-stone-500">{shadow.attempted||0} lines rated · avg {avg||'-'}</p></div>
-        <div className="divide-y divide-stone-50">{SHADOW_SCENARIOS.map(s=><button key={s.id} onClick={()=>{setCustomScenario(null);setSelectedId(s.id);}} className={`w-full text-left px-4 py-3 transition ${!customScenario&&selectedId===s.id?'bg-indigo-50':'hover:bg-stone-50'}`}><div className="font-medium text-stone-800">{s.title}</div><div className="text-xs text-stone-400">{s.level} · {s.focus}</div></button>)}</div>
-        {customScenario&&<div className="p-3 bg-amber-50 border-t border-amber-100"><div className="text-xs uppercase tracking-wider text-amber-700 font-medium">AI dialogue</div><div className="font-medium text-sm text-stone-800 mt-1">{customScenario.title}</div></div>}
-      </div>
-      <div className="space-y-4">
-        <AmbientReviewPanel state={state} setState={setState} words={words} practicePrefs={practicePrefs} wordLists={wordLists}/>
-        <div className="bg-white rounded-2xl border border-stone-200 p-5">
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">{scenario.level} · {scenario.focus}</div><h3 className="text-2xl font-semibold mt-1">{scenario.title}</h3></div>
-            <button onClick={playCurrent} className="p-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-600" title="Play line"><IconVolume className="w-5 h-5"/></button>
-          </div>
-          <div className="rounded-2xl bg-stone-50 border border-stone-200 p-5 min-h-48 flex flex-col justify-center">
-            <div className="text-xs text-stone-400 mb-3">Line {lineIdx+1}/{scenario.lines.length} · Speaker {line.speaker}</div>
-            <div className="text-3xl sm:text-4xl leading-relaxed font-medium" lang="ja">{line.ja}</div>
-            {showEnglish&&<div className="text-sm text-stone-500 mt-4">{line.en}</div>}
-          </div>
-          <div className="grid sm:grid-cols-[1fr_auto] gap-3 mt-4 items-center">
-            <div>
-              <label className="text-xs text-stone-500 block mb-1">Playback speed · {rate.toFixed(2)}x</label>
-              <input type="range" min="0.55" max="1.2" step="0.05" value={rate} onChange={e=>setRate(Number(e.target.value))} className="w-full"/>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <div className="grid grid-cols-3 gap-1 p-1 bg-stone-100 rounded-lg">
-                {[{id:'off',label:'Once'},{id:'line',label:'Line'},{id:'playlist',label:'Auto'}].map(o=><button key={o.id} onClick={()=>setLoopMode(o.id)} className={`px-2 py-1.5 rounded-md text-xs font-medium transition ${loopMode===o.id?'bg-white text-indigo-700 shadow-sm':'text-stone-500 hover:text-stone-800'}`}>{o.label}</button>)}
-              </div>
-              <button onClick={()=>setShowEnglish(!showEnglish)} className="px-3 py-2 rounded-lg text-sm border border-stone-200 hover:bg-stone-50">{showEnglish?'Hide EN':'Show EN'}</button>
-              <button onClick={nextLine} className="px-3 py-2 rounded-lg text-sm border border-stone-200 hover:bg-stone-50">Next</button>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 mt-4">
-            {[1,2,3].map(r=><button key={r} onClick={()=>rateLine(r)} className="py-2 rounded-xl border border-stone-200 hover:border-indigo-300 hover:bg-indigo-50 text-sm">{r===1?'Hard':r===2?'Okay':'Clear'}</button>)}
-          </div>
-          <div className="mt-4 pt-4 border-t border-stone-100">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <div><div className="text-sm font-medium flex items-center gap-1.5"><IconMic className="w-4 h-4 text-indigo-600"/>Record and compare</div><div className="text-xs text-stone-400">Audio stays local; transcript-based AI feedback is optional.</div></div>
-              <button onClick={recording?stopRecording:startRecording} className={`px-3 py-2 rounded-lg text-sm font-medium ${recording?'bg-rose-600 hover:bg-rose-700 text-white':'bg-stone-800 hover:bg-stone-900 text-white'}`}>{recording?'Stop':'Record'}</button>
-            </div>
-            <div className="grid sm:grid-cols-[1fr_auto] gap-2 items-center">
-              {recordedUrl?<audio src={recordedUrl} controls className="w-full"/>:<div className="text-xs text-stone-400 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">Record yourself shadowing this line, then replay it here.</div>}
-              <button onClick={getPronunciationFeedback} disabled={!geminiKey||!transcript.trim()||feedbackLoading} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm flex items-center justify-center gap-1.5"><IconSpark className="w-4 h-4"/>{feedbackLoading?'Checking…':'AI tip'}</button>
-            </div>
-            {!canTranscribeSpeech&&recordedUrl&&<div className="mt-2 text-xs text-stone-500">Transcript scoring needs a browser with Japanese speech recognition support.</div>}
-            {transcript&&<div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2"><div className="flex items-center justify-between gap-2"><span className="text-xs text-stone-500">Transcript</span>{transcriptScore!==null&&<span className={`text-xs font-semibold ${transcriptScore>=80?'text-emerald-600':transcriptScore>=55?'text-amber-600':'text-rose-600'}`}>{transcriptScore}% match</span>}</div><div className="mt-1 text-sm" lang="ja">{transcript}</div></div>}
-            {recordErr&&<div className="mt-2 text-sm text-rose-600">{recordErr}</div>}
-            {aiFeedback&&<div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-700 bg-white border border-stone-200 rounded-xl p-3">{aiFeedback}</div>}
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl border border-stone-200 p-5">
-          <h3 className="font-medium mb-1 flex items-center gap-2"><IconSpark className="w-4 h-4 text-indigo-600"/>AI dialogue generator</h3>
-          <p className="text-xs text-stone-500 mb-3">Generate short scenarios around conjugations you want to hear in context.</p>
-          <div className="flex gap-2"><input value={topic} onChange={e=>setTopic(e.target.value)} placeholder="restaurant, apology, making plans…" className="min-w-0 flex-1 px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/><button onClick={generateScenario} disabled={!geminiKey||loading} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm">{loading?'…':'Generate'}</button></div>
-          {!geminiKey&&<div className="mt-2 text-xs text-stone-400">Add a Gemini key in Settings.</div>}
-          {aiErr&&<div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LessonsView({geminiKey,practicePrefs=DEFAULT_PREFS}){
-  const[selectedId,setSelectedId]=useState(GRAMMAR_LESSONS[0]?.id||'');
-  const[aiText,setAiText]=useState('');
-  const[loading,setLoading]=useState(false);
-  const[err,setErr]=useState('');
-  const[ruleQuery,setRuleQuery]=useState('');
-  const[ruleAiText,setRuleAiText]=useState('');
-  const[ruleAiTitle,setRuleAiTitle]=useState('');
-  const[ruleAiLoading,setRuleAiLoading]=useState('');
-  const[ruleAiErr,setRuleAiErr]=useState('');
-  const lesson=GRAMMAR_LESSONS.find(l=>l.id===selectedId)||GRAMMAR_LESSONS[0];
-  const ruleRows=useMemo(()=>{
-    const q=ruleQuery.trim().toLowerCase();
-    const h=compactLookupText(toHiragana(ruleQuery));
-    return ALL_CARD_TYPES.map(type=>{
-      const previews=typePreviewValues(type.id).slice(0,2);
-      const primary=previews[0];
-      const explanation=primary?explainItem(primary.item,type.id):{rule:type.hint,derivation:'',note:''};
-      return{type,previews,rule:explanation.rule||type.hint||'',note:explanation.note||''};
-    }).filter(row=>{
-      if(!q)return true;
-      const hay=[row.type.id,row.type.label,row.type.sub,row.type.hint,row.rule,row.note].join(' ').toLowerCase();
-      const kanaHay=compactLookupText(`${row.type.sub||''} ${row.rule||''} ${row.note||''}`);
-      return hay.includes(q)||kanaHay.includes(h)||kanaToRomaji(row.type.sub||'').toLowerCase().includes(q);
-    });
-  },[ruleQuery]);
-  async function expandLesson(){
-    if(!lesson||!geminiKey)return;
-    setLoading(true);setErr('');setAiText('');
-    try{
-      const prompt=`Expand this Japanese conjugation lesson for a self-study app. Lesson: ${lesson.title}. Core explanation: ${lesson.body}. Forms: ${lesson.forms.join(', ')}. Give a concise explanation, 3 fresh examples, 2 common mistakes, and a mini quiz with answers.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1400,0.35,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
-      setAiText(reply);
-    }catch(e){setErr(e.message);}
-    setLoading(false);
-  }
-  async function expandRule(row){
-    if(!row||!geminiKey)return;
-    setRuleAiLoading(row.type.id);setRuleAiErr('');setRuleAiText('');setRuleAiTitle(row.type.label);
-    try{
-      const examples=row.previews.map(p=>`${p.item.dict} (${p.item.reading}) -> ${p.answer}`).join('; ')||'No local examples available';
-      const prompt=`Create a compact Japanese conjugation micro-drill for this form.\n\nForm: ${row.type.label}\nJapanese label: ${row.type.sub||'(none)'}\nHint: ${row.type.hint||''}\nRule: ${row.rule||''}\nLocal examples: ${examples}\n\nGive: 1 plain-English rule, 2 fresh examples, 1 contrast with a commonly confused form, and a 3-question mini quiz with answers. Keep it concise and learner-facing.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1100,0.3,aiSystemFromPrefs(practicePrefs,'You are a careful Japanese conjugation teacher. Give accurate compact rule drills and do not invent impossible forms.'));
-      setRuleAiText(reply);
-    }catch(e){setRuleAiErr(e.message||'AI rule drill failed.');}
-    setRuleAiLoading('');
-  }
-  return(
-    <div className="grid lg:grid-cols-[280px_1fr] gap-4">
-      <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-        <div className="p-4 border-b border-stone-100"><h3 className="font-medium">Lesson path</h3><p className="text-xs text-stone-500">Short grammar notes tied to drill forms.</p></div>
-        <div className="divide-y divide-stone-50">{GRAMMAR_LESSONS.map(l=>(<button key={l.id} onClick={()=>{setSelectedId(l.id);setAiText('');setErr('');}} className={`w-full text-left px-4 py-3 transition ${lesson?.id===l.id?'bg-indigo-50':'hover:bg-stone-50'}`}><div className="font-medium text-stone-800">{l.title}</div><div className="text-xs text-stone-400">{l.forms.map(f=>getTypeInfo(f).label).join(', ')}</div></button>))}</div>
-      </div>
-      {lesson&&<div className="space-y-4">
-        <div className="bg-white rounded-2xl border border-stone-200 p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Grammar lesson</div><h3 className="text-2xl font-semibold mt-1">{lesson.title}</h3></div>
-            <button onClick={expandLesson} disabled={!geminiKey||loading} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm flex items-center gap-1.5"><IconSpark className="w-4 h-4"/>{loading?'Expanding…':'AI expand'}</button>
-          </div>
-          <p className="text-sm text-stone-700 leading-relaxed mt-4">{lesson.body}</p>
-          <div className="flex flex-wrap gap-2 mt-4">{lesson.forms.map(f=><span key={f} className="text-xs px-2 py-1 rounded-lg bg-stone-100 text-stone-600">{getTypeInfo(f).label}</span>)}</div>
-        </div>
-        <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-          <table className="w-full text-sm"><thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider"><tr><th className="px-4 py-2 text-left font-medium">Base</th><th className="px-4 py-2 text-left font-medium">Form</th><th className="px-4 py-2 text-left font-medium">Example</th></tr></thead><tbody>{lesson.examples.map((ex,i)=><tr key={i} className="border-t border-stone-100"><td className="px-4 py-2" lang="ja">{ex[0]}</td><td className="px-4 py-2 text-lg" lang="ja">{ex[1]}</td><td className="px-4 py-2" lang="ja">{ex[2]}</td></tr>)}</tbody></table>
-        </div>
-        <div className="bg-white rounded-2xl border border-stone-200 p-5">
-          <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-start mb-4">
-            <div><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Rule lookup</div><h3 className="text-xl font-semibold mt-1">All conjugation rules</h3><p className="text-xs text-stone-500 mt-1">Search every verb and adjective form by name, ending, or rule text.</p></div>
-            <div className="text-xs text-stone-400 tabular-nums text-right">{ruleRows.length}/{ALL_CARD_TYPES.length} forms</div>
-          </div>
-          <input value={ruleQuery} onChange={e=>{setRuleQuery(e.target.value);setRuleAiErr('');}} placeholder="Search passive, て, たい, なさい..." className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none" autoCorrect="off" spellCheck="false"/>
-          <div className="mt-3 divide-y divide-stone-100">
-            {ruleRows.slice(0,36).map(row=><div key={row.type.id} className="py-3 grid md:grid-cols-[minmax(0,1fr)_minmax(14rem,1.15fr)_auto] gap-3 items-start">
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-stone-800">{row.type.label}</div>
-                <div className="text-xs text-stone-500">{row.type.sub&&(row.type.sub+' · ')}{row.type.hint}</div>
-                {row.note&&<div className="text-[11px] text-stone-400 mt-1">{row.note}</div>}
-              </div>
-              <div className="min-w-0">
-                <div className="text-sm text-stone-700 leading-relaxed">{row.rule||'Use the table examples to inspect this form.'}</div>
-                {!!row.previews.length&&<div className="mt-2 grid sm:grid-cols-2 gap-2">
-                  {row.previews.map(p=>{const view=formDisplay(p.answer,practicePrefs,p.item,row.type.id);return <div key={`${row.type.id}-${p.item.dict}`} className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-1.5 min-w-0"><div className="text-[11px] text-stone-400 truncate" lang="ja">{p.item.dict}</div><ScriptDisplay view={view} word={p.item} type={row.type.id} className="text-sm font-medium truncate" subClassName="text-[11px] text-stone-400 truncate"/></div>;})}
-                </div>}
-              </div>
-              <button onClick={()=>expandRule(row)} disabled={!geminiKey||!!ruleAiLoading} className="px-3 py-2 rounded-lg text-sm border border-indigo-200 hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 inline-flex items-center justify-center gap-1.5"><IconSpark className="w-4 h-4"/>{ruleAiLoading===row.type.id?'Drilling...':'AI drill'}</button>
-            </div>)}
-          </div>
-          {ruleRows.length>36&&<div className="mt-3 text-xs text-stone-400 text-center">Showing first 36 matches. Narrow the search to find a specific form.</div>}
-          {!ruleRows.length&&<div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500 text-center">No rules match that search.</div>}
-          {ruleAiErr&&<div className="mt-3 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{ruleAiErr}</div>}
-          {ruleAiText&&<div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm leading-relaxed whitespace-pre-wrap text-stone-700"><div className="text-xs uppercase tracking-wider text-indigo-600 font-medium mb-2">{ruleAiTitle} micro drill</div>{ruleAiText}</div>}
-          {!geminiKey&&<div className="mt-3 text-xs text-stone-400 text-center">Add a Gemini key in Settings to generate mini drills for individual rules.</div>}
-        </div>
-        {!geminiKey&&<div className="text-xs text-center text-stone-400">Add a Gemini key in Settings for expanded lessons and mini quizzes.</div>}
-        {err&&<div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{err}</div>}
-        {aiText&&<div className="bg-white rounded-2xl border border-stone-200 p-5 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{aiText}</div>}
-      </div>}
     </div>
   );
 }
@@ -5039,7 +4464,7 @@ function referenceWithHistory(reference,word){
   const fresh={...referenceWordSnapshot(word),count:(prior?.count||0)+1};
   return{...ref,history:[fresh,...ref.history.filter(w=>wordKey(w)!==key)].slice(0,24)};
 }
-function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordLists,geminiKey,practicePrefs=DEFAULT_PREFS,setPracticePrefs,setTab}){
+function ReferenceViewSub({state,setState,verbs,adjectives,wordLists=[],setWordLists,geminiKey,practicePrefs=DEFAULT_PREFS,setPracticePrefs,setTab}){
   const[query,setQuery]=useState('');
   const[selected,setSelected]=useState(null);
   const[expandedRow,setExpandedRow]=useState(null);
@@ -5484,286 +4909,6 @@ function ReferenceView({state,setState,verbs,adjectives,wordLists=[],setWordList
   );
 }
 
-function ScannerView({state,setState,words,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,wordLists,setWordLists,practicePrefs,setPracticePrefs,geminiKey}){
-  const[text,setText]=useState('');
-  const[msg,setMsg]=useState('');
-  const[aiRows,setAiRows]=useState([]);
-  const[aiLoading,setAiLoading]=useState(false);
-  const[aiErr,setAiErr]=useState('');
-  const[fileLoading,setFileLoading]=useState(false);
-  const[fileErr,setFileErr]=useState('');
-  const[imagePreview,setImagePreview]=useState('');
-  const[readerMatchId,setReaderMatchId]=useState('');
-  const[readerAiText,setReaderAiText]=useState('');
-  const[readerAiErr,setReaderAiErr]=useState('');
-  const[readerAiLoading,setReaderAiLoading]=useState(false);
-  const readerStats=state.reader||defaultState().reader;
-  const matches=useMemo(()=>findTextScannerMatches(text,words),[text,words]);
-  const uniqueWords=useMemo(()=>uniqueScannerWords(matches),[matches]);
-  const readerSegments=useMemo(()=>buildScannerReaderSegments(text,matches),[text,matches]);
-  const iPlusOne=useMemo(()=>buildIPlusOneSentences(text,matches,readerStats),[text,matches,readerStats]);
-  const newWordCount=uniqueWords.filter(w=>readerSeenCount(readerStats,wordKey(w))<1).length;
-  const seenWordCount=uniqueWords.length-newWordCount;
-  const selectedReaderMatch=readerMatchId?matches.find(m=>scannerMatchId(m)===readerMatchId):null;
-  const readerDetail=selectedReaderMatch||readerSegments.find(s=>s.kind==='match')?.match||null;
-  const readerContext=readerDetail?scannerSentenceContext(text,readerDetail.index,readerDetail.surface.length):'';
-  const visibleMatches=matches.slice(0,80);
-  const formCount=matches.filter(m=>m.kind==='form').length;
-  const selectedIds=practicePrefs.wordListIds||[];
-  useEffect(()=>{if(readerMatchId&&!matches.some(m=>scannerMatchId(m)===readerMatchId))setReaderMatchId('');},[readerMatchId,matches]);
-  useEffect(()=>{setReaderAiText('');setReaderAiErr('');},[readerMatchId,text]);
-  async function importSourceFile(event){
-    const file=event.target.files?.[0];
-    if(event.target)event.target.value='';
-    if(!file)return;
-    setFileErr('');setMsg('');
-    if(isScannerTextFile(file)){
-      try{
-        const content=(await readScannerFileAsText(file)).trim();
-        if(!content){setFileErr('No text found in that file.');return;}
-        setText(prev=>prev.trim()?`${prev.trim()}\n\n${content}`:content);
-        setAiRows([]);setAiErr('');
-        setImagePreview('');
-        setMsg(`Imported ${file.name}.`);
-      }catch(e){setFileErr(e.message||'Could not read that file.');}
-      return;
-    }
-    if(isScannerPdfFile(file)){
-      if(!geminiKey){setFileErr('Add a Gemini API key in Settings to scan PDFs.');return;}
-      setFileLoading(true);setAiRows([]);setAiErr('');setImagePreview('');
-      try{
-        const dataUrl=await readScannerFileAsDataURL(file);
-        const prompt=`Read this Japanese PDF for a conjugation practice app.\n\nExtract the Japanese text in natural reading order and identify useful verbs/adjectives, including words that appear in conjugated forms.\n\nReturn ONLY JSON with this shape:\n{"text":"Japanese text excerpt or full text in reading order","words":[{"dict":"dictionary form in Japanese","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective","evidence":"surface form seen in the PDF"}]}\n\nIf the PDF is long, prioritize the first Japanese-heavy pages and preserve complete sentences where possible.`;
-        const reply=await callGemini([{role:'user',parts:[scannerInlineDataFromDataURL(dataUrl,file),{text:prompt}]}],geminiKey,2600,0.1,'You are a careful Japanese document reader and grammar extraction assistant. Return only valid JSON.');
-        const data=extractJSON(reply);
-        const pdfText=String(data?.text||data?.ocrText||data?.japanese||'').trim();
-        const rows=parseScannerAIWords(data||reply);
-        if(pdfText)setText(prev=>prev.trim()?`${prev.trim()}\n\n${pdfText}`:pdfText);
-        if(rows.length)setAiRows(rows);
-        if(!pdfText&&!rows.length)setFileErr('No Japanese text found in that PDF.');
-        else setMsg(`Scanned ${file.name}${rows.length?` and found ${rows.length} AI candidate${rows.length===1?'':'s'}.`:'.'}`);
-      }catch(e){setFileErr(e.message||'PDF scan failed.');}
-      finally{setFileLoading(false);}
-      return;
-    }
-    if(!isScannerImageFile(file)){setFileErr('Choose an image, PDF, or text file.');return;}
-    if(!geminiKey){setFileErr('Add a Gemini API key in Settings to scan images.');return;}
-    setFileLoading(true);setAiRows([]);setAiErr('');
-    try{
-      const dataUrl=await readScannerFileAsDataURL(file);
-      setImagePreview(dataUrl);
-      const prompt=`Read the Japanese text in this image and extract verbs/adjectives for conjugation practice.\n\nReturn ONLY JSON with this shape:\n{"text":"full Japanese text in natural reading order","words":[{"dict":"dictionary form in Japanese","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective","evidence":"surface form seen in the image"}]}\n\nInclude useful conjugation-practice words even when the image shows conjugated forms.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt},scannerInlineDataFromDataURL(dataUrl,file)]}],geminiKey,2200,0.1,'You are a careful Japanese OCR and grammar extraction assistant. Return only valid JSON.');
-      const data=extractJSON(reply);
-      const ocrText=String(data?.text||data?.ocrText||data?.japanese||'').trim();
-      const rows=parseScannerAIWords(data||reply);
-      if(ocrText)setText(prev=>prev.trim()?`${prev.trim()}\n\n${ocrText}`:ocrText);
-      if(rows.length)setAiRows(rows);
-      if(!ocrText&&!rows.length)setFileErr('No Japanese text found in that image.');
-      else setMsg(`Scanned ${file.name}${rows.length?` and found ${rows.length} AI candidate${rows.length===1?'':'s'}.`:'.'}`);
-    }catch(e){setFileErr(e.message||'Image scan failed.');}
-    finally{setFileLoading(false);}
-  }
-  function clearScanner(){
-    setText('');setMsg('');setAiRows([]);setAiErr('');setFileErr('');setImagePreview('');setReaderMatchId('');setReaderAiText('');setReaderAiErr('');
-  }
-  function createListFromKeys(keys,name){
-    const clean=[...new Set(keys)].filter(Boolean);
-    if(!clean.length){setMsg('No matched words yet.');return null;}
-    const id='scan-'+Date.now().toString(36);
-    const list={id,name,wordKeys:clean};
-    setWordLists([...wordLists,list]);
-    setPracticePrefs({...practicePrefs,wordListIds:[...selectedIds.filter(x=>x!==id),id]});
-    setMsg(`Created ${name} with ${clean.length} word${clean.length===1?'':'s'} and enabled it for drills.`);
-    return list;
-  }
-  function createKnownList(){
-    const stamp=new Date().toLocaleDateString([],{month:'short',day:'numeric'});
-    createListFromKeys(uniqueWords.map(wordKey),`Scan ${stamp}`);
-  }
-  function trackReaderSession(){
-    if(!matches.length)return;
-    const nextReader=recordReaderSession(readerStats,text,matches);
-    setState({...state,reader:nextReader});
-    setMsg(`Tracked ${uniqueWords.length} unique word${uniqueWords.length===1?'':'s'} from this passage.`);
-  }
-  async function extractWithAI(){
-    if(!text.trim()||!geminiKey)return;
-    setAiLoading(true);setAiErr('');setAiRows([]);setMsg('');
-    try{
-      const known=uniqueWords.slice(0,60).map(w=>`${w.dict} (${w.reading}) - ${w.meaning} [${w.group}]`).join('\n')||'None';
-      const prompt=`Extract Japanese verbs and adjectives from this passage for a conjugation practice app.\n\nKnown words already detected by the app:\n${known}\n\nPassage:\n${text.slice(0,6000)}\n\nReturn ONLY JSON with this shape:\n{"words":[{"dict":"dictionary form in Japanese","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective","evidence":"surface form seen in the passage"}]}\n\nInclude useful conjugation-practice words even when they appear in conjugated form. Prefer base dictionary forms.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1800,0.1,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
-      const rows=parseScannerAIWords(reply);
-      setAiRows(rows);
-      if(!rows.length)setAiErr('AI did not return any valid verb or adjective rows.');
-    }catch(e){setAiErr(e.message||'AI extraction failed.');}
-    setAiLoading(false);
-  }
-  async function explainReaderContext(){
-    if(!readerDetail||!geminiKey)return;
-    setReaderAiLoading(true);setReaderAiErr('');setReaderAiText('');
-    try{
-      const prompt=`Explain this Japanese word in context for a conjugation learner.\n\nSentence/context: ${readerContext}\nSurface form: ${readerDetail.surface}\nReading: ${readerDetail.reading||readerDetail.word.reading}\nDictionary form: ${readerDetail.word.dict} (${readerDetail.word.reading})\nMeaning in my list: ${readerDetail.word.meaning}\nDetected form: ${readerDetail.label}\nGroup: ${GROUP_NAMES[readerDetail.word.group]||readerDetail.word.group}\n\nGive a concise answer with: the best contextual meaning, why this conjugation/form is used, one natural English translation of the sentence, and one tiny follow-up drill.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,900,0.25,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
-      setReaderAiText(reply);
-    }catch(e){setReaderAiErr(e.message||'AI context lookup failed.');}
-    setReaderAiLoading(false);
-  }
-  function addAIWords(){
-    if(!aiRows.length)return;
-    let verbs=customVerbs,adjs=customAdjectives,added=0;
-    const knownKeys=new Set(words.map(wordKey));
-    const keys=new Set(uniqueWords.map(wordKey));
-    for(const row of aiRows){
-      const key=wordKey(row);
-      if(!knownKeys.has(key)){
-        if(isAdjective(row))adjs=addUniqueWord(adjs,row);else verbs=addUniqueWord(verbs,row);
-        knownKeys.add(key);added++;
-      }
-      keys.add(key);
-    }
-    setCustomVerbs(verbs);setCustomAdjectives(adjs);
-    const stamp=new Date().toLocaleDateString([],{month:'short',day:'numeric'});
-    const id='scan-ai-'+Date.now().toString(36);
-    const wordKeys=[...keys];
-    const list={id,name:`AI scan ${stamp}`,wordKeys};
-    setWordLists([...wordLists,list]);
-    setPracticePrefs({...practicePrefs,wordListIds:[...selectedIds.filter(x=>x!==id),id]});
-    setMsg(`Added ${added} new word${added===1?'':'s'} and created ${list.name} with ${wordKeys.length} drill item${wordKeys.length===1?'':'s'}.`);
-  }
-  return(
-    <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-stone-200 p-5">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">Text scanner</div>
-            <h3 className="text-xl font-semibold mt-1">Mine conjugations from real Japanese</h3>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={trackReaderSession} disabled={!uniqueWords.length} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 disabled:opacity-40 rounded-lg text-sm">Track</button>
-            <button onClick={createKnownList} disabled={!uniqueWords.length} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm flex items-center gap-1.5"><IconList className="w-4 h-4"/>Create list</button>
-          </div>
-        </div>
-        <textarea value={text} onChange={e=>{setText(e.target.value);setMsg('');}} placeholder="昨日、静かなカフェで本を読んで、ケーキを食べました。" className="w-full min-h-40 px-3 py-2 border border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none" lang="ja" autoCorrect="off" spellCheck="false"/>
-        <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2 mt-3 items-end">
-          <label className="block">
-            <span className="text-xs text-stone-500 block mb-1">Photo/PDF/text source</span>
-            <input type="file" accept="image/*,application/pdf,.pdf,.txt,.md,.csv,.tsv,.srt,.vtt,.html,.htm" capture="environment" onChange={importSourceFile} disabled={fileLoading} className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-stone-100 file:text-stone-700"/>
-          </label>
-          <button onClick={clearScanner} disabled={!text&&!imagePreview&&!aiRows.length} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 disabled:opacity-40 rounded-lg text-sm">Clear</button>
-        </div>
-        {fileLoading&&<div className="mt-2 text-sm text-indigo-600">Reading source...</div>}
-        {fileErr&&<div className="mt-2 text-sm text-rose-600">{fileErr}</div>}
-        {imagePreview&&<div className="mt-3 overflow-hidden rounded-xl border border-stone-200 bg-stone-50"><img src={imagePreview} alt="Imported source preview" className="max-h-56 w-full object-contain"/></div>}
-        <div className="grid grid-cols-3 gap-2 mt-3 text-center">
-          <div className="rounded-xl bg-stone-50 border border-stone-200 px-3 py-2"><div className="text-2xl font-semibold tabular-nums">{matches.length}</div><div className="text-xs text-stone-500">matches</div></div>
-          <div className="rounded-xl bg-stone-50 border border-stone-200 px-3 py-2"><div className="text-2xl font-semibold tabular-nums">{uniqueWords.length}</div><div className="text-xs text-stone-500">words</div></div>
-          <div className="rounded-xl bg-stone-50 border border-stone-200 px-3 py-2"><div className="text-2xl font-semibold tabular-nums">{formCount}</div><div className="text-xs text-stone-500">forms</div></div>
-        </div>
-        {uniqueWords.length>0&&<div className="mt-3 grid sm:grid-cols-3 gap-2 text-center">
-          <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2"><div className="text-xl font-semibold tabular-nums">{seenWordCount}</div><div className="text-xs text-emerald-700">seen before</div></div>
-          <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2"><div className="text-xl font-semibold tabular-nums">{newWordCount}</div><div className="text-xs text-amber-700">new to tracker</div></div>
-          <div className="rounded-xl bg-indigo-50 border border-indigo-200 px-3 py-2"><div className="text-xl font-semibold tabular-nums">{iPlusOne.length}</div><div className="text-xs text-indigo-700">i+1 sentences</div></div>
-        </div>}
-        {msg&&<div className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
-      </div>
-      {text.trim()&&<div className="bg-white rounded-2xl border border-stone-200 p-5">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div><h3 className="font-medium">Reader overlay</h3><p className="text-xs text-stone-500">Tap highlighted conjugations for lookup details.</p></div>
-          {readerDetail&&<button onClick={()=>speakJapanese(readerDetail.reading||readerDetail.surface,0.85,practicePrefs.voiceURI)} className="p-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-stone-500" title="Speak"><IconVolume className="w-4 h-4"/></button>}
-        </div>
-        <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-4 text-lg leading-loose whitespace-pre-wrap" lang="ja">
-          {readerSegments.map((seg,i)=>seg.kind==='text'?<span key={`t-${i}`}>{seg.text}</span>:<button key={seg.id||i} onClick={()=>setReaderMatchId(seg.id)} className={`mx-0.5 px-1.5 py-1 rounded-lg align-baseline transition ${scannerMatchId(readerDetail)===seg.id?'bg-indigo-600 text-white':readerSeenCount(readerStats,seg.match.key)>0?'bg-emerald-100 hover:bg-emerald-200 text-stone-900':'bg-amber-100 hover:bg-amber-200 text-stone-900'}`} lang="ja"><ruby>{seg.match.surface}{seg.match.reading&&seg.match.reading!==seg.match.surface&&<rt>{seg.match.reading}</rt>}</ruby></button>)}
-        </div>
-        {readerDetail&&<div className="mt-4 grid md:grid-cols-[1fr_1.25fr] gap-3">
-          <div className="rounded-xl border border-stone-200 p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div><div className="text-2xl font-medium" lang="ja">{readerDetail.surface}</div><div className="text-sm text-stone-500" lang="ja">{readerDetail.reading||readerDetail.word.reading}</div></div>
-              <span className="text-[11px] px-2 py-1 rounded-lg bg-stone-100 text-stone-500">{readerDetail.label}</span>
-            </div>
-            <div className="mt-2 text-sm"><span className="font-medium" lang="ja">{readerDetail.word.dict}</span><span className="text-stone-500"> · {readerDetail.word.meaning}</span></div>
-            <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[readerDetail.word.group]}</div>
-            <div className="mt-2 text-xs font-medium">{readerSeenCount(readerStats,readerDetail.key)>0?`Seen ${readerSeenCount(readerStats,readerDetail.key)} time${readerSeenCount(readerStats,readerDetail.key)===1?'':'s'}`:'New to reader tracker'}</div>
-          </div>
-          <div className="rounded-xl border border-stone-200 p-3">
-            {readerDetail.type?<>
-              <div className="text-sm font-medium">{readerDetail.type.label}</div>
-              <div className="text-xs text-stone-500 mt-1">{explainItem(readerDetail.word,readerDetail.type.id).rule||readerDetail.type.hint}</div>
-              <div className="mt-2 text-xs text-stone-400" lang="ja">{scannerContext(text,readerDetail.index,readerDetail.surface.length)}</div>
-            </>:<>
-              <div className="text-sm font-medium">Dictionary form</div>
-              <div className="text-xs text-stone-500 mt-1">Base word match from the scanned text.</div>
-            </>}
-          </div>
-          <div className="md:col-span-2 rounded-xl border border-stone-200 p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm font-medium"><IconSpark className="w-4 h-4 text-indigo-600"/>Context lookup</div>
-              <button onClick={explainReaderContext} disabled={!geminiKey||readerAiLoading} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm">{readerAiLoading?'Checking...':'AI explain'}</button>
-            </div>
-            {!geminiKey&&<div className="mt-2 text-xs text-stone-400">Add a Gemini API key in Settings for context-aware meanings and grammar notes.</div>}
-            {readerAiErr&&<div className="mt-2 text-sm text-rose-600">{readerAiErr}</div>}
-            {readerAiText&&<div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{readerAiText}</div>}
-          </div>
-        </div>}
-        {iPlusOne.length>0&&<div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3">
-          <div className="text-sm font-medium text-indigo-800">i+1 sentence candidates</div>
-          <div className="mt-2 space-y-2">{iPlusOne.map(s=><button key={`${s.start}-${s.end}`} onClick={()=>setReaderMatchId(scannerMatchId(s.newMatches[0]))} className="w-full text-left rounded-lg bg-white/70 hover:bg-white border border-indigo-100 px-3 py-2">
-            <div className="text-sm" lang="ja">{s.text}</div>
-            <div className="text-xs text-indigo-600 mt-1">New: <span lang="ja">{s.newMatches[0].word.dict}</span> · {s.newMatches[0].word.meaning}</div>
-          </button>)}</div>
-        </div>}
-      </div>}
-      <div className="grid lg:grid-cols-[1fr_300px] gap-4">
-        <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between gap-3">
-            <h3 className="font-medium">Detected words</h3>
-            {matches.length>visibleMatches.length&&<span className="text-xs text-stone-400">showing first {visibleMatches.length}</span>}
-          </div>
-          <div className="max-h-[560px] overflow-y-auto divide-y divide-stone-50">
-            {!text.trim()?<div className="p-6 text-sm text-stone-500">Paste Japanese text to scan for verbs and adjectives.</div>:visibleMatches.length===0?<div className="p-6 text-sm text-stone-500">No known conjugation words found yet.</div>:visibleMatches.map((m,i)=><div key={`${m.key}-${m.surface}-${m.index}-${i}`} className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-baseline gap-2 flex-wrap"><span className="text-xl font-medium" lang="ja">{m.surface}</span><span className="text-sm text-stone-500" lang="ja">{m.word.dict}</span></div>
-                  <div className="text-xs text-stone-500 mt-0.5"><span lang="ja">{m.word.reading}</span> · {m.word.meaning}</div>
-                </div>
-                <span className="shrink-0 text-[11px] px-2 py-1 rounded-lg bg-stone-100 text-stone-500">{m.label}</span>
-              </div>
-              <div className="mt-2 text-xs text-stone-400" lang="ja">{scannerContext(text,m.index,m.surface.length)}</div>
-            </div>)}
-          </div>
-        </div>
-        <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-stone-200 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 font-medium"><IconSpark className="w-4 h-4 text-indigo-600"/>AI extract</div>
-              <button onClick={extractWithAI} disabled={!text.trim()||!geminiKey||aiLoading} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm">{aiLoading?'Scanning...':'Run'}</button>
-            </div>
-            {!geminiKey&&<div className="mt-2 text-xs text-stone-400">Add a Gemini API key in Settings.</div>}
-            {aiErr&&<div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
-            {aiRows.length>0&&<>
-              <div className="mt-3 space-y-2">{aiRows.slice(0,12).map(row=><div key={wordKey(row)} className="border border-stone-200 rounded-xl p-2">
-                <div className="font-medium" lang="ja">{row.dict}</div>
-                <div className="text-xs text-stone-500" lang="ja">{row.reading}</div>
-                <div className="text-xs text-stone-400 truncate">{row.meaning}</div>
-                {row.evidence&&<div className="text-[11px] text-indigo-500 mt-0.5" lang="ja">{row.evidence}</div>}
-              </div>)}</div>
-              <button onClick={addAIWords} className="w-full mt-3 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-xl font-medium text-sm">Add AI words to drills</button>
-            </>}
-          </div>
-          <div className="bg-white rounded-2xl border border-stone-200 p-4">
-            <h3 className="font-medium mb-2">Scan list preview</h3>
-            {uniqueWords.length===0?<div className="text-sm text-stone-500">Matched words will appear here.</div>:<div className="space-y-2 max-h-64 overflow-y-auto">{uniqueWords.map(w=><div key={wordKey(w)} className="flex items-center justify-between gap-2 text-sm">
-              <div className="min-w-0"><div className="font-medium truncate" lang="ja">{w.dict}</div><div className="text-xs text-stone-400 truncate">{w.meaning}</div></div>
-              <span className="text-[11px] text-stone-400">{isAdjective(w)?'adj':'verb'}</span>
-            </div>)}</div>}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function buildProductionSeeds(state,words=[],practicePrefs=DEFAULT_PREFS,wordLists=[],limit=10){
   const filtered=filterWordsForPrefs(words,practicePrefs,wordLists);
   const weakTypes=new Set(weakTypeIdsForState(state,state.enabledTypes||[]));
@@ -5782,140 +4927,6 @@ function buildProductionSeeds(state,words=[],practicePrefs=DEFAULT_PREFS,wordLis
   if(!pool.length)return[];
   const ordered=pool.some(p=>p.priority>0)?pool.sort((a,b)=>b.priority-a.priority||a.type.label.localeCompare(b.type.label)):shuffled(pool);
   return ordered.slice(0,limit);
-}
-function CoachView({state,setState,words=[],wordLists=[],geminiKey,practicePrefs=DEFAULT_PREFS}){
-  const[text,setText]=useState('');
-  const[result,setResult]=useState('');
-  const[loading,setLoading]=useState(false);
-  const[err,setErr]=useState('');
-  const[challenge,setChallenge]=useState(null);
-  const[challengeAnswer,setChallengeAnswer]=useState('');
-  const[challengeFeedback,setChallengeFeedback]=useState(null);
-  const[challengeLoading,setChallengeLoading]=useState(false);
-  const[challengeErr,setChallengeErr]=useState('');
-  const[grading,setGrading]=useState(false);
-  const[listening,setListening]=useState(false);
-  const[speechErr,setSpeechErr]=useState('');
-  const production=state.production||defaultState().production;
-  const productionPct=production.attempted?Math.round((production.correct||0)/(production.attempted||1)*100):0;
-  const canDictate=typeof window!=='undefined'&&Boolean(window.SpeechRecognition||window.webkitSpeechRecognition);
-  const challengeSeeds=useMemo(()=>buildProductionSeeds(state,words,practicePrefs,wordLists,10),[state.cards,state.mistakes,state.enabledTypes,state.verbStats,words,practicePrefs,wordLists]);
-  async function run(){
-    if(!text.trim()||!geminiKey)return;
-    setLoading(true);setErr('');setResult('');
-    try{
-      const prompt=`Analyze this Japanese sentence or conjugation attempt:\n\n${text}\n\nIdentify verb/adjective conjugations, correct any mistakes, explain the most important rule, and give one short follow-up drill.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1200,0.3,aiSystemFromPrefs(practicePrefs,AI_COACH_SYSTEM));
-      setResult(reply);
-    }catch(e){setErr(e.message);}
-    setLoading(false);
-  }
-  async function generateChallenge(){
-    if(!geminiKey||!challengeSeeds.length)return;
-    setChallengeLoading(true);setChallengeErr('');setSpeechErr('');setChallengeFeedback(null);setChallengeAnswer('');
-    try{
-      const seedLines=challengeSeeds.map((s,i)=>`${i+1}. ${s.word.dict} (${s.word.reading}) - ${s.word.meaning}; ${GROUP_NAMES[s.word.group]||s.word.group}; required form ${s.type.label}: ${s.answer}`).join('\n');
-      const prompt=`Create one Japanese sentence production challenge for a conjugation learner.\n\nChoose exactly one seed from this list and require the learner to use its required conjugated form in a natural sentence:\n${seedLines}\n\nReturn ONLY JSON:\n{"seedIndex":1,"englishPrompt":"English sentence the learner should produce","hint":"short non-answer cue","modelJapanese":"one natural model answer using the required form"}\n\nKeep the English prompt short and concrete. Do not ask for a literal word-for-word translation.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,900,0.45,aiSystemFromPrefs(practicePrefs,'You create precise Japanese sentence-production drills. Return valid JSON only. Use the required conjugated form exactly in the model answer.'));
-      const data=extractJSON(reply);
-      const seed=challengeSeeds[Math.max(0,Math.min(challengeSeeds.length-1,(Number(data?.seedIndex)||1)-1))]||challengeSeeds[0];
-      if(!data||!seed)throw new Error('AI did not return a usable challenge.');
-      setChallenge({
-        seedIndex:Number(data.seedIndex)||1,
-        english:String(data.englishPrompt||'').trim()||`Write a natural sentence using ${seed.answer}.`,
-        hint:String(data.hint||'').trim()||`${seed.type.label} of ${seed.word.dict}`,
-        model:String(data.modelJapanese||'').trim(),
-        word:seed.word,
-        type:seed.type.id,
-        typeLabel:seed.type.label,
-        expected:seed.answer,
-        rule:explainItem(seed.word,seed.type.id).rule||seed.type.hint
-      });
-    }catch(e){setChallengeErr(e.message||'Challenge generation failed.');}
-    setChallengeLoading(false);
-  }
-  function dictateChallengeAnswer(){
-    if(!canDictate){setSpeechErr('Speech input needs a browser with Japanese speech recognition support.');return;}
-    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-    const sr=new SpeechRecognition();
-    sr.lang='ja-JP';sr.interimResults=false;sr.maxAlternatives=1;
-    sr.onstart=()=>{setListening(true);setSpeechErr('');};
-    sr.onresult=e=>{
-      const transcript=Array.from(e.results||[]).map(r=>r[0]?.transcript||'').join('').trim();
-      if(transcript)setChallengeAnswer(prev=>prev.trim()?`${prev.trim()} ${transcript}`:transcript);
-    };
-    sr.onerror=e=>{if(e.error!=='aborted')setSpeechErr('Speech recognition could not produce Japanese text.');};
-    sr.onend=()=>setListening(false);
-    try{sr.start();}catch(e){setListening(false);setSpeechErr(e.message||'Could not start speech input.');}
-  }
-  async function gradeChallenge(){
-    if(!challenge||!challengeAnswer.trim()||!geminiKey)return;
-    setGrading(true);setChallengeErr('');setChallengeFeedback(null);
-    try{
-      const prompt=`Grade this Japanese sentence-production answer for a conjugation drill.\n\nEnglish prompt: ${challenge.english}\nRequired word: ${challenge.word.dict} (${challenge.word.reading}) - ${challenge.word.meaning}\nRequired form: ${challenge.typeLabel}\nRequired conjugated form: ${challenge.expected}\nModel answer: ${challenge.model||'(none)'}\nLearner answer: ${challengeAnswer}\n\nReturn ONLY JSON:\n{"correct":true,"score":0,"correctedJapanese":"...","feedback":"one concise explanation","rule":"specific conjugation rule","nextDrill":"one tiny follow-up prompt"}\n\nMark correct only if the sentence is natural enough and uses the required conjugated form correctly.`;
-      const reply=await callGemini([{role:'user',parts:[{text:prompt}]}],geminiKey,1000,0.2,aiSystemFromPrefs(practicePrefs,'You are a strict but helpful Japanese production grader. Return valid JSON only.'));
-      const data=extractJSON(reply);
-      if(!data)throw new Error('AI did not return structured feedback.');
-      const score=Math.max(0,Math.min(100,Number(data.score)||0));
-      const correct=data.correct===true||String(data.correct).toLowerCase()==='true'||score>=80;
-      const feedback={correct,score,corrected:String(data.correctedJapanese||'').trim(),feedback:String(data.feedback||'').trim(),rule:String(data.rule||challenge.rule||'').trim(),nextDrill:String(data.nextDrill||'').trim()};
-      setChallengeFeedback(feedback);
-      setState(prev=>{
-        const prior=prev.production||defaultState().production;
-        return{...prev,production:{...prior,attempted:(prior.attempted||0)+1,correct:(prior.correct||0)+(correct?1:0),lastScore:score,lastAt:Date.now()}};
-      });
-    }catch(e){setChallengeErr(e.message||'AI grading failed.');}
-    setGrading(false);
-  }
-  return(
-    <div className="grid lg:grid-cols-2 gap-4">
-      <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
-        <div className="flex items-center gap-2"><IconSpark className="w-4 h-4 text-indigo-600"/><h3 className="font-medium">AI sentence coach</h3></div>
-        <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="昨日、映画を見ます。 / I want to say: I was made to wait…" className="w-full min-h-32 px-3 py-2 border border-stone-200 rounded-xl focus:border-indigo-500 focus:outline-none" lang="ja" autoCorrect="off" spellCheck="false"/>
-        <button onClick={run} disabled={!text.trim()||!geminiKey||loading} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium">{loading?'Checking…':'Check with AI'}</button>
-        {!geminiKey&&<div className="text-xs text-stone-400 text-center">Add a Gemini API key in Settings.</div>}
-        {err&&<div className="text-sm text-rose-600">{err}</div>}
-        {result&&<div className="border-t border-stone-100 pt-4 text-sm leading-relaxed whitespace-pre-wrap text-stone-700">{result}</div>}
-      </div>
-      <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2"><IconSpark className="w-4 h-4 text-indigo-600"/><h3 className="font-medium">AI production drill</h3></div>
-            <p className="text-xs text-stone-500 mt-1">Generate a sentence task from current filters and weak conjugation forms.</p>
-          </div>
-          <div className="text-right text-xs text-stone-500"><div className="font-medium text-stone-700">{productionPct}%</div><div>{production.correct||0}/{production.attempted||0}</div></div>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {challengeSeeds.slice(0,4).map(s=><span key={`${s.ruleId}-${s.word.dict}`} className="px-2 py-1 rounded-lg bg-stone-100 text-xs text-stone-600">{s.word.dict} · {s.type.label}</span>)}
-          {!challengeSeeds.length&&<span className="text-xs text-stone-400">No words match the current filters.</span>}
-        </div>
-        <button onClick={generateChallenge} disabled={!geminiKey||challengeLoading||!challengeSeeds.length} className="w-full py-2.5 bg-stone-800 hover:bg-stone-900 disabled:opacity-40 text-white rounded-xl font-medium">{challengeLoading?'Building challenge…':'Generate sentence challenge'}</button>
-        {!geminiKey&&<div className="text-xs text-stone-400 text-center">Add a Gemini API key in Settings.</div>}
-        {challenge&&<div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4">
-          <div className="text-xs uppercase tracking-wider text-indigo-700 font-medium">Produce Japanese</div>
-          <div className="mt-2 text-sm font-medium text-stone-900">{challenge.english}</div>
-          <div className="mt-2 text-xs text-indigo-900/80">Required: <span lang="ja">{challenge.expected}</span> · {challenge.typeLabel} of <span lang="ja">{challenge.word.dict}</span></div>
-          <div className="mt-1 text-xs text-stone-500">Hint: {challenge.hint}</div>
-          <textarea value={challengeAnswer} onChange={e=>setChallengeAnswer(e.target.value)} placeholder="日本語で答えてください…" className="mt-3 w-full min-h-24 px-3 py-2 border border-indigo-100 rounded-xl focus:border-indigo-500 focus:outline-none bg-white" lang="ja" autoCorrect="off" spellCheck="false"/>
-          <div className="grid sm:grid-cols-[auto_1fr] gap-2 mt-3">
-            <button onClick={dictateChallengeAnswer} disabled={!canDictate||listening} className="px-3 py-2 border border-indigo-200 hover:bg-white disabled:opacity-40 rounded-xl text-sm text-indigo-700 inline-flex items-center justify-center gap-1.5"><IconMic className="w-4 h-4"/>{listening?'Listening…':'Speak answer'}</button>
-            <button onClick={gradeChallenge} disabled={!challengeAnswer.trim()||grading} className="py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium">{grading?'Grading…':'Grade production'}</button>
-          </div>
-          {!canDictate&&<div className="mt-2 text-xs text-stone-400">Speech input appears in browsers with Japanese speech recognition.</div>}
-          {speechErr&&<div className="mt-2 text-xs text-rose-600">{speechErr}</div>}
-          {challenge.model&&<button onClick={()=>speakJapanese(challenge.model,0.85,practicePrefs.voiceURI)} className="w-full mt-2 py-2 border border-indigo-200 hover:bg-white rounded-xl text-sm text-indigo-700 inline-flex items-center justify-center gap-1.5"><IconVolume className="w-4 h-4"/>Hear model answer</button>}
-        </div>}
-        {challengeErr&&<div className="text-sm text-rose-600">{challengeErr}</div>}
-        {challengeFeedback&&<div className={`rounded-xl border p-4 ${challengeFeedback.correct?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
-          <div className={`text-sm font-medium ${challengeFeedback.correct?'text-emerald-800':'text-rose-800'}`}>{challengeFeedback.correct?'Production accepted':'Needs revision'} · {challengeFeedback.score}%</div>
-          {challengeFeedback.corrected&&<div className="mt-2 text-lg" lang="ja">{challengeFeedback.corrected}</div>}
-          {challengeFeedback.feedback&&<div className="mt-2 text-sm text-stone-700 leading-relaxed">{challengeFeedback.feedback}</div>}
-          {challengeFeedback.rule&&<div className="mt-2 text-xs text-stone-600">{challengeFeedback.rule}</div>}
-          {challengeFeedback.nextDrill&&<div className="mt-2 rounded-lg bg-white/70 border border-stone-200 px-3 py-2 text-xs text-stone-600">{challengeFeedback.nextDrill}</div>}
-        </div>}
-      </div>
-    </div>
-  );
 }
 
 // ============================================================================
@@ -5986,7 +4997,7 @@ function downloadTextFile(filename,text,mime='text/plain;charset=utf-8'){
   a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-function ListsView({words,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,wordLists,setWordLists,practicePrefs,setPracticePrefs,geminiKey}){
+function ListsViewSub({words,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,wordLists,setWordLists,practicePrefs,setPracticePrefs,geminiKey}){
   const[name,setName]=useState('');
   const[activeId,setActiveId]=useState(wordLists[0]?.id||'');
   const[query,setQuery]=useState('');
@@ -6190,12 +5201,8 @@ function ListsView({words,customVerbs,setCustomVerbs,customAdjectives,setCustomA
       </div>
     </div>
   );
-}
-
-// ============================================================================
-// VERBS VIEW
-// ============================================================================
-function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
+}function CustomDictionaryViewSub({customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,geminiKey,state}){
+  const[dictTab,setDictTab]=useState('verbs');
   const[showAdd,setShowAdd]=useState(false);
   const[query,setQuery]=useState('');
   const[addPhase,setAddPhase]=useState('idle');
@@ -6203,44 +5210,69 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
   const[addError,setAddError]=useState('');
   const[mf,setMf]=useState({dict:'',reading:'',meaning:'',group:'ichidan'});
   const[mErr,setMErr]=useState('');
-  const[verbSugg,setVerbSugg]=useState(null);
+  const[sugg,setSugg]=useState(null);
   const[suggLoading,setSuggLoading]=useState(false);
   const[suggErr,setSuggErr]=useState('');
   const suggGen=useRef(0);
 
-  const allVerbs=useMemo(()=>[...STARTER_VERBS,...customVerbs],[customVerbs]);
+  const isAdj = dictTab === 'adjectives';
+  const starterWords = isAdj ? STARTER_ADJECTIVES : STARTER_VERBS;
+  const customWords = isAdj ? customAdjectives : customVerbs;
+  const setCustomWords = isAdj ? setCustomAdjectives : setCustomVerbs;
+  const allWords = useMemo(()=>[...starterWords,...customWords],[customWords, starterWords]);
 
-  async function fetchSugg(verbs){
+  async function fetchSugg(wordsList){
+    if(!geminiKey) return;
     const gen=++suggGen.current;
-    const vlist=verbs||allVerbs;
-    setSuggLoading(true);setSuggErr('');setVerbSugg(null);
+    const wlist=wordsList||allWords;
+    setSuggLoading(true);setSuggErr('');setSugg(null);
     try{
-      const r=await getSuggestedVerb(vlist,geminiKey);
+      const r=await getSuggestedWord(wlist,geminiKey,isAdj);
       if(gen!==suggGen.current)return;
-      if(vlist.some(v=>v.dict===r.dict)){setSuggErr('Suggestion was already in your list — try again');return;}
-      setVerbSugg(r);
+      if(wlist.some(v=>v.dict===r.dict)){setSuggErr('Suggestion was already in your list — try again');return;}
+      setSugg(r);
     }
     catch(e){if(gen===suggGen.current)setSuggErr(e.message);}
     finally{if(gen===suggGen.current)setSuggLoading(false);}
   }
 
-  useEffect(()=>{if(geminiKey)fetchSugg();},[geminiKey]);
+  useEffect(()=>{
+    setSugg(null);
+    setSuggErr('');
+    setSuggLoading(false);
+    if(geminiKey)fetchSugg();
+  },[geminiKey, dictTab]);
 
-  function resetAdd(){setShowAdd(false);setQuery('');setAddPhase('idle');setSuggestion(null);setAddError('');setMf({dict:'',reading:'',meaning:'',group:'ichidan'});setMErr('');}
+  function resetAdd(){
+    setShowAdd(false);
+    setQuery('');
+    setAddPhase('idle');
+    setSuggestion(null);
+    setAddError('');
+    setMf({dict:'',reading:'',meaning:'',group:isAdj ? 'i-adjective' : 'ichidan'});
+    setMErr('');
+  }
 
   async function lookup(){
     if(!query.trim()||addPhase==='loading')return;
     setAddPhase('loading');setAddError('');
-    try{const r=await lookupVerbWithGemini(query,geminiKey);setSuggestion(r);setAddPhase('confirming');}
+    try{
+      const r=await lookupWordWithGemini(query,geminiKey,isAdj);
+      setSuggestion(r);setAddPhase('confirming');
+    }
     catch(e){setAddPhase('error');setAddError(e.message);}
   }
 
-  function doAdd(verb){
-    if([...STARTER_VERBS,...customVerbs].some(v=>v.dict===verb.dict)){setAddError(`${verb.dict} is already in your list`);setAddPhase('error');return;}
-    const newCustom=[...customVerbs,verb];
-    setCustomVerbs(newCustom);
+  function doAdd(word){
+    if(allWords.some(v=>v.dict===word.dict)){
+      setAddError(`${word.dict} is already in your list`);
+      setAddPhase('error');
+      return;
+    }
+    const newCustom=[...customWords,word];
+    setCustomWords(newCustom);
     resetAdd();
-    if(geminiKey)fetchSugg([...STARTER_VERBS,...newCustom]);
+    if(geminiKey)fetchSugg([...starterWords,...newCustom]);
   }
 
   function addManual(){
@@ -6248,48 +5280,73 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
     if(!mf.dict.trim()||!mf.reading.trim()||!mf.meaning.trim()){setMErr('All fields required');return;}
     const reading=toHiragana(mf.reading);
     if(!isAllKana(reading)){setMErr('Reading must be hiragana');return;}
-    if(mf.group==='ichidan'&&!reading.endsWith('る')){setMErr('Ichidan must end in る');return;}
-    if(mf.group==='godan'&&!/[うくぐすつぬぶむる]$/.test(reading)){setMErr('Godan must end in う/く/ぐ/す/つ/ぬ/ぶ/む/る');return;}
-    doAdd({dict:mf.dict.trim(),reading,meaning:mf.meaning.trim(),group:mf.group});
+    if(isAdj) {
+      if(mf.group==='i-adjective'&&!reading.endsWith('い')){setMErr('い-adjective must end in い');return;}
+      doAdd({dict:mf.dict.trim(),reading,meaning:mf.meaning.trim(),group:mf.group});
+    } else {
+      if(mf.group==='ichidan'&&!reading.endsWith('る')){setMErr('Ichidan must end in る');return;}
+      if(mf.group==='godan'&&!/[うくぐすつぬぶむる]$/.test(reading)){setMErr('Godan must end in う/く/ぐ/す/つ/ぬ/ぶ/む/る');return;}
+      doAdd({dict:mf.dict.trim(),reading,meaning:mf.meaning.trim(),group:mf.group});
+    }
   }
 
-  const groupLabel={ichidan:'る-verb',godan:'う-verb',suru:'irregular',kuru:'irregular'};
-  const groupLong={ichidan:'る-verb (ichidan / Group 2)',godan:'う-verb (godan / Group 1)',suru:'irregular する (Group 3)',kuru:'irregular 来る (Group 3)'};
+  const groupLabel=isAdj 
+    ? { 'i-adjective': 'い-adjective', 'na-adjective': 'な-adjective' }
+    : {ichidan:'る-verb',godan:'う-verb',suru:'irregular',kuru:'irregular'};
+
+  const groupLong=isAdj
+    ? { 'i-adjective': 'い-adjective (conjugates with かった/くない/くて)', 'na-adjective': 'な-adjective (conjugates with だった/ではない/で)' }
+    : {ichidan:'る-verb (ichidan / Group 2)',godan:'う-verb (godan / Group 1)',suru:'irregular する (Group 3)',kuru:'irregular 来る (Group 3)'};
 
   return(<div className="space-y-4">
+    <div className="flex gap-2 p-1 bg-stone-100 rounded-xl border border-stone-200">
+      <button 
+        onClick={()=>{setDictTab('verbs'); resetAdd();}} 
+        className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${dictTab==='verbs'?'bg-white text-stone-800 shadow-sm':'text-stone-500 hover:text-stone-700'}`}
+      >
+        Verbs
+      </button>
+      <button 
+        onClick={()=>{setDictTab('adjectives'); resetAdd();}} 
+        className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${dictTab==='adjectives'?'bg-white text-stone-800 shadow-sm':'text-stone-500 hover:text-stone-700'}`}
+      >
+        Adjectives
+      </button>
+    </div>
+
     <div className="flex justify-between items-center">
-      <div className="text-sm text-stone-600">{STARTER_VERBS.length} starter + {customVerbs.length} custom = {STARTER_VERBS.length+customVerbs.length} verbs</div>
-      <button onClick={()=>setShowAdd(!showAdd)} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition"><IconPlus className="w-4 h-4"/>Add verb</button>
+      <div className="text-sm text-stone-600">{starterWords.length} starter + {customWords.length} custom = {starterWords.length+customWords.length} {isAdj?'adjectives':'verbs'}</div>
+      <button onClick={()=>setShowAdd(!showAdd)} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition"><IconPlus className="w-4 h-4"/>Add {isAdj?'adjective':'verb'}</button>
     </div>
 
     {geminiKey&&(
       <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">💡 Suggested next verb</div>
+          <div className="text-xs uppercase tracking-wider text-indigo-600 font-medium">💡 Suggested next {isAdj?'adjective':'verb'}</div>
           <button onClick={()=>fetchSugg()} disabled={suggLoading} className="text-xs text-indigo-500 hover:text-indigo-700 disabled:opacity-50 transition">
             {suggLoading?'…':'Suggest another ↻'}
           </button>
         </div>
-        {suggLoading&&!verbSugg&&<div className="text-sm text-indigo-400 italic">Finding a good next verb for you…</div>}
+        {suggLoading&&!sugg&&<div className="text-sm text-indigo-400 italic">Finding a good next {isAdj?'adjective':'verb'} for you…</div>}
         {suggErr&&<div className="text-sm text-rose-600">{suggErr}</div>}
-        {verbSugg&&!suggLoading&&(
+        {sugg&&!suggLoading&&(
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2 flex-wrap">
-                <span className="text-2xl font-medium" lang="ja">{verbSugg.dict}</span>
-                {verbSugg.dict!==verbSugg.reading&&<span className="text-sm text-indigo-600" lang="ja">{verbSugg.reading}</span>}
+                <span className="text-2xl font-medium" lang="ja">{sugg.dict}</span>
+                {sugg.dict!==sugg.reading&&<span className="text-sm text-indigo-600" lang="ja">{sugg.reading}</span>}
               </div>
-              <div className="text-sm text-stone-600 italic">{verbSugg.meaning}</div>
-              <div className="text-xs text-stone-500 mt-1 leading-relaxed">{verbSugg.reason}</div>
+              <div className="text-sm text-stone-600 italic">{sugg.meaning}</div>
+              <div className="text-xs text-stone-500 mt-1 leading-relaxed">{sugg.reason}</div>
             </div>
-            <button onClick={()=>doAdd(verbSugg)} className="flex-shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Add</button>
+            <button onClick={()=>doAdd(sugg)} className="flex-shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Add</button>
           </div>
         )}
       </div>
     )}
 
     {showAdd&&(<div className="bg-white rounded-2xl border border-stone-200 p-5">
-      <h3 className="font-medium mb-3">Add a verb</h3>
+      <h3 className="font-medium mb-3">Add {isAdj?'an adjective':'a verb'}</h3>
       {geminiKey?(
         addPhase!=='confirming'?(
           <div className="space-y-2">
@@ -6297,7 +5354,7 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
               <input type="text" value={query}
                 onChange={e=>{setQuery(e.target.value);if(addPhase==='error'){setAddPhase('idle');setAddError('');}}}
                 onKeyDown={e=>{if(e.key==='Enter')lookup();}}
-                placeholder="食べる, taberu, to eat, swim…"
+                placeholder={isAdj ? "美味しい, oishii, delicious, cold..." : "食べる, taberu, to eat, swim…"}
                 disabled={addPhase==='loading'}
                 autoCorrect="off" autoCapitalize="off" spellCheck="false"
                 className="flex-1 px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none disabled:opacity-50"/>
@@ -6310,7 +5367,7 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
           </div>
         ):(
           <div className="space-y-3">
-            <p className="text-sm text-stone-600">Is this the right verb?</p>
+            <p className="text-sm text-stone-600">Is this the right {isAdj?'adjective':'verb'}?</p>
             <div className="bg-stone-50 border border-stone-200 rounded-xl p-4">
               <div className="text-3xl font-medium mb-1" lang="ja">{suggestion.dict}</div>
               {suggestion.dict!==suggestion.reading&&<div className="text-base text-stone-500 mb-1" lang="ja">{suggestion.reading}</div>}
@@ -6318,7 +5375,7 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
               <div className="text-xs text-stone-400 mt-1">{groupLong[suggestion.group]}</div>
             </div>
             <div className="flex gap-2">
-              <button onClick={()=>doAdd(suggestion)} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Add verb</button>
+              <button onClick={()=>doAdd(suggestion)} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Add {isAdj?'adjective':'verb'}</button>
               <button onClick={()=>{setAddPhase('idle');setSuggestion(null);setQuery('');}} className="px-3 py-2 border border-stone-200 hover:bg-stone-50 rounded-lg text-sm">Try again</button>
             </div>
           </div>
@@ -6327,11 +5384,19 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
         <div className="space-y-3">
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Add a Gemini API key in Settings for AI lookup and suggestions.</p>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-xs text-stone-500 block mb-1">Dictionary form</label><input type="text" value={mf.dict} onChange={e=>setMf({...mf,dict:e.target.value})} placeholder="食べる" lang="ja" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
-            <div><label className="text-xs text-stone-500 block mb-1">Reading (kana/romaji)</label><input type="text" value={mf.reading} onChange={e=>setMf({...mf,reading:e.target.value})} placeholder="taberu" lang="ja" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
+            <div><label className="text-xs text-stone-500 block mb-1">Dictionary form</label><input type="text" value={mf.dict} onChange={e=>setMf({...mf,dict:e.target.value})} placeholder={isAdj?"美味しい":"食べる"} lang="ja" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
+            <div><label className="text-xs text-stone-500 block mb-1">Reading (kana/romaji)</label><input type="text" value={mf.reading} onChange={e=>setMf({...mf,reading:e.target.value})} placeholder={isAdj?"oishii":"taberu"} lang="ja" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
           </div>
-          <div><label className="text-xs text-stone-500 block mb-1">Meaning</label><input type="text" value={mf.meaning} onChange={e=>setMf({...mf,meaning:e.target.value})} placeholder="to eat" className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
-          <div><label className="text-xs text-stone-500 block mb-1">Group</label><div className="flex gap-2">{[{id:'ichidan',label:'る-verb'},{id:'godan',label:'う-verb'},{id:'suru',label:'suru'}].map(g=>(<button key={g.id} onClick={()=>setMf({...mf,group:g.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${mf.group===g.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{g.label}</button>))}</div></div>
+          <div><label className="text-xs text-stone-500 block mb-1">Meaning</label><input type="text" value={mf.meaning} onChange={e=>setMf({...mf,meaning:e.target.value})} placeholder={isAdj?"delicious":"to eat"} className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"/></div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Group</label>
+            <div className="flex gap-2">
+              {isAdj 
+                ? [{id:'i-adjective',label:'い-adj'},{id:'na-adjective',label:'な-adj'}].map(g=>(<button key={g.id} onClick={()=>setMf({...mf,group:g.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${mf.group===g.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{g.label}</button>))
+                : [{id:'ichidan',label:'る-verb'},{id:'godan',label:'う-verb'},{id:'suru',label:'suru'}].map(g=>(<button key={g.id} onClick={()=>setMf({...mf,group:g.id})} className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${mf.group===g.id?'bg-stone-800 text-white border-stone-800':'bg-white border-stone-200 hover:border-stone-300'}`}>{g.label}</button>))
+              }
+            </div>
+          </div>
           {mErr&&<div className="text-sm text-rose-600">{mErr}</div>}
           <button onClick={addManual} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm">Add</button>
         </div>
@@ -6339,8 +5404,116 @@ function VerbsView({customVerbs,setCustomVerbs,geminiKey,state}){
       <button onClick={resetAdd} className="mt-3 text-xs text-stone-400 hover:text-stone-600 block">Cancel</button>
     </div>)}
 
-    <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden"><table className="w-full text-sm"><thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider"><tr><th className="px-4 py-2 text-left font-medium">Verb</th><th className="px-4 py-2 text-left font-medium">Reading</th><th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Meaning</th><th className="px-4 py-2 text-left font-medium">Group</th><th className="px-4 py-2"></th></tr></thead><tbody>{[...STARTER_VERBS,...customVerbs].map((v,i)=>{const vvs=state?.verbStats?.[v.dict]||{};const totalSeen=Object.values(vvs).reduce((s,x)=>s+x.seen,0);const totalIncorrect=Object.values(vvs).reduce((s,x)=>s+x.incorrect,0);const acc=totalSeen>0?Math.round((totalSeen-totalIncorrect)/totalSeen*100):null;return(<tr key={v.dict} className="border-t border-stone-100"><td className="px-4 py-2 font-medium" lang="ja">{v.dict}</td><td className="px-4 py-2 text-stone-600" lang="ja">{v.reading}</td><td className="px-4 py-2 text-stone-500 hidden sm:table-cell">{v.meaning}</td><td className="px-4 py-2 text-xs"><div className="text-stone-500">{groupLabel[v.group]}</div>{acc!==null&&<div className={`mt-0.5 ${acc>=80?'text-emerald-600':acc>=50?'text-amber-600':'text-rose-600'}`}>{totalSeen} seen · {acc}%</div>}</td><td className="px-4 py-2 text-right">{i>=STARTER_VERBS.length&&<button onClick={()=>setCustomVerbs(customVerbs.filter(c=>c.dict!==v.dict))} className="text-stone-400 hover:text-rose-600 transition"><IconTrash className="w-4 h-4"/></button>}</td></tr>);})}</tbody></table></div>
+    <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wider">
+          <tr>
+            <th className="px-4 py-2 text-left font-medium">{isAdj?'Adjective':'Verb'}</th>
+            <th className="px-4 py-2 text-left font-medium">Reading</th>
+            <th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Meaning</th>
+            <th className="px-4 py-2 text-left font-medium">Group</th>
+            <th className="px-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {allWords.map((v,i)=>{
+            const vvs=state?.verbStats?.[v.dict]||{};
+            const totalSeen=Object.values(vvs).reduce((s,x)=>s+x.seen,0);
+            const totalIncorrect=Object.values(vvs).reduce((s,x)=>s+x.incorrect,0);
+            const acc=totalSeen>0?Math.round((totalSeen-totalIncorrect)/totalSeen*100):null;
+            return(
+              <tr key={v.dict} className="border-t border-stone-100">
+                <td className="px-4 py-2 font-medium" lang="ja">{v.dict}</td>
+                <td className="px-4 py-2 text-stone-600" lang="ja">{v.reading}</td>
+                <td className="px-4 py-2 text-stone-500 hidden sm:table-cell">{v.meaning}</td>
+                <td className="px-4 py-2 text-xs">
+                  <div className="text-stone-500">{groupLabel[v.group]}</div>
+                  {acc!==null&&<div className={`mt-0.5 ${acc>=80?'text-emerald-600':acc>=50?'text-amber-600':'text-rose-600'}`}>{totalSeen} seen · {acc}%</div>}
+                </td>
+                <td className="px-4 py-2 text-right">
+                  {i>=starterWords.length&&<button onClick={()=>setCustomWords(customWords.filter(c=>c.dict!==v.dict))} className="text-stone-400 hover:text-rose-600 transition"><IconTrash className="w-4 h-4"/></button>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   </div>);
+}
+
+// ============================================================================
+// LIBRARY VIEW (CONSOLIDATED REFERENCE, LISTS, CUSTOM DICTIONARY)
+// ============================================================================
+function LibraryView({state,setState,verbs,adjectives,customVerbs,setCustomVerbs,customAdjectives,setCustomAdjectives,wordLists,setWordLists,practicePrefs,setPracticePrefs,geminiKey,setTab}){
+  const[subTab,setSubTab]=useState('reference');
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-navigation bar */}
+      <div className="flex border-b border-stone-200">
+        {[
+          { id: 'reference', label: 'Search & Reference', desc: 'Verb & adjective lookup' },
+          { id: 'lists', label: 'Lists & Decks', desc: 'Custom groupings & Anki export' },
+          { id: 'dictionary', label: 'Custom Dictionary', desc: 'Manage custom verbs & adjectives' }
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`flex-1 pb-3 text-center border-b-2 transition ${
+              subTab === t.id
+                ? 'border-indigo-600 text-indigo-600 font-semibold'
+                : 'border-transparent text-stone-500 hover:text-stone-700'
+            }`}
+          >
+            <div className="text-sm">{t.label}</div>
+            <div className="text-[10px] text-stone-400 font-normal hidden sm:block">{t.desc}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4">
+        {subTab === 'reference' && (
+          <ReferenceViewSub
+            state={state}
+            setState={setState}
+            verbs={verbs}
+            adjectives={adjectives}
+            wordLists={wordLists}
+            setWordLists={setWordLists}
+            geminiKey={geminiKey}
+            practicePrefs={practicePrefs}
+            setPracticePrefs={setPracticePrefs}
+            setTab={setTab}
+          />
+        )}
+        {subTab === 'lists' && (
+          <ListsViewSub
+            words={[...verbs, ...adjectives]}
+            customVerbs={customVerbs}
+            setCustomVerbs={setCustomVerbs}
+            customAdjectives={customAdjectives}
+            setCustomAdjectives={setCustomAdjectives}
+            wordLists={wordLists}
+            setWordLists={setWordLists}
+            practicePrefs={practicePrefs}
+            setPracticePrefs={setPracticePrefs}
+            geminiKey={geminiKey}
+          />
+        )}
+        {subTab === 'dictionary' && (
+          <CustomDictionaryViewSub
+            customVerbs={customVerbs}
+            setCustomVerbs={setCustomVerbs}
+            customAdjectives={customAdjectives}
+            setCustomAdjectives={setCustomAdjectives}
+            geminiKey={geminiKey}
+            state={state}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ============================================================================
