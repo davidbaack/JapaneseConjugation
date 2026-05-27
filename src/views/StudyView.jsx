@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { IconCheck, IconX, IconVolume, IconSpark, IconChat } from '../components/Icons.jsx';
+import { IconCheck, IconX, IconVolume, IconSpark, IconChat, IconPen } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
 import { PitchAccentSection } from '../components/PitchAccent.jsx';
@@ -995,30 +995,44 @@ Keep it concise and clear.`;
                         {coachStatus}
                       </div>
                     </div>
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={answer}
-                      onChange={e => {
-                        setTypoGuard(null);
-                        setAnswer(e.target.value);
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          answer.trim() ? submit() : skipCurrent();
-                        } else if (e.key === 'Escape') {
-                          e.preventDefault();
-                          skipCurrent();
-                        }
-                      }}
-                      placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-                      className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
-                      lang="ja"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      spellCheck="false"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={answer}
+                        onChange={e => {
+                          setTypoGuard(null);
+                          setAnswer(e.target.value);
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            answer.trim() ? submit() : skipCurrent();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            skipCurrent();
+                          }
+                        }}
+                        placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
+                        className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
+                        lang="ja"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setKanaPadOpen(v => !v)}
+                        className={`shrink-0 px-3 py-1.5 rounded-lg border text-sm inline-flex items-center gap-1.5 transition ${
+                          kanaPadOpen
+                            ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
+                            : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
+                        }`}
+                      >
+                        <IconPen className="w-4 h-4" />
+                        Kana pad
+                      </button>
+                    </div>
                     {answer && coachPreview !== answer && (
                       <div className="mt-2 text-center text-sm text-stone-500" lang="ja">
                         → {coachPreview}
@@ -1032,6 +1046,7 @@ Keep it concise and clear.`;
                       onClear={clearAnswerText}
                       onSubmit={() => submit()}
                       canSubmit={!!answer.trim()}
+                      noToggle
                     />
                     <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_auto_auto] gap-2 mt-3">
                       <button
@@ -1081,30 +1096,44 @@ Keep it concise and clear.`;
                   </>
                 ) : (
                   <>
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={answer}
-                      onChange={e => {
-                        setTypoGuard(null);
-                        setAnswer(e.target.value);
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          answer.trim() ? submit() : skipCurrent();
-                        } else if (e.key === 'Escape') {
-                          e.preventDefault();
-                          skipCurrent();
-                        }
-                      }}
-                      placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-                      className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
-                      lang="ja"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      spellCheck="false"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={answer}
+                        onChange={e => {
+                          setTypoGuard(null);
+                          setAnswer(e.target.value);
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            answer.trim() ? submit() : skipCurrent();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            skipCurrent();
+                          }
+                        }}
+                        placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
+                        className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
+                        lang="ja"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setKanaPadOpen(v => !v)}
+                        className={`shrink-0 px-3 py-1.5 rounded-lg border text-sm inline-flex items-center gap-1.5 transition ${
+                          kanaPadOpen
+                            ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
+                            : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
+                        }`}
+                      >
+                        <IconPen className="w-4 h-4" />
+                        Kana pad
+                      </button>
+                    </div>
                     {answer && preview !== answer && (
                       <div className="mt-2 text-center text-sm text-stone-500" lang="ja">
                         → {preview}
@@ -1118,6 +1147,7 @@ Keep it concise and clear.`;
                       onClear={clearAnswerText}
                       onSubmit={() => submit()}
                       canSubmit={!!answer.trim()}
+                      noToggle
                     />
                     {!!liveCells.length && (
                       <div className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">

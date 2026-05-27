@@ -22,23 +22,25 @@ const KANA_PAD_ROWS = [
 // Let's verify line 494 in monolith. Yes, it was 'ぴ' ('\u3074')
 // Let's write the React component
 
-export default function KanaInputPad({ open, onToggle, onInsert, onBackspace, onClear, onSubmit, canSubmit }) {
+export default function KanaInputPad({ open, onToggle, onInsert, onBackspace, onClear, onSubmit, canSubmit, noToggle }) {
   return (
-    <div className="mt-2">
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={onToggle}
-          className={`px-3 py-1.5 rounded-lg border text-sm inline-flex items-center gap-1.5 transition ${
-            open
-              ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
-              : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
-          }`}
-        >
-          <IconPen className="w-4 h-4" />
-          Kana pad
-        </button>
-      </div>
+    <div>
+      {!noToggle && (
+        <div className="mt-2 flex justify-center">
+          <button
+            type="button"
+            onClick={onToggle}
+            className={`px-3 py-1.5 rounded-lg border text-sm inline-flex items-center gap-1.5 transition ${
+              open
+                ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
+                : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
+            }`}
+          >
+            <IconPen className="w-4 h-4" />
+            Kana pad
+          </button>
+        </div>
+      )}
       {open && (
         <div className="mt-2 rounded-2xl border border-stone-200 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950">
           <div className="space-y-1.5" lang="ja">
