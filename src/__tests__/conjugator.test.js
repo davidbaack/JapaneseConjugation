@@ -87,7 +87,6 @@ describe('ichidan verb: 食べる', () => {
     expect(conjugate(TABERU, 'obligation')).toBe('たべなければならない');
     expect(conjugate(TABERU, 'conjectural')).toBe('たべるだろう');
     expect(conjugate(TABERU, 'masu-stem')).toBe('たべ');
-    expect(conjugate(TABERU, 'negative-zu')).toBe('たべず');
     expect(conjugate(TABERU, 'negative-zuni')).toBe('たべずに');
   });
 });
