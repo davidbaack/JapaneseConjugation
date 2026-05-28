@@ -12,12 +12,14 @@ Japanese verb and adjective conjugation practice with spaced repetition, referen
 - **SRS Levels** — visual breakdown of card maturity across your whole vocabulary
 - **Stats** — session history, daily goal streak, and performance charts
 - **Library** — browse built-in words or add custom verbs and adjectives; organize into named word lists
-- **AI Coaching** — Gemini-powered explanations, conjugation breakdowns, and sentence context (requires a free Gemini API key)
+- **AI Coaching** — Gemini-powered explanations, conjugation breakdowns, and sentence context (sign in to unlock)
 - **Speech Synthesis** — hear any conjugated form read aloud using the browser's Web Speech API
 - **Flexible Input** — type romaji (auto-converts to hiragana), kana directly, or use the on-screen kana pad
+- **Answer Modes** — free input, guided kana, multiple choice, or self-check
+- **Drill Modes** — word-only or sentence context; forward (conjugate) or reverse (identify dictionary form)
 - **Script Modes** — toggle kanji, kana, romaji, furigana, and color-coded conjugation highlighting
-- **JLPT / Genki Filtering** — limit drills to specific proficiency levels or textbook lessons
-- **Cloud Sync** — optional Supabase-backed sync across devices (bring your own project)
+- **JLPT / Genki / Minna Filtering** — limit drills to specific proficiency levels, Genki lessons, or みんなの日本語 lessons
+- **Cloud Sync** — sign in to sync progress, custom words, and word lists across devices
 - **Dark / Light Theme** — respects system preference or override in settings
 
 ## Stack
@@ -46,19 +48,17 @@ npm run dev          # dev server at http://localhost:5173
 | `npm test` | Vitest unit tests |
 | `npm run test:e2e` | Playwright smoke tests (builds first) |
 
-## AI coaching setup
+## AI coaching
 
-1. Get a free API key from [Google AI Studio](https://aistudio.google.com/)
-2. Open the **Settings** tab in the app and paste it into the Gemini API Key field
+AI coaching is powered by Gemini and enabled automatically when you sign in — no API key setup required. Sign in via **Settings → Cloud Sync** to unlock AI miss coaching, conjugation breakdowns, and sentence context explanations.
 
-The key is stored only in `localStorage` and is never sent anywhere except directly to the Gemini API.
+To self-host with your own Gemini key, set `VITE_GEMINI_API_KEY` in your environment before building.
 
-## Cloud sync setup
+## Cloud sync
 
-Cloud sync uses a [Supabase](https://supabase.com) table to store your progress. To enable it:
+Cloud sync keeps your progress, custom vocabulary, and word lists in sync across devices. Open the **Settings** tab and click **Sign In / Sign Up**.
 
-1. Create a Supabase project and add a table named `srs_sync` with columns `id` (text, primary key) and `data` (jsonb)
-2. Copy your project URL and anon key into **Settings → Cloud Sync**
+To self-host, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in your environment and create a `srs_sync` table in Supabase with columns `id` (text, primary key) and `data` (jsonb).
 
 ## Project structure
 
