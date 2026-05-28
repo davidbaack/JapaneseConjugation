@@ -69,7 +69,6 @@ export default function SettingsView({
   syncStatus,
   syncNow,
   geminiKey,
-  setGeminiKey,
   practicePrefs,
   setPracticePrefs,
   speechVoices = [],
@@ -843,19 +842,17 @@ export default function SettingsView({
           AI Chat (Gemini)
         </h3>
         <p className="text-xs text-stone-500 mb-3">Powers AI miss coaching, "Ask Gemini why", and AI verb lookup. Free key at <span className="text-indigo-600 dark:text-indigo-400 font-medium">aistudio.google.com</span></p>
-        <div>
-          <label className="text-xs text-stone-500 block mb-1">Gemini API key</label>
-          <input
-            type="password"
-            value={localGeminiKey}
-            onChange={e => setLocalGeminiKey(e.target.value)}
-            placeholder="AIza..."
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck="false"
-            className="w-full px-3 py-2 text-sm font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
-          />
-        </div>
+        
+        {geminiKey ? (
+          <div className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-955/20 border border-emerald-250 dark:border-emerald-900 rounded-xl px-3 py-2 mb-3">
+            ✓ Gemini API is active (configured in environment).
+          </div>
+        ) : (
+          <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-955/20 border border-amber-250 dark:border-amber-900 rounded-xl px-3 py-2 mb-3">
+            ⚠️ Gemini API is not configured. Please set <code>VITE_GEMINI_API_KEY</code> in your environment variables to enable AI coaching.
+          </div>
+        )}
+
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
           <div>
             <label className="text-xs text-stone-500 block mb-1">AI feedback</label>
@@ -899,7 +896,7 @@ export default function SettingsView({
               className={`w-full px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center gap-1.5 ${
                 practicePrefs.autoAiExplainErrors
                   ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  : 'bg-white dark:bg-stone-955 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
               }`}
             >
               <IconSpark className="w-4 h-4" />
@@ -907,18 +904,6 @@ export default function SettingsView({
             </button>
           </div>
         </div>
-        <div className="flex gap-2 mt-3">
-          <button
-            onClick={() => { setGeminiKey(localGeminiKey.trim()); setGeminiMsg('Saved!'); setTimeout(() => setGeminiMsg(''), 2000); }}
-            disabled={!localGeminiKey.trim()}
-            className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
-          >
-            Save key
-          </button>
-          {geminiKey && <button onClick={() => { setGeminiKey(''); setLocalGeminiKey(''); }} className="px-3 py-2 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm">Clear</button>}
-        </div>
-        {geminiMsg && <div className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">{geminiMsg}</div>}
-        {geminiKey && !geminiMsg && <div className="mt-2 text-xs text-emerald-700 dark:text-emerald-400">✓ Key saved — AI features active</div>}
       </div>
 
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
