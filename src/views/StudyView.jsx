@@ -888,7 +888,7 @@ Keep it concise and clear.`;
                     ) : taskHint ? (
                       <span className="text-xs text-indigo-400 dark:text-indigo-500">· {taskHint}</span>
                     ) : null}
-                    {current.ruleLabel && (
+                    {current.ruleLabel && practicePrefs.showWordCategory && (
                       <span className="text-xs text-indigo-400 dark:text-indigo-500">· {current.ruleLabel}</span>
                     )}
                   </div>
