@@ -3,6 +3,7 @@ import { IconSpark } from './Icons.jsx';
 import { getConjugationSteps, conjugateItem, wordKey } from '../utils/conjugator.js';
 import { getTypeInfo } from '../data/conjugationTypes.js';
 import { callGemini, aiSystemFromPrefs } from '../utils/gemini.js';
+import { getAICache, setAICache } from '../utils/storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
 export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DEFAULT_PREFS }) {
@@ -23,13 +24,11 @@ export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DE
 
   async function getAIExplanation() {
     setShowAi(true);
-    try {
-      const cache = JSON.parse(localStorage.getItem('dojo_ai_explanations_cache') || '{}');
-      if (cache[cacheKey]) {
-        setAiExplanation(cache[cacheKey]);
-        return;
-      }
-    } catch (e) {}
+    const cached = getAICache('dojo_ai_explanations_cache', cacheKey);
+    if (cached) {
+      setAiExplanation(cached);
+      return;
+    }
 
     if (!geminiKey) {
       setErr('Please configure a Gemini API key in Settings to use AI explanations.');
@@ -42,11 +41,7 @@ export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DE
       const prompt = `Explain the conjugation of the Japanese word "${word.dict}" (${word.reading}) to the form "${getTypeInfo(type).label}" (${conjugateItem(word, type)}). Break it down into simple, easy-to-understand linguistic steps for a Japanese learner. Keep it under 100 words and be direct.`;
       const reply = await callGemini([{ role: 'user', parts: [{ text: prompt }] }], geminiKey, 600, 0.25, aiSystemFromPrefs(practicePrefs, 'You are a patient Japanese language teacher explaining conjugation rules step-by-step. Keep explanation concise and direct.'));
       setAiExplanation(reply.trim());
-      try {
-        const cache = JSON.parse(localStorage.getItem('dojo_ai_explanations_cache') || '{}');
-        cache[cacheKey] = reply.trim();
-        localStorage.setItem('dojo_ai_explanations_cache', JSON.stringify(cache));
-      } catch (e) {}
+      setAICache('dojo_ai_explanations_cache', cacheKey, reply.trim());
     } catch (e) {
       setErr(e.message || 'Failed to get AI explanation.');
     }

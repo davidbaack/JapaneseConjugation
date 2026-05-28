@@ -474,8 +474,7 @@ export function conjugateAdjective(adj,type){
     const stem=reading.replace(/na$/,'').replace(/な$/,'');
     const M={
       'adj-plain-present':stem+'だ','adj-plain-past':stem+'だった','adj-plain-negative':stem+'ではない','adj-plain-past-negative':stem+'ではなかった',
-      'adj-polite-present':stem+'です','adj-polite-past':stem+'でした','adj-polite-negative':stem+'れません','adj-polite-past-negative':stem+'ではありませんでした', // note: was incorrect key
-      'adj-polite-negative':stem+'ではありません','adj-polite-past-negative':stem+'ではありませんでした',
+      'adj-polite-present':stem+'です','adj-polite-past':stem+'でした','adj-polite-negative':stem+'ではありません','adj-polite-past-negative':stem+'ではありませんでした',
       'adj-te-form':stem+'で','adj-negative-te-form':negativeTeConnectiveForm(stem+'ではない'),'adj-adverb':stem+'に','adj-attributive':stem+'な','adj-conditional':stem+'なら','adj-negative-conditional':negativeBaForm(stem+'ではない'),
       'adj-tara':stem+'だったら','adj-negative-tara':stem+'ではなかったら','adj-sou':stem+'そう','adj-sugiru':stem+'すぎる','adj-naru':stem+'になる'
     };

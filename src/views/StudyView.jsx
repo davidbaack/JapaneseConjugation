@@ -21,7 +21,7 @@ import {
   isAdjective,
   promptFormLabel
 } from '../utils/conjugator.js';
-import { selectNext, recordMistake, gradeCard, bumpDaily, fmtInterval } from '../utils/storage.js';
+import { selectNext, recordMistake, gradeCard, bumpDaily, fmtInterval, getAICache, setAICache } from '../utils/storage.js';
 import {
   formDisplay,
   promptDisplay,
@@ -248,13 +248,11 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
 
     const key = `${current.verb.group}:${current.verb.dict}|${current.type}`;
 
-    try {
-      const cache = JSON.parse(localStorage.getItem('dojo_ai_sentence_cache') || '{}');
-      if (cache[key]) {
-        setAiSentence({ sentence: cache[key].sentence, translation: cache[key].translation, loading: false, err: '' });
-        return;
-      }
-    } catch (e) {}
+    const cached = getAICache('dojo_ai_sentence_cache', key);
+    if (cached) {
+      setAiSentence({ sentence: cached.sentence, translation: cached.translation, loading: false, err: '' });
+      return;
+    }
 
     if (geminiKey) {
       setAiSentence({ sentence: '', translation: '', loading: true, err: '' });
@@ -289,11 +287,7 @@ Keep it concise and clear.`;
           const data = extractJSON(reply);
           if (data && data.sentence && data.translation) {
             const resultObj = { sentence: data.sentence, translation: data.translation };
-            try {
-              const cache = JSON.parse(localStorage.getItem('dojo_ai_sentence_cache') || '{}');
-              cache[key] = resultObj;
-              localStorage.setItem('dojo_ai_sentence_cache', JSON.stringify(cache));
-            } catch (e) {}
+            setAICache('dojo_ai_sentence_cache', key, resultObj);
             setAiSentence({ ...resultObj, loading: false, err: '' });
           } else {
             throw new Error('Invalid JSON structure from AI.');
@@ -739,7 +733,7 @@ Keep it concise and clear.`;
 
   return (
     <div className="space-y-4">
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">
           <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
             JLPT {getWordMeta(current.verb).jlpt}

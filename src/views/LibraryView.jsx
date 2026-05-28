@@ -40,7 +40,7 @@ export default function LibraryView({
             }`}
           >
             <div className="text-sm">{t.label}</div>
-            <div className="text-[10px] text-stone-450 dark:text-stone-500 font-normal hidden sm:block">{t.desc}</div>
+            <div className="text-xs text-stone-450 dark:text-stone-500 font-normal hidden sm:block">{t.desc}</div>
           </button>
         ))}
       </div>

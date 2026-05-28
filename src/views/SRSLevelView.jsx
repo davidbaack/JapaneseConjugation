@@ -110,7 +110,7 @@ export default function SRSLevelView({ state, verbs }) {
                   <div key={col} className="w-14 flex justify-center flex-shrink-0">
                     <span
                       title={`${typeObj.label} · ${rule.label} — ${lDef.name}`}
-                      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border truncate max-w-full text-center ${lDef.bg} ${lDef.text} ${lDef.border}`}
+                      className={`text-xs font-semibold px-1.5 py-0.5 rounded-md border truncate max-w-full text-center ${lDef.bg} ${lDef.text} ${lDef.border}`}
                       lang="ja"
                     >
                       {COL_HEADS[COL_KEYS.indexOf(col)]}
