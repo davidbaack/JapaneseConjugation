@@ -34,24 +34,26 @@ import {
 } from '../utils/display.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
-function kanaCoachCells(expected, input, revealed = 0) {
+function kanaCoachCells(expected, input, revealed = 0, pendingLast = false) {
   const target = Array.from(expected || '');
   const typed = Array.from(toHiraganaProgress(input || ''));
   // Trailing 'n' is held pending in progress mode; commit it as 'ん' when context confirms it
   if (typed.length < target.length && target[typed.length] === 'ん' && /n$/i.test((input || '').trimEnd())) {
     typed.push('ん');
   }
+  const lastTypedIndex = typed.length - 1;
   const cells = target.map((expectedKana, i) => {
     const got = typed[i] || '';
     const hinted = !got && i < revealed;
+    const wrongButLast = pendingLast && got && got !== expectedKana && i === lastTypedIndex;
     return {
       expected: expectedKana,
       shown: got || (hinted ? expectedKana : ''),
-      state: got ? (got === expectedKana ? 'correct' : 'wrong') : (hinted ? 'hint' : 'empty')
+      state: got ? (got === expectedKana ? 'correct' : (wrongButLast ? 'pending' : 'wrong')) : (hinted ? 'hint' : 'empty')
     };
   });
   for (let i = target.length; i < typed.length; i++) {
-    cells.push({ expected: '', shown: typed[i], state: 'extra' });
+    cells.push({ expected: '', shown: typed[i], state: pendingLast && i === lastTypedIndex ? 'pending' : 'extra' });
   }
   return cells;
 }
@@ -361,7 +363,7 @@ Keep it concise and clear.`;
   const coachPreview = toHiragana(answer);
   const coachProgress = toHiraganaProgress(answer);
   const preview = coachPreview;
-  const coachCells = practicePrefs.answerMode === 'guided' ? kanaCoachCells(expected, answer, coachRevealed) : [];
+  const coachCells = practicePrefs.answerMode === 'guided' ? kanaCoachCells(expected, answer, coachRevealed, phase === 'answering') : [];
   const coachWrongIndex = coachCells.findIndex(c => c.state === 'wrong');
   const coachTypedCount = Array.from(coachProgress).length;
   const expectedKanaCount = Array.from(expected).length;
@@ -373,7 +375,7 @@ Keep it concise and clear.`;
         : coachTypedCount > expectedKanaCount
           ? 'Extra kana after the answer.'
           : `${Math.min(coachTypedCount, expectedKanaCount)}/${expectedKanaCount} kana matched.`;
-  const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill && answer ? kanaCoachCells(expected, answer, 0) : [];
+  const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill && answer ? kanaCoachCells(expected, answer, 0, phase === 'answering') : [];
   const liveWrongIndex = liveCells.findIndex(c => c.state === 'wrong' || c.state === 'extra');
   const liveMatched = liveCells.filter(c => c.state === 'correct').length;
   const liveStatus =
@@ -669,7 +671,7 @@ Keep it concise and clear.`;
     if (kanaMatchDisplay !== 'none' && (practicePrefs.answerMode === 'guided' || !reverseDrill)) {
       const newVal = answer + text;
       const revealed = practicePrefs.answerMode === 'guided' ? coachRevealed : 0;
-      const cells = kanaCoachCells(expected, newVal, revealed);
+      const cells = kanaCoachCells(expected, newVal, revealed, true);
       if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
         hadKanaMistakeRef.current = true;
       }
@@ -1003,9 +1005,11 @@ Keep it concise and clear.`;
                                 ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
                                 : cell.state === 'wrong' || cell.state === 'extra'
                                   ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
-                                  : cell.state === 'hint'
-                                    ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-805 dark:text-amber-300'
-                                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                                  : cell.state === 'pending'
+                                    ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
+                                    : cell.state === 'hint'
+                                      ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-805 dark:text-amber-300'
+                                      : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
                           return (
                             <div
                               key={i}
@@ -1052,7 +1056,7 @@ Keep it concise and clear.`;
                           setTypoGuard(null);
                           const newVal = e.target.value;
                           if (kanaMatchDisplay !== 'none') {
-                            const cells = kanaCoachCells(expected, newVal, coachRevealed);
+                            const cells = kanaCoachCells(expected, newVal, coachRevealed, true);
                             if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
                               hadKanaMistakeRef.current = true;
                             }
@@ -1145,7 +1149,7 @@ Keep it concise and clear.`;
                           setTypoGuard(null);
                           const newVal = e.target.value;
                           if (kanaMatchDisplay !== 'none' && !reverseDrill) {
-                            const cells = kanaCoachCells(expected, newVal, 0);
+                            const cells = kanaCoachCells(expected, newVal, 0, true);
                             if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
                               hadKanaMistakeRef.current = true;
                             }
@@ -1205,7 +1209,9 @@ Keep it concise and clear.`;
                                 ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
                                 : cell.state === 'wrong' || cell.state === 'extra'
                                   ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
-                                  : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                                  : cell.state === 'pending'
+                                    ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
+                                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
                             return (
                               <div
                                 key={i}
