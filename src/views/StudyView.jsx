@@ -845,7 +845,7 @@ Keep it concise and clear.`;
                   {aiHintLoading ? 'Thinking...' : 'AI clue'}
                 </button>
               </div>
-              {aiHintText && <div className="mt-2 text-stone-705 dark:text-stone-300 leading-relaxed">{aiHintText}</div>}
+              {aiHintText && <div className="mt-2 text-stone-705 dark:text-stone-300 leading-relaxed max-h-32 overflow-y-auto">{aiHintText}</div>}
               {aiHintErr && <div className="mt-2 text-rose-600">{aiHintErr}</div>}
             </div>
           ) : practicePrefs.drillMode === 'sentence' && aiSentence && !aiSentence.loading ? (
@@ -854,7 +854,7 @@ Keep it concise and clear.`;
             <>
               <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
               {aiHintText && phase === 'answering' && (
-                <div className="mt-2 text-xs text-stone-500 max-w-md mx-auto rounded-lg border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2">
+                <div className="mt-2 text-xs text-stone-500 max-w-md mx-auto rounded-lg border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 max-h-32 overflow-y-auto">
                   {aiHintText}
                 </div>
               )}
@@ -1052,7 +1052,7 @@ Keep it concise and clear.`;
                             {aiTypingHintLoading ? 'Thinking…' : 'Hint'}
                           </button>
                           {aiTypingHint && (
-                            <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
+                            <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-32 overflow-y-auto">
                               {aiTypingHint}
                             </div>
                           )}
@@ -1278,7 +1278,7 @@ Keep it concise and clear.`;
                       </div>
                     </div>
                     {aiTypingHint && (
-                      <div className="mt-2 rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left">
+                      <div className="mt-2 rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-32 overflow-y-auto">
                         {aiTypingHint}
                       </div>
                     )}
