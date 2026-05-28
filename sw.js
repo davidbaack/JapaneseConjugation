@@ -1,4 +1,4 @@
-const CACHE_NAME = 'conjugation-dojo-v68';
+const CACHE_NAME = 'katachiya-v68';
 const ASSETS = [
   './',
   './index.html',

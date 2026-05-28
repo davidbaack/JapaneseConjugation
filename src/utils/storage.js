@@ -51,7 +51,7 @@ export function saveAll(state, customVerbs, customAdjectives, wordLists, syncCon
 // AI CACHE WITH TTL
 // ============================================================================
 const AI_CACHE_TTL = 7 * DAY;
-const AI_CACHE_KEYS = ['dojo_ai_explanations_cache', 'dojo_ai_pitch_cache', 'dojo_ai_sentence_cache'];
+const AI_CACHE_KEYS = ['katachiya_ai_explanations_cache', 'katachiya_ai_pitch_cache', 'katachiya_ai_sentence_cache'];
 
 export function getAICache(storageKey, cacheKey) {
   try {

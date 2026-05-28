@@ -264,7 +264,7 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
 
     const key = `${current.verb.group}:${current.verb.dict}|${current.type}`;
 
-    const cached = getAICache('dojo_ai_sentence_cache', key);
+    const cached = getAICache('katachiya_ai_sentence_cache', key);
     if (cached) {
       setAiSentence({ sentence: cached.sentence, translation: cached.translation, loading: false, err: '' });
       return;
@@ -303,7 +303,7 @@ Keep it concise and clear.`;
           const data = extractJSON(reply);
           if (data && data.sentence && data.translation) {
             const resultObj = { sentence: data.sentence, translation: data.translation };
-            setAICache('dojo_ai_sentence_cache', key, resultObj);
+            setAICache('katachiya_ai_sentence_cache', key, resultObj);
             setAiSentence({ ...resultObj, loading: false, err: '' });
           } else {
             throw new Error('Invalid JSON structure from AI.');

@@ -25,7 +25,7 @@ export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DE
 
   async function getAIExplanation() {
     setShowAi(true);
-    const cached = getAICache('dojo_ai_explanations_cache', cacheKey);
+    const cached = getAICache('katachiya_ai_explanations_cache', cacheKey);
     if (cached) {
       setAiExplanation(cached);
       return;
@@ -42,7 +42,7 @@ export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DE
       const prompt = `Explain the conjugation of the Japanese word "${word.dict}" (${word.reading}) to the form "${getTypeInfo(type).label}" (${conjugateItem(word, type)}). Break it down into simple, easy-to-understand linguistic steps for a Japanese learner. Keep it under 100 words and be direct.`;
       const reply = await callGemini([{ role: 'user', parts: [{ text: prompt }] }], geminiKey, 600, 0.25, aiSystemFromPrefs(practicePrefs, 'You are a patient Japanese language teacher explaining conjugation rules step-by-step. Keep explanation concise and direct.'));
       setAiExplanation(reply.trim());
-      setAICache('dojo_ai_explanations_cache', cacheKey, reply.trim());
+      setAICache('katachiya_ai_explanations_cache', cacheKey, reply.trim());
     } catch (e) {
       setErr(e.message || 'Failed to get AI explanation.');
     }

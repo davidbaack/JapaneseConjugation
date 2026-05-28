@@ -1,4 +1,4 @@
-# Conjugation Dojo · 動詞と形容詞
+# Katachiya · 動詞と形容詞
 
 Japanese verb and adjective conjugation practice with spaced repetition, reference tables, and AI coaching.
 

@@ -102,7 +102,7 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
         {/* Header */}
         <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-stone-200 dark:border-stone-850">
           <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
-            {isSignUp ? 'Create Dojo Account' : 'Sign In to Dojo'}
+            {isSignUp ? 'Create Katachiya Account' : 'Sign In to Katachiya'}
           </h2>
           <button 
             onClick={onClose}
