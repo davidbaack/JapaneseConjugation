@@ -381,7 +381,7 @@ Keep it concise and clear.`;
         ? 'Complete match. Press Enter.'
         : coachTypedCount > expectedKanaCount
           ? 'Extra kana after the answer.'
-          : `${Math.min(coachTypedCount, expectedKanaCount)}/${expectedKanaCount} kana matched.`;
+          : '';
   const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill ? kanaCoachCells(expected, answer, 0, phase === 'answering') : [];
   const liveWrongIndex = liveCells.findIndex(c => c.state === 'wrong' || c.state === 'extra');
   const liveMatched = liveCells.filter(c => c.state === 'correct').length;
@@ -392,7 +392,7 @@ Keep it concise and clear.`;
         : `Kana ${liveWrongIndex + 1} does not match yet.`
       : preview === expected
         ? 'Complete match. Press Enter.'
-        : `${Math.min(liveMatched, expectedKanaCount)}/${expectedKanaCount} kana matched.`;
+        : '';
   const reviewKanaCells = ['input', 'guided'].includes(practicePrefs.answerMode) && !reverseDrill
     ? kanaCoachCells(expected, answer, practicePrefs.answerMode === 'guided' ? coachRevealed : 0)
     : [];
@@ -1027,7 +1027,7 @@ Keep it concise and clear.`;
                           );
                         })}
                       </div>
-                      {kanaMatchDisplay === 'color-count' && (
+                      {kanaMatchDisplay === 'color-count' && coachStatus && (
                         <div
                           className={`mt-2 text-xs text-center ${
                             coachWrongIndex >= 0 ? 'text-rose-700' : coachPreview === expected ? 'text-emerald-700' : 'text-stone-500'
@@ -1219,7 +1219,7 @@ Keep it concise and clear.`;
                             );
                           })}
                         </div>
-                        {kanaMatchDisplay === 'color-count' && (
+                        {kanaMatchDisplay === 'color-count' && liveStatus && (
                           <div
                             className={`mt-2 text-xs text-center ${
                               liveWrongIndex >= 0 ? 'text-rose-700' : preview === expected ? 'text-emerald-700' : 'text-stone-500'
@@ -1320,9 +1320,7 @@ Keep it concise and clear.`;
                             );
                           })}
                         </div>
-                        <div className={`mt-1 text-xs text-center ${wasCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
-                          {reviewKanaCells.filter(c => c.state === 'correct').length}/{expectedKanaCount} kana matched
-                        </div>
+
                       </div>
                     )}
                     <ScriptDisplay
