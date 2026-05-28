@@ -34,7 +34,7 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin
+            emailRedirectTo: window.location.origin + import.meta.env.BASE_URL
           }
         });
         if (error) throw error;
@@ -78,7 +78,7 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: window.location.origin + import.meta.env.BASE_URL
         }
       });
       if (error) throw error;

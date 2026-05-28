@@ -69,6 +69,9 @@ export default function App() {
       // Listen for auth state changes
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
         setSession(currentSession);
+        if (_event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
       });
 
       return () => subscription.unsubscribe();
