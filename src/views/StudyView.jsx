@@ -1203,22 +1203,18 @@ Keep it concise and clear.`;
                       canSubmit={!!answer.trim()}
                       noToggle
                     />
-                    {!!liveCells.length && (
+                    {!!liveCells.length && kanaMatchDisplay !== 'none' && (kanaMatchDisplay === 'color-count' || liveCells.some(c => c.state !== 'empty')) && (
                       <div className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">
                         <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                          {liveCells.map((cell, i) => {
+                          {(kanaMatchDisplay === 'color-count' ? liveCells : liveCells.filter(c => c.state !== 'empty')).map((cell, i) => {
                             const cls =
-                              kanaMatchDisplay === 'none'
-                                ? cell.state === 'empty'
-                                  ? 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300'
-                                  : 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
-                                : cell.state === 'correct'
-                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
-                                  : cell.state === 'wrong' || cell.state === 'extra'
-                                    ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
-                                    : cell.state === 'pending'
-                                      ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
-                                      : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                              cell.state === 'correct'
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
+                                : cell.state === 'wrong' || cell.state === 'extra'
+                                  ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
+                                  : cell.state === 'pending'
+                                    ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
+                                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
                             return (
                               <div
                                 key={i}
