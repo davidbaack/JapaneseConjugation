@@ -221,7 +221,7 @@ export default function App() {
         <header className="mb-4 sm:mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
-              動詞と形容詞 <span className="text-stone-400 font-normal">·</span> Conjugation Dojo
+              動詞と形容詞 <span className="text-stone-400 font-normal">·</span> Katachiya
             </h1>
             <p className="text-xs text-stone-500 mt-0.5">Spaced repetition, reference tables, and AI coaching</p>
           </div>

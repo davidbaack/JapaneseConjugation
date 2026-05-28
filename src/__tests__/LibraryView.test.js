@@ -414,9 +414,9 @@ describe('sanitizeExportName', () => {
     expect(sanitizeExportName('My   List')).toBe('My-List');
   });
 
-  it('falls back to "dojo" for blank input', () => {
-    expect(sanitizeExportName('')).toBe('dojo');
-    expect(sanitizeExportName(null)).toBe('dojo');
+  it('falls back to "katachiya" for blank input', () => {
+    expect(sanitizeExportName('')).toBe('katachiya');
+    expect(sanitizeExportName(null)).toBe('katachiya');
   });
 
   it('truncates to 64 characters', () => {

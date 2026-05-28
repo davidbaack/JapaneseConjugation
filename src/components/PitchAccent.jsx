@@ -113,7 +113,7 @@ export function PitchAccentSection({ word, kanaText, geminiKey, practicePrefs: _
     setShow(true);
     if (pitchData) return;
 
-    const cached = getAICache('dojo_ai_pitch_cache', cacheKey);
+    const cached = getAICache('katachiya_ai_pitch_cache', cacheKey);
     if (cached) {
       setPitchData(cached);
       return;
@@ -153,7 +153,7 @@ Do not return any extra markdown or chat formatting. Return valid JSON only.`;
           typeNumber: parsed.typeNumber || 0
         };
 
-        setAICache('dojo_ai_pitch_cache', cacheKey, result);
+        setAICache('katachiya_ai_pitch_cache', cacheKey, result);
 
         setPitchData(result);
       } else {

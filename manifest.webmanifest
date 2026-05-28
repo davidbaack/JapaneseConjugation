@@ -1,6 +1,6 @@
 {
-  "name": "Conjugation Dojo",
-  "short_name": "Dojo",
+  "name": "Katachiya",
+  "short_name": "Katachiya",
   "description": "Japanese verb and adjective conjugation practice with reference tables and AI coaching.",
   "start_url": "./index.html",
   "scope": "./",

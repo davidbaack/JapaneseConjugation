@@ -36,8 +36,8 @@ export function addUniqueWord(list, word) {
   return list.some(w => w.dict === word.dict && w.group === word.group) ? list : [...list, word];
 }
 
-export function sanitizeExportName(name = 'dojo') {
-  return String(name || 'dojo').normalize('NFKC').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'dojo';
+export function sanitizeExportName(name = 'katachiya') {
+  return String(name || 'katachiya').normalize('NFKC').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'katachiya';
 }
 
 function csvCell(value) {
@@ -50,7 +50,7 @@ function tsvCell(value) {
 }
 
 function ankiTag(value) {
-  return sanitizeExportName(value).toLowerCase().replace(/[^a-z0-9_-]+/g, '_') || 'dojo';
+  return sanitizeExportName(value).toLowerCase().replace(/[^a-z0-9_-]+/g, '_') || 'katachiya';
 }
 
 export function wordsForList(list, words) {
@@ -73,8 +73,8 @@ export function buildConjugationAnkiTsv(list, words) {
   const rows = [
     '#separator:Tab',
     '#html:false',
-    `#deck:Conjugation Dojo::${tsvCell(name)}`,
-    `#tags:conjugation-dojo ${ankiTag(name)}`,
+    `#deck:Katachiya::${tsvCell(name)}`,
+    `#tags:katachiya ${ankiTag(name)}`,
     ['Prompt', 'Answer', 'Base', 'Reading', 'Meaning', 'Group', 'Form', 'Rule', 'Tags'].join('\t')
   ];
   for (const word of wordsForList(list, words)) {
@@ -83,7 +83,7 @@ export function buildConjugationAnkiTsv(list, words) {
       if (!answer) continue;
       const explanation = explainItem(word, type.id);
       const prompt = `Conjugate ${word.dict} (${word.reading}) to ${type.label}.`;
-      const tags = `conjugation-dojo ${ankiTag(name)} ${ankiTag(word.group)} ${ankiTag(type.id)}`;
+      const tags = `katachiya ${ankiTag(name)} ${ankiTag(word.group)} ${ankiTag(type.id)}`;
       rows.push([prompt, answer, word.dict, word.reading, word.meaning, GROUP_NAMES[word.group] || word.group, type.label, explanation.rule || '', tags].map(tsvCell).join('\t'));
     }
   }
@@ -256,7 +256,7 @@ export default function ListsViewSub({
       setMsg('Choose a list with words before exporting.');
       return;
     }
-    downloadTextFile(`conjugation-dojo-${sanitizeExportName(active.name)}-vocab.csv`, buildVocabularyCsv(active, words), 'text/csv;charset=utf-8');
+    downloadTextFile(`katachiya-${sanitizeExportName(active.name)}-vocab.csv`, buildVocabularyCsv(active, words), 'text/csv;charset=utf-8');
     setMsg(`Exported ${activeWords.length} vocab row${activeWords.length === 1 ? '' : 's'} from ${active.name}.`);
   }
 
@@ -266,7 +266,7 @@ export default function ListsViewSub({
       return;
     }
     const cardCount = activeWords.reduce((sum, w) => sum + compatibleTypes(w).filter(t => !!conjugateItem(w, t.id)).length, 0);
-    downloadTextFile(`conjugation-dojo-${sanitizeExportName(active.name)}-anki.txt`, buildConjugationAnkiTsv(active, words), 'text/plain;charset=utf-8');
+    downloadTextFile(`katachiya-${sanitizeExportName(active.name)}-anki.txt`, buildConjugationAnkiTsv(active, words), 'text/plain;charset=utf-8');
     setMsg(`Exported ${cardCount} Anki drill row${cardCount === 1 ? '' : 's'} from ${active.name}.`);
   }
 
