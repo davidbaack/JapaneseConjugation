@@ -50,10 +50,9 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
   const timerRef = useRef(null);
   
   const ambient = state.ambient || defaultState().ambient;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const deck = useMemo(
     () => buildAmbientDeck(words, state, practicePrefs, wordLists, mode, 18),
-    [words, state.cards, state.mistakes, state.enabledTypes, state.verbStats, practicePrefs, wordLists, mode]
+    [words, state.cards, state.mistakes, state.enabledTypes, state.verbStats, practicePrefs, wordLists, mode] // eslint-disable-line react-hooks/exhaustive-deps
   );
   
   const current = deck[index % Math.max(1, deck.length)] || null;

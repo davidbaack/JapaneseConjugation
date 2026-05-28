@@ -167,6 +167,9 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
     if (current && phase === 'answering' && listeningPrompt && promptAudioText) {
       speakJapaneseLocal(promptAudioText, 0.85);
     }
+  // current?.id used intentionally instead of current to avoid re-triggering on unrelated state changes
+  // speakJapaneseLocal is defined inline and omitted to avoid infinite re-runs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, phase, listeningPrompt, promptAudioText, practicePrefs.voiceURI]);
 
   useEffect(() => {
@@ -174,6 +177,8 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
     if (current && phase === 'reviewing' && practicePrefs.autoSpeak) {
       speakJapaneseLocal(conjugateItem(current.verb, current.type), 0.9);
     }
+  // speakJapaneseLocal is defined inline and omitted to avoid infinite re-runs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, phase, practicePrefs.autoSpeak, practicePrefs.voiceURI]);
 
   useEffect(() => {
@@ -215,6 +220,8 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
 
   useEffect(() => {
     setReviewBase(state.session.reviewed || 0);
+  // state.session.reviewed intentionally omitted — only reset baseline when limit setting changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [practicePrefs.reviewLimit]);
 
   useEffect(() => {
@@ -303,6 +310,8 @@ Keep it concise and clear.`;
       const fallback = getOfflineTemplateSentence(current.verb, current.type);
       setAiSentence({ ...fallback, loading: false, err: '' });
     }
+  // current/practicePrefs.scriptMode/reverseDrill/sourceForm intentionally omitted — keyed on current?.id to avoid re-fetching on render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, practicePrefs.drillMode, geminiKey]);
 
   function speakJapaneseLocal(text, rateVal = 0.85) {
@@ -386,7 +395,6 @@ Keep it concise and clear.`;
           : '';
   const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill ? kanaCoachCells(expected, answer, 0, phase === 'answering') : [];
   const liveWrongIndex = liveCells.findIndex(c => c.state === 'wrong' || c.state === 'extra');
-  const liveMatched = liveCells.filter(c => c.state === 'correct').length;
   const liveStatus =
     liveWrongIndex >= 0
       ? liveCells[liveWrongIndex].state === 'extra'
@@ -446,7 +454,7 @@ Keep it concise and clear.`;
         aiSystemFromPrefs(practicePrefs, 'You help students learn Japanese conjugation. Never reveal the full correct answer.')
       );
       setAiTypingHint(reply);
-    } catch (e) {
+    } catch {
       // silently fail — no error shown for inline hint
     }
     setAiTypingHintLoading(false);
@@ -701,7 +709,6 @@ Keep it concise and clear.`;
     focusAnswerInput();
   }
 
-  const card = state.cards[current.id];
   if ((reviewSetComplete && phase === 'answering') || timeLeft === 0) {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
