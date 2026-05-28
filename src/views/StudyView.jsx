@@ -856,7 +856,7 @@ Keep it concise and clear.`;
             </>
           )}
 
-          {phase === 'reviewing' && (
+          {phase === 'reviewing' && practicePrefs.showWordCategory && (
             <div className="text-xs text-stone-400 mt-1">
               {GROUP_NAMES[current.verb.group]} · {wordType}
             </div>

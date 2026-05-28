@@ -422,6 +422,25 @@ export default function SettingsView({
             <p className="text-[11px] text-stone-400 mt-1">Hidden mode can still ask Gemini for a non-answer clue.</p>
           </div>
           <div>
+            <label className="text-xs text-stone-500 block mb-1">Word category label</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[{ id: true, label: 'Show' }, { id: false, label: 'Hide' }].map(o => (
+                <button
+                  key={String(o.id)}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, showWordCategory: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    (!!practicePrefs.showWordCategory === o.id)
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-1">Hides う-verb / る-verb / な-adjective labels during review — identifying the category is part of the training.</p>
+          </div>
+          <div>
             <label className="text-xs text-stone-500 block mb-1">Theme</label>
             <div className="grid grid-cols-3 gap-2">
               {[{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }, { id: 'system', label: `System${resolvedTheme === 'dark' ? ' dark' : ' light'}` }].map(o => (
