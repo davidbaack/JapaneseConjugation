@@ -733,7 +733,7 @@ Keep it concise and clear.`;
 
   return (
     <div className="space-y-4">
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">
           <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
             JLPT {getWordMeta(current.verb).jlpt}
