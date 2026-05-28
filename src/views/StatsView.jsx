@@ -2,10 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { IconSpark, IconFlame } from '../components/Icons.jsx';
 import { ALL_CARD_TYPES, TYPE_LABEL } from '../data/conjugationTypes.js';
 import { RULES } from '../utils/conjugator.js';
-import { defaultState, getCardLevel } from '../utils/storage.js';
+import { defaultState } from '../utils/storage.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import { shuffled } from '../utils/display.js';
 
 function srsStatsFor(state, verbs) {
   const now = Date.now();

@@ -22,7 +22,9 @@ export function ChatPanel({ verb, type, userAnswer, expected, explanation, gemin
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const endRef = useRef(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const context = useMemo(() => buildContext(verb, type, userAnswer, expected, explanation, practicePrefs, taskOverride), [verb, type, userAnswer, expected, explanation, practicePrefs.aiFeedbackLevel, taskOverride]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const systemText = useMemo(() => aiSystemFromPrefs(practicePrefs, AI_SYSTEM), [practicePrefs.aiFeedbackLevel, practicePrefs.aiGuideTone]);
 
   useEffect(() => {

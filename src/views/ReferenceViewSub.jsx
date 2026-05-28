@@ -3,13 +3,10 @@ import { IconList, IconStar, IconCheck, IconVolume, IconSpark, IconBook, IconPen
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import { PitchAccentSection } from '../components/PitchAccent.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
-import { toHiragana, kanaToRomaji, isAllKana } from '../utils/romaji.js';
+import { toHiragana, kanaToRomaji } from '../utils/romaji.js';
 import {
   conjugateItem,
-  getTypeInfo,
   explainItem,
-  diagnoseItem,
-  compatibleTypes,
   GROUP_NAMES,
   isAdjective,
   wordKind,
@@ -23,29 +20,15 @@ import { CONJ_TYPES, ADJ_TYPES } from '../data/conjugationTypes.js';
 import {
   normalizeReferenceState,
   referenceProgressFor,
-  defaultState,
-  ruleWeakScore
+  defaultState
 } from '../utils/storage.js';
 import {
   formDisplay,
-  promptDisplay,
-  englishForForm,
-  shuffled,
-  drillDirectionFor
+  promptDisplay
 } from '../utils/display.js';
 import { callGemini, aiSystemFromPrefs, extractJSON, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import { explainReversePrompt } from './StudyView.jsx';
 
-const CLASSIFY_OPTIONS = [
-  { id: 'ichidan', label: 'る-verb', hint: 'Drop る and attach endings directly.' },
-  { id: 'godan', label: 'う-verb', hint: 'The final kana shifts across あ/い/え/お rows.' },
-  { id: 'suru', label: 'する', hint: 'Irregular する pattern.' },
-  { id: 'kuru', label: '来る', hint: 'Irregular 来る pattern.' },
-  { id: 'irregular-adjective', label: 'irregular い-adjective', hint: 'いい keeps its present form but conjugates from よい.' },
-  { id: 'i-adjective', label: 'い-adjective', hint: 'Usually ends in い and conjugates like 高い → 高かった.' },
-  { id: 'na-adjective', label: 'な-adjective', hint: 'Takes な before nouns and uses だ/です as a predicate.' }
-];
 
 export function classifyHint(word) {
   if (word.group === 'ichidan') return `${word.reading} is ichidan: remove る to make forms like ${conjugate(word, 'polite-present')}.`;
@@ -582,7 +565,7 @@ export default function ReferenceViewSub({
         setCopyTableOk(true);
         setTimeout(() => setCopyTableOk(false), 1800);
       }
-    } catch (e) {}
+    } catch {}
   }
 
   async function generateExamples() {

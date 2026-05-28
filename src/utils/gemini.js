@@ -42,7 +42,7 @@ export function extractJSON(text) {
       if(inStr){if(c==='\\')j++;else if(c==='"')inStr=false;}
       else if(c==='"')inStr=true;
       else if(c==='{')depth++;
-      else if(c==='}'){if(!--depth){try{return JSON.parse(text.slice(i,j+1));}catch(e){break;}}}
+      else if(c==='}'){if(!--depth){try{return JSON.parse(text.slice(i,j+1));}catch{break;}}}
     }
   }
   return null;

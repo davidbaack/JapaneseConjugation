@@ -32,8 +32,7 @@ import {
   kanaToRomaji
 } from '../utils/romaji.js';
 import {
-  typePreviewValues,
-  isAdjective
+  typePreviewValues
 } from '../utils/conjugator.js';
 import {
   buildPracticePoolSummary,
@@ -83,13 +82,7 @@ export default function SettingsView({
   const [importErr, setImportErr] = useState('');
   const [msg, setMsg] = useState('');
   const [copyOk, setCopyOk] = useState(false);
-  const [localGeminiKey, setLocalGeminiKey] = useState(geminiKey);
-  const [geminiMsg, setGeminiMsg] = useState('');
   const [typeSearch, setTypeSearch] = useState('');
-
-  useEffect(() => {
-    setLocalGeminiKey(geminiKey);
-  }, [geminiKey]);
 
   const exportData = useMemo(() => {
     return JSON.stringify({
@@ -193,7 +186,7 @@ export default function SettingsView({
         setCopyOk(true);
         setTimeout(() => setCopyOk(false), 2000);
       }
-    } catch (e) {}
+    } catch {}
   }
 
   function doImport() {

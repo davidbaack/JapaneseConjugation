@@ -6,7 +6,6 @@ import {
   resolveThemePreference,
   loadAll,
   saveAll,
-  syncReady,
   cloudFetch,
   cloudUpsert,
   mergeState
@@ -119,6 +118,8 @@ export default function App() {
     } else {
       setSyncStatus({ kind: 'idle', message: '', at: null });
     }
+  // state/customVerbs/etc intentionally omitted — this effect is triggered by login, not data changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, hydrated]);
 
   // Local save & cloud auto-upsert on progress changes

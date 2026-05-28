@@ -59,6 +59,8 @@ export default function CustomDictionaryViewSub({
     setSuggErr('');
     setSuggLoading(false);
     if (geminiKey) fetchSugg();
+  // fetchSugg is defined inline without useCallback — adding it would cause infinite re-runs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geminiKey, dictTab]);
 
   function resetAdd() {

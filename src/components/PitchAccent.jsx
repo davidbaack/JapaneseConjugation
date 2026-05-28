@@ -90,7 +90,7 @@ export function PitchAccentContour({ morae, pitch }) {
   );
 }
 
-export function PitchAccentSection({ word, kanaText, geminiKey, practicePrefs = DEFAULT_PREFS }) {
+export function PitchAccentSection({ word, kanaText, geminiKey, practicePrefs: _practicePrefs = DEFAULT_PREFS }) {
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pitchData, setPitchData] = useState(null);

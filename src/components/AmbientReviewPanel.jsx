@@ -50,6 +50,7 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
   const timerRef = useRef(null);
   
   const ambient = state.ambient || defaultState().ambient;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const deck = useMemo(
     () => buildAmbientDeck(words, state, practicePrefs, wordLists, mode, 18),
     [words, state.cards, state.mistakes, state.enabledTypes, state.verbStats, practicePrefs, wordLists, mode]
@@ -98,6 +99,8 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
         timerRef.current = null;
       }
     };
+  // bumpPlayed/current/deck.length intentionally omitted — using current?.id to avoid re-triggering on obj identity changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, index, current?.id, rate, practicePrefs.voiceURI]);
 
   function bumpPlayed() {

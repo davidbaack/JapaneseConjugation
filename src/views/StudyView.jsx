@@ -21,7 +21,7 @@ import {
   isAdjective,
   promptFormLabel
 } from '../utils/conjugator.js';
-import { selectNext, recordMistake, gradeCard, bumpDaily, fmtInterval, getAICache, setAICache } from '../utils/storage.js';
+import { selectNext, recordMistake, gradeCard, bumpDaily, getAICache, setAICache } from '../utils/storage.js';
 import {
   formDisplay,
   promptDisplay,
@@ -124,6 +124,8 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
     if (current === null) {
       setCurrent(selectNext(state, practiceWords, enabledTypes, null, practicePrefs));
     }
+  // state intentionally omitted — this triggers on card change, not every state mutation
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, practiceWords, enabledTypes, practicePrefs]);
 
   useEffect(() => {

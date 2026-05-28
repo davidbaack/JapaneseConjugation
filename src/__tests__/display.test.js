@@ -9,12 +9,10 @@ import {
   pastParticiple,
   thirdPerson,
   resolveDisplayScripts,
-  formDisplay,
 } from '../utils/display.js';
 import { filterWordsForPrefs } from '../utils/conjugator.js';
 
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat',   group: 'ichidan' };
-const KAKU   = { dict: '書く',   reading: 'かく',   meaning: 'to write', group: 'godan'   };
 const TAKAI  = { dict: '高い',   reading: 'たかい', meaning: 'expensive', group: 'i-adjective' };
 
 // ─── normalizeJapaneseText ────────────────────────────────────────────────────

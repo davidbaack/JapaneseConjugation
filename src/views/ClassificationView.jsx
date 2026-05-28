@@ -9,14 +9,12 @@ import {
   conjugate,
   conjugateAdjective,
   conjugateItem,
-  getWordMeta,
-  GROUP_NAMES
+  getWordMeta
 } from '../utils/conjugator.js';
 import { defaultState, bumpDaily } from '../utils/storage.js';
 import { promptDisplay } from '../utils/display.js';
 import { TYPE_LABEL } from '../data/conjugationTypes.js';
 import { callGemini, aiSystemFromPrefs } from '../utils/gemini.js';
-import { DEFAULT_PREFS } from '../data/defaults.js';
 
 export const CLASSIFY_OPTIONS = [
   { id: 'ichidan', label: 'る-verb', hint: 'Drop る and attach endings directly.' },
@@ -139,7 +137,6 @@ export default function ClassificationView({ state, setState, words, practicePre
     setAiLoading(false);
   }
 
-  const acc = stats.attempted ? Math.round((stats.correct / stats.attempted) * 105) : 0; // Wait, stats.correct / stats.attempted * 100
   const realAcc = stats.attempted ? Math.round((stats.correct / stats.attempted) * 100) : 0;
   const currentView = promptDisplay(current, null, practicePrefs);
 

@@ -13,14 +13,15 @@ export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DE
   const [showAi, setShowAi] = useState(false);
 
   const steps = useMemo(() => getConjugationSteps(word, type), [word, type]);
-  const cacheKey = `${wordKey(word)}|${type}`;
+  const wKey = wordKey(word);
+  const cacheKey = `${wKey}|${type}`;
 
   useEffect(() => {
     setAiExplanation('');
     setErr('');
     setLoading(false);
     setShowAi(false);
-  }, [wordKey(word), type]);
+  }, [wKey, type]);
 
   async function getAIExplanation() {
     setShowAi(true);

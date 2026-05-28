@@ -1,6 +1,5 @@
 import {
   STORAGE_KEY,
-  DEFAULT_SYNC,
   DEFAULT_PREFS
 } from '../data/defaults.js';
 import {
@@ -14,10 +13,7 @@ import {
   RULES,
   isRedundantPracticeType,
   enabledTypeIdsFor,
-  filterWordsForPrefs,
-  wordKey,
-  compatibleTypes,
-  conjugateItem
+  filterWordsForPrefs
 } from './conjugator.js';
 
 export const DAY = 86400000;

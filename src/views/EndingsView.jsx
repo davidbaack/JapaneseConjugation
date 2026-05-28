@@ -35,6 +35,8 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
     if (!current && drillVerbs.length) {
       next(drillVerbs);
     }
+  // next is defined inline without useCallback — adding it would cause infinite re-runs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, drillVerbs, target]);
 
   useEffect(() => {

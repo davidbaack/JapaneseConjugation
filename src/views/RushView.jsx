@@ -48,6 +48,8 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
       if (left <= 0) resolveRound(false, 'timeout');
     }, 100);
     return () => clearInterval(id);
+  // resolveRound is defined inline without useCallback — adding it would reset the timer on every render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, paused, round, deadline]);
 
   function buildRound() {

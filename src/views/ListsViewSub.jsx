@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { IconPlus, IconSpark, IconTrash } from '../components/Icons.jsx';
+import { IconPlus, IconSpark } from '../components/Icons.jsx';
 import { searchWords } from './ReferenceViewSub.jsx';
 import {
   isAdjective,

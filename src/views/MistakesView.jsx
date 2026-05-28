@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { IconVolume } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import { toHiragana } from '../utils/romaji.js';
@@ -13,8 +13,8 @@ import { promptDisplay, formDisplay } from '../utils/display.js';
 import { speakJapanese } from '../utils/speech.js';
 
 export default function MistakesView({ state, setState, practicePrefs }) {
-  const mistakes = state.mistakes || [];
-  const open = mistakes.filter(m => !m.resolved);
+  const mistakes = useMemo(() => state.mistakes || [], [state.mistakes]);
+  const open = useMemo(() => mistakes.filter(m => !m.resolved), [mistakes]);
   const [activeKey, setActiveKey] = useState(open[0]?.key || mistakes[0]?.key || null);
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState(null);
