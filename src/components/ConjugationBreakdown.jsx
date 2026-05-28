@@ -85,7 +85,7 @@ export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DE
           ) : err ? (
             <div className="text-[11px] text-rose-600">{err}</div>
           ) : (
-            <p className="text-[11px] text-stone-600 leading-relaxed whitespace-pre-wrap">{aiExplanation}</p>
+            <p className="text-[11px] text-stone-600 leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto">{aiExplanation}</p>
           )}
         </div>
       )}
