@@ -45,11 +45,12 @@ function kanaCoachCells(expected, input, revealed = 0, pendingLast = false) {
   const cells = target.map((expectedKana, i) => {
     const got = typed[i] || '';
     const hinted = !got && i < revealed;
-    const wrongButLast = pendingLast && got && got !== expectedKana && i === lastTypedIndex;
     return {
       expected: expectedKana,
       shown: got || (hinted ? expectedKana : ''),
-      state: got ? (got === expectedKana ? 'correct' : (wrongButLast ? 'pending' : 'wrong')) : (hinted ? 'hint' : 'empty')
+      state: got
+        ? (pendingLast && i === lastTypedIndex ? 'pending' : (got === expectedKana ? 'correct' : 'wrong'))
+        : (hinted ? 'hint' : 'empty')
     };
   });
   for (let i = target.length; i < typed.length; i++) {
