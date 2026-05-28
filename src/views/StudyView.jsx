@@ -175,6 +175,18 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   }, [current?.id, practicePrefs.answerMode]);
 
   useEffect(() => {
+    if (!current) return;
+    if (phase !== 'answering') return;
+    if (reverseDrill) return;
+    if (!['input', 'guided'].includes(practicePrefs.answerMode)) return;
+    const exp = reverseDrill ? current.verb.reading : sourceForm;
+    const preview = toHiragana(answer);
+    if (exp && preview === exp) {
+      submit();
+    }
+  }, [answer]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (phase === 'answering') {
       setRevealedMiss(false);
       setReviewChoiceLabel('');
