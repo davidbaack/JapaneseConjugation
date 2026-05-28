@@ -1094,14 +1094,14 @@ Keep it concise and clear.`;
                       <button
                         type="button"
                         onClick={() => setKanaPadOpen(v => !v)}
-                        className={`shrink-0 px-3 py-1.5 rounded-lg border text-sm inline-flex items-center gap-1.5 transition ${
+                        className={`shrink-0 p-2 rounded-lg border inline-flex items-center justify-center aspect-square transition ${
                           kanaPadOpen
                             ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
                             : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
                         }`}
+                        title="Kana pad"
                       >
                         <IconPen className="w-4 h-4" />
-                        Kana pad
                       </button>
                     </div>
                     {answer && coachPreview !== answer && (
@@ -1187,14 +1187,14 @@ Keep it concise and clear.`;
                       <button
                         type="button"
                         onClick={() => setKanaPadOpen(v => !v)}
-                        className={`shrink-0 px-3 py-1.5 rounded-lg border text-sm inline-flex items-center gap-1.5 transition ${
+                        className={`shrink-0 p-2 rounded-lg border inline-flex items-center justify-center aspect-square transition ${
                           kanaPadOpen
                             ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
                             : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
                         }`}
+                        title="Kana pad"
                       >
                         <IconPen className="w-4 h-4" />
-                        Kana pad
                       </button>
                     </div>
                     {answer && preview !== answer && (
