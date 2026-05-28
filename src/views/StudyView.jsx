@@ -98,6 +98,7 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const inputRef = useRef(null);
   const autoAdvanceRef = useRef(null);
   const hadKanaMistakeRef = useRef(false);
+  const typingHintRef = useRef(null);
 
   const enabledTypes = state.enabledTypes.length > 0 ? state.enabledTypes : ['plain-past'];
   const practiceWords = useMemo(() => {
@@ -156,6 +157,12 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
     setAiHintErr('');
     setAiHintLoading(false);
   }, [current?.id, practicePrefs.englishHints]);
+
+  useEffect(() => {
+    if (aiTypingHint && typingHintRef.current) {
+      typingHintRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [aiTypingHint]);
 
   // Handle TTS speech synthesis inside StudyView
   useEffect(() => {
@@ -1056,7 +1063,7 @@ Keep it concise and clear.`;
                             {aiTypingHintLoading ? 'Thinking…' : 'Hint'}
                           </button>
                           {aiTypingHint && (
-                            <div className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-32 overflow-y-auto">
+                            <div ref={typingHintRef} className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-32 overflow-y-auto">
                               {aiTypingHint}
                             </div>
                           )}
@@ -1272,7 +1279,7 @@ Keep it concise and clear.`;
                       </div>
                     </div>
                     {aiTypingHint && (
-                      <div className="mt-2 rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-32 overflow-y-auto">
+                      <div ref={typingHintRef} className="mt-2 rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-32 overflow-y-auto">
                         {aiTypingHint}
                       </div>
                     )}
