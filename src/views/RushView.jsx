@@ -333,11 +333,6 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
               Submit
             </button>
           </div>
-          {answer && round && toHiragana(answer) !== answer && (
-            <div className="mt-2 text-center text-sm text-stone-500" lang="ja">
-              → {toHiragana(answer)}
-            </div>
-          )}
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
           <h3 className="font-medium mb-3 text-stone-950 dark:text-stone-50">Rush log</h3>

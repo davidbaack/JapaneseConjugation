@@ -1104,11 +1104,6 @@ Keep it concise and clear.`;
                         <IconPen className="w-4 h-4" />
                       </button>
                     </div>
-                    {answer && coachPreview !== answer && (
-                      <div className="mt-2 text-center text-sm text-stone-500" lang="ja">
-                        → {coachPreview}
-                      </div>
-                    )}
                     <KanaInputPad
                       open={kanaPadOpen}
                       onToggle={() => setKanaPadOpen(v => !v)}
@@ -1197,11 +1192,6 @@ Keep it concise and clear.`;
                         <IconPen className="w-4 h-4" />
                       </button>
                     </div>
-                    {answer && preview !== answer && (
-                      <div className="mt-2 text-center text-sm text-stone-500" lang="ja">
-                        → {preview}
-                      </div>
-                    )}
                     <KanaInputPad
                       open={kanaPadOpen}
                       onToggle={() => setKanaPadOpen(v => !v)}

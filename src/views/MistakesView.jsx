@@ -158,11 +158,6 @@ export default function MistakesView({ state, setState, practicePrefs }) {
                 autoCorrect="off"
                 spellCheck="false"
               />
-              {answer && toHiragana(answer) !== answer && (
-                <div className="mt-2 text-center text-sm text-stone-500" lang="ja">
-                  → {toHiragana(answer)}
-                </div>
-              )}
               <button
                 onClick={submit}
                 disabled={!answer.trim()}
