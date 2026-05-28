@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { IconCloud } from './components/Icons.jsx';
 import {
   defaultState,
@@ -18,16 +18,16 @@ import { STARTER_VERBS, STARTER_ADJECTIVES } from './data/starterWords.js';
 import { supabase } from './utils/supabase.js';
 import AuthModal from './components/AuthModal.jsx';
 
-// Views
-import StudyView from './views/StudyView.jsx';
-import RushView from './views/RushView.jsx';
-import EndingsView from './views/EndingsView.jsx';
-import ClassificationView from './views/ClassificationView.jsx';
-import MistakesView from './views/MistakesView.jsx';
-import StatsView from './views/StatsView.jsx';
-import SRSLevelView from './views/SRSLevelView.jsx';
-import LibraryView from './views/LibraryView.jsx';
-import SettingsView from './views/SettingsView.jsx';
+// Views — lazy-loaded so each gets its own chunk
+const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
+const RushView = React.lazy(() => import('./views/RushView.jsx'));
+const EndingsView = React.lazy(() => import('./views/EndingsView.jsx'));
+const ClassificationView = React.lazy(() => import('./views/ClassificationView.jsx'));
+const MistakesView = React.lazy(() => import('./views/MistakesView.jsx'));
+const StatsView = React.lazy(() => import('./views/StatsView.jsx'));
+const SRSLevelView = React.lazy(() => import('./views/SRSLevelView.jsx'));
+const LibraryView = React.lazy(() => import('./views/LibraryView.jsx'));
+const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 
 export default function App() {
   const [tab, setTab] = useState('study');
@@ -253,15 +253,17 @@ export default function App() {
             </button>
           ))}
         </nav>
-        {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
-        {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
-        {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
-        {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
-        {tab === 'mistakes' && <MistakesView state={state} setState={setState} practicePrefs={practicePrefs} />}
-        {tab === 'stats' && <StatsView state={state} setState={setState} verbs={allWords} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab} wordLists={wordLists} setWordLists={setWordLists} />}
-        {tab === 'levels' && <SRSLevelView state={state} verbs={allWords} />}
-        {tab === 'library' && <LibraryView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={activeGeminiKey} setTab={setTab} />}
-        {tab === 'settings' && <SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} session={session} syncStatus={syncStatus} syncNow={syncNow} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme} supabase={supabase} onShowAuth={() => setShowAuthModal(true)} />}
+        <Suspense fallback={<div className="flex justify-center py-20 text-stone-400 text-sm">Loading…</div>}>
+          {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
+          {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
+          {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
+          {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
+          {tab === 'mistakes' && <MistakesView state={state} setState={setState} practicePrefs={practicePrefs} />}
+          {tab === 'stats' && <StatsView state={state} setState={setState} verbs={allWords} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab} wordLists={wordLists} setWordLists={setWordLists} />}
+          {tab === 'levels' && <SRSLevelView state={state} verbs={allWords} />}
+          {tab === 'library' && <LibraryView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={activeGeminiKey} setTab={setTab} />}
+          {tab === 'settings' && <SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} session={session} syncStatus={syncStatus} syncNow={syncNow} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme} supabase={supabase} onShowAuth={() => setShowAuthModal(true)} />}
+        </Suspense>
       </div>
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} supabase={supabase} />
     </div>
