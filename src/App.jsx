@@ -40,6 +40,7 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
   const geminiKey = import.meta.env?.VITE_GEMINI_API_KEY || '';
+  const activeGeminiKey = useMemo(() => geminiKey || (session ? 'proxy' : ''), [geminiKey, session]);
   const [speechVoices, setSpeechVoices] = useState([]);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const [hydrated, setHydrated] = useState(false);
@@ -252,15 +253,15 @@ export default function App() {
             </button>
           ))}
         </nav>
-        {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
+        {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
         {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
-        {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
-        {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
+        {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
+        {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
         {tab === 'mistakes' && <MistakesView state={state} setState={setState} practicePrefs={practicePrefs} />}
-        {tab === 'stats' && <StatsView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab} wordLists={wordLists} setWordLists={setWordLists} />}
+        {tab === 'stats' && <StatsView state={state} setState={setState} verbs={allWords} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab} wordLists={wordLists} setWordLists={setWordLists} />}
         {tab === 'levels' && <SRSLevelView state={state} verbs={allWords} />}
-        {tab === 'library' && <LibraryView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey} setTab={setTab} />}
-        {tab === 'settings' && <SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} session={session} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme} supabase={supabase} onShowAuth={() => setShowAuthModal(true)} />}
+        {tab === 'library' && <LibraryView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={activeGeminiKey} setTab={setTab} />}
+        {tab === 'settings' && <SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} session={session} syncStatus={syncStatus} syncNow={syncNow} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme} supabase={supabase} onShowAuth={() => setShowAuthModal(true)} />}
       </div>
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} supabase={supabase} />
     </div>

@@ -845,11 +845,11 @@ export default function SettingsView({
         
         {geminiKey ? (
           <div className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-955/20 border border-emerald-250 dark:border-emerald-900 rounded-xl px-3 py-2 mb-3">
-            ✓ Gemini API is active (configured in environment).
+            ✓ {geminiKey === 'proxy' ? 'Gemini API is active via Secure Cloud Proxy.' : 'Gemini API is active (configured in environment).'}
           </div>
         ) : (
           <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-955/20 border border-amber-250 dark:border-amber-900 rounded-xl px-3 py-2 mb-3">
-            ⚠️ Gemini API is not configured. Please set <code>VITE_GEMINI_API_KEY</code> in your environment variables to enable AI coaching.
+            ⚠️ Gemini API is not configured. Please sign in (Cloud Sync) or set <code>VITE_GEMINI_API_KEY</code> in local development to enable AI coaching.
           </div>
         )}
 
