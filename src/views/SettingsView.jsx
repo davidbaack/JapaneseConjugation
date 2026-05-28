@@ -661,7 +661,11 @@ export default function SettingsView({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-stone-400 mt-1">Textbook filtering works together with JLPT, word type, and study-list filters.</p>
+          </div>
+          <div className="sm:col-span-2 flex items-center gap-3">
+            <div className="flex-1 border-t border-stone-200 dark:border-stone-800" />
+            <span className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 tracking-wide">OR</span>
+            <div className="flex-1 border-t border-stone-200 dark:border-stone-800" />
           </div>
           <div className="sm:col-span-2">
             <div className="flex items-center justify-between gap-3 mb-1">
@@ -688,7 +692,7 @@ export default function SettingsView({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-stone-400 mt-1">Selecting lessons from both textbooks returns words matching either (OR). Works with JLPT, word type, and study-list filters.</p>
+            <p className="text-[11px] text-stone-400 mt-1">Words from Genki <span className="font-semibold">OR</span> Minna lessons are included. Textbook selection applies <span className="font-semibold">AND</span> JLPT, word type, and study-list filters.</p>
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-stone-500 block mb-1">Word types</label>
