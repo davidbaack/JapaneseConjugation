@@ -387,7 +387,7 @@ Keep it concise and clear.`;
         : coachTypedCount > expectedKanaCount
           ? 'Extra kana after the answer.'
           : `${Math.min(coachTypedCount, expectedKanaCount)}/${expectedKanaCount} kana matched.`;
-  const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill && answer ? kanaCoachCells(expected, answer, 0, phase === 'answering') : [];
+  const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill ? kanaCoachCells(expected, answer, 0, phase === 'answering') : [];
   const liveWrongIndex = liveCells.findIndex(c => c.state === 'wrong' || c.state === 'extra');
   const liveMatched = liveCells.filter(c => c.state === 'correct').length;
   const liveStatus =
@@ -1085,7 +1085,7 @@ Keep it concise and clear.`;
                           }
                         }}
                         placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-                        className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
+                        className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-transparent caret-stone-850 dark:caret-stone-150 focus:border-indigo-500 focus:outline-none transition"
                         lang="ja"
                         autoComplete="off"
                         autoCorrect="off"
@@ -1178,7 +1178,7 @@ Keep it concise and clear.`;
                           }
                         }}
                         placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-                        className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
+                        className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-transparent caret-stone-850 dark:caret-stone-150 focus:border-indigo-500 focus:outline-none transition"
                         lang="ja"
                         autoComplete="off"
                         autoCorrect="off"
@@ -1212,18 +1212,22 @@ Keep it concise and clear.`;
                       canSubmit={!!answer.trim()}
                       noToggle
                     />
-                    {!!liveCells.length && kanaMatchDisplay !== 'none' && (
+                    {!!liveCells.length && (
                       <div className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">
                         <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
                           {liveCells.map((cell, i) => {
                             const cls =
-                              cell.state === 'correct'
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
-                                : cell.state === 'wrong' || cell.state === 'extra'
-                                  ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
-                                  : cell.state === 'pending'
-                                    ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
-                                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                              kanaMatchDisplay === 'none'
+                                ? cell.state === 'empty'
+                                  ? 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300'
+                                  : 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
+                                : cell.state === 'correct'
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
+                                  : cell.state === 'wrong' || cell.state === 'extra'
+                                    ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
+                                    : cell.state === 'pending'
+                                      ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
+                                      : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
                             return (
                               <div
                                 key={i}
