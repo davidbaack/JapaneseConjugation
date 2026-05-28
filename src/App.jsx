@@ -9,23 +9,24 @@ import {
   syncReady,
   cloudFetch,
   cloudUpsert,
-  mergeState
+  mergeState,
+  pruneAICache
 } from './utils/storage.js';
 import { DEFAULT_PREFS, DEFAULT_SYNC } from './data/defaults.js';
 import { getJapaneseVoices } from './utils/speech.js';
 import { mergePracticePrefs } from './utils/display.js';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from './data/starterWords.js';
 
-// Views
-import StudyView from './views/StudyView.jsx';
-import RushView from './views/RushView.jsx';
-import EndingsView from './views/EndingsView.jsx';
-import ClassificationView from './views/ClassificationView.jsx';
-import MistakesView from './views/MistakesView.jsx';
-import StatsView from './views/StatsView.jsx';
-import SRSLevelView from './views/SRSLevelView.jsx';
-import LibraryView from './views/LibraryView.jsx';
-import SettingsView from './views/SettingsView.jsx';
+// Views — lazy-loaded so each tab is its own chunk
+const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
+const RushView = React.lazy(() => import('./views/RushView.jsx'));
+const EndingsView = React.lazy(() => import('./views/EndingsView.jsx'));
+const ClassificationView = React.lazy(() => import('./views/ClassificationView.jsx'));
+const MistakesView = React.lazy(() => import('./views/MistakesView.jsx'));
+const StatsView = React.lazy(() => import('./views/StatsView.jsx'));
+const SRSLevelView = React.lazy(() => import('./views/SRSLevelView.jsx'));
+const LibraryView = React.lazy(() => import('./views/LibraryView.jsx'));
+const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 
 export default function App() {
   const [tab, setTab] = useState('study');
@@ -40,10 +41,12 @@ export default function App() {
   const [speechVoices, setSpeechVoices] = useState([]);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const [hydrated, setHydrated] = useState(false);
+  const [storageWarning, setStorageWarning] = useState(false);
   const pushTimer = useRef(null);
   const lastSyncedAtRef = useRef(0);
 
   useEffect(() => {
+    pruneAICache();
     const local = loadAll();
     let cfg = DEFAULT_SYNC;
     if (local) {
@@ -85,7 +88,12 @@ export default function App() {
 
   useEffect(() => {
     if (!hydrated) return;
-    saveAll(state, customVerbs, customAdjectives, wordLists, syncConfig, lastSyncedAtRef.current, geminiKey, practicePrefs);
+    try {
+      saveAll(state, customVerbs, customAdjectives, wordLists, syncConfig, lastSyncedAtRef.current, geminiKey, practicePrefs);
+      setStorageWarning(false);
+    } catch (e) {
+      if (e.isQuotaError) setStorageWarning(true);
+    }
     if (syncConfig.enabled && syncReady(syncConfig)) {
       if (pushTimer.current) clearTimeout(pushTimer.current);
       pushTimer.current = setTimeout(async () => {
@@ -200,10 +208,18 @@ export default function App() {
             )}
           </div>
         </header>
-        <nav className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
+        {storageWarning && (
+          <div className="mb-4 px-4 py-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-300 flex items-center justify-between gap-3">
+            <span>⚠️ Storage is full — your progress may not be saving. Go to <button onClick={() => setTab('settings')} className="underline font-medium">Settings → Export</button> to back up and free space.</span>
+            <button onClick={() => setStorageWarning(false)} className="text-amber-500 hover:text-amber-700 text-xs shrink-0">Dismiss</button>
+          </div>
+        )}
+        <nav role="tablist" aria-label="Main navigation" className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
           {['study', 'rush', 'classify', 'endings', 'mistakes', 'levels', 'stats', 'library', 'settings'].map(t => (
             <button
               key={t}
+              role="tab"
+              aria-selected={tab === t}
               onClick={() => setTab(t)}
               className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
                 tab === t
@@ -215,15 +231,17 @@ export default function App() {
             </button>
           ))}
         </nav>
-        {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
-        {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
-        {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
-        {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
-        {tab === 'mistakes' && <MistakesView state={state} setState={setState} practicePrefs={practicePrefs} />}
-        {tab === 'stats' && <StatsView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab} wordLists={wordLists} setWordLists={setWordLists} />}
-        {tab === 'levels' && <SRSLevelView state={state} verbs={allWords} />}
-        {tab === 'library' && <LibraryView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey} setTab={setTab} />}
-        {tab === 'settings' && <SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme} />}
+        <React.Suspense fallback={<div className="py-12 text-center text-stone-400 text-sm">Loading…</div>}>
+          {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
+          {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
+          {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
+          {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
+          {tab === 'mistakes' && <MistakesView state={state} setState={setState} practicePrefs={practicePrefs} />}
+          {tab === 'stats' && <StatsView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab} wordLists={wordLists} setWordLists={setWordLists} />}
+          {tab === 'levels' && <SRSLevelView state={state} verbs={allWords} />}
+          {tab === 'library' && <LibraryView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey} setTab={setTab} />}
+          {tab === 'settings' && <SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme} />}
+        </React.Suspense>
       </div>
     </div>
   );

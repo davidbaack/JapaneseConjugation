@@ -47,9 +47,19 @@ export function extractJSON(text) {
   return null;
 }
 
+const GEMINI_TIMEOUT_MS = 30000;
+
+function fetchWithTimeout(url, options) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal })
+    .catch(e => { if (e.name === 'AbortError') throw new Error('Request timed out — check your connection and try again'); throw e; })
+    .finally(() => clearTimeout(timer));
+}
+
 export async function callGemini(contents, apiKey, maxTokens=600, temp=0.7, systemText=AI_SYSTEM) {
   if(!apiKey)throw new Error('No Gemini API key — add it in Settings.');
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+  const r=await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
      body:JSON.stringify({contents,systemInstruction:{parts:[{text:systemText}]},generationConfig:{maxOutputTokens:maxTokens,temperature:temp}})});
   const d=await r.json();
@@ -71,7 +81,7 @@ export async function lookupWordWithGemini(query, apiKey, isAdj=false) {
   const groupOptions = isAdj ? 'i-adjective or na-adjective' : 'ichidan or godan or suru or kuru';
   const meaningStr = isAdj ? 'English meaning' : 'English meaning starting with to';
   const prompt=`Look up this Japanese ${typeStr}: "${query}"\n\nReturn ONLY a JSON object (no markdown, no extra text):\n{"dict":"kanji/kana dictionary form or stem","reading":"hiragana only","meaning":"${meaningStr}","group":"${groupOptions}"}\n\nIf the input is English or romaji, find the most common Japanese ${typeStr} for that meaning.`;
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+  const r=await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
      body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1024,temperature:0.1,thinkingConfig:{thinkingBudget:0}}})});
   const d=await r.json();
@@ -89,7 +99,7 @@ export async function getSuggestedWord(existing, apiKey, isAdj=false) {
   const groupOptions = isAdj ? 'i-adjective or na-adjective' : 'ichidan or godan or suru or kuru';
   const list=existing.map(v=>`${v.dict} (${v.reading}) — ${v.meaning} [${v.group}]`).join('\n');
   const prompt=`I'm learning Japanese ${typeStr} conjugation with an SRS app. Here are the ${existing.length} ${typeStr}s I'm already studying:\n\n${list}\n\nBased on my current vocabulary, suggest ONE new ${typeStr} to add next. Consider JLPT frequency, useful patterns I haven't covered, and what learners at this level typically need. Do NOT suggest any ${typeStr} already in my list.\n\nReturn ONLY a JSON object (no markdown):\n{"dict":"e.g. dict form","reading":"e.g. hiragana reading","meaning":"e.g. English meaning","group":"${groupOptions}","reason":"One sentence explaining why this is a good next ${typeStr} for me."}`;
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+  const r=await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1024,temperature:0.9,thinkingConfig:{thinkingBudget:0}}})});
   const d=await r.json();
   if(!r.ok)throw new Error(d.error?.message||`HTTP ${r.status}`);

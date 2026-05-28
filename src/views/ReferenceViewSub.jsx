@@ -137,7 +137,7 @@ function surfaceFormForLocal(item, typeId) {
 }
 
 function compactLookupText(s) {
-  return String(s || '').normalize('NFKC').replace(/[、。！？\s'"「」『』（）()\[\]{}]/g, '').toLowerCase();
+  return String(s || '').normalize('NFKC').replace(/[、。！？\s'"「」『』（）()[\]{}]/g, '').toLowerCase();
 }
 
 function lookupVariantValues(value) {
@@ -187,6 +187,7 @@ export function adHocReferenceCandidates(query) {
   if (!raw || raw.length > 48) return [];
   const reading = compactLookupText(toHiragana(raw));
   if (!reading || /[a-z]/i.test(reading)) return [];
+  // eslint-disable-next-line no-control-regex
   const dict = /^[\x00-\x7F\s'"-]+$/.test(raw) ? reading : compactLookupText(raw);
   const chars = Array.from(reading),
     last = chars[chars.length - 1],
@@ -786,7 +787,7 @@ export default function ReferenceViewSub({
                               <ScriptDisplay view={wv} className="text-sm font-medium truncate text-stone-900 dark:text-stone-100" subClassName="text-[11px] text-stone-450 truncate" />
                               <div className="text-xs text-stone-500 truncate">{w.meaning}</div>
                             </div>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 flex-shrink-0">
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 flex-shrink-0">
                               x{w.count || 1}
                             </span>
                           </div>
@@ -825,7 +826,7 @@ export default function ReferenceViewSub({
                             <ScriptDisplay view={av} className="text-sm font-medium text-stone-900 dark:text-stone-50" subClassName="text-[11px] text-stone-450" />
                             <div className="text-[11px] text-stone-500 mt-0.5">{m.type.label}</div>
                           </div>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${m.matchKind === 'exact' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${m.matchKind === 'exact' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                             {m.matchKind}
                           </span>
                         </div>
@@ -862,7 +863,7 @@ export default function ReferenceViewSub({
                 <div className="mt-3 rounded-xl border border-indigo-150 bg-indigo-50/60 dark:bg-indigo-950/20 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs uppercase tracking-wider text-indigo-750 font-medium">Scratch conjugator</div>
-                    <span className="text-[10px] rounded-full bg-white dark:bg-stone-800 px-2 py-0.5 text-indigo-700 dark:text-indigo-300">{GROUP_NAMES[scratchCandidate.group] || scratchCandidate.group}</span>
+                    <span className="text-xs rounded-full bg-white dark:bg-stone-800 px-2 py-0.5 text-indigo-700 dark:text-indigo-300">{GROUP_NAMES[scratchCandidate.group] || scratchCandidate.group}</span>
                   </div>
                   <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
                     Local table for <span className="font-semibold text-stone-800 dark:text-stone-200" lang="ja">{scratchCandidate.dict}</span>. {scratchCandidate.sourceNote}
@@ -1200,7 +1201,7 @@ export default function ReferenceViewSub({
                   </div>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="text-[10px] uppercase tracking-wider text-stone-400 font-semibold">{unit.type}</span>
+                  <span className="text-xs uppercase tracking-wider text-stone-400 font-semibold">{unit.type}</span>
                   <div className="flex flex-wrap justify-end gap-1">
                     {unit.links.map(link => (
                       <a

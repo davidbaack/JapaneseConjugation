@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { IconSpark } from './Icons.jsx';
 import { callGemini, extractJSON } from '../utils/gemini.js';
+import { getAICache, setAICache } from '../utils/storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
 export function getMorae(text) {
@@ -112,13 +113,11 @@ export function PitchAccentSection({ word, kanaText, geminiKey, practicePrefs = 
     setShow(true);
     if (pitchData) return;
 
-    try {
-      const cache = JSON.parse(localStorage.getItem('dojo_ai_pitch_cache') || '{}');
-      if (cache[cacheKey]) {
-        setPitchData(cache[cacheKey]);
-        return;
-      }
-    } catch (e) {}
+    const cached = getAICache('dojo_ai_pitch_cache', cacheKey);
+    if (cached) {
+      setPitchData(cached);
+      return;
+    }
 
     if (!geminiKey) {
       const fallback = getOfflinePitchAccent(word, morae);
@@ -154,11 +153,7 @@ Do not return any extra markdown or chat formatting. Return valid JSON only.`;
           typeNumber: parsed.typeNumber || 0
         };
 
-        try {
-          const cache = JSON.parse(localStorage.getItem('dojo_ai_pitch_cache') || '{}');
-          cache[cacheKey] = result;
-          localStorage.setItem('dojo_ai_pitch_cache', JSON.stringify(cache));
-        } catch (e) {}
+        setAICache('dojo_ai_pitch_cache', cacheKey, result);
 
         setPitchData(result);
       } else {
@@ -192,7 +187,7 @@ Do not return any extra markdown or chat formatting. Return valid JSON only.`;
             <>
               {pitchData && <PitchAccentContour morae={morae} pitch={alignedPitch} />}
               {pitchData && (
-                <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-2 font-medium">
+                <div className="text-xs text-stone-500 dark:text-stone-400 mt-2 font-medium">
                   Pattern: {pitchData.pattern} {pitchData.typeNumber !== undefined ? `(Type ${pitchData.typeNumber})` : ''}
                   {err && err !== 'offline' && <span className="text-rose-500 ml-2"> (fallback loaded: {err})</span>}
                   {err === 'offline' && <span className="text-amber-600 dark:text-amber-400 ml-2"> (offline estimate)</span>}
