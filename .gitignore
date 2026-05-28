@@ -6,3 +6,6 @@ temp-vite
 .DS_Store
 test-results
 playwright-report
+.env
+.env.local
+.env.*.local

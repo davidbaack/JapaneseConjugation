@@ -115,54 +115,46 @@ export function resolveThemePreference(theme = 'system', systemTheme = getSystem
 // ============================================================================
 // CLOUD SYNC
 // ============================================================================
-export function cleanCfg(cfg) {
-  return {
-    ...cfg,
-    url: (cfg.url || '').trim().replace(/\/+$/, ''),
-    anonKey: (cfg.anonKey || '').trim(),
-    syncId: (cfg.syncId || '').trim()
-  };
+import { supabase } from './supabase.js';
+
+export function syncReady() {
+  return !!supabase;
 }
 
-export function syncReady(cfg) {
-  return !!(cfg && cfg.url && cfg.anonKey && cfg.syncId);
-}
+export async function cloudFetch() {
+  if (!supabase) throw new Error('Supabase client is not configured');
+  
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return null;
 
-export async function cloudFetch(cfg) {
-  const c = cleanCfg(cfg);
-  const r = await fetch(`${c.url}/rest/v1/srs_state?id=eq.${encodeURIComponent(c.syncId)}&select=data,updated_at`, {
-    headers: {
-      apikey: c.anonKey,
-      Authorization: `Bearer ${c.anonKey}`
-    }
-  });
-  if (!r.ok) {
-    const t = await r.text().catch(() => '');
-    throw new Error(`HTTP ${r.status}${t ? ': ' + t.slice(0, 120) : ''}`);
+  const { data, error } = await supabase
+    .from('srs_sync')
+    .select('data, updated_at')
+    .eq('id', session.user.id)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
   }
-  const rows = await r.json();
-  return rows[0] || null;
+  return data;
 }
 
-export async function cloudUpsert(cfg, payload) {
-  const c = cleanCfg(cfg);
-  const r = await fetch(`${c.url}/rest/v1/srs_state`, {
-    method: 'POST',
-    headers: {
-      apikey: c.anonKey,
-      Authorization: `Bearer ${c.anonKey}`,
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates,return=minimal'
-    },
-    body: JSON.stringify({
-      id: c.syncId,
+export async function cloudUpsert(payload) {
+  if (!supabase) throw new Error('Supabase client is not configured');
+  
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('User is not authenticated');
+
+  const { error } = await supabase
+    .from('srs_sync')
+    .upsert({
+      id: session.user.id,
       data: payload,
       updated_at: new Date().toISOString()
-    })
-  });
-  if (!r.ok) {
-    const t = await r.text().catch(() => '');
-    throw new Error(`HTTP ${r.status}${t ? ': ' + t.slice(0, 120) : ''}`);
+    });
+
+  if (error) {
+    throw error;
   }
 }
 

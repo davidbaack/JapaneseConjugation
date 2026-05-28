@@ -9,24 +9,25 @@ import {
   syncReady,
   cloudFetch,
   cloudUpsert,
-  mergeState,
-  pruneAICache
+  mergeState
 } from './utils/storage.js';
-import { DEFAULT_PREFS, DEFAULT_SYNC } from './data/defaults.js';
+import { DEFAULT_PREFS } from './data/defaults.js';
 import { getJapaneseVoices } from './utils/speech.js';
 import { mergePracticePrefs } from './utils/display.js';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from './data/starterWords.js';
+import { supabase } from './utils/supabase.js';
+import AuthModal from './components/AuthModal.jsx';
 
-// Views — lazy-loaded so each tab is its own chunk
-const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
-const RushView = React.lazy(() => import('./views/RushView.jsx'));
-const EndingsView = React.lazy(() => import('./views/EndingsView.jsx'));
-const ClassificationView = React.lazy(() => import('./views/ClassificationView.jsx'));
-const MistakesView = React.lazy(() => import('./views/MistakesView.jsx'));
-const StatsView = React.lazy(() => import('./views/StatsView.jsx'));
-const SRSLevelView = React.lazy(() => import('./views/SRSLevelView.jsx'));
-const LibraryView = React.lazy(() => import('./views/LibraryView.jsx'));
-const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
+// Views
+import StudyView from './views/StudyView.jsx';
+import RushView from './views/RushView.jsx';
+import EndingsView from './views/EndingsView.jsx';
+import ClassificationView from './views/ClassificationView.jsx';
+import MistakesView from './views/MistakesView.jsx';
+import StatsView from './views/StatsView.jsx';
+import SRSLevelView from './views/SRSLevelView.jsx';
+import LibraryView from './views/LibraryView.jsx';
+import SettingsView from './views/SettingsView.jsx';
 
 export default function App() {
   const [tab, setTab] = useState('study');
@@ -35,36 +36,52 @@ export default function App() {
   const [customAdjectives, setCustomAdjectives] = useState([]);
   const [wordLists, setWordLists] = useState([]);
   const [practicePrefs, setPracticePrefs] = useState(DEFAULT_PREFS);
-  const [syncConfig, setSyncConfig] = useState(DEFAULT_SYNC);
+  const [session, setSession] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
   const [geminiKey, setGeminiKey] = useState('');
   const [speechVoices, setSpeechVoices] = useState([]);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const [hydrated, setHydrated] = useState(false);
-  const [storageWarning, setStorageWarning] = useState(false);
   const pushTimer = useRef(null);
   const lastSyncedAtRef = useRef(0);
 
+  // Local storage hydration on mount + Supabase auth listener
   useEffect(() => {
-    pruneAICache();
     const local = loadAll();
-    let cfg = DEFAULT_SYNC;
     if (local) {
       if (local.state) setState(mergeState(local.state, { reviewed: 0, correct: 0 }));
       if (Array.isArray(local.customVerbs)) setCustomVerbs(local.customVerbs);
       if (Array.isArray(local.customAdjectives)) setCustomAdjectives(local.customAdjectives);
       if (Array.isArray(local.wordLists)) setWordLists(local.wordLists);
       if (local.practicePrefs) setPracticePrefs(mergePracticePrefs(local.practicePrefs));
-      if (local.syncConfig) {
-        cfg = { ...DEFAULT_SYNC, ...local.syncConfig };
-        setSyncConfig(cfg);
-      }
       if (typeof local.lastSyncedAt === 'number') lastSyncedAtRef.current = local.lastSyncedAt;
       if (local.geminiKey) setGeminiKey(local.geminiKey);
     }
-    if (cfg.enabled && syncReady(cfg)) {
+    setHydrated(true);
+
+    if (supabase) {
+      // Get initial session
+      supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+        setSession(currentSession);
+      });
+
+      // Listen for auth state changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+        setSession(currentSession);
+      });
+
+      return () => subscription.unsubscribe();
+    }
+  }, []);
+
+  // Cloud sync trigger on login / session restoration
+  useEffect(() => {
+    if (!hydrated || !supabase) return;
+
+    if (session?.user) {
       setSyncStatus({ kind: 'syncing', message: 'Checking cloud…', at: null });
-      cloudFetch(cfg).then(cloud => {
+      cloudFetch().then(cloud => {
         if (cloud && cloud.data) {
           const cloudAt = cloud.updated_at ? new Date(cloud.updated_at).getTime() : 0;
           if (cloudAt > lastSyncedAtRef.current) {
@@ -75,41 +92,54 @@ export default function App() {
             if (cloud.data.practicePrefs) setPracticePrefs(mergePracticePrefs(cloud.data.practicePrefs));
             lastSyncedAtRef.current = cloudAt;
             setSyncStatus({ kind: 'ok', message: 'Restored from cloud', at: cloudAt });
+          } else if (cloudAt < lastSyncedAtRef.current) {
+            // Local is newer, upload to cloud
+            setSyncStatus({ kind: 'syncing', message: 'Uploading newer local progress…', at: null });
+            cloudUpsert({ state, customVerbs, customAdjectives, wordLists, practicePrefs }).then(() => {
+              const now = Date.now();
+              lastSyncedAtRef.current = now;
+              setSyncStatus({ kind: 'ok', message: 'Uploaded local progress', at: now });
+            }).catch(e => setSyncStatus({ kind: 'error', message: e.message || 'Push failed', at: null }));
           } else {
             setSyncStatus({ kind: 'ok', message: 'Up to date', at: lastSyncedAtRef.current });
           }
         } else {
-          setSyncStatus({ kind: 'ok', message: 'New cloud row — will upload', at: null });
+          // New cloud account — upload current local data
+          setSyncStatus({ kind: 'syncing', message: 'Syncing local progress to cloud…', at: null });
+          cloudUpsert({ state, customVerbs, customAdjectives, wordLists, practicePrefs }).then(() => {
+            const now = Date.now();
+            lastSyncedAtRef.current = now;
+            setSyncStatus({ kind: 'ok', message: 'Synced to cloud', at: now });
+          }).catch(e => setSyncStatus({ kind: 'error', message: e.message || 'Initial sync failed', at: null }));
         }
       }).catch(e => setSyncStatus({ kind: 'error', message: e.message || 'Cloud unreachable', at: null }));
+    } else {
+      setSyncStatus({ kind: 'idle', message: '', at: null });
     }
-    setHydrated(true);
-  }, []);
+  }, [session, hydrated]);
 
+  // Local save & cloud auto-upsert on progress changes
   useEffect(() => {
     if (!hydrated) return;
-    try {
-      saveAll(state, customVerbs, customAdjectives, wordLists, syncConfig, lastSyncedAtRef.current, geminiKey, practicePrefs);
-      setStorageWarning(false);
-    } catch (e) {
-      if (e.isQuotaError) setStorageWarning(true);
-    }
-    if (syncConfig.enabled && syncReady(syncConfig)) {
+    const dummySync = { enabled: !!session };
+    saveAll(state, customVerbs, customAdjectives, wordLists, dummySync, lastSyncedAtRef.current, geminiKey, practicePrefs);
+    
+    if (session?.user && supabase) {
       if (pushTimer.current) clearTimeout(pushTimer.current);
       pushTimer.current = setTimeout(async () => {
         setSyncStatus(s => ({ ...s, kind: 'syncing', message: 'Saving to cloud…' }));
         try {
-          await cloudUpsert(syncConfig, { state, customVerbs, customAdjectives, wordLists, practicePrefs });
+          await cloudUpsert({ state, customVerbs, customAdjectives, wordLists, practicePrefs });
           const now = Date.now();
           lastSyncedAtRef.current = now;
-          saveAll(state, customVerbs, customAdjectives, wordLists, syncConfig, now, geminiKey, practicePrefs);
+          saveAll(state, customVerbs, customAdjectives, wordLists, dummySync, now, geminiKey, practicePrefs);
           setSyncStatus({ kind: 'ok', message: 'Saved to cloud', at: now });
         } catch (e) {
           setSyncStatus({ kind: 'error', message: e.message || 'Push failed', at: null });
         }
       }, 2000);
     }
-  }, [state, customVerbs, customAdjectives, wordLists, syncConfig, geminiKey, practicePrefs, hydrated]);
+  }, [state, customVerbs, customAdjectives, wordLists, session, geminiKey, practicePrefs, hydrated]);
 
   useEffect(() => {
     const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
@@ -151,10 +181,10 @@ export default function App() {
   }, [resolvedTheme]);
 
   async function syncNow() {
-    if (!syncReady(syncConfig)) return;
+    if (!supabase || !session) return;
     setSyncStatus({ kind: 'syncing', message: 'Syncing…', at: null });
     try {
-      const cloud = await cloudFetch(syncConfig);
+      const cloud = await cloudFetch();
       const cloudAt = cloud && cloud.updated_at ? new Date(cloud.updated_at).getTime() : 0;
       if (cloud && cloud.data && cloudAt > lastSyncedAtRef.current) {
         if (cloud.data.state) setState(mergeState(cloud.data.state, state.session));
@@ -165,7 +195,7 @@ export default function App() {
         lastSyncedAtRef.current = cloudAt;
         setSyncStatus({ kind: 'ok', message: 'Pulled from cloud', at: cloudAt });
       } else {
-        await cloudUpsert(syncConfig, { state, customVerbs, customAdjectives, wordLists, practicePrefs });
+        await cloudUpsert({ state, customVerbs, customAdjectives, wordLists, practicePrefs });
         const now = Date.now();
         lastSyncedAtRef.current = now;
         setSyncStatus({ kind: 'ok', message: 'Pushed to cloud', at: now });
@@ -186,7 +216,7 @@ export default function App() {
       <div className="max-w-4xl mx-auto px-4 py-3 sm:py-6">
         <header className="mb-4 sm:mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-105">
+            <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
               動詞と形容詞 <span className="text-stone-400 font-normal">·</span> Conjugation Dojo
             </h1>
             <p className="text-xs text-stone-500 mt-0.5">Spaced repetition, reference tables, and AI coaching</p>
@@ -200,7 +230,7 @@ export default function App() {
               </span>
             </div>
             {!!daily.goalStreak && <div className="text-amber-600 dark:text-amber-400 mt-0.5">{daily.goalStreak} day goal streak</div>}
-            {syncConfig.enabled && (
+            {session && (
               <div className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind === 'error' ? 'text-rose-500' : syncStatus.kind === 'syncing' ? 'text-amber-500' : 'text-emerald-600'}`}>
                 <IconCloud className="w-3 h-3" />
                 <span>{syncStatus.kind === 'syncing' ? 'syncing' : syncStatus.kind === 'error' ? 'sync error' : 'synced'}</span>
@@ -208,41 +238,32 @@ export default function App() {
             )}
           </div>
         </header>
-        {storageWarning && (
-          <div className="mb-4 px-4 py-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl text-sm text-amber-800 dark:text-amber-300 flex items-center justify-between gap-3">
-            <span>⚠️ Storage is full — your progress may not be saving. Go to <button onClick={() => setTab('settings')} className="underline font-medium">Settings → Export</button> to back up and free space.</span>
-            <button onClick={() => setStorageWarning(false)} className="text-amber-500 hover:text-amber-700 text-xs shrink-0">Dismiss</button>
-          </div>
-        )}
-        <nav role="tablist" aria-label="Main navigation" className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
+        <nav className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
           {['study', 'rush', 'classify', 'endings', 'mistakes', 'levels', 'stats', 'library', 'settings'].map(t => (
             <button
               key={t}
-              role="tab"
-              aria-selected={tab === t}
               onClick={() => setTab(t)}
               className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
                 tab === t
                   ? 'bg-stone-800 dark:bg-indigo-700 text-white font-semibold'
-                  : 'text-stone-605 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+                  : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
               }`}
             >
               {t}
             </button>
           ))}
         </nav>
-        <React.Suspense fallback={<div className="py-12 text-center text-stone-400 text-sm">Loading…</div>}>
-          {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
-          {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
-          {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
-          {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
-          {tab === 'mistakes' && <MistakesView state={state} setState={setState} practicePrefs={practicePrefs} />}
-          {tab === 'stats' && <StatsView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab} wordLists={wordLists} setWordLists={setWordLists} />}
-          {tab === 'levels' && <SRSLevelView state={state} verbs={allWords} />}
-          {tab === 'library' && <LibraryView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey} setTab={setTab} />}
-          {tab === 'settings' && <SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} syncConfig={syncConfig} setSyncConfig={setSyncConfig} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme} />}
-        </React.Suspense>
+        {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
+        {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
+        {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
+        {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={geminiKey} />}
+        {tab === 'mistakes' && <MistakesView state={state} setState={setState} practicePrefs={practicePrefs} />}
+        {tab === 'stats' && <StatsView state={state} setState={setState} verbs={allWords} geminiKey={geminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} setTab={setTab} wordLists={wordLists} setWordLists={setWordLists} />}
+        {tab === 'levels' && <SRSLevelView state={state} verbs={allWords} />}
+        {tab === 'library' && <LibraryView state={state} setState={setState} verbs={allVerbs} adjectives={allAdjectives} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} geminiKey={geminiKey} setTab={setTab} />}
+        {tab === 'settings' && <SettingsView state={state} setState={setState} customVerbs={customVerbs} setCustomVerbs={setCustomVerbs} customAdjectives={customAdjectives} setCustomAdjectives={setCustomAdjectives} wordLists={wordLists} setWordLists={setWordLists} session={session} syncStatus={syncStatus} syncNow={syncNow} geminiKey={geminiKey} setGeminiKey={setGeminiKey} practicePrefs={practicePrefs} setPracticePrefs={setPracticePrefs} speechVoices={speechVoices} resolvedTheme={resolvedTheme} supabase={supabase} onShowAuth={() => setShowAuthModal(true)} />}
       </div>
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} supabase={supabase} />
     </div>
   );
 }
