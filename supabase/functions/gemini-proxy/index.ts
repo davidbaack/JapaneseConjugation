@@ -49,8 +49,10 @@ serve(async (req) => {
       )
     }
 
-    // 5. Query Google's Gemini API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`
+    // 5. Query Google's Gemini API. Use the auto-updating "-latest" alias so we
+    // always hit the newest Flash-Lite model without redeploying as Google
+    // rolls over versions.
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${encodeURIComponent(apiKey)}`
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: {

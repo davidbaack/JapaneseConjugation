@@ -48,6 +48,9 @@ export function extractJSON(text) {
   return null;
 }
 
+// Use the auto-updating "-latest" alias so we always get the newest Flash-Lite
+// model without code changes as Google rolls over versions.
+const GEMINI_MODEL = 'gemini-flash-lite-latest';
 const GEMINI_TIMEOUT_MS = 30000;
 
 function fetchWithTimeout(url, options) {
@@ -88,7 +91,7 @@ async function executeGeminiRequest(payload, apiKey) {
   // 2. Fallback to local environment key (restricted to local development only)
   const safeApiKey = getLocalApiKey(apiKey);
   if (safeApiKey && safeApiKey !== 'proxy') {
-    const r = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(safeApiKey)}`, {
+    const r = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(safeApiKey)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
