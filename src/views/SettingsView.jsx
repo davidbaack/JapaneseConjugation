@@ -53,7 +53,7 @@ import { DEFAULT_PREFS } from '../data/defaults.js';
 const POLITE_FORM_IDS = ALL_CARD_TYPES.filter(t => t.id.includes('polite') || t.label.toLowerCase().includes('polite')).map(t => t.id);
 
 function compactLookupText(s) {
-  return String(s || '').normalize('NFKC').replace(/[、。！？\s'"「」『』（）()\[\]{}]/g, '').toLowerCase();
+  return String(s || '').normalize('NFKC').replace(/[、。！？\s'"「」『』（）()[\]{}]/g, '').toLowerCase();
 }
 
 export default function SettingsView({
@@ -768,7 +768,7 @@ export default function SettingsView({
             }`}
           >
             Polite forms
-            <span className={`tabular-nums px-1.5 py-0.5 rounded-full text-[10px] ${
+            <span className={`tabular-nums px-1.5 py-0.5 rounded-full text-xs ${
               allPoliteOn ? 'bg-white/20 text-white' : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
             }`}>
               {enabledPoliteCount}/{POLITE_FORM_IDS.length}
@@ -913,6 +913,9 @@ export default function SettingsView({
           Cloud sync (Supabase)
         </h3>
         <p className="text-xs text-stone-500 mb-3">Same values on every device to stay in sync.</p>
+        <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 mb-3">
+          ⚠️ Enable Row-Level Security (RLS) on your <code className="font-mono">srs_state</code> table in Supabase to prevent unauthorized access. Anyone with your Project URL and anon key can read or overwrite your data if RLS is disabled.
+        </p>
         {(syncStatus.message || syncConfig.enabled) && (
           <div className={`mb-3 text-xs rounded-lg border px-3 py-2 ${statusColor}`}>
             <div className="flex items-center justify-between">

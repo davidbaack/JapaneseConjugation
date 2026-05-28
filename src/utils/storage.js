@@ -44,7 +44,63 @@ export function saveAll(state, customVerbs, customAdjectives, wordLists, syncCon
       geminiKey,
       practicePrefs
     }));
+  } catch (e) {
+    if (e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22)) {
+      throw Object.assign(new Error('Storage full — export your data in Settings to free up space.'), { isQuotaError: true });
+    }
+  }
+}
+
+// ============================================================================
+// AI CACHE WITH TTL
+// ============================================================================
+const AI_CACHE_TTL = 7 * DAY;
+const AI_CACHE_KEYS = ['dojo_ai_explanations_cache', 'dojo_ai_pitch_cache', 'dojo_ai_sentence_cache'];
+
+export function getAICache(storageKey, cacheKey) {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return null;
+    const store = JSON.parse(raw);
+    const entry = store[cacheKey];
+    if (!entry) return null;
+    if (entry && typeof entry === 'object' && entry.ts) {
+      if (Date.now() - entry.ts > AI_CACHE_TTL) return null;
+      return entry.v;
+    }
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+export function setAICache(storageKey, cacheKey, value) {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const store = raw ? JSON.parse(raw) : {};
+    store[cacheKey] = { ts: Date.now(), v: value };
+    localStorage.setItem(storageKey, JSON.stringify(store));
   } catch {}
+}
+
+export function pruneAICache() {
+  const now = Date.now();
+  for (const key of AI_CACHE_KEYS) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const store = JSON.parse(raw);
+      let changed = false;
+      for (const k of Object.keys(store)) {
+        const entry = store[k];
+        if (entry && typeof entry === 'object' && entry.ts && now - entry.ts > AI_CACHE_TTL) {
+          delete store[k];
+          changed = true;
+        }
+      }
+      if (changed) localStorage.setItem(key, JSON.stringify(store));
+    } catch {}
+  }
 }
 
 export function getSystemTheme() {

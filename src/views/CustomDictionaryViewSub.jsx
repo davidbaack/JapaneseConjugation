@@ -23,6 +23,7 @@ export default function CustomDictionaryViewSub({
   const [sugg, setSugg] = useState(null);
   const [suggLoading, setSuggLoading] = useState(false);
   const [suggErr, setSuggErr] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const suggGen = useRef(0);
 
   const isAdj = dictTab === 'adjectives';
@@ -350,9 +351,16 @@ export default function CustomDictionaryViewSub({
                     </td>
                     <td className="px-4 py-2 text-right">
                       {i >= starterWords.length && (
-                        <button onClick={() => setCustomWords(customWords.filter(c => c.dict !== v.dict))} className="text-stone-400 hover:text-rose-600 dark:text-stone-500 dark:hover:text-rose-400 transition">
-                          <IconTrash className="w-4 h-4" />
-                        </button>
+                        confirmDelete === v.dict ? (
+                          <span className="flex items-center gap-1 justify-end">
+                            <button onClick={() => { setCustomWords(customWords.filter(c => c.dict !== v.dict)); setConfirmDelete(null); }} className="text-xs px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded transition">Delete</button>
+                            <button onClick={() => setConfirmDelete(null)} className="text-xs px-2 py-1 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 transition">Cancel</button>
+                          </span>
+                        ) : (
+                          <button onClick={() => setConfirmDelete(v.dict)} className="text-stone-400 hover:text-rose-600 dark:text-stone-500 dark:hover:text-rose-400 transition">
+                            <IconTrash className="w-4 h-4" />
+                          </button>
+                        )
                       )}
                     </td>
                   </tr>
