@@ -223,7 +223,7 @@ export default function ClassificationView({ state, setState, words, practicePre
             )}
             {aiErr && <div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
             {aiText && (
-              <div className="mt-3 rounded-xl border border-indigo-100 bg-white/70 dark:bg-stone-905 px-3 py-2 text-sm text-stone-700 dark:text-stone-300 leading-relaxed whitespace-pre-wrap">
+              <div className="mt-3 rounded-xl border border-indigo-100 bg-white/70 dark:bg-stone-905 px-3 py-2 text-sm text-stone-700 dark:text-stone-300 leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto">
                 {aiText}
               </div>
             )}

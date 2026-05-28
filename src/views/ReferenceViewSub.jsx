@@ -841,7 +841,7 @@ export default function ReferenceViewSub({
                 <div className="mt-1 text-[11px] text-stone-400 text-center">Add a Gemini key for contextual ranking.</div>
               )}
               {lookupAiErr && <div className="mt-2 text-xs text-rose-600">{lookupAiErr}</div>}
-              {lookupAiText && <div className="mt-2 text-xs leading-relaxed whitespace-pre-wrap text-stone-700 dark:text-stone-300">{lookupAiText}</div>}
+              {lookupAiText && <div className="mt-2 text-xs leading-relaxed whitespace-pre-wrap text-stone-700 dark:text-stone-300 max-h-72 overflow-y-auto">{lookupAiText}</div>}
               {showScratch && (
                 <div className="mt-3 rounded-xl border border-indigo-150 bg-indigo-50/60 dark:bg-indigo-950/20 p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -924,7 +924,7 @@ export default function ReferenceViewSub({
               </div>
               {!geminiKey && <div className="mt-2 text-xs text-stone-500">Add a Gemini key to verify the real dictionary form, reading, and group.</div>}
               {scratchAiErr && <div className="mt-2 text-sm text-rose-600">{scratchAiErr}</div>}
-              {scratchAiText && <div className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans">{scratchAiText}</div>}
+              {scratchAiText && <div className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans max-h-72 overflow-y-auto">{scratchAiText}</div>}
             </div>
             <div className="max-h-80 overflow-y-auto">
               <table className="w-full text-sm">
@@ -1082,7 +1082,7 @@ export default function ReferenceViewSub({
             </div>
             {pairAiErr && <div className="mt-2 text-sm text-rose-600">{pairAiErr}</div>}
             {pairAiText && (
-              <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-sm text-stone-750 dark:text-stone-305 leading-relaxed whitespace-pre-wrap font-sans">
+              <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-sm text-stone-750 dark:text-stone-305 leading-relaxed whitespace-pre-wrap font-sans max-h-80 overflow-y-auto">
                 {pairAiText}
               </div>
             )}
@@ -1152,7 +1152,7 @@ export default function ReferenceViewSub({
           )}
           {kanjiErr && <div className="mt-2 text-sm text-rose-600">{kanjiErr}</div>}
           {kanjiText && (
-            <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans border-t border-stone-100 dark:border-stone-800 pt-3">
+            <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans border-t border-stone-100 dark:border-stone-800 pt-3 max-h-80 overflow-y-auto">
               {kanjiText}
             </div>
           )}
@@ -1215,7 +1215,7 @@ export default function ReferenceViewSub({
           {!geminiKey && <div className="mt-2 text-xs text-stone-400">Add a Gemini key in Settings.</div>}
           {writingErr && <div className="mt-2 text-sm text-rose-600">{writingErr}</div>}
           {writingText && (
-            <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 border-t border-stone-100 dark:border-stone-800 pt-3 font-sans">
+            <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 border-t border-stone-100 dark:border-stone-800 pt-3 font-sans max-h-80 overflow-y-auto">
               {writingText}
             </div>
           )}
@@ -1290,7 +1290,7 @@ export default function ReferenceViewSub({
           )}
           {accentErr && <div className="mt-2 text-sm text-rose-600">{accentErr}</div>}
           {accentText && (
-            <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 border-t border-stone-100 dark:border-stone-800 pt-3 font-sans">
+            <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 border-t border-stone-100 dark:border-stone-800 pt-3 font-sans max-h-80 overflow-y-auto">
               {accentText}
             </div>
           )}

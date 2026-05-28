@@ -53,7 +53,7 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
         {!geminiKey && <div className="text-xs text-indigo-900/60 dark:text-indigo-300/60 self-center">Add a Gemini key for natural examples.</div>}
       </div>
       {err && <div className="mt-2 text-sm text-rose-600">{err}</div>}
-      {aiText && <div className="mt-3 rounded-lg border border-indigo-100 dark:border-indigo-900/40 bg-white/80 dark:bg-stone-800/80 px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-700 dark:text-stone-200">{aiText}</div>}
+      {aiText && <div className="mt-3 rounded-lg border border-indigo-100 dark:border-indigo-900/40 bg-white/80 dark:bg-stone-800/80 px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-700 dark:text-stone-200 max-h-80 overflow-y-auto">{aiText}</div>}
     </div>
   );
 }

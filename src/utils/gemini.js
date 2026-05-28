@@ -105,7 +105,10 @@ export async function callGemini(contents, apiKey, maxTokens=600, temp=0.7, syst
   const payload = {
     contents,
     systemInstruction: { parts: [{ text: systemText }] },
-    generationConfig: { maxOutputTokens: maxTokens, temperature: temp }
+    // Disable model "thinking" so the entire maxOutputTokens budget is spent on the
+    // visible reply. Otherwise thinking tokens eat the budget and responses get
+    // truncated mid-sentence (e.g. only "You'" of "You're on the right track…").
+    generationConfig: { maxOutputTokens: maxTokens, temperature: temp, thinkingConfig: { thinkingBudget: 0 } }
   };
   const d = await executeGeminiRequest(payload, apiKey);
   return geminiText(d);

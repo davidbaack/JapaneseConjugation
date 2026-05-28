@@ -280,7 +280,7 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
           )}
           {aiErr && <div className="mt-3 text-sm text-rose-600">{aiErr}</div>}
           {aiTip && (
-            <div className="mt-3 text-left rounded-xl border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/25 dark:border-indigo-900/50 px-3 py-2 text-sm text-indigo-900 dark:text-indigo-300 leading-relaxed">
+            <div className="mt-3 text-left rounded-xl border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/25 dark:border-indigo-900/50 px-3 py-2 text-sm text-indigo-900 dark:text-indigo-300 leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto">
               {aiTip}
             </div>
           )}
