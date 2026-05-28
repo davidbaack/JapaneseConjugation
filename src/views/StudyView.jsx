@@ -94,6 +94,7 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const [aiSentence, setAiSentence] = useState(null);
   const inputRef = useRef(null);
   const autoAdvanceRef = useRef(null);
+  const hadKanaMistakeRef = useRef(false);
 
   const enabledTypes = state.enabledTypes.length > 0 ? state.enabledTypes : ['plain-past'];
   const practiceWords = useMemo(() => {
@@ -455,6 +456,7 @@ Keep it concise and clear.`;
       setTypoGuard(null);
       setAiTypingHint('');
       setAiTypingHintLoading(false);
+      hadKanaMistakeRef.current = false;
       setPhase('answering');
       if (!reviewSetComplete) {
         setCurrent(selectNext(state, practiceWords, enabledTypes, current.id, practicePrefs));
@@ -464,7 +466,8 @@ Keep it concise and clear.`;
     const raw = choiceValue !== undefined ? choiceValue : answer;
     if (!raw.trim()) return;
     const normalized = choiceValue !== undefined ? raw : toHiragana(raw);
-    const ok = reverseDrill ? dictionaryAnswerMatches(raw, current.verb) : normalized === expected;
+    const finalOk = reverseDrill ? dictionaryAnswerMatches(raw, current.verb) : normalized === expected;
+    const ok = finalOk && !(kanaMatchDisplay !== 'none' && hadKanaMistakeRef.current);
     const nearMiss =
       choiceValue === undefined && !ok ? typoGuardForAnswer(raw, normalized, expected, current.verb, reverseDrill) : null;
     if (nearMiss && typoGuard?.key !== nearMiss.key) {
@@ -522,6 +525,7 @@ Keep it concise and clear.`;
         setTypoGuard(null);
         setAiTypingHint('');
         setAiTypingHintLoading(false);
+        hadKanaMistakeRef.current = false;
         setPhase('answering');
         setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
       }, 850);
@@ -545,6 +549,7 @@ Keep it concise and clear.`;
     setTypoGuard(null);
     setAiTypingHint('');
     setAiTypingHintLoading(false);
+    hadKanaMistakeRef.current = false;
     setPhase('answering');
     setWasCorrect(false);
     setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
@@ -608,6 +613,7 @@ Keep it concise and clear.`;
         setTypoGuard(null);
         setAiTypingHint('');
         setAiTypingHintLoading(false);
+        hadKanaMistakeRef.current = false;
         setPhase('answering');
         setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
       }, 850);
@@ -660,6 +666,14 @@ Keep it concise and clear.`;
 
   function insertAnswerText(text) {
     setTypoGuard(null);
+    if (kanaMatchDisplay !== 'none' && (practicePrefs.answerMode === 'guided' || !reverseDrill)) {
+      const newVal = answer + text;
+      const revealed = practicePrefs.answerMode === 'guided' ? coachRevealed : 0;
+      const cells = kanaCoachCells(expected, newVal, revealed);
+      if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
+        hadKanaMistakeRef.current = true;
+      }
+    }
     setAnswer(prev => `${prev}${text}`);
     focusAnswerInput();
   }
@@ -1036,7 +1050,14 @@ Keep it concise and clear.`;
                         value={answer}
                         onChange={e => {
                           setTypoGuard(null);
-                          setAnswer(e.target.value);
+                          const newVal = e.target.value;
+                          if (kanaMatchDisplay !== 'none') {
+                            const cells = kanaCoachCells(expected, newVal, coachRevealed);
+                            if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
+                              hadKanaMistakeRef.current = true;
+                            }
+                          }
+                          setAnswer(newVal);
                         }}
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
@@ -1122,7 +1143,14 @@ Keep it concise and clear.`;
                         value={answer}
                         onChange={e => {
                           setTypoGuard(null);
-                          setAnswer(e.target.value);
+                          const newVal = e.target.value;
+                          if (kanaMatchDisplay !== 'none' && !reverseDrill) {
+                            const cells = kanaCoachCells(expected, newVal, 0);
+                            if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
+                              hadKanaMistakeRef.current = true;
+                            }
+                          }
+                          setAnswer(newVal);
                         }}
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
