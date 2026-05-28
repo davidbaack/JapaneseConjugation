@@ -281,7 +281,9 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
                     subClassName="mt-1 text-sm text-stone-500"
                   />
                   <div className="mt-2 text-sm text-stone-500">{round.item.meaning}</div>
-                  <div className="mt-1 text-xs text-stone-400">{GROUP_NAMES[round.item.group]}</div>
+                  {practicePrefs.showWordCategory && (
+                    <div className="mt-1 text-xs text-stone-400">{GROUP_NAMES[round.item.group]}</div>
+                  )}
                 </div>
               </div>
             )}

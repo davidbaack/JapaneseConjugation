@@ -32,5 +32,6 @@ export const DEFAULT_PREFS = {
   wordListIds: [],
   drillMode: 'word',
   colorCodeConjugations: true,
-  kanaMatchDisplay: 'color-count'
+  kanaMatchDisplay: 'color-count',
+  showWordCategory: false
 };
