@@ -125,8 +125,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
           </div>
           <p className="text-sm text-stone-500 dark:text-stone-400 mb-5 max-w-md">
             Type a conjugated verb or adjective — in romaji, kana, or kanji — and
-            I'll work out which dictionary word and form it is, and tell you if
-            it's right.
+            I'll work out which dictionary word it is and which form you made.
           </p>
 
           {/* Input row — mirrors Study's answer input */}
@@ -364,10 +363,21 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
                 Couldn't identify that
               </div>
               <p className="text-stone-700 dark:text-stone-300">
-                <span className="font-medium" lang="ja">{result.normalized}</span> doesn't match a
-                conjugation of any verb or adjective I know. Double-check the
-                spelling, or add the word in the Library.
+                <span className="font-medium" lang="ja">{result.normalized}</span> isn't close to
+                any conjugation I could find. Two things to check:
               </p>
+              <ul className="mt-2 space-y-1 text-sm text-stone-600 dark:text-stone-300 list-disc pl-5">
+                <li>
+                  <span className="font-medium">A typo?</span> If a character is off it may be too
+                  far from the real form to match — give it another look.
+                </li>
+                <li>
+                  <span className="font-medium">Verb not loaded?</span> Check only knows the
+                  {' '}
+                  {allWords.length} words in your active set. If this verb isn't one of them, add it
+                  in the Library.
+                </li>
+              </ul>
             </div>
           )}
 

@@ -3,7 +3,7 @@
 // an exact hit or a near-miss typo — so the Check view can confirm it or
 // explain how it differs.
 
-import { conjugateItem, compatibleTypes, surfaceFormFor } from './conjugator.js';
+import { conjugateItem, compatibleTypes, surfaceFormFor, surfaceStemPair } from './conjugator.js';
 import { toHiragana } from './romaji.js';
 
 // Forms that are real conjugations but make poor free-form answers: the
@@ -82,7 +82,19 @@ export function describeDiff(given, expected) {
 }
 
 const MAX_NEAR_DISTANCE = 2;
+// Stem-anchored candidates (the input shares the verb's whole masu-stem, so the
+// intended verb is almost certainly that one) get a little more slack, since
+// the entire suffix may have been formed wrongly.
+const ANCHORED_MAX_DISTANCE = 3;
 const MAX_NEAR_RESULTS = 5;
+
+// Which form does a て/た ending suggest the learner was aiming for? Used only
+// to break ties between equally-close candidates of the intended verb.
+function suffixPreference(normalized) {
+  if (/[てで]$/.test(normalized)) return 'te-form';
+  if (/[ただ]$/.test(normalized)) return 'plain-past';
+  return null;
+}
 
 // identifyConjugation(input, words, options)
 //   input:   raw user string (kana, romaji, or kanji)
@@ -107,6 +119,7 @@ export function identifyConjugation(input, words = [], options = {}) {
   }
 
   const typeIdOf = (t) => (typeof t === 'string' ? t : t.id);
+  const wantSuffix = suffixPreference(normalized);
 
   // An input that is exactly some word's masu-stem (たべ for 食べる) is an
   // incomplete fragment, not a conjugation — report it as unidentified rather
@@ -114,15 +127,35 @@ export function identifyConjugation(input, words = [], options = {}) {
   let isBareStem = false;
 
   for (const word of words) {
+    // The reading-stem is the unchanging head a verb keeps across its
+    // conjugations (の for 飲む, たべ for 食べる, し for 死ぬ). If the input begins
+    // with it, the learner almost certainly meant THIS verb and got the ending
+    // wrong — the classic onbin (sound-change) mistake (のみて for 飲んで). We
+    // anchor on it so the right verb wins over a coincidentally-closer string.
+    const { readingStem } = surfaceStemPair(word);
+    const anchored = !!readingStem && normalized.startsWith(readingStem);
+
+    // A bare masu-stem (たべ for 食べる) is an incomplete fragment, not a
+    // conjugation — flag it so we can report "couldn't identify" rather than
+    // guessing at the fuller forms.
+    const masuStem = conjugateItem(word, 'masu-stem');
+    if (masuStem && (normalized === masuStem || raw === masuStem)) isBareStem = true;
+
+    // The classic over-regularization error: forming a past/te by tacking the
+    // regular ending straight onto the masu-stem (のみ+た = のみた instead of
+    // のんだ, のみ+て = のみて instead of のんで). When the input is exactly that,
+    // we know precisely which form the learner intended, so we promote it above
+    // a coincidentally-closer form like the potential-past (のめた).
+    let regularizedType = null;
+    if (masuStem && normalized.startsWith(masuStem)) {
+      const tail = normalized.slice(masuStem.length);
+      if (tail === 'て' || tail === 'で') regularizedType = 'te-form';
+      else if (tail === 'た' || tail === 'だ') regularizedType = 'plain-past';
+    }
+
     for (const t of typesFor(word)) {
       const type = typeIdOf(t);
-      if (IGNORED_TYPES.has(type)) {
-        if (!isBareStem) {
-          const stem = conjugateItem(word, type);
-          if (stem && (normalized === stem || raw === stem)) isBareStem = true;
-        }
-        continue;
-      }
+      if (IGNORED_TYPES.has(type)) continue;
       const kana = conjugateItem(word, type);
       if (!kana) continue;
       const kanji = surfaceFormFor(word, type) || kana;
@@ -131,15 +164,24 @@ export function identifyConjugation(input, words = [], options = {}) {
         normalized === kana || raw === kanji || raw === kana;
       if (isExact) {
         exact.push({ word, type, kana, kanji });
-      } else if (normalized.length >= 2) {
-        // Near-miss typo. Require the input to keep at least 2 characters in
-        // common with the form so tiny inputs (1-2 kana) don't "almost match"
-        // every short conjugation in the set.
-        const distance = levenshtein(normalized, kana);
-        const shared = Math.max(normalized.length, kana.length) - distance;
-        if (distance > 0 && distance <= MAX_NEAR_DISTANCE && shared >= 2) {
-          near.push({ word, type, kana, kanji, distance });
-        }
+        continue;
+      }
+      if (normalized.length < 2) continue;
+
+      const distance = levenshtein(normalized, kana);
+      const shared = Math.max(normalized.length, kana.length) - distance;
+      // Stem-anchored candidates get more distance slack (a whole wrong suffix
+      // can be 2-3 edits). The shared-character floor — which stops a 1-kana
+      // overlap from matching everything — is waived only for a clear sound-
+      // change attempt (a て/た-family ending on an anchored verb, e.g. のみて
+      // for 飲んで); otherwise even anchored inputs need real overlap so a noun
+      // like ねこ doesn't get read as a botched 寝る.
+      const limit = anchored ? ANCHORED_MAX_DISTANCE : MAX_NEAR_DISTANCE;
+      const onbinAttempt = anchored && /[てでただ]$/.test(normalized);
+      const floorOk = onbinAttempt || shared >= 2;
+      if (distance > 0 && distance <= limit && floorOk) {
+        const regularized = type === regularizedType;
+        near.push({ word, type, kana, kanji, distance, anchored, regularized });
       }
     }
   }
@@ -154,14 +196,26 @@ export function identifyConjugation(input, words = [], options = {}) {
     return { input: raw, normalized, exact, near: [] };
   }
 
-  near.sort((a, b) => {
+  // If any candidate is stem-anchored, the intended verb is known — drop the
+  // coincidental unanchored guesses entirely so the lead suggestion is right.
+  const anchoredNear = near.filter((c) => c.anchored);
+  const pool = anchoredNear.length > 0 ? anchoredNear : near;
+
+  pool.sort((a, b) => {
+    // An exact over-regularization (のみた→のんだ) names the intended form
+    // outright, so it wins even over a closer-by-distance coincidence.
+    if (a.regularized !== b.regularized) return a.regularized ? -1 : 1;
     if (a.distance !== b.distance) return a.distance - b.distance;
+    // Prefer the form the learner's ending was reaching for (て→te, た→past).
+    const aWanted = wantSuffix && a.type === wantSuffix ? 0 : 1;
+    const bWanted = wantSuffix && b.type === wantSuffix ? 0 : 1;
+    if (aWanted !== bWanted) return aWanted - bWanted;
     return a.kana.length - b.kana.length;
   });
-  near.splice(MAX_NEAR_RESULTS);
-  for (const cand of near) {
+  pool.splice(MAX_NEAR_RESULTS);
+  for (const cand of pool) {
     cand.diff = describeDiff(normalized, cand.kana);
   }
 
-  return { input: raw, normalized, exact, near };
+  return { input: raw, normalized, exact, near: pool };
 }

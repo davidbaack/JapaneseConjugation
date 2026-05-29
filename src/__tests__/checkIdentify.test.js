@@ -112,6 +112,37 @@ describe('identifyConjugation', () => {
     ).toBe(true);
   });
 
+  describe('stem-aware near-miss (onbin / sound-change errors)', () => {
+    // For each: the learner kept the right verb but formed the ending wrongly.
+    // The lead near-miss should name THAT verb and the form they reached for —
+    // not a coincidentally-closer unrelated word.
+    const cases = [
+      ['のみて', 'のむ', 'のんで', 'te-form'], // 飲む te: みて, not んで
+      ['しにて', 'しぬ', 'しんで', 'te-form'], // 死ぬ te
+      ['いいて', 'いく', 'いって', 'te-form'], // 行く irregular te
+      ['まちて', 'まつ', 'まって', 'te-form'], // 待つ te
+      ['およいて', 'およぐ', 'およいで', 'te-form'], // 泳ぐ te (voicing)
+      ['のみた', 'のむ', 'のんだ', 'plain-past'], // 飲む past
+    ];
+    for (const [input, reading, expectedKana, expectedType] of cases) {
+      it(`${input} → ${expectedKana} (${expectedType} of ${reading})`, () => {
+        const res = identifyConjugation(input, ALL);
+        expect(res.exact).toHaveLength(0);
+        expect(res.near.length).toBeGreaterThan(0);
+        const best = res.near[0];
+        expect(best.word.reading).toBe(reading);
+        expect(best.type).toBe(expectedType);
+        expect(best.kana).toBe(expectedKana);
+      });
+    }
+
+    it('does not read a plain noun as a botched verb (ねこ is not 寝る)', () => {
+      const res = identifyConjugation('ねこ', ALL);
+      expect(res.exact).toHaveLength(0);
+      expect(res.near).toHaveLength(0);
+    });
+  });
+
   it('reports both readings of an ambiguous form (potential = passive)', () => {
     const res = identifyConjugation('たべられる', ALL);
     const types = res.exact
