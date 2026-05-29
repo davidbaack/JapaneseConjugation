@@ -111,6 +111,10 @@ export function practiceTypesForItem(item,enabledTypeIds,prefs=DEFAULT_PREFS){
 }
 
 export function isRedundantPracticeType(item,typeId,enabledTypeIds,prefs=DEFAULT_PREFS){
+  // A form with no valid conjugation (e.g. short causative-passive on an
+  // ichidan/す-godan/する verb) can never be practiced — it would surface as a
+  // blank card. Exclude it regardless of the duplicate-skipping preference.
+  if(!conjugateItem(item,typeId))return true;
   if(prefs.skipDuplicateForms===false)return false;
   return !practiceTypesForItem(item,enabledTypeIds,prefs).some(t=>t.id===typeId);
 }
@@ -866,6 +870,44 @@ export function explainItem(item,type){
   if(!e.rule&&type==='prohibition')e.rule='Use the dictionary form, then add な for a blunt prohibition.';
   if(!e.rule&&type==='command-nasai')e.rule='Use the masu-stem, then add なさい.';
   return e;
+}
+
+// Deterministic, offline hint shown when the student clicks "Hint" while
+// answering. It states how the (possibly multi-step) form is built and where
+// the student currently is, without revealing any kana they haven't typed yet.
+//
+// Irregular forms (する, 来る, よい-based adjectives…) have no derivable rule —
+// their "rule" text spells out the answer. To keep the first hint spoiler-free,
+// such text is replaced with a nudge unless `reveal` is true (a second Hint
+// click). Returns { text, masked }, where `masked` means more can be revealed.
+export function stepCoachHint(item,type,typed,reveal=false){
+  const expected=conjugateItem(item,type);
+  const exp=explainItem(item,type);
+  let recipe=[exp.rule,exp.note].filter(Boolean).join(' ').trim();
+  // Only a genuine transformation can spoil — the unchanged dictionary form can't.
+  const wouldReveal=!!expected&&expected!==item.reading&&recipe.includes(expected);
+  let masked=false;
+  if(wouldReveal&&!reveal){
+    recipe=`This is an irregular form, so it doesn't follow the usual pattern — try to recall its special conjugation. Tap Hint again or use “Discuss further” to reveal the steps.`;
+    masked=true;
+  }
+  const got=toHiragana(typed||'')||(typed||'');
+  let correct=0;
+  while(correct<got.length&&correct<expected.length&&got[correct]===expected[correct])correct++;
+  let status;
+  if(!got){
+    status=`You haven't typed anything yet — start from the dictionary form ${item.reading}, then work through the steps above.`;
+  }else if(correct===0){
+    status=`The very beginning doesn't match yet — re-check the first step above.`;
+  }else if(correct<got.length){
+    status=`Your first ${correct} kana (「${got.slice(0,correct)}」) are on track, but kana ${correct+1} goes off course — re-check the next step above.`;
+  }else if(correct>=expected.length){
+    status=`That's the full length — press Enter to check it.`;
+  }else{
+    const remaining=expected.length-correct;
+    status=`「${got}」 is correct so far — ${remaining} more kana to go. Apply the next step above.`;
+  }
+  return{text:recipe?`${recipe}\n\n${status}`:status,masked};
 }
 
 export function diagnose(verb,type,userAnswer){

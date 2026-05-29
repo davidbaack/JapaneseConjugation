@@ -17,6 +17,7 @@ import {
   getOfflineTemplateSentence,
   explainItem,
   diagnoseItem,
+  stepCoachHint,
   GROUP_NAMES,
   isAdjective,
   promptFormLabel
@@ -94,8 +95,11 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const [aiHintText, setAiHintText] = useState('');
   const [aiHintLoading, setAiHintLoading] = useState(false);
   const [aiHintErr, setAiHintErr] = useState('');
-  const [aiTypingHint, setAiTypingHint] = useState('');
-  const [aiTypingHintLoading, setAiTypingHintLoading] = useState(false);
+  const [stepHint, setStepHint] = useState('');
+  const [hintMasked, setHintMasked] = useState(false);
+  const [hintRevealed, setHintRevealed] = useState(false);
+  const [coachChatOpen, setCoachChatOpen] = useState(false);
+  const [coachSeedAnswer, setCoachSeedAnswer] = useState('');
   const [coachRevealed, setCoachRevealed] = useState(0);
   const [greenRevealed, setGreenRevealed] = useState(0);
   const [revealedMiss, setRevealedMiss] = useState(false);
@@ -194,10 +198,10 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   }, [current?.id, practicePrefs.englishHints]);
 
   useEffect(() => {
-    if (aiTypingHint && typingHintRef.current) {
+    if (stepHint && typingHintRef.current) {
       typingHintRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [aiTypingHint]);
+  }, [stepHint]);
 
   // Handle TTS speech synthesis inside StudyView
   useEffect(() => {
@@ -500,25 +504,23 @@ Keep it concise and clear.`;
     setAiHintLoading(false);
   }
 
-  async function generateTypingHint() {
+  // Deterministic, offline step coach — no API key required. Irregular forms
+  // are masked on the first click; a second click reveals the spelled-out steps.
+  function showStepHint() {
+    if (!current) return;
+    const reveal = hintRevealed || (!!stepHint && hintMasked);
+    const { text, masked } = stepCoachHint(current.verb, current.type, answer, reveal);
+    setStepHint(text);
+    setHintMasked(masked);
+    if (reveal) setHintRevealed(true);
+  }
+
+  // Opens a continuous AI chat for deeper help, seeded with the current
+  // attempt. Snapshot the typed answer so the chat doesn't re-init on keypress.
+  function openCoachChat() {
     if (!current || !geminiKey) return;
-    setAiTypingHintLoading(true);
-    setAiTypingHint('');
-    const typedKana = toHiragana(answer) || answer;
-    try {
-      const prompt = `A student is conjugating a Japanese verb and needs targeted guidance.\n\nBase word: ${current.verb.dict} (${current.verb.reading}), meaning: "${current.verb.meaning}"\nVerb class: ${GROUP_NAMES[current.verb.group] || current.verb.group}\nTask: transform to ${typeInfo.label}${taskSub ? ` (${taskSub})` : ''}${typedKana ? `\nStudent typed so far: "${typedKana}"` : '\nStudent has not typed anything yet.'}\n\nDo NOT reveal the correct answer. Give one short targeted hint (under 20 words) about where to start or what to fix next.`;
-      const reply = await callGemini(
-        [{ role: 'user', parts: [{ text: prompt }] }],
-        geminiKey,
-        120,
-        0.3,
-        aiSystemFromPrefs(practicePrefs, 'You help students learn Japanese conjugation. Never reveal the full correct answer.')
-      );
-      setAiTypingHint(reply);
-    } catch {
-      // silently fail — no error shown for inline hint
-    }
-    setAiTypingHintLoading(false);
+    setCoachSeedAnswer(answer);
+    setCoachChatOpen(true);
   }
 
   function submit(choiceValue) {
@@ -534,8 +536,10 @@ Keep it concise and clear.`;
       setReviewChoiceLabel('');
       setSelfCheckOpen(false);
       setTypoGuard(null);
-      setAiTypingHint('');
-      setAiTypingHintLoading(false);
+      setStepHint('');
+      setHintMasked(false);
+      setHintRevealed(false);
+      setCoachChatOpen(false);
       hadKanaMistakeRef.current = false;
       wrongSnapshotRef.current = null;
       setPhase('answering');
@@ -608,8 +612,10 @@ Keep it concise and clear.`;
         setReviewChoiceLabel('');
         setSelfCheckOpen(false);
         setTypoGuard(null);
-        setAiTypingHint('');
-        setAiTypingHintLoading(false);
+        setStepHint('');
+        setHintMasked(false);
+        setHintRevealed(false);
+        setCoachChatOpen(false);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
         setPhase('answering');
@@ -633,8 +639,10 @@ Keep it concise and clear.`;
     setReviewChoiceLabel('');
     setSelfCheckOpen(false);
     setTypoGuard(null);
-    setAiTypingHint('');
-    setAiTypingHintLoading(false);
+    setStepHint('');
+    setHintMasked(false);
+    setHintRevealed(false);
+    setCoachChatOpen(false);
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
     setPhase('answering');
@@ -698,8 +706,10 @@ Keep it concise and clear.`;
         setReviewChoiceLabel('');
         setSelfCheckOpen(false);
         setTypoGuard(null);
-        setAiTypingHint('');
-        setAiTypingHintLoading(false);
+        setStepHint('');
+        setHintMasked(false);
+        setHintRevealed(false);
+        setCoachChatOpen(false);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
         setPhase('answering');
@@ -808,6 +818,46 @@ Keep it concise and clear.`;
       </div>
     );
   }
+
+  // Shared hint disclosure for both answer modes: the deterministic step-coach
+  // text, an optional "Discuss further" AI chat trigger, and the chat itself.
+  // Each mode supplies its own "Hint" button (styled to fit its layout) that
+  // calls showStepHint().
+  const hintDisclosure = !reverseDrill && (stepHint || (geminiKey && (stepHint || coachChatOpen))) ? (
+    <div className="mt-2 flex flex-col items-center gap-1">
+      {stepHint && (
+        <div
+          ref={typingHintRef}
+          style={{ whiteSpace: 'pre-wrap' }}
+          className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-40 overflow-y-auto"
+        >
+          {stepHint}
+        </div>
+      )}
+      {geminiKey && stepHint && !coachChatOpen && (
+        <button
+          onClick={openCoachChat}
+          className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
+        >
+          <IconChat className="w-3 h-3" />
+          Discuss further
+        </button>
+      )}
+      {coachChatOpen && geminiKey && (
+        <div className="w-full text-left">
+          <ChatPanel
+            mode="coach"
+            verb={current.verb}
+            type={current.type}
+            userAnswer={coachSeedAnswer}
+            geminiKey={geminiKey}
+            practicePrefs={practicePrefs}
+            taskOverride={taskOverride}
+          />
+        </div>
+      )}
+    </div>
+  ) : null;
 
   return (
     <div className="space-y-4">
@@ -1114,21 +1164,16 @@ Keep it concise and clear.`;
                           {coachStatus}
                         </div>
                       )}
-                      {geminiKey && !reverseDrill && answer && (
+                      {!reverseDrill && (
                         <div className="mt-2 flex flex-col items-center gap-1">
                           <button
-                            onClick={generateTypingHint}
-                            disabled={aiTypingHintLoading}
-                            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:opacity-40 inline-flex items-center gap-1 transition"
+                            onClick={showStepHint}
+                            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
                           >
                             <IconSpark className="w-3 h-3" />
-                            {aiTypingHintLoading ? 'Thinking…' : 'Hint'}
+                            Hint
                           </button>
-                          {aiTypingHint && (
-                            <div ref={typingHintRef} className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-32 overflow-y-auto">
-                              {aiTypingHint}
-                            </div>
-                          )}
+                          {hintDisclosure}
                         </div>
                       )}
                     </div>
@@ -1318,14 +1363,13 @@ Keep it concise and clear.`;
                       >
                         Check (Enter)
                       </button>
-                      <div className={`grid gap-2 ${geminiKey && !reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                        {geminiKey && !reverseDrill && (
+                      <div className={`grid gap-2 ${!reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                        {!reverseDrill && (
                           <button
-                            onClick={generateTypingHint}
-                            disabled={aiTypingHintLoading}
-                            className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition disabled:opacity-40"
+                            onClick={showStepHint}
+                            className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
                           >
-                            {aiTypingHintLoading ? '…' : 'Hint'}
+                            Hint
                           </button>
                         )}
                         <button
@@ -1342,11 +1386,7 @@ Keep it concise and clear.`;
                         </button>
                       </div>
                     </div>
-                    {aiTypingHint && (
-                      <div ref={typingHintRef} className="mt-2 rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-32 overflow-y-auto">
-                        {aiTypingHint}
-                      </div>
-                    )}
+                    {hintDisclosure}
                   </>
                 )}
               </>

@@ -10,8 +10,10 @@ import {
   normalizeReferenceState,
   buildFocusCard,
   defaultState,
+  selectNext,
   DAY,
 } from '../utils/storage.js';
+import { conjugateItem } from '../utils/conjugator.js';
 
 // Mock localStorage for storage tests (mergeState etc. are pure but defaultState references CONJ_TYPES)
 // No localStorage calls in the functions we're testing — they're all pure.
@@ -292,5 +294,26 @@ describe('buildFocusCard', () => {
     const word = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
     expect(buildFocusCard(state, word, 'adj-plain-past')).toBeNull();
     expect(buildFocusCard(state, null, 'plain-past')).toBeNull();
+  });
+});
+
+describe('selectNext never serves an unconjugatable (blank) card', () => {
+  // short-causative-passive is empty for ichidan/す-godan/する verbs.
+  const ICHIDAN = [{ dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' }];
+  const GODAN = [{ dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan' }];
+  const enabled = ['short-causative-passive'];
+  const freshState = () => ({ enabledTypes: enabled, cards: {}, verbStats: {}, session: {} });
+
+  for (const skipDuplicateForms of [true, false]) {
+    it(`returns no card for an ichidan verb when only the empty form is enabled (skipDuplicateForms=${skipDuplicateForms})`, () => {
+      const card = selectNext(freshState(), ICHIDAN, enabled, null, { skipDuplicateForms });
+      expect(card).toBeNull();
+    });
+  }
+
+  it('still serves a valid card for a godan verb with the same form (skipDuplicateForms=false)', () => {
+    const card = selectNext(freshState(), GODAN, enabled, null, { skipDuplicateForms: false });
+    expect(card).not.toBeNull();
+    expect(conjugateItem(card.verb, card.type)).toBe('かかされる');
   });
 });
