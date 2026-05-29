@@ -451,8 +451,10 @@ Keep it concise and clear.`;
     setAiTypingHintLoading(true);
     setAiTypingHint('');
     const typedKana = toHiragana(answer) || answer;
+    const exp = explainItem(current.verb, current.type);
+    const buildSteps = [exp.rule, exp.note].filter(Boolean).join(' ');
     try {
-      const prompt = `A student is conjugating a Japanese verb and needs targeted guidance.\n\nBase word: ${current.verb.dict} (${current.verb.reading}), meaning: "${current.verb.meaning}"\nVerb class: ${GROUP_NAMES[current.verb.group] || current.verb.group}\nTask: transform to ${typeInfo.label}${taskSub ? ` (${taskSub})` : ''}${typedKana ? `\nStudent typed so far: "${typedKana}"` : '\nStudent has not typed anything yet.'}\n\nDo NOT reveal the correct answer. Give one short targeted hint (under 20 words) about where to start or what to fix next.`;
+      const prompt = `A student is conjugating a Japanese verb and needs targeted, step-by-step guidance.\n\nBase word: ${current.verb.dict} (${current.verb.reading}), meaning: "${current.verb.meaning}"\nVerb class: ${GROUP_NAMES[current.verb.group] || current.verb.group}\nTarget form: ${typeInfo.label}${taskSub ? ` (${taskSub})` : ''}\nCorrect answer (for your reference ONLY — never state it): ${expected}\nHow this form is built: ${buildSteps || 'apply the standard rule for this form'}${typedKana ? `\nStudent has typed so far: "${typedKana}"` : '\nStudent has not typed anything yet.'}\n\nThis form may chain several transformations together (e.g. potential, then past, then negative). Compare what the student typed against the correct answer to work out which transformations they have already done, then coach ONLY the single next step toward the full answer. Be concrete — name the exact sound/kana shift or suffix to add next, and never stop at just the first step when more remain. Do NOT reveal the full answer. One short hint, under 25 words.`;
       const reply = await callGemini(
         [{ role: 'user', parts: [{ text: prompt }] }],
         geminiKey,
