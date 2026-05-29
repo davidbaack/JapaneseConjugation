@@ -88,6 +88,7 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const [coachRevealed, setCoachRevealed] = useState(0);
   const [revealedMiss, setRevealedMiss] = useState(false);
   const [reviewChoiceLabel, setReviewChoiceLabel] = useState('');
+  const [submittedAnswer, setSubmittedAnswer] = useState('');
   const [selfCheckOpen, setSelfCheckOpen] = useState(false);
   const [typoGuard, setTypoGuard] = useState(null);
   const [kanaPadOpen, setKanaPadOpen] = useState(false);
@@ -98,6 +99,10 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const inputRef = useRef(null);
   const autoAdvanceRef = useRef(null);
   const hadKanaMistakeRef = useRef(false);
+  // Snapshots the typed answer the moment a kana mistake first occurs, so the
+  // review panel can show what was actually entered when it went wrong rather
+  // than the live (possibly self-corrected) input.
+  const wrongSnapshotRef = useRef(null);
   const typingHintRef = useRef(null);
 
   const enabledTypes = state.enabledTypes.length > 0 ? state.enabledTypes : ['plain-past'];
@@ -410,8 +415,9 @@ Keep it concise and clear.`;
       : preview === expected
         ? 'Complete match. Press Enter.'
         : '';
+  const reviewAnswerSource = phase === 'reviewing' && submittedAnswer ? submittedAnswer : answer;
   const reviewKanaCells = ['input', 'guided'].includes(practicePrefs.answerMode) && !reverseDrill
-    ? kanaCoachCells(expected, answer, practicePrefs.answerMode === 'guided' ? coachRevealed : 0)
+    ? kanaCoachCells(expected, reviewAnswerSource, practicePrefs.answerMode === 'guided' ? coachRevealed : 0)
     : [];
 
   async function generateAIClue() {
@@ -483,6 +489,7 @@ Keep it concise and clear.`;
       setAiTypingHint('');
       setAiTypingHintLoading(false);
       hadKanaMistakeRef.current = false;
+      wrongSnapshotRef.current = null;
       setPhase('answering');
       if (!reviewSetComplete) {
         setCurrent(selectNext(state, practiceWords, enabledTypes, current.id, practicePrefs));
@@ -535,6 +542,10 @@ Keep it concise and clear.`;
     setReviewChoiceLabel('');
     setRevealedMiss(false);
     setSelfCheckOpen(false);
+    // When the final string matched but the card was still marked wrong (a kana
+    // mistake was made and then corrected mid-typing), show the snapshot from
+    // when it went wrong instead of the corrected text.
+    setSubmittedAnswer(finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw);
     setWasCorrect(ok);
     setPhase('reviewing');
     const reviewWillComplete = reviewLimit > 0 && reviewsDone + 1 >= reviewLimit;
@@ -552,6 +563,7 @@ Keep it concise and clear.`;
         setAiTypingHint('');
         setAiTypingHintLoading(false);
         hadKanaMistakeRef.current = false;
+        wrongSnapshotRef.current = null;
         setPhase('answering');
         setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
       }, 850);
@@ -576,6 +588,7 @@ Keep it concise and clear.`;
     setAiTypingHint('');
     setAiTypingHintLoading(false);
     hadKanaMistakeRef.current = false;
+    wrongSnapshotRef.current = null;
     setPhase('answering');
     setWasCorrect(false);
     setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
@@ -640,6 +653,7 @@ Keep it concise and clear.`;
         setAiTypingHint('');
         setAiTypingHintLoading(false);
         hadKanaMistakeRef.current = false;
+        wrongSnapshotRef.current = null;
         setPhase('answering');
         setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
       }, 850);
@@ -1081,6 +1095,7 @@ Keep it concise and clear.`;
                           if (kanaMatchDisplay !== 'none') {
                             const cells = kanaCoachCells(expected, newVal, coachRevealed, true);
                             if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
+                              if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = newVal;
                               hadKanaMistakeRef.current = true;
                             }
                           }
@@ -1169,6 +1184,7 @@ Keep it concise and clear.`;
                           if (kanaMatchDisplay !== 'none' && !reverseDrill) {
                             const cells = kanaCoachCells(expected, newVal, 0, true);
                             if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
+                              if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = newVal;
                               hadKanaMistakeRef.current = true;
                             }
                           }
@@ -1309,7 +1325,7 @@ Keep it concise and clear.`;
                             : 'You wrote:'}{' '}
                         {!revealedMiss && !reviewChoiceLabel && (
                           <span lang="ja" className="font-semibold">
-                            {reverseDrill ? answer.trim() || '(empty)' : toHiragana(answer) || '(empty)'}
+                            {reverseDrill ? submittedAnswer.trim() || '(empty)' : toHiragana(submittedAnswer) || '(empty)'}
                           </span>
                         )}
                       </div>
