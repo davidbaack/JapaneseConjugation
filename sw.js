@@ -24,6 +24,10 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  // Only cache same-origin requests. Cross-origin API calls (Supabase, Gemini)
+  // must never be served from cache — stale auth tokens or AI responses would
+  // silently corrupt the user's session.
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;

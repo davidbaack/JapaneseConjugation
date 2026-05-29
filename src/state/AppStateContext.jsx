@@ -9,6 +9,7 @@ import {
   cloudTimestamp,
   resolveSyncAction,
   mergeState,
+  pruneAICache,
 } from '../utils/storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { getJapaneseVoices } from '../utils/speech.js';
@@ -48,6 +49,7 @@ function useAppController() {
 
   // Local storage hydration on mount + Supabase auth listener
   useEffect(() => {
+    pruneAICache();
     const local = loadAll();
     if (local) {
       if (local.state) setState(mergeState(local.state, { reviewed: 0, correct: 0 }));
@@ -146,7 +148,6 @@ function useAppController() {
     customVerbs,
     customAdjectives,
     wordLists,
-    geminiKey,
     practicePrefs,
     lastSyncedAtRef,
     setSyncStatus,
@@ -198,7 +199,7 @@ function useAppController() {
       const cloud = await cloudFetch();
       if (resolveSyncAction(cloud, lastSyncedAtRef.current) === 'pull') {
         const cloudAt = cloudTimestamp(cloud);
-        if (cloud.data.state) setState(mergeState(cloud.data.state, state.session));
+        if (cloud.data.state) setState(mergeState(cloud.data.state, { reviewed: 0, correct: 0 }));
         if (Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);
         if (Array.isArray(cloud.data.customAdjectives))
           setCustomAdjectives(cloud.data.customAdjectives);

@@ -41,7 +41,6 @@ export function saveAll(
   wordLists,
   syncConfig,
   lastSyncedAt,
-  geminiKey = '',
   practicePrefs = DEFAULT_PREFS,
 ) {
   const payload = JSON.stringify({
@@ -51,7 +50,6 @@ export function saveAll(
     wordLists,
     syncConfig,
     lastSyncedAt,
-    geminiKey,
     practicePrefs,
   });
   try {

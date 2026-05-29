@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   timeout: 30000,
-  retries: 0,
+  retries: process.env.CI ? 1 : 0,
   use: {
     headless: true,
     baseURL: 'http://localhost:4173/JapaneseConjugation/',

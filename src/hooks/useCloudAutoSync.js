@@ -19,7 +19,6 @@ export function useCloudAutoSync({
   customVerbs,
   customAdjectives,
   wordLists,
-  geminiKey,
   practicePrefs,
   lastSyncedAtRef,
   setSyncStatus,
@@ -36,7 +35,6 @@ export function useCloudAutoSync({
       wordLists,
       dummySync,
       lastSyncedAtRef.current,
-      geminiKey,
       practicePrefs,
     );
 
@@ -55,7 +53,6 @@ export function useCloudAutoSync({
             wordLists,
             dummySync,
             now,
-            geminiKey,
             practicePrefs,
           );
           setSyncStatus({ kind: 'ok', message: 'Saved to cloud', at: now });
@@ -71,7 +68,6 @@ export function useCloudAutoSync({
     customAdjectives,
     wordLists,
     session,
-    geminiKey,
     practicePrefs,
     hydrated,
     lastSyncedAtRef,
