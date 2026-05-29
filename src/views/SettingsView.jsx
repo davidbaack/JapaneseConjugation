@@ -34,6 +34,7 @@ import {
   scriptModeFromDisplay,
 } from '../utils/display.js';
 import { speakJapanese } from '../utils/speech.js';
+import { serializeBackup, parseBackup } from '../utils/backup.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
 const POLITE_FORM_IDS = ALL_CARD_TYPES.filter(
@@ -76,34 +77,10 @@ export default function SettingsView({
   const [copyOk, setCopyOk] = useState(false);
   const [typeSearch, setTypeSearch] = useState('');
 
-  const exportData = useMemo(() => {
-    return JSON.stringify({
-      format: 'jp-verb-srs',
-      version: 39,
-      exportedAt: new Date().toISOString(),
-      state: {
-        cards: state.cards,
-        enabledTypes: state.enabledTypes,
-        verbStats: state.verbStats || {},
-        mistakes: state.mistakes || [],
-        shadow: state.shadow,
-        ambient: state.ambient,
-        game: state.game,
-        onbin: state.onbin,
-        meaning: state.meaning,
-        mock: state.mock,
-        reader: state.reader,
-        production: state.production || defaultState().production,
-        reference: state.reference,
-        daily: state.daily,
-        classify: state.classify,
-      },
-      customVerbs,
-      customAdjectives,
-      wordLists,
-      practicePrefs,
-    });
-  }, [state, customVerbs, customAdjectives, wordLists, practicePrefs]);
+  const exportData = useMemo(
+    () => serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
+    [state, customVerbs, customAdjectives, wordLists, practicePrefs],
+  );
 
   function toggle(id) {
     const has = state.enabledTypes.includes(id);
@@ -209,22 +186,20 @@ export default function SettingsView({
 
   function doImport() {
     setImportErr('');
-    try {
-      const data = JSON.parse(importText.trim());
-      if (data.format !== 'jp-verb-srs') throw new Error("doesn't look like a verb-drill backup");
-      if (!data.state || typeof data.state.cards !== 'object') throw new Error('missing card data');
-      setState(mergeState(data.state, { reviewed: 0, correct: 0 }));
-      if (Array.isArray(data.customVerbs)) setCustomVerbs(data.customVerbs);
-      if (Array.isArray(data.customAdjectives)) setCustomAdjectives(data.customAdjectives);
-      if (Array.isArray(data.wordLists)) setWordLists(data.wordLists);
-      if (data.practicePrefs) setPracticePrefs(mergePracticePrefs(data.practicePrefs));
-      setImportText('');
-      setImportOpen(false);
-      setMsg('Restored!');
-      setTimeout(() => setMsg(''), 3000);
-    } catch (e) {
-      setImportErr('Invalid: ' + (e.message || 'parse failed'));
+    const { ok, error, data } = parseBackup(importText);
+    if (!ok) {
+      setImportErr('Invalid: ' + error);
+      return;
     }
+    setState(mergeState(data.state, { reviewed: 0, correct: 0 }));
+    if (Array.isArray(data.customVerbs)) setCustomVerbs(data.customVerbs);
+    if (Array.isArray(data.customAdjectives)) setCustomAdjectives(data.customAdjectives);
+    if (Array.isArray(data.wordLists)) setWordLists(data.wordLists);
+    if (data.practicePrefs) setPracticePrefs(mergePracticePrefs(data.practicePrefs));
+    setImportText('');
+    setImportOpen(false);
+    setMsg('Restored!');
+    setTimeout(() => setMsg(''), 3000);
   }
 
   const statusColor =

@@ -8,13 +8,15 @@ import {
   IconPen,
 } from '../components/Icons.jsx';
 import { playPronunciation } from '../utils/speech.js';
+import { useStudyTimer } from '../hooks/useStudyTimer.js';
+import { useAISentence } from '../hooks/useAISentence.js';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
 import { PitchAccentSection } from '../components/PitchAccent.jsx';
 import { ContextExamplePanel } from '../components/ContextExamplePanel.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import { ChatPanel } from '../components/ChatPanel.jsx';
-import { callGemini, aiSystemFromPrefs, extractJSON } from '../utils/gemini.js';
+import { callGemini, aiSystemFromPrefs } from '../utils/gemini.js';
 import { toHiragana, toHiraganaProgress } from '../utils/romaji.js';
 import {
   conjugateItem,
@@ -26,7 +28,6 @@ import {
   promptFormLabel,
 } from '../utils/conjugator.js';
 import {
-  getOfflineTemplateSentence,
   explainItem,
   diagnoseItem,
   stepCoachHint,
@@ -38,8 +39,6 @@ import {
   recordMistake,
   gradeCard,
   bumpDaily,
-  getAICache,
-  setAICache,
 } from '../utils/storage.js';
 import {
   formDisplay,
@@ -89,10 +88,7 @@ export default function StudyView({
   const [selfCheckOpen, setSelfCheckOpen] = useState(false);
   const [typoGuard, setTypoGuard] = useState(null);
   const [kanaPadOpen, setKanaPadOpen] = useState(false);
-  const [endAt, setEndAt] = useState(null);
-  const [now, setNow] = useState(Date.now());
   const [reviewBase, setReviewBase] = useState(state.session.reviewed || 0);
-  const [aiSentence, setAiSentence] = useState(null);
   const inputRef = useRef(null);
   const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
@@ -131,6 +127,17 @@ export default function StudyView({
         ? conjugateItem(current.verb, promptType)
         : current.verb.reading
     : '';
+
+  // Timed-drill clock and (sentence-mode) AI example sentence — extracted hooks.
+  const { endAt, timeLeft, restart: restartTimer } = useStudyTimer(practicePrefs.durationSec);
+  const aiSentence = useAISentence({
+    current,
+    drillMode: practicePrefs.drillMode,
+    geminiKey,
+    reverseDrill,
+    sourceForm,
+    scriptMode: practicePrefs.scriptMode,
+  });
 
   useEffect(() => {
     if (current !== null) return;
@@ -274,99 +281,10 @@ export default function StudyView({
   }, [practicePrefs.reviewLimit]);
 
   useEffect(() => {
-    if (practicePrefs.durationSec > 0) {
-      setEndAt(Date.now() + practicePrefs.durationSec * 1000);
-    } else {
-      setEndAt(null);
-    }
-    setNow(Date.now());
-  }, [practicePrefs.durationSec]);
-
-  useEffect(() => {
-    if (!endAt) return;
-    const id = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(id);
-  }, [endAt]);
-
-  useEffect(() => {
     return () => {
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    if (!current) {
-      setAiSentence(null);
-      return;
-    }
-    if (practicePrefs.drillMode !== 'sentence') {
-      setAiSentence(null);
-      return;
-    }
-
-    const key = `${current.verb.group}:${current.verb.dict}|${current.type}`;
-
-    const cached = getAICache('katachiya_ai_sentence_cache', key);
-    if (cached) {
-      setAiSentence({
-        sentence: cached.sentence,
-        translation: cached.translation,
-        loading: false,
-        err: '',
-      });
-      return;
-    }
-
-    if (geminiKey) {
-      setAiSentence({ sentence: '', translation: '', loading: true, err: '' });
-
-      const expectedVal = reverseDrill ? current.verb.reading : sourceForm;
-      const targetLabel = getTypeInfo(current.type).label;
-      const jlptLevel = getWordMeta(current.verb).jlpt || 'N5';
-      const scriptPref =
-        practicePrefs.scriptMode === 'hiragana'
-          ? 'Write the Japanese sentence in Hiragana only (no Kanji).'
-          : practicePrefs.scriptMode === 'romaji'
-            ? 'Write the Japanese sentence in Romaji only (English letters).'
-            : 'Use standard Japanese writing with Kanji and Hiragana.';
-      const prompt = `Create one short, level-appropriate Japanese practice sentence for a learner of JLPT ${jlptLevel}.
-${scriptPref}
-The sentence must naturally contain the word "${current.verb.dict}" (${current.verb.reading}) conjugated into its "${targetLabel}" form (which is "${expectedVal}").
-In the sentence, replace the conjugated form with a blank "[______]".
-
-Return ONLY valid JSON (no markdown formatting, no code block backticks):
-{"sentence": "Japanese sentence with [______]", "translation": "English translation"}
-
-Keep it concise and clear.`;
-
-      callGemini(
-        [{ role: 'user', parts: [{ text: prompt }] }],
-        geminiKey,
-        400,
-        0.2,
-        'You create short Japanese grammar sentences for quizzes. Return JSON only.',
-      )
-        .then((reply) => {
-          const data = extractJSON(reply);
-          if (data && data.sentence && data.translation) {
-            const resultObj = { sentence: data.sentence, translation: data.translation };
-            setAICache('katachiya_ai_sentence_cache', key, resultObj);
-            setAiSentence({ ...resultObj, loading: false, err: '' });
-          } else {
-            throw new Error('Invalid JSON structure from AI.');
-          }
-        })
-        .catch(() => {
-          const fallback = getOfflineTemplateSentence(current.verb, current.type);
-          setAiSentence({ ...fallback, loading: false, err: '' });
-        });
-    } else {
-      const fallback = getOfflineTemplateSentence(current.verb, current.type);
-      setAiSentence({ ...fallback, loading: false, err: '' });
-    }
-    // current/practicePrefs.scriptMode/reverseDrill/sourceForm intentionally omitted — keyed on current?.id to avoid re-fetching on render
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id, practicePrefs.drillMode, geminiKey]);
 
   function speakJapaneseLocal(text, rateVal = 0.85) {
     // Prefer a recorded clip with TTS fallback (improvement #18).
@@ -433,7 +351,6 @@ Keep it concise and clear.`;
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const sessionSkipped = state.session?.skipped || 0;
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
-  const timeLeft = endAt ? Math.max(0, Math.ceil((endAt - now) / 1000)) : null;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishHint = englishHintsHidden && phase === 'answering' && !showEnglishHint;
   const coachPreview = toHiragana(answer);
@@ -840,10 +757,7 @@ Keep it concise and clear.`;
         <button
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
-            setEndAt(
-              practicePrefs.durationSec > 0 ? Date.now() + practicePrefs.durationSec * 1000 : null,
-            );
-            setNow(Date.now());
+            restartTimer();
             setCurrent(selectNext(state, practiceWords, enabledTypes, current.id, practicePrefs));
             setAnswer('');
             setPhase('answering');
