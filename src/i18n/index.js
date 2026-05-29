@@ -1,3 +1,4 @@
+// @ts-check
 // Minimal i18n runtime (improvement #19).
 //
 // Goals: zero dependencies, a single `t(key, vars)` entry point, {placeholder}

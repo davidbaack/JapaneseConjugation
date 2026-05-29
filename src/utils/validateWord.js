@@ -1,3 +1,4 @@
+// @ts-check
 // Validation & sanitization for custom vocabulary input (improvement #16).
 //
 // Custom word fields flow into localStorage, cloud sync, TSV export, and — most
@@ -34,7 +35,19 @@ export function sanitizeField(value, max = 200) {
 // Validate and normalize a candidate word. Returns
 // `{ ok, errors: string[], word }` where `word` is the sanitized result (only
 // meaningful when ok). `reading` is converted to hiragana and must be all kana.
+/**
+ * @typedef {Object} WordInput
+ * @property {string} [dict]
+ * @property {string} [reading]
+ * @property {string} [meaning]
+ * @property {string} [group]
+ */
+/**
+ * @param {WordInput} raw
+ * @returns {{ ok: boolean, errors: string[], word: { dict: string, reading: string, meaning: string, group: string } }}
+ */
 export function validateWord(raw) {
+  /** @type {string[]} */
   const errors = [];
   const dict = sanitizeField(raw?.dict, FIELD_LIMITS.dict);
   const meaning = sanitizeField(raw?.meaning, FIELD_LIMITS.meaning);

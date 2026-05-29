@@ -1,3 +1,4 @@
+// @ts-check
 // Client-side rate limiting for AI calls (improvement #17).
 //
 // Gemini requests otherwise rely entirely on server-side quota, so a user

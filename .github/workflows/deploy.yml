@@ -40,6 +40,9 @@ jobs:
 
       - run: npm run lint
 
+      - name: Typecheck (JSDoc / @ts-check)
+        run: npm run typecheck
+
       - name: Check formatting
         run: npm run format:check
 

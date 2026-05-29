@@ -1,3 +1,4 @@
+// @ts-check
 // Lightweight client logger (improvement #13).
 //
 // The app has an ErrorBoundary and many silent `catch {}` blocks, but errors

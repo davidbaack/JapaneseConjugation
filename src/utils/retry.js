@@ -1,3 +1,4 @@
+// @ts-check
 // Exponential backoff with jitter for transient failures (improvement #14).
 //
 // Used to protect cloud sync (so a flaky network doesn't drop a user's
@@ -40,6 +41,23 @@ export function isTransientError(error) {
 // Run `fn` (which may be async), retrying on transient failure with exponential
 // backoff + jitter. Resolves with fn's value, or rejects with the last error
 // once retries are exhausted or the error is deemed non-transient.
+/**
+ * @typedef {Object} RetryOptions
+ * @property {number} [retries]      Max retries after the first attempt.
+ * @property {number} [baseDelay]    Base backoff delay in ms.
+ * @property {number} [maxDelay]     Maximum backoff delay in ms.
+ * @property {number} [factor]       Exponential growth factor.
+ * @property {boolean} [jitter]      Apply [50%,100%] jitter to each delay.
+ * @property {(error: any) => boolean} [shouldRetry]
+ * @property {(error: any, attempt: number, delay: number) => void} [onRetry]
+ * @property {(ms: number) => Promise<void>} [sleep]
+ */
+/**
+ * @template T
+ * @param {(attempt: number) => Promise<T> | T} fn
+ * @param {RetryOptions} [options]
+ * @returns {Promise<T>}
+ */
 export async function retryWithBackoff(fn, options = {}) {
   const {
     retries = 3,

@@ -1,3 +1,4 @@
+// @ts-check
 import { useState, useCallback } from 'react';
 
 // Fixed-height row windowing for long lists (improvement #12). A large custom
