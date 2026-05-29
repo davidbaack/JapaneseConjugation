@@ -1,18 +1,22 @@
 export function getJapaneseVoices() {
   if (typeof window === 'undefined' || !window.speechSynthesis?.getVoices) return [];
   const voices = window.speechSynthesis.getVoices() || [];
-  return voices.filter(v => /^ja([-_]|$)/i.test(v.lang || '') || /Japanese|Kyoko|Otoya|Haruka|Ichiro|Sayaka|Hattori/i.test(v.name || ''));
+  return voices.filter(
+    (v) =>
+      /^ja([-_]|$)/i.test(v.lang || '') ||
+      /Japanese|Kyoko|Otoya|Haruka|Ichiro|Sayaka|Hattori/i.test(v.name || ''),
+  );
 }
 
 export function pickSpeechVoice(voiceURI) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return null;
   const voices = window.speechSynthesis.getVoices();
   if (voiceURI) {
-    const v = voices.find(v => v.voiceURI === voiceURI);
+    const v = voices.find((v) => v.voiceURI === voiceURI);
     if (v) return v;
   }
   // Try to find a Japanese voice
-  const jp = voices.find(v => v.lang === 'ja-JP' || v.lang.replace('_', '-').startsWith('ja'));
+  const jp = voices.find((v) => v.lang === 'ja-JP' || v.lang.replace('_', '-').startsWith('ja'));
   if (jp) return jp;
   return null;
 }

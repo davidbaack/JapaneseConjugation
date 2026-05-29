@@ -16,9 +16,22 @@ import { defaultState, gradeCard, recordMistake, bumpDaily } from '../utils/stor
 import { promptDisplay, shuffled } from '../utils/display.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
-export default function RushView({ state, setState, verbs, practicePrefs = DEFAULT_PREFS, wordLists = [] }) {
-  const gameWords = useMemo(() => filterWordsForPrefs(verbs, practicePrefs, wordLists), [verbs, practicePrefs, wordLists]);
-  const eligible = useMemo(() => gameWords.filter(w => practiceTypesForItem(w, state.enabledTypes, practicePrefs).length), [gameWords, state.enabledTypes, practicePrefs]);
+export default function RushView({
+  state,
+  setState,
+  verbs,
+  practicePrefs = DEFAULT_PREFS,
+  wordLists = [],
+}) {
+  const gameWords = useMemo(
+    () => filterWordsForPrefs(verbs, practicePrefs, wordLists),
+    [verbs, practicePrefs, wordLists],
+  );
+  const eligible = useMemo(
+    () =>
+      gameWords.filter((w) => practiceTypesForItem(w, state.enabledTypes, practicePrefs).length),
+    [gameWords, state.enabledTypes, practicePrefs],
+  );
   const game = state.game || defaultState().game;
   const [active, setActive] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -49,8 +62,8 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
       if (left <= 0) resolveRound(false, 'timeout');
     }, 100);
     return () => clearInterval(id);
-  // resolveRound is defined inline without useCallback — adding it would reset the timer on every render
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // resolveRound is defined inline without useCallback — adding it would reset the timer on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, paused, round, deadline]);
 
   function buildRound() {
@@ -67,7 +80,7 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
       promptType,
       prompt,
       expected: conjugateItem(item, type.id),
-      key: `${item.dict}-${type.id}-${Date.now()}-${Math.random()}`
+      key: `${item.dict}-${type.id}-${Date.now()}-${Math.random()}`,
     };
   }
 
@@ -79,7 +92,7 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
       setFeedback({
         kind: 'bad',
         title: 'No cards available',
-        detail: 'Current filters have no enabled conjugation cards.'
+        detail: 'Current filters have no enabled conjugation cards.',
       });
       return;
     }
@@ -99,7 +112,7 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
       setFeedback({
         kind: 'bad',
         title: 'No cards available',
-        detail: 'Current filters have no enabled conjugation cards.'
+        detail: 'Current filters have no enabled conjugation cards.',
       });
       return;
     }
@@ -110,7 +123,7 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
     setRecent([]);
     setPaused(false);
     setActive(true);
-    setState(s => {
+    setState((s) => {
       const prev = s.game || defaultState().game;
       return { ...s, game: { ...prev, played: (prev.played || 0) + 1 } };
     });
@@ -127,11 +140,11 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
   }
 
   function matchingRule(item, typeId) {
-    return RULES.find(r => r.type === typeId && r.verbFilter([item]).length);
+    return RULES.find((r) => r.type === typeId && r.verbFilter([item]).length);
   }
 
   function recordRushAttempt(current, ok, raw, nextScore, nextCombo) {
-    setState(s => {
+    setState((s) => {
       const rule = matchingRule(current.item, current.type.id);
       const rid = rule?.id || `${current.item.group}-${current.type.id}`;
       const dict = current.item.dict;
@@ -144,19 +157,30 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
           ...(s.verbStats || {}),
           [dict]: {
             ...(s.verbStats?.[dict] || {}),
-            [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) }
-          }
+            [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
+          },
         },
         mistakes: ok
           ? s.mistakes
-          : recordMistake(s.mistakes, current.item, current.type.id, current.promptType, toHiragana(raw), current.expected),
-        session: { ...s.session, reviewed: s.session.reviewed + 1, correct: s.session.correct + (ok ? 1 : 0) },
+          : recordMistake(
+              s.mistakes,
+              current.item,
+              current.type.id,
+              current.promptType,
+              toHiragana(raw),
+              current.expected,
+            ),
+        session: {
+          ...s.session,
+          reviewed: s.session.reviewed + 1,
+          correct: s.session.correct + (ok ? 1 : 0),
+        },
         daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 10) : s.daily,
         game: {
           ...prevGame,
           bestScore: Math.max(prevGame.bestScore || 0, nextScore),
-          bestCombo: Math.max(prevGame.bestCombo || 0, nextCombo)
-        }
+          bestCombo: Math.max(prevGame.bestCombo || 0, nextCombo),
+        },
       };
     });
   }
@@ -177,14 +201,44 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
       setScore(nextScore);
       setCombo(nextCombo);
       setCleared(nextCleared);
-      setFeedback({ kind: 'ok', title: `+${gained}`, detail: `${current.expected} · combo ${nextCombo}` });
-      setRecent(r => [{ ok: true, prompt: current.prompt.main, type: current.type.label, expected: current.expected, answer: toHiragana(raw) }, ...r].slice(0, 5));
+      setFeedback({
+        kind: 'ok',
+        title: `+${gained}`,
+        detail: `${current.expected} · combo ${nextCombo}`,
+      });
+      setRecent((r) =>
+        [
+          {
+            ok: true,
+            prompt: current.prompt.main,
+            type: current.type.label,
+            expected: current.expected,
+            answer: toHiragana(raw),
+          },
+          ...r,
+        ].slice(0, 5),
+      );
       recordRushAttempt(current, true, raw, nextScore, nextCombo);
       advanceRef.current = setTimeout(() => active && launchRound(nextCleared), 520);
     } else {
       setCombo(0);
-      setFeedback({ kind: 'bad', title: reason === 'timeout' ? 'Time' : 'Miss', detail: `${current.expected} · ${current.type.label}` });
-      setRecent(r => [{ ok: false, prompt: current.prompt.main, type: current.type.label, expected: current.expected, answer: raw ? toHiragana(raw) : '--' }, ...r].slice(0, 5));
+      setFeedback({
+        kind: 'bad',
+        title: reason === 'timeout' ? 'Time' : 'Miss',
+        detail: `${current.expected} · ${current.type.label}`,
+      });
+      setRecent((r) =>
+        [
+          {
+            ok: false,
+            prompt: current.prompt.main,
+            type: current.type.label,
+            expected: current.expected,
+            answer: raw ? toHiragana(raw) : '--',
+          },
+          ...r,
+        ].slice(0, 5),
+      );
       recordRushAttempt(current, false, raw, score, 0);
       advanceRef.current = setTimeout(() => active && launchRound(cleared), 900);
     }
@@ -198,25 +252,37 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
 
   const pct = round ? Math.max(0, Math.min(100, Math.round((timeLeft / round.limit) * 100))) : 0;
   const fall = round ? Math.round((1 - timeLeft / round.limit) * 126) : 0;
-  const promptLabel = round ? (round.promptType ? getTypeInfo(round.promptType).label : 'Dictionary form') : '';
+  const promptLabel = round
+    ? round.promptType
+      ? getTypeInfo(round.promptType).label
+      : 'Dictionary form'
+    : '';
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">{score}</div>
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {score}
+          </div>
           <div className="text-xs text-stone-500">Score</div>
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">{combo}</div>
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {combo}
+          </div>
           <div className="text-xs text-stone-500">Combo</div>
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">{wave}</div>
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {wave}
+          </div>
           <div className="text-xs text-stone-500">Wave</div>
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">{game.bestScore || 0}</div>
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {game.bestScore || 0}
+          </div>
           <div className="text-xs text-stone-500">Best</div>
         </div>
       </div>
@@ -285,7 +351,9 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
                   />
                   <div className="mt-2 text-sm text-stone-500">{round.item.meaning}</div>
                   {practicePrefs.showWordCategory && (
-                    <div className="mt-1 text-xs text-stone-400">{GROUP_NAMES[round.item.group]}</div>
+                    <div className="mt-1 text-xs text-stone-400">
+                      {GROUP_NAMES[round.item.group]}
+                    </div>
                   )}
                 </div>
               </div>
@@ -309,7 +377,9 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
                 ) : (
                   <div>
                     <div className="text-3xl font-semibold">Kotoba Rush</div>
-                    <div className="text-sm text-stone-300 mt-2">Score {game.bestScore || 0} to beat.</div>
+                    <div className="text-sm text-stone-300 mt-2">
+                      Score {game.bestScore || 0} to beat.
+                    </div>
                   </div>
                 )}
               </div>
@@ -319,8 +389,8 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
             <div className="grid sm:grid-cols-[1fr_auto] gap-2">
               <input
                 value={answer}
-                onChange={e => setAnswer(e.target.value)}
-                onKeyDown={e => {
+                onChange={(e) => setAnswer(e.target.value)}
+                onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     submit();
@@ -328,7 +398,9 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
                 }}
                 disabled={!round || paused}
                 placeholder="Type answer"
-                aria-label={round ? `Answer: ${round.type.label} of ${round.item.dict}` : 'Type answer'}
+                aria-label={
+                  round ? `Answer: ${round.type.label} of ${round.item.dict}` : 'Type answer'
+                }
                 lang="ja"
                 autoComplete="off"
                 autoCorrect="off"
@@ -362,7 +434,9 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-stone-550 dark:text-stone-400">{r.type}</span>
-                    <span className={`text-xs font-semibold ${r.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
+                    <span
+                      className={`text-xs font-semibold ${r.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}
+                    >
                       {r.ok ? 'OK' : 'MISS'}
                     </span>
                   </div>

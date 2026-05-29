@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { IconCheck, IconX, IconVolume, IconSpark, IconChat, IconPen } from '../components/Icons.jsx';
+import {
+  IconCheck,
+  IconX,
+  IconVolume,
+  IconSpark,
+  IconChat,
+  IconPen,
+} from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
 import { PitchAccentSection } from '../components/PitchAccent.jsx';
@@ -15,7 +22,7 @@ import {
   getTypeInfo,
   getWordMeta,
   isAdjective,
-  promptFormLabel
+  promptFormLabel,
 } from '../utils/conjugator.js';
 import {
   getOfflineTemplateSentence,
@@ -24,7 +31,15 @@ import {
   stepCoachHint,
   GROUP_NAMES,
 } from '../utils/conjugatorExplain.js';
-import { selectNext, buildFocusCard, recordMistake, gradeCard, bumpDaily, getAICache, setAICache } from '../utils/storage.js';
+import {
+  selectNext,
+  buildFocusCard,
+  recordMistake,
+  gradeCard,
+  bumpDaily,
+  getAICache,
+  setAICache,
+} from '../utils/storage.js';
 import {
   formDisplay,
   promptDisplay,
@@ -33,14 +48,23 @@ import {
   makeChoices,
   makeReverseChoices,
   dictionaryAnswerMatches,
-  typoGuardForAnswer
+  typoGuardForAnswer,
 } from '../utils/display.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
 export { kanaCoachCells, explainReversePrompt };
 
-export default function StudyView({ state, setState, verbs, geminiKey, practicePrefs = DEFAULT_PREFS, wordLists = [], focus = null, onFocusConsumed }) {
+export default function StudyView({
+  state,
+  setState,
+  verbs,
+  geminiKey,
+  practicePrefs = DEFAULT_PREFS,
+  wordLists = [],
+  focus = null,
+  onFocusConsumed,
+}) {
   const [current, setCurrent] = useState(null);
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');
@@ -84,7 +108,10 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
     // Keep a "Practice this verb" target from Check eligible even if it sits
     // outside the current Study filters, so the reset guard below doesn't
     // discard the focus card the moment it's seeded.
-    if (focus?.word && !base.some(w => w.dict === focus.word.dict && w.group === focus.word.group)) {
+    if (
+      focus?.word &&
+      !base.some((w) => w.dict === focus.word.dict && w.group === focus.word.group)
+    ) {
       return [...base, focus.word];
     }
     return base;
@@ -94,7 +121,8 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const drillDirection = current ? drillDirectionFor(current, practicePrefs) : 'forward';
   const reverseDrill = drillDirection === 'reverse';
   const sourceForm = current ? conjugateItem(current.verb, current.type) : '';
-  const promptType = current && !reverseDrill ? pickPromptType(current.verb, current.type, practicePrefs) : null;
+  const promptType =
+    current && !reverseDrill ? pickPromptType(current.verb, current.type, practicePrefs) : null;
   const promptAudioText = current
     ? reverseDrill
       ? sourceForm
@@ -116,8 +144,8 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
       }
     }
     setCurrent(selectNext(state, practiceWords, enabledTypes, null, practicePrefs));
-  // state intentionally omitted — this triggers on card change, not every state mutation
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // state intentionally omitted — this triggers on card change, not every state mutation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, practiceWords, enabledTypes, practicePrefs, focus]);
 
   // Clear the one-shot focus when leaving Study, so returning later doesn't
@@ -128,7 +156,7 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
     if (
       current &&
       practiceWords.length &&
-      !practiceWords.some(w => w.dict === current.verb.dict && w.group === current.verb.group)
+      !practiceWords.some((w) => w.dict === current.verb.dict && w.group === current.verb.group)
     ) {
       setCurrent(null);
       setAnswer('');
@@ -169,9 +197,9 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
     if (current && phase === 'answering' && listeningPrompt && promptAudioText) {
       speakJapaneseLocal(promptAudioText, 0.85);
     }
-  // current?.id used intentionally instead of current to avoid re-triggering on unrelated state changes
-  // speakJapaneseLocal is defined inline and omitted to avoid infinite re-runs
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // current?.id used intentionally instead of current to avoid re-triggering on unrelated state changes
+    // speakJapaneseLocal is defined inline and omitted to avoid infinite re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, phase, listeningPrompt, promptAudioText, practicePrefs.voiceURI]);
 
   useEffect(() => {
@@ -179,8 +207,8 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
     if (current && phase === 'reviewing' && practicePrefs.autoSpeak) {
       speakJapaneseLocal(conjugateItem(current.verb, current.type), 0.9);
     }
-  // speakJapaneseLocal is defined inline and omitted to avoid infinite re-runs
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // speakJapaneseLocal is defined inline and omitted to avoid infinite re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, phase, practicePrefs.autoSpeak, practicePrefs.voiceURI]);
 
   useEffect(() => {
@@ -214,7 +242,7 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
       if (c.state === 'correct') committed += 1;
       else break;
     }
-    setGreenRevealed(prev => (committed > prev ? committed : prev));
+    setGreenRevealed((prev) => (committed > prev ? committed : prev));
   }, [answer, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -240,8 +268,8 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
 
   useEffect(() => {
     setReviewBase(state.session.reviewed || 0);
-  // state.session.reviewed intentionally omitted — only reset baseline when limit setting changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // state.session.reviewed intentionally omitted — only reset baseline when limit setting changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [practicePrefs.reviewLimit]);
 
   useEffect(() => {
@@ -279,7 +307,12 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
 
     const cached = getAICache('katachiya_ai_sentence_cache', key);
     if (cached) {
-      setAiSentence({ sentence: cached.sentence, translation: cached.translation, loading: false, err: '' });
+      setAiSentence({
+        sentence: cached.sentence,
+        translation: cached.translation,
+        loading: false,
+        err: '',
+      });
       return;
     }
 
@@ -310,9 +343,9 @@ Keep it concise and clear.`;
         geminiKey,
         400,
         0.2,
-        'You create short Japanese grammar sentences for quizzes. Return JSON only.'
+        'You create short Japanese grammar sentences for quizzes. Return JSON only.',
       )
-        .then(reply => {
+        .then((reply) => {
           const data = extractJSON(reply);
           if (data && data.sentence && data.translation) {
             const resultObj = { sentence: data.sentence, translation: data.translation };
@@ -330,8 +363,8 @@ Keep it concise and clear.`;
       const fallback = getOfflineTemplateSentence(current.verb, current.type);
       setAiSentence({ ...fallback, loading: false, err: '' });
     }
-  // current/practicePrefs.scriptMode/reverseDrill/sourceForm intentionally omitted — keyed on current?.id to avoid re-fetching on render
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // current/practicePrefs.scriptMode/reverseDrill/sourceForm intentionally omitted — keyed on current?.id to avoid re-fetching on render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, practicePrefs.drillMode, geminiKey]);
 
   function speakJapaneseLocal(text, rateVal = 0.85) {
@@ -342,7 +375,7 @@ Keep it concise and clear.`;
     u.rate = rateVal;
     if (practicePrefs.voiceURI) {
       const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find(v => v.voiceURI === practicePrefs.voiceURI);
+      const voice = voices.find((v) => v.voiceURI === practicePrefs.voiceURI);
       if (voice) u.voice = voice;
     }
     window.speechSynthesis.speak(u);
@@ -352,7 +385,9 @@ Keep it concise and clear.`;
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
         <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
-        <p className="text-xs text-stone-400 dark:text-stone-500">Enable conjugation types in Settings.</p>
+        <p className="text-xs text-stone-400 dark:text-stone-500">
+          Enable conjugation types in Settings.
+        </p>
       </div>
     );
   }
@@ -364,9 +399,14 @@ Keep it concise and clear.`;
   const expectedView = reverseDrill
     ? promptDisplay(current.verb, null, practicePrefs)
     : formDisplay(expected, practicePrefs, current.verb, current.type);
-  const promptEnglish = reverseDrill ? englishForForm(current.verb, current.type) : englishForForm(current.verb, promptType);
-  const targetEnglish = reverseDrill ? englishForForm(current.verb, null) : englishForForm(current.verb, current.type);
-  const englishHintsHidden = (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden';
+  const promptEnglish = reverseDrill
+    ? englishForForm(current.verb, current.type)
+    : englishForForm(current.verb, promptType);
+  const targetEnglish = reverseDrill
+    ? englishForForm(current.verb, null)
+    : englishForForm(current.verb, current.type);
+  const englishHintsHidden =
+    (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden';
   const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
   const typeInfo = getTypeInfo(current.type);
   const reviewExplanation =
@@ -380,11 +420,17 @@ Keep it concise and clear.`;
     phase === 'reviewing' && !wasCorrect && !reverseDrill && !revealedMiss
       ? diagnoseItem(current.verb, current.type, answer)
       : '';
-  const choices = reverseDrill ? makeReverseChoices(current, practiceWords) : makeChoices(current, practiceWords);
+  const choices = reverseDrill
+    ? makeReverseChoices(current, practiceWords)
+    : makeChoices(current, practiceWords);
   const wordType = isAdjective(current.verb) ? 'Adjective' : 'Verb';
   const noChangePrompt = !reverseDrill && promptType === current.type;
   const taskLabel = reverseDrill ? `Reverse ${typeInfo.label}` : typeInfo.label;
-  const taskHint = reverseDrill ? 'answer with dictionary form' : noChangePrompt ? 'same form; answer may not change' : typeInfo.hint;
+  const taskHint = reverseDrill
+    ? 'answer with dictionary form'
+    : noChangePrompt
+      ? 'same form; answer may not change'
+      : typeInfo.hint;
   const taskSub = reverseDrill ? '辞書形' : typeInfo.sub;
   const taskOverride = reverseDrill
     ? `Reverse drill: identify the dictionary form from ${typeInfo.label} (${sourceForm})`
@@ -401,8 +447,11 @@ Keep it concise and clear.`;
   const coachPreview = toHiragana(answer);
   const coachProgress = toHiraganaProgress(answer);
   const preview = coachPreview;
-  const coachCells = practicePrefs.answerMode === 'guided' ? kanaCoachCells(expected, answer, coachRevealed, phase === 'answering', greenRevealed) : [];
-  const coachWrongIndex = coachCells.findIndex(c => c.state === 'wrong');
+  const coachCells =
+    practicePrefs.answerMode === 'guided'
+      ? kanaCoachCells(expected, answer, coachRevealed, phase === 'answering', greenRevealed)
+      : [];
+  const coachWrongIndex = coachCells.findIndex((c) => c.state === 'wrong');
   const coachTypedCount = Array.from(coachProgress).length;
   const expectedKanaCount = Array.from(expected).length;
   const coachStatus =
@@ -413,8 +462,11 @@ Keep it concise and clear.`;
         : coachTypedCount > expectedKanaCount
           ? 'Extra kana after the answer.'
           : '';
-  const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill ? kanaCoachCells(expected, answer, 0, phase === 'answering', greenRevealed) : [];
-  const liveWrongIndex = liveCells.findIndex(c => c.state === 'wrong' || c.state === 'extra');
+  const liveCells =
+    practicePrefs.answerMode === 'input' && !reverseDrill
+      ? kanaCoachCells(expected, answer, 0, phase === 'answering', greenRevealed)
+      : [];
+  const liveWrongIndex = liveCells.findIndex((c) => c.state === 'wrong' || c.state === 'extra');
   const liveStatus =
     liveWrongIndex >= 0
       ? liveCells[liveWrongIndex].state === 'extra'
@@ -424,9 +476,14 @@ Keep it concise and clear.`;
         ? 'Complete match. Press Enter.'
         : '';
   const reviewAnswerSource = phase === 'reviewing' && submittedAnswer ? submittedAnswer : answer;
-  const reviewKanaCells = ['input', 'guided'].includes(practicePrefs.answerMode) && !reverseDrill
-    ? kanaCoachCells(expected, reviewAnswerSource, practicePrefs.answerMode === 'guided' ? coachRevealed : 0)
-    : [];
+  const reviewKanaCells =
+    ['input', 'guided'].includes(practicePrefs.answerMode) && !reverseDrill
+      ? kanaCoachCells(
+          expected,
+          reviewAnswerSource,
+          practicePrefs.answerMode === 'guided' ? coachRevealed : 0,
+        )
+      : [];
 
   async function generateAIClue() {
     if (!current || !geminiKey) return;
@@ -450,8 +507,8 @@ Keep it concise and clear.`;
         0.25,
         aiSystemFromPrefs(
           practicePrefs,
-          'You give safe study hints for Japanese conjugation quizzes. Never reveal the exact answer.'
-        )
+          'You give safe study hints for Japanese conjugation quizzes. Never reveal the exact answer.',
+        ),
       );
       setAiHintText(reply);
     } catch (e) {
@@ -507,10 +564,14 @@ Keep it concise and clear.`;
     const raw = choiceValue !== undefined ? choiceValue : answer;
     if (!raw.trim()) return;
     const normalized = choiceValue !== undefined ? raw : toHiragana(raw);
-    const finalOk = reverseDrill ? dictionaryAnswerMatches(raw, current.verb) : normalized === expected;
+    const finalOk = reverseDrill
+      ? dictionaryAnswerMatches(raw, current.verb)
+      : normalized === expected;
     const ok = finalOk && !(kanaMatchDisplay !== 'none' && hadKanaMistakeRef.current);
     const nearMiss =
-      choiceValue === undefined && !ok ? typoGuardForAnswer(raw, normalized, expected, current.verb, reverseDrill) : null;
+      choiceValue === undefined && !ok
+        ? typoGuardForAnswer(raw, normalized, expected, current.verb, reverseDrill)
+        : null;
     if (nearMiss && typoGuard?.key !== nearMiss.key) {
       setTypoGuard(nearMiss);
       return;
@@ -521,7 +582,10 @@ Keep it concise and clear.`;
     const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
     const newVerbStats = {
       ...state.verbStats,
-      [dict]: { ...(state.verbStats?.[dict] || {}), [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) } }
+      [dict]: {
+        ...(state.verbStats?.[dict] || {}),
+        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
+      },
     };
     const nextMistakes = ok
       ? state.mistakes
@@ -531,7 +595,7 @@ Keep it concise and clear.`;
           current.type,
           reverseDrill ? current.type : promptType,
           reverseDrill ? raw.trim() : normalized,
-          expected
+          expected,
         );
     const nextState = {
       ...state,
@@ -541,9 +605,9 @@ Keep it concise and clear.`;
       session: {
         ...(state.session || {}),
         reviewed: (state.session?.reviewed || 0) + 1,
-        correct: (state.session?.correct || 0) + (ok ? 1 : 0)
+        correct: (state.session?.correct || 0) + (ok ? 1 : 0),
       },
-      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 10)
+      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 10),
     };
     setState(nextState);
     setChatOpen(!ok && !!geminiKey && !!practicePrefs.autoAiExplainErrors);
@@ -553,7 +617,9 @@ Keep it concise and clear.`;
     // When the final string matched but the card was still marked wrong (a kana
     // mistake was made and then corrected mid-typing), show the snapshot from
     // when it went wrong instead of the corrected text.
-    setSubmittedAnswer(finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw);
+    setSubmittedAnswer(
+      finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw,
+    );
     setWasCorrect(ok);
     setPhase('reviewing');
     const reviewWillComplete = reviewLimit > 0 && reviewsDone + 1 >= reviewLimit;
@@ -586,7 +652,10 @@ Keep it concise and clear.`;
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
-    const nextState = { ...state, session: { ...(state.session || {}), skipped: (state.session?.skipped || 0) + 1 } };
+    const nextState = {
+      ...state,
+      session: { ...(state.session || {}), skipped: (state.session?.skipped || 0) + 1 },
+    };
     setState(nextState);
     setChatOpen(false);
     setAnswer('');
@@ -617,7 +686,10 @@ Keep it concise and clear.`;
     const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
     const newVerbStats = {
       ...state.verbStats,
-      [dict]: { ...(state.verbStats?.[dict] || {}), [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) } }
+      [dict]: {
+        ...(state.verbStats?.[dict] || {}),
+        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
+      },
     };
     const nextMistakes = ok
       ? state.mistakes
@@ -627,7 +699,7 @@ Keep it concise and clear.`;
           current.type,
           reverseDrill ? current.type : promptType,
           `self-check: ${label}`,
-          expected
+          expected,
         );
     const nextState = {
       ...state,
@@ -637,9 +709,9 @@ Keep it concise and clear.`;
       session: {
         ...(state.session || {}),
         reviewed: (state.session?.reviewed || 0) + 1,
-        correct: (state.session?.correct || 0) + (ok ? 1 : 0)
+        correct: (state.session?.correct || 0) + (ok ? 1 : 0),
       },
-      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 10)
+      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 10),
     };
     setState(nextState);
     setAnswer('');
@@ -685,7 +757,10 @@ Keep it concise and clear.`;
     const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
     const newVerbStats = {
       ...state.verbStats,
-      [dict]: { ...(state.verbStats?.[dict] || {}), [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + 1 } }
+      [dict]: {
+        ...(state.verbStats?.[dict] || {}),
+        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + 1 },
+      },
     };
     const nextMistakes = recordMistake(
       state.mistakes,
@@ -693,15 +768,19 @@ Keep it concise and clear.`;
       current.type,
       reverseDrill ? current.type : promptType,
       '(revealed)',
-      expected
+      expected,
     );
     const nextState = {
       ...state,
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], false) },
       verbStats: newVerbStats,
       mistakes: nextMistakes,
-      session: { ...(state.session || {}), reviewed: (state.session?.reviewed || 0) + 1, correct: state.session?.correct || 0 },
-      daily: bumpDaily(state.daily, false, practicePrefs.dailyGoal || 10)
+      session: {
+        ...(state.session || {}),
+        reviewed: (state.session?.reviewed || 0) + 1,
+        correct: state.session?.correct || 0,
+      },
+      daily: bumpDaily(state.daily, false, practicePrefs.dailyGoal || 10),
     };
     setState(nextState);
     setAnswer('');
@@ -724,17 +803,17 @@ Keep it concise and clear.`;
       const newVal = answer + text;
       const revealed = practicePrefs.answerMode === 'guided' ? coachRevealed : 0;
       const cells = kanaCoachCells(expected, newVal, revealed, true);
-      if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
+      if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
         hadKanaMistakeRef.current = true;
       }
     }
-    setAnswer(prev => `${prev}${text}`);
+    setAnswer((prev) => `${prev}${text}`);
     focusAnswerInput();
   }
 
   function backspaceAnswerText() {
     setTypoGuard(null);
-    setAnswer(prev => Array.from(prev).slice(0, -1).join(''));
+    setAnswer((prev) => Array.from(prev).slice(0, -1).join(''));
     focusAnswerInput();
   }
 
@@ -754,14 +833,24 @@ Keep it concise and clear.`;
           {state.session.correct}/{state.session.reviewed}
         </div>
         <div className="text-sm text-stone-500 mb-1">
-          Session accuracy: {state.session.reviewed ? Math.round((state.session.correct / state.session.reviewed) * 100) : 0}%
+          Session accuracy:{' '}
+          {state.session.reviewed
+            ? Math.round((state.session.correct / state.session.reviewed) * 100)
+            : 0}
+          %
         </div>
-        {reviewLimit > 0 && <div className="text-xs text-stone-400 mb-5">{Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this set</div>}
+        {reviewLimit > 0 && (
+          <div className="text-xs text-stone-400 mb-5">
+            {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this set
+          </div>
+        )}
         {!reviewLimit && <div className="mb-5" />}
         <button
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
-            setEndAt(practicePrefs.durationSec > 0 ? Date.now() + practicePrefs.durationSec * 1000 : null);
+            setEndAt(
+              practicePrefs.durationSec > 0 ? Date.now() + practicePrefs.durationSec * 1000 : null,
+            );
             setNow(Date.now());
             setCurrent(selectNext(state, practiceWords, enabledTypes, current.id, practicePrefs));
             setAnswer('');
@@ -779,42 +868,43 @@ Keep it concise and clear.`;
   // text, an optional "Discuss further" AI chat trigger, and the chat itself.
   // Each mode supplies its own "Hint" button (styled to fit its layout) that
   // calls showStepHint().
-  const hintDisclosure = !reverseDrill && (stepHint || (geminiKey && (stepHint || coachChatOpen))) ? (
-    <div className="mt-2 flex flex-col items-center gap-1">
-      {stepHint && (
-        <div
-          ref={typingHintRef}
-          style={{ whiteSpace: 'pre-wrap' }}
-          className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-40 overflow-y-auto"
-        >
-          {stepHint}
-        </div>
-      )}
-      {geminiKey && stepHint && !coachChatOpen && (
-        <button
-          onClick={openCoachChat}
-          aria-expanded={coachChatOpen}
-          className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
-        >
-          <IconChat className="w-3 h-3" />
-          Discuss further
-        </button>
-      )}
-      {coachChatOpen && geminiKey && (
-        <div className="w-full text-left">
-          <ChatPanel
-            mode="coach"
-            verb={current.verb}
-            type={current.type}
-            userAnswer={coachSeedAnswer}
-            geminiKey={geminiKey}
-            practicePrefs={practicePrefs}
-            taskOverride={taskOverride}
-          />
-        </div>
-      )}
-    </div>
-  ) : null;
+  const hintDisclosure =
+    !reverseDrill && (stepHint || (geminiKey && (stepHint || coachChatOpen))) ? (
+      <div className="mt-2 flex flex-col items-center gap-1">
+        {stepHint && (
+          <div
+            ref={typingHintRef}
+            style={{ whiteSpace: 'pre-wrap' }}
+            className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-40 overflow-y-auto"
+          >
+            {stepHint}
+          </div>
+        )}
+        {geminiKey && stepHint && !coachChatOpen && (
+          <button
+            onClick={openCoachChat}
+            aria-expanded={coachChatOpen}
+            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
+          >
+            <IconChat className="w-3 h-3" />
+            Discuss further
+          </button>
+        )}
+        {coachChatOpen && geminiKey && (
+          <div className="w-full text-left">
+            <ChatPanel
+              mode="coach"
+              verb={current.verb}
+              type={current.type}
+              userAnswer={coachSeedAnswer}
+              geminiKey={geminiKey}
+              practicePrefs={practicePrefs}
+              taskOverride={taskOverride}
+            />
+          </div>
+        )}
+      </div>
+    ) : null;
 
   return (
     <div className="space-y-4">
@@ -823,7 +913,7 @@ Keep it concise and clear.`;
           <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
             JLPT {getWordMeta(current.verb).jlpt}
           </div>
-          {(timeLeft !== null || reviewLimit > 0 || !!sessionSkipped) ? (
+          {timeLeft !== null || reviewLimit > 0 || !!sessionSkipped ? (
             <div className="flex justify-end mb-3">
               <div className="text-xs text-stone-400 text-right shrink-0">
                 {timeLeft !== null && (
@@ -839,9 +929,13 @@ Keep it concise and clear.`;
                 {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
                 <div className="text-[9px]">
                   {[
-                    getWordMeta(current.verb).lesson && `Genki L${getWordMeta(current.verb).lesson}`,
-                    getWordMeta(current.verb).minnaLesson && `Minna L${getWordMeta(current.verb).minnaLesson}`,
-                  ].filter(Boolean).join(' · ')}
+                    getWordMeta(current.verb).lesson &&
+                      `Genki L${getWordMeta(current.verb).lesson}`,
+                    getWordMeta(current.verb).minnaLesson &&
+                      `Minna L${getWordMeta(current.verb).minnaLesson}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </div>
               </div>
             </div>
@@ -849,8 +943,11 @@ Keep it concise and clear.`;
             <div className="absolute top-4 right-4 sm:top-8 sm:right-6 text-right text-[9px] text-stone-400">
               {[
                 getWordMeta(current.verb).lesson && `Genki L${getWordMeta(current.verb).lesson}`,
-                getWordMeta(current.verb).minnaLesson && `Minna L${getWordMeta(current.verb).minnaLesson}`,
-              ].filter(Boolean).join(' · ')}
+                getWordMeta(current.verb).minnaLesson &&
+                  `Minna L${getWordMeta(current.verb).minnaLesson}`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </div>
           )}
           {hidePromptText ? (
@@ -882,7 +979,10 @@ Keep it concise and clear.`;
             ) : aiSentence.err ? (
               <div className="text-rose-500 py-6 text-sm">{aiSentence.err}</div>
             ) : (
-              <div className="text-2xl sm:text-3xl font-medium mb-4 text-center leading-relaxed tracking-wide text-stone-850 dark:text-stone-150" lang="ja">
+              <div
+                className="text-2xl sm:text-3xl font-medium mb-4 text-center leading-relaxed tracking-wide text-stone-850 dark:text-stone-150"
+                lang="ja"
+              >
                 {aiSentence.sentence}
               </div>
             )
@@ -896,7 +996,9 @@ Keep it concise and clear.`;
           {promptType && !hidePromptText && (
             <div className="text-xs text-stone-400">
               Base: <span lang="ja">{current.verb.dict}</span>
-              {current.verb.dict !== current.verb.reading && <span lang="ja"> · {current.verb.reading}</span>}
+              {current.verb.dict !== current.verb.reading && (
+                <span lang="ja"> · {current.verb.reading}</span>
+              )}
             </div>
           )}
           {noChangePrompt && !hidePromptText && (
@@ -904,8 +1006,10 @@ Keep it concise and clear.`;
               Trick: no change needed
             </div>
           )}
-          {reverseDrill && !hidePromptText && <div className="text-xs text-stone-400">Answer with the dictionary form.</div>}
-          
+          {reverseDrill && !hidePromptText && (
+            <div className="text-xs text-stone-400">Answer with the dictionary form.</div>
+          )}
+
           {hideEnglishHint ? (
             <div className="mt-3 max-w-md mx-auto rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2 text-xs text-stone-500">
               <div className="flex flex-wrap items-center justify-center gap-2">
@@ -925,11 +1029,17 @@ Keep it concise and clear.`;
                   {aiHintLoading ? 'Thinking...' : 'AI clue'}
                 </button>
               </div>
-              {aiHintText && <div className="mt-2 text-stone-705 dark:text-stone-300 leading-relaxed max-h-32 overflow-y-auto">{aiHintText}</div>}
+              {aiHintText && (
+                <div className="mt-2 text-stone-705 dark:text-stone-300 leading-relaxed max-h-32 overflow-y-auto">
+                  {aiHintText}
+                </div>
+              )}
               {aiHintErr && <div className="mt-2 text-rose-600">{aiHintErr}</div>}
             </div>
           ) : practicePrefs.drillMode === 'sentence' && aiSentence && !aiSentence.loading ? (
-            <div className="text-sm text-stone-500 mt-2 italic">Context: {aiSentence.translation}</div>
+            <div className="text-sm text-stone-500 mt-2 italic">
+              Context: {aiSentence.translation}
+            </div>
           ) : (
             <>
               <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
@@ -955,17 +1065,26 @@ Keep it concise and clear.`;
                       {taskLabel}
                     </span>
                     {taskSub && (
-                      <span className="text-sm text-indigo-500 dark:text-indigo-400 font-medium" lang="ja">
+                      <span
+                        className="text-sm text-indigo-500 dark:text-indigo-400 font-medium"
+                        lang="ja"
+                      >
                         {taskSub}
                       </span>
                     )}
                     {targetEnglish && targetEnglish !== promptEnglish ? (
-                      <span className="text-xs text-indigo-400 dark:text-indigo-500">· {targetEnglish}</span>
+                      <span className="text-xs text-indigo-400 dark:text-indigo-500">
+                        · {targetEnglish}
+                      </span>
                     ) : taskHint ? (
-                      <span className="text-xs text-indigo-400 dark:text-indigo-500">· {taskHint}</span>
+                      <span className="text-xs text-indigo-400 dark:text-indigo-500">
+                        · {taskHint}
+                      </span>
                     ) : null}
                     {current.ruleLabel && practicePrefs.showWordCategory && (
-                      <span className="text-xs text-indigo-400 dark:text-indigo-500">· {current.ruleLabel}</span>
+                      <span className="text-xs text-indigo-400 dark:text-indigo-500">
+                        · {current.ruleLabel}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -1004,7 +1123,9 @@ Keep it concise and clear.`;
                     ) : (
                       <>
                         <div className="rounded-xl bg-white dark:bg-stone-900 border border-stone-205 dark:border-stone-800 px-3 py-3">
-                          <div className="text-[11px] uppercase tracking-wider text-stone-400 mb-1">Answer</div>
+                          <div className="text-[11px] uppercase tracking-wider text-stone-400 mb-1">
+                            Answer
+                          </div>
                           <ScriptDisplay
                             view={expectedView}
                             word={current.verb}
@@ -1042,7 +1163,7 @@ Keep it concise and clear.`;
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {reverseDrill
-                        ? choices.map(w => {
+                        ? choices.map((w) => {
                             const cv = promptDisplay(w, null, practicePrefs);
                             return (
                               <button
@@ -1050,12 +1171,18 @@ Keep it concise and clear.`;
                                 onClick={() => submit(w.dict)}
                                 className="min-h-14 px-3 py-3 border-2 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-xl text-stone-800 dark:text-stone-200 transition"
                               >
-                                <ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1" />
-                                {!hideEnglishHint && <div className="mt-1 text-xs text-stone-500">{w.meaning}</div>}
+                                <ScriptDisplay
+                                  view={cv}
+                                  className="text-xl"
+                                  subClassName="text-xs text-stone-400 mt-1"
+                                />
+                                {!hideEnglishHint && (
+                                  <div className="mt-1 text-xs text-stone-500">{w.meaning}</div>
+                                )}
                               </button>
                             );
                           })
-                        : choices.map(c => {
+                        : choices.map((c) => {
                             const cv = formDisplay(c, practicePrefs);
                             return (
                               <button
@@ -1063,7 +1190,11 @@ Keep it concise and clear.`;
                                 onClick={() => submit(c)}
                                 className="min-h-14 px-3 py-3 border-2 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-xl text-stone-800 dark:text-stone-200 transition"
                               >
-                                <ScriptDisplay view={cv} className="text-xl" subClassName="text-xs text-stone-400 mt-1" />
+                                <ScriptDisplay
+                                  view={cv}
+                                  className="text-xl"
+                                  subClassName="text-xs text-stone-400 mt-1"
+                                />
                               </button>
                             );
                           })}
@@ -1115,7 +1246,11 @@ Keep it concise and clear.`;
                       {kanaMatchDisplay === 'color-count' && coachStatus && (
                         <div
                           className={`mt-2 text-xs text-center ${
-                            coachWrongIndex >= 0 ? 'text-rose-700' : coachPreview === expected ? 'text-emerald-700' : 'text-stone-500'
+                            coachWrongIndex >= 0
+                              ? 'text-rose-700'
+                              : coachPreview === expected
+                                ? 'text-emerald-700'
+                                : 'text-stone-500'
                           }`}
                         >
                           {coachStatus}
@@ -1139,19 +1274,19 @@ Keep it concise and clear.`;
                         ref={inputRef}
                         type="text"
                         value={answer}
-                        onChange={e => {
+                        onChange={(e) => {
                           setTypoGuard(null);
                           const newVal = e.target.value;
                           if (kanaMatchDisplay !== 'none') {
                             const cells = kanaCoachCells(expected, newVal, coachRevealed, true);
-                            if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
+                            if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
                               if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = newVal;
                               hadKanaMistakeRef.current = true;
                             }
                           }
                           setAnswer(newVal);
                         }}
-                        onKeyDown={e => {
+                        onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             if (answer.trim()) submit();
@@ -1160,8 +1295,14 @@ Keep it concise and clear.`;
                             skipCurrent();
                           }
                         }}
-                        placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-                        aria-label={reverseDrill ? 'Type the dictionary form' : 'Type your answer in romaji or kana'}
+                        placeholder={
+                          reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'
+                        }
+                        aria-label={
+                          reverseDrill
+                            ? 'Type the dictionary form'
+                            : 'Type your answer in romaji or kana'
+                        }
                         className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-transparent caret-stone-850 dark:caret-stone-150 focus:border-indigo-500 focus:outline-none transition"
                         lang="ja"
                         autoComplete="off"
@@ -1170,7 +1311,7 @@ Keep it concise and clear.`;
                       />
                       <button
                         type="button"
-                        onClick={() => setKanaPadOpen(v => !v)}
+                        onClick={() => setKanaPadOpen((v) => !v)}
                         className={`shrink-0 p-2 rounded-lg border inline-flex items-center justify-center aspect-square transition ${
                           kanaPadOpen
                             ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
@@ -1183,7 +1324,7 @@ Keep it concise and clear.`;
                     </div>
                     <KanaInputPad
                       open={kanaPadOpen}
-                      onToggle={() => setKanaPadOpen(v => !v)}
+                      onToggle={() => setKanaPadOpen((v) => !v)}
                       onInsert={insertAnswerText}
                       onBackspace={backspaceAnswerText}
                       onClear={clearAnswerText}
@@ -1202,7 +1343,14 @@ Keep it concise and clear.`;
                     </StickyAction>
                     <div className="mt-2 grid grid-cols-3 gap-2">
                       <button
-                        onClick={() => setCoachRevealed(Math.min(expectedKanaCount, Math.max(coachRevealed, coachTypedCount) + 1))}
+                        onClick={() =>
+                          setCoachRevealed(
+                            Math.min(
+                              expectedKanaCount,
+                              Math.max(coachRevealed, coachTypedCount) + 1,
+                            ),
+                          )
+                        }
                         disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
                         className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
                       >
@@ -1229,19 +1377,19 @@ Keep it concise and clear.`;
                         ref={inputRef}
                         type="text"
                         value={answer}
-                        onChange={e => {
+                        onChange={(e) => {
                           setTypoGuard(null);
                           const newVal = e.target.value;
                           if (kanaMatchDisplay !== 'none' && !reverseDrill) {
                             const cells = kanaCoachCells(expected, newVal, 0, true);
-                            if (cells.some(c => c.state === 'wrong' || c.state === 'extra')) {
+                            if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
                               if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = newVal;
                               hadKanaMistakeRef.current = true;
                             }
                           }
                           setAnswer(newVal);
                         }}
-                        onKeyDown={e => {
+                        onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             if (answer.trim()) submit();
@@ -1250,8 +1398,14 @@ Keep it concise and clear.`;
                             skipCurrent();
                           }
                         }}
-                        placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-                        aria-label={reverseDrill ? 'Type the dictionary form' : 'Type your answer in romaji or kana'}
+                        placeholder={
+                          reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'
+                        }
+                        aria-label={
+                          reverseDrill
+                            ? 'Type the dictionary form'
+                            : 'Type your answer in romaji or kana'
+                        }
                         className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-transparent caret-stone-850 dark:caret-stone-150 focus:border-indigo-500 focus:outline-none transition"
                         lang="ja"
                         autoComplete="off"
@@ -1260,7 +1414,7 @@ Keep it concise and clear.`;
                       />
                       <button
                         type="button"
-                        onClick={() => setKanaPadOpen(v => !v)}
+                        onClick={() => setKanaPadOpen((v) => !v)}
                         className={`shrink-0 p-2 rounded-lg border inline-flex items-center justify-center aspect-square transition ${
                           kanaPadOpen
                             ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
@@ -1273,7 +1427,7 @@ Keep it concise and clear.`;
                     </div>
                     <KanaInputPad
                       open={kanaPadOpen}
-                      onToggle={() => setKanaPadOpen(v => !v)}
+                      onToggle={() => setKanaPadOpen((v) => !v)}
                       onInsert={insertAnswerText}
                       onBackspace={backspaceAnswerText}
                       onClear={clearAnswerText}
@@ -1281,39 +1435,49 @@ Keep it concise and clear.`;
                       canSubmit={!!answer.trim()}
                       noToggle
                     />
-                    {!!liveCells.length && kanaMatchDisplay !== 'none' && (kanaMatchDisplay === 'color-count' || liveCells.some(c => c.state !== 'empty')) && (
-                      <div className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">
-                        <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                          {(kanaMatchDisplay === 'color-count' ? liveCells : liveCells.filter(c => c.state !== 'empty')).map((cell, i) => {
-                            const cls =
-                              cell.state === 'correct'
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
-                                : cell.state === 'wrong' || cell.state === 'extra'
-                                  ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
-                                  : cell.state === 'pending'
-                                    ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
-                                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
-                            return (
-                              <div
-                                key={i}
-                                className={`w-9 h-10 sm:w-10 sm:h-11 rounded-xl border flex items-center justify-center text-lg font-medium tabular-nums transition ${cls}`}
-                              >
-                                {cell.shown || '·'}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {kanaMatchDisplay === 'color-count' && liveStatus && (
-                          <div
-                            className={`mt-2 text-xs text-center ${
-                              liveWrongIndex >= 0 ? 'text-rose-700' : preview === expected ? 'text-emerald-700' : 'text-stone-500'
-                            }`}
-                          >
-                            {liveStatus}
+                    {!!liveCells.length &&
+                      kanaMatchDisplay !== 'none' &&
+                      (kanaMatchDisplay === 'color-count' ||
+                        liveCells.some((c) => c.state !== 'empty')) && (
+                        <div className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">
+                          <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
+                            {(kanaMatchDisplay === 'color-count'
+                              ? liveCells
+                              : liveCells.filter((c) => c.state !== 'empty')
+                            ).map((cell, i) => {
+                              const cls =
+                                cell.state === 'correct'
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
+                                  : cell.state === 'wrong' || cell.state === 'extra'
+                                    ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
+                                    : cell.state === 'pending'
+                                      ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
+                                      : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                              return (
+                                <div
+                                  key={i}
+                                  className={`w-9 h-10 sm:w-10 sm:h-11 rounded-xl border flex items-center justify-center text-lg font-medium tabular-nums transition ${cls}`}
+                                >
+                                  {cell.shown || '·'}
+                                </div>
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
-                    )}
+                          {kanaMatchDisplay === 'color-count' && liveStatus && (
+                            <div
+                              className={`mt-2 text-xs text-center ${
+                                liveWrongIndex >= 0
+                                  ? 'text-rose-700'
+                                  : preview === expected
+                                    ? 'text-emerald-700'
+                                    : 'text-stone-500'
+                              }`}
+                            >
+                              {liveStatus}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     <StickyAction className="mt-3">
                       <button
                         onClick={() => submit()}
@@ -1323,7 +1487,9 @@ Keep it concise and clear.`;
                         Check (Enter)
                       </button>
                     </StickyAction>
-                    <div className={`mt-2 grid gap-2 ${!reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                    <div
+                      className={`mt-2 grid gap-2 ${!reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}
+                    >
                       {!reverseDrill && (
                         <button
                           onClick={showStepHint}
@@ -1352,7 +1518,9 @@ Keep it concise and clear.`;
             ) : (
               <div
                 className={`rounded-xl p-4 ${
-                  wasCorrect ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50' : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50'
+                  wasCorrect
+                    ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
+                    : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50'
                 }`}
               >
                 {/* Scoped to the short verdict so screen readers announce the
@@ -1361,11 +1529,15 @@ Keep it concise and clear.`;
                   {wasCorrect ? 'Correct!' : 'Not quite.'}
                 </span>
                 <div className="flex items-start gap-3 text-left">
-                  <div className={`mt-0.5 flex-shrink-0 ${wasCorrect ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  <div
+                    className={`mt-0.5 flex-shrink-0 ${wasCorrect ? 'text-emerald-600' : 'text-rose-600'}`}
+                  >
                     {wasCorrect ? <IconCheck className="w-5 h-5" /> : <IconX className="w-5 h-5" />}
                   </div>
                   <div className="flex-1">
-                    <div className={`text-sm font-medium ${wasCorrect ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800'}`}>
+                    <div
+                      className={`text-sm font-medium ${wasCorrect ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800'}`}
+                    >
                       {wasCorrect ? 'Correct!' : 'Not quite.'}
                     </div>
                     {!wasCorrect && (
@@ -1377,7 +1549,9 @@ Keep it concise and clear.`;
                             : 'You wrote:'}{' '}
                         {!revealedMiss && !reviewChoiceLabel && (
                           <span lang="ja" className="font-semibold">
-                            {reverseDrill ? submittedAnswer.trim() || '(empty)' : toHiragana(submittedAnswer) || '(empty)'}
+                            {reverseDrill
+                              ? submittedAnswer.trim() || '(empty)'
+                              : toHiragana(submittedAnswer) || '(empty)'}
                           </span>
                         )}
                       </div>
@@ -1404,7 +1578,6 @@ Keep it concise and clear.`;
                             );
                           })}
                         </div>
-
                       </div>
                     )}
                     <ScriptDisplay
@@ -1415,7 +1588,9 @@ Keep it concise and clear.`;
                       className={`text-xl mt-2 ${wasCorrect ? 'text-emerald-900 dark:text-emerald-100' : 'text-rose-900 dark:text-rose-100'}`}
                       subClassName="text-xs text-stone-500 mt-1"
                     />
-                    <div className={`text-xs mt-1 ${wasCorrect ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-705 dark:text-rose-400'}`}>
+                    <div
+                      className={`text-xs mt-1 ${wasCorrect ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-705 dark:text-rose-400'}`}
+                    >
                       {targetEnglish}
                     </div>
                     <PitchAccentSection
@@ -1442,12 +1617,19 @@ Keep it concise and clear.`;
                     <div className="text-xs uppercase tracking-wider text-emerald-700 dark:text-emerald-450 font-medium">
                       Why this is right
                     </div>
-                    <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">{reviewExplanation.intro}</div>
+                    <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                      {reviewExplanation.intro}
+                    </div>
                     {reviewExplanation.rule && (
-                      <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">{reviewExplanation.rule}</div>
+                      <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                        {reviewExplanation.rule}
+                      </div>
                     )}
                     {reviewExplanation.derivation && reviewExplanation.derivation !== expected && (
-                      <div className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100" lang="ja">
+                      <div
+                        className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
+                        lang="ja"
+                      >
                         {reviewExplanation.derivation}
                       </div>
                     )}
@@ -1468,20 +1650,32 @@ Keep it concise and clear.`;
                 {!wasCorrect && explanation && (
                   <div className="mt-4 pt-4 border-t border-rose-200 dark:border-rose-900/50 space-y-2.5 text-left">
                     <div className="text-xs uppercase tracking-wider text-rose-700 dark:text-rose-400 font-medium">
-                      Why it's <span lang="ja" className="normal-case tracking-normal">{expected}</span>
+                      Why it's{' '}
+                      <span lang="ja" className="normal-case tracking-normal">
+                        {expected}
+                      </span>
                     </div>
                     {diagnostic && (
                       <div className="text-sm text-rose-800 dark:text-rose-300 bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2">
-                        <span className="font-medium text-rose-900 dark:text-rose-200">Likely mix-up: </span>
+                        <span className="font-medium text-rose-900 dark:text-rose-200">
+                          Likely mix-up:{' '}
+                        </span>
                         {diagnostic}
                       </div>
                     )}
-                    <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">{explanation.intro}</div>
+                    <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                      {explanation.intro}
+                    </div>
                     {explanation.rule && (
-                      <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">{explanation.rule}</div>
+                      <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                        {explanation.rule}
+                      </div>
                     )}
                     {explanation.derivation && explanation.derivation !== expected && (
-                      <div className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100" lang="ja">
+                      <div
+                        className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
+                        lang="ja"
+                      >
                         {explanation.derivation}
                       </div>
                     )}

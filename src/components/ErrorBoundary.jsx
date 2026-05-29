@@ -16,7 +16,9 @@ export default class ErrorBoundary extends React.Component {
   }
 
   handleReset() {
-    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
     window.location.reload();
   }
 
@@ -26,7 +28,9 @@ export default class ErrorBoundary extends React.Component {
       <div className="min-h-screen bg-stone-50 dark:bg-stone-950 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
           <div className="text-4xl mb-4">⚠️</div>
-          <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-2">Something went wrong</h1>
+          <h1 className="text-lg font-semibold text-stone-900 dark:text-stone-100 mb-2">
+            Something went wrong
+          </h1>
           <p className="text-sm text-stone-500 dark:text-stone-400 mb-6">
             An unexpected error occurred. Your progress is saved — try reloading first.
           </p>
@@ -44,7 +48,9 @@ export default class ErrorBoundary extends React.Component {
               Reset app data &amp; reload
             </button>
             <details className="text-left mt-2">
-              <summary className="text-xs text-stone-400 cursor-pointer hover:text-stone-500">Error details</summary>
+              <summary className="text-xs text-stone-400 cursor-pointer hover:text-stone-500">
+                Error details
+              </summary>
               <pre className="mt-2 text-xs text-stone-500 bg-stone-50 dark:bg-stone-950 rounded p-3 overflow-auto whitespace-pre-wrap break-all">
                 {this.state.error.toString()}
               </pre>

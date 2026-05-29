@@ -10,19 +10,26 @@ import {
   onbinPatternForVerb,
   ONBIN_TE_CHOICES,
   ONBIN_TA_CHOICES,
-  ONBIN_PATTERN_META
+  ONBIN_PATTERN_META,
 } from '../utils/conjugator.js';
 import { defaultState, bumpDaily } from '../utils/storage.js';
 import { promptDisplay, formDisplay, shuffled } from '../utils/display.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
-export default function EndingsView({ state, setState, verbs, practicePrefs = DEFAULT_PREFS, wordLists = [], geminiKey }) {
+export default function EndingsView({
+  state,
+  setState,
+  verbs,
+  practicePrefs = DEFAULT_PREFS,
+  wordLists = [],
+  geminiKey,
+}) {
   const drillVerbs = useMemo(
-    () => filterWordsForPrefs(verbs, practicePrefs, wordLists).filter(v => !isAdjective(v)),
-    [verbs, practicePrefs, wordLists]
+    () => filterWordsForPrefs(verbs, practicePrefs, wordLists).filter((v) => !isAdjective(v)),
+    [verbs, practicePrefs, wordLists],
   );
-  
+
   const stats = state.onbin || defaultState().onbin;
   const [target, setTarget] = useState('te-form');
   const [current, setCurrent] = useState(null);
@@ -36,12 +43,16 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
     if (!current && drillVerbs.length) {
       next(drillVerbs);
     }
-  // next is defined inline without useCallback — adding it would cause infinite re-runs
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // next is defined inline without useCallback — adding it would cause infinite re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, drillVerbs, target]);
 
   useEffect(() => {
-    if (current && drillVerbs.length && !drillVerbs.some(v => v.dict === current.dict && v.group === current.group)) {
+    if (
+      current &&
+      drillVerbs.length &&
+      !drillVerbs.some((v) => v.dict === current.dict && v.group === current.group)
+    ) {
       setCurrent(null);
       setResult(null);
     }
@@ -77,13 +88,16 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
   const choices = target === 'te-form' ? ONBIN_TE_CHOICES : ONBIN_TA_CHOICES;
   const patternStats = stats.byPattern?.[pattern.label] || { attempted: 0, correct: 0 };
   const acc = stats.attempted ? Math.round((stats.correct / stats.attempted) * 100) : 0;
-  const hint = expected.split('').map((ch, i) => (i < hintChars ? ch : '＿')).join('');
+  const hint = expected
+    .split('')
+    .map((ch, i) => (i < hintChars ? ch : '＿'))
+    .join('');
 
   function choose(tail) {
     if (result) return;
     const ok = tail === expectedTail;
     setResult({ ok, tail });
-    setState(s => {
+    setState((s) => {
       const prev = s.onbin || defaultState().onbin;
       const pp = prev.byPattern?.[pattern.label] || { attempted: 0, correct: 0 };
       const streak = ok ? (prev.streak || 0) + 1 : 0;
@@ -101,11 +115,11 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
             [pattern.label]: {
               attempted: (pp.attempted || 0) + 1,
               correct: (pp.correct || 0) + (ok ? 1 : 0),
-              lastAt: Date.now()
-            }
-          }
+              lastAt: Date.now(),
+            },
+          },
         },
-        daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 10) : s.daily
+        daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 10) : s.daily,
       };
     });
   }
@@ -124,7 +138,7 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
         geminiKey,
         350,
         0.45,
-        aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM)
+        aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM),
       );
       setAiTip(reply.trim());
     } catch (e) {
@@ -158,7 +172,9 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
           <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50 text-ellipsis overflow-hidden whitespace-nowrap">
             {patternStats.correct || 0}/{patternStats.attempted || 0}
           </div>
-          <div className="text-xs text-stone-500 text-ellipsis overflow-hidden whitespace-nowrap">{pattern.label}</div>
+          <div className="text-xs text-stone-500 text-ellipsis overflow-hidden whitespace-nowrap">
+            {pattern.label}
+          </div>
         </div>
       </div>
       <div className="grid lg:grid-cols-[1fr_280px] gap-4">
@@ -176,8 +192,8 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
             <div className="flex gap-2">
               {[
                 { id: 'te-form', label: 'て' },
-                { id: 'plain-past', label: 'た' }
-              ].map(o => (
+                { id: 'plain-past', label: 'た' },
+              ].map((o) => (
                 <button
                   key={o.id}
                   onClick={() => {
@@ -200,7 +216,11 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
             <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
               Choose the ending tail
             </div>
-            <ScriptDisplay view={prompt} className="text-4xl sm:text-5xl font-semibold text-stone-900 dark:text-stone-50" subClassName="text-sm text-stone-500 mt-1" />
+            <ScriptDisplay
+              view={prompt}
+              className="text-4xl sm:text-5xl font-semibold text-stone-900 dark:text-stone-50"
+              subClassName="text-sm text-stone-500 mt-1"
+            />
             <div className="mt-2 text-sm text-stone-500">{current.meaning}</div>
             <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-850 px-3 py-1 text-xs text-stone-600 dark:text-stone-400">
               <span>{pattern.label}</span>
@@ -209,7 +229,7 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-            {choices.map(c => (
+            {choices.map((c) => (
               <button
                 key={c}
                 onClick={() => choose(c)}
@@ -244,7 +264,10 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
             </button>
           </div>
           {hintChars > 0 && (
-            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-center text-xl tracking-widest text-amber-800 dark:text-amber-300" lang="ja">
+            <div
+              className="mt-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-center text-xl tracking-widest text-amber-800 dark:text-amber-300"
+              lang="ja"
+            >
               {hint}
             </div>
           )}
@@ -259,7 +282,9 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
               <span role="status" aria-live="polite" className="sr-only">
                 {result.ok ? 'Clean sound change.' : 'Different ending pattern.'}
               </span>
-              <div className={`text-sm font-medium ${result.ok ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}>
+              <div
+                className={`text-sm font-medium ${result.ok ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}
+              >
                 {result.ok ? 'Clean sound change.' : 'Different ending pattern.'}
               </div>
               <ScriptDisplay
@@ -294,13 +319,18 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
           <h3 className="font-medium mb-3 text-stone-950 dark:text-stone-50">Pattern map</h3>
           <div className="space-y-2">
-            {Object.values(ONBIN_PATTERN_META).map(p => {
+            {Object.values(ONBIN_PATTERN_META).map((p) => {
               const s = stats.byPattern?.[p.label] || { attempted: 0, correct: 0 };
               const pctVal = s.attempted ? Math.round((s.correct / s.attempted) * 100) : 0;
               return (
-                <div key={p.label} className="rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-2 text-left">
+                <div
+                  key={p.label}
+                  className="rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-2 text-left"
+                >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-sm text-stone-800 dark:text-stone-200">{p.label}</span>
+                    <span className="font-medium text-sm text-stone-800 dark:text-stone-200">
+                      {p.label}
+                    </span>
                     <span className="text-xs text-stone-500">
                       {s.correct || 0}/{s.attempted || 0}
                     </span>

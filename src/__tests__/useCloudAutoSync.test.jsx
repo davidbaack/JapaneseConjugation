@@ -51,14 +51,16 @@ afterEach(() => {
 
 describe('useCloudAutoSync', () => {
   it('saves to localStorage synchronously on every change', () => {
-    renderHook(p => useCloudAutoSync(p), { initialProps: props() });
+    renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
     // Local save is immediate, not debounced.
     expect(saveAll).toHaveBeenCalledTimes(1);
     expect(cloudUpsert).not.toHaveBeenCalled();
   });
 
   it('debounces rapid changes into a single cloud upsert with the latest payload', async () => {
-    const { rerender } = renderHook(p => useCloudAutoSync(p), { initialProps: props({ state: { v: 1 } }) });
+    const { rerender } = renderHook((p) => useCloudAutoSync(p), {
+      initialProps: props({ state: { v: 1 } }),
+    });
 
     // Three quick edits, each resetting the timer before it can fire.
     rerender(props({ state: { v: 2 } }));
@@ -75,7 +77,7 @@ describe('useCloudAutoSync', () => {
   });
 
   it('does not push before the debounce window elapses', async () => {
-    renderHook(p => useCloudAutoSync(p), { initialProps: props() });
+    renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS - 1);
     });
@@ -83,7 +85,7 @@ describe('useCloudAutoSync', () => {
   });
 
   it('records the sync time and an ok status after a successful push', async () => {
-    renderHook(p => useCloudAutoSync(p), { initialProps: props() });
+    renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
     });
@@ -93,27 +95,27 @@ describe('useCloudAutoSync', () => {
     // Persisted again with the new sync time after the push.
     expect(saveAll).toHaveBeenCalledTimes(2);
     expect(setSyncStatus).toHaveBeenLastCalledWith(
-      expect.objectContaining({ kind: 'ok', message: 'Saved to cloud' })
+      expect.objectContaining({ kind: 'ok', message: 'Saved to cloud' }),
     );
   });
 
   it('surfaces a push failure as an error status without crashing', async () => {
     cloudUpsert.mockRejectedValueOnce(new Error('network down'));
-    renderHook(p => useCloudAutoSync(p), { initialProps: props() });
+    renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
     });
 
     expect(setSyncStatus).toHaveBeenLastCalledWith(
-      expect.objectContaining({ kind: 'error', message: 'network down' })
+      expect.objectContaining({ kind: 'error', message: 'network down' }),
     );
     // A failed push must not advance the last-synced marker.
     expect(lastSyncedAtRef.current).toBe(0);
   });
 
   it('saves locally but never pushes when signed out', async () => {
-    renderHook(p => useCloudAutoSync(p), { initialProps: props({ session: null }) });
+    renderHook((p) => useCloudAutoSync(p), { initialProps: props({ session: null }) });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
     });
@@ -122,7 +124,7 @@ describe('useCloudAutoSync', () => {
   });
 
   it('does nothing at all until local state has hydrated', async () => {
-    renderHook(p => useCloudAutoSync(p), { initialProps: props({ hydrated: false }) });
+    renderHook((p) => useCloudAutoSync(p), { initialProps: props({ hydrated: false }) });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
     });

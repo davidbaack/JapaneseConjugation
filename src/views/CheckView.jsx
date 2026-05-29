@@ -6,10 +6,7 @@ import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import StickyAction from '../components/StickyAction.jsx';
 import { speakJapanese } from '../utils/speech.js';
 import { identifyConjugation } from '../utils/checkIdentify.js';
-import {
-  getTypeInfo,
-  getWordMeta,
-} from '../utils/conjugator.js';
+import { getTypeInfo, getWordMeta } from '../utils/conjugator.js';
 import { explainItem, GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { formRows } from './ReferenceViewSub.jsx';
 import { formDisplay, englishForForm } from '../utils/display.js';
@@ -119,7 +116,12 @@ function WordExtras({ word, type, showForms, onToggleForms, onPracticeWord }) {
   );
 }
 
-export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, geminiKey, onPracticeWord }) {
+export default function CheckView({
+  verbs,
+  practicePrefs = DEFAULT_PREFS,
+  geminiKey,
+  onPracticeWord,
+}) {
   const [input, setInput] = useState('');
   const [result, setResult] = useState(null);
   const [kanaPadOpen, setKanaPadOpen] = useState(false);
@@ -176,7 +178,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
         return [entry, ...h.filter((e) => e.input !== entry.input)].slice(0, MAX_HISTORY);
       });
     },
-    [allWords]
+    [allWords],
   );
 
   const handleCheck = useCallback(() => runCheck(input), [runCheck, input]);
@@ -186,7 +188,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
       setInput(ex);
       runCheck(ex);
     },
-    [runCheck]
+    [runCheck],
   );
 
   const handleNext = useCallback(() => {
@@ -197,7 +199,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
 
   const speak = useCallback(
     (text) => speakJapanese(text, 0.9, practicePrefs.voiceURI),
-    [practicePrefs.voiceURI]
+    [practicePrefs.voiceURI],
   );
 
   const insertText = useCallback((t) => setInput((a) => a + t), []);
@@ -220,16 +222,11 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
   // moment (e.g. potential = passive for ichidan verbs), not a footnote.
   const exactForms = result?.exact ?? [];
   const sameWord =
-    exactForms.length > 1 &&
-    exactForms.every((e) => e.word.reading === exactForms[0].word.reading);
+    exactForms.length > 1 && exactForms.every((e) => e.word.reading === exactForms[0].word.reading);
   // The word+form a breakdown should explain: the recognised form when correct,
   // or the intended form when it's a near-miss.
   const headForm =
-    result?.status === 'exact'
-      ? exactForms[0]
-      : result?.status === 'near'
-        ? result.near[0]
-        : null;
+    result?.status === 'exact' ? exactForms[0] : result?.status === 'near' ? result.near[0] : null;
 
   return (
     <div className="space-y-4">
@@ -239,8 +236,8 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
             Check a conjugation
           </div>
           <p className="text-sm text-stone-500 dark:text-stone-400 mb-5 max-w-md">
-            Type a conjugated verb or adjective — in romaji, kana, or kanji — and
-            I'll work out which dictionary word it is and which form you made.
+            Type a conjugated verb or adjective — in romaji, kana, or kanji — and I'll work out
+            which dictionary word it is and which form you made.
           </p>
 
           {/* Input row — mirrors Study's answer input */}
@@ -383,7 +380,10 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
               {/* The dictionary word is the headline — that's what the learner
                   most wants confirmed. */}
               <div className="text-center mb-4">
-                <div className="text-3xl font-semibold text-stone-900 dark:text-stone-100" lang="ja">
+                <div
+                  className="text-3xl font-semibold text-stone-900 dark:text-stone-100"
+                  lang="ja"
+                >
                   {exactForms[0].word.dict}
                 </div>
                 <div className="text-sm text-stone-500 dark:text-stone-400 mt-1" lang="ja">
@@ -403,7 +403,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
                       exactForms[0].kana,
                       practicePrefs,
                       exactForms[0].word,
-                      exactForms[0].type
+                      exactForms[0].type,
                     )}
                     word={exactForms[0].word}
                     type={exactForms[0].type}
@@ -493,8 +493,12 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
               <p className="text-stone-700 dark:text-stone-300">
                 It looks like you were going for the{' '}
                 <span className="font-semibold">{getTypeInfo(result.near[0].type).label}</span> of{' '}
-                <span className="font-semibold" lang="ja">{result.near[0].word.dict}</span>{' '}
-                <span className="text-stone-500" lang="ja">（{result.near[0].word.reading}）</span>{' '}
+                <span className="font-semibold" lang="ja">
+                  {result.near[0].word.dict}
+                </span>{' '}
+                <span className="text-stone-500" lang="ja">
+                  （{result.near[0].word.reading}）
+                </span>{' '}
                 — {result.near[0].word.meaning}.
               </p>
               <div className="mt-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
@@ -508,7 +512,10 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
                   <span className="text-stone-400">Correct form</span>
                   <span className="flex items-center gap-1.5">
                     <span className="text-emerald-700 dark:text-emerald-300 text-lg">
-                      <DiffForm correct={result.near[0].kana} firstDiff={result.near[0].diff.firstDiff} />
+                      <DiffForm
+                        correct={result.near[0].kana}
+                        firstDiff={result.near[0].diff.firstDiff}
+                      />
                     </span>
                     <button
                       type="button"
@@ -530,7 +537,8 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
               <p className="mt-4 text-sm text-stone-700 dark:text-stone-200">
                 {explainItem(result.near[0].word, result.near[0].type)}
                 <span className="text-stone-400">
-                  {' '}({englishForForm(result.near[0].word, result.near[0].type)})
+                  {' '}
+                  ({englishForForm(result.near[0].word, result.near[0].type)})
                 </span>
               </p>
 
@@ -597,8 +605,10 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
                 Couldn't identify that
               </div>
               <p className="text-stone-700 dark:text-stone-300">
-                <span className="font-medium" lang="ja">{result.normalized}</span> isn't close to
-                any conjugation I could find. Two things to check:
+                <span className="font-medium" lang="ja">
+                  {result.normalized}
+                </span>{' '}
+                isn't close to any conjugation I could find. Two things to check:
               </p>
               <ul className="mt-2 space-y-1 text-sm text-stone-600 dark:text-stone-300 list-disc pl-5">
                 <li>
@@ -606,8 +616,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
                   far from the real form to match — give it another look.
                 </li>
                 <li>
-                  <span className="font-medium">Word not loaded?</span> Check only knows the
-                  {' '}
+                  <span className="font-medium">Word not loaded?</span> Check only knows the{' '}
                   {allWords.length} words in your active set. If this word isn't one of them, add it
                   in the Library.
                 </li>

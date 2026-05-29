@@ -7,7 +7,7 @@ import { useTablist } from '../components/useTablist.js';
 const LIBRARY_TABS = [
   { id: 'reference', label: 'Search & Reference', desc: 'Verb & adjective lookup' },
   { id: 'lists', label: 'Lists & Decks', desc: 'Custom groupings & Anki export' },
-  { id: 'dictionary', label: 'Custom Dictionary', desc: 'Manage custom verbs & adjectives' }
+  { id: 'dictionary', label: 'Custom Dictionary', desc: 'Manage custom verbs & adjectives' },
 ];
 
 export default function LibraryView({
@@ -24,16 +24,24 @@ export default function LibraryView({
   practicePrefs,
   setPracticePrefs,
   geminiKey,
-  setTab
+  setTab,
 }) {
   const [subTab, setSubTab] = useState('reference');
-  const { tabProps, panelProps } = useTablist(LIBRARY_TABS.map(t => t.id), subTab, setSubTab);
+  const { tabProps, panelProps } = useTablist(
+    LIBRARY_TABS.map((t) => t.id),
+    subTab,
+    setSubTab,
+  );
 
   return (
     <div className="space-y-4">
       {/* Sub-navigation bar */}
-      <div role="tablist" aria-label="Library sections" className="flex border-b border-stone-200 dark:border-stone-800">
-        {LIBRARY_TABS.map(t => (
+      <div
+        role="tablist"
+        aria-label="Library sections"
+        className="flex border-b border-stone-200 dark:border-stone-800"
+      >
+        {LIBRARY_TABS.map((t) => (
           <button
             key={t.id}
             {...tabProps(t.id)}
@@ -45,7 +53,9 @@ export default function LibraryView({
             }`}
           >
             <div className="text-sm">{t.label}</div>
-            <div className="text-xs text-stone-450 dark:text-stone-500 font-normal hidden sm:block">{t.desc}</div>
+            <div className="text-xs text-stone-450 dark:text-stone-500 font-normal hidden sm:block">
+              {t.desc}
+            </div>
           </button>
         ))}
       </div>

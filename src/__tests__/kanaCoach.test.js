@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { kanaCoachCells } from '../utils/kanaCoach.js';
 
-const states = cells => cells.map(c => c.state);
-const shown = cells => cells.map(c => c.shown);
+const states = (cells) => cells.map((c) => c.state);
+const shown = (cells) => cells.map((c) => c.shown);
 
 describe('kanaCoachCells green water-mark', () => {
   const expected = 'たべます';

@@ -8,12 +8,15 @@ export default defineConfig({
     headless: true,
     baseURL: 'http://localhost:4173/JapaneseConjugation/',
   },
+  // Cross-engine coverage. Katachiya leans on the Web Speech API and Service
+  // Workers, so WebKit (Safari/iOS — the PWA's likely primary platform) and
+  // Firefox catch engine-specific breakage Chromium alone would miss.
+  // Set PW_PROJECT (e.g. PW_PROJECT=chromium) to scope a run to one engine.
   projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-  ],
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  ].filter((p) => !process.env.PW_PROJECT || p.name === process.env.PW_PROJECT),
   // Start the vite preview server before running e2e tests
   webServer: {
     command: 'npm run build && npm run preview',

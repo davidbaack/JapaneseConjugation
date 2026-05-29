@@ -82,9 +82,9 @@ describe('stepCoachHint coverage sweep (all classes × all conjugations)', () =>
 
   it('regular, derivable forms are never masked', () => {
     const REGULAR = ['食べる', '書く', '待つ', '飲む', '高い', '静か'];
-    const wrongly = COMBOS
-      .filter(({ w, type }) => REGULAR.includes(w.dict) && stepCoachHint(w, type, '').masked)
-      .map(({ w, type }) => `${w.dict}/${type}`);
+    const wrongly = COMBOS.filter(
+      ({ w, type }) => REGULAR.includes(w.dict) && stepCoachHint(w, type, '').masked,
+    ).map(({ w, type }) => `${w.dict}/${type}`);
     expect(wrongly).toEqual([]);
   });
 });

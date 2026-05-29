@@ -40,7 +40,11 @@ const SESSION = { user: { id: 'user-123' } };
 
 // A payload exercising every field the app round-trips through the cloud.
 const SAMPLE_PAYLOAD = {
-  state: { cards: { 'taberu|plain-past': { reps: 3, interval: 6 } }, daily: { count: 5 }, mistakes: [] },
+  state: {
+    cards: { 'taberu|plain-past': { reps: 3, interval: 6 } },
+    daily: { count: 5 },
+    mistakes: [],
+  },
   customVerbs: [{ dict: '走る', reading: 'はしる', meaning: 'to run', group: 'godan' }],
   customAdjectives: [{ dict: '青い', reading: 'あおい', meaning: 'blue', group: 'i-adjective' }],
   wordLists: [{ id: 'l1', name: 'JLPT N5', words: ['taberu'] }],
@@ -141,7 +145,10 @@ describe('cloudUpsert', () => {
     await cloudUpsert(SAMPLE_PAYLOAD);
     const written = upBuilder.upsert.mock.calls[0][0];
 
-    const fetchBuilder = selectBuilder({ data: { data: written.data, updated_at: written.updated_at }, error: null });
+    const fetchBuilder = selectBuilder({
+      data: { data: written.data, updated_at: written.updated_at },
+      error: null,
+    });
     mockSupabase.from.mockReturnValue(fetchBuilder);
     const result = await cloudFetch();
 
@@ -151,8 +158,9 @@ describe('cloudUpsert', () => {
 
 describe('cloudTimestamp', () => {
   it('parses an ISO updated_at into epoch millis', () => {
-    expect(cloudTimestamp({ updated_at: '2026-05-29T00:00:00.000Z' }))
-      .toBe(Date.parse('2026-05-29T00:00:00.000Z'));
+    expect(cloudTimestamp({ updated_at: '2026-05-29T00:00:00.000Z' })).toBe(
+      Date.parse('2026-05-29T00:00:00.000Z'),
+    );
   });
 
   it('returns 0 for missing, empty, or unparseable timestamps', () => {
@@ -168,11 +176,15 @@ describe('resolveSyncAction (conflict resolution)', () => {
   const cloudAt = Date.parse(newer);
 
   it('pulls when the cloud row is newer than our last sync', () => {
-    expect(resolveSyncAction({ data: SAMPLE_PAYLOAD, updated_at: newer }, cloudAt - 1000)).toBe('pull');
+    expect(resolveSyncAction({ data: SAMPLE_PAYLOAD, updated_at: newer }, cloudAt - 1000)).toBe(
+      'pull',
+    );
   });
 
   it('pushes when local progress is newer than the cloud row', () => {
-    expect(resolveSyncAction({ data: SAMPLE_PAYLOAD, updated_at: newer }, cloudAt + 1000)).toBe('push');
+    expect(resolveSyncAction({ data: SAMPLE_PAYLOAD, updated_at: newer }, cloudAt + 1000)).toBe(
+      'push',
+    );
   });
 
   it('does nothing when the timestamps match exactly', () => {

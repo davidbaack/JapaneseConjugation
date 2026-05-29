@@ -26,9 +26,20 @@ const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', gro
 const KAKU = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan' };
 const SURU = { dict: 'する', reading: 'する', meaning: 'to do', group: 'suru' };
 const KURU = { dict: '来る', reading: 'くる', meaning: 'to come', group: 'kuru' };
-const TAKAI = { dict: '高い', reading: 'たかい', meaning: 'expensive / high', group: 'i-adjective' };
+const TAKAI = {
+  dict: '高い',
+  reading: 'たかい',
+  meaning: 'expensive / high',
+  group: 'i-adjective',
+};
 const SHIZUKA = { dict: '静か', reading: 'しずか', meaning: 'quiet', group: 'na-adjective' };
-const II = { dict: 'いい', reading: 'いい', meaning: 'good', group: 'i-adjective', irregular: true };
+const II = {
+  dict: 'いい',
+  reading: 'いい',
+  meaning: 'good',
+  group: 'i-adjective',
+  irregular: true,
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // classifyHint
@@ -84,19 +95,19 @@ describe('formRows', () => {
 
   it('returns adjective forms for an adjective', () => {
     const rows = formRows(TAKAI);
-    const ids = rows.map(r => r.type.id);
-    expect(ids.some(id => id.startsWith('adj-'))).toBe(true);
+    const ids = rows.map((r) => r.type.id);
+    expect(ids.some((id) => id.startsWith('adj-'))).toBe(true);
   });
 
   it('returns verb forms for a verb (no adj- prefix)', () => {
     const rows = formRows(TABERU);
-    const ids = rows.map(r => r.type.id);
-    expect(ids.every(id => !id.startsWith('adj-'))).toBe(true);
+    const ids = rows.map((r) => r.type.id);
+    expect(ids.every((id) => !id.startsWith('adj-'))).toBe(true);
   });
 
   it('produces correct plain-past for たべる', () => {
     const rows = formRows(TABERU);
-    const pastRow = rows.find(r => r.type.id === 'plain-past');
+    const pastRow = rows.find((r) => r.type.id === 'plain-past');
     expect(pastRow?.answer).toBe('たべた');
   });
 });
@@ -146,27 +157,27 @@ describe('adHocReferenceCandidates', () => {
 
   it('returns godan for godan-final kana (く)', () => {
     const candidates = adHocReferenceCandidates('かく');
-    expect(candidates.some(c => c.group === 'godan')).toBe(true);
+    expect(candidates.some((c) => c.group === 'godan')).toBe(true);
   });
 
   it('returns suru for する ending', () => {
     const candidates = adHocReferenceCandidates('べんきょうする');
-    expect(candidates.some(c => c.group === 'suru')).toBe(true);
+    expect(candidates.some((c) => c.group === 'suru')).toBe(true);
   });
 
   it('returns kuru for くる', () => {
     const candidates = adHocReferenceCandidates('くる');
-    expect(candidates.some(c => c.group === 'kuru')).toBe(true);
+    expect(candidates.some((c) => c.group === 'kuru')).toBe(true);
   });
 
   it('returns i-adjective for い ending', () => {
     const candidates = adHocReferenceCandidates('たかい');
-    expect(candidates.some(c => c.group === 'i-adjective')).toBe(true);
+    expect(candidates.some((c) => c.group === 'i-adjective')).toBe(true);
   });
 
   it('returns na-adjective for な ending', () => {
     const candidates = adHocReferenceCandidates('しずかな');
-    expect(candidates.some(c => c.group === 'na-adjective')).toBe(true);
+    expect(candidates.some((c) => c.group === 'na-adjective')).toBe(true);
   });
 
   it('returns empty for too-long query', () => {
@@ -186,7 +197,7 @@ describe('formLookupCandidates', () => {
 
   it('finds a verb by conjugated form', () => {
     const hits = formLookupCandidates('たべた', words);
-    expect(hits.some(h => h.word.dict === '食べる')).toBe(true);
+    expect(hits.some((h) => h.word.dict === '食べる')).toBe(true);
   });
 
   it('result entries have word, type, answer, and matchKind', () => {
@@ -201,7 +212,10 @@ describe('formLookupCandidates', () => {
 
   it('returns at most 12 results', () => {
     const manyWords = Array.from({ length: 30 }, (_, i) => ({
-      dict: `verb${i}る`, reading: `verb${i}る`, meaning: `test`, group: 'ichidan'
+      dict: `verb${i}る`,
+      reading: `verb${i}る`,
+      meaning: `test`,
+      group: 'ichidan',
     }));
     expect(formLookupCandidates('verbた', manyWords).length).toBeLessThanOrEqual(12);
   });
@@ -262,7 +276,7 @@ describe('toggleFavoriteInLists', () => {
   it('preserves other lists when toggling', () => {
     const other = { id: 'custom', name: 'My List', wordKeys: [] };
     const { wordLists } = toggleFavoriteInLists([other], TABERU);
-    expect(wordLists.some(l => l.id === 'custom')).toBe(true);
+    expect(wordLists.some((l) => l.id === 'custom')).toBe(true);
   });
 });
 
@@ -273,14 +287,14 @@ describe('focusWordInLists', () => {
   it('returns a focus list containing the word key', () => {
     const { wordLists, count } = focusWordInLists([], TABERU);
     expect(count).toBe(1);
-    const focus = wordLists.find(l => l.id === 'focus-word');
+    const focus = wordLists.find((l) => l.id === 'focus-word');
     expect(focus?.wordKeys).toHaveLength(1);
   });
 
   it('replaces previous focus word', () => {
     const { wordLists: first } = focusWordInLists([], TABERU);
     const { wordLists: second } = focusWordInLists(first, KAKU);
-    const focus = second.find(l => l.id === 'focus-word');
+    const focus = second.find((l) => l.id === 'focus-word');
     expect(focus?.wordKeys).toHaveLength(1);
     expect(focus?.wordKeys[0]).toBe(`${KAKU.group}:${KAKU.dict}`);
   });
@@ -305,7 +319,7 @@ describe('referenceWithSearch', () => {
     const ref2 = referenceWithSearch(ref1, 'write');
     const ref3 = referenceWithSearch(ref2, 'eat');
     expect(ref3.recentSearches[0]).toBe('eat');
-    expect(ref3.recentSearches.filter(s => s === 'eat')).toHaveLength(1);
+    expect(ref3.recentSearches.filter((s) => s === 'eat')).toHaveLength(1);
   });
 
   it('returns normalized state for blank query', () => {
@@ -339,13 +353,21 @@ describe('referenceWithHistory', () => {
   it('caps history at 24', () => {
     let ref = {};
     for (let i = 0; i < 30; i++) {
-      ref = referenceWithHistory(ref, { dict: `verb${i}`, reading: `v${i}`, meaning: 'x', group: 'godan' });
+      ref = referenceWithHistory(ref, {
+        dict: `verb${i}`,
+        reading: `v${i}`,
+        meaning: 'x',
+        group: 'godan',
+      });
     }
     expect(ref.history.length).toBeLessThanOrEqual(24);
   });
 
   it('returns normalized state for null word', () => {
-    const ref = referenceWithHistory({ history: [{ dict: '食べる', reading: 'たべる', group: 'ichidan' }] }, null);
+    const ref = referenceWithHistory(
+      { history: [{ dict: '食べる', reading: 'たべる', group: 'ichidan' }] },
+      null,
+    );
     expect(ref.history).toHaveLength(1);
   });
 });

@@ -3,11 +3,21 @@ import { conjugateItem, isAdjective } from './conjugator.js';
 import { getTypeInfo } from '../data/conjugationTypes.js';
 import { GROUP_NAMES } from './conjugatorExplain.js';
 
-export function kanaCoachCells(expected, input, revealed = 0, pendingLast = false, greenRevealed = 0) {
+export function kanaCoachCells(
+  expected,
+  input,
+  revealed = 0,
+  pendingLast = false,
+  greenRevealed = 0,
+) {
   const target = Array.from(expected || '');
   const typed = Array.from(toHiraganaProgress(input || ''));
   // Trailing 'n' is held pending in progress mode; commit it as 'ん' when context confirms it
-  if (typed.length < target.length && target[typed.length] === 'ん' && /n$/i.test((input || '').trimEnd())) {
+  if (
+    typed.length < target.length &&
+    target[typed.length] === 'ん' &&
+    /n$/i.test((input || '').trimEnd())
+  ) {
     typed.push('ん');
   }
   const lastTypedIndex = typed.length - 1;
@@ -30,11 +40,15 @@ export function kanaCoachCells(expected, input, revealed = 0, pendingLast = fals
     return {
       expected: expectedKana,
       shown: got || (greenRevealedCell || hinted ? expectedKana : ''),
-      state
+      state,
     };
   });
   for (let i = target.length; i < typed.length; i++) {
-    cells.push({ expected: '', shown: typed[i], state: pendingLast && i === lastTypedIndex ? 'pending' : 'extra' });
+    cells.push({
+      expected: '',
+      shown: typed[i],
+      state: pendingLast && i === lastTypedIndex ? 'pending' : 'extra',
+    });
   }
   return cells;
 }
@@ -48,6 +62,6 @@ export function explainReversePrompt(item, type) {
     derivation: `${form} → ${item.reading}`,
     note: isAdjective(item)
       ? 'Answer with the dictionary adjective form, not another tense or politeness level.'
-      : 'Answer with the dictionary verb form, the form used in dictionaries before adding endings.'
+      : 'Answer with the dictionary verb form, the form used in dictionaries before adding endings.',
   };
 }

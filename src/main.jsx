@@ -9,7 +9,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
-  </React.StrictMode>
+  </React.StrictMode>,
 );
 
 if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {

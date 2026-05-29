@@ -13,7 +13,15 @@ function feedbackNoteFor(prefs) {
     : 'Use the configured Beginner feedback style; show romaji for key forms.';
 }
 
-export function buildContext(verb, type, userAnswer, expected, explanation, prefs = DEFAULT_PREFS, taskOverride = '') {
+export function buildContext(
+  verb,
+  type,
+  userAnswer,
+  expected,
+  explanation,
+  prefs = DEFAULT_PREFS,
+  taskOverride = '',
+) {
   const ti = getTypeInfo(type);
   const label = isAdjective(verb) ? 'Adjective' : 'Verb';
   const feedbackNote = feedbackNoteFor(prefs);
@@ -24,7 +32,13 @@ export function buildContext(verb, type, userAnswer, expected, explanation, pref
 // Context for the "Discuss further" chat opened while the student is still
 // answering. Crucially it never states the correct answer — the AI coaches
 // toward it one step at a time.
-export function buildCoachContext(verb, type, userAnswer, prefs = DEFAULT_PREFS, taskOverride = '') {
+export function buildCoachContext(
+  verb,
+  type,
+  userAnswer,
+  prefs = DEFAULT_PREFS,
+  taskOverride = '',
+) {
   const ti = getTypeInfo(type);
   const label = isAdjective(verb) ? 'Adjective' : 'Verb';
   const feedbackNote = feedbackNoteFor(prefs);
@@ -33,7 +47,17 @@ export function buildCoachContext(verb, type, userAnswer, prefs = DEFAULT_PREFS,
   return `I'm practicing Japanese conjugation and want step-by-step hints. IMPORTANT: do NOT tell me the final answer — coach me toward it.\n\n${label}: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: transform to ${task}\nWhat I've typed so far: ${toHiragana(userAnswer) || userAnswer || '(nothing yet)'}\nHow this form is built: ${exp.rule || 'apply the standard rule for this form'}${exp.note ? ' ' + exp.note : ''}\n\nTell me what to do for the next step only, then wait for me. Never reveal the whole answer. ${feedbackNote}`;
 }
 
-export function ChatPanel({ verb, type, userAnswer, expected, explanation, geminiKey, practicePrefs = DEFAULT_PREFS, taskOverride = '', mode = 'review' }) {
+export function ChatPanel({
+  verb,
+  type,
+  userAnswer,
+  expected,
+  explanation,
+  geminiKey,
+  practicePrefs = DEFAULT_PREFS,
+  taskOverride = '',
+  mode = 'review',
+}) {
   const [apiHistory, setApiHistory] = useState([]);
   const [display, setDisplay] = useState([]);
   const [input, setInput] = useState('');
@@ -41,27 +65,45 @@ export function ChatPanel({ verb, type, userAnswer, expected, explanation, gemin
   const endRef = useRef(null);
   /* eslint-disable react-hooks/exhaustive-deps */
   const context = useMemo(
-    () => mode === 'coach'
-      ? buildCoachContext(verb, type, userAnswer, practicePrefs, taskOverride)
-      : buildContext(verb, type, userAnswer, expected, explanation, practicePrefs, taskOverride),
-    [verb, type, userAnswer, expected, explanation, practicePrefs.aiFeedbackLevel, taskOverride, mode]
+    () =>
+      mode === 'coach'
+        ? buildCoachContext(verb, type, userAnswer, practicePrefs, taskOverride)
+        : buildContext(verb, type, userAnswer, expected, explanation, practicePrefs, taskOverride),
+    [
+      verb,
+      type,
+      userAnswer,
+      expected,
+      explanation,
+      practicePrefs.aiFeedbackLevel,
+      taskOverride,
+      mode,
+    ],
   );
   /* eslint-enable react-hooks/exhaustive-deps */
-  const baseSystem = mode === 'coach'
-    ? `${AI_SYSTEM} You are coaching a student who is still mid-answer: never reveal the full correct answer, and guide only the next single step.`
-    : AI_SYSTEM;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const systemText = useMemo(() => aiSystemFromPrefs(practicePrefs, baseSystem), [practicePrefs.aiFeedbackLevel, practicePrefs.aiGuideTone, mode]);
+  const baseSystem =
+    mode === 'coach'
+      ? `${AI_SYSTEM} You are coaching a student who is still mid-answer: never reveal the full correct answer, and guide only the next single step.`
+      : AI_SYSTEM;
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const systemText = useMemo(
+    () => aiSystemFromPrefs(practicePrefs, baseSystem),
+    [practicePrefs.aiFeedbackLevel, practicePrefs.aiGuideTone, mode],
+  );
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   useEffect(() => {
     const init = [{ role: 'user', content: context }];
-    const geminiMsgs = init.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+    const geminiMsgs = init.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
     callGemini(geminiMsgs, geminiKey, 600, 0.7, systemText)
-      .then(reply => {
+      .then((reply) => {
         setApiHistory([...init, { role: 'assistant', content: reply }]);
         setDisplay([{ role: 'assistant', content: reply }]);
       })
-      .catch(e => setDisplay([{ role: 'assistant', content: `Error: ${e.message}` }]))
+      .catch((e) => setDisplay([{ role: 'assistant', content: `Error: ${e.message}` }]))
       .finally(() => setLoading(false));
   }, [context, geminiKey, systemText]);
 
@@ -71,12 +113,17 @@ export function ChatPanel({ verb, type, userAnswer, expected, explanation, gemin
 
   async function send() {
     if (!input.trim() || loading) return;
-    const txt = input; setInput('');
+    const txt = input;
+    setInput('');
     const newDisplay = [...display, { role: 'user', content: txt }];
-    setDisplay(newDisplay); setLoading(true);
+    setDisplay(newDisplay);
+    setLoading(true);
     const newApi = [...apiHistory, { role: 'user', content: txt }];
     try {
-      const geminiMsgs = newApi.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+      const geminiMsgs = newApi.map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      }));
       const reply = await callGemini(geminiMsgs, geminiKey, 600, 0.7, systemText);
       setApiHistory([...newApi, { role: 'assistant', content: reply }]);
       setDisplay([...newDisplay, { role: 'assistant', content: reply }]);
@@ -87,31 +134,66 @@ export function ChatPanel({ verb, type, userAnswer, expected, explanation, gemin
   }
 
   return (
-    <div className={`mt-3 pt-3 border-t ${mode === 'coach' ? 'border-indigo-200 dark:border-indigo-800/40' : 'border-rose-200'}`}>
+    <div
+      className={`mt-3 pt-3 border-t ${mode === 'coach' ? 'border-indigo-200 dark:border-indigo-800/40' : 'border-rose-200'}`}
+    >
       <div className="text-xs font-medium text-stone-500 mb-2 flex items-center gap-1.5">
         <IconChat className="w-3.5 h-3.5" />
         {mode === 'coach' ? 'Discuss with Gemini' : 'Chat with Gemini'}
       </div>
-      <div role="log" aria-live="polite" aria-busy={loading} className="space-y-2 max-h-96 overflow-y-auto pb-1">
-        {loading && !display.length && <div className="text-sm text-stone-400 italic px-3 py-2 animate-pulse">Gemini is thinking…</div>}
+      <div
+        role="log"
+        aria-live="polite"
+        aria-busy={loading}
+        className="space-y-2 max-h-96 overflow-y-auto pb-1"
+      >
+        {loading && !display.length && (
+          <div className="text-sm text-stone-400 italic px-3 py-2 animate-pulse">
+            Gemini is thinking…
+          </div>
+        )}
         {display.map((m, i) => (
-          <div key={i} style={{ whiteSpace: 'pre-wrap' }}
-            className={`text-sm px-3 py-2 rounded-lg leading-relaxed ${m.role === 'assistant' ? 'bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-100' : 'bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/50 text-indigo-900 dark:text-indigo-200 ml-6 text-right'}`}>
+          <div
+            key={i}
+            style={{ whiteSpace: 'pre-wrap' }}
+            className={`text-sm px-3 py-2 rounded-lg leading-relaxed ${m.role === 'assistant' ? 'bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-100' : 'bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/50 text-indigo-900 dark:text-indigo-200 ml-6 text-right'}`}
+          >
             {m.content}
           </div>
         ))}
-        {loading && display.length > 0 && <div className="text-sm text-stone-400 italic px-3 animate-pulse">Gemini is thinking…</div>}
+        {loading && display.length > 0 && (
+          <div className="text-sm text-stone-400 italic px-3 animate-pulse">
+            Gemini is thinking…
+          </div>
+        )}
         <div ref={endRef} />
       </div>
       <div className="flex gap-2 mt-2">
-        <input type="text" value={input} onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); send(); } }}
-          placeholder="Ask a follow-up…" disabled={loading}
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              send();
+            }
+          }}
+          placeholder="Ask a follow-up…"
+          disabled={loading}
           aria-label="Ask Gemini a follow-up question"
-          autoComplete="off" autoCorrect="off" spellCheck="false"
-          className="flex-1 px-3 py-1.5 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none disabled:opacity-50" />
-        <button onClick={send} disabled={loading || !input.trim()}
-          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium">Send</button>
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck="false"
+          className="flex-1 px-3 py-1.5 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none disabled:opacity-50"
+        />
+        <button
+          onClick={send}
+          disabled={loading || !input.trim()}
+          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
+        >
+          Send
+        </button>
       </div>
     </div>
   );

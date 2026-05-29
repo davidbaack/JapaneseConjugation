@@ -14,7 +14,8 @@ export function useTablist(ids, value, onChange) {
     const idx = ids.indexOf(value);
     let next = null;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = ids[(idx + 1) % ids.length];
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = ids[(idx - 1 + ids.length) % ids.length];
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')
+      next = ids[(idx - 1 + ids.length) % ids.length];
     else if (e.key === 'Home') next = ids[0];
     else if (e.key === 'End') next = ids[ids.length - 1];
     if (next == null) return;
@@ -31,7 +32,9 @@ export function useTablist(ids, value, onChange) {
     // Roving tabindex: only the active tab is in the tab order; arrows move
     // between tabs once focus is inside the tablist.
     tabIndex: value === id ? 0 : -1,
-    ref: (el) => { if (el) refs.current[id] = el; },
+    ref: (el) => {
+      if (el) refs.current[id] = el;
+    },
     onKeyDown,
   });
 

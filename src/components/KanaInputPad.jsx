@@ -16,13 +16,22 @@ const KANA_PAD_ROWS = [
   ['だ', 'ぢ', 'づ', 'で', 'ど'],
   ['ば', 'び', 'ぶ', 'べ', 'ぼ'],
   ['ぱ', 'ぴ', 'ぷ', 'ぺ', 'ぽ'], // Wait, was it 'ぴ' or 'pi'? Let's keep it 'ぴ' as in line 494: ['ぱ','ぴ','ぷ','ぺ','ぽ']
-  ['ゃ', 'ゅ', 'ょ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ', 'っ', 'ー']
+  ['ゃ', 'ゅ', 'ょ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ', 'っ', 'ー'],
 ];
 
 // Let's verify line 494 in monolith. Yes, it was 'ぴ' ('\u3074')
 // Let's write the React component
 
-export default function KanaInputPad({ open, onToggle, onInsert, onBackspace, onClear, onSubmit, canSubmit, noToggle }) {
+export default function KanaInputPad({
+  open,
+  onToggle,
+  onInsert,
+  onBackspace,
+  onClear,
+  onSubmit,
+  canSubmit,
+  noToggle,
+}) {
   return (
     <div>
       {!noToggle && (

@@ -1,25 +1,166 @@
 export const VOCAB_PACKS = [
-  {id:'n5-motion',name:'N5 Motion Verbs',level:'N5',desc:'Everyday movement and classroom verbs.',words:[
-    {dict:'歩く',reading:'あるく',meaning:'to walk',group:'godan'},{dict:'入る',reading:'はいる',meaning:'to enter',group:'godan'},{dict:'座る',reading:'すわる',meaning:'to sit',group:'godan'},{dict:'止まる',reading:'とまる',meaning:'to stop',group:'godan'},{dict:'乗る',reading:'のる',meaning:'to ride',group:'godan'},{dict:'降りる',reading:'おりる',meaning:'to get off',group:'ichidan'},{dict:'会う',reading:'あう',meaning:'to meet',group:'godan'},{dict:'送る',reading:'おくる',meaning:'to send / escort',group:'godan'},{dict:'急ぐ',reading:'いそぐ',meaning:'to hurry',group:'godan'}
-  ]},
-  {id:'n5-daily',name:'N5 Daily Life',level:'N5',desc:'High-frequency verbs for home, school, and errands.',words:[
-    {dict:'洗う',reading:'あらう',meaning:'to wash',group:'godan'},{dict:'借りる',reading:'かりる',meaning:'to borrow',group:'ichidan'},{dict:'貸す',reading:'かす',meaning:'to lend',group:'godan'},{dict:'返す',reading:'かえす',meaning:'to return something',group:'godan'},{dict:'忘れる',reading:'わすれる',meaning:'to forget',group:'ichidan'},{dict:'始める',reading:'はじめる',meaning:'to begin',group:'ichidan'},{dict:'終わる',reading:'おわる',meaning:'to end',group:'godan'},{dict:'勉強する',reading:'べんきょうする',meaning:'to study',group:'suru'},{dict:'練習する',reading:'れんしゅうする',meaning:'to practice',group:'suru'},{dict:'料理する',reading:'りょうりする',meaning:'to cook',group:'suru'}
-  ]},
-  {id:'n4-core',name:'N4 Core Verbs',level:'N4',desc:'Useful intermediate verbs with common godan/ichidan traps.',words:[
-    {dict:'選ぶ',reading:'えらぶ',meaning:'to choose',group:'godan'},{dict:'直す',reading:'なおす',meaning:'to fix',group:'godan'},{dict:'治る',reading:'なおる',meaning:'to heal',group:'godan'},{dict:'間違える',reading:'まちがえる',meaning:'to make a mistake',group:'ichidan'},{dict:'調べる',reading:'しらべる',meaning:'to investigate / look up',group:'ichidan'},{dict:'説明する',reading:'せつめいする',meaning:'to explain',group:'suru'},{dict:'予約する',reading:'よやくする',meaning:'to reserve',group:'suru'},{dict:'運転する',reading:'うんてんする',meaning:'to drive',group:'suru'},{dict:'壊す',reading:'こわす',meaning:'to break something',group:'godan'},{dict:'壊れる',reading:'こわれる',meaning:'to break',group:'ichidan'}
-  ]},
-  {id:'adjectives-core',name:'Core Adjectives',level:'N5',desc:'Common い and な adjectives for adjective conjugation drills.',words:[
-    {dict:'早い',reading:'はやい',meaning:'early / fast',group:'i-adjective'},{dict:'遅い',reading:'おそい',meaning:'late / slow',group:'i-adjective'},{dict:'強い',reading:'つよい',meaning:'strong',group:'i-adjective'},{dict:'弱い',reading:'よわい',meaning:'weak',group:'i-adjective'},{dict:'長い',reading:'ながい',meaning:'long',group:'i-adjective'},{dict:'短い',reading:'みじかい',meaning:'short',group:'i-adjective'},{dict:'簡単',reading:'かんたん',meaning:'simple',group:'na-adjective'},{dict:'複雑',reading:'ふくざつ',meaning:'complex',group:'na-adjective'},{dict:'安全',reading:'あんぜん',meaning:'safe',group:'na-adjective'},{dict:'危険',reading:'きけん',meaning:'dangerous',group:'na-adjective'}
-  ]},
-  {id:'n3-practical',name:'N3 Practical Mix',level:'N3',desc:'Everyday intermediate verbs and adjectives for longer sentences.',words:[
-    {dict:'比べる',reading:'くらべる',meaning:'to compare',group:'ichidan'},{dict:'減る',reading:'へる',meaning:'to decrease',group:'godan'},{dict:'増える',reading:'ふえる',meaning:'to increase',group:'ichidan'},{dict:'続く',reading:'つづく',meaning:'to continue',group:'godan'},{dict:'続ける',reading:'つづける',meaning:'to continue something',group:'ichidan'},{dict:'決める',reading:'きめる',meaning:'to decide',group:'ichidan'},{dict:'決まる',reading:'きまる',meaning:'to be decided',group:'godan'},{dict:'伝える',reading:'つたえる',meaning:'to convey',group:'ichidan'},{dict:'参加する',reading:'さんかする',meaning:'to participate',group:'suru'},{dict:'準備する',reading:'じゅんびする',meaning:'to prepare',group:'suru'},{dict:'詳しい',reading:'くわしい',meaning:'detailed / knowledgeable',group:'i-adjective'},{dict:'深い',reading:'ふかい',meaning:'deep',group:'i-adjective'},{dict:'必要',reading:'ひつよう',meaning:'necessary',group:'na-adjective'},{dict:'特別',reading:'とくべつ',meaning:'special',group:'na-adjective'}
-  ]},
-  {id:'n2-work-society',name:'N2 Work & Society',level:'N2',desc:'Formal, workplace, and social-issue vocabulary with harder patterns.',words:[
-    {dict:'扱う',reading:'あつかう',meaning:'to handle / treat',group:'godan'},{dict:'認める',reading:'みとめる',meaning:'to recognize / approve',group:'ichidan'},{dict:'断る',reading:'ことわる',meaning:'to refuse',group:'godan'},{dict:'述べる',reading:'のべる',meaning:'to state',group:'ichidan'},{dict:'影響する',reading:'えいきょうする',meaning:'to influence',group:'suru'},{dict:'発展する',reading:'はってんする',meaning:'to develop',group:'suru'},{dict:'解決する',reading:'かいけつする',meaning:'to solve',group:'suru'},{dict:'提出する',reading:'ていしゅつする',meaning:'to submit',group:'suru'},{dict:'補う',reading:'おぎなう',meaning:'to supplement',group:'godan'},{dict:'改善する',reading:'かいぜんする',meaning:'to improve',group:'suru'},{dict:'具体的',reading:'ぐたいてき',meaning:'concrete / specific',group:'na-adjective'},{dict:'積極的',reading:'せっきょくてき',meaning:'proactive',group:'na-adjective'},{dict:'正確',reading:'せいかく',meaning:'accurate',group:'na-adjective'},{dict:'激しい',reading:'はげしい',meaning:'intense',group:'i-adjective'}
-  ]},
-  {id:'n1-nuance',name:'N1 Nuance Verbs',level:'N1',desc:'Advanced written-style verbs and precise adjectives for upper-level drills.',words:[
-    {dict:'試みる',reading:'こころみる',meaning:'to attempt',group:'ichidan'},{dict:'伴う',reading:'ともなう',meaning:'to accompany / involve',group:'godan'},{dict:'損なう',reading:'そこなう',meaning:'to harm / impair',group:'godan'},{dict:'促す',reading:'うながす',meaning:'to urge / prompt',group:'godan'},{dict:'覆す',reading:'くつがえす',meaning:'to overturn',group:'godan'},{dict:'滞る',reading:'とどこおる',meaning:'to be delayed / stagnate',group:'godan'},{dict:'免れる',reading:'まぬがれる',meaning:'to escape / avoid',group:'ichidan'},{dict:'衰える',reading:'おとろえる',meaning:'to decline / weaken',group:'ichidan'},{dict:'執着する',reading:'しゅうちゃくする',meaning:'to cling to / obsess over',group:'suru'},{dict:'把握する',reading:'はあくする',meaning:'to grasp / understand',group:'suru'},{dict:'著しい',reading:'いちじるしい',meaning:'remarkable / striking',group:'i-adjective'},{dict:'乏しい',reading:'とぼしい',meaning:'scarce / poor',group:'i-adjective'},{dict:'曖昧',reading:'あいまい',meaning:'ambiguous',group:'na-adjective'},{dict:'厳密',reading:'げんみつ',meaning:'strict / precise',group:'na-adjective'}
-  ]}
+  {
+    id: 'n5-motion',
+    name: 'N5 Motion Verbs',
+    level: 'N5',
+    desc: 'Everyday movement and classroom verbs.',
+    words: [
+      { dict: '歩く', reading: 'あるく', meaning: 'to walk', group: 'godan' },
+      { dict: '入る', reading: 'はいる', meaning: 'to enter', group: 'godan' },
+      { dict: '座る', reading: 'すわる', meaning: 'to sit', group: 'godan' },
+      { dict: '止まる', reading: 'とまる', meaning: 'to stop', group: 'godan' },
+      { dict: '乗る', reading: 'のる', meaning: 'to ride', group: 'godan' },
+      { dict: '降りる', reading: 'おりる', meaning: 'to get off', group: 'ichidan' },
+      { dict: '会う', reading: 'あう', meaning: 'to meet', group: 'godan' },
+      { dict: '送る', reading: 'おくる', meaning: 'to send / escort', group: 'godan' },
+      { dict: '急ぐ', reading: 'いそぐ', meaning: 'to hurry', group: 'godan' },
+    ],
+  },
+  {
+    id: 'n5-daily',
+    name: 'N5 Daily Life',
+    level: 'N5',
+    desc: 'High-frequency verbs for home, school, and errands.',
+    words: [
+      { dict: '洗う', reading: 'あらう', meaning: 'to wash', group: 'godan' },
+      { dict: '借りる', reading: 'かりる', meaning: 'to borrow', group: 'ichidan' },
+      { dict: '貸す', reading: 'かす', meaning: 'to lend', group: 'godan' },
+      { dict: '返す', reading: 'かえす', meaning: 'to return something', group: 'godan' },
+      { dict: '忘れる', reading: 'わすれる', meaning: 'to forget', group: 'ichidan' },
+      { dict: '始める', reading: 'はじめる', meaning: 'to begin', group: 'ichidan' },
+      { dict: '終わる', reading: 'おわる', meaning: 'to end', group: 'godan' },
+      { dict: '勉強する', reading: 'べんきょうする', meaning: 'to study', group: 'suru' },
+      { dict: '練習する', reading: 'れんしゅうする', meaning: 'to practice', group: 'suru' },
+      { dict: '料理する', reading: 'りょうりする', meaning: 'to cook', group: 'suru' },
+    ],
+  },
+  {
+    id: 'n4-core',
+    name: 'N4 Core Verbs',
+    level: 'N4',
+    desc: 'Useful intermediate verbs with common godan/ichidan traps.',
+    words: [
+      { dict: '選ぶ', reading: 'えらぶ', meaning: 'to choose', group: 'godan' },
+      { dict: '直す', reading: 'なおす', meaning: 'to fix', group: 'godan' },
+      { dict: '治る', reading: 'なおる', meaning: 'to heal', group: 'godan' },
+      { dict: '間違える', reading: 'まちがえる', meaning: 'to make a mistake', group: 'ichidan' },
+      {
+        dict: '調べる',
+        reading: 'しらべる',
+        meaning: 'to investigate / look up',
+        group: 'ichidan',
+      },
+      { dict: '説明する', reading: 'せつめいする', meaning: 'to explain', group: 'suru' },
+      { dict: '予約する', reading: 'よやくする', meaning: 'to reserve', group: 'suru' },
+      { dict: '運転する', reading: 'うんてんする', meaning: 'to drive', group: 'suru' },
+      { dict: '壊す', reading: 'こわす', meaning: 'to break something', group: 'godan' },
+      { dict: '壊れる', reading: 'こわれる', meaning: 'to break', group: 'ichidan' },
+    ],
+  },
+  {
+    id: 'adjectives-core',
+    name: 'Core Adjectives',
+    level: 'N5',
+    desc: 'Common い and な adjectives for adjective conjugation drills.',
+    words: [
+      { dict: '早い', reading: 'はやい', meaning: 'early / fast', group: 'i-adjective' },
+      { dict: '遅い', reading: 'おそい', meaning: 'late / slow', group: 'i-adjective' },
+      { dict: '強い', reading: 'つよい', meaning: 'strong', group: 'i-adjective' },
+      { dict: '弱い', reading: 'よわい', meaning: 'weak', group: 'i-adjective' },
+      { dict: '長い', reading: 'ながい', meaning: 'long', group: 'i-adjective' },
+      { dict: '短い', reading: 'みじかい', meaning: 'short', group: 'i-adjective' },
+      { dict: '簡単', reading: 'かんたん', meaning: 'simple', group: 'na-adjective' },
+      { dict: '複雑', reading: 'ふくざつ', meaning: 'complex', group: 'na-adjective' },
+      { dict: '安全', reading: 'あんぜん', meaning: 'safe', group: 'na-adjective' },
+      { dict: '危険', reading: 'きけん', meaning: 'dangerous', group: 'na-adjective' },
+    ],
+  },
+  {
+    id: 'n3-practical',
+    name: 'N3 Practical Mix',
+    level: 'N3',
+    desc: 'Everyday intermediate verbs and adjectives for longer sentences.',
+    words: [
+      { dict: '比べる', reading: 'くらべる', meaning: 'to compare', group: 'ichidan' },
+      { dict: '減る', reading: 'へる', meaning: 'to decrease', group: 'godan' },
+      { dict: '増える', reading: 'ふえる', meaning: 'to increase', group: 'ichidan' },
+      { dict: '続く', reading: 'つづく', meaning: 'to continue', group: 'godan' },
+      { dict: '続ける', reading: 'つづける', meaning: 'to continue something', group: 'ichidan' },
+      { dict: '決める', reading: 'きめる', meaning: 'to decide', group: 'ichidan' },
+      { dict: '決まる', reading: 'きまる', meaning: 'to be decided', group: 'godan' },
+      { dict: '伝える', reading: 'つたえる', meaning: 'to convey', group: 'ichidan' },
+      { dict: '参加する', reading: 'さんかする', meaning: 'to participate', group: 'suru' },
+      { dict: '準備する', reading: 'じゅんびする', meaning: 'to prepare', group: 'suru' },
+      {
+        dict: '詳しい',
+        reading: 'くわしい',
+        meaning: 'detailed / knowledgeable',
+        group: 'i-adjective',
+      },
+      { dict: '深い', reading: 'ふかい', meaning: 'deep', group: 'i-adjective' },
+      { dict: '必要', reading: 'ひつよう', meaning: 'necessary', group: 'na-adjective' },
+      { dict: '特別', reading: 'とくべつ', meaning: 'special', group: 'na-adjective' },
+    ],
+  },
+  {
+    id: 'n2-work-society',
+    name: 'N2 Work & Society',
+    level: 'N2',
+    desc: 'Formal, workplace, and social-issue vocabulary with harder patterns.',
+    words: [
+      { dict: '扱う', reading: 'あつかう', meaning: 'to handle / treat', group: 'godan' },
+      { dict: '認める', reading: 'みとめる', meaning: 'to recognize / approve', group: 'ichidan' },
+      { dict: '断る', reading: 'ことわる', meaning: 'to refuse', group: 'godan' },
+      { dict: '述べる', reading: 'のべる', meaning: 'to state', group: 'ichidan' },
+      { dict: '影響する', reading: 'えいきょうする', meaning: 'to influence', group: 'suru' },
+      { dict: '発展する', reading: 'はってんする', meaning: 'to develop', group: 'suru' },
+      { dict: '解決する', reading: 'かいけつする', meaning: 'to solve', group: 'suru' },
+      { dict: '提出する', reading: 'ていしゅつする', meaning: 'to submit', group: 'suru' },
+      { dict: '補う', reading: 'おぎなう', meaning: 'to supplement', group: 'godan' },
+      { dict: '改善する', reading: 'かいぜんする', meaning: 'to improve', group: 'suru' },
+      {
+        dict: '具体的',
+        reading: 'ぐたいてき',
+        meaning: 'concrete / specific',
+        group: 'na-adjective',
+      },
+      { dict: '積極的', reading: 'せっきょくてき', meaning: 'proactive', group: 'na-adjective' },
+      { dict: '正確', reading: 'せいかく', meaning: 'accurate', group: 'na-adjective' },
+      { dict: '激しい', reading: 'はげしい', meaning: 'intense', group: 'i-adjective' },
+    ],
+  },
+  {
+    id: 'n1-nuance',
+    name: 'N1 Nuance Verbs',
+    level: 'N1',
+    desc: 'Advanced written-style verbs and precise adjectives for upper-level drills.',
+    words: [
+      { dict: '試みる', reading: 'こころみる', meaning: 'to attempt', group: 'ichidan' },
+      { dict: '伴う', reading: 'ともなう', meaning: 'to accompany / involve', group: 'godan' },
+      { dict: '損なう', reading: 'そこなう', meaning: 'to harm / impair', group: 'godan' },
+      { dict: '促す', reading: 'うながす', meaning: 'to urge / prompt', group: 'godan' },
+      { dict: '覆す', reading: 'くつがえす', meaning: 'to overturn', group: 'godan' },
+      { dict: '滞る', reading: 'とどこおる', meaning: 'to be delayed / stagnate', group: 'godan' },
+      { dict: '免れる', reading: 'まぬがれる', meaning: 'to escape / avoid', group: 'ichidan' },
+      { dict: '衰える', reading: 'おとろえる', meaning: 'to decline / weaken', group: 'ichidan' },
+      {
+        dict: '執着する',
+        reading: 'しゅうちゃくする',
+        meaning: 'to cling to / obsess over',
+        group: 'suru',
+      },
+      { dict: '把握する', reading: 'はあくする', meaning: 'to grasp / understand', group: 'suru' },
+      {
+        dict: '著しい',
+        reading: 'いちじるしい',
+        meaning: 'remarkable / striking',
+        group: 'i-adjective',
+      },
+      { dict: '乏しい', reading: 'とぼしい', meaning: 'scarce / poor', group: 'i-adjective' },
+      { dict: '曖昧', reading: 'あいまい', meaning: 'ambiguous', group: 'na-adjective' },
+      { dict: '厳密', reading: 'げんみつ', meaning: 'strict / precise', group: 'na-adjective' },
+    ],
+  },
 ];
 
-export const AI_LIST_TARGETS = ['N5','N4','N3','N2','N1','Genki','Travel','Work'];
+export const AI_LIST_TARGETS = ['N5', 'N4', 'N3', 'N2', 'N1', 'Genki', 'Travel', 'Work'];

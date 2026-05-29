@@ -1,6 +1,6 @@
 export const STORAGE_KEY = 'jp-verb-srs-v2';
 
-export const DEFAULT_SYNC = {url:'',anonKey:'',syncId:'',enabled:false};
+export const DEFAULT_SYNC = { url: '', anonKey: '', syncId: '', enabled: false };
 
 export const DEFAULT_PREFS = {
   answerMode: 'input',
@@ -19,19 +19,27 @@ export const DEFAULT_PREFS = {
   aiGuideTone: 'sensei',
   dailyGoal: 10,
   scriptMode: 'kanji',
-  displayScripts: {kanji:true,kana:true,romaji:false},
+  displayScripts: { kanji: true, kana: true, romaji: false },
   furigana: true,
   promptForm: 'dictionary',
   durationSec: 0,
   reviewLimit: 0,
-  jlptLevels: ['N5','N4','N3','N2','N1'],
+  jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
   genkiLessons: [],
   minnaLessons: [],
-  wordTypes: ['verb','i-adjective','na-adjective'],
-  wordGroups: ['ichidan','godan','suru','kuru','irregular-adjective','i-adjective','na-adjective'],
+  wordTypes: ['verb', 'i-adjective', 'na-adjective'],
+  wordGroups: [
+    'ichidan',
+    'godan',
+    'suru',
+    'kuru',
+    'irregular-adjective',
+    'i-adjective',
+    'na-adjective',
+  ],
   wordListIds: [],
   drillMode: 'word',
   colorCodeConjugations: true,
   kanaMatchDisplay: 'color-count',
-  showWordCategory: false
+  showWordCategory: false,
 };

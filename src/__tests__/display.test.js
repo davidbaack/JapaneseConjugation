@@ -12,8 +12,8 @@ import {
 } from '../utils/display.js';
 import { filterWordsForPrefs } from '../utils/conjugator.js';
 
-const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat',   group: 'ichidan' };
-const TAKAI  = { dict: '高い',   reading: 'たかい', meaning: 'expensive', group: 'i-adjective' };
+const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+const TAKAI = { dict: '高い', reading: 'たかい', meaning: 'expensive', group: 'i-adjective' };
 
 // ─── normalizeJapaneseText ────────────────────────────────────────────────────
 describe('normalizeJapaneseText', () => {
@@ -188,7 +188,9 @@ describe('resolveDisplayScripts', () => {
   });
 
   it('respects explicit displayScripts', () => {
-    const result = resolveDisplayScripts({ displayScripts: { kanji: false, kana: true, romaji: true } });
+    const result = resolveDisplayScripts({
+      displayScripts: { kanji: false, kana: true, romaji: true },
+    });
     expect(result.kanji).toBe(false);
     expect(result.romaji).toBe(true);
   });
@@ -211,19 +213,27 @@ describe('resolveDisplayScripts', () => {
 // ─── filterWordsForPrefs ──────────────────────────────────────────────────────
 const sampleWords = [
   { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan', jlpt: 'N5' },
-  { dict: '書く',   reading: 'かく',   meaning: 'to write', group: 'godan', jlpt: 'N5' },
+  { dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan', jlpt: 'N5' },
   { dict: '勉強する', reading: 'べんきょうする', meaning: 'to study', group: 'suru', jlpt: 'N5' },
-  { dict: '来る',   reading: 'くる',   meaning: 'to come', group: 'kuru', jlpt: 'N5' },
-  { dict: '高い',   reading: 'たかい', meaning: 'expensive', group: 'i-adjective', jlpt: 'N5' },
-  { dict: '静か',   reading: 'しずか', meaning: 'quiet', group: 'na-adjective', jlpt: 'N5' },
+  { dict: '来る', reading: 'くる', meaning: 'to come', group: 'kuru', jlpt: 'N5' },
+  { dict: '高い', reading: 'たかい', meaning: 'expensive', group: 'i-adjective', jlpt: 'N5' },
+  { dict: '静か', reading: 'しずか', meaning: 'quiet', group: 'na-adjective', jlpt: 'N5' },
 ];
 
 describe('filterWordsForPrefs', () => {
   it('returns all words with default prefs', () => {
     const result = filterWordsForPrefs(sampleWords, {
-      jlptLevels: ['N5','N4','N3','N2','N1'],
-      wordTypes: ['verb','i-adjective','na-adjective'],
-      wordGroups: ['ichidan','godan','suru','kuru','irregular-adjective','i-adjective','na-adjective'],
+      jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
+      wordTypes: ['verb', 'i-adjective', 'na-adjective'],
+      wordGroups: [
+        'ichidan',
+        'godan',
+        'suru',
+        'kuru',
+        'irregular-adjective',
+        'i-adjective',
+        'na-adjective',
+      ],
       genkiLessons: [],
       wordListIds: [],
     });
@@ -233,8 +243,16 @@ describe('filterWordsForPrefs', () => {
   it('filters by JLPT level', () => {
     const result = filterWordsForPrefs(sampleWords, {
       jlptLevels: ['N2'], // words are N5, so none pass
-      wordTypes: ['verb','i-adjective','na-adjective'],
-      wordGroups: ['ichidan','godan','suru','kuru','irregular-adjective','i-adjective','na-adjective'],
+      wordTypes: ['verb', 'i-adjective', 'na-adjective'],
+      wordGroups: [
+        'ichidan',
+        'godan',
+        'suru',
+        'kuru',
+        'irregular-adjective',
+        'i-adjective',
+        'na-adjective',
+      ],
       genkiLessons: [],
       wordListIds: [],
     });
@@ -243,21 +261,21 @@ describe('filterWordsForPrefs', () => {
 
   it('filters by wordTypes (verb only)', () => {
     const result = filterWordsForPrefs(sampleWords, {
-      jlptLevels: ['N5','N4','N3','N2','N1'],
+      jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
       wordTypes: ['verb'],
-      wordGroups: ['ichidan','godan','suru','kuru'],
+      wordGroups: ['ichidan', 'godan', 'suru', 'kuru'],
       genkiLessons: [],
       wordListIds: [],
     });
-    const groups = result.map(w => w.group);
+    const groups = result.map((w) => w.group);
     expect(groups).not.toContain('i-adjective');
     expect(groups).not.toContain('na-adjective');
   });
 
   it('filters by wordGroups', () => {
     const result = filterWordsForPrefs(sampleWords, {
-      jlptLevels: ['N5','N4','N3','N2','N1'],
-      wordTypes: ['verb','i-adjective','na-adjective'],
+      jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
+      wordTypes: ['verb', 'i-adjective', 'na-adjective'],
       wordGroups: ['ichidan'],
       genkiLessons: [],
       wordListIds: [],

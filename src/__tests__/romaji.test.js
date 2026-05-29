@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  toHiragana,
-  toHiraganaProgress,
-  kanaToRomaji,
-  isAllKana,
-} from '../utils/romaji.js';
+import { toHiragana, toHiraganaProgress, kanaToRomaji, isAllKana } from '../utils/romaji.js';
 
 describe('toHiragana', () => {
   it('converts basic romaji syllables', () => {

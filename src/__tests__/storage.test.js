@@ -43,16 +43,16 @@ describe('gradeCard', () => {
   });
 
   it('increments interval on second correct answer', () => {
-    let card = gradeCard(null, true);      // reps=1 interval=1
-    card = gradeCard(card, true);          // reps=2 interval=3
+    let card = gradeCard(null, true); // reps=1 interval=1
+    card = gradeCard(card, true); // reps=2 interval=3
     expect(card.reps).toBe(2);
     expect(card.interval).toBe(3);
   });
 
   it('uses ease factor for third+ correct answer', () => {
-    let card = gradeCard(null, true);     // reps=1 interval=1
-    card = gradeCard(card, true);         // reps=2 interval=3
-    card = gradeCard(card, true);         // reps=3 interval=ceil(3 * 2.5) = 8
+    let card = gradeCard(null, true); // reps=1 interval=1
+    card = gradeCard(card, true); // reps=2 interval=3
+    card = gradeCard(card, true); // reps=3 interval=ceil(3 * 2.5) = 8
     expect(card.reps).toBe(3);
     expect(card.interval).toBe(Math.ceil(3 * 2.5));
   });
@@ -69,7 +69,15 @@ describe('gradeCard', () => {
   });
 
   it('reduces ease on incorrect but not below 1.3', () => {
-    let card = { ease: 1.4, interval: 5, reps: 2, nextReview: 0, correct: 2, incorrect: 0, lastSeen: 0 };
+    let card = {
+      ease: 1.4,
+      interval: 5,
+      reps: 2,
+      nextReview: 0,
+      correct: 2,
+      incorrect: 0,
+      lastSeen: 0,
+    };
     card = gradeCard(card, false);
     // Math.max(1.3, 1.4 - 0.2) = Math.max(1.3, 1.2) = 1.3
     expect(card.ease).toBe(1.3);
@@ -127,7 +135,15 @@ describe('bumpDaily', () => {
 
   it('marks goalHit when count reaches dailyGoal', () => {
     const today = localDateKey();
-    let d = { date: today, count: 9, goalHit: false, goalStreak: 0, bestGoalStreak: 0, currentAnswerStreak: 0, bestAnswerStreak: 0 };
+    let d = {
+      date: today,
+      count: 9,
+      goalHit: false,
+      goalStreak: 0,
+      bestGoalStreak: 0,
+      currentAnswerStreak: 0,
+      bestAnswerStreak: 0,
+    };
     d = bumpDaily(d, true, 10);
     expect(d.goalHit).toBe(true);
     expect(d.goalStreak).toBe(1);
@@ -135,7 +151,15 @@ describe('bumpDaily', () => {
 
   it('increments answer streak on correct', () => {
     const today = localDateKey();
-    let d = { date: today, count: 0, goalHit: false, goalStreak: 0, bestGoalStreak: 0, currentAnswerStreak: 2, bestAnswerStreak: 2 };
+    let d = {
+      date: today,
+      count: 0,
+      goalHit: false,
+      goalStreak: 0,
+      bestGoalStreak: 0,
+      currentAnswerStreak: 2,
+      bestAnswerStreak: 2,
+    };
     d = bumpDaily(d, true, 10);
     expect(d.currentAnswerStreak).toBe(3);
     expect(d.bestAnswerStreak).toBe(3);
@@ -143,7 +167,15 @@ describe('bumpDaily', () => {
 
   it('resets answer streak on incorrect', () => {
     const today = localDateKey();
-    let d = { date: today, count: 5, goalHit: false, goalStreak: 0, bestGoalStreak: 0, currentAnswerStreak: 5, bestAnswerStreak: 5 };
+    let d = {
+      date: today,
+      count: 5,
+      goalHit: false,
+      goalStreak: 0,
+      bestGoalStreak: 0,
+      currentAnswerStreak: 5,
+      bestAnswerStreak: 5,
+    };
     d = bumpDaily(d, false, 10);
     expect(d.currentAnswerStreak).toBe(0);
     expect(d.bestAnswerStreak).toBe(5); // best preserved
@@ -151,7 +183,15 @@ describe('bumpDaily', () => {
 
   it('resets count when date changes', () => {
     const yesterday = localDateKey(-1);
-    let d = { date: yesterday, count: 99, goalHit: true, goalStreak: 3, bestGoalStreak: 3, currentAnswerStreak: 10, bestAnswerStreak: 10 };
+    let d = {
+      date: yesterday,
+      count: 99,
+      goalHit: true,
+      goalStreak: 3,
+      bestGoalStreak: 3,
+      currentAnswerStreak: 10,
+      bestAnswerStreak: 10,
+    };
     d = bumpDaily(d, true, 10);
     expect(d.date).toBe(localDateKey());
     expect(d.count).toBe(1);
@@ -231,9 +271,9 @@ describe('normalizeReferenceState', () => {
     const result = normalizeReferenceState({
       history: [
         { dict: '食べる', reading: 'たべる', group: 'ichidan' },
-        { dict: null, reading: 'x', group: 'godan' },   // invalid: no dict
+        { dict: null, reading: 'x', group: 'godan' }, // invalid: no dict
         null,
-      ]
+      ],
     });
     expect(result.history).toHaveLength(1);
   });
@@ -251,7 +291,19 @@ describe('mergeState', () => {
   });
 
   it('preserves saved cards', () => {
-    const saved = { cards: { 'ichidan|plain-past': { reps: 3, interval: 8, ease: 2.5, nextReview: 9999999999999, correct: 3, incorrect: 0, lastSeen: 1 } } };
+    const saved = {
+      cards: {
+        'ichidan|plain-past': {
+          reps: 3,
+          interval: 8,
+          ease: 2.5,
+          nextReview: 9999999999999,
+          correct: 3,
+          incorrect: 0,
+          lastSeen: 1,
+        },
+      },
+    };
     const state = mergeState(saved, null);
     expect(state.cards['ichidan|plain-past'].reps).toBe(3);
   });
@@ -265,7 +317,7 @@ describe('mergeState', () => {
   it('backfills adj types for old saves without them', () => {
     const saved = { enabledTypes: ['plain-past', 'te-form'] }; // no adj- types
     const state = mergeState(saved, null);
-    expect(state.enabledTypes.some(id => id.startsWith('adj-'))).toBe(true);
+    expect(state.enabledTypes.some((id) => id.startsWith('adj-'))).toBe(true);
   });
 });
 

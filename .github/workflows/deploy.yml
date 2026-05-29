@@ -40,8 +40,11 @@ jobs:
 
       - run: npm run lint
 
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Run E2E tests
         run: npm run test:e2e
@@ -51,6 +54,9 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+
+      - name: Check bundle size budget
+        run: npm run size
 
       - uses: actions/configure-pages@v5
 

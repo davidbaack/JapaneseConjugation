@@ -3,19 +3,37 @@ import { IconVolume } from './Icons.jsx';
 import ScriptDisplay from './ScriptDisplay.jsx';
 import { speakJapanese } from '../utils/speech.js';
 import { promptDisplay, formDisplay, shuffled } from '../utils/display.js';
-import { RULES, filterWordsForPrefs, conjugateItem, isRedundantPracticeType, wordKey } from '../utils/conjugator.js';
+import {
+  RULES,
+  filterWordsForPrefs,
+  conjugateItem,
+  isRedundantPracticeType,
+  wordKey,
+} from '../utils/conjugator.js';
 import { contextSentenceFor } from '../utils/conjugatorExplain.js';
 import { ruleWeakScore, defaultState } from '../utils/storage.js';
 import { TYPE_LABEL, ALL_CARD_TYPES } from '../data/conjugationTypes.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
-export function buildAmbientDeck(words, state, practicePrefs = DEFAULT_PREFS, wordLists = [], mode = 'smart', count = 18) {
+export function buildAmbientDeck(
+  words,
+  state,
+  practicePrefs = DEFAULT_PREFS,
+  wordLists = [],
+  mode = 'smart',
+  count = 18,
+) {
   const filtered = filterWordsForPrefs(words, practicePrefs, wordLists);
-  const enabled = state.enabledTypes && state.enabledTypes.length ? state.enabledTypes : ALL_CARD_TYPES.map(t => t.id);
+  const enabled =
+    state.enabledTypes && state.enabledTypes.length
+      ? state.enabledTypes
+      : ALL_CARD_TYPES.map((t) => t.id);
   const cards = [];
   for (const rule of RULES) {
     if (!enabled.includes(rule.type)) continue;
-    const pool = rule.verbFilter(filtered).filter(item => !isRedundantPracticeType(item, rule.type, enabled, practicePrefs));
+    const pool = rule
+      .verbFilter(filtered)
+      .filter((item) => !isRedundantPracticeType(item, rule.type, enabled, practicePrefs));
     if (!pool.length) continue;
     const item = shuffled(pool)[0];
     const form = conjugateItem(item, rule.type);
@@ -24,7 +42,10 @@ export function buildAmbientDeck(words, state, practicePrefs = DEFAULT_PREFS, wo
     const due = card && card.nextReview <= Date.now();
     const fresh = !card;
     const weak = ruleWeakScore(state, rule.id);
-    const score = mode === 'all' ? Math.random() : weak * 3 + (due ? 4 : 0) + (fresh ? 1 : 0) + (card?.incorrect || 0);
+    const score =
+      mode === 'all'
+        ? Math.random()
+        : weak * 3 + (due ? 4 : 0) + (fresh ? 1 : 0) + (card?.incorrect || 0);
     cards.push({
       id: `${rule.id}|${wordKey(item)}`,
       item,
@@ -35,27 +56,49 @@ export function buildAmbientDeck(words, state, practicePrefs = DEFAULT_PREFS, wo
       score,
       due,
       fresh,
-      weak
+      weak,
     });
   }
-  const sorted = mode === 'all' ? shuffled(cards) : cards.sort((a, b) => b.score - a.score || a.ruleLabel.localeCompare(b.ruleLabel));
+  const sorted =
+    mode === 'all'
+      ? shuffled(cards)
+      : cards.sort((a, b) => b.score - a.score || a.ruleLabel.localeCompare(b.ruleLabel));
   return sorted.slice(0, count);
 }
 
-export default function AmbientReviewPanel({ state, setState, words, practicePrefs = DEFAULT_PREFS, wordLists = [] }) {
+export default function AmbientReviewPanel({
+  state,
+  setState,
+  words,
+  practicePrefs = DEFAULT_PREFS,
+  wordLists = [],
+}) {
   const [mode, setMode] = useState('smart');
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(0.82);
   const [showEnglish, setShowEnglish] = useState(true);
   const timerRef = useRef(null);
-  
+
   const ambient = state.ambient || defaultState().ambient;
+  /* eslint-disable react-hooks/exhaustive-deps */
+  // Recompute only when the relevant state slices change, not on every state
+  // mutation (e.g. session counters), so the ambient deck stays stable.
   const deck = useMemo(
     () => buildAmbientDeck(words, state, practicePrefs, wordLists, mode, 18),
-    [words, state.cards, state.mistakes, state.enabledTypes, state.verbStats, practicePrefs, wordLists, mode] // eslint-disable-line react-hooks/exhaustive-deps
+    [
+      words,
+      state.cards,
+      state.mistakes,
+      state.enabledTypes,
+      state.verbStats,
+      practicePrefs,
+      wordLists,
+      mode,
+    ],
   );
-  
+  /* eslint-enable react-hooks/exhaustive-deps */
+
   const current = deck[index % Math.max(1, deck.length)] || null;
 
   useEffect(() => {
@@ -68,7 +111,7 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
     practicePrefs.wordTypes,
     practicePrefs.wordGroups,
     practicePrefs.genkiLessons,
-    practicePrefs.skipDuplicateForms
+    practicePrefs.skipDuplicateForms,
   ]);
 
   useEffect(() => {
@@ -89,7 +132,7 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
       bumpPlayed();
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        if (!cancelled) setIndex(i => (i + 1) % deck.length);
+        if (!cancelled) setIndex((i) => (i + 1) % deck.length);
       }, 1200);
     });
     return () => {
@@ -99,16 +142,16 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
         timerRef.current = null;
       }
     };
-  // bumpPlayed/current/deck.length intentionally omitted — using current?.id to avoid re-triggering on obj identity changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // bumpPlayed/current/deck.length intentionally omitted — using current?.id to avoid re-triggering on obj identity changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, index, current?.id, rate, practicePrefs.voiceURI]);
 
   function bumpPlayed() {
-    setState(s => {
+    setState((s) => {
       const a = s.ambient || defaultState().ambient;
       return {
         ...s,
-        ambient: { ...a, played: (a.played || 0) + 1, lastAt: Date.now() }
+        ambient: { ...a, played: (a.played || 0) + 1, lastAt: Date.now() },
       };
     });
   }
@@ -122,11 +165,11 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
       }
       return;
     }
-    setState(s => {
+    setState((s) => {
       const a = s.ambient || defaultState().ambient;
       return {
         ...s,
-        ambient: { ...a, sessions: (a.sessions || 0) + 1, lastAt: Date.now() }
+        ambient: { ...a, sessions: (a.sessions || 0) + 1, lastAt: Date.now() },
       };
     });
     setPlaying(true);
@@ -135,7 +178,7 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
   function next() {
     if (!deck.length) return;
     bumpPlayed();
-    setIndex(i => (i + 1) % deck.length);
+    setIndex((i) => (i + 1) % deck.length);
   }
 
   if (!deck.length) {
@@ -176,10 +219,18 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
           {current.ruleLabel} · {TYPE_LABEL[current.type]}
         </div>
-        <ScriptDisplay view={view} className="text-3xl sm:text-4xl font-medium" subClassName="text-sm text-stone-500 mt-1" />
+        <ScriptDisplay
+          view={view}
+          className="text-3xl sm:text-4xl font-medium"
+          subClassName="text-sm text-stone-500 mt-1"
+        />
         <div className="mt-3 text-sm text-stone-500 italic">{current.item.meaning}</div>
         <div className="my-4 h-px bg-stone-250 dark:bg-stone-800" />
-        <ScriptDisplay view={formView} className="text-2xl font-semibold" subClassName="text-xs text-stone-500 mt-1" />
+        <ScriptDisplay
+          view={formView}
+          className="text-2xl font-semibold"
+          subClassName="text-xs text-stone-500 mt-1"
+        />
         <div className="mt-3 text-lg leading-relaxed text-stone-800 dark:text-stone-200" lang="ja">
           {current.example.ja}
         </div>
@@ -196,13 +247,16 @@ export default function AmbientReviewPanel({ state, setState, words, practicePre
             max="1.1"
             step="0.05"
             value={rate}
-            onChange={e => setRate(Number(e.target.value))}
+            onChange={(e) => setRate(Number(e.target.value))}
             className="w-full cursor-pointer accent-indigo-600"
           />
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           <div className="grid grid-cols-2 gap-1 p-1 bg-stone-100 dark:bg-stone-950 rounded-lg">
-            {[{ id: 'smart', label: 'Smart' }, { id: 'all', label: 'All' }].map(o => (
+            {[
+              { id: 'smart', label: 'Smart' },
+              { id: 'all', label: 'All' },
+            ].map((o) => (
               <button
                 key={o.id}
                 onClick={() => setMode(o.id)}

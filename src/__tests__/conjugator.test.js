@@ -1,25 +1,36 @@
 import { describe, it, expect } from 'vitest';
-import { conjugate, conjugateAdjective, conjugateItem, isRedundantPracticeType } from '../utils/conjugator.js';
+import {
+  conjugate,
+  conjugateAdjective,
+  conjugateItem,
+  isRedundantPracticeType,
+} from '../utils/conjugator.js';
 import { stepCoachHint } from '../utils/conjugatorExplain.js';
 
 // ─── Test verbs ───────────────────────────────────────────────────────────────
-const TABERU  = { dict: '食べる',  reading: 'たべる',  meaning: 'to eat',   group: 'ichidan' };
-const KAKU    = { dict: '書く',    reading: 'かく',    meaning: 'to write', group: 'godan' };
-const HANASU  = { dict: '話す',    reading: 'はなす',  meaning: 'to speak', group: 'godan' };
-const MATSU   = { dict: '待つ',    reading: 'まつ',    meaning: 'to wait',  group: 'godan' };
-const NOMU    = { dict: '飲む',    reading: 'のむ',    meaning: 'to drink', group: 'godan' };
-const KAEРУ   = { dict: '買う',    reading: 'かう',    meaning: 'to buy',   group: 'godan' };
-const OYOGU   = { dict: '泳ぐ',    reading: 'およぐ',  meaning: 'to swim',  group: 'godan' };
-const SHINU   = { dict: '死ぬ',    reading: 'しぬ',    meaning: 'to die',   group: 'godan' };
-const IKU     = { dict: '行く',    reading: 'いく',    meaning: 'to go',    group: 'godan' };
-const SURU    = { dict: 'する',    reading: 'する',    meaning: 'to do',    group: 'suru'  };
+const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+const KAKU = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan' };
+const HANASU = { dict: '話す', reading: 'はなす', meaning: 'to speak', group: 'godan' };
+const MATSU = { dict: '待つ', reading: 'まつ', meaning: 'to wait', group: 'godan' };
+const NOMU = { dict: '飲む', reading: 'のむ', meaning: 'to drink', group: 'godan' };
+const KAEРУ = { dict: '買う', reading: 'かう', meaning: 'to buy', group: 'godan' };
+const OYOGU = { dict: '泳ぐ', reading: 'およぐ', meaning: 'to swim', group: 'godan' };
+const SHINU = { dict: '死ぬ', reading: 'しぬ', meaning: 'to die', group: 'godan' };
+const IKU = { dict: '行く', reading: 'いく', meaning: 'to go', group: 'godan' };
+const SURU = { dict: 'する', reading: 'する', meaning: 'to do', group: 'suru' };
 const BENKYOU = { dict: '勉強する', reading: 'べんきょうする', meaning: 'to study', group: 'suru' };
-const KURU    = { dict: '来る',    reading: 'くる',    meaning: 'to come',  group: 'kuru'  };
+const KURU = { dict: '来る', reading: 'くる', meaning: 'to come', group: 'kuru' };
 
 // ─── Test adjectives ──────────────────────────────────────────────────────────
-const TAKAI   = { dict: '高い',  reading: 'たかい', meaning: 'expensive', group: 'i-adjective' };
-const II      = { dict: 'いい',  reading: 'いい',   meaning: 'good',      group: 'i-adjective', irregular: true };
-const SHIZUKA = { dict: '静か',  reading: 'しずか', meaning: 'quiet',     group: 'na-adjective' };
+const TAKAI = { dict: '高い', reading: 'たかい', meaning: 'expensive', group: 'i-adjective' };
+const II = {
+  dict: 'いい',
+  reading: 'いい',
+  meaning: 'good',
+  group: 'i-adjective',
+  irregular: true,
+};
+const SHIZUKA = { dict: '静か', reading: 'しずか', meaning: 'quiet', group: 'na-adjective' };
 
 // ─── Ichidan verb (食べる) ────────────────────────────────────────────────────
 describe('ichidan verb: 食べる', () => {
@@ -300,7 +311,9 @@ describe('na-adjective: 静か', () => {
     expect(conjugateAdjective(SHIZUKA, 'adj-polite-present')).toBe('しずかです');
     expect(conjugateAdjective(SHIZUKA, 'adj-polite-past')).toBe('しずかでした');
     expect(conjugateAdjective(SHIZUKA, 'adj-polite-negative')).toBe('しずかではありません');
-    expect(conjugateAdjective(SHIZUKA, 'adj-polite-past-negative')).toBe('しずかではありませんでした');
+    expect(conjugateAdjective(SHIZUKA, 'adj-polite-past-negative')).toBe(
+      'しずかではありませんでした',
+    );
   });
 
   it('derivational forms', () => {
@@ -403,12 +416,16 @@ describe('isRedundantPracticeType', () => {
   });
 
   it('excludes the empty form even when duplicate-skipping is OFF', () => {
-    expect(isRedundantPracticeType(TABERU, EMPTY, [EMPTY], { skipDuplicateForms: false })).toBe(true);
+    expect(isRedundantPracticeType(TABERU, EMPTY, [EMPTY], { skipDuplicateForms: false })).toBe(
+      true,
+    );
     expect(isRedundantPracticeType(SURU, EMPTY, [EMPTY], { skipDuplicateForms: false })).toBe(true);
   });
 
   it('keeps a valid form practiceable when duplicate-skipping is OFF', () => {
     expect(conjugateItem(KAKU, EMPTY)).toBe('かかされる'); // sanity: valid for 書く
-    expect(isRedundantPracticeType(KAKU, EMPTY, [EMPTY], { skipDuplicateForms: false })).toBe(false);
+    expect(isRedundantPracticeType(KAKU, EMPTY, [EMPTY], { skipDuplicateForms: false })).toBe(
+      false,
+    );
   });
 });

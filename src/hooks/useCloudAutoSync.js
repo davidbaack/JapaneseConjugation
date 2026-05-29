@@ -28,22 +28,51 @@ export function useCloudAutoSync({
   useEffect(() => {
     if (!hydrated) return;
     const dummySync = { enabled: !!session };
-    saveAll(state, customVerbs, customAdjectives, wordLists, dummySync, lastSyncedAtRef.current, geminiKey, practicePrefs);
+    saveAll(
+      state,
+      customVerbs,
+      customAdjectives,
+      wordLists,
+      dummySync,
+      lastSyncedAtRef.current,
+      geminiKey,
+      practicePrefs,
+    );
 
     if (session?.user && supabase) {
       if (pushTimer.current) clearTimeout(pushTimer.current);
       pushTimer.current = setTimeout(async () => {
-        setSyncStatus(s => ({ ...s, kind: 'syncing', message: 'Saving to cloud…' }));
+        setSyncStatus((s) => ({ ...s, kind: 'syncing', message: 'Saving to cloud…' }));
         try {
           await cloudUpsert({ state, customVerbs, customAdjectives, wordLists, practicePrefs });
           const now = Date.now();
           lastSyncedAtRef.current = now;
-          saveAll(state, customVerbs, customAdjectives, wordLists, dummySync, now, geminiKey, practicePrefs);
+          saveAll(
+            state,
+            customVerbs,
+            customAdjectives,
+            wordLists,
+            dummySync,
+            now,
+            geminiKey,
+            practicePrefs,
+          );
           setSyncStatus({ kind: 'ok', message: 'Saved to cloud', at: now });
         } catch (e) {
           setSyncStatus({ kind: 'error', message: e.message || 'Push failed', at: null });
         }
       }, PUSH_DEBOUNCE_MS);
     }
-  }, [state, customVerbs, customAdjectives, wordLists, session, geminiKey, practicePrefs, hydrated, lastSyncedAtRef, setSyncStatus]);
+  }, [
+    state,
+    customVerbs,
+    customAdjectives,
+    wordLists,
+    session,
+    geminiKey,
+    practicePrefs,
+    hydrated,
+    lastSyncedAtRef,
+    setSyncStatus,
+  ]);
 }

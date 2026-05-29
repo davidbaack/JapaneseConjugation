@@ -26,7 +26,9 @@ export function mergePracticePrefs(prefs) {
   const displayScripts = source.displayScripts
     ? { ...DEFAULT_PREFS.displayScripts, ...source.displayScripts }
     : resolveDisplayScripts(source);
-  let wordGroups = Array.isArray(source.wordGroups) ? [...source.wordGroups] : DEFAULT_PREFS.wordGroups;
+  let wordGroups = Array.isArray(source.wordGroups)
+    ? [...source.wordGroups]
+    : DEFAULT_PREFS.wordGroups;
   const oldAllGroups = ['ichidan', 'godan', 'suru', 'kuru', 'i-adjective', 'na-adjective'];
   if (
     Array.isArray(source.wordGroups) &&
@@ -56,8 +58,11 @@ export function promptDisplay(item, promptType, prefs = DEFAULT_PREFS) {
   const kana = promptType ? conjugateItem(item, promptType) : item.reading;
   const kanji = promptType ? null : item.dict;
   const rom = kanaToRomaji(kana);
-  const main = ds.kanji && kanji ? kanji : (ds.kana || !ds.romaji ? kana : rom);
-  const ruby = !!prefs.furigana && ds.kanji && ds.kana && kanji && main === kanji && kanji !== kana ? kana : '';
+  const main = ds.kanji && kanji ? kanji : ds.kana || !ds.romaji ? kana : rom;
+  const ruby =
+    !!prefs.furigana && ds.kanji && ds.kana && kanji && main === kanji && kanji !== kana
+      ? kana
+      : '';
   const sub = [];
   if (ds.kanji && kanji && main !== kanji) sub.push(kanji);
   if (ds.kana && main !== kana && !ruby) sub.push(kana);
@@ -66,46 +71,139 @@ export function promptDisplay(item, promptType, prefs = DEFAULT_PREFS) {
 }
 
 export function normalizeJapaneseText(s) {
-  return (s || '').normalize('NFKC').replace(/[、。！？\s'"「」『』（）()]/g, '').toLowerCase();
+  return (s || '')
+    .normalize('NFKC')
+    .replace(/[、。！？\s'"「」『』（）()]/g, '')
+    .toLowerCase();
 }
 
 export function cleanEnglishAction(meaning = '') {
-  return String(meaning || '').trim().replace(/^to\s+/i, '') || 'do it';
+  return (
+    String(meaning || '')
+      .trim()
+      .replace(/^to\s+/i, '') || 'do it'
+  );
 }
 
 export function pastParticiple(action) {
   const map = {
-    eat: 'eaten', see: 'seen', watch: 'watched', sleep: 'slept', 'wake up': 'woken up', leave: 'left',
-    exit: 'exited', teach: 'taught', remember: 'remembered', wear: 'worn', open: 'opened', close: 'closed',
-    go: 'gone', write: 'written', speak: 'spoken', wait: 'waited', die: 'died', play: 'played',
-    drink: 'drunk', take: 'taken', buy: 'bought', swim: 'swum', read: 'read', stand: 'stood', run: 'run',
-    'return home': 'returned home', listen: 'listened', ask: 'asked', hold: 'held', use: 'used',
-    make: 'made', do: 'done', come: 'come', walk: 'walked', enter: 'entered', 'take out': 'taken out',
-    submit: 'submitted', sit: 'sat', stop: 'stopped', ride: 'ridden', 'get off': 'gotten off', meet: 'met',
-    send: 'sent', escort: 'escorted', hurry: 'hurried', wash: 'washed', borrow: 'borrowed', lend: 'lent',
-    'return something': 'returned something', forget: 'forgotten', begin: 'begun', end: 'ended',
-    study: 'studied', practice: 'practiced', cook: 'cooked', choose: 'chosen', fix: 'fixed', heal: 'healed',
-    'make a mistake': 'made a mistake', investigate: 'investigated', 'look up': 'looked up',
-    explain: 'explained', reserve: 'reserved', drive: 'driven', 'break something': 'broken something', break: 'broken'
+    eat: 'eaten',
+    see: 'seen',
+    watch: 'watched',
+    sleep: 'slept',
+    'wake up': 'woken up',
+    leave: 'left',
+    exit: 'exited',
+    teach: 'taught',
+    remember: 'remembered',
+    wear: 'worn',
+    open: 'opened',
+    close: 'closed',
+    go: 'gone',
+    write: 'written',
+    speak: 'spoken',
+    wait: 'waited',
+    die: 'died',
+    play: 'played',
+    drink: 'drunk',
+    take: 'taken',
+    buy: 'bought',
+    swim: 'swum',
+    read: 'read',
+    stand: 'stood',
+    run: 'run',
+    'return home': 'returned home',
+    listen: 'listened',
+    ask: 'asked',
+    hold: 'held',
+    use: 'used',
+    make: 'made',
+    do: 'done',
+    come: 'come',
+    walk: 'walked',
+    enter: 'entered',
+    'take out': 'taken out',
+    submit: 'submitted',
+    sit: 'sat',
+    stop: 'stopped',
+    ride: 'ridden',
+    'get off': 'gotten off',
+    meet: 'met',
+    send: 'sent',
+    escort: 'escorted',
+    hurry: 'hurried',
+    wash: 'washed',
+    borrow: 'borrowed',
+    lend: 'lent',
+    'return something': 'returned something',
+    forget: 'forgotten',
+    begin: 'begun',
+    end: 'ended',
+    study: 'studied',
+    practice: 'practiced',
+    cook: 'cooked',
+    choose: 'chosen',
+    fix: 'fixed',
+    heal: 'healed',
+    'make a mistake': 'made a mistake',
+    investigate: 'investigated',
+    'look up': 'looked up',
+    explain: 'explained',
+    reserve: 'reserved',
+    drive: 'driven',
+    'break something': 'broken something',
+    break: 'broken',
   };
-  return map[action] || (/e$/.test(action) ? action + 'd' : /[bcdfghjklmnpqrstvwxyz]y$/.test(action) ? action.slice(0, -1) + 'ied' : action + 'ed');
+  return (
+    map[action] ||
+    (/e$/.test(action)
+      ? action + 'd'
+      : /[bcdfghjklmnpqrstvwxyz]y$/.test(action)
+        ? action.slice(0, -1) + 'ied'
+        : action + 'ed')
+  );
 }
 
 export function gerund(action) {
   const map = {
-    die: 'dying', lie: 'lying', tie: 'tying', use: 'using', make: 'making', come: 'coming', write: 'writing',
-    take: 'taking', ride: 'riding', drive: 'driving'
+    die: 'dying',
+    lie: 'lying',
+    tie: 'tying',
+    use: 'using',
+    make: 'making',
+    come: 'coming',
+    write: 'writing',
+    take: 'taking',
+    ride: 'riding',
+    drive: 'driving',
   };
-  return map[action] || (/ie$/.test(action) ? action.slice(0, -2) + 'ying' : /e$/.test(action) && !/ee$/.test(action) ? action.slice(0, -1) + 'ing' : action + 'ing');
+  return (
+    map[action] ||
+    (/ie$/.test(action)
+      ? action.slice(0, -2) + 'ying'
+      : /e$/.test(action) && !/ee$/.test(action)
+        ? action.slice(0, -1) + 'ing'
+        : action + 'ing')
+  );
 }
 
 export function thirdPerson(action) {
   const map = { do: 'does', go: 'goes' };
-  return map[action] || (/(s|sh|ch|x|z|o)$/.test(action) ? action + 'es' : /[bcdfghjklmnpqrstvwxyz]y$/.test(action) ? action.slice(0, -1) + 'ies' : action + 's');
+  return (
+    map[action] ||
+    (/(s|sh|ch|x|z|o)$/.test(action)
+      ? action + 'es'
+      : /[bcdfghjklmnpqrstvwxyz]y$/.test(action)
+        ? action.slice(0, -1) + 'ies'
+        : action + 's')
+  );
 }
 
 export function actionParts(meaning = '') {
-  return cleanEnglishAction(meaning).split('/').map((s) => s.trim()).filter(Boolean);
+  return cleanEnglishAction(meaning)
+    .split('/')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function mapActionMeaning(meaning, fn) {
@@ -114,7 +212,12 @@ export function mapActionMeaning(meaning, fn) {
 
 export function englishForForm(item, type) {
   if (!item) return '';
-  if (!type || type === 'plain-present' || type === 'adj-plain-present' || type === 'adj-attributive') {
+  if (
+    !type ||
+    type === 'plain-present' ||
+    type === 'adj-plain-present' ||
+    type === 'adj-attributive'
+  ) {
     return item.meaning;
   }
   if (isAdjective(item)) {
@@ -136,7 +239,7 @@ export function englishForForm(item, type) {
       'adj-negative-tara': `if/when it was not ${base}`,
       'adj-sou': `looks ${base}`,
       'adj-sugiru': `too ${base}`,
-      'adj-naru': `becomes ${base}`
+      'adj-naru': `becomes ${base}`,
     };
     return M[type] || base;
   }
@@ -153,12 +256,12 @@ export function englishForForm(item, type) {
     'polite-volitional': `let's ${action} (polite)`,
     'polite-te': `${action} and... (polite)`,
     'polite-conditional-tara': `if/when someone did ${action} (polite)`,
-    'honorific': `${action} (honorific, someone else's action)`,
+    honorific: `${action} (honorific, someone else's action)`,
     'honorific-polite': `${action} (honorific polite, someone else's action)`,
-    'humble': `${action} (humble, my/our action)`,
+    humble: `${action} (humble, my/our action)`,
     'humble-polite': `${action} (humble polite, my/our action)`,
     'te-form': `${action} and... / ${action} for a helper pattern`,
-    'potential': `can ${action}`,
+    potential: `can ${action}`,
     'potential-polite': `can ${action} (polite)`,
     'potential-negative': `cannot ${action}`,
     'potential-polite-negative': `cannot ${action} (polite)`,
@@ -167,27 +270,45 @@ export function englishForForm(item, type) {
     'potential-past': `could ${action} / was able to ${action}`,
     'potential-past-negative': `could not ${action} / was not able to ${action}`,
     'potential-conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone can ${a}`),
-    'volitional': `let's ${action}`,
+    volitional: `let's ${action}`,
     'conditional-tara': `if/when someone did ${action}`,
     'negative-conditional-tara': `if/when someone did not ${action}`,
     'conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone ${thirdPerson(a)}`),
     'negative-conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone does not ${a}`),
-    'potential-negative-conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone cannot ${a}`),
-    'conditional-nara': mapActionMeaning(item.meaning, (a) => `if it is that someone ${thirdPerson(a)}`),
-    'conjectural': mapActionMeaning(item.meaning, (a) => `probably ${thirdPerson(a)}`),
-    'imperative': `${action}!`,
+    'potential-negative-conditional-ba': mapActionMeaning(
+      item.meaning,
+      (a) => `if someone cannot ${a}`,
+    ),
+    'conditional-nara': mapActionMeaning(
+      item.meaning,
+      (a) => `if it is that someone ${thirdPerson(a)}`,
+    ),
+    conjectural: mapActionMeaning(item.meaning, (a) => `probably ${thirdPerson(a)}`),
+    imperative: `${action}!`,
     'command-nasai': `${action}! (firm なさい instruction)`,
-    'passive': mapActionMeaning(item.meaning, (a) => `be ${pastParticiple(a)}`),
+    passive: mapActionMeaning(item.meaning, (a) => `be ${pastParticiple(a)}`),
     'passive-polite': mapActionMeaning(item.meaning, (a) => `be ${pastParticiple(a)} (polite)`),
     'passive-negative': mapActionMeaning(item.meaning, (a) => `not be ${pastParticiple(a)}`),
-    'passive-polite-negative': mapActionMeaning(item.meaning, (a) => `not be ${pastParticiple(a)} (polite)`),
-    'passive-polite-past': mapActionMeaning(item.meaning, (a) => `was ${pastParticiple(a)} (polite)`),
-    'passive-polite-past-negative': mapActionMeaning(item.meaning, (a) => `was not ${pastParticiple(a)} (polite)`),
+    'passive-polite-negative': mapActionMeaning(
+      item.meaning,
+      (a) => `not be ${pastParticiple(a)} (polite)`,
+    ),
+    'passive-polite-past': mapActionMeaning(
+      item.meaning,
+      (a) => `was ${pastParticiple(a)} (polite)`,
+    ),
+    'passive-polite-past-negative': mapActionMeaning(
+      item.meaning,
+      (a) => `was not ${pastParticiple(a)} (polite)`,
+    ),
     'passive-past': mapActionMeaning(item.meaning, (a) => `was ${pastParticiple(a)}`),
     'passive-past-negative': mapActionMeaning(item.meaning, (a) => `was not ${pastParticiple(a)}`),
     'passive-conditional-ba': mapActionMeaning(item.meaning, (a) => `if be ${pastParticiple(a)}`),
-    'passive-negative-conditional-ba': mapActionMeaning(item.meaning, (a) => `if not be ${pastParticiple(a)}`),
-    'causative': `make/let someone ${action}`,
+    'passive-negative-conditional-ba': mapActionMeaning(
+      item.meaning,
+      (a) => `if not be ${pastParticiple(a)}`,
+    ),
+    causative: `make/let someone ${action}`,
     'causative-polite': `make/let someone ${action} (polite)`,
     'causative-negative': `not make/let someone ${action}`,
     'causative-polite-negative': `not make/let someone ${action} (polite)`,
@@ -227,7 +348,7 @@ export function englishForForm(item, type) {
     'short-causative-passive-past-negative': `was not made to ${action} (short spoken form)`,
     'short-causative-passive-conditional-ba': `if be made to ${action} (short spoken form)`,
     'short-causative-passive-negative-conditional-ba': `if not be made to ${action} (short spoken form)`,
-    'desiderative': `want to ${action}`,
+    desiderative: `want to ${action}`,
     'desiderative-polite': `want to ${action} (polite)`,
     'desiderative-negative': `do not want to ${action}`,
     'desiderative-polite-negative': `do not want to ${action} (polite)`,
@@ -235,23 +356,44 @@ export function englishForForm(item, type) {
     'desiderative-polite-past': `wanted to ${action} (polite)`,
     'desiderative-past-negative': `did not want to ${action}`,
     'desiderative-polite-past-negative': `did not want to ${action} (polite)`,
-    'progressive': mapActionMeaning(item.meaning, (a) => `be ${gerund(a)}`),
+    progressive: mapActionMeaning(item.meaning, (a) => `be ${gerund(a)}`),
     'progressive-polite': mapActionMeaning(item.meaning, (a) => `be ${gerund(a)} (polite)`),
-    'progressive-negative': mapActionMeaning(item.meaning, (a) => `not be ${gerund(a)} / have not been ${gerund(a)}`),
-    'progressive-polite-negative': mapActionMeaning(item.meaning, (a) => `not be ${gerund(a)} / have not been ${gerund(a)} (polite)`),
-    'progressive-past': mapActionMeaning(item.meaning, (a) => `was ${gerund(a)} / had been ${gerund(a)}`),
-    'progressive-polite-past': mapActionMeaning(item.meaning, (a) => `was ${gerund(a)} / had been ${gerund(a)} (polite)`),
-    'progressive-past-negative': mapActionMeaning(item.meaning, (a) => `was not ${gerund(a)} / had not been ${gerund(a)}`),
-    'progressive-polite-past-negative': mapActionMeaning(item.meaning, (a) => `was not ${gerund(a)} / had not been ${gerund(a)} (polite)`),
+    'progressive-negative': mapActionMeaning(
+      item.meaning,
+      (a) => `not be ${gerund(a)} / have not been ${gerund(a)}`,
+    ),
+    'progressive-polite-negative': mapActionMeaning(
+      item.meaning,
+      (a) => `not be ${gerund(a)} / have not been ${gerund(a)} (polite)`,
+    ),
+    'progressive-past': mapActionMeaning(
+      item.meaning,
+      (a) => `was ${gerund(a)} / had been ${gerund(a)}`,
+    ),
+    'progressive-polite-past': mapActionMeaning(
+      item.meaning,
+      (a) => `was ${gerund(a)} / had been ${gerund(a)} (polite)`,
+    ),
+    'progressive-past-negative': mapActionMeaning(
+      item.meaning,
+      (a) => `was not ${gerund(a)} / had not been ${gerund(a)}`,
+    ),
+    'progressive-polite-past-negative': mapActionMeaning(
+      item.meaning,
+      (a) => `was not ${gerund(a)} / had not been ${gerund(a)} (polite)`,
+    ),
     'negative-te': mapActionMeaning(item.meaning, (a) => `without ${gerund(a)}`),
-    'negative-te-connective': mapActionMeaning(item.meaning, (a) => `not ${gerund(a)}, and... / because someone does not ${a}`),
+    'negative-te-connective': mapActionMeaning(
+      item.meaning,
+      (a) => `not ${gerund(a)}, and... / because someone does not ${a}`,
+    ),
     'negative-zu': mapActionMeaning(item.meaning, (a) => `not ${gerund(a)} (formal ず)`),
     'negative-zuni': mapActionMeaning(item.meaning, (a) => `without ${gerund(a)} (formal ずに)`),
-    'prohibition': `do not ${action}!`,
+    prohibition: `do not ${action}!`,
     'request-kudasai': `please ${action}`,
     'negative-request': `please do not ${action}`,
-    'permission': `may ${action}`,
-    'obligation': `must ${action}`
+    permission: `may ${action}`,
+    obligation: `must ${action}`,
   };
   return M[type] || item.meaning;
 }
@@ -267,7 +409,7 @@ export function editDistance(a, b) {
       dp[i][j] = Math.min(
         dp[i - 1][j] + 1,
         dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
       );
     }
   }
@@ -282,7 +424,12 @@ export function hasAdjacentTransposition(a, b) {
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) diffs.push(i);
   }
-  return diffs.length === 2 && diffs[1] === diffs[0] + 1 && a[diffs[0]] === b[diffs[1]] && a[diffs[1]] === b[diffs[0]];
+  return (
+    diffs.length === 2 &&
+    diffs[1] === diffs[0] + 1 &&
+    a[diffs[0]] === b[diffs[1]] &&
+    a[diffs[1]] === b[diffs[0]]
+  );
 }
 
 export function typoGuardForAnswer(raw, normalized, expected, item, reverseDrill) {
@@ -291,7 +438,7 @@ export function typoGuardForAnswer(raw, normalized, expected, item, reverseDrill
   if (!submitted || !target || submitted === target) return null;
   const maxLen = Math.max(
     Array.from(normalizeJapaneseText(submitted)).length,
-    Array.from(normalizeJapaneseText(target)).length
+    Array.from(normalizeJapaneseText(target)).length,
   );
   if (maxLen < 3) return null;
   const distance = editDistance(submitted, target);
@@ -335,7 +482,10 @@ export function hashString(s) {
 export function drillDirectionFor(current, prefs = DEFAULT_PREFS) {
   const mode = prefs.drillDirection || 'forward';
   if (mode === 'reverse') return 'reverse';
-  if (mode === 'mixed') return hashString(`${current?.id || ''}|${current?.verb?.dict || ''}|reverse`) % 2 === 0 ? 'reverse' : 'forward';
+  if (mode === 'mixed')
+    return hashString(`${current?.id || ''}|${current?.verb?.dict || ''}|reverse`) % 2 === 0
+      ? 'reverse'
+      : 'forward';
   return 'forward';
 }
 
@@ -348,7 +498,7 @@ export function makeChoices(current, verbs) {
     if (v && v !== expected) set.add(v);
     if (set.size >= 4) break;
   }
-  for (const v of shuffled(verbs.filter(v => v.group === current.verb.group))) {
+  for (const v of shuffled(verbs.filter((v) => v.group === current.verb.group))) {
     const x = conjugateItem(v, current.type);
     if (x && x !== expected) set.add(x);
     if (set.size >= 4) break;
@@ -371,7 +521,11 @@ export function makeReverseChoices(current, words) {
   const key = wordKey(current.verb);
   const seen = new Set([key]);
   const choices = [current.verb];
-  for (const w of shuffled(words.filter(w => w.group === current.verb.group || isAdjective(w) === isAdjective(current.verb)))) {
+  for (const w of shuffled(
+    words.filter(
+      (w) => w.group === current.verb.group || isAdjective(w) === isAdjective(current.verb),
+    ),
+  )) {
     const k = wordKey(w);
     if (seen.has(k)) continue;
     seen.add(k);

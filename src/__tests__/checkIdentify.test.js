@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  identifyConjugation,
-  levenshtein,
-  describeDiff,
-} from '../utils/checkIdentify.js';
+import { identifyConjugation, levenshtein, describeDiff } from '../utils/checkIdentify.js';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
 
 const ALL = [...STARTER_VERBS, ...STARTER_ADJECTIVES];
@@ -35,18 +31,14 @@ describe('identifyConjugation', () => {
   it('finds an exact kana match (plain past of 食べる)', () => {
     const res = identifyConjugation('たべた', ALL);
     expect(res.near).toHaveLength(0);
-    const hit = res.exact.find(
-      (e) => e.word.reading === 'たべる' && e.type === 'plain-past'
-    );
+    const hit = res.exact.find((e) => e.word.reading === 'たべる' && e.type === 'plain-past');
     expect(hit).toBeTruthy();
     expect(hit.kana).toBe('たべた');
   });
 
   it('finds an exact kanji match (食べた)', () => {
     const res = identifyConjugation('食べた', ALL);
-    const hit = res.exact.find(
-      (e) => e.word.reading === 'たべる' && e.type === 'plain-past'
-    );
+    const hit = res.exact.find((e) => e.word.reading === 'たべる' && e.type === 'plain-past');
     expect(hit).toBeTruthy();
     expect(hit.kanji).toBe('食べた');
   });
@@ -54,17 +46,13 @@ describe('identifyConjugation', () => {
   it('finds an exact romaji-typed match (tabeta)', () => {
     const res = identifyConjugation('tabeta', ALL);
     expect(res.normalized).toBe('たべた');
-    const hit = res.exact.find(
-      (e) => e.word.reading === 'たべる' && e.type === 'plain-past'
-    );
+    const hit = res.exact.find((e) => e.word.reading === 'たべる' && e.type === 'plain-past');
     expect(hit).toBeTruthy();
   });
 
   it('finds an exact match for a godan verb (のんだ = past of 飲む)', () => {
     const res = identifyConjugation('のんだ', ALL);
-    const hit = res.exact.find(
-      (e) => e.word.reading === 'のむ' && e.type === 'plain-past'
-    );
+    const hit = res.exact.find((e) => e.word.reading === 'のむ' && e.type === 'plain-past');
     expect(hit).toBeTruthy();
   });
 
@@ -107,9 +95,9 @@ describe('identifyConjugation', () => {
     const te = identifyConjugation('たべて', ALL);
     expect(te.exact.some((e) => e.word.reading === 'たべる' && e.type === 'te-form')).toBe(true);
     const masu = identifyConjugation('たべます', ALL);
-    expect(
-      masu.exact.some((e) => e.word.reading === 'たべる' && e.type === 'polite-present')
-    ).toBe(true);
+    expect(masu.exact.some((e) => e.word.reading === 'たべる' && e.type === 'polite-present')).toBe(
+      true,
+    );
   });
 
   describe('stem-aware near-miss (onbin / sound-change errors)', () => {
@@ -145,9 +133,7 @@ describe('identifyConjugation', () => {
 
   it('reports both readings of an ambiguous form (potential = passive)', () => {
     const res = identifyConjugation('たべられる', ALL);
-    const types = res.exact
-      .filter((e) => e.word.reading === 'たべる')
-      .map((e) => e.type);
+    const types = res.exact.filter((e) => e.word.reading === 'たべる').map((e) => e.type);
     expect(types).toContain('potential');
     expect(types).toContain('passive');
   });
@@ -174,9 +160,7 @@ describe('identifyConjugation', () => {
 
   it('recognises katakana-typed input (タベタ = 食べた)', () => {
     const res = identifyConjugation('タベタ', ALL);
-    const hit = res.exact.find(
-      (e) => e.word.reading === 'たべる' && e.type === 'plain-past'
-    );
+    const hit = res.exact.find((e) => e.word.reading === 'たべる' && e.type === 'plain-past');
     expect(hit).toBeTruthy();
   });
 

@@ -15,9 +15,7 @@ const IGNORED_TYPES = new Set(['masu-stem']);
 // in katakana mode (or loanword verbs) still matches. toHiragana handles
 // romaji but passes katakana through unchanged.
 export function katakanaToHiragana(s) {
-  return String(s || '').replace(/[ァ-ヶ]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0x60)
-  );
+  return String(s || '').replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
 }
 
 // Normalize free-form input to hiragana for matching: katakana is folded to
@@ -160,8 +158,7 @@ export function identifyConjugation(input, words = [], options = {}) {
       if (!kana) continue;
       const kanji = surfaceFormFor(word, type) || kana;
 
-      const isExact =
-        normalized === kana || raw === kanji || raw === kana;
+      const isExact = normalized === kana || raw === kanji || raw === kana;
       if (isExact) {
         exact.push({ word, type, kana, kanji });
         continue;
