@@ -36,6 +36,8 @@ export function addUniqueWord(list, word) {
   return list.some(w => w.dict === word.dict && w.group === word.group) ? list : [...list, word];
 }
 
+const LEVEL_ORDER = ['N5', 'N4', 'N3', 'N2', 'N1'];
+
 export function sanitizeExportName(name = 'katachiya') {
   return String(name || 'katachiya').normalize('NFKC').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'katachiya';
 }
@@ -133,6 +135,18 @@ export default function ListsViewSub({
   const activeWords = useMemo(() => wordsForList(active, words), [active, words]);
   const selectedIds = practicePrefs.wordListIds || [];
 
+  const packGroups = useMemo(() => {
+    const map = new Map();
+    for (const pack of VOCAB_PACKS) {
+      const lvl = pack.level || 'Other';
+      if (!map.has(lvl)) map.set(lvl, []);
+      map.get(lvl).push(pack);
+    }
+    return [...map.entries()].sort(
+      (a, b) => (LEVEL_ORDER.indexOf(a[0]) + 1 || 99) - (LEVEL_ORDER.indexOf(b[0]) + 1 || 99)
+    );
+  }, []);
+
   function createList() {
     const n = name.trim() || `List ${wordLists.length + 1}`;
     const l = { id: 'list-' + Date.now().toString(36), name: n, wordKeys: [] };
@@ -178,28 +192,51 @@ export default function ListsViewSub({
     setMsg(`Imported ${rows.length} row${rows.length === 1 ? '' : 's'} into ${active.name}.`);
   }
 
-  function importPack(pack) {
-    let list = wordLists.find(l => l.id === 'pack-' + pack.id);
-    const id = list?.id || 'pack-' + pack.id;
-    let verbs = customVerbs, adjs = customAdjectives, keys = new Set(list?.wordKeys || []);
-    const packWords = pack.words.map(w => ({ ...w, jlpt: normalizeJlptLevel(w.jlpt) || normalizeJlptLevel(pack.level) || getWordMeta(w).jlpt }));
-    for (const w of packWords) {
-      if (isAdjective(w)) adjs = addUniqueWord(adjs, w);
-      else verbs = addUniqueWord(verbs, w);
-      keys.add(wordKey(w));
-    }
-    if (list) {
-      setWordLists(wordLists.map(l => l.id === id ? { ...l, name: pack.name, wordKeys: [...keys] } : l));
-    } else {
-      setWordLists([...wordLists, { id, name: pack.name, wordKeys: [...keys] }]);
+  function importPacks(packs) {
+    if (!packs.length) return [];
+    let verbs = customVerbs, adjs = customAdjectives;
+    let nextLists = [...wordLists];
+    const enableIds = [];
+    for (const pack of packs) {
+      const id = 'pack-' + pack.id;
+      const existing = nextLists.find(l => l.id === id);
+      const keys = new Set(existing?.wordKeys || []);
+      const packWords = pack.words.map(w => ({ ...w, jlpt: normalizeJlptLevel(w.jlpt) || normalizeJlptLevel(pack.level) || getWordMeta(w).jlpt }));
+      for (const w of packWords) {
+        if (isAdjective(w)) adjs = addUniqueWord(adjs, w);
+        else verbs = addUniqueWord(verbs, w);
+        keys.add(wordKey(w));
+      }
+      if (existing) {
+        nextLists = nextLists.map(l => l.id === id ? { ...l, name: pack.name, wordKeys: [...keys] } : l);
+      } else {
+        nextLists = [...nextLists, { id, name: pack.name, wordKeys: [...keys] }];
+      }
+      enableIds.push(id);
     }
     setCustomVerbs(verbs);
     setCustomAdjectives(adjs);
-    setActiveId(id);
-    if (!selectedIds.includes(id)) {
-      setPracticePrefs({ ...practicePrefs, wordListIds: [...selectedIds, id] });
-    }
-    setMsg(`Imported ${packWords.length} words from ${pack.name}.`);
+    setWordLists(nextLists);
+    const merged = [...new Set([...selectedIds, ...enableIds])];
+    setPracticePrefs({ ...practicePrefs, wordListIds: merged });
+    return enableIds;
+  }
+
+  function importPack(pack) {
+    const [id] = importPacks([pack]);
+    if (id) setActiveId(id);
+    setMsg(`Imported ${pack.words.length} words from ${pack.name}.`);
+  }
+
+  function enableGroup(level, packs) {
+    importPacks(packs);
+    setMsg(`Enabled ${packs.length} ${level} pack${packs.length === 1 ? '' : 's'} for drills.`);
+  }
+
+  function disableGroup(level, packs) {
+    const ids = new Set(packs.map(p => 'pack-' + p.id));
+    setPracticePrefs({ ...practicePrefs, wordListIds: selectedIds.filter(x => !ids.has(x)) });
+    setMsg(`Disabled ${packs.length} ${level} pack${packs.length === 1 ? '' : 's'}. Lists kept.`);
   }
 
   async function generateAIList() {
@@ -325,20 +362,52 @@ export default function ListsViewSub({
       <div className="space-y-4">
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
           <h3 className="font-medium mb-1 text-stone-800 dark:text-stone-200">Built-in packs</h3>
-          <p className="text-xs text-stone-500 mb-3">Seed drills with curated JLPT-style packs, then edit them as normal lists.</p>
-          <div className="grid sm:grid-cols-2 gap-2">
-            {VOCAB_PACKS.map(pack => (
-              <div key={pack.id} className="border border-stone-200 dark:border-stone-800 rounded-xl p-3 bg-white dark:bg-stone-950">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-medium text-sm text-stone-800 dark:text-stone-200">{pack.name}</div>
-                    <div className="text-xs text-stone-500 mt-0.5">{pack.desc}</div>
-                    <div className="text-[11px] text-stone-400 mt-1">{pack.level ? `JLPT ${pack.level} · ` : ''}{pack.words.length} words</div>
+          <p className="text-xs text-stone-500 mb-3">Seed drills with curated JLPT-style packs, then edit them as normal lists. Enable or disable a whole level at once.</p>
+          <div className="space-y-4">
+            {packGroups.map(([level, packs]) => {
+              const activeCount = packs.filter(p => selectedIds.includes('pack-' + p.id)).length;
+              const allActive = activeCount === packs.length;
+              return (
+                <div key={level}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-stone-700 dark:text-stone-300">JLPT {level}</span>
+                      <span className="text-[11px] text-stone-400">{activeCount}/{packs.length} in drills</span>
+                    </div>
+                    <button
+                      onClick={() => allActive ? disableGroup(level, packs) : enableGroup(level, packs)}
+                      className={`px-2.5 py-1 rounded-lg text-xs border ${
+                        allActive
+                          ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                          : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850'
+                      }`}
+                    >
+                      {allActive ? 'Disable all' : 'Enable all'}
+                    </button>
                   </div>
-                  <button onClick={() => importPack(pack)} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs">Import</button>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {packs.map(pack => {
+                      const inDrill = selectedIds.includes('pack-' + pack.id);
+                      return (
+                        <div key={pack.id} className="border border-stone-200 dark:border-stone-800 rounded-xl p-3 bg-white dark:bg-stone-950">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="font-medium text-sm text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
+                                {pack.name}
+                                {inDrill && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" aria-label="In drill" title="In drill" />}
+                              </div>
+                              <div className="text-xs text-stone-500 mt-0.5">{pack.desc}</div>
+                              <div className="text-[11px] text-stone-400 mt-1">{pack.words.length} words{inDrill ? ' · in drill' : ''}</div>
+                            </div>
+                            <button onClick={() => importPack(pack)} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs">Import</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
