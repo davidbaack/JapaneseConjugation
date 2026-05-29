@@ -246,18 +246,31 @@ export default function App() {
           </div>
         </header>
         <nav className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
-          {['study', 'check', 'rush', 'classify', 'endings', 'mistakes', 'levels', 'stats', 'library', 'settings'].map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
-                tab === t
-                  ? 'bg-stone-800 dark:bg-indigo-700 text-white font-semibold'
-                  : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
-              }`}
-            >
-              {{ endings: 'て Forms', levels: 'Progress', check: 'Spot Check', classify: 'Which Group?' }[t] ?? t}
-            </button>
+          {[
+            { tabs: ['study', 'check', 'classify', 'endings'] },
+            { label: 'Games', tabs: ['rush'] },
+            { tabs: ['mistakes', 'levels', 'stats', 'library', 'settings'] },
+          ].map(({ label, tabs }) => (
+            <React.Fragment key={label ?? tabs[0]}>
+              {label && (
+                <span className="flex items-center px-2 text-xs text-stone-400 dark:text-stone-600 self-center">
+                  {label}
+                </span>
+              )}
+              {tabs.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
+                    tab === t
+                      ? 'bg-stone-800 dark:bg-indigo-700 text-white font-semibold'
+                      : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+                  }`}
+                >
+                  {{ endings: 'て Forms', levels: 'Progress', check: 'Spot Check', classify: 'Which Group?' }[t] ?? t}
+                </button>
+              ))}
+            </React.Fragment>
           ))}
         </nav>
         <Suspense fallback={<div className="flex justify-center py-20 text-stone-400 text-sm">Loading…</div>}>
