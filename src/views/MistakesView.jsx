@@ -6,9 +6,9 @@ import { toHiragana } from '../utils/romaji.js';
 import {
   conjugateItem,
   getTypeInfo,
-  explainItem,
   promptFormLabel
 } from '../utils/conjugator.js';
+import { explainItem } from '../utils/conjugatorExplain.js';
 import { bumpDaily, markMistakeResolved } from '../utils/storage.js';
 import { promptDisplay, formDisplay } from '../utils/display.js';
 import { speakJapanese } from '../utils/speech.js';

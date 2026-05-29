@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { conjugateItem, explainItem, stepCoachHint, compatibleTypes } from '../utils/conjugator.js';
+import { conjugateItem, compatibleTypes } from '../utils/conjugator.js';
+import { explainItem, stepCoachHint } from '../utils/conjugatorExplain.js';
 
 // Representative words spanning every class: ichidan, all godan endings
 // (う/く/ぐ/す/つ/ぬ/ぶ/む/る) + the 行く exception, both irregular verbs and

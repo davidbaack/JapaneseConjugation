@@ -9,9 +9,8 @@ import {
   compatibleTypes,
   conjugateItem,
   surfaceFormFor,
-  explainItem,
-  GROUP_NAMES
 } from '../utils/conjugator.js';
+import { explainItem, GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { toHiragana, isAllKana } from '../utils/romaji.js';
 import { callGemini, aiSystemFromPrefs, normalizeGroup, parseScannerAIWords } from '../utils/gemini.js';
 import { VOCAB_PACKS, AI_LIST_TARGETS } from '../data/vocabPacks.js';

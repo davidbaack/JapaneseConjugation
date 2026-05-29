@@ -8,10 +8,9 @@ import { speakJapanese } from '../utils/speech.js';
 import { identifyConjugation } from '../utils/checkIdentify.js';
 import {
   getTypeInfo,
-  explainItem,
   getWordMeta,
-  GROUP_NAMES,
 } from '../utils/conjugator.js';
+import { explainItem, GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { formRows } from './ReferenceViewSub.jsx';
 import { formDisplay, englishForForm } from '../utils/display.js';
 import { toHiragana } from '../utils/romaji.js';

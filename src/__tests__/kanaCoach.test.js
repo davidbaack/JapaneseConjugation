@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { kanaCoachCells } from '../views/StudyView.jsx';
+import { kanaCoachCells } from '../utils/kanaCoach.js';
 
 const states = cells => cells.map(c => c.state);
 const shown = cells => cells.map(c => c.shown);

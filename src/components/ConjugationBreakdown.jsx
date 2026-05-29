@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { IconSpark } from './Icons.jsx';
-import { getConjugationSteps, conjugateItem, wordKey } from '../utils/conjugator.js';
+import { conjugateItem, wordKey } from '../utils/conjugator.js';
+import { getConjugationSteps } from '../utils/conjugatorExplain.js';
 import { getTypeInfo } from '../data/conjugationTypes.js';
 import { callGemini, aiSystemFromPrefs } from '../utils/gemini.js';
 import { getAICache, setAICache } from '../utils/storage.js';

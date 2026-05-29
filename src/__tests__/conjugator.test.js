@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { conjugate, conjugateAdjective, conjugateItem, stepCoachHint, isRedundantPracticeType } from '../utils/conjugator.js';
+import { conjugate, conjugateAdjective, conjugateItem, isRedundantPracticeType } from '../utils/conjugator.js';
+import { stepCoachHint } from '../utils/conjugatorExplain.js';
 
 // ─── Test verbs ───────────────────────────────────────────────────────────────
 const TABERU  = { dict: '食べる',  reading: 'たべる',  meaning: 'to eat',   group: 'ichidan' };

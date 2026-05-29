@@ -3,7 +3,8 @@ import { IconChat } from './Icons.jsx';
 import { toHiragana } from '../utils/romaji.js';
 import { callGemini, aiSystemFromPrefs, AI_SYSTEM } from '../utils/gemini.js';
 import { getTypeInfo } from '../data/conjugationTypes.js';
-import { GROUP_NAMES, isAdjective, explainItem } from '../utils/conjugator.js';
+import { isAdjective } from '../utils/conjugator.js';
+import { GROUP_NAMES, explainItem } from '../utils/conjugatorExplain.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
 function feedbackNoteFor(prefs) {

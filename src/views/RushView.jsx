@@ -10,8 +10,8 @@ import {
   conjugateItem,
   getTypeInfo,
   RULES,
-  GROUP_NAMES
 } from '../utils/conjugator.js';
+import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { defaultState, gradeCard, recordMistake, bumpDaily } from '../utils/storage.js';
 import { promptDisplay, shuffled } from '../utils/display.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';

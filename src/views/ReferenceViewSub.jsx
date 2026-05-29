@@ -6,8 +6,6 @@ import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import { toHiragana, kanaToRomaji } from '../utils/romaji.js';
 import {
   conjugateItem,
-  explainItem,
-  GROUP_NAMES,
   isAdjective,
   wordKind,
   wordGroupId,
@@ -16,6 +14,7 @@ import {
   conjugateAdjective,
   isIrregularAdjective
 } from '../utils/conjugator.js';
+import { explainItem, GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { CONJ_TYPES, ADJ_TYPES } from '../data/conjugationTypes.js';
 import {
   normalizeReferenceState,

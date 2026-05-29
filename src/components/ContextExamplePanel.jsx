@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { IconVolume, IconSpark } from './Icons.jsx';
-import { contextSentenceFor } from '../utils/conjugator.js';
+import { contextSentenceFor } from '../utils/conjugatorExplain.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { TYPE_LABEL } from '../data/conjugationTypes.js';
 import { speakJapanese } from '../utils/speech.js';
