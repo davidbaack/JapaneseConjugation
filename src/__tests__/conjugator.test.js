@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { conjugate, conjugateAdjective, conjugateItem } from '../utils/conjugator.js';
+import { conjugate, conjugateAdjective, conjugateItem, stepCoachHint } from '../utils/conjugator.js';
 
 // ─── Test verbs ───────────────────────────────────────────────────────────────
 const TABERU  = { dict: '食べる',  reading: 'たべる',  meaning: 'to eat',   group: 'ichidan' };
@@ -325,5 +325,47 @@ describe('conjugateItem', () => {
 
   it('returns empty string for unknown type', () => {
     expect(conjugateItem(TABERU, 'nonexistent-type')).toBe('');
+  });
+});
+
+// ─── Deterministic step-coach hint ──────────────────────────────────────────
+describe('stepCoachHint (offline hint)', () => {
+  const TYPE = 'potential-past-negative';
+  const ANSWER = conjugateItem(MATSU, TYPE); // まてなかった
+
+  it('includes the multi-step build recipe', () => {
+    const hint = stepCoachHint(MATSU, TYPE, '');
+    expect(hint).toContain('potential');
+    expect(hint).toContain('なかった');
+  });
+
+  it('does not reveal the full answer when nothing or only part is typed', () => {
+    expect(stepCoachHint(MATSU, TYPE, '')).not.toContain(ANSWER);
+    expect(stepCoachHint(MATSU, TYPE, 'まて')).not.toContain(ANSWER);
+  });
+
+  it('prompts to start when nothing is typed', () => {
+    expect(stepCoachHint(MATSU, TYPE, '')).toMatch(/haven't typed/);
+  });
+
+  it('acknowledges a correct prefix and counts remaining kana', () => {
+    const hint = stepCoachHint(MATSU, TYPE, 'まて');
+    expect(hint).toContain('「まて」');
+    expect(hint).toContain(`${ANSWER.length - 2} more kana`);
+  });
+
+  it('flags where a wrong kana goes off course', () => {
+    const hint = stepCoachHint(MATSU, TYPE, 'まと'); // 2nd kana wrong
+    expect(hint).toMatch(/kana 2 goes off course/);
+  });
+
+  it('accepts romaji input and converts it', () => {
+    // "mate" -> まて, a correct prefix of まてなかった
+    const hint = stepCoachHint(MATSU, TYPE, 'mate');
+    expect(hint).toContain('「まて」');
+  });
+
+  it('tells the student to press Enter once the full answer is typed', () => {
+    expect(stepCoachHint(MATSU, TYPE, ANSWER)).toMatch(/press Enter/);
   });
 });

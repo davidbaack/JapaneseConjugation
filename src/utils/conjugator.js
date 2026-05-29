@@ -868,6 +868,32 @@ export function explainItem(item,type){
   return e;
 }
 
+// Deterministic, offline hint shown when the student clicks "Hint" while
+// answering. It states how the (possibly multi-step) form is built and where
+// the student currently is, without revealing any kana they haven't typed yet.
+export function stepCoachHint(item,type,typed){
+  const expected=conjugateItem(item,type);
+  const exp=explainItem(item,type);
+  const recipe=[exp.rule,exp.note].filter(Boolean).join(' ').trim();
+  const got=toHiragana(typed||'')||(typed||'');
+  let correct=0;
+  while(correct<got.length&&correct<expected.length&&got[correct]===expected[correct])correct++;
+  let status;
+  if(!got){
+    status=`You haven't typed anything yet — start from the dictionary form ${item.reading}, then work through the steps above.`;
+  }else if(correct===0){
+    status=`The very beginning doesn't match yet — re-check the first step above.`;
+  }else if(correct<got.length){
+    status=`Your first ${correct} kana (「${got.slice(0,correct)}」) are on track, but kana ${correct+1} goes off course — re-check the next step above.`;
+  }else if(correct>=expected.length){
+    status=`That's the full length — press Enter to check it.`;
+  }else{
+    const remaining=expected.length-correct;
+    status=`「${got}」 is correct so far — ${remaining} more kana to go. Apply the next step above.`;
+  }
+  return recipe?`${recipe}\n\n${status}`:status;
+}
+
 export function diagnose(verb,type,userAnswer){
   const got=toHiragana(userAnswer);
   if(!got)return'';
