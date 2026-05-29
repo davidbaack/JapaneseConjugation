@@ -1,6 +1,8 @@
 import { toHiragana, isAllKana } from './romaji.js';
 import { normalizeJlptLevel } from './conjugator.js';
 import { supabase } from './supabase.js';
+import { retryWithBackoff } from './retry.js';
+import { guardAIRequest } from './rateLimiter.js';
 
 export const AI_SYSTEM = `You are a friendly Japanese language teacher helping a student who just got a verb conjugation wrong. The student can read hiragana and katakana but struggles with kanji. Always write Japanese in hiragana/katakana with romaji in brackets after it, e.g. たべた [tabeta]. Be warm, encouraging, and concise — 2 to 3 short paragraphs at most. Focus on the specific rule missed and give one extra example.`;
 export const AI_COACH_SYSTEM = `You are a concise Japanese conjugation and sentence coach. Analyze verbs and adjectives in context, identify conjugation mistakes, explain the rule, give a natural corrected sentence, and finish with one tiny practice prompt. Keep Japanese readable for learners by adding romaji after key forms.`;
@@ -107,7 +109,13 @@ function getLocalApiKey(apiKey) {
   return isLocal ? apiKey : '';
 }
 
-async function executeGeminiRequest(payload, apiKey) {
+// Build an Error that carries the HTTP status so retry logic can tell a
+// transient 429/5xx from a permanent 4xx.
+function httpError(message, status) {
+  return Object.assign(new Error(message || `HTTP ${status}`), { status });
+}
+
+async function executeGeminiRequestOnce(payload, apiKey) {
   // 1. Try secure Cloud Proxy via Supabase Edge Function if user is logged in
   if (supabase) {
     const {
@@ -124,7 +132,7 @@ async function executeGeminiRequest(payload, apiKey) {
         body: JSON.stringify(payload),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      if (!r.ok) throw httpError(d.error, r.status);
       return d;
     }
   }
@@ -141,13 +149,19 @@ async function executeGeminiRequest(payload, apiKey) {
       },
     );
     const d = await r.json();
-    if (!r.ok) throw new Error(d.error?.message || `HTTP ${r.status}`);
+    if (!r.ok) throw httpError(d.error?.message, r.status);
     return d;
   }
 
   throw new Error(
     'Please sign in (Cloud Sync) to use AI features, or configure VITE_GEMINI_API_KEY in local development.',
   );
+}
+
+// Retry transient failures (timeouts, 429, 5xx) with backoff so a momentary
+// hiccup doesn't surface as a hard error to the learner (improvement #14).
+function executeGeminiRequest(payload, apiKey) {
+  return retryWithBackoff(() => executeGeminiRequestOnce(payload, apiKey), { retries: 2 });
 }
 
 export async function callGemini(
@@ -157,6 +171,7 @@ export async function callGemini(
   temp = 0.7,
   systemText = AI_SYSTEM,
 ) {
+  guardAIRequest();
   const payload = {
     contents,
     systemInstruction: { parts: [{ text: systemText }] },
@@ -182,6 +197,7 @@ export function aiSystemFromPrefs(prefs, base = AI_SYSTEM) {
 }
 
 export async function lookupWordWithGemini(query, apiKey, isAdj = false) {
+  guardAIRequest();
   const typeStr = isAdj ? 'adjective' : 'verb';
   const groupOptions = isAdj ? 'i-adjective or na-adjective' : 'ichidan or godan or suru or kuru';
   const meaningStr = isAdj ? 'English meaning' : 'English meaning starting with to';
@@ -205,6 +221,7 @@ export async function lookupWordWithGemini(query, apiKey, isAdj = false) {
 }
 
 export async function getSuggestedWord(existing, apiKey, isAdj = false) {
+  guardAIRequest();
   const typeStr = isAdj ? 'adjective' : 'verb';
   const groupOptions = isAdj ? 'i-adjective or na-adjective' : 'ichidan or godan or suru or kuru';
   const list = existing

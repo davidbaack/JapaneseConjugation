@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { saveAll, cloudUpsert } from '../utils/storage.js';
 import { supabase } from '../utils/supabase.js';
+import { logWarn } from '../utils/logger.js';
 
 // How long to wait after the last change before pushing to the cloud. Rapid
 // edits (e.g. grading several cards in a row) keep resetting this timer so they
@@ -59,6 +60,7 @@ export function useCloudAutoSync({
           );
           setSyncStatus({ kind: 'ok', message: 'Saved to cloud', at: now });
         } catch (e) {
+          logWarn(e, { source: 'useCloudAutoSync.push' });
           setSyncStatus({ kind: 'error', message: e.message || 'Push failed', at: null });
         }
       }, PUSH_DEBOUNCE_MS);

@@ -12,6 +12,7 @@ import {
   enabledTypeIdsFor,
   filterWordsForPrefs,
 } from './conjugator.js';
+import { retryWithBackoff } from './retry.js';
 
 export const DAY = 86400000;
 
@@ -25,6 +26,14 @@ export function loadAll() {
   }
 }
 
+// Detect the browser's various flavors of "localStorage is full".
+export function isQuotaExceeded(e) {
+  return !!(
+    e &&
+    (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22)
+  );
+}
+
 export function saveAll(
   state,
   customVerbs,
@@ -35,29 +44,34 @@ export function saveAll(
   geminiKey = '',
   practicePrefs = DEFAULT_PREFS,
 ) {
+  const payload = JSON.stringify({
+    state,
+    customVerbs,
+    customAdjectives,
+    wordLists,
+    syncConfig,
+    lastSyncedAt,
+    geminiKey,
+    practicePrefs,
+  });
   try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        state,
-        customVerbs,
-        customAdjectives,
-        wordLists,
-        syncConfig,
-        lastSyncedAt,
-        geminiKey,
-        practicePrefs,
-      }),
-    );
+    localStorage.setItem(STORAGE_KEY, payload);
   } catch (e) {
-    if (
-      e &&
-      (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22)
-    ) {
-      throw Object.assign(
-        new Error('Storage full — export your data in Settings to free up space.'),
-        { isQuotaError: true },
-      );
+    if (!isQuotaExceeded(e)) return;
+    // Quota hit: the regenerable AI cache is the safest thing to drop. Evict it
+    // and retry once before surfacing an error, so the user's actual progress
+    // is never lost to a full cache (improvement #15).
+    pruneAICache();
+    clearAICache();
+    try {
+      localStorage.setItem(STORAGE_KEY, payload);
+    } catch (e2) {
+      if (isQuotaExceeded(e2)) {
+        throw Object.assign(
+          new Error('Storage full — export your data in Settings to free up space.'),
+          { isQuotaError: true },
+        );
+      }
     }
   }
 }
@@ -118,6 +132,38 @@ export function pruneAICache() {
   }
 }
 
+// Drop the entire AI cache (used as a last-resort eviction when storage is
+// full). The cache is purely a network/cost optimization, so clearing it only
+// costs a re-fetch — never user progress.
+export function clearAICache() {
+  for (const key of AI_CACHE_KEYS) {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+  }
+}
+
+// Rough estimate of how many bytes this app is using in localStorage (UTF-16,
+// so ~2 bytes/char). Used by Settings to warn before the user hits the wall.
+export function estimateStorageBytes() {
+  if (typeof localStorage === 'undefined') return 0;
+  let total = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      const isAppKey =
+        key === STORAGE_KEY || key.startsWith('katachiya') || key.startsWith('jp-verb');
+      if (!isAppKey) continue;
+      const value = localStorage.getItem(key) || '';
+      total += (key.length + value.length) * 2;
+    }
+  } catch {
+    return total;
+  }
+  return total;
+}
+
 export function getSystemTheme() {
   if (typeof window === 'undefined' || !window.matchMedia) return 'light';
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -144,16 +190,17 @@ export async function cloudFetch() {
   } = await supabase.auth.getSession();
   if (!session) return null;
 
-  const { data, error } = await supabase
-    .from('srs_sync')
-    .select('data, updated_at')
-    .eq('id', session.user.id)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-  return data;
+  // Retry transient network/5xx failures so a flaky connection doesn't abort
+  // the read; auth/RLS errors fail fast (non-transient) (improvement #14).
+  return retryWithBackoff(async () => {
+    const { data, error } = await supabase
+      .from('srs_sync')
+      .select('data, updated_at')
+      .eq('id', session.user.id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  });
 }
 
 export async function cloudUpsert(payload) {
@@ -164,15 +211,16 @@ export async function cloudUpsert(payload) {
   } = await supabase.auth.getSession();
   if (!session) throw new Error('User is not authenticated');
 
-  const { error } = await supabase.from('srs_sync').upsert({
-    id: session.user.id,
-    data: payload,
-    updated_at: new Date().toISOString(),
+  // Retry transient failures so a momentary network blip doesn't drop the
+  // user's progress; a fresh timestamp is written on each attempt.
+  await retryWithBackoff(async () => {
+    const { error } = await supabase.from('srs_sync').upsert({
+      id: session.user.id,
+      data: payload,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw error;
   });
-
-  if (error) {
-    throw error;
-  }
 }
 
 // Parse the cloud row's updated_at into epoch millis (0 when absent/invalid).

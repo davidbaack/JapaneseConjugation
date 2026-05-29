@@ -1,5 +1,6 @@
 import React from 'react';
 import { STORAGE_KEY } from '../data/defaults.js';
+import { logError } from '../utils/logger.js';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -12,7 +13,7 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('App error:', error, info.componentStack);
+    logError(error, { source: 'ErrorBoundary', componentStack: info?.componentStack });
   }
 
   handleReset() {
