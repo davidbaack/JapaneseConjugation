@@ -77,6 +77,7 @@ function WordExtras({ word, type, showForms, onToggleForms, onPracticeWord }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <button
           onClick={onToggleForms}
+          aria-expanded={showForms}
           className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
         >
           {showForms ? 'Hide all forms' : `Show all forms of ${word.dict}`}
@@ -358,12 +359,12 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
       {result && (
         <div
           ref={resultRef}
-          role="status"
-          aria-live="polite"
           className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5 sm:p-6 scroll-mt-4"
         >
-          {/* Screen readers get a one-line verdict before the visual details. */}
-          <span className="sr-only">
+          {/* Only the verdict is a live region — scoping it here (rather than the
+              whole card) keeps screen readers from re-announcing the breakdown,
+              forms table, etc. each time the user expands a disclosure. */}
+          <span role="status" aria-live="polite" className="sr-only">
             {result.status === 'exact'
               ? 'Correct conjugation.'
               : result.status === 'near'
@@ -439,6 +440,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
                 <div className="mt-4">
                   <button
                     onClick={() => setShowBreakdown((v) => !v)}
+                    aria-expanded={showBreakdown}
                     className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
                   >
                     {showBreakdown ? 'Hide breakdown' : 'Show how it’s built'}
@@ -534,6 +536,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
                 <div className="mt-3">
                   <button
                     onClick={() => setShowBreakdown((v) => !v)}
+                    aria-expanded={showBreakdown}
                     className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
                   >
                     {showBreakdown ? 'Hide breakdown' : 'Show how it’s built'}
@@ -564,6 +567,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
                 <div className="mt-3">
                   <button
                     onClick={() => setShowOthers((v) => !v)}
+                    aria-expanded={showOthers}
                     className="text-sm text-stone-500 dark:text-stone-400 hover:underline"
                   >
                     {showOthers
@@ -600,9 +604,9 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
                   far from the real form to match — give it another look.
                 </li>
                 <li>
-                  <span className="font-medium">Verb not loaded?</span> Check only knows the
+                  <span className="font-medium">Word not loaded?</span> Check only knows the
                   {' '}
-                  {allWords.length} words in your active set. If this verb isn't one of them, add it
+                  {allWords.length} words in your active set. If this word isn't one of them, add it
                   in the Library.
                 </li>
               </ul>
