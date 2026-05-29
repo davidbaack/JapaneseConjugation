@@ -334,38 +334,59 @@ describe('stepCoachHint (offline hint)', () => {
   const ANSWER = conjugateItem(MATSU, TYPE); // まてなかった
 
   it('includes the multi-step build recipe', () => {
-    const hint = stepCoachHint(MATSU, TYPE, '');
-    expect(hint).toContain('potential');
-    expect(hint).toContain('なかった');
+    const { text } = stepCoachHint(MATSU, TYPE, '');
+    expect(text).toContain('potential');
+    expect(text).toContain('なかった');
   });
 
   it('does not reveal the full answer when nothing or only part is typed', () => {
-    expect(stepCoachHint(MATSU, TYPE, '')).not.toContain(ANSWER);
-    expect(stepCoachHint(MATSU, TYPE, 'まて')).not.toContain(ANSWER);
+    expect(stepCoachHint(MATSU, TYPE, '').text).not.toContain(ANSWER);
+    expect(stepCoachHint(MATSU, TYPE, 'まて').text).not.toContain(ANSWER);
+  });
+
+  it('is not masked for a regular (derivable) verb', () => {
+    expect(stepCoachHint(MATSU, TYPE, '').masked).toBe(false);
   });
 
   it('prompts to start when nothing is typed', () => {
-    expect(stepCoachHint(MATSU, TYPE, '')).toMatch(/haven't typed/);
+    expect(stepCoachHint(MATSU, TYPE, '').text).toMatch(/haven't typed/);
   });
 
   it('acknowledges a correct prefix and counts remaining kana', () => {
-    const hint = stepCoachHint(MATSU, TYPE, 'まて');
-    expect(hint).toContain('「まて」');
-    expect(hint).toContain(`${ANSWER.length - 2} more kana`);
+    const { text } = stepCoachHint(MATSU, TYPE, 'まて');
+    expect(text).toContain('「まて」');
+    expect(text).toContain(`${ANSWER.length - 2} more kana`);
   });
 
   it('flags where a wrong kana goes off course', () => {
-    const hint = stepCoachHint(MATSU, TYPE, 'まと'); // 2nd kana wrong
-    expect(hint).toMatch(/kana 2 goes off course/);
+    const { text } = stepCoachHint(MATSU, TYPE, 'まと'); // 2nd kana wrong
+    expect(text).toMatch(/kana 2 goes off course/);
   });
 
   it('accepts romaji input and converts it', () => {
     // "mate" -> まて, a correct prefix of まてなかった
-    const hint = stepCoachHint(MATSU, TYPE, 'mate');
-    expect(hint).toContain('「まて」');
+    expect(stepCoachHint(MATSU, TYPE, 'mate').text).toContain('「まて」');
   });
 
   it('tells the student to press Enter once the full answer is typed', () => {
-    expect(stepCoachHint(MATSU, TYPE, ANSWER)).toMatch(/press Enter/);
+    expect(stepCoachHint(MATSU, TYPE, ANSWER).text).toMatch(/press Enter/);
+  });
+
+  // Irregular verbs: the rule spells out the answer, so the first hint masks it.
+  it('masks the irregular する form on the first hint, then reveals on request', () => {
+    const SHITA = conjugateItem(SURU, 'plain-past'); // した
+    const first = stepCoachHint(SURU, 'plain-past', '');
+    expect(first.masked).toBe(true);
+    expect(first.text).not.toContain(SHITA);
+    expect(first.text).toMatch(/irregular/i);
+
+    const revealed = stepCoachHint(SURU, 'plain-past', '', true);
+    expect(revealed.masked).toBe(false);
+    expect(revealed.text).toContain(SHITA);
+  });
+
+  it('does not mask the unchanged dictionary form of an irregular verb', () => {
+    // plain-present of する is する itself — nothing to spoil.
+    expect(stepCoachHint(SURU, 'plain-present', '').masked).toBe(false);
   });
 });

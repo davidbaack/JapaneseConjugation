@@ -85,6 +85,8 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const [aiHintLoading, setAiHintLoading] = useState(false);
   const [aiHintErr, setAiHintErr] = useState('');
   const [stepHint, setStepHint] = useState('');
+  const [hintMasked, setHintMasked] = useState(false);
+  const [hintRevealed, setHintRevealed] = useState(false);
   const [coachChatOpen, setCoachChatOpen] = useState(false);
   const [coachSeedAnswer, setCoachSeedAnswer] = useState('');
   const [coachRevealed, setCoachRevealed] = useState(0);
@@ -448,10 +450,15 @@ Keep it concise and clear.`;
     setAiHintLoading(false);
   }
 
-  // Deterministic, offline step coach — no API key required.
+  // Deterministic, offline step coach — no API key required. Irregular forms
+  // are masked on the first click; a second click reveals the spelled-out steps.
   function showStepHint() {
     if (!current) return;
-    setStepHint(stepCoachHint(current.verb, current.type, answer));
+    const reveal = hintRevealed || (!!stepHint && hintMasked);
+    const { text, masked } = stepCoachHint(current.verb, current.type, answer, reveal);
+    setStepHint(text);
+    setHintMasked(masked);
+    if (reveal) setHintRevealed(true);
   }
 
   // Opens a continuous AI chat for deeper help, seeded with the current
@@ -476,6 +483,8 @@ Keep it concise and clear.`;
       setSelfCheckOpen(false);
       setTypoGuard(null);
       setStepHint('');
+      setHintMasked(false);
+      setHintRevealed(false);
       setCoachChatOpen(false);
       hadKanaMistakeRef.current = false;
       setPhase('answering');
@@ -545,6 +554,8 @@ Keep it concise and clear.`;
         setSelfCheckOpen(false);
         setTypoGuard(null);
         setStepHint('');
+        setHintMasked(false);
+        setHintRevealed(false);
         setCoachChatOpen(false);
         hadKanaMistakeRef.current = false;
         setPhase('answering');
@@ -569,6 +580,8 @@ Keep it concise and clear.`;
     setSelfCheckOpen(false);
     setTypoGuard(null);
     setStepHint('');
+    setHintMasked(false);
+    setHintRevealed(false);
     setCoachChatOpen(false);
     hadKanaMistakeRef.current = false;
     setPhase('answering');
@@ -633,6 +646,8 @@ Keep it concise and clear.`;
         setSelfCheckOpen(false);
         setTypoGuard(null);
         setStepHint('');
+        setHintMasked(false);
+        setHintRevealed(false);
         setCoachChatOpen(false);
         hadKanaMistakeRef.current = false;
         setPhase('answering');

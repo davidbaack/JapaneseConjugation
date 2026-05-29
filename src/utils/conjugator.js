@@ -871,10 +871,22 @@ export function explainItem(item,type){
 // Deterministic, offline hint shown when the student clicks "Hint" while
 // answering. It states how the (possibly multi-step) form is built and where
 // the student currently is, without revealing any kana they haven't typed yet.
-export function stepCoachHint(item,type,typed){
+//
+// Irregular forms (する, 来る, よい-based adjectives…) have no derivable rule —
+// their "rule" text spells out the answer. To keep the first hint spoiler-free,
+// such text is replaced with a nudge unless `reveal` is true (a second Hint
+// click). Returns { text, masked }, where `masked` means more can be revealed.
+export function stepCoachHint(item,type,typed,reveal=false){
   const expected=conjugateItem(item,type);
   const exp=explainItem(item,type);
-  const recipe=[exp.rule,exp.note].filter(Boolean).join(' ').trim();
+  let recipe=[exp.rule,exp.note].filter(Boolean).join(' ').trim();
+  // Only a genuine transformation can spoil — the unchanged dictionary form can't.
+  const wouldReveal=!!expected&&expected!==item.reading&&recipe.includes(expected);
+  let masked=false;
+  if(wouldReveal&&!reveal){
+    recipe=`This is an irregular form, so it doesn't follow the usual pattern — try to recall its special conjugation. Tap Hint again or use “Discuss further” to reveal the steps.`;
+    masked=true;
+  }
   const got=toHiragana(typed||'')||(typed||'');
   let correct=0;
   while(correct<got.length&&correct<expected.length&&got[correct]===expected[correct])correct++;
@@ -891,7 +903,7 @@ export function stepCoachHint(item,type,typed){
     const remaining=expected.length-correct;
     status=`「${got}」 is correct so far — ${remaining} more kana to go. Apply the next step above.`;
   }
-  return recipe?`${recipe}\n\n${status}`:status;
+  return{text:recipe?`${recipe}\n\n${status}`:status,masked};
 }
 
 export function diagnose(verb,type,userAnswer){
