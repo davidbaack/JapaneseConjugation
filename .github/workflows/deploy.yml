@@ -30,9 +30,21 @@ jobs:
 
       - run: npm ci
 
+      # Non-blocking dependency vulnerability scan — surfaces high/critical
+      # advisories in the job log without failing the deploy.
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
       - run: npm test
 
       - run: npm run lint
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e
 
       - run: npm run build
         env:
