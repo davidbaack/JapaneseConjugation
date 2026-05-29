@@ -2,6 +2,13 @@ import React, { useState } from 'react';
 import ReferenceViewSub from './ReferenceViewSub.jsx';
 import ListsViewSub from './ListsViewSub.jsx';
 import CustomDictionaryViewSub from './CustomDictionaryViewSub.jsx';
+import { useTablist } from '../components/useTablist.js';
+
+const LIBRARY_TABS = [
+  { id: 'reference', label: 'Search & Reference', desc: 'Verb & adjective lookup' },
+  { id: 'lists', label: 'Lists & Decks', desc: 'Custom groupings & Anki export' },
+  { id: 'dictionary', label: 'Custom Dictionary', desc: 'Manage custom verbs & adjectives' }
+];
 
 export default function LibraryView({
   state,
@@ -20,18 +27,16 @@ export default function LibraryView({
   setTab
 }) {
   const [subTab, setSubTab] = useState('reference');
+  const { tabProps, panelProps } = useTablist(LIBRARY_TABS.map(t => t.id), subTab, setSubTab);
 
   return (
     <div className="space-y-4">
       {/* Sub-navigation bar */}
-      <div className="flex border-b border-stone-200 dark:border-stone-800">
-        {[
-          { id: 'reference', label: 'Search & Reference', desc: 'Verb & adjective lookup' },
-          { id: 'lists', label: 'Lists & Decks', desc: 'Custom groupings & Anki export' },
-          { id: 'dictionary', label: 'Custom Dictionary', desc: 'Manage custom verbs & adjectives' }
-        ].map(t => (
+      <div role="tablist" aria-label="Library sections" className="flex border-b border-stone-200 dark:border-stone-800">
+        {LIBRARY_TABS.map(t => (
           <button
             key={t.id}
+            {...tabProps(t.id)}
             onClick={() => setSubTab(t.id)}
             className={`flex-1 pb-3 text-center border-b-2 transition ${
               subTab === t.id
@@ -45,7 +50,7 @@ export default function LibraryView({
         ))}
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4" {...panelProps(subTab)}>
         {subTab === 'reference' && (
           <ReferenceViewSub
             state={state}
