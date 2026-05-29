@@ -14,7 +14,10 @@ export default function CustomDictionaryViewSub({
   state
 }) {
   const [dictTab, setDictTab] = useState('verbs');
-  const { tabProps, panelProps } = useTablist(['verbs', 'adjectives'], dictTab, setDictTab);
+  // Switch tab + clear any half-filled add form. Used by both click and the
+  // tablist's keyboard activation so the two paths behave identically.
+  const selectDictTab = (id) => { setDictTab(id); resetAdd(); };
+  const { tabProps, panelProps } = useTablist(['verbs', 'adjectives'], dictTab, selectDictTab);
   const [showAdd, setShowAdd] = useState(false);
   const [query, setQuery] = useState('');
   const [addPhase, setAddPhase] = useState('idle');
@@ -144,7 +147,7 @@ export default function CustomDictionaryViewSub({
       <div role="tablist" aria-label="Custom dictionary type" className="flex gap-2 p-1 bg-stone-100 dark:bg-stone-950 rounded-xl border border-stone-200 dark:border-stone-850">
         <button
           {...tabProps('verbs')}
-          onClick={() => { setDictTab('verbs'); resetAdd(); }}
+          onClick={() => selectDictTab('verbs')}
           className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${
             dictTab === 'verbs'
               ? 'bg-white dark:bg-stone-600 text-stone-800 dark:text-white shadow-sm'
@@ -155,7 +158,7 @@ export default function CustomDictionaryViewSub({
         </button>
         <button
           {...tabProps('adjectives')}
-          onClick={() => { setDictTab('adjectives'); resetAdd(); }}
+          onClick={() => selectDictTab('adjectives')}
           className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${
             dictTab === 'adjectives'
               ? 'bg-white dark:bg-stone-600 text-stone-800 dark:text-white shadow-sm'
