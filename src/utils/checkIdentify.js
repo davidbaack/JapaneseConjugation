@@ -6,6 +6,26 @@
 import { conjugateItem, compatibleTypes, surfaceFormFor } from './conjugator.js';
 import { toHiragana } from './romaji.js';
 
+// Forms that are real conjugations but make poor free-form answers: the
+// masu-stem is just a fragment of longer forms (たべ for 食べる), so a learner
+// who simply hasn't finished typing would otherwise be told they're "correct".
+const IGNORED_TYPES = new Set(['masu-stem']);
+
+// Convert any katakana in the string to hiragana so input typed with the IME
+// in katakana mode (or loanword verbs) still matches. toHiragana handles
+// romaji but passes katakana through unchanged.
+export function katakanaToHiragana(s) {
+  return String(s || '').replace(/[ァ-ヶ]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+}
+
+// Normalize free-form input to hiragana for matching: katakana is folded to
+// hiragana first, then any romaji is converted (toHiragana leaves kana as-is).
+export function normalizeInput(s) {
+  return toHiragana(katakanaToHiragana(s));
+}
+
 // Small Levenshtein edit distance between two strings (by character).
 export function levenshtein(a, b) {
   const s = Array.from(a || '');
@@ -76,7 +96,7 @@ const MAX_NEAR_RESULTS = 5;
 //   near:  [{ word, type, kana, kanji, distance, diff }] sorted best-first
 export function identifyConjugation(input, words = [], options = {}) {
   const raw = String(input ?? '').trim();
-  const normalized = toHiragana(raw);
+  const normalized = normalizeInput(raw);
   const typesFor = options.typesFor || ((item) => compatibleTypes(item));
 
   const exact = [];
@@ -91,6 +111,7 @@ export function identifyConjugation(input, words = [], options = {}) {
   for (const word of words) {
     for (const t of typesFor(word)) {
       const type = typeIdOf(t);
+      if (IGNORED_TYPES.has(type)) continue;
       const kana = conjugateItem(word, type);
       if (!kana) continue;
       const kanji = surfaceFormFor(word, type) || kana;

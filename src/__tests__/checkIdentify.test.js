@@ -141,6 +141,20 @@ describe('identifyConjugation', () => {
     expect(res.exact.some((e) => e.type === 'plain-present')).toBe(false);
   });
 
+  it('recognises katakana-typed input (タベタ = 食べた)', () => {
+    const res = identifyConjugation('タベタ', ALL);
+    const hit = res.exact.find(
+      (e) => e.word.reading === 'たべる' && e.type === 'plain-past'
+    );
+    expect(hit).toBeTruthy();
+  });
+
+  it('does not register masu-stem as a match (たべ should not be "correct")', () => {
+    const res = identifyConjugation('たべ', ALL);
+    expect(res.exact.some((e) => e.type === 'masu-stem')).toBe(false);
+    expect(res.exact).toHaveLength(0);
+  });
+
   it('uses real starter words', () => {
     expect(taberu).toBeTruthy();
     expect(nomu).toBeTruthy();

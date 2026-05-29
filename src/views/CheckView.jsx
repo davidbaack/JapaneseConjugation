@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { IconCheck, IconX, IconPen } from '../components/Icons.jsx';
+import { IconCheck, IconX, IconPen, IconVolume } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
+import { speakJapanese } from '../utils/speech.js';
 import { identifyConjugation } from '../utils/checkIdentify.js';
 import {
   getTypeInfo,
@@ -86,6 +87,11 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
     setResult(null);
     focusInput();
   }, [focusInput]);
+
+  const speak = useCallback(
+    (text) => speakJapanese(text, 0.9, practicePrefs.voiceURI),
+    [practicePrefs.voiceURI]
+  );
 
   const insertText = useCallback((t) => setInput((a) => a + t), []);
   const backspaceText = useCallback(() => setInput((a) => Array.from(a).slice(0, -1).join('')), []);
@@ -233,17 +239,28 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
               </div>
 
               <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4 text-center">
-                <ScriptDisplay
-                  view={formDisplay(
-                    exactForms[0].kana,
-                    practicePrefs,
-                    exactForms[0].word,
-                    exactForms[0].type
-                  )}
-                  word={exactForms[0].word}
-                  type={exactForms[0].type}
-                  className="text-2xl text-stone-900 dark:text-stone-100"
-                />
+                <div className="flex items-center justify-center gap-2">
+                  <ScriptDisplay
+                    view={formDisplay(
+                      exactForms[0].kana,
+                      practicePrefs,
+                      exactForms[0].word,
+                      exactForms[0].type
+                    )}
+                    word={exactForms[0].word}
+                    type={exactForms[0].type}
+                    className="text-2xl text-stone-900 dark:text-stone-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => speak(exactForms[0].kana)}
+                    className="shrink-0 p-1.5 rounded-lg text-stone-400 hover:text-indigo-600 hover:bg-stone-100 dark:hover:text-indigo-400 dark:hover:bg-stone-800 transition"
+                    title="Play audio"
+                    aria-label="Play audio"
+                  >
+                    <IconVolume className="w-5 h-5" />
+                  </button>
+                </div>
                 {sameWord ? (
                   <div className="mt-3 text-sm text-stone-600 dark:text-stone-300">
                     This form is both the{' '}
@@ -300,8 +317,19 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm mt-2">
                   <span className="text-stone-400">Correct form</span>
-                  <span className="text-emerald-700 dark:text-emerald-300 text-lg">
-                    <DiffForm correct={result.near[0].kana} firstDiff={result.near[0].diff.firstDiff} />
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-emerald-700 dark:text-emerald-300 text-lg">
+                      <DiffForm correct={result.near[0].kana} firstDiff={result.near[0].diff.firstDiff} />
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => speak(result.near[0].kana)}
+                      className="shrink-0 p-1 rounded-lg text-stone-400 hover:text-indigo-600 hover:bg-stone-100 dark:hover:text-indigo-400 dark:hover:bg-stone-800 transition"
+                      title="Play audio"
+                      aria-label="Play audio"
+                    >
+                      <IconVolume className="w-4 h-4" />
+                    </button>
                   </span>
                 </div>
                 <div className="mt-3 pt-3 border-t border-stone-200 dark:border-stone-800 text-xs text-stone-500 dark:text-stone-400">
