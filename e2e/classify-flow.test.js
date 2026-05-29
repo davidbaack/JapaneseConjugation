@@ -7,7 +7,7 @@ test.describe('Classification drill', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await page.locator('nav').getByRole('button', { name: 'classify', exact: true }).click();
+    await page.locator('nav').getByRole('button', { name: 'Which Group?', exact: true }).click();
     await expect(page.getByText('Classification drill')).toBeVisible();
 
     // At least the godan/ichidan choices are always present for a verb deck.

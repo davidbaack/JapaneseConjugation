@@ -22,9 +22,9 @@ const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 const TABS = [
   'study',
   'check',
-  'rush',
   'classify',
   'endings',
+  'games',
   'mistakes',
   'levels',
   'stats',
@@ -114,7 +114,7 @@ function AppShell() {
         <Suspense fallback={<ViewSkeleton />}>
           {tab === 'study' && <StudyView />}
           {tab === 'check' && <CheckView />}
-          {tab === 'rush' && <RushView />}
+          {tab === 'games' && <RushView />}
           {tab === 'endings' && <EndingsView />}
           {tab === 'classify' && <ClassificationView />}
           {tab === 'mistakes' && <MistakesView />}

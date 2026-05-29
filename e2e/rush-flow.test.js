@@ -7,7 +7,7 @@ test.describe('Rush mode', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await page.locator('nav').getByRole('button', { name: 'rush', exact: true }).click();
+    await page.locator('nav').getByRole('button', { name: 'games', exact: true }).click();
     await expect(page.getByText('Kotoba Rush').first()).toBeVisible();
 
     const start = page.getByRole('button', { name: 'Start', exact: true });

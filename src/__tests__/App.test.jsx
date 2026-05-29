@@ -14,8 +14,9 @@ describe('App shell', () => {
     render(<App />);
     expect(screen.getByRole('heading', { name: /Katachiya/ })).toBeTruthy();
     expect(screen.getByText('Spaced repetition, reference tables, and AI coaching')).toBeTruthy();
-    for (const tab of ['study', 'check', 'rush', 'settings', 'library', 'stats']) {
-      expect(screen.getByRole('button', { name: tab, exact: true })).toBeTruthy();
+    // Nav labels (accessible name is the catalog string; CSS only capitalizes).
+    for (const label of ['study', 'Conjugation Check', 'games', 'settings', 'library', 'stats']) {
+      expect(screen.getByRole('button', { name: label, exact: true })).toBeTruthy();
     }
   });
 
@@ -29,23 +30,24 @@ describe('App shell', () => {
 
   it('mounts every tab without hitting the error boundary', async () => {
     render(<App />);
-    const tabs = [
-      'check',
-      'rush',
-      'classify',
-      'endings',
+    // Each nav button's accessible name is its catalog label.
+    const labels = [
+      'Conjugation Check',
+      'Which Group?',
+      'て Forms',
+      'games',
       'mistakes',
-      'levels',
+      'Progress',
       'stats',
       'library',
       'settings',
       'study',
     ];
-    for (const tab of tabs) {
-      fireEvent.click(screen.getByRole('button', { name: tab, exact: true }));
+    for (const label of labels) {
+      fireEvent.click(screen.getByRole('button', { name: label, exact: true }));
       // Each view lazy-loads; wait until its chunk resolves (nav stays mounted).
       await waitFor(() => expect(screen.queryByText('Something went wrong')).toBeNull());
-      expect(screen.getByRole('button', { name: tab, exact: true })).toBeTruthy();
+      expect(screen.getByRole('button', { name: label, exact: true })).toBeTruthy();
     }
   });
 });
