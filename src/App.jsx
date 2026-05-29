@@ -246,37 +246,24 @@ export default function App() {
           </div>
         </header>
         <nav className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
-          {[
-            { tabs: ['study', 'check', 'classify', 'endings'] },
-            { label: 'Games', tabs: ['rush'] },
-            { tabs: ['mistakes', 'levels', 'stats', 'library', 'settings'] },
-          ].map(({ label, tabs }) => (
-            <React.Fragment key={label ?? tabs[0]}>
-              {label && (
-                <span className="flex items-center px-2 text-xs text-stone-400 dark:text-stone-600 self-center">
-                  {label}
-                </span>
-              )}
-              {tabs.map(t => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
-                    tab === t
-                      ? 'bg-stone-800 dark:bg-indigo-700 text-white font-semibold'
-                      : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
-                  }`}
-                >
-                  {{ endings: 'て Forms', levels: 'Progress', check: 'Conjugation Check', classify: 'Which Group?' }[t] ?? t}
-                </button>
-              ))}
-            </React.Fragment>
+          {['study', 'check', 'classify', 'endings', 'games', 'mistakes', 'levels', 'stats', 'library', 'settings'].map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
+                tab === t
+                  ? 'bg-stone-800 dark:bg-indigo-700 text-white font-semibold'
+                  : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
+              }`}
+            >
+              {{ endings: 'て Forms', levels: 'Progress', check: 'Conjugation Check', classify: 'Which Group?' }[t] ?? t}
+            </button>
           ))}
         </nav>
         <Suspense fallback={<div className="flex justify-center py-20 text-stone-400 text-sm">Loading…</div>}>
           {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} wordLists={wordLists} focus={studyFocus} onFocusConsumed={() => setStudyFocus(null)} />}
           {tab === 'check' && <CheckView verbs={allWords} practicePrefs={practicePrefs} geminiKey={activeGeminiKey} onPracticeWord={(word, type) => { setStudyFocus({ word, type }); setTab('study'); }} />}
-          {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
+          {tab === 'games' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
           {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
           {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
           {tab === 'mistakes' && <MistakesView state={state} setState={setState} practicePrefs={practicePrefs} />}
