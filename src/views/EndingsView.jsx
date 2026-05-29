@@ -227,33 +227,22 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
               </button>
             ))}
           </div>
-          <StickyAction pad="-mx-5 px-5" className="mt-4">
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setHintChars(Math.min(expected.length, hintChars + 1))}
-                disabled={hintChars >= expected.length || !!result}
-                className="px-3 py-2 border border-stone-205 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 disabled:opacity-40 rounded-lg text-sm transition"
-              >
-                Hint kana
-              </button>
-              <button
-                onClick={generateMnemonic}
-                disabled={!geminiKey || aiLoading}
-                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm transition"
-              >
-                {aiLoading ? 'Thinking...' : 'AI memory hook'}
-              </button>
-              {result && (
-                <button
-                  onClick={() => next()}
-                  autoFocus
-                  className="ml-auto px-4 py-2 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-lg text-sm font-medium transition"
-                >
-                  Next
-                </button>
-              )}
-            </div>
-          </StickyAction>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => setHintChars(Math.min(expected.length, hintChars + 1))}
+              disabled={hintChars >= expected.length || !!result}
+              className="px-3 py-2 border border-stone-205 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 disabled:opacity-40 rounded-lg text-sm transition"
+            >
+              Hint kana
+            </button>
+            <button
+              onClick={generateMnemonic}
+              disabled={!geminiKey || aiLoading}
+              className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm transition"
+            >
+              {aiLoading ? 'Thinking...' : 'AI memory hook'}
+            </button>
+          </div>
           {hintChars > 0 && (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-center text-xl tracking-widest text-amber-800 dark:text-amber-300" lang="ja">
               {hint}
@@ -289,6 +278,17 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
             <div className="mt-3 text-left rounded-xl border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/25 dark:border-indigo-900/50 px-3 py-2 text-sm text-indigo-900 dark:text-indigo-300 leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto">
               {aiTip}
             </div>
+          )}
+          {result && (
+            <StickyAction pad="-mx-5 px-5" className="mt-4">
+              <button
+                onClick={() => next()}
+                autoFocus
+                className="w-full py-2.5 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl font-medium shadow-lg transition"
+              >
+                Next
+              </button>
+            </StickyAction>
           )}
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">

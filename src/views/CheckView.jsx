@@ -302,7 +302,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
 
           {!result && (
             <>
-              <StickyAction pad="-mx-5 px-5 sm:-mx-6 sm:px-6" className="mt-4">
+              <StickyAction pad="-mx-4 px-4 sm:-mx-6 sm:px-6" className="mt-4">
                 <button
                   onClick={handleCheck}
                   disabled={!input.trim()}
