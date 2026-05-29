@@ -149,10 +149,12 @@ describe('identifyConjugation', () => {
     expect(hit).toBeTruthy();
   });
 
-  it('does not register masu-stem as a match (たべ should not be "correct")', () => {
+  it('treats a bare masu-stem as unidentified (たべ is not a conjugation)', () => {
     const res = identifyConjugation('たべ', ALL);
     expect(res.exact.some((e) => e.type === 'masu-stem')).toBe(false);
     expect(res.exact).toHaveLength(0);
+    // No near-miss guesses toward fuller forms — it's an incomplete fragment.
+    expect(res.near).toHaveLength(0);
   });
 
   it('uses real starter words', () => {

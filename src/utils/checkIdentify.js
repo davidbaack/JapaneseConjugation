@@ -108,10 +108,21 @@ export function identifyConjugation(input, words = [], options = {}) {
 
   const typeIdOf = (t) => (typeof t === 'string' ? t : t.id);
 
+  // An input that is exactly some word's masu-stem (たべ for 食べる) is an
+  // incomplete fragment, not a conjugation — report it as unidentified rather
+  // than offering near-miss guesses toward the fuller forms.
+  let isBareStem = false;
+
   for (const word of words) {
     for (const t of typesFor(word)) {
       const type = typeIdOf(t);
-      if (IGNORED_TYPES.has(type)) continue;
+      if (IGNORED_TYPES.has(type)) {
+        if (!isBareStem) {
+          const stem = conjugateItem(word, type);
+          if (stem && (normalized === stem || raw === stem)) isBareStem = true;
+        }
+        continue;
+      }
       const kana = conjugateItem(word, type);
       if (!kana) continue;
       const kanji = surfaceFormFor(word, type) || kana;
@@ -135,6 +146,11 @@ export function identifyConjugation(input, words = [], options = {}) {
 
   // Near-misses only matter when nothing matched exactly.
   if (exact.length > 0) {
+    return { input: raw, normalized, exact, near: [] };
+  }
+
+  // A bare masu-stem is treated as unidentified (no near-miss suggestions).
+  if (isBareStem) {
     return { input: raw, normalized, exact, near: [] };
   }
 
