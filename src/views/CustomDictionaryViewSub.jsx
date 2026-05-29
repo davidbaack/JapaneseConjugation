@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { IconPlus, IconTrash } from '../components/Icons.jsx';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
-import { toHiragana, isAllKana } from '../utils/romaji.js';
 import { getSuggestedWord, lookupWordWithGemini } from '../utils/gemini.js';
 import { useTablist } from '../components/useTablist.js';
+import { validateWord, sanitizeField, FIELD_LIMITS } from '../utils/validateWord.js';
 
 export default function CustomDictionaryViewSub({
   customVerbs,
@@ -95,7 +95,14 @@ export default function CustomDictionaryViewSub({
     }
   }
 
-  function doAdd(word) {
+  function doAdd(rawWord) {
+    // Sanitize fields even for AI-sourced words before they hit storage/prompts.
+    const word = {
+      ...rawWord,
+      dict: sanitizeField(rawWord.dict, FIELD_LIMITS.dict),
+      reading: sanitizeField(rawWord.reading, FIELD_LIMITS.reading),
+      meaning: sanitizeField(rawWord.meaning, FIELD_LIMITS.meaning),
+    };
     if (allWords.some((v) => v.dict === word.dict)) {
       setAddError(`${word.dict} is already in your list`);
       setAddPhase('error');
@@ -109,32 +116,14 @@ export default function CustomDictionaryViewSub({
 
   function addManual() {
     setMErr('');
-    if (!mf.dict.trim() || !mf.reading.trim() || !mf.meaning.trim()) {
-      setMErr('All fields required');
+    // Sanitize and validate before storing — fields end up in localStorage,
+    // cloud sync, TSV export, and AI prompts (improvement #16).
+    const { ok, errors, word } = validateWord(mf);
+    if (!ok) {
+      setMErr(errors[0]);
       return;
     }
-    const reading = toHiragana(mf.reading);
-    if (!isAllKana(reading)) {
-      setMErr('Reading must be hiragana');
-      return;
-    }
-    if (isAdj) {
-      if (mf.group === 'i-adjective' && !reading.endsWith('い')) {
-        setMErr('い-adjective must end in い');
-        return;
-      }
-      doAdd({ dict: mf.dict.trim(), reading, meaning: mf.meaning.trim(), group: mf.group });
-    } else {
-      if (mf.group === 'ichidan' && !reading.endsWith('る')) {
-        setMErr('Ichidan must end in る');
-        return;
-      }
-      if (mf.group === 'godan' && !/[うくぐすつぬぶむる]$/.test(reading)) {
-        setMErr('Godan must end in う/く/ぐ/す/つ/ぬ/ぶ/む/る');
-        return;
-      }
-      doAdd({ dict: mf.dict.trim(), reading, meaning: mf.meaning.trim(), group: mf.group });
-    }
+    doAdd(word);
   }
 
   const groupLabel = isAdj
