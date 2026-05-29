@@ -6,6 +6,11 @@ temp-vite
 .DS_Store
 test-results
 playwright-report
+
+# Environment files
 .env
 .env.local
 .env.*.local
+
+# Supabase CLI local state
+supabase/.temp/
