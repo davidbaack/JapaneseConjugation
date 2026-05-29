@@ -11,11 +11,31 @@ import {
   getWordMeta,
   GROUP_NAMES,
 } from '../utils/conjugator.js';
+import { formRows } from './ReferenceViewSub.jsx';
 import { formDisplay, englishForForm } from '../utils/display.js';
 import { toHiragana } from '../utils/romaji.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
 const MAX_HISTORY = 6;
+const HISTORY_KEY = 'katachiya_check_history';
+
+// Recent checks should survive tab switches and reloads like the rest of the
+// app's state — CheckView unmounts whenever you leave the tab.
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.slice(0, MAX_HISTORY) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Avoid popping the soft keyboard on phones the instant the tab opens.
+const isCoarsePointer =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(pointer: coarse)').matches;
 
 const EXAMPLES = ['食べた', 'のんで', 'たかかった', 'tabemasu'];
 
@@ -48,14 +68,66 @@ function candidateLabel(cand) {
   return `${ti.label} of ${word.dict}（${word.reading}）— ${word.meaning}`;
 }
 
-export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, geminiKey }) {
+// Post-result extras shared by the correct and near-miss branches: a full
+// conjugation table for the recognised word, and a jump into Study to drill it.
+function WordExtras({ word, type, showForms, onToggleForms, onPracticeWord }) {
+  const rows = useMemo(() => (showForms ? formRows(word) : []), [showForms, word]);
+  return (
+    <div className="mt-3 flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <button
+          onClick={onToggleForms}
+          className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+        >
+          {showForms ? 'Hide all forms' : `Show all forms of ${word.dict}`}
+        </button>
+        {onPracticeWord && (
+          <button
+            onClick={() => onPracticeWord(word, type)}
+            className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+          >
+            Practice this word →
+          </button>
+        )}
+      </div>
+      {showForms && (
+        <div className="overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800">
+          <table className="w-full text-sm">
+            <tbody>
+              {rows.map((r, i) => (
+                <tr
+                  key={r.type.id}
+                  className={i % 2 ? 'bg-stone-50 dark:bg-stone-950/40' : undefined}
+                >
+                  <td className="px-3 py-1.5 text-stone-500 dark:text-stone-400 whitespace-nowrap">
+                    {getTypeInfo(r.type.id).label}
+                  </td>
+                  <td
+                    className="px-3 py-1.5 text-right font-medium text-stone-800 dark:text-stone-200"
+                    lang="ja"
+                  >
+                    {r.answer}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, geminiKey, onPracticeWord }) {
   const [input, setInput] = useState('');
   const [result, setResult] = useState(null);
   const [kanaPadOpen, setKanaPadOpen] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState(loadHistory);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [showOthers, setShowOthers] = useState(false);
+  const [showForms, setShowForms] = useState(false);
   const inputRef = useRef(null);
+  const resultRef = useRef(null);
 
   // Check recognises a conjugation of ANY known word, in ANY valid form — a
   // correct conjugation should never be reported as wrong just because it
@@ -67,10 +139,26 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
     inputRef.current?.focus();
   }, []);
 
-  // Land with the cursor in the box — this is a "type immediately" tool.
+  // Land with the cursor in the box — this is a "type immediately" tool — but
+  // not on touch devices, where it would force the keyboard up over the intro.
   useEffect(() => {
-    focusInput();
+    if (!isCoarsePointer) focusInput();
   }, [focusInput]);
+
+  // Persist recent checks so they survive tab switches and reloads.
+  useEffect(() => {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    } catch {
+      /* ignore quota / private-mode failures */
+    }
+  }, [history]);
+
+  // Bring the verdict into view after a check — on mobile it lands below the
+  // fold under the keyboard otherwise.
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [result]);
 
   const runCheck = useCallback(
     (value) => {
@@ -80,6 +168,7 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
       const status = res.exact.length > 0 ? 'exact' : res.near.length > 0 ? 'near' : 'none';
       setShowBreakdown(false);
       setShowOthers(false);
+      setShowForms(false);
       setResult({ ...res, status });
       setHistory((h) => {
         const entry = { input: res.normalized || raw, status };
@@ -267,7 +356,20 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
 
       {/* Result card */}
       {result && (
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5 sm:p-6">
+        <div
+          ref={resultRef}
+          role="status"
+          aria-live="polite"
+          className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5 sm:p-6 scroll-mt-4"
+        >
+          {/* Screen readers get a one-line verdict before the visual details. */}
+          <span className="sr-only">
+            {result.status === 'exact'
+              ? 'Correct conjugation.'
+              : result.status === 'near'
+                ? 'Not quite.'
+                : "Couldn't identify that."}
+          </span>
           {result.status === 'exact' && (
             <div>
               <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold mb-4">
@@ -350,6 +452,16 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
                     />
                   )}
                 </div>
+              )}
+
+              {headForm && (
+                <WordExtras
+                  word={headForm.word}
+                  type={headForm.type}
+                  showForms={showForms}
+                  onToggleForms={() => setShowForms((v) => !v)}
+                  onPracticeWord={onPracticeWord}
+                />
               )}
 
               {/* Distinct OTHER words this string could also belong to. */}
@@ -435,6 +547,16 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
                     />
                   )}
                 </div>
+              )}
+
+              {headForm && (
+                <WordExtras
+                  word={headForm.word}
+                  type={headForm.type}
+                  showForms={showForms}
+                  onToggleForms={() => setShowForms((v) => !v)}
+                  onPracticeWord={onPracticeWord}
+                />
               )}
 
               {/* Alternative interpretations are secondary — tuck them away. */}

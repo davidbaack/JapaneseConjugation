@@ -415,6 +415,25 @@ export function selectNext(state, verbs, enabledTypes, lastRuleId, prefs = DEFAU
   return { id: chosen.rule.id, verb, type: chosen.rule.type, card: state.cards[chosen.rule.id], ruleLabel: chosen.rule.label };
 }
 
+// Build a Study card for a SPECIFIC word + form — used when "Practice this
+// verb" is tapped in Check. Returns the same shape as selectNext (so it can be
+// dropped straight into StudyView's `current`), or null when no rule covers
+// this word/form, letting the caller fall back to normal selection. Matching
+// on verbFilter([word]) rather than on the id string means the 行く exception
+// and any other rule quirks resolve themselves.
+export function buildFocusCard(state, word, type) {
+  if (!word || !type) return null;
+  const rule = RULES.find((r) => r.type === type && r.verbFilter([word]).length === 1);
+  if (!rule) return null;
+  return {
+    id: rule.id,
+    verb: word,
+    type: rule.type,
+    card: state.cards[rule.id],
+    ruleLabel: rule.label,
+  };
+}
+
 export function buildPracticePoolSummary(state, words, prefs = DEFAULT_PREFS, wordLists = []) {
   const filtered = filterWordsForPrefs(words, prefs, wordLists);
   const enabled = enabledTypeIdsFor(state.enabledTypes);

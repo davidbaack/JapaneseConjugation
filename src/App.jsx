@@ -37,6 +37,8 @@ export default function App() {
   const [wordLists, setWordLists] = useState([]);
   const [practicePrefs, setPracticePrefs] = useState(DEFAULT_PREFS);
   const [session, setSession] = useState(null);
+  // A { word, type } the user asked to practise from Check; consumed by Study.
+  const [studyFocus, setStudyFocus] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
   const geminiKey = import.meta.env?.VITE_GEMINI_API_KEY || '';
@@ -259,8 +261,8 @@ export default function App() {
           ))}
         </nav>
         <Suspense fallback={<div className="flex justify-center py-20 text-stone-400 text-sm">Loading…</div>}>
-          {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
-          {tab === 'check' && <CheckView verbs={allWords} practicePrefs={practicePrefs} geminiKey={activeGeminiKey} />}
+          {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} wordLists={wordLists} focus={studyFocus} onFocusConsumed={() => setStudyFocus(null)} />}
+          {tab === 'check' && <CheckView verbs={allWords} practicePrefs={practicePrefs} geminiKey={activeGeminiKey} onPracticeWord={(word, type) => { setStudyFocus({ word, type }); setTab('study'); }} />}
           {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
           {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
           {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}

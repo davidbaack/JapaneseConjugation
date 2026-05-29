@@ -8,6 +8,8 @@ import {
   mergeState,
   getCardLevel,
   normalizeReferenceState,
+  buildFocusCard,
+  defaultState,
   DAY,
 } from '../utils/storage.js';
 
@@ -262,5 +264,33 @@ describe('mergeState', () => {
     const saved = { enabledTypes: ['plain-past', 'te-form'] }; // no adj- types
     const state = mergeState(saved, null);
     expect(state.enabledTypes.some(id => id.startsWith('adj-'))).toBe(true);
+  });
+});
+
+describe('buildFocusCard', () => {
+  const state = defaultState();
+
+  it('builds a card matching the word group and requested form', () => {
+    const word = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+    const card = buildFocusCard(state, word, 'plain-past');
+    expect(card).toMatchObject({ id: 'ichidan|plain-past', verb: word, type: 'plain-past' });
+  });
+
+  it('routes the 行く exception to its dedicated rule for plain-past', () => {
+    const iku = { dict: '行く', reading: 'いく', meaning: 'to go', group: 'godan' };
+    const card = buildFocusCard(state, iku, 'plain-past');
+    expect(card.id).toBe('exception-いく|plain-past');
+  });
+
+  it('uses the ordinary godan rule for 行く on non-exception forms', () => {
+    const iku = { dict: '行く', reading: 'いく', meaning: 'to go', group: 'godan' };
+    const card = buildFocusCard(state, iku, 'polite-present');
+    expect(card.id).toBe('godan|polite-present');
+  });
+
+  it('returns null when no rule covers the word/form', () => {
+    const word = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+    expect(buildFocusCard(state, word, 'adj-plain-past')).toBeNull();
+    expect(buildFocusCard(state, null, 'plain-past')).toBeNull();
   });
 });

@@ -21,7 +21,7 @@ import {
   isAdjective,
   promptFormLabel
 } from '../utils/conjugator.js';
-import { selectNext, recordMistake, gradeCard, bumpDaily, getAICache, setAICache } from '../utils/storage.js';
+import { selectNext, buildFocusCard, recordMistake, gradeCard, bumpDaily, getAICache, setAICache } from '../utils/storage.js';
 import {
   formDisplay,
   promptDisplay,
@@ -83,7 +83,7 @@ export function explainReversePrompt(item, type) {
   };
 }
 
-export default function StudyView({ state, setState, verbs, geminiKey, practicePrefs = DEFAULT_PREFS, wordLists = [] }) {
+export default function StudyView({ state, setState, verbs, geminiKey, practicePrefs = DEFAULT_PREFS, wordLists = [], focus = null, onFocusConsumed }) {
   const [current, setCurrent] = useState(null);
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');
@@ -109,6 +109,7 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const [reviewBase, setReviewBase] = useState(state.session.reviewed || 0);
   const [aiSentence, setAiSentence] = useState(null);
   const inputRef = useRef(null);
+  const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
   const hadKanaMistakeRef = useRef(false);
   // Snapshots the typed answer the moment a kana mistake first occurs, so the
@@ -119,11 +120,15 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
 
   const enabledTypes = state.enabledTypes.length > 0 ? state.enabledTypes : ['plain-past'];
   const practiceWords = useMemo(() => {
-    // Make sure we have a clean reference in case selectNext or other utilities call it
-    // Wait, conjugator.js defines filterWordsForPrefs
-    // Let's import it from ../utils/conjugator.js
-    return filterWordsForPrefs(verbs, practicePrefs, wordLists);
-  }, [verbs, practicePrefs, wordLists]);
+    const base = filterWordsForPrefs(verbs, practicePrefs, wordLists);
+    // Keep a "Practice this verb" target from Check eligible even if it sits
+    // outside the current Study filters, so the reset guard below doesn't
+    // discard the focus card the moment it's seeded.
+    if (focus?.word && !base.some(w => w.dict === focus.word.dict && w.group === focus.word.group)) {
+      return [...base, focus.word];
+    }
+    return base;
+  }, [verbs, practicePrefs, wordLists, focus]);
 
   const listeningPrompt = !!practicePrefs.listeningPrompt;
   const drillDirection = current ? drillDirectionFor(current, practicePrefs) : 'forward';
@@ -139,12 +144,25 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
     : '';
 
   useEffect(() => {
-    if (current === null) {
-      setCurrent(selectNext(state, practiceWords, enabledTypes, null, practicePrefs));
+    if (current !== null) return;
+    // When arriving from Check's "Practice this verb", seed that exact word/form
+    // once. If no rule covers it, fall through to normal selection.
+    if (focus?.word && !focusSeededRef.current) {
+      focusSeededRef.current = true;
+      const card = buildFocusCard(state, focus.word, focus.type);
+      if (card) {
+        setCurrent(card);
+        return;
+      }
     }
+    setCurrent(selectNext(state, practiceWords, enabledTypes, null, practicePrefs));
   // state intentionally omitted — this triggers on card change, not every state mutation
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, practiceWords, enabledTypes, practicePrefs]);
+  }, [current, practiceWords, enabledTypes, practicePrefs, focus]);
+
+  // Clear the one-shot focus when leaving Study, so returning later doesn't
+  // re-seed the same word.
+  useEffect(() => () => onFocusConsumed?.(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (
