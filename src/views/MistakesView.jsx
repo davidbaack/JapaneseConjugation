@@ -140,37 +140,35 @@ export default function MistakesView({ state, setState, practicePrefs }) {
                 <IconVolume className="w-4 h-4" />
               </button>
             </div>
-            <div>
-              <input
-                value={answer}
-                onChange={e => {
-                  setAnswer(e.target.value);
-                  setResult(null);
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    submit();
-                  }
-                }}
-                placeholder="Type romaji or kana..."
-                aria-label="Type your answer in romaji or kana"
-                className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-xl focus:border-indigo-500 focus:outline-none transition"
-                lang="ja"
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck="false"
-              />
-              <StickyAction pad="-mx-5 px-5" className="mt-3">
-                <button
-                  onClick={submit}
-                  disabled={!answer.trim()}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition"
-                >
-                  Retest
-                </button>
-              </StickyAction>
-            </div>
+            <input
+              value={answer}
+              onChange={e => {
+                setAnswer(e.target.value);
+                setResult(null);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              placeholder="Type romaji or kana..."
+              aria-label="Type your answer in romaji or kana"
+              className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-xl focus:border-indigo-500 focus:outline-none transition"
+              lang="ja"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="false"
+            />
+            <StickyAction pad="-mx-5 px-5">
+              <button
+                onClick={submit}
+                disabled={!answer.trim()}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition"
+              >
+                Retest
+              </button>
+            </StickyAction>
             {result && (
               <div
                 className={`rounded-xl border p-4 ${
