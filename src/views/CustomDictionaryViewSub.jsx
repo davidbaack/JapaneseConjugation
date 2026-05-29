@@ -3,6 +3,7 @@ import { IconPlus, IconTrash } from '../components/Icons.jsx';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
 import { toHiragana, isAllKana } from '../utils/romaji.js';
 import { getSuggestedWord, lookupWordWithGemini } from '../utils/gemini.js';
+import { useTablist } from '../components/useTablist.js';
 
 export default function CustomDictionaryViewSub({
   customVerbs,
@@ -13,6 +14,7 @@ export default function CustomDictionaryViewSub({
   state
 }) {
   const [dictTab, setDictTab] = useState('verbs');
+  const { tabProps, panelProps } = useTablist(['verbs', 'adjectives'], dictTab, setDictTab);
   const [showAdd, setShowAdd] = useState(false);
   const [query, setQuery] = useState('');
   const [addPhase, setAddPhase] = useState('idle');
@@ -139,8 +141,9 @@ export default function CustomDictionaryViewSub({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 p-1 bg-stone-100 dark:bg-stone-950 rounded-xl border border-stone-200 dark:border-stone-850">
+      <div role="tablist" aria-label="Custom dictionary type" className="flex gap-2 p-1 bg-stone-100 dark:bg-stone-950 rounded-xl border border-stone-200 dark:border-stone-850">
         <button
+          {...tabProps('verbs')}
           onClick={() => { setDictTab('verbs'); resetAdd(); }}
           className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${
             dictTab === 'verbs'
@@ -151,6 +154,7 @@ export default function CustomDictionaryViewSub({
           Verbs
         </button>
         <button
+          {...tabProps('adjectives')}
           onClick={() => { setDictTab('adjectives'); resetAdd(); }}
           className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${
             dictTab === 'adjectives'
@@ -162,6 +166,7 @@ export default function CustomDictionaryViewSub({
         </button>
       </div>
 
+      <div {...panelProps(dictTab)} className="space-y-4">
       <div className="flex justify-between items-center">
         <div className="text-sm text-stone-605 dark:text-stone-400">
           {starterWords.length} starter + {customWords.length} custom = {starterWords.length + customWords.length} {isAdj ? 'adjectives' : 'verbs'}
@@ -378,6 +383,7 @@ export default function CustomDictionaryViewSub({
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
   );
