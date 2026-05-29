@@ -35,6 +35,13 @@ import {
 } from '../utils/display.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
+// Wrapper that pins a primary action button to the bottom of the viewport while
+// its card is in view, so expandable hint/AI content can't push it off-screen.
+// The top-fading backdrop keeps content from showing through behind the button;
+// `-mx-4 px-4` lets it span the full width of the card's `p-4` padding.
+const STICKY_ACTION =
+  'sticky bottom-0 z-10 -mx-4 px-4 pt-3 pb-1 bg-gradient-to-t from-white via-white dark:from-stone-900 dark:via-stone-900 to-transparent';
+
 export function kanaCoachCells(expected, input, revealed = 0, pendingLast = false, greenRevealed = 0) {
   const target = Array.from(expected || '');
   const typed = Array.from(toHiraganaProgress(input || ''));
@@ -1236,13 +1243,15 @@ Keep it concise and clear.`;
                       noToggle
                     />
                     <div className="mt-3 space-y-2">
-                      <button
-                        onClick={() => submit()}
-                        disabled={!answer.trim()}
-                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40"
-                      >
-                        Check (Enter)
-                      </button>
+                      <div className={STICKY_ACTION}>
+                        <button
+                          onClick={() => submit()}
+                          disabled={!answer.trim()}
+                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
+                        >
+                          Check (Enter)
+                        </button>
+                      </div>
                       <div className="grid grid-cols-3 gap-2">
                         <button
                           onClick={() => setCoachRevealed(Math.min(expectedKanaCount, Math.max(coachRevealed, coachTypedCount) + 1))}
@@ -1359,13 +1368,15 @@ Keep it concise and clear.`;
                       </div>
                     )}
                     <div className="mt-3 space-y-2">
-                      <button
-                        onClick={() => submit()}
-                        disabled={!answer.trim()}
-                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition disabled:opacity-40"
-                      >
-                        Check (Enter)
-                      </button>
+                      <div className={STICKY_ACTION}>
+                        <button
+                          onClick={() => submit()}
+                          disabled={!answer.trim()}
+                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
+                        >
+                          Check (Enter)
+                        </button>
+                      </div>
                       <div className={`grid gap-2 ${!reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}>
                         {!reverseDrill && (
                           <button
@@ -1569,13 +1580,15 @@ Keep it concise and clear.`;
                   </div>
                 )}
 
-                <button
-                  onClick={() => submit()}
-                  autoFocus
-                  className="w-full mt-3 py-2.5 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl font-medium transition"
-                >
-                  Next (Enter)
-                </button>
+                <div className={`${STICKY_ACTION} mt-3`}>
+                  <button
+                    onClick={() => submit()}
+                    autoFocus
+                    className="w-full py-2.5 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl font-medium shadow-lg transition"
+                  >
+                    Next (Enter)
+                  </button>
+                </div>
               </div>
             )}
           </div>
