@@ -19,6 +19,7 @@ import AuthModal from './components/AuthModal.jsx';
 
 // Views — lazy-loaded so each gets its own chunk
 const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
+const CheckView = React.lazy(() => import('./views/CheckView.jsx'));
 const RushView = React.lazy(() => import('./views/RushView.jsx'));
 const EndingsView = React.lazy(() => import('./views/EndingsView.jsx'));
 const ClassificationView = React.lazy(() => import('./views/ClassificationView.jsx'));
@@ -243,7 +244,7 @@ export default function App() {
           </div>
         </header>
         <nav className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
-          {['study', 'rush', 'classify', 'endings', 'mistakes', 'levels', 'stats', 'library', 'settings'].map(t => (
+          {['study', 'check', 'rush', 'classify', 'endings', 'mistakes', 'levels', 'stats', 'library', 'settings'].map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -259,6 +260,7 @@ export default function App() {
         </nav>
         <Suspense fallback={<div className="flex justify-center py-20 text-stone-400 text-sm">Loading…</div>}>
           {tab === 'study' && <StudyView state={state} setState={setState} verbs={allWords} geminiKey={activeGeminiKey} practicePrefs={practicePrefs} wordLists={wordLists} />}
+          {tab === 'check' && <CheckView state={state} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
           {tab === 'rush' && <RushView state={state} setState={setState} verbs={allWords} practicePrefs={practicePrefs} wordLists={wordLists} />}
           {tab === 'endings' && <EndingsView state={state} setState={setState} verbs={allVerbs} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
           {tab === 'classify' && <ClassificationView state={state} setState={setState} words={allWords} practicePrefs={practicePrefs} wordLists={wordLists} geminiKey={activeGeminiKey} />}
