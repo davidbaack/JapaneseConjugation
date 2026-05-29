@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { IconSpark } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import StickyAction from '../components/StickyAction.jsx';
 import {
   filterWordsForPrefs,
   isAdjective,
@@ -226,31 +227,33 @@ export default function EndingsView({ state, setState, verbs, practicePrefs = DE
               </button>
             ))}
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              onClick={() => setHintChars(Math.min(expected.length, hintChars + 1))}
-              disabled={hintChars >= expected.length || !!result}
-              className="px-3 py-2 border border-stone-205 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 disabled:opacity-40 rounded-lg text-sm transition"
-            >
-              Hint kana
-            </button>
-            <button
-              onClick={generateMnemonic}
-              disabled={!geminiKey || aiLoading}
-              className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm transition"
-            >
-              {aiLoading ? 'Thinking...' : 'AI memory hook'}
-            </button>
-            {result && (
+          <StickyAction pad="-mx-5 px-5" className="mt-4">
+            <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => next()}
-                autoFocus
-                className="ml-auto px-4 py-2 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-lg text-sm font-medium transition"
+                onClick={() => setHintChars(Math.min(expected.length, hintChars + 1))}
+                disabled={hintChars >= expected.length || !!result}
+                className="px-3 py-2 border border-stone-205 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 disabled:opacity-40 rounded-lg text-sm transition"
               >
-                Next
+                Hint kana
               </button>
-            )}
-          </div>
+              <button
+                onClick={generateMnemonic}
+                disabled={!geminiKey || aiLoading}
+                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm transition"
+              >
+                {aiLoading ? 'Thinking...' : 'AI memory hook'}
+              </button>
+              {result && (
+                <button
+                  onClick={() => next()}
+                  autoFocus
+                  className="ml-auto px-4 py-2 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-lg text-sm font-medium transition"
+                >
+                  Next
+                </button>
+              )}
+            </div>
+          </StickyAction>
           {hintChars > 0 && (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-center text-xl tracking-widest text-amber-800 dark:text-amber-300" lang="ja">
               {hint}

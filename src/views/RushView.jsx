@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { IconSpark } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import StickyAction from '../components/StickyAction.jsx';
 import { toHiragana } from '../utils/romaji.js';
 import {
   filterWordsForPrefs,
@@ -314,33 +315,35 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
               </div>
             )}
           </div>
-          <div className="mt-4 grid sm:grid-cols-[1fr_auto] gap-2">
-            <input
-              value={answer}
-              onChange={e => setAnswer(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              disabled={!round || paused}
-              placeholder="Type answer"
-              aria-label={round ? `Answer: ${round.type.label} of ${round.item.dict}` : 'Type answer'}
-              lang="ja"
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck="false"
-              className="px-4 py-3 text-xl border-2 border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-xl focus:border-indigo-500 focus:outline-none disabled:bg-stone-50 dark:disabled:bg-stone-900 transition"
-            />
-            <button
-              onClick={submit}
-              disabled={!round || paused}
-              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium transition"
-            >
-              Submit
-            </button>
-          </div>
+          <StickyAction pad="-mx-5 px-5" className="mt-4">
+            <div className="grid sm:grid-cols-[1fr_auto] gap-2">
+              <input
+                value={answer}
+                onChange={e => setAnswer(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submit();
+                  }
+                }}
+                disabled={!round || paused}
+                placeholder="Type answer"
+                aria-label={round ? `Answer: ${round.type.label} of ${round.item.dict}` : 'Type answer'}
+                lang="ja"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck="false"
+                className="px-4 py-3 text-xl border-2 border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-xl focus:border-indigo-500 focus:outline-none disabled:bg-stone-50 dark:disabled:bg-stone-900 transition"
+              />
+              <button
+                onClick={submit}
+                disabled={!round || paused}
+                className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium shadow-lg transition"
+              >
+                Submit
+              </button>
+            </div>
+          </StickyAction>
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
           <h3 className="font-medium mb-3 text-stone-950 dark:text-stone-50">Rush log</h3>

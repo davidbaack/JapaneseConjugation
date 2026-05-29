@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { IconVolume } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import StickyAction from '../components/StickyAction.jsx';
 import { toHiragana } from '../utils/romaji.js';
 import {
   conjugateItem,
@@ -160,13 +161,15 @@ export default function MistakesView({ state, setState, practicePrefs }) {
                 autoCorrect="off"
                 spellCheck="false"
               />
-              <button
-                onClick={submit}
-                disabled={!answer.trim()}
-                className="w-full mt-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition"
-              >
-                Retest
-              </button>
+              <StickyAction pad="-mx-5 px-5" className="mt-3">
+                <button
+                  onClick={submit}
+                  disabled={!answer.trim()}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition"
+                >
+                  Retest
+                </button>
+              </StickyAction>
             </div>
             {result && (
               <div

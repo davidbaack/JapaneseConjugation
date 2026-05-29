@@ -3,6 +3,7 @@ import { IconCheck, IconX, IconPen, IconVolume } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
+import StickyAction from '../components/StickyAction.jsx';
 import { speakJapanese } from '../utils/speech.js';
 import { identifyConjugation } from '../utils/checkIdentify.js';
 import {
@@ -301,13 +302,15 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
 
           {!result && (
             <>
-              <button
-                onClick={handleCheck}
-                disabled={!input.trim()}
-                className="mt-4 w-full py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-medium transition"
-              >
-                Check
-              </button>
+              <StickyAction pad="-mx-5 px-5 sm:-mx-6 sm:px-6" className="mt-4">
+                <button
+                  onClick={handleCheck}
+                  disabled={!input.trim()}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-medium shadow-lg transition"
+                >
+                  Check
+                </button>
+              </StickyAction>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-stone-400">Try:</span>
                 {EXAMPLES.map((ex) => (
@@ -613,12 +616,14 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, gemini
             </div>
           )}
 
-          <button
-            onClick={handleNext}
-            className="mt-5 w-full py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium transition"
-          >
-            Check another
-          </button>
+          <StickyAction pad="-mx-5 px-5 sm:-mx-6 sm:px-6" className="mt-5">
+            <button
+              onClick={handleNext}
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium shadow-lg transition"
+            >
+              Check another
+            </button>
+          </StickyAction>
         </div>
       )}
     </div>

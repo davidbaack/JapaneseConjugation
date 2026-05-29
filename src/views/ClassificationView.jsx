@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { IconSpark } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import StickyAction from '../components/StickyAction.jsx';
 import {
   filterWordsForPrefs,
   isAdjective,
@@ -203,23 +204,25 @@ export default function ClassificationView({ state, setState, words, practicePre
               </span>
             </div>
             <div className="text-sm text-stone-705 dark:text-stone-300 mt-2">{classifyHint(current)}</div>
-            <div className="grid sm:grid-cols-2 gap-2 mt-3">
-              <button
-                onClick={explainClassificationWithAI}
-                disabled={!geminiKey || aiLoading}
-                className="py-2 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium inline-flex items-center justify-center gap-1.5 transition"
-              >
-                <IconSpark className="w-4 h-4" />
-                {aiLoading ? 'Explaining...' : 'AI why'}
-              </button>
-              <button
-                onClick={next}
-                autoFocus
-                className="py-2 px-3 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl text-sm font-medium transition"
-              >
-                Next
-              </button>
-            </div>
+            <StickyAction pad="-mx-4 px-4" className="mt-3">
+              <div className="grid sm:grid-cols-2 gap-2">
+                <button
+                  onClick={explainClassificationWithAI}
+                  disabled={!geminiKey || aiLoading}
+                  className="py-2 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium inline-flex items-center justify-center gap-1.5 transition"
+                >
+                  <IconSpark className="w-4 h-4" />
+                  {aiLoading ? 'Explaining...' : 'AI why'}
+                </button>
+                <button
+                  onClick={next}
+                  autoFocus
+                  className="py-2 px-3 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl text-sm font-medium transition"
+                >
+                  Next
+                </button>
+              </div>
+            </StickyAction>
             {!geminiKey && (
               <div className="mt-2 text-xs text-stone-400 text-center">
                 Add a Gemini key in Settings for classification coaching.
