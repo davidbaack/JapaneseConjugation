@@ -5,7 +5,6 @@ import {
   getSystemTheme,
   resolveThemePreference,
   loadAll,
-  saveAll,
   cloudFetch,
   cloudUpsert,
   cloudTimestamp,
@@ -17,6 +16,7 @@ import { getJapaneseVoices } from './utils/speech.js';
 import { mergePracticePrefs } from './utils/display.js';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from './data/starterWords.js';
 import { supabase } from './utils/supabase.js';
+import { useCloudAutoSync } from './hooks/useCloudAutoSync.js';
 import AuthModal from './components/AuthModal.jsx';
 
 // Views — lazy-loaded so each gets its own chunk
@@ -48,7 +48,6 @@ export default function App() {
   const [speechVoices, setSpeechVoices] = useState([]);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const [hydrated, setHydrated] = useState(false);
-  const pushTimer = useRef(null);
   const lastSyncedAtRef = useRef(0);
 
   // Local storage hydration on mount + Supabase auth listener
@@ -120,28 +119,11 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, hydrated]);
 
-  // Local save & cloud auto-upsert on progress changes
-  useEffect(() => {
-    if (!hydrated) return;
-    const dummySync = { enabled: !!session };
-    saveAll(state, customVerbs, customAdjectives, wordLists, dummySync, lastSyncedAtRef.current, geminiKey, practicePrefs);
-    
-    if (session?.user && supabase) {
-      if (pushTimer.current) clearTimeout(pushTimer.current);
-      pushTimer.current = setTimeout(async () => {
-        setSyncStatus(s => ({ ...s, kind: 'syncing', message: 'Saving to cloud…' }));
-        try {
-          await cloudUpsert({ state, customVerbs, customAdjectives, wordLists, practicePrefs });
-          const now = Date.now();
-          lastSyncedAtRef.current = now;
-          saveAll(state, customVerbs, customAdjectives, wordLists, dummySync, now, geminiKey, practicePrefs);
-          setSyncStatus({ kind: 'ok', message: 'Saved to cloud', at: now });
-        } catch (e) {
-          setSyncStatus({ kind: 'error', message: e.message || 'Push failed', at: null });
-        }
-      }, 2000);
-    }
-  }, [state, customVerbs, customAdjectives, wordLists, session, geminiKey, practicePrefs, hydrated]);
+  // Local save on every change + debounced cloud push when signed in.
+  useCloudAutoSync({
+    hydrated, session, state, customVerbs, customAdjectives,
+    wordLists, geminiKey, practicePrefs, lastSyncedAtRef, setSyncStatus,
+  });
 
   useEffect(() => {
     const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
