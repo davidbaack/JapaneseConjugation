@@ -8,8 +8,10 @@ import { explainItem } from '../utils/conjugatorExplain.js';
 import { bumpDaily, markMistakeResolved } from '../utils/storage.js';
 import { promptDisplay, formDisplay } from '../utils/display.js';
 import { playPronunciation } from '../utils/speech.js';
+import { useApp } from '../state/AppStateContext.jsx';
 
-export default function MistakesView({ state, setState, practicePrefs }) {
+export default function MistakesView() {
+  const { state, setState, practicePrefs } = useApp();
   const mistakes = useMemo(() => state.mistakes || [], [state.mistakes]);
   const open = useMemo(() => mistakes.filter((m) => !m.resolved), [mistakes]);
   const [activeKey, setActiveKey] = useState(open[0]?.key || mistakes[0]?.key || null);

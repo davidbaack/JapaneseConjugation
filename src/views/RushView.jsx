@@ -14,15 +14,10 @@ import {
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { defaultState, gradeCard, recordMistake, bumpDaily } from '../utils/storage.js';
 import { promptDisplay, shuffled } from '../utils/display.js';
-import { DEFAULT_PREFS } from '../data/defaults.js';
+import { useApp } from '../state/AppStateContext.jsx';
 
-export default function RushView({
-  state,
-  setState,
-  verbs,
-  practicePrefs = DEFAULT_PREFS,
-  wordLists = [],
-}) {
+export default function RushView() {
+  const { state, setState, allWords: verbs, practicePrefs, wordLists } = useApp();
   const gameWords = useMemo(
     () => filterWordsForPrefs(verbs, practicePrefs, wordLists),
     [verbs, practicePrefs, wordLists],

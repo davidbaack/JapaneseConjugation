@@ -10,6 +10,7 @@ import {
 import { playPronunciation } from '../utils/speech.js';
 import { useStudyTimer } from '../hooks/useStudyTimer.js';
 import { useAISentence } from '../hooks/useAISentence.js';
+import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
 import { PitchAccentSection } from '../components/PitchAccent.jsx';
@@ -55,16 +56,17 @@ import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
 export { kanaCoachCells, explainReversePrompt };
 
-export default function StudyView({
-  state,
-  setState,
-  verbs,
-  geminiKey,
-  practicePrefs = DEFAULT_PREFS,
-  wordLists = [],
-  focus = null,
-  onFocusConsumed,
-}) {
+export default function StudyView() {
+  const {
+    state,
+    setState,
+    allWords: verbs,
+    activeGeminiKey: geminiKey,
+    practicePrefs,
+    wordLists,
+    studyFocus: focus,
+    clearStudyFocus: onFocusConsumed,
+  } = useApp();
   const [current, setCurrent] = useState(null);
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');

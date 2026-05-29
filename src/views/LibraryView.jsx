@@ -3,6 +3,7 @@ import ReferenceViewSub from './ReferenceViewSub.jsx';
 import ListsViewSub from './ListsViewSub.jsx';
 import CustomDictionaryViewSub from './CustomDictionaryViewSub.jsx';
 import { useTablist } from '../components/useTablist.js';
+import { useApp } from '../state/AppStateContext.jsx';
 
 const LIBRARY_TABS = [
   { id: 'reference', label: 'Search & Reference', desc: 'Verb & adjective lookup' },
@@ -10,22 +11,23 @@ const LIBRARY_TABS = [
   { id: 'dictionary', label: 'Custom Dictionary', desc: 'Manage custom verbs & adjectives' },
 ];
 
-export default function LibraryView({
-  state,
-  setState,
-  verbs,
-  adjectives,
-  customVerbs,
-  setCustomVerbs,
-  customAdjectives,
-  setCustomAdjectives,
-  wordLists,
-  setWordLists,
-  practicePrefs,
-  setPracticePrefs,
-  geminiKey,
-  setTab,
-}) {
+export default function LibraryView() {
+  const {
+    state,
+    setState,
+    allVerbs: verbs,
+    allAdjectives: adjectives,
+    customVerbs,
+    setCustomVerbs,
+    customAdjectives,
+    setCustomAdjectives,
+    wordLists,
+    setWordLists,
+    practicePrefs,
+    setPracticePrefs,
+    activeGeminiKey: geminiKey,
+    setTab,
+  } = useApp();
   const [subTab, setSubTab] = useState('reference');
   const { tabProps, panelProps } = useTablist(
     LIBRARY_TABS.map((t) => t.id),

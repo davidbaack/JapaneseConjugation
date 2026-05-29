@@ -11,7 +11,7 @@ import { explainItem, GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { formRows } from './ReferenceViewSub.jsx';
 import { formDisplay, englishForForm } from '../utils/display.js';
 import { toHiragana } from '../utils/romaji.js';
-import { DEFAULT_PREFS } from '../data/defaults.js';
+import { useApp } from '../state/AppStateContext.jsx';
 
 const MAX_HISTORY = 6;
 const HISTORY_KEY = 'katachiya_check_history';
@@ -116,12 +116,13 @@ function WordExtras({ word, type, showForms, onToggleForms, onPracticeWord }) {
   );
 }
 
-export default function CheckView({
-  verbs,
-  practicePrefs = DEFAULT_PREFS,
-  geminiKey,
-  onPracticeWord,
-}) {
+export default function CheckView() {
+  const {
+    allWords: verbs,
+    practicePrefs,
+    activeGeminiKey: geminiKey,
+    practiceWord: onPracticeWord,
+  } = useApp();
   const [input, setInput] = useState('');
   const [result, setResult] = useState(null);
   const [kanaPadOpen, setKanaPadOpen] = useState(false);

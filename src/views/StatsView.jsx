@@ -4,7 +4,7 @@ import { ALL_CARD_TYPES, TYPE_LABEL } from '../data/conjugationTypes.js';
 import { RULES } from '../utils/conjugator.js';
 import { defaultState } from '../utils/storage.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
-import { DEFAULT_PREFS } from '../data/defaults.js';
+import { useApp } from '../state/AppStateContext.jsx';
 
 function srsStatsFor(state, verbs) {
   const now = Date.now();
@@ -155,17 +155,18 @@ function skillRadarScores(state, verbs) {
   ];
 }
 
-export default function StatsView({
-  state,
-  setState,
-  verbs,
-  geminiKey,
-  practicePrefs = DEFAULT_PREFS,
-  setPracticePrefs,
-  setTab,
-  wordLists = [],
-  setWordLists,
-}) {
+export default function StatsView() {
+  const {
+    state,
+    setState,
+    allWords: verbs,
+    activeGeminiKey: geminiKey,
+    practicePrefs,
+    setPracticePrefs,
+    setTab,
+    wordLists,
+    setWordLists,
+  } = useApp();
   const stats = useMemo(() => srsStatsFor(state, verbs), [state, verbs]);
   const radar = useMemo(() => skillRadarScores(state, verbs), [state, verbs]);
   const formRowsData = useMemo(() => formAccuracyRows(state, verbs), [state, verbs]);

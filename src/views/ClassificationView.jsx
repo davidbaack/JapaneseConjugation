@@ -16,6 +16,7 @@ import { defaultState, bumpDaily } from '../utils/storage.js';
 import { promptDisplay } from '../utils/display.js';
 import { TYPE_LABEL } from '../data/conjugationTypes.js';
 import { callGemini, aiSystemFromPrefs } from '../utils/gemini.js';
+import { useApp } from '../state/AppStateContext.jsx';
 
 export const CLASSIFY_OPTIONS = [
   { id: 'ichidan', label: 'る-verb', hint: 'Drop る and attach endings directly.' },
@@ -54,14 +55,15 @@ export function classifyHint(word) {
   return `${word.reading} is a な-adjective: ${conjugateAdjective(word, 'adj-attributive')} + noun, or ${conjugateAdjective(word, 'adj-polite-present')}.`;
 }
 
-export default function ClassificationView({
-  state,
-  setState,
-  words,
-  practicePrefs,
-  wordLists = [],
-  geminiKey,
-}) {
+export default function ClassificationView() {
+  const {
+    state,
+    setState,
+    allWords: words,
+    practicePrefs,
+    wordLists,
+    activeGeminiKey: geminiKey,
+  } = useApp();
   const filtered = useMemo(
     () => filterWordsForPrefs(words, practicePrefs, wordLists),
     [words, practicePrefs, wordLists],

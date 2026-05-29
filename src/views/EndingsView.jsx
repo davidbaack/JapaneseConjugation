@@ -15,16 +15,17 @@ import {
 import { defaultState, bumpDaily } from '../utils/storage.js';
 import { promptDisplay, formDisplay, shuffled } from '../utils/display.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
-import { DEFAULT_PREFS } from '../data/defaults.js';
+import { useApp } from '../state/AppStateContext.jsx';
 
-export default function EndingsView({
-  state,
-  setState,
-  verbs,
-  practicePrefs = DEFAULT_PREFS,
-  wordLists = [],
-  geminiKey,
-}) {
+export default function EndingsView() {
+  const {
+    state,
+    setState,
+    allVerbs: verbs,
+    practicePrefs,
+    wordLists,
+    activeGeminiKey: geminiKey,
+  } = useApp();
   const drillVerbs = useMemo(
     () => filterWordsForPrefs(verbs, practicePrefs, wordLists).filter((v) => !isAdjective(v)),
     [verbs, practicePrefs, wordLists],

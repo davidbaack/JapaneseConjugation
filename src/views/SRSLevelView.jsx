@@ -2,8 +2,10 @@ import React, { useMemo } from 'react';
 import { ALL_CARD_TYPES } from '../data/conjugationTypes.js';
 import { RULES } from '../utils/conjugator.js';
 import { SRS_LEVELS, getCardLevel } from '../utils/storage.js';
+import { useApp } from '../state/AppStateContext.jsx';
 
-export default function SRSLevelView({ state, verbs }) {
+export default function SRSLevelView() {
+  const { state, allWords: verbs } = useApp();
   const enabledTypes =
     state.enabledTypes.length > 0 ? state.enabledTypes : ALL_CARD_TYPES.map((t) => t.id);
 

@@ -36,6 +36,7 @@ import {
 import { speakJapanese } from '../utils/speech.js';
 import { serializeBackup, parseBackup } from '../utils/backup.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { useApp } from '../state/AppStateContext.jsx';
 
 const POLITE_FORM_IDS = ALL_CARD_TYPES.filter(
   (t) => t.id.includes('polite') || t.label.toLowerCase().includes('polite'),
@@ -48,26 +49,27 @@ function compactLookupText(s) {
     .toLowerCase();
 }
 
-export default function SettingsView({
-  state,
-  setState,
-  customVerbs,
-  setCustomVerbs,
-  customAdjectives,
-  setCustomAdjectives,
-  wordLists,
-  setWordLists,
-  session,
-  syncStatus,
-  syncNow,
-  geminiKey,
-  practicePrefs,
-  setPracticePrefs,
-  speechVoices = [],
-  resolvedTheme = 'light',
-  supabase,
-  onShowAuth,
-}) {
+export default function SettingsView() {
+  const {
+    state,
+    setState,
+    customVerbs,
+    setCustomVerbs,
+    customAdjectives,
+    setCustomAdjectives,
+    wordLists,
+    setWordLists,
+    session,
+    syncStatus,
+    syncNow,
+    activeGeminiKey: geminiKey,
+    practicePrefs,
+    setPracticePrefs,
+    speechVoices,
+    resolvedTheme,
+    supabase,
+    showAuth: onShowAuth,
+  } = useApp();
   const [confirmReset, setConfirmReset] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
