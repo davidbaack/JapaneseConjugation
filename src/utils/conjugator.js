@@ -111,6 +111,10 @@ export function practiceTypesForItem(item,enabledTypeIds,prefs=DEFAULT_PREFS){
 }
 
 export function isRedundantPracticeType(item,typeId,enabledTypeIds,prefs=DEFAULT_PREFS){
+  // A form with no valid conjugation (e.g. short causative-passive on an
+  // ichidan/す-godan/する verb) can never be practiced — it would surface as a
+  // blank card. Exclude it regardless of the duplicate-skipping preference.
+  if(!conjugateItem(item,typeId))return true;
   if(prefs.skipDuplicateForms===false)return false;
   return !practiceTypesForItem(item,enabledTypeIds,prefs).some(t=>t.id===typeId);
 }

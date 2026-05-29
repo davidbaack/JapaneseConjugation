@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { conjugate, conjugateAdjective, conjugateItem, stepCoachHint } from '../utils/conjugator.js';
+import { conjugate, conjugateAdjective, conjugateItem, stepCoachHint, isRedundantPracticeType } from '../utils/conjugator.js';
 
 // ─── Test verbs ───────────────────────────────────────────────────────────────
 const TABERU  = { dict: '食べる',  reading: 'たべる',  meaning: 'to eat',   group: 'ichidan' };
@@ -388,5 +388,26 @@ describe('stepCoachHint (offline hint)', () => {
   it('does not mask the unchanged dictionary form of an irregular verb', () => {
     // plain-present of する is する itself — nothing to spoil.
     expect(stepCoachHint(SURU, 'plain-present', '').masked).toBe(false);
+  });
+});
+
+// ─── isRedundantPracticeType: never offer an unconjugatable form ─────────────
+describe('isRedundantPracticeType', () => {
+  // short-causative-passive has no valid conjugation for ichidan/す-godan/する.
+  const EMPTY = 'short-causative-passive';
+
+  it('treats a form with no conjugation as redundant (excluded)', () => {
+    expect(conjugateItem(TABERU, EMPTY)).toBe(''); // sanity: truly empty
+    expect(isRedundantPracticeType(TABERU, EMPTY, [EMPTY])).toBe(true);
+  });
+
+  it('excludes the empty form even when duplicate-skipping is OFF', () => {
+    expect(isRedundantPracticeType(TABERU, EMPTY, [EMPTY], { skipDuplicateForms: false })).toBe(true);
+    expect(isRedundantPracticeType(SURU, EMPTY, [EMPTY], { skipDuplicateForms: false })).toBe(true);
+  });
+
+  it('keeps a valid form practiceable when duplicate-skipping is OFF', () => {
+    expect(conjugateItem(KAKU, EMPTY)).toBe('かかされる'); // sanity: valid for 書く
+    expect(isRedundantPracticeType(KAKU, EMPTY, [EMPTY], { skipDuplicateForms: false })).toBe(false);
   });
 });
