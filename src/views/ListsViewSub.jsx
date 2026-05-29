@@ -281,6 +281,7 @@ export default function ListsViewSub({
               onChange={e => setName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') createList(); }}
               placeholder="New list name"
+              aria-label="New list name"
               className="min-w-0 flex-1 px-3 py-2 text-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
             />
             <button onClick={createList} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">
@@ -479,11 +480,14 @@ export default function ListsViewSub({
             value={importText}
             onChange={e => { setImportText(e.target.value); setMsg(''); }}
             placeholder={"始める,はじめる,to begin,ichidan\n有名,ゆうめい,famous,na-adjective"}
+            aria-label="Paste CSV or TSV rows to bulk import"
             className="w-full h-28 px-3 py-2 text-sm font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
             autoCorrect="off"
             spellCheck="false"
           />
-          {msg && <div className="mt-2 text-sm text-stone-605 dark:text-stone-350">{msg}</div>}
+          <div role="status" aria-live="polite">
+            {msg && <div className="mt-2 text-sm text-stone-605 dark:text-stone-350">{msg}</div>}
+          </div>
           <button onClick={importRows} disabled={!active || !importText.trim()} className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium">Import rows</button>
         </div>
       </div>

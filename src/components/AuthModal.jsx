@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function AuthModal({ isOpen, onClose, supabase }) {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -8,6 +8,14 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Close on Escape, the expected affordance for a modal dialog.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -97,11 +105,16 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
       />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-md bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-850 rounded-2xl shadow-xl overflow-hidden z-10 flex flex-col transition-colors duration-200">
-        
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-modal-title"
+        className="relative w-full max-w-md bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-850 rounded-2xl shadow-xl overflow-hidden z-10 flex flex-col transition-colors duration-200"
+      >
+
         {/* Header */}
         <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-stone-200 dark:border-stone-850">
-          <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+          <h2 id="auth-modal-title" className="text-base font-semibold text-stone-900 dark:text-stone-100">
             {isSignUp ? 'Create Katachiya Account' : 'Sign In to Katachiya'}
           </h2>
           <button 
@@ -117,16 +130,18 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
 
         {/* Form Body */}
         <div className="p-5 space-y-4">
-          {errorMsg && (
-            <div className="p-3 text-xs bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-350 rounded-xl">
-              {errorMsg}
-            </div>
-          )}
-          {successMsg && (
-            <div className="p-3 text-xs bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900 text-emerald-800 dark:text-emerald-350 rounded-xl">
-              {successMsg}
-            </div>
-          )}
+          <div role="status" aria-live="polite">
+            {errorMsg && (
+              <div className="p-3 text-xs bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-350 rounded-xl">
+                {errorMsg}
+              </div>
+            )}
+            {successMsg && (
+              <div className="p-3 text-xs bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900 text-emerald-800 dark:text-emerald-350 rounded-xl">
+                {successMsg}
+              </div>
+            )}
+          </div>
 
           {/* OAuth Option */}
           <button

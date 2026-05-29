@@ -134,6 +134,7 @@ export default function MistakesView({ state, setState, practicePrefs }) {
                 onClick={() => speakJapanese(activeExpected, 0.9, practicePrefs.voiceURI)}
                 className="p-2 border border-stone-205 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-500"
                 title="Speak"
+                aria-label="Speak answer"
               >
                 <IconVolume className="w-4 h-4" />
               </button>
@@ -152,6 +153,7 @@ export default function MistakesView({ state, setState, practicePrefs }) {
                   }
                 }}
                 placeholder="Type romaji or kana..."
+                aria-label="Type your answer in romaji or kana"
                 className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-xl focus:border-indigo-500 focus:outline-none transition"
                 lang="ja"
                 autoComplete="off"
@@ -174,6 +176,9 @@ export default function MistakesView({ state, setState, practicePrefs }) {
                     : 'bg-rose-50 dark:bg-rose-950/15 border-rose-250 dark:border-rose-900/50'
                 }`}
               >
+                <span role="status" aria-live="polite" className="sr-only">
+                  {result.ok ? 'Resolved.' : 'Still needs work.'}
+                </span>
                 <div className={`text-sm font-medium ${result.ok ? 'text-emerald-800 dark:text-emerald-305' : 'text-rose-800 dark:text-rose-305'}`}>
                   {result.ok ? 'Resolved.' : 'Still needs work.'}
                 </div>

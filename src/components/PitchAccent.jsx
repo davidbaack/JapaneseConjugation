@@ -173,6 +173,7 @@ Do not return any extra markdown or chat formatting. Return valid JSON only.`;
     <div className="mt-2 text-left">
       <button
         onClick={(e) => { e.stopPropagation(); toggleShow(); }}
+        aria-expanded={show}
         className="px-2 py-1 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg text-[11px] font-medium flex items-center gap-1 transition select-none"
       >
         <IconSpark className="w-3 h-3 text-indigo-500" />
@@ -180,7 +181,7 @@ Do not return any extra markdown or chat formatting. Return valid JSON only.`;
       </button>
 
       {show && (
-        <div className="mt-2 p-3 bg-stone-50 dark:bg-stone-900/40 rounded-xl border border-stone-100 dark:border-stone-800/80 flex flex-col items-center justify-center">
+        <div role="status" aria-live="polite" className="mt-2 p-3 bg-stone-50 dark:bg-stone-900/40 rounded-xl border border-stone-100 dark:border-stone-800/80 flex flex-col items-center justify-center">
           {loading ? (
             <div className="text-[11px] text-stone-400 italic py-2 animate-pulse">Querying pitch accent...</div>
           ) : (

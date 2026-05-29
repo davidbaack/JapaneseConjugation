@@ -837,6 +837,7 @@ Keep it concise and clear.`;
       {geminiKey && stepHint && !coachChatOpen && (
         <button
           onClick={openCoachChat}
+          aria-expanded={coachChatOpen}
           className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
         >
           <IconChat className="w-3 h-3" />
@@ -1204,6 +1205,7 @@ Keep it concise and clear.`;
                           }
                         }}
                         placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
+                        aria-label={reverseDrill ? 'Type the dictionary form' : 'Type your answer in romaji or kana'}
                         className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-transparent caret-stone-850 dark:caret-stone-150 focus:border-indigo-500 focus:outline-none transition"
                         lang="ja"
                         autoComplete="off"
@@ -1293,6 +1295,7 @@ Keep it concise and clear.`;
                           }
                         }}
                         placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
+                        aria-label={reverseDrill ? 'Type the dictionary form' : 'Type your answer in romaji or kana'}
                         className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-transparent caret-stone-850 dark:caret-stone-150 focus:border-indigo-500 focus:outline-none transition"
                         lang="ja"
                         autoComplete="off"
@@ -1396,6 +1399,11 @@ Keep it concise and clear.`;
                   wasCorrect ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50' : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50'
                 }`}
               >
+                {/* Scoped to the short verdict so screen readers announce the
+                    result without re-reading the breakdown/chat below. */}
+                <span role="status" aria-live="polite" className="sr-only">
+                  {wasCorrect ? 'Correct!' : 'Not quite.'}
+                </span>
                 <div className="flex items-start gap-3 text-left">
                   <div className={`mt-0.5 flex-shrink-0 ${wasCorrect ? 'text-emerald-600' : 'text-rose-600'}`}>
                     {wasCorrect ? <IconCheck className="w-5 h-5" /> : <IconX className="w-5 h-5" />}
@@ -1536,6 +1544,7 @@ Keep it concise and clear.`;
                       !chatOpen ? (
                         <button
                           onClick={() => setChatOpen(true)}
+                          aria-expanded={chatOpen}
                           className="w-full mt-1 py-2 border border-rose-200 dark:border-rose-900 hover:bg-rose-100/50 dark:hover:bg-rose-950/50 rounded-xl text-sm text-rose-700 dark:text-rose-450 flex items-center justify-center gap-1.5 transition"
                         >
                           <IconChat className="w-4 h-4" /> Ask Gemini why

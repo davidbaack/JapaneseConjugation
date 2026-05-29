@@ -307,12 +307,14 @@ export default function StatsView({
               Add a Gemini key in Settings for a personalized 7-day plan.
             </div>
           )}
-          {aiErr && <div className="mt-3 text-sm text-rose-600">{aiErr}</div>}
-          {aiText && (
-            <div className="mt-4 rounded-xl border border-indigo-100 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-sm text-indigo-950 dark:text-indigo-100 leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto">
-              {aiText}
-            </div>
-          )}
+          <div role="status" aria-live="polite">
+            {aiErr && <div className="mt-3 text-sm text-rose-600">{aiErr}</div>}
+            {aiText && (
+              <div className="mt-4 rounded-xl border border-indigo-100 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-sm text-indigo-950 dark:text-indigo-100 leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto">
+                {aiText}
+              </div>
+            )}
+          </div>
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
           <h3 className="font-medium mb-3 text-stone-950 dark:text-stone-50">Lifetime accuracy</h3>

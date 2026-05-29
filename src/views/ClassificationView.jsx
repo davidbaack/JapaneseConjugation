@@ -192,6 +192,10 @@ export default function ClassificationView({ state, setState, words, practicePre
                 : 'bg-rose-50 dark:bg-rose-950/15 border-rose-250 dark:border-rose-900/50'
             }`}
           >
+            <span role="status" aria-live="polite" className="sr-only">
+              {result.ok ? 'Correct.' : 'Not quite.'} It is{' '}
+              {CLASSIFY_OPTIONS.find(o => o.id === correctGroup)?.label}.
+            </span>
             <div className={`font-medium text-sm ${result.ok ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}>
               {result.ok ? 'Correct.' : 'Not quite.'}{' '}
               <span className="font-normal">

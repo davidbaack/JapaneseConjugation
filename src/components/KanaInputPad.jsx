@@ -30,6 +30,7 @@ export default function KanaInputPad({ open, onToggle, onInsert, onBackspace, on
           <button
             type="button"
             onClick={onToggle}
+            aria-expanded={open}
             className={`px-3 py-1.5 rounded-lg border text-sm inline-flex items-center gap-1.5 transition ${
               open
                 ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'

@@ -786,6 +786,7 @@ export default function SettingsView({
             value={typeSearch}
             onChange={e => setTypeSearch(e.target.value)}
             placeholder="Search forms, e.g. passive, たい, ba..."
+            aria-label="Search conjugation forms"
             className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
           />
           <div className="text-xs text-stone-400 tabular-nums text-right">{visibleCardTypes.length}/{ALL_CARD_TYPES.length} forms</div>
@@ -971,10 +972,13 @@ export default function SettingsView({
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
         <h3 className="font-medium mb-1 text-stone-850 dark:text-stone-200">Backup & restore</h3>
         <p className="text-xs text-stone-500 mb-3">Manual JSON transfer without cloud sync.</p>
-        {msg && <div className="mb-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-250 rounded-lg px-3 py-2">{msg}</div>}
+        <div role="status" aria-live="polite">
+          {msg && <div className="mb-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-250 rounded-lg px-3 py-2">{msg}</div>}
+        </div>
         <div className="flex gap-2">
           <button
             onClick={() => { setExportOpen(!exportOpen); setImportOpen(false); }}
+            aria-expanded={exportOpen}
             className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
               exportOpen
                 ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
@@ -985,6 +989,7 @@ export default function SettingsView({
           </button>
           <button
             onClick={() => { setImportOpen(!importOpen); setExportOpen(false); setImportErr(''); }}
+            aria-expanded={importOpen}
             className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
               importOpen
                 ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
@@ -1013,12 +1018,15 @@ export default function SettingsView({
               value={importText}
               onChange={e => { setImportText(e.target.value); setImportErr(''); }}
               placeholder="Paste backup JSON…"
+              aria-label="Paste backup JSON to restore"
               className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-250 rounded-lg focus:border-indigo-500 focus:outline-none"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck="false"
             />
-            {importErr && <div className="text-sm text-rose-600">{importErr}</div>}
+            <div role="status" aria-live="polite">
+              {importErr && <div className="text-sm text-rose-600">{importErr}</div>}
+            </div>
             <p className="text-xs text-rose-600 dark:text-rose-400">⚠ Restoring replaces current progress.</p>
             <button
               onClick={doImport}

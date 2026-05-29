@@ -299,6 +299,9 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
                         : 'bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-350 border-rose-200 dark:border-rose-900/50'
                     }`}
                   >
+                    <span role="status" aria-live="polite" className="sr-only">
+                      {feedback.title}. {feedback.detail}
+                    </span>
                     <div className="text-2xl font-semibold">{feedback.title}</div>
                     <div className="text-sm mt-1">{feedback.detail}</div>
                   </div>
@@ -323,6 +326,7 @@ export default function RushView({ state, setState, verbs, practicePrefs = DEFAU
               }}
               disabled={!round || paused}
               placeholder="Type answer"
+              aria-label={round ? `Answer: ${round.type.label} of ${round.item.dict}` : 'Type answer'}
               lang="ja"
               autoComplete="off"
               autoCorrect="off"

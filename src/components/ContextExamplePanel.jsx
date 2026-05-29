@@ -41,7 +41,7 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
           <div className="mt-1 text-lg text-stone-900 dark:text-stone-100" lang="ja">{example.ja}</div>
           <div className="mt-1 text-xs text-indigo-900/80 dark:text-indigo-300/90">{example.en}</div>
         </div>
-        <button onClick={() => speakJapanese(example.ja, 0.85, practicePrefs.voiceURI)} className="px-2.5 py-2 rounded-lg border border-indigo-200 bg-white/70 hover:bg-white text-indigo-700">
+        <button onClick={() => speakJapanese(example.ja, 0.85, practicePrefs.voiceURI)} aria-label="Play example audio" className="px-2.5 py-2 rounded-lg border border-indigo-200 bg-white/70 hover:bg-white text-indigo-700">
           <IconVolume className="w-4 h-4" />
         </button>
       </div>
@@ -52,8 +52,10 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
         </button>
         {!geminiKey && <div className="text-xs text-indigo-900/60 dark:text-indigo-300/60 self-center">Add a Gemini key for natural examples.</div>}
       </div>
-      {err && <div className="mt-2 text-sm text-rose-600">{err}</div>}
-      {aiText && <div className="mt-3 rounded-lg border border-indigo-100 dark:border-indigo-900/40 bg-white/80 dark:bg-stone-800/80 px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-700 dark:text-stone-200 max-h-80 overflow-y-auto">{aiText}</div>}
+      <div role="status" aria-live="polite">
+        {err && <div className="mt-2 text-sm text-rose-600">{err}</div>}
+        {aiText && <div className="mt-3 rounded-lg border border-indigo-100 dark:border-indigo-900/40 bg-white/80 dark:bg-stone-800/80 px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-700 dark:text-stone-200 max-h-80 overflow-y-auto">{aiText}</div>}
+      </div>
     </div>
   );
 }

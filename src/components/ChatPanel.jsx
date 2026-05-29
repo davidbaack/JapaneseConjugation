@@ -91,7 +91,7 @@ export function ChatPanel({ verb, type, userAnswer, expected, explanation, gemin
         <IconChat className="w-3.5 h-3.5" />
         {mode === 'coach' ? 'Discuss with Gemini' : 'Chat with Gemini'}
       </div>
-      <div className="space-y-2 max-h-96 overflow-y-auto pb-1">
+      <div role="log" aria-live="polite" aria-busy={loading} className="space-y-2 max-h-96 overflow-y-auto pb-1">
         {loading && !display.length && <div className="text-sm text-stone-400 italic px-3 py-2 animate-pulse">Gemini is thinking…</div>}
         {display.map((m, i) => (
           <div key={i} style={{ whiteSpace: 'pre-wrap' }}
@@ -106,6 +106,7 @@ export function ChatPanel({ verb, type, userAnswer, expected, explanation, gemin
         <input type="text" value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); send(); } }}
           placeholder="Ask a follow-up…" disabled={loading}
+          aria-label="Ask Gemini a follow-up question"
           autoComplete="off" autoCorrect="off" spellCheck="false"
           className="flex-1 px-3 py-1.5 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none disabled:opacity-50" />
         <button onClick={send} disabled={loading || !input.trim()}

@@ -723,6 +723,7 @@ export default function ReferenceViewSub({
                 if (e.key === 'Enter' && query.trim()) rememberSearch(query);
               }}
               placeholder="Search word or form"
+              aria-label="Search for a word or conjugation form"
               className="w-full pl-9 pr-3 py-2 text-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-lg focus:border-indigo-500 focus:outline-none transition"
               autoCorrect="off"
               spellCheck="false"

@@ -180,8 +180,10 @@ export default function CustomDictionaryViewSub({
               {suggLoading ? '…' : 'Suggest another ↻'}
             </button>
           </div>
-          {suggLoading && !sugg && <div className="text-sm text-indigo-400 italic">Finding a good next {isAdj ? 'adjective' : 'verb'} for you…</div>}
-          {suggErr && <div className="text-sm text-rose-600">{suggErr}</div>}
+          <div role="status" aria-live="polite">
+            {suggLoading && !sugg && <div className="text-sm text-indigo-400 italic">Finding a good next {isAdj ? 'adjective' : 'verb'} for you…</div>}
+            {suggErr && <div className="text-sm text-rose-600">{suggErr}</div>}
+          </div>
           {sugg && !suggLoading && (
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
@@ -211,6 +213,7 @@ export default function CustomDictionaryViewSub({
                     onChange={e => { setQuery(e.target.value); if (addPhase === 'error') { setAddPhase('idle'); setAddError(''); } }}
                     onKeyDown={e => { if (e.key === 'Enter') lookup(); }}
                     placeholder={isAdj ? "美味しい, oishii, delicious, cold..." : "食べる, taberu, to eat, swim…"}
+                    aria-label={isAdj ? 'Look up an adjective to add' : 'Look up a verb to add'}
                     disabled={addPhase === 'loading'}
                     autoCorrect="off"
                     autoCapitalize="off"
@@ -225,7 +228,9 @@ export default function CustomDictionaryViewSub({
                     {addPhase === 'loading' ? '…' : 'Look up'}
                   </button>
                 </div>
-                {addError && <div className="text-sm text-rose-600">{addError}</div>}
+                <div role="status" aria-live="polite">
+                  {addError && <div className="text-sm text-rose-600">{addError}</div>}
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -312,7 +317,9 @@ export default function CustomDictionaryViewSub({
                   }
                 </div>
               </div>
-              {mErr && <div className="text-sm text-rose-600">{mErr}</div>}
+              <div role="status" aria-live="polite">
+                {mErr && <div className="text-sm text-rose-600">{mErr}</div>}
+              </div>
               <button onClick={addManual} className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-sm">Add</button>
             </div>
           )}
