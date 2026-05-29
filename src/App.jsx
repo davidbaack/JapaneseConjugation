@@ -256,7 +256,7 @@ export default function App() {
                   : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
               }`}
             >
-              {{ endings: 'て Forms', levels: 'Progress' }[t] ?? t}
+              {{ endings: 'て Forms', levels: 'Progress', check: 'Spot Check' }[t] ?? t}
             </button>
           ))}
         </nav>
