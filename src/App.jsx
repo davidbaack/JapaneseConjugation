@@ -18,6 +18,7 @@ import { STARTER_VERBS, STARTER_ADJECTIVES } from './data/starterWords.js';
 import { supabase } from './utils/supabase.js';
 import { useCloudAutoSync } from './hooks/useCloudAutoSync.js';
 import AuthModal from './components/AuthModal.jsx';
+import ViewSkeleton from './components/Skeleton.jsx';
 
 // Views — lazy-loaded so each gets its own chunk
 const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
@@ -312,11 +313,7 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <Suspense
-          fallback={
-            <div className="flex justify-center py-20 text-stone-400 text-sm">Loading…</div>
-          }
-        >
+        <Suspense fallback={<ViewSkeleton />}>
           {tab === 'study' && (
             <StudyView
               state={state}

@@ -4,6 +4,12 @@ import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
 import { getSuggestedWord, lookupWordWithGemini } from '../utils/gemini.js';
 import { useTablist } from '../components/useTablist.js';
 import { validateWord, sanitizeField, FIELD_LIMITS } from '../utils/validateWord.js';
+import { useVirtualRows } from '../hooks/useVirtualRows.js';
+
+// Windowing tuning for the dictionary table.
+const ROW_HEIGHT = 53; // approximate rendered row height in px
+const LIST_VIEWPORT = 600; // fixed scroll-container height when windowing
+const VIRTUAL_THRESHOLD = 60; // only window once the list exceeds this many rows
 
 export default function CustomDictionaryViewSub({
   customVerbs,
@@ -39,6 +45,17 @@ export default function CustomDictionaryViewSub({
   const customWords = isAdj ? customAdjectives : customVerbs;
   const setCustomWords = isAdj ? setCustomAdjectives : setCustomVerbs;
   const allWords = useMemo(() => [...starterWords, ...customWords], [customWords, starterWords]);
+
+  // Window the table once the list gets long so a large dictionary stays smooth
+  // (improvement #12). Below the threshold we render everything (no windowing).
+  const virtualize = allWords.length > VIRTUAL_THRESHOLD;
+  const { start, end, padTop, padBottom, onScroll } = useVirtualRows({
+    count: allWords.length,
+    rowHeight: ROW_HEIGHT,
+    viewportHeight: LIST_VIEWPORT,
+    enabled: virtualize,
+  });
+  const visibleWords = virtualize ? allWords.slice(start, end) : allWords;
 
   async function fetchSugg(wordsList) {
     if (!geminiKey) return;
@@ -435,7 +452,11 @@ export default function CustomDictionaryViewSub({
         )}
 
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
-          <div className="overflow-x-auto">
+          <div
+            className="overflow-x-auto overflow-y-auto"
+            style={virtualize ? { maxHeight: LIST_VIEWPORT } : undefined}
+            onScroll={virtualize ? onScroll : undefined}
+          >
             <table className="w-full text-sm">
               <thead className="bg-stone-50 dark:bg-stone-950 text-stone-500 dark:text-stone-400 text-xs uppercase tracking-wider">
                 <tr>
@@ -449,7 +470,13 @@ export default function CustomDictionaryViewSub({
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
-                {allWords.map((v, i) => {
+                {virtualize && padTop > 0 && (
+                  <tr aria-hidden="true" style={{ height: padTop }}>
+                    <td colSpan={5} className="p-0" />
+                  </tr>
+                )}
+                {visibleWords.map((v, localI) => {
+                  const i = virtualize ? start + localI : localI;
                   const vvs = state?.verbStats?.[v.dict] || {};
                   const totalSeen = Object.values(vvs).reduce((s, x) => s + x.seen, 0);
                   const totalIncorrect = Object.values(vvs).reduce((s, x) => s + x.incorrect, 0);
@@ -518,6 +545,11 @@ export default function CustomDictionaryViewSub({
                     </tr>
                   );
                 })}
+                {virtualize && padBottom > 0 && (
+                  <tr aria-hidden="true" style={{ height: padBottom }}>
+                    <td colSpan={5} className="p-0" />
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

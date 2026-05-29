@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap.js';
 
 export default function AuthModal({ isOpen, onClose, supabase }) {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -8,62 +9,9 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const dialogRef = useRef(null);
 
-  // Close on Escape, the expected affordance for a modal dialog.
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose]);
-
-  // Focus trap: move focus into the dialog on open, keep Tab cycling within it,
-  // and restore focus to whatever opened it on close.
-  useEffect(() => {
-    if (!isOpen) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const previouslyFocused = document.activeElement;
-
-    const getFocusable = () =>
-      Array.from(
-        dialog.querySelectorAll(
-          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter((el) => el.offsetParent !== null);
-
-    // Prefer the first form field; fall back to the first focusable / dialog.
-    const firstField = dialog.querySelector('input:not([disabled]), textarea, select');
-    (firstField || getFocusable()[0] || dialog).focus();
-
-    const onKeyDown = (e) => {
-      if (e.key !== 'Tab') return;
-      const items = getFocusable();
-      if (!items.length) {
-        e.preventDefault();
-        return;
-      }
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-
-    dialog.addEventListener('keydown', onKeyDown);
-    return () => {
-      dialog.removeEventListener('keydown', onKeyDown);
-      if (previouslyFocused && typeof previouslyFocused.focus === 'function')
-        previouslyFocused.focus();
-    };
-  }, [isOpen]);
+  // Esc-to-close, focus trap, and focus restoration (shared modal a11y).
+  const dialogRef = useFocusTrap({ isOpen, onClose });
 
   if (!isOpen) return null;
 
