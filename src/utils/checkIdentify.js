@@ -99,9 +99,13 @@ export function identifyConjugation(input, words = [], options = {}) {
         normalized === kana || raw === kanji || raw === kana;
       if (isExact) {
         exact.push({ word, type, kana, kanji });
-      } else {
+      } else if (normalized.length >= 2) {
+        // Near-miss typo. Require the input to keep at least 2 characters in
+        // common with the form so tiny inputs (1-2 kana) don't "almost match"
+        // every short conjugation in the set.
         const distance = levenshtein(normalized, kana);
-        if (distance > 0 && distance <= MAX_NEAR_DISTANCE) {
+        const shared = Math.max(normalized.length, kana.length) - distance;
+        if (distance > 0 && distance <= MAX_NEAR_DISTANCE && shared >= 2) {
           near.push({ word, type, kana, kanji, distance });
         }
       }

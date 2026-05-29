@@ -93,6 +93,34 @@ describe('identifyConjugation', () => {
     expect(res.near).toHaveLength(0);
   });
 
+  it('does not produce junk near-misses for a tiny 1-char input', () => {
+    // A single kana is within edit distance 1-2 of many short forms; the
+    // shared-character floor should suppress those meaningless matches.
+    const res = identifyConjugation('ぷ', ALL);
+    expect(res.exact).toHaveLength(0);
+    expect(res.near).toHaveLength(0);
+  });
+
+  it('recognises any valid form, not just a restricted subset', () => {
+    // te-form and polite present should both be identified as exact when no
+    // typesFor restriction is supplied (the Check view default).
+    const te = identifyConjugation('たべて', ALL);
+    expect(te.exact.some((e) => e.word.reading === 'たべる' && e.type === 'te-form')).toBe(true);
+    const masu = identifyConjugation('たべます', ALL);
+    expect(
+      masu.exact.some((e) => e.word.reading === 'たべる' && e.type === 'polite-present')
+    ).toBe(true);
+  });
+
+  it('reports both readings of an ambiguous form (potential = passive)', () => {
+    const res = identifyConjugation('たべられる', ALL);
+    const types = res.exact
+      .filter((e) => e.word.reading === 'たべる')
+      .map((e) => e.type);
+    expect(types).toContain('potential');
+    expect(types).toContain('passive');
+  });
+
   it('returns an empty result for blank input', () => {
     const res = identifyConjugation('   ', ALL);
     expect(res.exact).toHaveLength(0);

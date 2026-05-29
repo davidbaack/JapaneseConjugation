@@ -4,8 +4,6 @@ import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
 import { identifyConjugation } from '../utils/checkIdentify.js';
 import {
-  filterWordsForPrefs,
-  practiceTypesForItem,
   getTypeInfo,
   explainItem,
   getWordMeta,
@@ -14,6 +12,8 @@ import {
 import { formDisplay, englishForForm } from '../utils/display.js';
 import { toHiragana } from '../utils/romaji.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+
+const EXAMPLES = ['食べた', 'のんで', 'たかかった', 'tabemasu'];
 
 // Render the correct form with the first character that differs from the
 // learner's input highlighted, so they can see exactly what to fix.
@@ -37,56 +37,49 @@ function DiffForm({ correct, firstDiff }) {
   );
 }
 
-// Human-readable "Plain Past of 食べる (to eat)" line for a candidate.
+// "Plain Past of 食べる（たべる）— to eat" line for a secondary candidate.
 function candidateLabel(cand) {
   const ti = getTypeInfo(cand.type);
   const word = cand.word;
   return `${ti.label} of ${word.dict}（${word.reading}）— ${word.meaning}`;
 }
 
-export default function CheckView({ state, verbs, practicePrefs = DEFAULT_PREFS, wordLists = [] }) {
+export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
   const [input, setInput] = useState('');
   const [result, setResult] = useState(null);
-  const [session, setSession] = useState({ correct: 0, attempts: 0 });
   const [kanaPadOpen, setKanaPadOpen] = useState(false);
   const inputRef = useRef(null);
 
-  // The same active word set StudyView practices against.
-  const practiceWords = useMemo(
-    () => filterWordsForPrefs(verbs, practicePrefs, wordLists),
-    [verbs, practicePrefs, wordLists]
-  );
-
-  // The same enabled conjugation types StudyView uses.
-  const enabledTypes = useMemo(
-    () => (state?.enabledTypes?.length > 0 ? state.enabledTypes : ['plain-past']),
-    [state]
-  );
-
-  // For each word, the forms the learner has enabled — so Check recognises the
-  // same conjugations Study would quiz, and flags everything else as unknown.
-  const lookupOptions = useMemo(
-    () => ({
-      typesFor: (item) => practiceTypesForItem(item, enabledTypes, practicePrefs),
-    }),
-    [enabledTypes, practicePrefs]
-  );
+  // Check recognises a conjugation of ANY known word, in ANY valid form — a
+  // correct conjugation should never be reported as wrong just because it
+  // isn't part of the current Study filters. We pass the full word set and let
+  // identifyConjugation default to every compatible form.
+  const allWords = useMemo(() => verbs || [], [verbs]);
 
   const focusInput = useCallback(() => {
     inputRef.current?.focus();
   }, []);
 
-  const handleCheck = useCallback(() => {
-    const raw = input.trim();
-    if (!raw) return;
-    const res = identifyConjugation(raw, practiceWords, lookupOptions);
-    const status = res.exact.length > 0 ? 'exact' : res.near.length > 0 ? 'near' : 'none';
-    setResult({ ...res, status });
-    setSession((s) => ({
-      correct: s.correct + (status === 'exact' ? 1 : 0),
-      attempts: s.attempts + 1,
-    }));
-  }, [input, practiceWords, lookupOptions]);
+  const runCheck = useCallback(
+    (value) => {
+      const raw = (value ?? '').trim();
+      if (!raw) return;
+      const res = identifyConjugation(raw, allWords);
+      const status = res.exact.length > 0 ? 'exact' : res.near.length > 0 ? 'near' : 'none';
+      setResult({ ...res, status });
+    },
+    [allWords]
+  );
+
+  const handleCheck = useCallback(() => runCheck(input), [runCheck, input]);
+
+  const handleExample = useCallback(
+    (ex) => {
+      setInput(ex);
+      runCheck(ex);
+    },
+    [runCheck]
+  );
 
   const handleNext = useCallback(() => {
     setInput('');
@@ -98,33 +91,29 @@ export default function CheckView({ state, verbs, practicePrefs = DEFAULT_PREFS,
   const backspaceText = useCallback(() => setInput((a) => Array.from(a).slice(0, -1).join('')), []);
   const clearText = useCallback(() => setInput(''), []);
 
-  if (!practiceWords.length) {
+  if (!allWords.length) {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
         <p className="text-stone-600 dark:text-stone-300 mb-2">No words available</p>
         <p className="text-xs text-stone-400 dark:text-stone-500">
-          Enable words and conjugation types in Settings.
+          Add or enable words in the Library.
         </p>
       </div>
     );
   }
 
-  const acc = session.attempts ? Math.round((session.correct / session.attempts) * 100) : 0;
   const previewKana = toHiragana(input);
+  // When several distinct forms share the same surface, that's a teaching
+  // moment (e.g. potential = passive for ichidan verbs), not a footnote.
+  const exactForms = result?.exact ?? [];
+  const sameWord =
+    exactForms.length > 1 &&
+    exactForms.every((e) => e.word.reading === exactForms[0].word.reading);
 
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-        <div className="px-4 py-6 sm:px-6 sm:py-8 relative">
-          {/* Session score, top-right — mirrors Study */}
-          <div className="absolute top-4 right-4 sm:top-6 sm:right-6 text-right text-[11px] text-stone-400">
-            <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-              {session.correct} correct
-            </div>
-            <div>{session.attempts} checked</div>
-            {session.attempts > 0 && <div className="text-[10px]">{acc}%</div>}
-          </div>
-
+        <div className="px-4 py-6 sm:px-6 sm:py-8">
           <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
             Check a conjugation
           </div>
@@ -191,13 +180,28 @@ export default function CheckView({ state, verbs, practicePrefs = DEFAULT_PREFS,
           />
 
           {!result && (
-            <button
-              onClick={handleCheck}
-              disabled={!input.trim()}
-              className="mt-4 w-full py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-medium transition"
-            >
-              Check
-            </button>
+            <>
+              <button
+                onClick={handleCheck}
+                disabled={!input.trim()}
+                className="mt-4 w-full py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-medium transition"
+              >
+                Check
+              </button>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-stone-400">Try:</span>
+                {EXAMPLES.map((ex) => (
+                  <button
+                    key={ex}
+                    onClick={() => handleExample(ex)}
+                    className="px-2.5 py-1 rounded-full border border-stone-200 dark:border-stone-800 text-sm text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition"
+                    lang="ja"
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -207,40 +211,63 @@ export default function CheckView({ state, verbs, practicePrefs = DEFAULT_PREFS,
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5 sm:p-6">
           {result.status === 'exact' && (
             <div>
-              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold mb-3">
+              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold mb-4">
                 <IconCheck className="w-5 h-5" />
-                Correct!
+                Correct conjugation
               </div>
+
+              {/* The dictionary word is the headline — that's what the learner
+                  most wants confirmed. */}
               <div className="text-center mb-4">
+                <div className="text-3xl font-semibold text-stone-900 dark:text-stone-100" lang="ja">
+                  {exactForms[0].word.dict}
+                </div>
+                <div className="text-sm text-stone-500 dark:text-stone-400 mt-1" lang="ja">
+                  {exactForms[0].word.reading} — {exactForms[0].word.meaning}
+                </div>
+                <div className="text-xs text-stone-400 mt-1">
+                  {GROUP_NAMES?.[exactForms[0].word.group] || exactForms[0].word.group}
+                  {' · '}
+                  {getWordMeta(exactForms[0].word).jlpt}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4 text-center">
                 <ScriptDisplay
                   view={formDisplay(
-                    result.exact[0].kana,
+                    exactForms[0].kana,
                     practicePrefs,
-                    result.exact[0].word,
-                    result.exact[0].type
+                    exactForms[0].word,
+                    exactForms[0].type
                   )}
-                  word={result.exact[0].word}
-                  type={result.exact[0].type}
-                  className="text-3xl text-stone-900 dark:text-stone-100"
+                  word={exactForms[0].word}
+                  type={exactForms[0].type}
+                  className="text-2xl text-stone-900 dark:text-stone-100"
                 />
+                {sameWord ? (
+                  <div className="mt-3 text-sm text-stone-600 dark:text-stone-300">
+                    This form is both the{' '}
+                    {exactForms.map((e, i) => (
+                      <React.Fragment key={e.type}>
+                        {i > 0 && (i === exactForms.length - 1 ? ' and ' : ', ')}
+                        <span className="font-semibold">{getTypeInfo(e.type).label}</span>
+                      </React.Fragment>
+                    ))}
+                    .
+                  </div>
+                ) : (
+                  <div className="mt-3 text-sm text-stone-600 dark:text-stone-300">
+                    <span className="font-semibold">{getTypeInfo(exactForms[0].type).label}</span>
+                  </div>
+                )}
               </div>
-              <p className="text-stone-700 dark:text-stone-300 text-center">
-                That's the{' '}
-                <span className="font-semibold">{getTypeInfo(result.exact[0].type).label}</span> of{' '}
-                <span className="font-semibold" lang="ja">{result.exact[0].word.dict}</span>{' '}
-                <span className="text-stone-500" lang="ja">（{result.exact[0].word.reading}）</span>{' '}
-                — {result.exact[0].word.meaning}.
-              </p>
-              <p className="mt-1 text-center text-xs text-stone-400">
-                {GROUP_NAMES?.[result.exact[0].word.group] || result.exact[0].word.group}
-                {' · '}
-                {getWordMeta(result.exact[0].word).jlpt}
-              </p>
-              {result.exact.length > 1 && (
+
+              {/* Distinct OTHER words this string could also belong to. */}
+              {!sameWord && exactForms.length > 1 && (
                 <div className="mt-4 pt-4 border-t border-stone-100 dark:border-stone-800 text-sm text-stone-500 dark:text-stone-400">
-                  <div className="font-medium mb-1">Also a valid reading of:</div>
+                  <div className="font-medium mb-1">Also a valid form of:</div>
                   <ul className="space-y-0.5">
-                    {result.exact.slice(1).map((e) => (
+                    {exactForms.slice(1).map((e) => (
                       <li key={`${e.word.reading}-${e.type}`} lang="ja">
                         {candidateLabel(e)}
                       </li>
@@ -258,9 +285,7 @@ export default function CheckView({ state, verbs, practicePrefs = DEFAULT_PREFS,
                 Not quite
               </div>
               <p className="text-stone-700 dark:text-stone-300">
-                You typed{' '}
-                <span className="font-medium" lang="ja">{result.normalized}</span>. It looks like you
-                were going for the{' '}
+                It looks like you were going for the{' '}
                 <span className="font-semibold">{getTypeInfo(result.near[0].type).label}</span> of{' '}
                 <span className="font-semibold" lang="ja">{result.near[0].word.dict}</span>{' '}
                 <span className="text-stone-500" lang="ja">（{result.near[0].word.reading}）</span>{' '}
@@ -312,9 +337,8 @@ export default function CheckView({ state, verbs, practicePrefs = DEFAULT_PREFS,
               </div>
               <p className="text-stone-700 dark:text-stone-300">
                 <span className="font-medium" lang="ja">{result.normalized}</span> doesn't match a
-                conjugation of any word in your active set. Double-check the
-                spelling, or review which words and conjugation forms are enabled
-                in Settings.
+                conjugation of any verb or adjective I know. Double-check the
+                spelling, or add the word in the Library.
               </p>
             </div>
           )}
