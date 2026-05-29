@@ -3,7 +3,7 @@ import { IconVolume, IconSpark } from './Icons.jsx';
 import { contextSentenceFor } from '../utils/conjugatorExplain.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { TYPE_LABEL } from '../data/conjugationTypes.js';
-import { speakJapanese } from '../utils/speech.js';
+import { playPronunciation } from '../utils/speech.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
 export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEFAULT_PREFS }) {
@@ -54,7 +54,7 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
           </div>
         </div>
         <button
-          onClick={() => speakJapanese(example.ja, 0.85, practicePrefs.voiceURI)}
+          onClick={() => playPronunciation(example.ja, 0.85, practicePrefs.voiceURI)}
           aria-label="Play example audio"
           className="px-2.5 py-2 rounded-lg border border-indigo-200 bg-white/70 hover:bg-white text-indigo-700"
         >

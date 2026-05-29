@@ -7,6 +7,7 @@ import {
   IconChat,
   IconPen,
 } from '../components/Icons.jsx';
+import { playPronunciation } from '../utils/speech.js';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
 import { PitchAccentSection } from '../components/PitchAccent.jsx';
@@ -368,17 +369,8 @@ Keep it concise and clear.`;
   }, [current?.id, practicePrefs.drillMode, geminiKey]);
 
   function speakJapaneseLocal(text, rateVal = 0.85) {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ja-JP';
-    u.rate = rateVal;
-    if (practicePrefs.voiceURI) {
-      const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find((v) => v.voiceURI === practicePrefs.voiceURI);
-      if (voice) u.voice = voice;
-    }
-    window.speechSynthesis.speak(u);
+    // Prefer a recorded clip with TTS fallback (improvement #18).
+    playPronunciation(text, rateVal, practicePrefs.voiceURI);
   }
 
   if (!current) {

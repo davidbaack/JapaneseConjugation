@@ -13,6 +13,7 @@ import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import { PitchAccentSection } from '../components/PitchAccent.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import { toHiragana, kanaToRomaji } from '../utils/romaji.js';
+import { playPronunciation } from '../utils/speech.js';
 import {
   conjugateItem,
   isAdjective,
@@ -1088,17 +1089,8 @@ export default function ReferenceViewSub({
   }
 
   function speakJapaneseLocal(text) {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ja-JP';
-    u.rate = 0.9;
-    if (practicePrefs.voiceURI) {
-      const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find((v) => v.voiceURI === practicePrefs.voiceURI);
-      if (voice) u.voice = voice;
-    }
-    window.speechSynthesis.speak(u);
+    // Prefer a recorded clip with TTS fallback (improvement #18).
+    playPronunciation(text, 0.9, practicePrefs.voiceURI);
   }
 
   return (

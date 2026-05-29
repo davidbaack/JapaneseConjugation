@@ -7,7 +7,7 @@ import { conjugateItem, getTypeInfo, promptFormLabel } from '../utils/conjugator
 import { explainItem } from '../utils/conjugatorExplain.js';
 import { bumpDaily, markMistakeResolved } from '../utils/storage.js';
 import { promptDisplay, formDisplay } from '../utils/display.js';
-import { speakJapanese } from '../utils/speech.js';
+import { playPronunciation } from '../utils/speech.js';
 
 export default function MistakesView({ state, setState, practicePrefs }) {
   const mistakes = useMemo(() => state.mistakes || [], [state.mistakes]);
@@ -145,7 +145,7 @@ export default function MistakesView({ state, setState, practicePrefs }) {
                 </div>
               </div>
               <button
-                onClick={() => speakJapanese(activeExpected, 0.9, practicePrefs.voiceURI)}
+                onClick={() => playPronunciation(activeExpected, 0.9, practicePrefs.voiceURI)}
                 className="p-2 border border-stone-205 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-500"
                 title="Speak"
                 aria-label="Speak answer"

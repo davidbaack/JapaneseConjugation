@@ -3,7 +3,12 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { initLogger } from './utils/logger.js';
+import { detectLocale, setLocale } from './i18n/index.js';
 import './index.css';
+
+// Pick a supported UI locale from the browser (currently English-only, but the
+// catalog/registry is in place for future locales) (improvement #19).
+setLocale(detectLocale());
 
 // Capture uncaught errors / rejections and (optionally) ship them to a
 // collector configured via VITE_LOG_ENDPOINT (improvement #13).

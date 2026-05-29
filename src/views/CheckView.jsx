@@ -4,7 +4,7 @@ import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import StickyAction from '../components/StickyAction.jsx';
-import { speakJapanese } from '../utils/speech.js';
+import { playPronunciation } from '../utils/speech.js';
 import { identifyConjugation } from '../utils/checkIdentify.js';
 import { getTypeInfo, getWordMeta } from '../utils/conjugator.js';
 import { explainItem, GROUP_NAMES } from '../utils/conjugatorExplain.js';
@@ -198,7 +198,7 @@ export default function CheckView({
   }, [focusInput]);
 
   const speak = useCallback(
-    (text) => speakJapanese(text, 0.9, practicePrefs.voiceURI),
+    (text) => playPronunciation(text, 0.9, practicePrefs.voiceURI),
     [practicePrefs.voiceURI],
   );
 

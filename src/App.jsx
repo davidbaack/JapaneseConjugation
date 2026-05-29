@@ -19,6 +19,7 @@ import { supabase } from './utils/supabase.js';
 import { useCloudAutoSync } from './hooks/useCloudAutoSync.js';
 import AuthModal from './components/AuthModal.jsx';
 import ViewSkeleton from './components/Skeleton.jsx';
+import { t } from './i18n/index.js';
 
 // Views — lazy-loaded so each gets its own chunk
 const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
@@ -248,19 +249,20 @@ export default function App() {
         <header className="mb-4 sm:mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
-              動詞と形容詞 <span className="text-stone-400 font-normal">·</span> Katachiya
+              動詞と形容詞 <span className="text-stone-400 font-normal">·</span> {t('app.title')}
             </h1>
-            <p className="text-xs text-stone-500 mt-0.5">
-              Spaced repetition, reference tables, and AI coaching
-            </p>
+            <p className="text-xs text-stone-500 mt-0.5">{t('app.tagline')}</p>
           </div>
           <div className="text-xs text-stone-500 text-right">
             <div>
-              {state.session.correct}/{state.session.reviewed} this session
+              {t('header.session', {
+                correct: state.session.correct,
+                reviewed: state.session.reviewed,
+              })}
             </div>
             <div className="mt-1 flex items-center justify-end gap-2">
               <span>
-                {daily.count}/{practicePrefs.dailyGoal} today
+                {t('header.today', { count: daily.count, goal: practicePrefs.dailyGoal })}
               </span>
               <span className="inline-block w-14 h-1.5 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden">
                 <span className="block h-full bg-indigo-500" style={{ width: dailyPct + '%' }} />
@@ -268,7 +270,7 @@ export default function App() {
             </div>
             {!!daily.goalStreak && (
               <div className="text-amber-600 dark:text-amber-400 mt-0.5">
-                {daily.goalStreak} day goal streak
+                {t('header.goalStreak', { days: daily.goalStreak })}
               </div>
             )}
             {session && (
@@ -278,10 +280,10 @@ export default function App() {
                 <IconCloud className="w-3 h-3" />
                 <span>
                   {syncStatus.kind === 'syncing'
-                    ? 'syncing'
+                    ? t('sync.syncing')
                     : syncStatus.kind === 'error'
-                      ? 'sync error'
-                      : 'synced'}
+                      ? t('sync.error')
+                      : t('sync.synced')}
                 </span>
               </div>
             )}
@@ -299,17 +301,17 @@ export default function App() {
             'stats',
             'library',
             'settings',
-          ].map((t) => (
+          ].map((id) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={id}
+              onClick={() => setTab(id)}
               className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
-                tab === t
+                tab === id
                   ? 'bg-stone-800 dark:bg-indigo-700 text-white font-semibold'
                   : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
               }`}
             >
-              {t}
+              {t(`nav.${id}`)}
             </button>
           ))}
         </nav>

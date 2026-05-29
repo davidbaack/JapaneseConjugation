@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { IconVolume } from './Icons.jsx';
 import ScriptDisplay from './ScriptDisplay.jsx';
-import { speakJapanese } from '../utils/speech.js';
+import { playPronunciation } from '../utils/speech.js';
 import { promptDisplay, formDisplay, shuffled } from '../utils/display.js';
 import {
   RULES,
@@ -127,7 +127,7 @@ export default function AmbientReviewPanel({
     }
     if (!playing || !current) return undefined;
     let cancelled = false;
-    speakJapanese(current.example.ja, rate, practicePrefs.voiceURI, () => {
+    playPronunciation(current.example.ja, rate, practicePrefs.voiceURI, () => {
       if (cancelled) return;
       bumpPlayed();
       timerRef.current = setTimeout(() => {
@@ -271,7 +271,7 @@ export default function AmbientReviewPanel({
             ))}
           </div>
           <button
-            onClick={() => speakJapanese(current.example.ja, rate, practicePrefs.voiceURI)}
+            onClick={() => playPronunciation(current.example.ja, rate, practicePrefs.voiceURI)}
             className="px-3 py-2 rounded-lg text-sm border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-350"
           >
             Speak

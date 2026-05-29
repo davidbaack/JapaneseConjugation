@@ -35,3 +35,60 @@ export function speakJapanese(text, rate = 0.9, voiceURI = '', onEnd = null) {
   }
   window.speechSynthesis.speak(u);
 }
+
+// ============================================================================
+// PRE-RECORDED PRONUNCIATION (improvement #18)
+//
+// Web Speech voices vary wildly across platforms, so we allow higher-quality
+// pre-recorded clips for core vocabulary. A clip source is resolved from (in
+// order) an explicit manifest, then a configurable CDN base URL; if neither
+// yields a playable clip we fall back to TTS — so behavior is unchanged until
+// recordings are actually provided.
+// ============================================================================
+
+const audioManifest = new Map();
+
+// Register reading→URL clips (e.g. from a packaged manifest or a vocab pack).
+export function registerAudioClips(entries = {}) {
+  for (const [key, url] of Object.entries(entries)) {
+    if (key && url) audioManifest.set(key, url);
+  }
+}
+
+export function clearAudioClips() {
+  audioManifest.clear();
+}
+
+const AUDIO_BASE_URL = (import.meta.env?.VITE_AUDIO_BASE_URL || '').replace(/\/$/, '');
+
+// Resolve a clip URL for some Japanese text, or null if none is known.
+export function audioClipUrl(text, { baseUrl = AUDIO_BASE_URL, manifest = audioManifest } = {}) {
+  if (!text) return null;
+  if (manifest.has(text)) return manifest.get(text);
+  if (baseUrl) return `${baseUrl}/${encodeURIComponent(text)}.mp3`;
+  return null;
+}
+
+// Play a pronunciation: prefer a recorded clip, fall back to TTS on miss or
+// playback failure. Drop-in superset of speakJapanese's signature.
+export function playPronunciation(text, rate = 0.9, voiceURI = '', onEnd = null) {
+  const url = audioClipUrl(text);
+  if (!url || typeof Audio === 'undefined') {
+    speakJapanese(text, rate, voiceURI, onEnd);
+    return;
+  }
+  try {
+    if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
+    const audio = new Audio(url);
+    audio.playbackRate = rate < 0.5 ? 0.5 : rate; // clamp to a sane minimum
+    if (typeof onEnd === 'function') audio.onended = onEnd;
+    // On any load/playback error, fall back to TTS so the user still hears it.
+    audio.onerror = () => speakJapanese(text, rate, voiceURI, onEnd);
+    const p = audio.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => speakJapanese(text, rate, voiceURI, onEnd));
+    }
+  } catch {
+    speakJapanese(text, rate, voiceURI, onEnd);
+  }
+}

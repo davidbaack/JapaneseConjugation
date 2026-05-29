@@ -34,6 +34,7 @@ export default [
         FileReader: 'readonly',
         SpeechSynthesisUtterance: 'readonly',
         SpeechSynthesis: 'readonly',
+        Audio: 'readonly',
         console: 'readonly',
         Date: 'readonly',
         Math: 'readonly',
