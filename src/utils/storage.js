@@ -137,7 +137,7 @@ export async function cloudFetch() {
 
 export async function cloudUpsert(payload) {
   if (!supabase) throw new Error('Supabase client is not configured');
-  
+
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('User is not authenticated');
 
@@ -152,6 +152,27 @@ export async function cloudUpsert(payload) {
   if (error) {
     throw error;
   }
+}
+
+// Parse the cloud row's updated_at into epoch millis (0 when absent/invalid).
+export function cloudTimestamp(cloud) {
+  if (!cloud || !cloud.updated_at) return 0;
+  const t = new Date(cloud.updated_at).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+// Decide what to do after a cloud fetch, given the timestamp of our last
+// successful sync. This is the conflict-resolution core, kept pure so it can
+// be tested without rendering the app:
+//   - 'pull'  cloud is newer than what we last synced → adopt cloud data
+//   - 'push'  local is newer, or the cloud row is empty/new → upload local
+//   - 'noop'  timestamps match → already in sync
+export function resolveSyncAction(cloud, localSyncedAt = 0) {
+  if (!cloud || !cloud.data) return 'push';
+  const cloudAt = cloudTimestamp(cloud);
+  if (cloudAt > localSyncedAt) return 'pull';
+  if (cloudAt < localSyncedAt) return 'push';
+  return 'noop';
 }
 
 // ============================================================================

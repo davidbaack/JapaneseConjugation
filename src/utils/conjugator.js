@@ -1,9 +1,7 @@
-import { toHiragana } from './romaji.js';
 import {
   CONJ_TYPES,
   ADJ_TYPES,
   ALL_CARD_TYPES,
-  TYPE_LABEL,
   getTypeInfo,
   TYPE_PREVIEW_VERBS,
   TYPE_PREVIEW_ADJECTIVES

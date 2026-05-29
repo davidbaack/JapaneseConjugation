@@ -8,6 +8,8 @@ import {
   saveAll,
   cloudFetch,
   cloudUpsert,
+  cloudTimestamp,
+  resolveSyncAction,
   mergeState
 } from './utils/storage.js';
 import { DEFAULT_PREFS } from './data/defaults.js';
@@ -87,35 +89,28 @@ export default function App() {
     if (session?.user) {
       setSyncStatus({ kind: 'syncing', message: 'Checking cloud…', at: null });
       cloudFetch().then(cloud => {
-        if (cloud && cloud.data) {
-          const cloudAt = cloud.updated_at ? new Date(cloud.updated_at).getTime() : 0;
-          if (cloudAt > lastSyncedAtRef.current) {
-            if (cloud.data.state) setState(mergeState(cloud.data.state, { reviewed: 0, correct: 0 }));
-            if (Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);
-            if (Array.isArray(cloud.data.customAdjectives)) setCustomAdjectives(cloud.data.customAdjectives);
-            if (Array.isArray(cloud.data.wordLists)) setWordLists(cloud.data.wordLists);
-            if (cloud.data.practicePrefs) setPracticePrefs(mergePracticePrefs(cloud.data.practicePrefs));
-            lastSyncedAtRef.current = cloudAt;
-            setSyncStatus({ kind: 'ok', message: 'Restored from cloud', at: cloudAt });
-          } else if (cloudAt < lastSyncedAtRef.current) {
-            // Local is newer, upload to cloud
-            setSyncStatus({ kind: 'syncing', message: 'Uploading newer local progress…', at: null });
-            cloudUpsert({ state, customVerbs, customAdjectives, wordLists, practicePrefs }).then(() => {
-              const now = Date.now();
-              lastSyncedAtRef.current = now;
-              setSyncStatus({ kind: 'ok', message: 'Uploaded local progress', at: now });
-            }).catch(e => setSyncStatus({ kind: 'error', message: e.message || 'Push failed', at: null }));
-          } else {
-            setSyncStatus({ kind: 'ok', message: 'Up to date', at: lastSyncedAtRef.current });
-          }
+        const action = resolveSyncAction(cloud, lastSyncedAtRef.current);
+        if (action === 'pull') {
+          const cloudAt = cloudTimestamp(cloud);
+          if (cloud.data.state) setState(mergeState(cloud.data.state, { reviewed: 0, correct: 0 }));
+          if (Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);
+          if (Array.isArray(cloud.data.customAdjectives)) setCustomAdjectives(cloud.data.customAdjectives);
+          if (Array.isArray(cloud.data.wordLists)) setWordLists(cloud.data.wordLists);
+          if (cloud.data.practicePrefs) setPracticePrefs(mergePracticePrefs(cloud.data.practicePrefs));
+          lastSyncedAtRef.current = cloudAt;
+          setSyncStatus({ kind: 'ok', message: 'Restored from cloud', at: cloudAt });
+        } else if (action === 'noop') {
+          setSyncStatus({ kind: 'ok', message: 'Up to date', at: lastSyncedAtRef.current });
         } else {
-          // New cloud account — upload current local data
-          setSyncStatus({ kind: 'syncing', message: 'Syncing local progress to cloud…', at: null });
+          // push: either local is newer than the cloud row, or this is a brand-new
+          // cloud account with no data yet — upload current local progress either way.
+          const hadCloud = !!(cloud && cloud.data);
+          setSyncStatus({ kind: 'syncing', message: hadCloud ? 'Uploading newer local progress…' : 'Syncing local progress to cloud…', at: null });
           cloudUpsert({ state, customVerbs, customAdjectives, wordLists, practicePrefs }).then(() => {
             const now = Date.now();
             lastSyncedAtRef.current = now;
-            setSyncStatus({ kind: 'ok', message: 'Synced to cloud', at: now });
-          }).catch(e => setSyncStatus({ kind: 'error', message: e.message || 'Initial sync failed', at: null }));
+            setSyncStatus({ kind: 'ok', message: hadCloud ? 'Uploaded local progress' : 'Synced to cloud', at: now });
+          }).catch(e => setSyncStatus({ kind: 'error', message: e.message || (hadCloud ? 'Push failed' : 'Initial sync failed'), at: null }));
         }
       }).catch(e => setSyncStatus({ kind: 'error', message: e.message || 'Cloud unreachable', at: null }));
     } else {
@@ -192,8 +187,8 @@ export default function App() {
     setSyncStatus({ kind: 'syncing', message: 'Syncing…', at: null });
     try {
       const cloud = await cloudFetch();
-      const cloudAt = cloud && cloud.updated_at ? new Date(cloud.updated_at).getTime() : 0;
-      if (cloud && cloud.data && cloudAt > lastSyncedAtRef.current) {
+      if (resolveSyncAction(cloud, lastSyncedAtRef.current) === 'pull') {
+        const cloudAt = cloudTimestamp(cloud);
         if (cloud.data.state) setState(mergeState(cloud.data.state, state.session));
         if (Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);
         if (Array.isArray(cloud.data.customAdjectives)) setCustomAdjectives(cloud.data.customAdjectives);
