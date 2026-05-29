@@ -34,7 +34,7 @@ import {
 } from '../utils/display.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
-function kanaCoachCells(expected, input, revealed = 0, pendingLast = false) {
+export function kanaCoachCells(expected, input, revealed = 0, pendingLast = false, greenRevealed = 0) {
   const target = Array.from(expected || '');
   const typed = Array.from(toHiraganaProgress(input || ''));
   // Trailing 'n' is held pending in progress mode; commit it as 'ん' when context confirms it
@@ -44,13 +44,24 @@ function kanaCoachCells(expected, input, revealed = 0, pendingLast = false) {
   const lastTypedIndex = typed.length - 1;
   const cells = target.map((expectedKana, i) => {
     const got = typed[i] || '';
+    // Positions that have been correctly typed at some point stay green: keep them
+    // green when re-typed (skip the pending styling) and refill them when backspaced.
+    const greenRevealedCell = i < greenRevealed;
     const hinted = !got && i < revealed;
+    let state;
+    if (got) {
+      if (got === expectedKana) {
+        state = pendingLast && i === lastTypedIndex && !greenRevealedCell ? 'pending' : 'correct';
+      } else {
+        state = pendingLast && i === lastTypedIndex ? 'pending' : 'wrong';
+      }
+    } else {
+      state = greenRevealedCell ? 'correct' : hinted ? 'hint' : 'empty';
+    }
     return {
       expected: expectedKana,
-      shown: got || (hinted ? expectedKana : ''),
-      state: got
-        ? (pendingLast && i === lastTypedIndex ? 'pending' : (got === expectedKana ? 'correct' : 'wrong'))
-        : (hinted ? 'hint' : 'empty')
+      shown: got || (greenRevealedCell || hinted ? expectedKana : ''),
+      state
     };
   });
   for (let i = target.length; i < typed.length; i++) {
@@ -86,6 +97,7 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
   const [aiTypingHint, setAiTypingHint] = useState('');
   const [aiTypingHintLoading, setAiTypingHintLoading] = useState(false);
   const [coachRevealed, setCoachRevealed] = useState(0);
+  const [greenRevealed, setGreenRevealed] = useState(0);
   const [revealedMiss, setRevealedMiss] = useState(false);
   const [reviewChoiceLabel, setReviewChoiceLabel] = useState('');
   const [submittedAnswer, setSubmittedAnswer] = useState('');
@@ -195,6 +207,7 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
 
   useEffect(() => {
     setCoachRevealed(0);
+    setGreenRevealed(0);
   }, [current?.id, practicePrefs.answerMode]);
 
   useEffect(() => {
@@ -208,6 +221,23 @@ export default function StudyView({ state, setState, verbs, geminiKey, practiceP
       submit();
     }
   }, [answer]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Remember how many leading kana have turned green so they stay green through
+  // a backspace and reappear as green immediately when re-typed.
+  useEffect(() => {
+    if (!current) return;
+    if (phase !== 'answering') return;
+    if (reverseDrill) return;
+    if (!['input', 'guided'].includes(practicePrefs.answerMode)) return;
+    if ((practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay) === 'none') return;
+    const cells = kanaCoachCells(sourceForm, answer, 0, true, 0);
+    let committed = 0;
+    for (const c of cells) {
+      if (c.state === 'correct') committed += 1;
+      else break;
+    }
+    setGreenRevealed(prev => (committed > prev ? committed : prev));
+  }, [answer, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (phase === 'answering') {
@@ -393,7 +423,7 @@ Keep it concise and clear.`;
   const coachPreview = toHiragana(answer);
   const coachProgress = toHiraganaProgress(answer);
   const preview = coachPreview;
-  const coachCells = practicePrefs.answerMode === 'guided' ? kanaCoachCells(expected, answer, coachRevealed, phase === 'answering') : [];
+  const coachCells = practicePrefs.answerMode === 'guided' ? kanaCoachCells(expected, answer, coachRevealed, phase === 'answering', greenRevealed) : [];
   const coachWrongIndex = coachCells.findIndex(c => c.state === 'wrong');
   const coachTypedCount = Array.from(coachProgress).length;
   const expectedKanaCount = Array.from(expected).length;
@@ -405,7 +435,7 @@ Keep it concise and clear.`;
         : coachTypedCount > expectedKanaCount
           ? 'Extra kana after the answer.'
           : '';
-  const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill ? kanaCoachCells(expected, answer, 0, phase === 'answering') : [];
+  const liveCells = practicePrefs.answerMode === 'input' && !reverseDrill ? kanaCoachCells(expected, answer, 0, phase === 'answering', greenRevealed) : [];
   const liveWrongIndex = liveCells.findIndex(c => c.state === 'wrong' || c.state === 'extra');
   const liveStatus =
     liveWrongIndex >= 0
