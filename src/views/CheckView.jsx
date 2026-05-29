@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { IconCheck, IconX, IconPen, IconVolume } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
+import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import { speakJapanese } from '../utils/speech.js';
 import { identifyConjugation } from '../utils/checkIdentify.js';
 import {
@@ -13,6 +14,8 @@ import {
 import { formDisplay, englishForForm } from '../utils/display.js';
 import { toHiragana } from '../utils/romaji.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+
+const MAX_HISTORY = 6;
 
 const EXAMPLES = ['食べた', 'のんで', 'たかかった', 'tabemasu'];
 
@@ -45,10 +48,13 @@ function candidateLabel(cand) {
   return `${ti.label} of ${word.dict}（${word.reading}）— ${word.meaning}`;
 }
 
-export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
+export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS, geminiKey }) {
   const [input, setInput] = useState('');
   const [result, setResult] = useState(null);
   const [kanaPadOpen, setKanaPadOpen] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showOthers, setShowOthers] = useState(false);
   const inputRef = useRef(null);
 
   // Check recognises a conjugation of ANY known word, in ANY valid form — a
@@ -61,13 +67,24 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
     inputRef.current?.focus();
   }, []);
 
+  // Land with the cursor in the box — this is a "type immediately" tool.
+  useEffect(() => {
+    focusInput();
+  }, [focusInput]);
+
   const runCheck = useCallback(
     (value) => {
       const raw = (value ?? '').trim();
       if (!raw) return;
       const res = identifyConjugation(raw, allWords);
       const status = res.exact.length > 0 ? 'exact' : res.near.length > 0 ? 'near' : 'none';
+      setShowBreakdown(false);
+      setShowOthers(false);
       setResult({ ...res, status });
+      setHistory((h) => {
+        const entry = { input: res.normalized || raw, status };
+        return [entry, ...h.filter((e) => e.input !== entry.input)].slice(0, MAX_HISTORY);
+      });
     },
     [allWords]
   );
@@ -115,6 +132,14 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
   const sameWord =
     exactForms.length > 1 &&
     exactForms.every((e) => e.word.reading === exactForms[0].word.reading);
+  // The word+form a breakdown should explain: the recognised form when correct,
+  // or the intended form when it's a near-miss.
+  const headForm =
+    result?.status === 'exact'
+      ? exactForms[0]
+      : result?.status === 'near'
+        ? result.near[0]
+        : null;
 
   return (
     <div className="space-y-4">
@@ -208,6 +233,35 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
               </div>
             </>
           )}
+
+          {/* Recent checks — re-run any of the last few without re-typing. */}
+          {history.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-stone-100 dark:border-stone-800">
+              <div className="text-[11px] uppercase tracking-wider text-stone-400 mb-2">Recent</div>
+              <div className="flex flex-wrap gap-2">
+                {history.map((h) => (
+                  <button
+                    key={h.input}
+                    onClick={() => handleExample(h.input)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-stone-200 dark:border-stone-800 text-sm text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition"
+                    lang="ja"
+                    title="Check again"
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        h.status === 'exact'
+                          ? 'bg-emerald-500'
+                          : h.status === 'near'
+                            ? 'bg-rose-500'
+                            : 'bg-stone-400'
+                      }`}
+                    />
+                    {h.input}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -278,6 +332,26 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
                 )}
               </div>
 
+              {/* How it's built — reinforces the pattern, not just a checkmark. */}
+              {headForm && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => setShowBreakdown((v) => !v)}
+                    className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    {showBreakdown ? 'Hide breakdown' : 'Show how it’s built'}
+                  </button>
+                  {showBreakdown && (
+                    <ConjugationBreakdown
+                      word={headForm.word}
+                      type={headForm.type}
+                      geminiKey={geminiKey}
+                      practicePrefs={practicePrefs}
+                    />
+                  )}
+                </div>
+              )}
+
               {/* Distinct OTHER words this string could also belong to. */}
               {!sameWord && exactForms.length > 1 && (
                 <div className="mt-4 pt-4 border-t border-stone-100 dark:border-stone-800 text-sm text-stone-500 dark:text-stone-400">
@@ -335,22 +409,54 @@ export default function CheckView({ verbs, practicePrefs = DEFAULT_PREFS }) {
                   {result.near[0].diff.summary}.
                 </div>
               </div>
-              <p className="mt-4 text-sm text-stone-600 dark:text-stone-300">
+
+              {/* Lead with the rule — the most useful part for learning. */}
+              <p className="mt-4 text-sm text-stone-700 dark:text-stone-200">
                 {explainItem(result.near[0].word, result.near[0].type)}
+                <span className="text-stone-400">
+                  {' '}({englishForForm(result.near[0].word, result.near[0].type)})
+                </span>
               </p>
-              <p className="mt-1 text-xs text-stone-400">
-                ({englishForForm(result.near[0].word, result.near[0].type)})
-              </p>
+
+              {headForm && (
+                <div className="mt-3">
+                  <button
+                    onClick={() => setShowBreakdown((v) => !v)}
+                    className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    {showBreakdown ? 'Hide breakdown' : 'Show how it’s built'}
+                  </button>
+                  {showBreakdown && (
+                    <ConjugationBreakdown
+                      word={headForm.word}
+                      type={headForm.type}
+                      geminiKey={geminiKey}
+                      practicePrefs={practicePrefs}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Alternative interpretations are secondary — tuck them away. */}
               {result.near.length > 1 && (
-                <div className="mt-4 pt-4 border-t border-stone-100 dark:border-stone-800 text-sm text-stone-500 dark:text-stone-400">
-                  <div className="font-medium mb-1">Or did you mean:</div>
-                  <ul className="space-y-0.5">
-                    {result.near.slice(1).map((e) => (
-                      <li key={`${e.word.reading}-${e.type}`} lang="ja">
-                        {e.kana} — {candidateLabel(e)}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="mt-3">
+                  <button
+                    onClick={() => setShowOthers((v) => !v)}
+                    className="text-sm text-stone-500 dark:text-stone-400 hover:underline"
+                  >
+                    {showOthers
+                      ? 'Hide other matches'
+                      : `Other close matches (${result.near.length - 1})`}
+                  </button>
+                  {showOthers && (
+                    <ul className="mt-2 space-y-0.5 text-sm text-stone-500 dark:text-stone-400">
+                      {result.near.slice(1).map((e) => (
+                        <li key={`${e.word.reading}-${e.type}`} lang="ja">
+                          {e.kana} — {candidateLabel(e)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
             </div>
