@@ -10,10 +10,10 @@ import App from '../App.jsx';
 afterEach(cleanup);
 
 describe('App shell', () => {
-  it('renders the header, tagline, and full nav', async () => {
+  it('renders the header, subtitle, and full nav', async () => {
     render(<App />);
     expect(screen.getByRole('heading', { name: /Katachiya/ })).toBeTruthy();
-    expect(screen.getByText('Spaced repetition, reference tables, and AI coaching')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Japanese Conjugation SRS/ })).toBeTruthy();
     // Nav labels (accessible name is the catalog string; CSS only capitalizes).
     for (const label of [
       'study',

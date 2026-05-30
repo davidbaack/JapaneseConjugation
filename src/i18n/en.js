@@ -7,7 +7,7 @@
 // carry their exact casing.
 export default {
   'app.title': 'Katachiya',
-  'app.tagline': 'Spaced repetition, reference tables, and AI coaching',
+  'app.subtitle': 'Japanese Conjugation SRS',
 
   'nav.study': 'study',
   'nav.check': 'Conjugation Check',
