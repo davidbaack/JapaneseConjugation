@@ -112,7 +112,11 @@ function useAppController() {
                 setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: cloudAt });
               })
               .catch((e) =>
-                setSyncStatus({ kind: 'error', message: e.message || 'Merge push failed', at: null }),
+                setSyncStatus({
+                  kind: 'error',
+                  message: e.message || 'Merge push failed',
+                  at: null,
+                }),
               );
           } else if (action === 'pull') {
             const cloudAt = cloudTimestamp(cloud);
@@ -233,7 +237,13 @@ function useAppController() {
         if (Array.isArray(cloud.data.wordLists)) setWordLists(cloud.data.wordLists);
         if (cloud.data.practicePrefs)
           setPracticePrefs(mergePracticePrefs(cloud.data.practicePrefs));
-        await cloudUpsert({ state: merged, customVerbs, customAdjectives, wordLists, practicePrefs });
+        await cloudUpsert({
+          state: merged,
+          customVerbs,
+          customAdjectives,
+          wordLists,
+          practicePrefs,
+        });
         const now = Date.now();
         lastSyncedAtRef.current = now;
         setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: now });

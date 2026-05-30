@@ -274,8 +274,7 @@ export function mergeVerbStats(local = {}, cloud = {}) {
       for (const ruleId of Object.keys(lw)) {
         const ls = lw[ruleId],
           cs = cw[ruleId];
-        merged[word][ruleId] =
-          !cs || (ls.seen || 0) > (cs.seen || 0) ? ls : cs;
+        merged[word][ruleId] = !cs || (ls.seen || 0) > (cs.seen || 0) ? ls : cs;
       }
     }
   }
@@ -308,9 +307,7 @@ export function mergeCloudState(local, cloud) {
     cards: mergeCards(local.cards || {}, cloud.cards || {}),
     verbStats: mergeVerbStats(local.verbStats || {}, cloud.verbStats || {}),
     mistakes: mergeMistakes(local.mistakes || [], cloud.mistakes || []),
-    enabledTypes: [
-      ...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])]),
-    ],
+    enabledTypes: [...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])])],
     daily: (() => {
       const ld = local.daily || {},
         cd = cloud.daily || {};
@@ -354,15 +351,18 @@ export function mergeCloudState(local, cloud) {
     mock: {
       taken: maxNum(local.mock?.taken, cloud.mock?.taken),
       bestPct: maxNum(local.mock?.bestPct, cloud.mock?.bestPct),
-      lastPct: (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
-        ? local.mock?.lastPct
-        : cloud.mock?.lastPct,
-      lastScore: (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
-        ? local.mock?.lastScore
-        : cloud.mock?.lastScore,
-      lastTotal: (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
-        ? local.mock?.lastTotal
-        : cloud.mock?.lastTotal,
+      lastPct:
+        (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
+          ? local.mock?.lastPct
+          : cloud.mock?.lastPct,
+      lastScore:
+        (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
+          ? local.mock?.lastScore
+          : cloud.mock?.lastScore,
+      lastTotal:
+        (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
+          ? local.mock?.lastTotal
+          : cloud.mock?.lastTotal,
       lastAt: maxNum(local.mock?.lastAt, cloud.mock?.lastAt) || null,
       bySkill: { ...(cloud.mock?.bySkill || {}), ...(local.mock?.bySkill || {}) },
     },
