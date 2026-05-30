@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   IconList,
   IconStar,
@@ -90,6 +90,13 @@ export default function ReferenceViewSub({
   const [pairAiLoading, setPairAiLoading] = useState(false);
   const [pairAiErr, setPairAiErr] = useState('');
   const [favoriteMsg, setFavoriteMsg] = useState('');
+  const aiAbortRef = useRef(null);
+  const lookupAbortRef = useRef(null);
+  const accentAbortRef = useRef(null);
+  const kanjiAbortRef = useRef(null);
+  const writingAbortRef = useRef(null);
+  const scratchAbortRef = useRef(null);
+  const pairAbortRef = useRef(null);
 
   const words = useMemo(() => [...verbs, ...adjectives], [verbs, adjectives]);
   const reference = normalizeReferenceState(state.reference);
@@ -285,6 +292,14 @@ export default function ReferenceViewSub({
 
   async function generateExamples() {
     if (!selected || !geminiKey) return;
+    if (aiLoading) {
+      aiAbortRef.current?.abort();
+      aiAbortRef.current = null;
+      setAiLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
     setAiLoading(true);
     setAiErr('');
     setAiText('');
@@ -297,15 +312,24 @@ export default function ReferenceViewSub({
         0.4,
         aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM),
       );
-      setAiText(reply);
+      if (!controller.signal.aborted) setAiText(reply);
     } catch (e) {
-      setAiErr(e.message);
+      if (!controller.signal.aborted) setAiErr(e.message);
     }
-    setAiLoading(false);
+    if (!controller.signal.aborted) setAiLoading(false);
+    aiAbortRef.current = null;
   }
 
   async function explainLookup() {
     if (!query.trim() || !geminiKey || !lookupMatches.length) return;
+    if (lookupAiLoading) {
+      lookupAbortRef.current?.abort();
+      lookupAbortRef.current = null;
+      setLookupAiLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    lookupAbortRef.current = controller;
     setLookupAiLoading(true);
     setLookupAiErr('');
     setLookupAiText('');
@@ -325,15 +349,24 @@ export default function ReferenceViewSub({
         0.25,
         aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM),
       );
-      setLookupAiText(reply);
+      if (!controller.signal.aborted) setLookupAiText(reply);
     } catch (e) {
-      setLookupAiErr(e.message || 'AI lookup failed.');
+      if (!controller.signal.aborted) setLookupAiErr(e.message || 'AI lookup failed.');
     }
-    setLookupAiLoading(false);
+    if (!controller.signal.aborted) setLookupAiLoading(false);
+    lookupAbortRef.current = null;
   }
 
   async function generateAccentGuide() {
     if (!selected || !geminiKey) return;
+    if (accentLoading) {
+      accentAbortRef.current?.abort();
+      accentAbortRef.current = null;
+      setAccentLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    accentAbortRef.current = controller;
     setAccentLoading(true);
     setAccentErr('');
     setAccentText('');
@@ -350,15 +383,24 @@ export default function ReferenceViewSub({
           'You are a careful Japanese pronunciation coach. Be honest about uncertainty in pitch-accent data and focus on practical listening and speaking guidance.',
         ),
       );
-      setAccentText(reply);
+      if (!controller.signal.aborted) setAccentText(reply);
     } catch (e) {
-      setAccentErr(e.message || 'Accent guide failed.');
+      if (!controller.signal.aborted) setAccentErr(e.message || 'Accent guide failed.');
     }
-    setAccentLoading(false);
+    if (!controller.signal.aborted) setAccentLoading(false);
+    accentAbortRef.current = null;
   }
 
   async function generateKanjiInsight() {
     if (!selected || !geminiKey) return;
+    if (kanjiLoading) {
+      kanjiAbortRef.current?.abort();
+      kanjiAbortRef.current = null;
+      setKanjiLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    kanjiAbortRef.current = controller;
     setKanjiLoading(true);
     setKanjiErr('');
     setKanjiText('');
@@ -375,15 +417,24 @@ export default function ReferenceViewSub({
           'You are a careful Japanese dictionary and kanji coach. Keep explanations practical for conjugation learners. Do not invent kanji readings, stroke counts, or etymology when uncertain.',
         ),
       );
-      setKanjiText(reply);
+      if (!controller.signal.aborted) setKanjiText(reply);
     } catch (e) {
-      setKanjiErr(e.message || 'Kanji insight failed.');
+      if (!controller.signal.aborted) setKanjiErr(e.message || 'Kanji insight failed.');
     }
-    setKanjiLoading(false);
+    if (!controller.signal.aborted) setKanjiLoading(false);
+    kanjiAbortRef.current = null;
   }
 
   async function generateWritingGuide() {
     if (!selected || !geminiKey) return;
+    if (writingLoading) {
+      writingAbortRef.current?.abort();
+      writingAbortRef.current = null;
+      setWritingLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    writingAbortRef.current = controller;
     setWritingLoading(true);
     setWritingErr('');
     setWritingText('');
@@ -400,15 +451,24 @@ export default function ReferenceViewSub({
           'You are a careful Japanese handwriting coach. Be honest about uncertainty, avoid invented etymology, and turn dictionary entries into practical writing drills.',
         ),
       );
-      setWritingText(reply);
+      if (!controller.signal.aborted) setWritingText(reply);
     } catch (e) {
-      setWritingErr(e.message || 'Writing guide failed.');
+      if (!controller.signal.aborted) setWritingErr(e.message || 'Writing guide failed.');
     }
-    setWritingLoading(false);
+    if (!controller.signal.aborted) setWritingLoading(false);
+    writingAbortRef.current = null;
   }
 
   async function verifyScratchWithAI() {
     if (!showScratch || !geminiKey) return;
+    if (scratchAiLoading) {
+      scratchAbortRef.current?.abort();
+      scratchAbortRef.current = null;
+      setScratchAiLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    scratchAbortRef.current = controller;
     setScratchAiLoading(true);
     setScratchAiErr('');
     setScratchAiText('');
@@ -445,15 +505,25 @@ export default function ReferenceViewSub({
         result.group === local
           ? 'Matches the local guess.'
           : `Gemini suggests ${GROUP_NAMES[result.group] || result.group}, not ${GROUP_NAMES[local] || local}.`;
-      setScratchAiText(`${result.dict} (${result.reading}) — ${result.meaning}\n${verdict}`);
+      if (!controller.signal.aborted)
+        setScratchAiText(`${result.dict} (${result.reading}) — ${result.meaning}\n${verdict}`);
     } catch (e) {
-      setScratchAiErr(e.message || 'AI verification failed.');
+      if (!controller.signal.aborted) setScratchAiErr(e.message || 'AI verification failed.');
     }
-    setScratchAiLoading(false);
+    if (!controller.signal.aborted) setScratchAiLoading(false);
+    scratchAbortRef.current = null;
   }
 
   async function explainTransitivePair() {
     if (!transitivePair || !geminiKey) return;
+    if (pairAiLoading) {
+      pairAbortRef.current?.abort();
+      pairAbortRef.current = null;
+      setPairAiLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    pairAbortRef.current = controller;
     setPairAiLoading(true);
     setPairAiErr('');
     setPairAiText('');
@@ -475,11 +545,12 @@ export default function ReferenceViewSub({
           'You are a careful Japanese grammar coach. Explain transitive and intransitive verb pairs with particles, context, and learner traps. Do not overgeneralize suffix patterns.',
         ),
       );
-      setPairAiText(reply);
+      if (!controller.signal.aborted) setPairAiText(reply);
     } catch (e) {
-      setPairAiErr(e.message || 'AI pair contrast failed.');
+      if (!controller.signal.aborted) setPairAiErr(e.message || 'AI pair contrast failed.');
     }
-    setPairAiLoading(false);
+    if (!controller.signal.aborted) setPairAiLoading(false);
+    pairAbortRef.current = null;
   }
 
   function speakJapaneseLocal(text) {
@@ -637,11 +708,11 @@ export default function ReferenceViewSub({
               )}
               <button
                 onClick={explainLookup}
-                disabled={!geminiKey || lookupAiLoading || !lookupMatches.length}
+                disabled={!geminiKey || !lookupMatches.length}
                 className="mt-2 w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center justify-center gap-1.5 transition"
               >
                 <IconSpark className="w-4 h-4" />
-                {lookupAiLoading ? 'Ranking...' : 'AI disambiguate'}
+                {lookupAiLoading ? 'Cancel' : 'AI disambiguate'}
               </button>
               {!geminiKey && (
                 <div className="mt-1 text-[11px] text-stone-400 text-center">
@@ -745,11 +816,11 @@ export default function ReferenceViewSub({
                 </div>
                 <button
                   onClick={verifyScratchWithAI}
-                  disabled={!geminiKey || scratchAiLoading}
+                  disabled={!geminiKey}
                   className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconSpark className="w-4 h-4" />
-                  {scratchAiLoading ? 'Verifying...' : 'AI verify'}
+                  {scratchAiLoading ? 'Cancel' : 'AI verify'}
                 </button>
               </div>
               {!geminiKey && (
@@ -906,11 +977,11 @@ export default function ReferenceViewSub({
               </div>
               <button
                 onClick={explainTransitivePair}
-                disabled={!geminiKey || pairAiLoading}
+                disabled={!geminiKey}
                 className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
               >
                 <IconSpark className="w-4 h-4" />
-                {pairAiLoading ? 'Contrasting...' : 'AI contrast'}
+                {pairAiLoading ? 'Cancel' : 'AI contrast'}
               </button>
             </div>
             <div className="grid sm:grid-cols-2 gap-3 mt-4">
@@ -977,11 +1048,11 @@ export default function ReferenceViewSub({
             </div>
             <button
               onClick={generateKanjiInsight}
-              disabled={!geminiKey || kanjiLoading}
+              disabled={!geminiKey}
               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
             >
               <IconSpark className="w-4 h-4" />
-              {kanjiLoading ? 'Checking...' : 'AI kanji'}
+              {kanjiLoading ? 'Cancel' : 'AI kanji'}
             </button>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -1055,11 +1126,11 @@ export default function ReferenceViewSub({
             </div>
             <button
               onClick={generateWritingGuide}
-              disabled={!geminiKey || writingLoading}
+              disabled={!geminiKey}
               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
             >
               <IconSpark className="w-4 h-4" />
-              {writingLoading ? 'Guiding...' : 'AI writing'}
+              {writingLoading ? 'Cancel' : 'AI writing'}
             </button>
           </div>
           <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1133,11 +1204,11 @@ export default function ReferenceViewSub({
             </div>
             <button
               onClick={generateAccentGuide}
-              disabled={!geminiKey || accentLoading}
+              disabled={!geminiKey}
               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
             >
               <IconSpark className="w-4 h-4" />
-              {accentLoading ? 'Listening...' : 'AI accent'}
+              {accentLoading ? 'Cancel' : 'AI accent'}
             </button>
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1309,10 +1380,10 @@ export default function ReferenceViewSub({
             </div>
             <button
               onClick={generateExamples}
-              disabled={!geminiKey || aiLoading}
+              disabled={!geminiKey}
               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm transition"
             >
-              {aiLoading ? 'Thinking...' : 'Generate'}
+              {aiLoading ? 'Cancel' : 'Generate'}
             </button>
           </div>
           {!geminiKey && (

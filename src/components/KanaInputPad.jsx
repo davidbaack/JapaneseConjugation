@@ -61,7 +61,7 @@ export default function KanaInputPad({
                     key={kana}
                     type="button"
                     onClick={() => onInsert(kana)}
-                    className="w-8 h-10 rounded-lg border border-stone-200 bg-white hover:bg-indigo-50 hover:border-indigo-200 text-base font-medium text-stone-800 dark:border-stone-800 dark:bg-stone-900 dark:hover:bg-indigo-950 dark:hover:border-indigo-800 dark:text-stone-200 transition"
+                    className="w-9 h-11 rounded-lg border border-stone-200 bg-white hover:bg-indigo-50 hover:border-indigo-200 text-base font-medium text-stone-800 dark:border-stone-800 dark:bg-stone-900 dark:hover:bg-indigo-950 dark:hover:border-indigo-800 dark:text-stone-200 transition"
                   >
                     {kana}
                   </button>
