@@ -13,7 +13,7 @@ const MISMATCH_MS = 900;
 // word's dictionary form with one of its conjugated forms; flipping the two tiles
 // that belong together locks them in. No typing, so it complements Kotoba Rush.
 export default function MatchView() {
-  const { state, setState, allWords: verbs, practicePrefs, wordLists } = useApp();
+  const { state, setState, setTab, allWords: verbs, practicePrefs, wordLists } = useApp();
   const gameWords = useMemo(
     () => filterWordsForPrefs(verbs, practicePrefs, wordLists),
     [verbs, practicePrefs, wordLists],
@@ -221,6 +221,14 @@ export default function MatchView() {
               <div className="inline-block rounded-2xl px-5 py-4 border bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-350 border-rose-200 dark:border-rose-900/50">
                 <div className="text-lg font-semibold">{notice.title}</div>
                 <div className="text-sm mt-1">{notice.detail}</div>
+                {notice.title === 'Not enough cards' && (
+                  <button
+                    onClick={() => setTab('settings')}
+                    className="mt-3 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+                  >
+                    Go to Settings
+                  </button>
+                )}
               </div>
             ) : (
               <div>

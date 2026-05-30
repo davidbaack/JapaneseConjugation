@@ -120,6 +120,7 @@ export default function SettingsView() {
     showAuth: onShowAuth,
   } = useApp();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
@@ -1393,20 +1394,33 @@ export default function SettingsView() {
               >
                 Sync Now
               </button>
-              <button
-                onClick={async () => {
-                  if (
-                    confirm(
-                      'Are you sure you want to sign out? Your local progress will be preserved.',
-                    )
-                  ) {
-                    await supabase.auth.signOut();
-                  }
-                }}
-                className="px-4 py-2 border border-stone-250 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm font-medium transition"
-              >
-                Sign Out
-              </button>
+              {confirmSignOut ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-stone-500">Local progress is preserved.</span>
+                  <button
+                    onClick={async () => {
+                      setConfirmSignOut(false);
+                      await supabase.auth.signOut();
+                    }}
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-medium transition"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={() => setConfirmSignOut(false)}
+                    className="px-3 py-1.5 border border-stone-250 dark:border-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-xs font-medium transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmSignOut(true)}
+                  className="px-4 py-2 border border-stone-250 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm font-medium transition"
+                >
+                  Sign Out
+                </button>
+              )}
             </div>
           </div>
         )}
