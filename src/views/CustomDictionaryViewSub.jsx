@@ -39,6 +39,7 @@ export default function CustomDictionaryViewSub({
   const [suggErr, setSuggErr] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
   const suggGen = useRef(0);
+  const lookupCancelledRef = useRef(false);
 
   const isAdj = dictTab === 'adjectives';
   const starterWords = isAdj ? STARTER_ADJECTIVES : STARTER_VERBS;
@@ -99,16 +100,26 @@ export default function CustomDictionaryViewSub({
   }
 
   async function lookup() {
-    if (!query.trim() || addPhase === 'loading') return;
+    if (!query.trim()) return;
+    if (addPhase === 'loading') {
+      lookupCancelledRef.current = true;
+      setAddPhase('idle');
+      return;
+    }
+    lookupCancelledRef.current = false;
     setAddPhase('loading');
     setAddError('');
     try {
       const r = await lookupWordWithGemini(query, geminiKey, isAdj);
-      setSuggestion(r);
-      setAddPhase('confirming');
+      if (!lookupCancelledRef.current) {
+        setSuggestion(r);
+        setAddPhase('confirming');
+      }
     } catch (e) {
-      setAddPhase('error');
-      setAddError(e.message);
+      if (!lookupCancelledRef.current) {
+        setAddPhase('error');
+        setAddError(e.message);
+      }
     }
   }
 
@@ -297,10 +308,10 @@ export default function CustomDictionaryViewSub({
                     />
                     <button
                       onClick={lookup}
-                      disabled={!query.trim() || addPhase === 'loading'}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium min-w-16"
+                      disabled={!query.trim() && addPhase !== 'loading'}
+                      className={`px-4 py-2 disabled:opacity-40 text-white rounded-lg text-sm font-medium min-w-16 ${addPhase === 'loading' ? 'bg-stone-500 hover:bg-stone-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}
                     >
-                      {addPhase === 'loading' ? '…' : 'Look up'}
+                      {addPhase === 'loading' ? 'Cancel' : 'Look up'}
                     </button>
                   </div>
                   <div role="status" aria-live="polite">

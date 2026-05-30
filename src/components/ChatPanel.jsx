@@ -72,6 +72,7 @@ export function ChatPanel({
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const endRef = useRef(null);
+  const sendCancelledRef = useRef(false);
   /* eslint-disable react-hooks/exhaustive-deps */
   const context = useMemo(
     () =>
@@ -112,6 +113,7 @@ export function ChatPanel({
   /* eslint-enable react-hooks/exhaustive-deps */
 
   useEffect(() => {
+    let cancelled = false;
     const init = [{ role: 'user', content: context }];
     const geminiMsgs = init.map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
@@ -119,11 +121,19 @@ export function ChatPanel({
     }));
     callGemini(geminiMsgs, geminiKey, 600, 0.7, systemText)
       .then((reply) => {
+        if (cancelled) return;
         setApiHistory([...init, { role: 'assistant', content: reply }]);
         setDisplay([{ role: 'assistant', content: reply }]);
       })
-      .catch((e) => setDisplay([{ role: 'assistant', content: `Error: ${e.message}` }]))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (!cancelled) setDisplay([{ role: 'assistant', content: `Error: ${e.message}` }]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [context, geminiKey, systemText]);
 
   useEffect(() => {
@@ -136,6 +146,7 @@ export function ChatPanel({
     setInput('');
     const newDisplay = [...display, { role: 'user', content: txt }];
     setDisplay(newDisplay);
+    sendCancelledRef.current = false;
     setLoading(true);
     const newApi = [...apiHistory, { role: 'user', content: txt }];
     try {
@@ -144,11 +155,19 @@ export function ChatPanel({
         parts: [{ text: m.content }],
       }));
       const reply = await callGemini(geminiMsgs, geminiKey, 600, 0.7, systemText);
-      setApiHistory([...newApi, { role: 'assistant', content: reply }]);
-      setDisplay([...newDisplay, { role: 'assistant', content: reply }]);
+      if (!sendCancelledRef.current) {
+        setApiHistory([...newApi, { role: 'assistant', content: reply }]);
+        setDisplay([...newDisplay, { role: 'assistant', content: reply }]);
+      }
     } catch (e) {
-      setDisplay([...newDisplay, { role: 'assistant', content: `Error: ${e.message}` }]);
+      if (!sendCancelledRef.current)
+        setDisplay([...newDisplay, { role: 'assistant', content: `Error: ${e.message}` }]);
     }
+    if (!sendCancelledRef.current) setLoading(false);
+  }
+
+  function cancelSend() {
+    sendCancelledRef.current = true;
     setLoading(false);
   }
 
@@ -206,13 +225,22 @@ export function ChatPanel({
           spellCheck="false"
           className="flex-1 px-3 py-1.5 text-sm border border-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none disabled:opacity-50"
         />
-        <button
-          onClick={send}
-          disabled={loading || !input.trim()}
-          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
-        >
-          Send
-        </button>
+        {loading ? (
+          <button
+            onClick={cancelSend}
+            className="px-3 py-1.5 bg-stone-200 hover:bg-stone-300 dark:bg-stone-700 dark:hover:bg-stone-600 text-stone-700 dark:text-stone-200 rounded-lg text-sm font-medium"
+          >
+            Cancel
+          </button>
+        ) : (
+          <button
+            onClick={send}
+            disabled={!input.trim()}
+            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
+          >
+            Send
+          </button>
+        )}
       </div>
     </div>
   );
