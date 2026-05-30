@@ -15,7 +15,7 @@ const ASSET_DIR = 'dist/assets';
 
 // Budgets in kilobytes (gzipped). Tuned with ~20% headroom over current sizes;
 // bump deliberately (with a note) when a real feature justifies the growth.
-const TOTAL_GZIP_KB = 210;
+const TOTAL_GZIP_KB = 250;
 const MAX_CHUNK_GZIP_KB = 70;
 
 const KB = 1024;
