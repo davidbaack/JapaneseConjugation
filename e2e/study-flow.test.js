@@ -19,10 +19,12 @@ test.describe('Study flow', () => {
     // A deliberately wrong answer gives a deterministic "Not quite." verdict
     // without needing to know the expected conjugation.
     await input.fill('zzzz');
-    await page.getByRole('button', { name: 'Check (Enter)' }).click();
+    const checkBtn = page.getByRole('button', { name: 'Check (Enter)' });
+    await expect(checkBtn).toBeEnabled();
+    await checkBtn.click();
 
     // Review phase: verdict + the canonical advance control.
-    await expect(page.getByText('Not quite.').first()).toBeVisible();
+    await expect(page.getByText('Not quite.').last()).toBeVisible();
     const next = page.getByRole('button', { name: 'Next (Enter)' });
     await expect(next).toBeVisible();
 

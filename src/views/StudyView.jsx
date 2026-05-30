@@ -1448,45 +1448,117 @@ export default function StudyView() {
                     >
                       {wasCorrect ? 'Correct!' : 'Not quite.'}
                     </div>
-                    {!wasCorrect && (
-                      <div className="text-xs text-rose-700 mt-1">
-                        {reviewChoiceLabel
-                          ? `You chose: ${reviewChoiceLabel}`
-                          : revealedMiss
-                            ? "You chose: I don't know"
-                            : 'You wrote:'}{' '}
-                        {!revealedMiss && !reviewChoiceLabel && (
-                          <span lang="ja" className="font-semibold">
-                            {reverseDrill
-                              ? submittedAnswer.trim() || '(empty)'
-                              : toHiragana(submittedAnswer) || '(empty)'}
-                          </span>
+                    {wasCorrect ? (
+                      /* Correct answer case */
+                      <>
+                        {reviewKanaCells.length > 0 && (
+                          <div className="mt-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50 p-2">
+                            <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                              {reviewKanaCells.map((cell, i) => {
+                                const cls =
+                                  cell.state === 'correct'
+                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
+                                    : cell.state === 'wrong' || cell.state === 'extra'
+                                      ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
+                                      : cell.state === 'hint'
+                                        ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
+                                        : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`w-8 h-9 sm:w-9 sm:h-10 rounded-lg border flex items-center justify-center text-base font-medium tabular-nums ${cls}`}
+                                  >
+                                    {cell.shown || '·'}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    )}
-                    {reviewKanaCells.length > 0 && (
-                      <div className="mt-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50 p-2">
-                        <div className="flex flex-wrap justify-center gap-1" lang="ja">
-                          {reviewKanaCells.map((cell, i) => {
-                            const cls =
-                              cell.state === 'correct'
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
-                                : cell.state === 'wrong' || cell.state === 'extra'
-                                  ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
-                                  : cell.state === 'hint'
-                                    ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
-                                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
-                            return (
-                              <div
-                                key={i}
-                                className={`w-8 h-9 sm:w-9 sm:h-10 rounded-lg border flex items-center justify-center text-base font-medium tabular-nums ${cls}`}
-                              >
-                                {cell.shown || '·'}
+                      </>
+                    ) : (
+                      /* Incorrect answer case */
+                      <>
+                        {reviewKanaCells.length > 0 ? (
+                          <>
+                            {/* Correct Answer nice and clearly at the top */}
+                            <div className="mt-3">
+                              <div className="text-[11px] uppercase tracking-wider text-emerald-600 dark:text-emerald-455 font-semibold mb-1">
+                                Correct Answer
                               </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                              <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/10 p-2">
+                                <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
+                                  {Array.from(expected).map((char, i) => (
+                                    <div
+                                      key={i}
+                                      className="w-9 h-10 sm:w-10 sm:h-11 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-850 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300 flex items-center justify-center text-lg font-semibold tabular-nums shadow-sm"
+                                    >
+                                      {char}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Guessed answer below it with less emphasis */}
+                            <div className="mt-3 opacity-65">
+                              <div className="text-[11px] uppercase tracking-wider text-rose-700/80 dark:text-rose-400/80 mb-1">
+                                {reviewChoiceLabel
+                                  ? 'You chose'
+                                  : revealedMiss
+                                    ? "You chose: I don't know"
+                                    : 'Your guess'}
+                                {!revealedMiss && !reviewChoiceLabel && (
+                                  <span lang="ja" className="ml-1 font-medium">
+                                    (
+                                    {reverseDrill
+                                      ? submittedAnswer.trim() || 'empty'
+                                      : toHiragana(submittedAnswer) || 'empty'}
+                                    )
+                                  </span>
+                                )}
+                              </div>
+                              <div className="rounded-xl border border-stone-200/60 dark:border-stone-800/60 bg-stone-50/40 dark:bg-stone-900/20 p-2">
+                                <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                                  {reviewKanaCells.map((cell, i) => {
+                                    const cls =
+                                      cell.state === 'correct'
+                                        ? 'bg-emerald-50/50 border-emerald-350/40 text-emerald-800/80 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-300/80'
+                                        : cell.state === 'wrong' || cell.state === 'extra'
+                                          ? 'bg-rose-50/50 border-rose-350/40 text-rose-800/80 dark:bg-rose-950/20 dark:border-rose-800/30 dark:text-rose-300/80'
+                                          : cell.state === 'hint'
+                                            ? 'bg-amber-50/50 border-amber-350/40 text-amber-800/80 dark:bg-amber-950/20 dark:border-amber-300/30 dark:text-amber-300/80'
+                                            : 'bg-white/50 dark:bg-stone-900/50 border-stone-200/40 dark:border-stone-800/40 text-stone-300/85';
+                                    return (
+                                      <div
+                                        key={i}
+                                        className={`w-7 h-8 sm:w-8 sm:h-9 rounded-lg border flex items-center justify-center text-sm font-medium tabular-nums ${cls}`}
+                                      >
+                                        {cell.shown || '·'}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-xs text-rose-700 mt-1">
+                            {reviewChoiceLabel
+                              ? `You chose: ${reviewChoiceLabel}`
+                              : revealedMiss
+                                ? "You chose: I don't know"
+                                : 'You wrote:'}{' '}
+                            {!revealedMiss && !reviewChoiceLabel && (
+                              <span lang="ja" className="font-semibold">
+                                {reverseDrill
+                                  ? submittedAnswer.trim() || '(empty)'
+                                  : toHiragana(submittedAnswer) || '(empty)'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                     <ScriptDisplay
                       view={expectedView}

@@ -33,7 +33,7 @@ test.describe('Tab navigation', () => {
     await page.waitForLoadState('networkidle');
 
     for (const { id, label } of TABS) {
-      const button = page.locator('nav').getByRole('button', { name: label, exact: true });
+      const button = page.locator('nav').getByRole('tab', { name: label, exact: true });
       await expect(button, `nav button "${label}" should exist`).toBeVisible();
       await button.click();
 
@@ -54,7 +54,7 @@ test.describe('Tab navigation', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const studyTab = page.locator('nav').getByRole('button', { name: 'study', exact: true });
+    const studyTab = page.locator('nav').getByRole('tab', { name: 'study', exact: true });
     await expect(studyTab).toHaveClass(/font-semibold/);
   });
 });

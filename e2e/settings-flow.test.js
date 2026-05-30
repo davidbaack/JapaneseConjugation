@@ -8,7 +8,7 @@ test.describe('Settings — theme preference', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await page.locator('nav').getByRole('button', { name: 'settings', exact: true }).click();
+    await page.locator('nav').getByRole('tab', { name: 'settings', exact: true }).click();
     await expect(page.getByText('Practice mode')).toBeVisible();
 
     await page.getByRole('button', { name: 'Dark', exact: true }).click();
@@ -20,7 +20,7 @@ test.describe('Settings — theme preference', () => {
     await expect(page.locator('body')).toHaveClass(/theme-dark/);
 
     // Flip back to Light to confirm the toggle is bidirectional.
-    await page.locator('nav').getByRole('button', { name: 'settings', exact: true }).click();
+    await page.locator('nav').getByRole('tab', { name: 'settings', exact: true }).click();
     await page.getByRole('button', { name: 'Light', exact: true }).click();
     await expect(page.locator('body')).toHaveClass(/theme-light/);
   });
