@@ -764,7 +764,7 @@ export function conjugate(verb, type) {
       'masu-stem': 'き',
       'polite-volitional': 'きましょう',
       'polite-te': 'きまして',
-      'polite-conditional-tara': 'しましたら',
+      'polite-conditional-tara': 'きましたら',
       'te-form': 'きて',
       potential: 'こられる',
       'potential-negative': 'こられない',

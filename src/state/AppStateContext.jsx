@@ -9,6 +9,7 @@ import {
   cloudTimestamp,
   resolveSyncAction,
   mergeState,
+  mergeCloudState,
   pruneAICache,
 } from '../utils/storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
@@ -87,8 +88,33 @@ function useAppController() {
       setSyncStatus({ kind: 'syncing', message: 'Checking cloud…', at: null });
       cloudFetch()
         .then((cloud) => {
-          const action = resolveSyncAction(cloud, lastSyncedAtRef.current);
-          if (action === 'pull') {
+          const action = resolveSyncAction(cloud, lastSyncedAtRef.current, state);
+          if (action === 'merge') {
+            // Both local and cloud have SRS data — merge card-level to preserve
+            // progress from multiple devices rather than silently discarding one.
+            const cloudAt = cloudTimestamp(cloud);
+            const merged = mergeCloudState(state, cloud.data.state);
+            setState(mergeState(merged, { reviewed: 0, correct: 0 }));
+            // Vocabulary and lists: cloud wins if it was updated more recently
+            // (we don't have item-level timestamps for these).
+            if (Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);
+            if (Array.isArray(cloud.data.customAdjectives))
+              setCustomAdjectives(cloud.data.customAdjectives);
+            if (Array.isArray(cloud.data.wordLists)) setWordLists(cloud.data.wordLists);
+            if (cloud.data.practicePrefs)
+              setPracticePrefs(mergePracticePrefs(cloud.data.practicePrefs));
+            // Upload the merged result so the cloud reflects the combined state.
+            setSyncStatus({ kind: 'syncing', message: 'Merging devices…', at: null });
+            cloudUpsert({ state: merged, customVerbs, customAdjectives, wordLists, practicePrefs })
+              .then(() => {
+                const now = Date.now();
+                lastSyncedAtRef.current = now;
+                setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: cloudAt });
+              })
+              .catch((e) =>
+                setSyncStatus({ kind: 'error', message: e.message || 'Merge push failed', at: null }),
+              );
+          } else if (action === 'pull') {
             const cloudAt = cloudTimestamp(cloud);
             if (cloud.data.state)
               setState(mergeState(cloud.data.state, { reviewed: 0, correct: 0 }));
@@ -197,7 +223,21 @@ function useAppController() {
     setSyncStatus({ kind: 'syncing', message: 'Syncing…', at: null });
     try {
       const cloud = await cloudFetch();
-      if (resolveSyncAction(cloud, lastSyncedAtRef.current) === 'pull') {
+      const action = resolveSyncAction(cloud, lastSyncedAtRef.current, state);
+      if (action === 'merge') {
+        const merged = mergeCloudState(state, cloud.data.state);
+        setState(mergeState(merged, { reviewed: 0, correct: 0 }));
+        if (Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);
+        if (Array.isArray(cloud.data.customAdjectives))
+          setCustomAdjectives(cloud.data.customAdjectives);
+        if (Array.isArray(cloud.data.wordLists)) setWordLists(cloud.data.wordLists);
+        if (cloud.data.practicePrefs)
+          setPracticePrefs(mergePracticePrefs(cloud.data.practicePrefs));
+        await cloudUpsert({ state: merged, customVerbs, customAdjectives, wordLists, practicePrefs });
+        const now = Date.now();
+        lastSyncedAtRef.current = now;
+        setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: now });
+      } else if (action === 'pull') {
         const cloudAt = cloudTimestamp(cloud);
         if (cloud.data.state) setState(mergeState(cloud.data.state, { reviewed: 0, correct: 0 }));
         if (Array.isArray(cloud.data.customVerbs)) setCustomVerbs(cloud.data.customVerbs);

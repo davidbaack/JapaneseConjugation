@@ -96,10 +96,17 @@ function AppShell() {
             )}
           </div>
         </header>
-        <nav className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800">
+        <nav
+          role="tablist"
+          aria-label="App sections"
+          className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800"
+        >
           {TABS.map((id) => (
             <button
               key={id}
+              role="tab"
+              aria-selected={tab === id}
+              aria-controls={`panel-${id}`}
               onClick={() => setTab(id)}
               className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
                 tab === id

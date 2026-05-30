@@ -231,15 +231,142 @@ export function cloudTimestamp(cloud) {
 // Decide what to do after a cloud fetch, given the timestamp of our last
 // successful sync. This is the conflict-resolution core, kept pure so it can
 // be tested without rendering the app:
-//   - 'pull'  cloud is newer than what we last synced → adopt cloud data
+//   - 'merge' cloud changed since our last sync AND we have local data → merge
+//   - 'pull'  cloud changed but local has no SRS data yet → adopt cloud data
 //   - 'push'  local is newer, or the cloud row is empty/new → upload local
 //   - 'noop'  timestamps match → already in sync
-export function resolveSyncAction(cloud, localSyncedAt = 0) {
+export function resolveSyncAction(cloud, localSyncedAt = 0, localState = null) {
   if (!cloud || !cloud.data) return 'push';
   const cloudAt = cloudTimestamp(cloud);
-  if (cloudAt > localSyncedAt) return 'pull';
+  if (cloudAt > localSyncedAt) {
+    const hasLocalCards =
+      localState && localState.cards && Object.keys(localState.cards).length > 0;
+    return hasLocalCards ? 'merge' : 'pull';
+  }
   if (cloudAt < localSyncedAt) return 'push';
   return 'noop';
+}
+
+// Merge two SRS card maps: for each card key, keep the card with more reps;
+// break ties by taking the later nextReview.
+export function mergeCards(local = {}, cloud = {}) {
+  const merged = { ...cloud };
+  for (const key of Object.keys(local)) {
+    const lc = local[key],
+      cc = cloud[key];
+    if (!cc || lc.reps > cc.reps || (lc.reps === cc.reps && lc.nextReview > cc.nextReview)) {
+      merged[key] = lc;
+    }
+  }
+  return merged;
+}
+
+// Merge two verbStats maps: per-word per-rule, take the entry with more `seen`.
+export function mergeVerbStats(local = {}, cloud = {}) {
+  const merged = { ...cloud };
+  for (const word of Object.keys(local)) {
+    if (!merged[word]) {
+      merged[word] = local[word];
+    } else {
+      const lw = local[word],
+        cw = cloud[word];
+      merged[word] = { ...cw };
+      for (const ruleId of Object.keys(lw)) {
+        const ls = lw[ruleId],
+          cs = cw[ruleId];
+        merged[word][ruleId] =
+          !cs || (ls.seen || 0) > (cs.seen || 0) ? ls : cs;
+      }
+    }
+  }
+  return merged;
+}
+
+// Merge two mistakes arrays: union by key, keeping the most-recent entry.
+export function mergeMistakes(local = [], cloud = []) {
+  const byKey = new Map();
+  for (const m of [...cloud, ...local]) {
+    const prev = byKey.get(m.key);
+    if (!prev || m.at > prev.at) byKey.set(m.key, m);
+  }
+  return [...byKey.values()].sort((a, b) => b.at - a.at).slice(0, 50);
+}
+
+// Take the higher of two numeric values, treating nullish as 0.
+function maxNum(a, b) {
+  return Math.max(Number(a) || 0, Number(b) || 0);
+}
+
+// Merge two full SRS state blobs from different devices. Card-level merging
+// ensures that progress graded on device A and device B are both preserved
+// rather than one silently winning the conflict.
+export function mergeCloudState(local, cloud) {
+  if (!local) return cloud;
+  if (!cloud) return local;
+  return {
+    ...local,
+    cards: mergeCards(local.cards || {}, cloud.cards || {}),
+    verbStats: mergeVerbStats(local.verbStats || {}, cloud.verbStats || {}),
+    mistakes: mergeMistakes(local.mistakes || [], cloud.mistakes || []),
+    enabledTypes: [
+      ...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])]),
+    ],
+    daily: (() => {
+      const ld = local.daily || {},
+        cd = cloud.daily || {};
+      const today = localDateKey();
+      if (ld.date === today && cd.date === today) {
+        return {
+          ...ld,
+          count: maxNum(ld.count, cd.count),
+          goalHit: !!(ld.goalHit || cd.goalHit),
+          goalStreak: maxNum(ld.goalStreak, cd.goalStreak),
+          bestGoalStreak: maxNum(ld.bestGoalStreak, cd.bestGoalStreak),
+          currentAnswerStreak: maxNum(ld.currentAnswerStreak, cd.currentAnswerStreak),
+          bestAnswerStreak: maxNum(ld.bestAnswerStreak, cd.bestAnswerStreak),
+        };
+      }
+      return ld.date === today ? ld : cd.date === today ? cd : ld;
+    })(),
+    classify: {
+      attempted: maxNum(local.classify?.attempted, cloud.classify?.attempted),
+      correct: maxNum(local.classify?.correct, cloud.classify?.correct),
+      byGroup: { ...(cloud.classify?.byGroup || {}), ...(local.classify?.byGroup || {}) },
+    },
+    game: {
+      played: maxNum(local.game?.played, cloud.game?.played),
+      bestScore: maxNum(local.game?.bestScore, cloud.game?.bestScore),
+      bestCombo: maxNum(local.game?.bestCombo, cloud.game?.bestCombo),
+    },
+    onbin: {
+      attempted: maxNum(local.onbin?.attempted, cloud.onbin?.attempted),
+      correct: maxNum(local.onbin?.correct, cloud.onbin?.correct),
+      hints: maxNum(local.onbin?.hints, cloud.onbin?.hints),
+      streak: maxNum(local.onbin?.streak, cloud.onbin?.streak),
+      bestStreak: maxNum(local.onbin?.bestStreak, cloud.onbin?.bestStreak),
+      byPattern: { ...(cloud.onbin?.byPattern || {}), ...(local.onbin?.byPattern || {}) },
+    },
+    meaning: {
+      attempted: maxNum(local.meaning?.attempted, cloud.meaning?.attempted),
+      correct: maxNum(local.meaning?.correct, cloud.meaning?.correct),
+      byWord: { ...(cloud.meaning?.byWord || {}), ...(local.meaning?.byWord || {}) },
+    },
+    mock: {
+      taken: maxNum(local.mock?.taken, cloud.mock?.taken),
+      bestPct: maxNum(local.mock?.bestPct, cloud.mock?.bestPct),
+      lastPct: (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
+        ? local.mock?.lastPct
+        : cloud.mock?.lastPct,
+      lastScore: (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
+        ? local.mock?.lastScore
+        : cloud.mock?.lastScore,
+      lastTotal: (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
+        ? local.mock?.lastTotal
+        : cloud.mock?.lastTotal,
+      lastAt: maxNum(local.mock?.lastAt, cloud.mock?.lastAt) || null,
+      bySkill: { ...(cloud.mock?.bySkill || {}), ...(local.mock?.bySkill || {}) },
+    },
+  };
 }
 
 // ============================================================================
@@ -439,8 +566,11 @@ export function gradeCard(card, correct) {
     if (card.reps === 0) iv = 1;
     else if (card.reps === 1) iv = 3;
     else iv = Math.ceil(card.interval * card.ease);
+    // SM-2: ease grows slightly with each correct answer so mastered cards
+    // drift toward longer intervals over time.
+    const ease = Math.min(2.5, card.ease + 0.1);
     return {
-      ease: card.ease,
+      ease,
       reps: card.reps + 1,
       interval: iv,
       nextReview: now + iv * DAY,

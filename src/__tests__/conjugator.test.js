@@ -247,6 +247,10 @@ describe('kuru verb: 来る', () => {
     expect(conjugate(KURU, 'polite-present')).toBe('きます');
     expect(conjugate(KURU, 'polite-past')).toBe('きました');
     expect(conjugate(KURU, 'polite-negative')).toBe('きません');
+    expect(conjugate(KURU, 'polite-past-negative')).toBe('きませんでした');
+    expect(conjugate(KURU, 'polite-volitional')).toBe('きましょう');
+    expect(conjugate(KURU, 'polite-te')).toBe('きまして');
+    expect(conjugate(KURU, 'polite-conditional-tara')).toBe('きましたら');
   });
 
   it('te-form and potential', () => {

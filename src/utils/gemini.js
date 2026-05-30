@@ -224,10 +224,12 @@ export async function getSuggestedWord(existing, apiKey, isAdj = false) {
   guardAIRequest();
   const typeStr = isAdj ? 'adjective' : 'verb';
   const groupOptions = isAdj ? 'i-adjective or na-adjective' : 'ichidan or godan or suru or kuru';
-  const list = existing
+  // Cap at 60 words to stay well within the model's context window.
+  const sample = existing.slice(-60);
+  const list = sample
     .map((v) => `${v.dict} (${v.reading}) — ${v.meaning} [${v.group}]`)
     .join('\n');
-  const prompt = `I'm learning Japanese ${typeStr} conjugation with an SRS app. Here are the ${existing.length} ${typeStr}s I'm already studying:\n\n${list}\n\nBased on my current vocabulary, suggest ONE new ${typeStr} to add next. Consider JLPT frequency, useful patterns I haven't covered, and what learners at this level typically need. Do NOT suggest any ${typeStr} already in my list.\n\nReturn ONLY a JSON object (no markdown):\n{"dict":"e.g. dict form","reading":"e.g. hiragana reading","meaning":"e.g. English meaning","group":"${groupOptions}","reason":"One sentence explaining why this is a good next ${typeStr} for me."}`;
+  const prompt = `I'm learning Japanese ${typeStr} conjugation with an SRS app. I'm studying ${existing.length} ${typeStr}s total; here is a representative sample:\n\n${list}\n\nBased on my current vocabulary, suggest ONE new ${typeStr} to add next. Consider JLPT frequency, useful patterns I haven't covered, and what learners at this level typically need. Do NOT suggest any ${typeStr} already in my list.\n\nReturn ONLY a JSON object (no markdown):\n{"dict":"e.g. dict form","reading":"e.g. hiragana reading","meaning":"e.g. English meaning","group":"${groupOptions}","reason":"One sentence explaining why this is a good next ${typeStr} for me."}`;
 
   const payload = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],

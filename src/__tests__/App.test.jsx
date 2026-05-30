@@ -16,7 +16,7 @@ describe('App shell', () => {
     expect(screen.getByText('Spaced repetition, reference tables, and AI coaching')).toBeTruthy();
     // Nav labels (accessible name is the catalog string; CSS only capitalizes).
     for (const label of ['study', 'Conjugation Check', 'games', 'settings', 'library', 'stats']) {
-      expect(screen.getByRole('button', { name: label, exact: true })).toBeTruthy();
+      expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
     }
   });
 
@@ -44,10 +44,10 @@ describe('App shell', () => {
       'study',
     ];
     for (const label of labels) {
-      fireEvent.click(screen.getByRole('button', { name: label, exact: true }));
+      fireEvent.click(screen.getByRole('tab', { name: label, exact: true }));
       // Each view lazy-loads; wait until its chunk resolves (nav stays mounted).
       await waitFor(() => expect(screen.queryByText('Something went wrong')).toBeNull());
-      expect(screen.getByRole('button', { name: label, exact: true })).toBeTruthy();
+      expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
     }
   });
 });
