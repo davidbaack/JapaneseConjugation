@@ -14,9 +14,7 @@ export default {
   'nav.classify': 'Which Group?',
   'nav.endings': 'て Forms',
   'nav.games': 'games',
-  'nav.mistakes': 'mistakes',
-  'nav.levels': 'Progress',
-  'nav.stats': 'stats',
+  'nav.insights': 'insights',
   'nav.library': 'library',
   'nav.settings': 'settings',
 

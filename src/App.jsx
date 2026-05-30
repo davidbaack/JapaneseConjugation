@@ -13,24 +13,11 @@ const CheckView = React.lazy(() => import('./views/CheckView.jsx'));
 const RushView = React.lazy(() => import('./views/RushView.jsx'));
 const EndingsView = React.lazy(() => import('./views/EndingsView.jsx'));
 const ClassificationView = React.lazy(() => import('./views/ClassificationView.jsx'));
-const MistakesView = React.lazy(() => import('./views/MistakesView.jsx'));
-const StatsView = React.lazy(() => import('./views/StatsView.jsx'));
-const SRSLevelView = React.lazy(() => import('./views/SRSLevelView.jsx'));
+const InsightsView = React.lazy(() => import('./views/InsightsView.jsx'));
 const LibraryView = React.lazy(() => import('./views/LibraryView.jsx'));
 const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 
-const TABS = [
-  'study',
-  'check',
-  'classify',
-  'endings',
-  'games',
-  'mistakes',
-  'levels',
-  'stats',
-  'library',
-  'settings',
-];
+const TABS = ['study', 'check', 'classify', 'endings', 'games', 'insights', 'library', 'settings'];
 
 function AppShell() {
   const {
@@ -124,9 +111,7 @@ function AppShell() {
           {tab === 'games' && <RushView />}
           {tab === 'endings' && <EndingsView />}
           {tab === 'classify' && <ClassificationView />}
-          {tab === 'mistakes' && <MistakesView />}
-          {tab === 'stats' && <StatsView />}
-          {tab === 'levels' && <SRSLevelView />}
+          {tab === 'insights' && <InsightsView />}
           {tab === 'library' && <LibraryView />}
           {tab === 'settings' && <SettingsView />}
         </Suspense>
