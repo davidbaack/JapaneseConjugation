@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IconVolume } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import StickyAction from '../components/StickyAction.jsx';
@@ -11,12 +11,14 @@ import { playPronunciation } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
 export default function MistakesView() {
-  const { state, setState, practicePrefs } = useApp();
+  const { state, setState, setTab, practicePrefs } = useApp();
   const mistakes = useMemo(() => state.mistakes || [], [state.mistakes]);
   const open = useMemo(() => mistakes.filter((m) => !m.resolved), [mistakes]);
   const [activeKey, setActiveKey] = useState(open[0]?.key || mistakes[0]?.key || null);
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const retestPanelRef = useRef(null);
 
   useEffect(() => {
     if (activeKey && !mistakes.some((m) => m.key === activeKey)) {
@@ -34,6 +36,7 @@ export default function MistakesView() {
     setActiveKey(m.key);
     setAnswer('');
     setResult(null);
+    retestPanelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function submit() {
@@ -72,18 +75,43 @@ export default function MistakesView() {
               {open.length} unresolved / {mistakes.length} total
             </p>
           </div>
-          {!!mistakes.length && (
-            <button
-              onClick={() => setState({ ...state, mistakes: mistakes.filter((m) => !m.resolved) })}
-              className="text-xs text-stone-400 hover:text-rose-600 transition"
-            >
-              Clear resolved
-            </button>
-          )}
+          {!!mistakes.length &&
+            (confirmClear ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setState({ ...state, mistakes: mistakes.filter((m) => !m.resolved) });
+                    setConfirmClear(false);
+                  }}
+                  className="text-xs text-rose-600 hover:text-rose-800 font-medium transition"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setConfirmClear(false)}
+                  className="text-xs text-stone-400 hover:text-stone-600 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmClear(true)}
+                className="text-xs text-stone-400 hover:text-rose-600 transition"
+              >
+                Clear resolved
+              </button>
+            ))}
         </div>
         {!mistakes.length ? (
           <div className="p-8 text-center text-sm text-stone-500">
-            Missed answers will appear here for one-tap retests.
+            <p className="mb-4">Missed answers will appear here for one-tap retests.</p>
+            <button
+              onClick={() => setTab('study')}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+            >
+              Go to Study
+            </button>
           </div>
         ) : (
           <div className="max-h-[560px] overflow-y-auto divide-y divide-stone-50 dark:divide-stone-850">
@@ -120,7 +148,10 @@ export default function MistakesView() {
           </div>
         )}
       </div>
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+      <div
+        ref={retestPanelRef}
+        className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5 overflow-y-auto"
+      >
         {!active ? (
           <div className="text-center text-stone-550 py-16">No mistakes to retest yet.</div>
         ) : (

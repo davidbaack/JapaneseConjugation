@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IconSpark } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import StickyAction from '../components/StickyAction.jsx';
@@ -21,6 +21,7 @@ export default function EndingsView() {
   const {
     state,
     setState,
+    setTab,
     allVerbs: verbs,
     practicePrefs,
     wordLists,
@@ -39,6 +40,7 @@ export default function EndingsView() {
   const [aiTip, setAiTip] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiErr, setAiErr] = useState('');
+  const aiAbortRef = useRef(null);
 
   useEffect(() => {
     if (!current && drillVerbs.length) {
@@ -74,7 +76,13 @@ export default function EndingsView() {
   if (!drillVerbs.length) {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-8 text-center text-stone-500">
-        No verbs match the current filters.
+        <p className="mb-4">No verbs match the current filters.</p>
+        <button
+          onClick={() => setTab('settings')}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+        >
+          Go to Settings
+        </button>
       </div>
     );
   }
@@ -156,6 +164,14 @@ export default function EndingsView() {
 
   async function generateMnemonic() {
     if (!geminiKey) return;
+    if (aiLoading) {
+      aiAbortRef.current?.abort();
+      aiAbortRef.current = null;
+      setAiLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
     setAiLoading(true);
     setAiTip('');
     setAiErr('');
@@ -170,11 +186,12 @@ export default function EndingsView() {
         0.45,
         aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM),
       );
-      setAiTip(reply.trim());
+      if (!controller.signal.aborted) setAiTip(reply.trim());
     } catch (e) {
-      setAiErr(e.message);
+      if (!controller.signal.aborted) setAiErr(e.message);
     }
-    setAiLoading(false);
+    if (!controller.signal.aborted) setAiLoading(false);
+    aiAbortRef.current = null;
   }
 
   return (
@@ -293,10 +310,10 @@ export default function EndingsView() {
             </button>
             <button
               onClick={generateMnemonic}
-              disabled={!geminiKey || aiLoading}
+              disabled={!geminiKey}
               className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm transition"
             >
-              {aiLoading ? 'Thinking...' : 'AI memory hook'}
+              {aiLoading ? 'Cancel' : 'AI memory hook'}
             </button>
           </div>
           {hintChars > 0 && (

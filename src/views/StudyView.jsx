@@ -91,6 +91,7 @@ export default function StudyView() {
   const {
     state,
     setState,
+    setTab,
     allWords: verbs,
     activeGeminiKey: geminiKey,
     practicePrefs,
@@ -336,9 +337,15 @@ export default function StudyView() {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
         <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
-        <p className="text-xs text-stone-400 dark:text-stone-500">
+        <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
           Enable conjugation types in Settings.
         </p>
+        <button
+          onClick={() => setTab('settings')}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+        >
+          Go to Settings
+        </button>
       </div>
     );
   }
@@ -986,7 +993,17 @@ export default function StudyView() {
                   {aiHintText}
                 </div>
               )}
-              {aiHintErr && <div className="mt-2 text-rose-600">{aiHintErr}</div>}
+              {aiHintErr && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-rose-600 text-sm">{aiHintErr}</span>
+                  <button
+                    onClick={generateAIClue}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
             </div>
           ) : practicePrefs.drillMode === 'sentence' && aiSentence && !aiSentence.loading ? (
             <div className="text-sm text-stone-500 mt-2 italic">

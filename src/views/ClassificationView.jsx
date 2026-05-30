@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IconSpark } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import StickyAction from '../components/StickyAction.jsx';
@@ -59,6 +59,7 @@ export default function ClassificationView() {
   const {
     state,
     setState,
+    setTab,
     allWords: words,
     practicePrefs,
     wordLists,
@@ -73,6 +74,7 @@ export default function ClassificationView() {
   const [aiText, setAiText] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiErr, setAiErr] = useState('');
+  const aiAbortRef = useRef(null);
 
   useEffect(() => {
     if (!current && filtered.length) {
@@ -100,7 +102,13 @@ export default function ClassificationView() {
   if (!filtered.length) {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-8 text-center text-stone-500">
-        No words match the current filters.
+        <p className="mb-4">No words match the current filters.</p>
+        <button
+          onClick={() => setTab('settings')}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+        >
+          Go to Settings
+        </button>
       </div>
     );
   }
@@ -148,6 +156,14 @@ export default function ClassificationView() {
 
   async function explainClassificationWithAI() {
     if (!geminiKey || !current) return;
+    if (aiLoading) {
+      aiAbortRef.current?.abort();
+      aiAbortRef.current = null;
+      setAiLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
     setAiLoading(true);
     setAiErr('');
     setAiText('');
@@ -173,11 +189,12 @@ export default function ClassificationView() {
           'You are a careful Japanese conjugation coach. Explain classification decisions with practical clues and avoid overclaiming. Keep it concise.',
         ),
       );
-      setAiText(reply);
+      if (!controller.signal.aborted) setAiText(reply);
     } catch (e) {
-      setAiErr(e.message || 'AI explanation failed.');
+      if (!controller.signal.aborted) setAiErr(e.message || 'AI explanation failed.');
     }
-    setAiLoading(false);
+    if (!controller.signal.aborted) setAiLoading(false);
+    aiAbortRef.current = null;
   }
 
   const realAcc = stats.attempted ? Math.round((stats.correct / stats.attempted) * 100) : 0;
@@ -275,11 +292,11 @@ export default function ClassificationView() {
               <div className="grid sm:grid-cols-2 gap-2">
                 <button
                   onClick={explainClassificationWithAI}
-                  disabled={!geminiKey || aiLoading}
+                  disabled={!geminiKey}
                   className="py-2 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium inline-flex items-center justify-center gap-1.5 transition"
                 >
                   <IconSpark className="w-4 h-4" />
-                  {aiLoading ? 'Explaining...' : 'AI why'}
+                  {aiLoading ? 'Cancel' : 'AI why'}
                 </button>
                 <button
                   onClick={next}

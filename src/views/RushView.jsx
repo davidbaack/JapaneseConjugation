@@ -17,7 +17,7 @@ import { promptDisplay, shuffled } from '../utils/display.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
 export default function RushView() {
-  const { state, setState, allWords: verbs, practicePrefs, wordLists } = useApp();
+  const { state, setState, setTab, allWords: verbs, practicePrefs, wordLists } = useApp();
   const gameWords = useMemo(
     () => filterWordsForPrefs(verbs, practicePrefs, wordLists),
     [verbs, practicePrefs, wordLists],
@@ -368,6 +368,14 @@ export default function RushView() {
                     </span>
                     <div className="text-2xl font-semibold">{feedback.title}</div>
                     <div className="text-sm mt-1">{feedback.detail}</div>
+                    {feedback.title === 'No cards available' && (
+                      <button
+                        onClick={() => setTab('settings')}
+                        className="mt-3 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+                      >
+                        Go to Settings
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div>

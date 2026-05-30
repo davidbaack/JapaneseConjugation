@@ -118,6 +118,7 @@ function WordExtras({ word, type, showForms, onToggleForms, onPracticeWord }) {
 
 export default function CheckView() {
   const {
+    setTab,
     allWords: verbs,
     practicePrefs,
     activeGeminiKey: geminiKey,
@@ -211,9 +212,23 @@ export default function CheckView() {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
         <p className="text-stone-600 dark:text-stone-300 mb-2">No words available</p>
-        <p className="text-xs text-stone-400 dark:text-stone-500">
+        <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
           Add or enable words in the Library.
         </p>
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={() => setTab('library')}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+          >
+            Go to Library
+          </button>
+          <button
+            onClick={() => setTab('settings')}
+            className="px-4 py-2 border border-stone-300 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 text-sm rounded-lg transition"
+          >
+            Settings
+          </button>
+        </div>
       </div>
     );
   }
