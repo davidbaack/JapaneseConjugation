@@ -10,9 +10,7 @@ const TABS = [
   { id: 'classify', label: 'Which Group?' },
   { id: 'endings', label: 'て Forms' },
   { id: 'games', label: 'games' },
-  { id: 'mistakes', label: 'mistakes' },
-  { id: 'levels', label: 'Progress' },
-  { id: 'stats', label: 'stats' },
+  { id: 'insights', label: 'insights' },
   { id: 'library', label: 'library' },
   { id: 'settings', label: 'settings' },
 ];
@@ -22,9 +20,7 @@ const VIEW_ANCHORS = {
   games: () => /Kotoba Rush/,
   classify: () => /Classification drill/,
   endings: () => /Pattern map/,
-  mistakes: () => /Mistake history/,
-  levels: () => /Level breakdown/,
-  stats: () => /Lifetime accuracy/,
+  insights: () => /Overview/,
 };
 
 test.describe('Tab navigation', () => {
