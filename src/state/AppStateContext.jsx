@@ -276,7 +276,7 @@ function useAppController() {
   );
   const allWords = useMemo(() => [...allVerbs, ...allAdjectives], [allVerbs, allAdjectives]);
   const daily = state.daily || defaultState().daily;
-  const dailyPct = Math.min(100, Math.round((daily.count / (practicePrefs.dailyGoal || 10)) * 100));
+  const dailyPct = Math.min(100, Math.round((daily.count / (practicePrefs.dailyGoal || 30)) * 100));
 
   // Cross-view actions, so views don't need ad-hoc callback props.
   function practiceWord(word, type) {

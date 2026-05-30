@@ -520,7 +520,7 @@ export default function StudyView() {
         reviewed: (state.session?.reviewed || 0) + 1,
         correct: (state.session?.correct || 0) + (ok ? 1 : 0),
       },
-      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 10),
+      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 30),
     };
     setState(nextState);
     setChatOpen(!ok && !!geminiKey && !!practicePrefs.autoAiExplainErrors);
@@ -627,7 +627,7 @@ export default function StudyView() {
         reviewed: (state.session?.reviewed || 0) + 1,
         correct: (state.session?.correct || 0) + (ok ? 1 : 0),
       },
-      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 10),
+      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 30),
     };
     setState(nextState);
     setAnswer('');
@@ -697,7 +697,7 @@ export default function StudyView() {
         reviewed: (state.session?.reviewed || 0) + 1,
         correct: state.session?.correct || 0,
       },
-      daily: bumpDaily(state.daily, false, practicePrefs.dailyGoal || 10),
+      daily: bumpDaily(state.daily, false, practicePrefs.dailyGoal || 30),
     };
     setState(nextState);
     setAnswer('');

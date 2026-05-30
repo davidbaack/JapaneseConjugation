@@ -46,7 +46,7 @@ export default function MistakesView() {
       setState({
         ...state,
         mistakes: markMistakeResolved(state.mistakes, active.key),
-        daily: bumpDaily(state.daily, true, practicePrefs.dailyGoal || 10),
+        daily: bumpDaily(state.daily, true, practicePrefs.dailyGoal || 30),
       });
     }
   }

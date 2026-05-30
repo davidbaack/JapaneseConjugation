@@ -170,7 +170,7 @@ export default function RushView() {
           reviewed: s.session.reviewed + 1,
           correct: s.session.correct + (ok ? 1 : 0),
         },
-        daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 10) : s.daily,
+        daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 30) : s.daily,
         game: {
           ...prevGame,
           bestScore: Math.max(prevGame.bestScore || 0, nextScore),

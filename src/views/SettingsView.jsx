@@ -675,7 +675,7 @@ export default function SettingsView() {
               onChange={(e) =>
                 setPracticePrefs({
                   ...practicePrefs,
-                  dailyGoal: Math.max(1, Number(e.target.value) || 10),
+                  dailyGoal: Math.max(1, Number(e.target.value) || 30),
                 })
               }
               className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"

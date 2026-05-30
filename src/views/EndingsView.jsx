@@ -120,7 +120,7 @@ export default function EndingsView() {
             },
           },
         },
-        daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 10) : s.daily,
+        daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 30) : s.daily,
       };
     });
   }

@@ -132,7 +132,7 @@ export default function ClassificationView() {
           [correctGroup]: { attempted: prev.attempted + 1, correct: prev.correct + (ok ? 1 : 0) },
         },
       },
-      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 10),
+      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 30),
     });
     setResult({ ok, chosen: group });
   }
