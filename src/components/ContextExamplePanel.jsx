@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IconVolume, IconSpark } from './Icons.jsx';
 import { contextSentenceFor } from '../utils/conjugatorExplain.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
@@ -11,6 +11,7 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
   const [aiText, setAiText] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
+  const abortRef = useRef(null);
 
   useEffect(() => {
     setAiText('');
@@ -20,6 +21,14 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
 
   async function generate() {
     if (!geminiKey || !item) return;
+    if (loading) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     setErr('');
     setAiText('');
@@ -32,11 +41,12 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
         0.35,
         aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM),
       );
-      setAiText(reply.trim());
+      if (!controller.signal.aborted) setAiText(reply.trim());
     } catch (e) {
-      setErr(e.message);
+      if (!controller.signal.aborted) setErr(e.message);
     }
-    setLoading(false);
+    if (!controller.signal.aborted) setLoading(false);
+    abortRef.current = null;
   }
 
   return (
@@ -64,11 +74,11 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           onClick={generate}
-          disabled={!geminiKey || loading}
+          disabled={!geminiKey}
           className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5"
         >
           <IconSpark className="w-4 h-4" />
-          {loading ? 'Writing...' : 'AI examples'}
+          {loading ? 'Cancel' : 'AI examples'}
         </button>
         {!geminiKey && (
           <div className="text-xs text-indigo-900/60 dark:text-indigo-300/60 self-center">

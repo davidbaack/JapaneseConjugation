@@ -135,6 +135,7 @@ export default function StudyView() {
   // than the live (possibly self-corrected) input.
   const wrongSnapshotRef = useRef(null);
   const typingHintRef = useRef(null);
+  const aiHintAbortRef = useRef(null);
 
   const enabledTypes = state.enabledTypes.length > 0 ? state.enabledTypes : ['plain-past'];
   const practiceWords = useMemo(() => {
@@ -444,6 +445,14 @@ export default function StudyView() {
 
   async function generateAIClue() {
     if (!current || !geminiKey) return;
+    if (aiHintLoading) {
+      aiHintAbortRef.current?.abort();
+      aiHintAbortRef.current = null;
+      setAiHintLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    aiHintAbortRef.current = controller;
     setAiHintLoading(true);
     setAiHintErr('');
     setAiHintText('');
@@ -467,11 +476,12 @@ export default function StudyView() {
           'You give safe study hints for Japanese conjugation quizzes. Never reveal the exact answer.',
         ),
       );
-      setAiHintText(reply);
+      if (!controller.signal.aborted) setAiHintText(reply);
     } catch (e) {
-      setAiHintErr(e.message || 'AI clue failed.');
+      if (!controller.signal.aborted) setAiHintErr(e.message || 'AI clue failed.');
     }
-    setAiHintLoading(false);
+    if (!controller.signal.aborted) setAiHintLoading(false);
+    aiHintAbortRef.current = null;
   }
 
   // Deterministic, offline step coach — no API key required. Irregular forms
@@ -981,11 +991,11 @@ export default function StudyView() {
                 </button>
                 <button
                   onClick={generateAIClue}
-                  disabled={!geminiKey || aiHintLoading}
+                  disabled={!geminiKey}
                   className="px-2 py-1 rounded-lg border border-indigo-200 bg-white hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 dark:bg-stone-900 dark:border-stone-800 dark:text-indigo-400 inline-flex items-center gap-1"
                 >
                   <IconSpark className="w-3.5 h-3.5" />
-                  {aiHintLoading ? 'Thinking...' : 'AI clue'}
+                  {aiHintLoading ? 'Cancel' : 'AI clue'}
                 </button>
               </div>
               {aiHintText && (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IconSpark } from './Icons.jsx';
 import { callGemini, extractJSON } from '../utils/gemini.js';
 import { getAICache, setAICache } from '../utils/storage.js';
@@ -106,6 +106,7 @@ export function PitchAccentSection({
   const [loading, setLoading] = useState(false);
   const [pitchData, setPitchData] = useState(null);
   const [err, setErr] = useState('');
+  const abortRef = useRef(null);
 
   const morae = useMemo(() => getMorae(kanaText), [kanaText]);
   const cacheKey = `${word.dict}|${kanaText}`;
@@ -118,6 +119,9 @@ export function PitchAccentSection({
 
   async function toggleShow() {
     if (show) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setLoading(false);
       setShow(false);
       return;
     }
@@ -137,6 +141,8 @@ export function PitchAccentSection({
       return;
     }
 
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     setErr('');
     try {
@@ -155,31 +161,34 @@ Do not return any extra markdown or chat formatting. Return valid JSON only.`;
         'You are a precise Japanese phonetics database. Return JSON pitch accent arrays matching Tokyo standard pronunciation.',
       );
 
-      const parsed = extractJSON(reply);
-      if (parsed && Array.isArray(parsed.pitch)) {
-        const alignedPitch = morae.map((_, i) =>
-          parsed.pitch[i] !== undefined
-            ? parsed.pitch[i]
-            : parsed.pitch[parsed.pitch.length - 1] || 0,
-        );
-        const result = {
-          pitch: alignedPitch,
-          pattern: parsed.pattern || 'Heiban',
-          typeNumber: parsed.typeNumber || 0,
-        };
-
-        setAICache('katachiya_ai_pitch_cache', cacheKey, result);
-
-        setPitchData(result);
-      } else {
-        throw new Error('Invalid JSON structure from AI.');
+      if (!controller.signal.aborted) {
+        const parsed = extractJSON(reply);
+        if (parsed && Array.isArray(parsed.pitch)) {
+          const alignedPitch = morae.map((_, i) =>
+            parsed.pitch[i] !== undefined
+              ? parsed.pitch[i]
+              : parsed.pitch[parsed.pitch.length - 1] || 0,
+          );
+          const result = {
+            pitch: alignedPitch,
+            pattern: parsed.pattern || 'Heiban',
+            typeNumber: parsed.typeNumber || 0,
+          };
+          setAICache('katachiya_ai_pitch_cache', cacheKey, result);
+          setPitchData(result);
+        } else {
+          throw new Error('Invalid JSON structure from AI.');
+        }
       }
     } catch (e) {
-      const fallback = getOfflinePitchAccent(word, morae);
-      setPitchData(fallback);
-      setErr(e.message || 'AI pitch accent retrieval failed.');
+      if (!controller.signal.aborted) {
+        const fallback = getOfflinePitchAccent(word, morae);
+        setPitchData(fallback);
+        setErr(e.message || 'AI pitch accent retrieval failed.');
+      }
     }
-    setLoading(false);
+    if (!controller.signal.aborted) setLoading(false);
+    abortRef.current = null;
   }
 
   const alignedPitch = pitchData
