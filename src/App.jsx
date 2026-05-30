@@ -10,7 +10,7 @@ import { AppStateProvider, useApp } from './state/AppStateContext.jsx';
 // without prop-drilling.
 const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
 const CheckView = React.lazy(() => import('./views/CheckView.jsx'));
-const RushView = React.lazy(() => import('./views/RushView.jsx'));
+const GamesView = React.lazy(() => import('./views/GamesView.jsx'));
 const EndingsView = React.lazy(() => import('./views/EndingsView.jsx'));
 const ClassificationView = React.lazy(() => import('./views/ClassificationView.jsx'));
 const InsightsView = React.lazy(() => import('./views/InsightsView.jsx'));
@@ -110,7 +110,7 @@ function AppShell() {
         <Suspense fallback={<ViewSkeleton />}>
           {tab === 'study' && <StudyView />}
           {tab === 'check' && <CheckView />}
-          {tab === 'games' && <RushView />}
+          {tab === 'games' && <GamesView />}
           {tab === 'endings' && <EndingsView />}
           {tab === 'classify' && <ClassificationView />}
           {tab === 'insights' && <InsightsView />}

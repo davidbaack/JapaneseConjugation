@@ -408,7 +408,7 @@ export function defaultState() {
     mistakes: [],
     shadow: { attempted: 0, totalRating: 0, byScenario: {} },
     ambient: { sessions: 0, played: 0, lastAt: null },
-    game: { played: 0, bestScore: 0, bestCombo: 0 },
+    game: { played: 0, bestScore: 0, bestCombo: 0, matchBestScore: 0, matchBestStreak: 0 },
     onbin: { attempted: 0, correct: 0, hints: 0, streak: 0, bestStreak: 0, byPattern: {} },
     meaning: { attempted: 0, correct: 0, byWord: {} },
     mock: {
