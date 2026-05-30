@@ -17,7 +17,13 @@ import {
   WORD_TYPE_OPTIONS,
   WORD_GROUP_OPTIONS,
 } from '../data/starterWords.js';
-import { ALL_CARD_TYPES, TYPE_PACKS, CONJ_TYPES, ADJ_TYPES } from '../data/conjugationTypes.js';
+import {
+  ALL_CARD_TYPES,
+  TYPE_PACKS,
+  CONJ_TYPES,
+  ADJ_TYPES,
+  FORM_GROUPS,
+} from '../data/conjugationTypes.js';
 import { AI_FEEDBACK_LEVELS, AI_GUIDE_TONES } from '../utils/gemini.js';
 import { toHiragana, kanaToRomaji } from '../utils/romaji.js';
 import { typePreviewValues } from '../utils/conjugator.js';
@@ -41,6 +47,49 @@ import { useApp } from '../state/AppStateContext.jsx';
 const POLITE_FORM_IDS = ALL_CARD_TYPES.filter(
   (t) => t.id.includes('polite') || t.label.toLowerCase().includes('polite'),
 ).map((t) => t.id);
+
+function FormRow({ t, on, previews, practicePrefs, toggle }) {
+  return (
+    <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(14rem,auto)_auto] gap-3 items-center py-2 px-3 hover:bg-stone-50 dark:hover:bg-stone-950">
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-stone-850 dark:text-stone-200">{t.label}</div>
+        <div className="text-xs text-stone-500">
+          {t.sub && t.sub + ' · '}
+          {t.hint}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {previews.map((p) => {
+          const view = formDisplay(p.answer, practicePrefs, p.item, t.id);
+          return (
+            <div
+              key={`${t.id}-${p.item.dict}`}
+              className="min-w-0 rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 px-2 py-1.5"
+            >
+              <div className="text-[11px] text-stone-400 truncate" lang="ja">
+                {p.item.dict}
+              </div>
+              <ScriptDisplay
+                view={view}
+                className="text-sm font-medium truncate text-stone-800 dark:text-stone-200"
+                subClassName="text-[11px] text-stone-400 truncate"
+              />
+            </div>
+          );
+        })}
+      </div>
+      <button
+        onClick={() => toggle(t.id)}
+        className={`relative w-10 h-6 rounded-full transition flex-shrink-0 justify-self-end ${on ? 'bg-indigo-600' : 'bg-stone-300 dark:bg-stone-700'}`}
+        title={`${on ? 'Disable' : 'Enable'} ${t.label}`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on ? 'translate-x-4' : ''}`}
+        />
+      </button>
+    </div>
+  );
+}
 
 function compactLookupText(s) {
   return String(s || '')
@@ -78,6 +127,7 @@ export default function SettingsView() {
   const [msg, setMsg] = useState('');
   const [copyOk, setCopyOk] = useState(false);
   const [typeSearch, setTypeSearch] = useState('');
+  const [openGroups, setOpenGroups] = useState(new Set());
 
   const exportData = useMemo(
     () => serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
@@ -169,6 +219,30 @@ export default function SettingsView() {
         enabledTypes: [...new Set([...state.enabledTypes, ...POLITE_FORM_IDS])],
       });
     }
+  }
+
+  function toggleGroupForms(groupTypeIds) {
+    const allOn = groupTypeIds.every((id) => state.enabledTypes.includes(id));
+    if (allOn) {
+      setState({
+        ...state,
+        enabledTypes: state.enabledTypes.filter((id) => !groupTypeIds.includes(id)),
+      });
+    } else {
+      setState({
+        ...state,
+        enabledTypes: [...new Set([...state.enabledTypes, ...groupTypeIds])],
+      });
+    }
+  }
+
+  function toggleOpenGroup(groupId) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
   }
 
   function reset() {
@@ -1002,60 +1076,103 @@ export default function SettingsView() {
             {visibleCardTypes.length}/{ALL_CARD_TYPES.length} forms
           </div>
         </div>
-        <div className="space-y-2">
-          {visibleCardTypes.map((t) => {
-            const on = state.enabledTypes.includes(t.id);
-            const previews = typePreviewValues(t.id);
-            return (
-              <div
-                key={t.id}
-                className="grid sm:grid-cols-[minmax(0,1fr)_minmax(14rem,auto)_auto] gap-3 items-center py-2 px-3 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-950"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-stone-850 dark:text-stone-200">
-                    {t.label}
-                  </div>
-                  <div className="text-xs text-stone-500">
-                    {t.sub && t.sub + ' · '}
-                    {t.hint}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {previews.map((p) => {
-                    const view = formDisplay(p.answer, practicePrefs, p.item, t.id);
-                    return (
-                      <div
-                        key={`${t.id}-${p.item.dict}`}
-                        className="min-w-0 rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 px-2 py-1.5"
-                      >
-                        <div className="text-[11px] text-stone-400 truncate" lang="ja">
-                          {p.item.dict}
-                        </div>
-                        <ScriptDisplay
-                          view={view}
-                          className="text-sm font-medium truncate text-stone-800 dark:text-stone-200"
-                          subClassName="text-[11px] text-stone-400 truncate"
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-                <button
-                  onClick={() => toggle(t.id)}
-                  className={`relative w-10 h-6 rounded-full transition flex-shrink-0 justify-self-end ${on ? 'bg-indigo-600' : 'bg-stone-300 dark:bg-stone-700'}`}
-                  title={`${on ? 'Disable' : 'Enable'} ${t.label}`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on ? 'translate-x-4' : ''}`}
-                  />
-                </button>
+        {typeSearch ? (
+          <>
+            <div className="space-y-2">
+              {visibleCardTypes.map((t) => (
+                <FormRow
+                  key={t.id}
+                  t={t}
+                  on={state.enabledTypes.includes(t.id)}
+                  previews={typePreviewValues(t.id)}
+                  practicePrefs={practicePrefs}
+                  toggle={toggle}
+                />
+              ))}
+            </div>
+            {!visibleCardTypes.length && (
+              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4 text-sm text-stone-500 text-center">
+                No forms match that search.
               </div>
-            );
-          })}
-        </div>
-        {!visibleCardTypes.length && (
-          <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4 text-sm text-stone-500 text-center">
-            No forms match that search.
+            )}
+          </>
+        ) : (
+          <div className="space-y-1">
+            {FORM_GROUPS.map((group) => {
+              const groupTypes = group.typeIds
+                .map((id) => ALL_CARD_TYPES.find((t) => t.id === id))
+                .filter(Boolean);
+              const enabledCount = groupTypes.filter((t) =>
+                state.enabledTypes.includes(t.id),
+              ).length;
+              const allOn = enabledCount === groupTypes.length;
+              const someOn = enabledCount > 0 && !allOn;
+              const isOpen = openGroups.has(group.id);
+              return (
+                <div
+                  key={group.id}
+                  className="rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden"
+                >
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-stone-50 dark:bg-stone-950">
+                    <button
+                      onClick={() => toggleOpenGroup(group.id)}
+                      className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 text-stone-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M7.293 4.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span className="text-sm font-medium text-stone-800 dark:text-stone-200 truncate">
+                        {group.label}
+                      </span>
+                      <span
+                        className={`ml-1 tabular-nums px-1.5 py-0.5 rounded-full text-xs flex-shrink-0 ${
+                          allOn
+                            ? 'bg-indigo-600 text-white'
+                            : someOn
+                              ? 'bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300'
+                              : 'bg-white dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700'
+                        }`}
+                      >
+                        {enabledCount}/{groupTypes.length}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => toggleGroupForms(group.typeIds)}
+                      className={`flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border transition ${
+                        allOn
+                          ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                          : 'bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700 hover:border-indigo-300 dark:hover:border-indigo-700'
+                      }`}
+                      title={allOn ? `Disable all ${group.label}` : `Enable all ${group.label}`}
+                    >
+                      {allOn ? 'Disable all' : 'Enable all'}
+                    </button>
+                  </div>
+                  {isOpen && (
+                    <div className="divide-y divide-stone-100 dark:divide-stone-800">
+                      {groupTypes.map((t) => (
+                        <FormRow
+                          key={t.id}
+                          t={t}
+                          on={state.enabledTypes.includes(t.id)}
+                          previews={typePreviewValues(t.id)}
+                          practicePrefs={practicePrefs}
+                          toggle={toggle}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
