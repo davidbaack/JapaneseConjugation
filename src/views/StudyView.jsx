@@ -56,6 +56,37 @@ import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
 export { kanaCoachCells, explainReversePrompt };
 
+// Keep the active card across a page refresh so reloading Study resumes the
+// same word/form rather than drawing a fresh one. Scoped to sessionStorage so
+// it survives reloads but resets when the tab is closed.
+const STUDY_CURRENT_KEY = 'jp-study-current';
+
+function loadPersistedCurrent(state, verbs) {
+  try {
+    if (typeof sessionStorage === 'undefined') return null;
+    const raw = sessionStorage.getItem(STUDY_CURRENT_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!saved?.dict || !saved?.type) return null;
+    const word = verbs.find((w) => w.dict === saved.dict && w.group === saved.group);
+    if (!word) return null;
+    return buildFocusCard(state, word, saved.type);
+  } catch {
+    return null;
+  }
+}
+
+function persistCurrent(card) {
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    if (!card?.verb?.dict) return;
+    sessionStorage.setItem(
+      STUDY_CURRENT_KEY,
+      JSON.stringify({ dict: card.verb.dict, group: card.verb.group, type: card.type }),
+    );
+  } catch {}
+}
+
 export default function StudyView() {
   const {
     state,
@@ -67,7 +98,9 @@ export default function StudyView() {
     studyFocus: focus,
     clearStudyFocus: onFocusConsumed,
   } = useApp();
-  const [current, setCurrent] = useState(null);
+  const [current, setCurrent] = useState(() =>
+    focus?.word ? null : loadPersistedCurrent(state, verbs),
+  );
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');
   const [wasCorrect, setWasCorrect] = useState(false);
@@ -158,6 +191,11 @@ export default function StudyView() {
     // state intentionally omitted — this triggers on card change, not every state mutation
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, practiceWords, enabledTypes, practicePrefs, focus]);
+
+  // Persist the active card so a refresh resumes it instead of drawing fresh.
+  useEffect(() => {
+    if (current) persistCurrent(current);
+  }, [current]);
 
   // Clear the one-shot focus when leaving Study, so returning later doesn't
   // re-seed the same word.
