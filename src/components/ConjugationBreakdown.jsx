@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IconSpark } from './Icons.jsx';
 import { conjugateItem, wordKey } from '../utils/conjugator.js';
 import { getConjugationSteps } from '../utils/conjugatorExplain.js';
@@ -12,6 +12,7 @@ export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DE
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [showAi, setShowAi] = useState(false);
+  const abortRef = useRef(null);
 
   const steps = useMemo(() => getConjugationSteps(word, type), [word, type]);
   const wKey = wordKey(word);
@@ -25,6 +26,12 @@ export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DE
   }, [wKey, type]);
 
   async function getAIExplanation() {
+    if (loading) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setLoading(false);
+      return;
+    }
     setShowAi(true);
     const cached = getAICache('katachiya_ai_explanations_cache', cacheKey);
     if (cached) {
@@ -37,6 +44,8 @@ export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DE
       return;
     }
 
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     setErr('');
     try {
@@ -51,12 +60,15 @@ export function ConjugationBreakdown({ word, type, geminiKey, practicePrefs = DE
           'You are a patient Japanese language teacher explaining conjugation rules step-by-step. Keep explanation concise and direct.',
         ),
       );
-      setAiExplanation(reply.trim());
-      setAICache('katachiya_ai_explanations_cache', cacheKey, reply.trim());
+      if (!controller.signal.aborted) {
+        setAiExplanation(reply.trim());
+        setAICache('katachiya_ai_explanations_cache', cacheKey, reply.trim());
+      }
     } catch (e) {
-      setErr(e.message || 'Failed to get AI explanation.');
+      if (!controller.signal.aborted) setErr(e.message || 'Failed to get AI explanation.');
     }
-    setLoading(false);
+    if (!controller.signal.aborted) setLoading(false);
+    abortRef.current = null;
   }
 
   return (
