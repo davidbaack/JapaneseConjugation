@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { IconSpark, IconFlame } from '../components/Icons.jsx';
 import { ALL_CARD_TYPES, TYPE_LABEL } from '../data/conjugationTypes.js';
 import { RULES } from '../utils/conjugator.js';
@@ -175,15 +175,11 @@ export default function StatsView() {
   const [aiText, setAiText] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiErr, setAiErr] = useState('');
+  const aiAbortRef = useRef(null);
 
   function drillWeaknesses() {
     const weakRows = formRowsData.filter((row) => row.attempted > 0);
-    if (weakRows.length === 0) {
-      alert(
-        'No weakness data yet! Complete some reviews first so we can identify areas to improve.',
-      );
-      return;
-    }
+    if (weakRows.length === 0) return;
     const weakestTypeIds = weakRows.slice(0, 8).map((row) => row.type.id);
     const wordIncorrectMap = new Map();
     for (const word of verbs) {
@@ -243,6 +239,14 @@ export default function StatsView() {
 
   async function generatePlan() {
     if (!geminiKey) return;
+    if (aiLoading) {
+      aiAbortRef.current?.abort();
+      aiAbortRef.current = null;
+      setAiLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
     setAiLoading(true);
     setAiText('');
     setAiErr('');
@@ -267,11 +271,12 @@ export default function StatsView() {
         0.35,
         aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM),
       );
-      setAiText(reply.trim());
+      if (!controller.signal.aborted) setAiText(reply.trim());
     } catch (e) {
-      setAiErr(e.message);
+      if (!controller.signal.aborted) setAiErr(e.message);
     }
-    setAiLoading(false);
+    if (!controller.signal.aborted) setAiLoading(false);
+    aiAbortRef.current = null;
   }
 
   const Stat = ({ label, value }) => (
@@ -304,11 +309,11 @@ export default function StatsView() {
             </div>
             <button
               onClick={generatePlan}
-              disabled={!geminiKey || aiLoading}
+              disabled={!geminiKey}
               className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm flex items-center gap-1.5 transition"
             >
               <IconSpark className="w-4 h-4" />
-              {aiLoading ? 'Planning...' : 'AI plan'}
+              {aiLoading ? 'Cancel' : 'AI plan'}
             </button>
           </div>
           <div className="space-y-3">

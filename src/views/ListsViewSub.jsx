@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IconPlus, IconSpark } from '../components/Icons.jsx';
 import { searchWords } from './ReferenceViewSub.jsx';
 import {
@@ -194,6 +194,7 @@ export default function ListsViewSub({
   const [aiRows, setAiRows] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiErr, setAiErr] = useState('');
+  const aiAbortRef = useRef(null);
   const active = wordLists.find((l) => l.id === activeId) || wordLists[0] || null;
 
   useEffect(() => {
@@ -324,6 +325,14 @@ export default function ListsViewSub({
 
   async function generateAIList() {
     if (!geminiKey) return;
+    if (aiLoading) {
+      aiAbortRef.current?.abort();
+      aiAbortRef.current = null;
+      setAiLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
     const count = Math.max(5, Math.min(24, Number(aiCount) || 10));
     const activeSeen = new Set(active?.wordKeys || []);
     const avoid = words
@@ -349,11 +358,12 @@ export default function ListsViewSub({
       );
       const rows = parseScannerAIWords(reply).slice(0, count);
       if (!rows.length) throw new Error('AI did not return valid verb/adjective rows.');
-      setAiRows(rows);
+      if (!controller.signal.aborted) setAiRows(rows);
     } catch (e) {
-      setAiErr(e.message || 'AI list generation failed.');
+      if (!controller.signal.aborted) setAiErr(e.message || 'AI list generation failed.');
     }
-    setAiLoading(false);
+    if (!controller.signal.aborted) setAiLoading(false);
+    aiAbortRef.current = null;
   }
 
   function addAIRowsToList() {
@@ -575,10 +585,10 @@ export default function ListsViewSub({
             </div>
             <button
               onClick={generateAIList}
-              disabled={!geminiKey || aiLoading}
+              disabled={!geminiKey}
               className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium text-sm"
             >
-              {aiLoading ? 'Building...' : 'Build pack'}
+              {aiLoading ? 'Cancel' : 'Build pack'}
             </button>
           </div>
           <div className="grid sm:grid-cols-[1fr_auto] gap-3">
