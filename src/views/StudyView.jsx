@@ -1498,10 +1498,21 @@ export default function StudyView() {
                                   ))}
                                 </div>
                               </div>
+                              <ScriptDisplay
+                                view={expectedView}
+                                word={current.verb}
+                                type={current.type}
+                                colorHighlight={practicePrefs.colorCodeConjugations !== false}
+                                className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
+                                subClassName="text-xs text-stone-500 mt-1"
+                              />
+                              <div className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
+                                {targetEnglish}
+                              </div>
                             </div>
 
-                            {/* Guessed answer below it with less emphasis */}
-                            <div className="mt-3 opacity-65">
+                            {/* Guessed answer below it */}
+                            <div className="mt-3">
                               <div className="text-[11px] uppercase tracking-wider text-rose-700/80 dark:text-rose-400/80 mb-1">
                                 {reviewChoiceLabel
                                   ? 'You chose'
@@ -1560,19 +1571,21 @@ export default function StudyView() {
                         )}
                       </>
                     )}
-                    <ScriptDisplay
-                      view={expectedView}
-                      word={current.verb}
-                      type={current.type}
-                      colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                      className={`text-xl mt-2 ${wasCorrect ? 'text-emerald-900 dark:text-emerald-100' : 'text-rose-900 dark:text-rose-100'}`}
-                      subClassName="text-xs text-stone-500 mt-1"
-                    />
-                    <div
-                      className={`text-xs mt-1 ${wasCorrect ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-705 dark:text-rose-400'}`}
-                    >
-                      {targetEnglish}
-                    </div>
+                    {wasCorrect && (
+                      <>
+                        <ScriptDisplay
+                          view={expectedView}
+                          word={current.verb}
+                          type={current.type}
+                          colorHighlight={practicePrefs.colorCodeConjugations !== false}
+                          className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
+                          subClassName="text-xs text-stone-500 mt-1"
+                        />
+                        <div className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
+                          {targetEnglish}
+                        </div>
+                      </>
+                    )}
                     <PitchAccentSection
                       word={current.verb}
                       kanaText={expected}
