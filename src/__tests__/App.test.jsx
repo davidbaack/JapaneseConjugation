@@ -15,7 +15,16 @@ describe('App shell', () => {
     expect(screen.getByRole('heading', { name: /Katachiya/ })).toBeTruthy();
     expect(screen.getByText('Spaced repetition, reference tables, and AI coaching')).toBeTruthy();
     // Nav labels (accessible name is the catalog string; CSS only capitalizes).
-    for (const label of ['study', 'Conjugation Check', 'games', 'settings', 'library', 'stats']) {
+    for (const label of [
+      'study',
+      'Conjugation Check',
+      'Which Group?',
+      'て Forms',
+      'games',
+      'insights',
+      'library',
+      'settings',
+    ]) {
       expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
     }
   });
@@ -32,16 +41,14 @@ describe('App shell', () => {
     render(<App />);
     // Each nav button's accessible name is its catalog label.
     const labels = [
+      'study',
       'Conjugation Check',
       'Which Group?',
       'て Forms',
       'games',
-      'mistakes',
-      'Progress',
-      'stats',
+      'insights',
       'library',
       'settings',
-      'study',
     ];
     for (const label of labels) {
       fireEvent.click(screen.getByRole('tab', { name: label, exact: true }));
