@@ -46,15 +46,7 @@ export function useCloudAutoSync({
           await cloudUpsert({ state, customVerbs, customAdjectives, wordLists, practicePrefs });
           const now = Date.now();
           lastSyncedAtRef.current = now;
-          saveAll(
-            state,
-            customVerbs,
-            customAdjectives,
-            wordLists,
-            dummySync,
-            now,
-            practicePrefs,
-          );
+          saveAll(state, customVerbs, customAdjectives, wordLists, dummySync, now, practicePrefs);
           setSyncStatus({ kind: 'ok', message: 'Saved to cloud', at: now });
         } catch (e) {
           logWarn(e, { source: 'useCloudAutoSync.push' });
