@@ -43,7 +43,9 @@ function AppShell() {
         <header className="mb-4 sm:mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
-              {t('app.title')} <span className="text-stone-400 font-normal">·</span>{' '}
+              {t('app.title')}{' '}
+              <span className="text-stone-500 dark:text-stone-400 font-normal">活用練習</span>{' '}
+              <span className="text-stone-400 font-normal">·</span>{' '}
               <span className="font-normal">{t('app.subtitle')}</span>
             </h1>
           </div>
