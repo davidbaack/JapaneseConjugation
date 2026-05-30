@@ -128,6 +128,7 @@ export default function SettingsView() {
   const [copyOk, setCopyOk] = useState(false);
   const [typeSearch, setTypeSearch] = useState('');
   const [openGroups, setOpenGroups] = useState(new Set());
+  const [openLessons, setOpenLessons] = useState({ genki: false, minna: false });
 
   const exportData = useMemo(
     () => serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
@@ -345,9 +346,9 @@ export default function SettingsView() {
 
   return (
     <div className="space-y-4 text-left">
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-        <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Practice mode</h3>
-        <div
+            <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+        <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Practice session</h3>
+<div
           className={`mb-4 border-y py-3 ${poolSummary.prompts ? 'border-stone-100 dark:border-stone-850' : 'border-amber-200 bg-amber-50/60 dark:bg-amber-955/20 -mx-2 px-2 rounded-xl'}`}
         >
           <div className="flex items-center justify-between gap-3 mb-2">
@@ -376,6 +377,7 @@ export default function SettingsView() {
             ))}
           </div>
         </div>
+
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-stone-500 block mb-1">Answer mode</label>
@@ -399,31 +401,6 @@ export default function SettingsView() {
                 </button>
               ))}
             </div>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Kana feedback while typing</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'none', label: 'None' },
-                { id: 'color', label: 'Colors' },
-                { id: 'color-count', label: 'Colors + count' },
-              ].map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, kanaMatchDisplay: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay) === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Colors + count always shown after submitting.
-            </p>
           </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Drill mode</label>
@@ -492,133 +469,6 @@ export default function SettingsView() {
               ))}
             </div>
           </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Identical forms</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: true, label: 'Skip' },
-                { id: false, label: 'Keep' },
-              ].map((o) => (
-                <button
-                  key={String(o.id)}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, skipDuplicateForms: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.skipDuplicateForms !== false) === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">English hints</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'show', label: 'Show' },
-                { id: 'hidden', label: 'Hide' },
-              ].map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, englishHints: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Hidden mode can still ask Gemini for a non-answer clue.
-            </p>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Word category label</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: true, label: 'Show' },
-                { id: false, label: 'Hide' },
-              ].map((o) => (
-                <button
-                  key={String(o.id)}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, showWordCategory: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    !!practicePrefs.showWordCategory === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Hides う-verb / る-verb / な-adjective labels during review — identifying the category
-              is part of the training.
-            </p>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Theme</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'light', label: 'Light' },
-                { id: 'dark', label: 'Dark' },
-                { id: 'system', label: `System${resolvedTheme === 'dark' ? ' dark' : ' light'}` },
-              ].map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, theme: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.theme || 'system') === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Display scripts</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'kanji', label: 'Kanji' },
-                { id: 'kana', label: 'Kana' },
-                { id: 'romaji', label: 'Romaji' },
-              ].map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => toggleDisplayScript(o.id)}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    displayScripts[o.id]
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() =>
-                setPracticePrefs({ ...practicePrefs, furigana: practicePrefs.furigana === false })
-              }
-              disabled={!(displayScripts.kanji && displayScripts.kana)}
-              className={`mt-2 w-full px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 ${
-                practicePrefs.furigana !== false && displayScripts.kanji && displayScripts.kana
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-              }`}
-            >
-              Furigana {practicePrefs.furigana !== false ? 'on' : 'off'}
-            </button>
-          </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-stone-500 block mb-1">Prompt form</label>
             <select
@@ -681,108 +531,6 @@ export default function SettingsView() {
               className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
             />
           </div>
-          <div className="flex items-end">
-            <button
-              onClick={() =>
-                setPracticePrefs({ ...practicePrefs, autoSpeak: !practicePrefs.autoSpeak })
-              }
-              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
-                practicePrefs.autoSpeak
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-              }`}
-            >
-              <IconVolume className="w-4 h-4 inline-block mr-1.5" />
-              Speak answers
-            </button>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={() =>
-                setPracticePrefs({
-                  ...practicePrefs,
-                  autoAdvanceCorrect: !practicePrefs.autoAdvanceCorrect,
-                })
-              }
-              className={`w-full px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center gap-1.5 ${
-                practicePrefs.autoAdvanceCorrect
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-              }`}
-            >
-              <IconRefresh className="w-4 h-4" />
-              Auto next
-            </button>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={() =>
-                setPracticePrefs({
-                  ...practicePrefs,
-                  listeningPrompt: !practicePrefs.listeningPrompt,
-                })
-              }
-              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
-                practicePrefs.listeningPrompt
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-              }`}
-            >
-              <IconVolume className="w-4 h-4 inline-block mr-1.5" />
-              Listening prompt
-            </button>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={() =>
-                setPracticePrefs({
-                  ...practicePrefs,
-                  colorCodeConjugations: practicePrefs.colorCodeConjugations === false,
-                })
-              }
-              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
-                practicePrefs.colorCodeConjugations !== false
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-              }`}
-            >
-              <IconPen className="w-4 h-4 inline-block mr-1.5" />
-              Color segments
-            </button>
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-xs text-stone-500 block mb-1">Japanese voice</label>
-            <div className="flex gap-2">
-              <select
-                value={practicePrefs.voiceURI || ''}
-                onChange={(e) => setPracticePrefs({ ...practicePrefs, voiceURI: e.target.value })}
-                className="flex-1 min-w-0 px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
-              >
-                <option value="">Auto Japanese voice</option>
-                {!selectedVoiceAvailable && (
-                  <option value={practicePrefs.voiceURI}>Selected voice unavailable</option>
-                )}
-                {speechVoices.map((v, i) => (
-                  <option key={v.voiceURI || `${v.name}-${i}`} value={v.voiceURI}>
-                    {v.name} - {v.lang}
-                    {v.localService ? ' - local' : ''}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => speakJapanese('食べてください', 0.85, practicePrefs.voiceURI)}
-                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm flex items-center gap-1.5"
-              >
-                <IconVolume className="w-4 h-4" />
-                Test
-              </button>
-            </div>
-            {speechVoices.length === 0 && (
-              <p className="text-[11px] text-stone-400 mt-1">
-                Japanese voices appear after the browser loads speech voices.
-              </p>
-            )}
-          </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Timed drill</label>
             <select
@@ -819,6 +567,287 @@ export default function SettingsView() {
               Stops Study after a fixed set; timed drill can still run at the same time.
             </p>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+        <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Display & audio</h3>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Theme</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'light', label: 'Light' },
+                { id: 'dark', label: 'Dark' },
+                { id: 'system', label: `System${resolvedTheme === 'dark' ? ' dark' : ' light'}` },
+              ].map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, theme: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    (practicePrefs.theme || 'system') === o.id
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Display scripts</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'kanji', label: 'Kanji' },
+                { id: 'kana', label: 'Kana' },
+                { id: 'romaji', label: 'Romaji' },
+              ].map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => toggleDisplayScript(o.id)}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    displayScripts[o.id]
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() =>
+                setPracticePrefs({ ...practicePrefs, furigana: practicePrefs.furigana === false })
+              }
+              disabled={!(displayScripts.kanji && displayScripts.kana)}
+              className={`mt-2 w-full px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 ${
+                practicePrefs.furigana !== false && displayScripts.kanji && displayScripts.kana
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              Furigana {practicePrefs.furigana !== false ? 'on' : 'off'}
+            </button>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Kana feedback while typing</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'none', label: 'None' },
+                { id: 'color', label: 'Colors' },
+                { id: 'color-count', label: 'Colors + count' },
+              ].map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, kanaMatchDisplay: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    (practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay) === o.id
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-1">
+              Colors + count always shown after submitting.
+            </p>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">English hints</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'show', label: 'Show' },
+                { id: 'hidden', label: 'Hide' },
+              ].map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, englishHints: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === o.id
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-1">
+              Hidden mode can still ask Gemini for a non-answer clue.
+            </p>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Word category label</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: true, label: 'Show' },
+                { id: false, label: 'Hide' },
+              ].map((o) => (
+                <button
+                  key={String(o.id)}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, showWordCategory: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    !!practicePrefs.showWordCategory === o.id
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-1">
+              Hides う-verb / る-verb / な-adjective labels during review — identifying the category
+              is part of the training.
+            </p>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">Identical forms</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: true, label: 'Skip' },
+                { id: false, label: 'Keep' },
+              ].map((o) => (
+                <button
+                  key={String(o.id)}
+                  onClick={() => setPracticePrefs({ ...practicePrefs, skipDuplicateForms: o.id })}
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    (practicePrefs.skipDuplicateForms !== false) === o.id
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() =>
+                setPracticePrefs({
+                  ...practicePrefs,
+                  colorCodeConjugations: practicePrefs.colorCodeConjugations === false,
+                })
+              }
+              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
+                practicePrefs.colorCodeConjugations !== false
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              <IconPen className="w-4 h-4 inline-block mr-1.5" />
+              Color segments
+            </button>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() =>
+                setPracticePrefs({ ...practicePrefs, autoSpeak: !practicePrefs.autoSpeak })
+              }
+              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
+                practicePrefs.autoSpeak
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              <IconVolume className="w-4 h-4 inline-block mr-1.5" />
+              Speak answers
+            </button>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() =>
+                setPracticePrefs({
+                  ...practicePrefs,
+                  autoAdvanceCorrect: !practicePrefs.autoAdvanceCorrect,
+                })
+              }
+              className={`w-full px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center gap-1.5 ${
+                practicePrefs.autoAdvanceCorrect
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              <IconRefresh className="w-4 h-4" />
+              Auto next
+            </button>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() =>
+                setPracticePrefs({ ...practicePrefs, autoSpeak: !practicePrefs.autoSpeak })
+              }
+              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
+                practicePrefs.autoSpeak
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              <IconVolume className="w-4 h-4 inline-block mr-1.5" />
+              Speak answers
+            </button>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() =>
+                setPracticePrefs({
+                  ...practicePrefs,
+                  listeningPrompt: !practicePrefs.listeningPrompt,
+                })
+              }
+              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
+                practicePrefs.listeningPrompt
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+              }`}
+            >
+              <IconVolume className="w-4 h-4 inline-block mr-1.5" />
+              Listening prompt
+            </button>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs text-stone-500 block mb-1">Japanese voice</label>
+            <div className="flex gap-2">
+              <select
+                value={practicePrefs.voiceURI || ''}
+                onChange={(e) => setPracticePrefs({ ...practicePrefs, voiceURI: e.target.value })}
+                className="flex-1 min-w-0 px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="">Auto Japanese voice</option>
+                {!selectedVoiceAvailable && (
+                  <option value={practicePrefs.voiceURI}>Selected voice unavailable</option>
+                )}
+                {speechVoices.map((v, i) => (
+                  <option key={v.voiceURI || `${v.name}-${i}`} value={v.voiceURI}>
+                    {v.name} - {v.lang}
+                    {v.localService ? ' - local' : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => speakJapanese('食べてください', 0.85, practicePrefs.voiceURI)}
+                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm flex items-center gap-1.5"
+              >
+                <IconVolume className="w-4 h-4" />
+                Test
+              </button>
+            </div>
+            {speechVoices.length === 0 && (
+              <p className="text-[11px] text-stone-400 mt-1">
+                Japanese voices appear after the browser loads speech voices.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+        <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Vocabulary filters</h3>
+        <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-stone-500 block mb-1">JLPT levels</label>
             <div className="flex gap-1">
@@ -837,109 +866,84 @@ export default function SettingsView() {
               ))}
             </div>
           </div>
-          <div className="sm:col-span-2">
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <label className="text-xs text-stone-500 block">Genki lessons</label>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setPracticePrefs({ ...practicePrefs, genkiLessons: null })}
-                  className={`px-2 py-1 rounded-md text-[11px] border transition ${practicePrefs.genkiLessons === null ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850'}`}
+          <div className="hidden sm:block"></div>
+                    <div className="sm:col-span-2 rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-stone-50 dark:bg-stone-950">
+              <button
+                onClick={() => setOpenLessons(prev => ({ ...prev, genki: !prev.genki }))}
+                className="flex items-center gap-2 flex-1 text-left"
+              >
+                <svg
+                  className={`w-3.5 h-3.5 text-stone-400 flex-shrink-0 transition-transform ${openLessons.genki ? 'rotate-90' : ''}`}
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
                 >
-                  None
-                </button>
-                <button
-                  onClick={() => setGenkiLessons(GENKI_LESSONS)}
-                  className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setGenkiLessons(GENKI_LESSONS.filter((n) => n <= 12))}
-                  className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                >
-                  I
-                </button>
-                <button
-                  onClick={() => setGenkiLessons(GENKI_LESSONS.filter((n) => n >= 13))}
-                  className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                >
-                  II
-                </button>
+                  <path fillRule="evenodd" d="M7.293 4.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+                <span className="text-sm font-medium text-stone-800 dark:text-stone-200">Genki lessons</span>
+              </button>
+              <div className="text-xs text-stone-500 font-medium">
+                {selectedGenkiLessons.length === 0 ? 'None' : selectedGenkiLessons.length === GENKI_LESSONS.length ? 'All' : `${selectedGenkiLessons.length} selected`}
               </div>
             </div>
-            <div className="grid grid-cols-6 sm:grid-cols-[repeat(12,minmax(0,1fr))] gap-1">
-              {GENKI_LESSONS.map((n) => (
-                <button
-                  key={n}
-                  onClick={() => toggleGenkiLesson(n)}
-                  className={`px-2 py-2 rounded-lg text-xs border transition ${
-                    selectedGenkiLessons.includes(n)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  L{n}
-                </button>
-              ))}
-            </div>
+            {openLessons.genki && (
+              <div className="p-3 bg-white dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800">
+                <div className="flex gap-1 mb-2">
+                  <button onClick={() => setPracticePrefs({ ...practicePrefs, genkiLessons: null })} className={`px-2 py-1 rounded-md text-[11px] border transition ${practicePrefs.genkiLessons === null ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850'}`}>None</button>
+                  <button onClick={() => setGenkiLessons(GENKI_LESSONS)} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">All</button>
+                  <button onClick={() => setGenkiLessons(GENKI_LESSONS.filter((n) => n <= 12))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">I</button>
+                  <button onClick={() => setGenkiLessons(GENKI_LESSONS.filter((n) => n >= 13))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">II</button>
+                </div>
+                <div className="grid grid-cols-6 sm:grid-cols-[repeat(12,minmax(0,1fr))] gap-1">
+                  {GENKI_LESSONS.map((n) => (
+                    <button key={n} onClick={() => toggleGenkiLesson(n)} className={`px-2 py-2 rounded-lg text-xs border transition ${selectedGenkiLessons.includes(n) ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'}`}>L{n}</button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="sm:col-span-2 flex items-center gap-3">
             <div className="flex-1 border-t border-stone-200 dark:border-stone-800" />
-            <span className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 tracking-wide">
-              OR
-            </span>
+            <span className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 tracking-wide">OR</span>
             <div className="flex-1 border-t border-stone-200 dark:border-stone-800" />
           </div>
-          <div className="sm:col-span-2">
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <label className="text-xs text-stone-500 block">みんなの日本語 lessons</label>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setPracticePrefs({ ...practicePrefs, minnaLessons: null })}
-                  className={`px-2 py-1 rounded-md text-[11px] border transition ${practicePrefs.minnaLessons === null ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850'}`}
+                    <div className="sm:col-span-2 rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-stone-50 dark:bg-stone-950">
+              <button
+                onClick={() => setOpenLessons(prev => ({ ...prev, minna: !prev.minna }))}
+                className="flex items-center gap-2 flex-1 text-left"
+              >
+                <svg
+                  className={`w-3.5 h-3.5 text-stone-400 flex-shrink-0 transition-transform ${openLessons.minna ? 'rotate-90' : ''}`}
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
                 >
-                  None
-                </button>
-                <button
-                  onClick={() => setMinnaLessons(MINNA_LESSONS)}
-                  className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setMinnaLessons(MINNA_LESSONS.filter((n) => n <= 25))}
-                  className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                >
-                  I
-                </button>
-                <button
-                  onClick={() => setMinnaLessons(MINNA_LESSONS.filter((n) => n >= 26))}
-                  className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                >
-                  II
-                </button>
+                  <path fillRule="evenodd" d="M7.293 4.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+                <span className="text-sm font-medium text-stone-800 dark:text-stone-200">みんなの日本語 lessons</span>
+              </button>
+              <div className="text-xs text-stone-500 font-medium">
+                {selectedMinnaLessons.length === 0 ? 'None' : selectedMinnaLessons.length === MINNA_LESSONS.length ? 'All' : `${selectedMinnaLessons.length} selected`}
               </div>
             </div>
-            <div className="grid grid-cols-6 sm:grid-cols-[repeat(13,minmax(0,1fr))] gap-1">
-              {MINNA_LESSONS.map((n) => (
-                <button
-                  key={n}
-                  onClick={() => toggleMinnaLesson(n)}
-                  className={`px-2 py-2 rounded-lg text-xs border transition ${
-                    selectedMinnaLessons.includes(n)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  L{n}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Words from Genki <span className="font-semibold">OR</span> Minna lessons are included.
-              Textbook selection applies <span className="font-semibold">AND</span> JLPT, word type,
-              and study-list filters.
-            </p>
+            {openLessons.minna && (
+              <div className="p-3 bg-white dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800">
+                <div className="flex gap-1 mb-2">
+                  <button onClick={() => setPracticePrefs({ ...practicePrefs, minnaLessons: null })} className={`px-2 py-1 rounded-md text-[11px] border transition ${practicePrefs.minnaLessons === null ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850'}`}>None</button>
+                  <button onClick={() => setMinnaLessons(MINNA_LESSONS)} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">All</button>
+                  <button onClick={() => setMinnaLessons(MINNA_LESSONS.filter((n) => n <= 25))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">I</button>
+                  <button onClick={() => setMinnaLessons(MINNA_LESSONS.filter((n) => n >= 26))} className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850">II</button>
+                </div>
+                <div className="grid grid-cols-6 sm:grid-cols-[repeat(13,minmax(0,1fr))] gap-1">
+                  {MINNA_LESSONS.map((n) => (
+                    <button key={n} onClick={() => toggleMinnaLesson(n)} className={`px-2 py-2 rounded-lg text-xs border transition ${selectedMinnaLessons.includes(n) ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'}`}>L{n}</button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-stone-400 mt-2">
+                  Words from Genki <span className="font-semibold">OR</span> Minna lessons are included. Textbook selection applies <span className="font-semibold">AND</span> JLPT, word type, and study-list filters.
+                </p>
+              </div>
+            )}
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-stone-500 block mb-1">Word types</label>
