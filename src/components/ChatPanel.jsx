@@ -21,12 +21,20 @@ export function buildContext(
   explanation,
   prefs = DEFAULT_PREFS,
   taskOverride = '',
+  wasCorrected = false,
 ) {
   const ti = getTypeInfo(type);
   const label = isAdjective(verb) ? 'Adjective' : 'Verb';
   const feedbackNote = feedbackNoteFor(prefs);
   const task = taskOverride || `${ti.label} (${ti.hint})`;
-  return `I'm studying Japanese and just got this wrong.\n\n${label}: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: ${task}\nMy answer: ${toHiragana(userAnswer) || userAnswer || '(blank)'}\nCorrect: ${expected}\n\nAuto-explanation: ${explanation.intro} ${explanation.rule}${explanation.derivation && explanation.derivation !== expected ? '\nStep: ' + explanation.derivation : ''}${explanation.note ? '\nNote: ' + explanation.note : ''}\n\nHelp me understand why the answer is ${expected} and where I went wrong. ${feedbackNote}`;
+  const opener = wasCorrected
+    ? `I'm studying Japanese. I made a mistake mid-typing but self-corrected to the right answer — it still counts as wrong.`
+    : `I'm studying Japanese and just got this wrong.`;
+  const answerLabel = wasCorrected ? 'My answer when I went wrong' : 'My answer';
+  const correctedNote = wasCorrected
+    ? `\nSelf-correction: I later typed the right answer before submitting, but the initial mistake counted.`
+    : '';
+  return `${opener}\n\n${label}: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: ${task}\n${answerLabel}: ${toHiragana(userAnswer) || userAnswer || '(blank)'}\nCorrect: ${expected}${correctedNote}\n\nAuto-explanation: ${explanation.intro} ${explanation.rule}${explanation.derivation && explanation.derivation !== expected ? '\nStep: ' + explanation.derivation : ''}${explanation.note ? '\nNote: ' + explanation.note : ''}\n\nHelp me understand what I typed wrong and how to remember the right form. ${feedbackNote}`;
 }
 
 // Context for the "Discuss further" chat opened while the student is still
@@ -57,6 +65,7 @@ export function ChatPanel({
   practicePrefs = DEFAULT_PREFS,
   taskOverride = '',
   mode = 'review',
+  wasCorrected = false,
 }) {
   const [apiHistory, setApiHistory] = useState([]);
   const [display, setDisplay] = useState([]);
@@ -68,7 +77,16 @@ export function ChatPanel({
     () =>
       mode === 'coach'
         ? buildCoachContext(verb, type, userAnswer, practicePrefs, taskOverride)
-        : buildContext(verb, type, userAnswer, expected, explanation, practicePrefs, taskOverride),
+        : buildContext(
+            verb,
+            type,
+            userAnswer,
+            expected,
+            explanation,
+            practicePrefs,
+            taskOverride,
+            wasCorrected,
+          ),
     [
       verb,
       type,
@@ -78,6 +96,7 @@ export function ChatPanel({
       practicePrefs.aiFeedbackLevel,
       taskOverride,
       mode,
+      wasCorrected,
     ],
   );
   /* eslint-enable react-hooks/exhaustive-deps */

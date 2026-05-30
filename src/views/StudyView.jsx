@@ -71,6 +71,7 @@ export default function StudyView() {
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');
   const [wasCorrect, setWasCorrect] = useState(false);
+  const [wasCorrected, setWasCorrected] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [showPromptText, setShowPromptText] = useState(false);
   const [showEnglishHint, setShowEnglishHint] = useState(false);
@@ -466,6 +467,7 @@ export default function StudyView() {
       setCoachChatOpen(false);
       hadKanaMistakeRef.current = false;
       wrongSnapshotRef.current = null;
+      setWasCorrected(false);
       setPhase('answering');
       if (!reviewSetComplete) {
         setCurrent(selectNext(state, practiceWords, enabledTypes, current.id, practicePrefs));
@@ -531,6 +533,7 @@ export default function StudyView() {
     setSubmittedAnswer(
       finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw,
     );
+    setWasCorrected(finalOk && !ok);
     setWasCorrect(ok);
     setPhase('reviewing');
     const reviewWillComplete = reviewLimit > 0 && reviewsDone + 1 >= reviewLimit;
@@ -551,6 +554,7 @@ export default function StudyView() {
         setCoachChatOpen(false);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
+        setWasCorrected(false);
         setPhase('answering');
         setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
       }, 850);
@@ -581,6 +585,7 @@ export default function StudyView() {
     setCoachChatOpen(false);
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
+    setWasCorrected(false);
     setPhase('answering');
     setWasCorrect(false);
     setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
@@ -651,6 +656,7 @@ export default function StudyView() {
         setCoachChatOpen(false);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
+        setWasCorrected(false);
         setPhase('answering');
         setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
       }, 850);
@@ -1428,26 +1434,33 @@ export default function StudyView() {
                 className={`rounded-xl p-4 ${
                   wasCorrect
                     ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
-                    : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50'
+                    : wasCorrected
+                      ? 'bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/50'
+                      : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50'
                 }`}
               >
                 {/* Scoped to the short verdict so screen readers announce the
                     result without re-reading the breakdown/chat below. */}
                 <span role="status" aria-live="polite" className="sr-only">
-                  {wasCorrect ? 'Correct!' : 'Not quite.'}
+                  {wasCorrect ? 'Correct!' : wasCorrected ? 'Self-corrected.' : 'Not quite.'}
                 </span>
                 <div className="flex items-start gap-3 text-left">
                   <div
-                    className={`mt-0.5 flex-shrink-0 ${wasCorrect ? 'text-emerald-600' : 'text-rose-600'}`}
+                    className={`mt-0.5 flex-shrink-0 ${wasCorrect ? 'text-emerald-600' : wasCorrected ? 'text-amber-600' : 'text-rose-600'}`}
                   >
                     {wasCorrect ? <IconCheck className="w-5 h-5" /> : <IconX className="w-5 h-5" />}
                   </div>
                   <div className="flex-1">
                     <div
-                      className={`text-sm font-medium ${wasCorrect ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800'}`}
+                      className={`text-sm font-medium ${wasCorrect ? 'text-emerald-800 dark:text-emerald-300' : wasCorrected ? 'text-amber-800 dark:text-amber-300' : 'text-rose-800'}`}
                     >
-                      {wasCorrect ? 'Correct!' : 'Not quite.'}
+                      {wasCorrect ? 'Correct!' : wasCorrected ? 'Self-corrected.' : 'Not quite.'}
                     </div>
+                    {wasCorrected && (
+                      <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                        You fixed it mid-type, but the mistake still counts.
+                      </div>
+                    )}
                     {wasCorrect ? (
                       /* Correct answer case */
                       <>
@@ -1513,7 +1526,9 @@ export default function StudyView() {
 
                             {/* Guessed answer below it */}
                             <div className="mt-3">
-                              <div className="text-[11px] uppercase tracking-wider text-rose-700/80 dark:text-rose-400/80 mb-1">
+                              <div
+                                className={`text-[11px] uppercase tracking-wider ${wasCorrected ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-rose-700/80 dark:text-rose-400/80'} mb-1`}
+                              >
                                 {reviewChoiceLabel
                                   ? 'You chose'
                                   : revealedMiss
@@ -1696,12 +1711,13 @@ export default function StudyView() {
                         <ChatPanel
                           verb={current.verb}
                           type={current.type}
-                          userAnswer={revealedMiss ? '(revealed)' : answer}
+                          userAnswer={revealedMiss ? '(revealed)' : submittedAnswer}
                           expected={expected}
                           explanation={explanation}
                           geminiKey={geminiKey}
                           practicePrefs={practicePrefs}
                           taskOverride={taskOverride}
+                          wasCorrected={wasCorrected}
                         />
                       )
                     ) : (
