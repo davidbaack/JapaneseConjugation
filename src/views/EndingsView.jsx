@@ -125,6 +125,35 @@ export default function EndingsView() {
     });
   }
 
+  function revealAll() {
+    if (result) return;
+    setHintChars(expected.length);
+    setResult({ ok: false, tail: null });
+    setState((s) => {
+      const prev = s.onbin || defaultState().onbin;
+      const pp = prev.byPattern?.[pattern.label] || { attempted: 0, correct: 0 };
+      return {
+        ...s,
+        onbin: {
+          ...prev,
+          attempted: (prev.attempted || 0) + 1,
+          correct: prev.correct || 0,
+          hints: (prev.hints || 0) + expected.length,
+          streak: 0,
+          bestStreak: prev.bestStreak || 0,
+          byPattern: {
+            ...(prev.byPattern || {}),
+            [pattern.label]: {
+              attempted: (pp.attempted || 0) + 1,
+              correct: pp.correct || 0,
+              lastAt: Date.now(),
+            },
+          },
+        },
+      };
+    });
+  }
+
   async function generateMnemonic() {
     if (!geminiKey) return;
     setAiLoading(true);
@@ -250,7 +279,13 @@ export default function EndingsView() {
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
-              onClick={() => setHintChars(Math.min(expected.length, hintChars + 1))}
+              onClick={() => {
+                if (hintChars + 1 >= expected.length) {
+                  revealAll();
+                } else {
+                  setHintChars(hintChars + 1);
+                }
+              }}
               disabled={hintChars >= expected.length || !!result}
               className="px-3 py-2 border border-stone-205 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 disabled:opacity-40 rounded-lg text-sm transition"
             >
