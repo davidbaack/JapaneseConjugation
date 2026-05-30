@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs fast checks before every push. Mirrors the first half of the CI
+# pipeline so format/lint/type/unit errors are caught locally, not in CI.
+# For the full pipeline (including E2E), run: npm run ci
+npm run ci:fast
