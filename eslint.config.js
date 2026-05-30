@@ -1,5 +1,5 @@
 import js from '@eslint/js';
-import reactX from '@eslint-react/eslint-plugin';
+import reactPlugin from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettier from 'eslint-config-prettier';
 
@@ -8,7 +8,7 @@ export default [
   {
     files: ['src/**/*.{js,jsx}'],
     plugins: {
-      'react-x': reactX,
+      react: reactPlugin,
       'react-hooks': reactHooks,
     },
     languageOptions: {
@@ -65,8 +65,11 @@ export default [
       react: { version: 'detect' },
     },
     rules: {
-      ...reactX.configs.recommended.rules,
+      ...reactPlugin.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
+      'react/no-unescaped-entities': 'off',
       'no-unused-vars': ['warn', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
       'no-console': 'off',
       // Hydration patterns (loading state from localStorage in useEffect) are established here
