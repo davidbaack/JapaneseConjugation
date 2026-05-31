@@ -1875,14 +1875,6 @@ export default function StudyView() {
               subClassName="text-base text-stone-500"
             />
           )}
-          {promptType && !hidePromptText && (practicePrefs.showDictionaryForm ?? true) && (
-            <div className="text-xs text-stone-400">
-              Dictionary: <span lang="ja">{current.verb.dict}</span>
-              {current.verb.dict !== current.verb.reading && (
-                <span lang="ja"> · {current.verb.reading}</span>
-              )}
-            </div>
-          )}
           {transformationMode && !hidePromptText && (
             <div className="mt-1 text-xs text-stone-400">Prompt form: {sourceTypeInfo.label}.</div>
           )}

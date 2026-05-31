@@ -43,5 +43,4 @@ export const DEFAULT_PREFS = {
   colorCodeConjugations: true,
   kanaMatchDisplay: 'color-count',
   showWordCategory: false,
-  showDictionaryForm: true,
 };

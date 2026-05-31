@@ -512,30 +512,6 @@ export default function SettingsView() {
               category stays part of the training.
             </p>
           </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Dictionary form</label>
-            <div role="group" aria-label="Dictionary form" className="grid grid-cols-2 gap-2">
-              {[
-                { id: true, label: 'Show' },
-                { id: false, label: 'Hide' },
-              ].map((o) => (
-                <button
-                  key={String(o.id)}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, showDictionaryForm: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.showDictionaryForm ?? true) === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Hides the dictionary form during drills so recalling it is part of the challenge.
-            </p>
-          </div>
           <div className="flex items-end">
             <button
               onClick={() =>
