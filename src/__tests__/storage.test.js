@@ -11,6 +11,8 @@ import {
   buildFocusCard,
   defaultState,
   selectNext,
+  gradeTransformationStats,
+  mergeTransformationStats,
   DAY,
 } from '../utils/storage.js';
 import { conjugateItem } from '../utils/conjugator.js';
@@ -224,6 +226,29 @@ describe('recordMistake', () => {
     expect(mistakes).toHaveLength(2);
   });
 
+  it('tags transformation mistakes as a distinct practice dimension', () => {
+    const result = recordMistake(
+      [],
+      item,
+      'polite-present',
+      'plain-past-negative',
+      'たべます',
+      'たべます',
+      {
+        dimension: 'transformation',
+        sourceType: 'plain-past-negative',
+        targetType: 'polite-present',
+        direction: 'forward',
+      },
+    );
+    expect(result[0]).toMatchObject({
+      dimension: 'transformation',
+      sourceType: 'plain-past-negative',
+      targetType: 'polite-present',
+      direction: 'forward',
+    });
+  });
+
   it('caps at 50 mistakes', () => {
     let mistakes = [];
     for (let i = 0; i < 55; i++) {
@@ -231,6 +256,48 @@ describe('recordMistake', () => {
       mistakes = recordMistake(mistakes, fakeItem, 'plain-past', null, 'x', 'y');
     }
     expect(mistakes.length).toBe(50);
+  });
+});
+
+describe('transformation stats', () => {
+  it('tracks attempts separately by source, target, pair, and direction', () => {
+    const stats = gradeTransformationStats(null, {
+      correct: true,
+      sourceType: 'plain-past-negative',
+      targetType: 'polite-present',
+      direction: 'forward',
+    });
+
+    expect(stats.attempted).toBe(1);
+    expect(stats.correct).toBe(1);
+    expect(stats.bySource['plain-past-negative'].attempted).toBe(1);
+    expect(stats.byTarget['polite-present'].correct).toBe(1);
+    expect(stats.byPair['plain-past-negative->polite-present'].attempted).toBe(1);
+    expect(stats.byDirection.forward.correct).toBe(1);
+  });
+
+  it('merges transformation stats without dropping cloud-only buckets', () => {
+    const local = gradeTransformationStats(null, {
+      correct: true,
+      sourceType: 'te-form',
+      targetType: 'plain-negative',
+      direction: 'forward',
+    });
+    const cloud = gradeTransformationStats(null, {
+      correct: false,
+      sourceType: 'polite-present',
+      targetType: 'dictionary',
+      direction: 'reverse',
+    });
+
+    const merged = mergeTransformationStats(local, cloud);
+
+    expect(merged.attempted).toBe(2);
+    expect(merged.correct).toBe(1);
+    expect(merged.byPair['te-form->plain-negative'].attempted).toBe(1);
+    expect(merged.byPair['polite-present->dictionary'].attempted).toBe(1);
+    expect(merged.byDirection.forward.correct).toBe(1);
+    expect(merged.byDirection.reverse.correct).toBe(0);
   });
 });
 
