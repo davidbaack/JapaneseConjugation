@@ -58,6 +58,7 @@ import {
   upsertRepairWordList,
 } from '../utils/mistakeDiagnosis.js';
 import {
+  clearMinimalPairPrefs,
   getMinimalPairSet,
   minimalPairFeedbackForCard,
   minimalPairSetMatchesCard,
@@ -1607,9 +1608,26 @@ export default function StudyView() {
                   </div>
                 </div>
                 {activeMinimalPairSet && (
-                  <div className="mb-3 inline-flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-250">
-                    <span className="font-semibold uppercase tracking-wider">Minimal pair</span>
-                    <span>{activeMinimalPairSet.label}</span>
+                  <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-250">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold uppercase tracking-wider">Minimal pair</span>
+                      <span>{activeMinimalPairSet.label}</span>
+                      {reviewsDone > 0 && (
+                        <span className="tabular-nums opacity-70">{reviewsDone} this session</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (setPracticePrefs)
+                          setPracticePrefs(clearMinimalPairPrefs(practicePrefs));
+                        if (setState) setState((prev) => ({ ...prev, enabledTypes: [] }));
+                      }}
+                      className="ml-1 font-bold leading-none hover:text-emerald-950 dark:hover:text-emerald-100 transition"
+                      aria-label="End minimal pair drill"
+                      title="End drill"
+                    >
+                      ×
+                    </button>
                   </div>
                 )}
                 {typoGuard && (
