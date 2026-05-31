@@ -117,6 +117,7 @@ function skillRadarScores(state, verbs) {
   const meaning = state.meaning || defaultState().meaning;
   const classify = state.classify || defaultState().classify;
   const mock = state.mock || defaultState().mock;
+  const transformation = state.transformation || defaultState().transformation;
   const daily = state.daily || defaultState().daily;
   const retention = srs.total ? Math.round((srs.mastered / srs.total) * 100) : 0;
   const consistency = Math.min(
@@ -144,6 +145,12 @@ function skillRadarScores(state, verbs) {
       label: 'Meaning',
       score: pct(meaning.correct || 0, meaning.attempted || 0),
       detail: `${meaning.correct || 0}/${meaning.attempted || 0} meaning checks`,
+    },
+    {
+      id: 'transformation',
+      label: 'Transformation',
+      score: pct(transformation.correct || 0, transformation.attempted || 0),
+      detail: `${transformation.correct || 0}/${transformation.attempted || 0} transformations`,
     },
     {
       id: 'classification',
@@ -202,6 +209,8 @@ export default function StatsView() {
   );
   const [showAllPatterns, setShowAllPatterns] = useState(false);
   const visiblePatterns = showAllPatterns ? mistakePatterns : mistakePatterns.slice(0, 6);
+  const transformation = state.transformation || defaultState().transformation;
+  const transformationAccuracy = pct(transformation.correct || 0, transformation.attempted || 0);
   const weakestForms = formRowsData.filter((row) => row.attempted > 0).slice(0, 8);
   const weakest = radar.slice().sort((a, b) => a.score - b.score)[0];
   const [aiText, setAiText] = useState('');
@@ -378,11 +387,19 @@ export default function StatsView() {
 
   return (
     <div className="space-y-4 text-left">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <Stat label="Due now" value={stats.due} />
         <Stat label="Learning" value={stats.learning} />
         <Stat label="Mastered" value={stats.mastered} />
         <Stat label="New" value={stats.fresh} />
+        <Stat
+          label="Transform"
+          value={
+            transformation.attempted
+              ? `${transformationAccuracy}%`
+              : `${transformation.correct || 0}/${transformation.attempted || 0}`
+          }
+        />
       </div>
       <div className="grid lg:grid-cols-[1fr_280px] gap-4">
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">

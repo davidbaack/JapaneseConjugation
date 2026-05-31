@@ -37,6 +37,19 @@ describe('App shell', () => {
     });
   });
 
+  it('starts Transformation Mode from the Study screen', async () => {
+    render(<App />);
+    const transformButton = await screen.findByRole('button', { name: /Transformation Mode/i });
+
+    fireEvent.click(transformButton);
+
+    expect(screen.getAllByRole('button', { name: /Conjugate/i }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Un-conjugate' })).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getAllByText(/Transformation Mode/i).length).toBeGreaterThan(0),
+    );
+  });
+
   it('mounts every tab without hitting the error boundary', async () => {
     render(<App />);
     // Each nav button's accessible name is its catalog label.

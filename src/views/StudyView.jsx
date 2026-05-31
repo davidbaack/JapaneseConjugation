@@ -37,6 +37,7 @@ import {
   recordMistake,
   gradeCard,
   bumpDaily,
+  gradeTransformationStats,
 } from '../utils/storage.js';
 import { recordReadinessAttempt } from '../utils/readiness.js';
 import {
@@ -65,6 +66,18 @@ export { kanaCoachCells, explainReversePrompt };
 // same word/form rather than drawing a fresh one. Scoped to sessionStorage so
 // it survives reloads but resets when the tab is closed.
 const STUDY_CURRENT_KEY = 'jp-study-current';
+const DICTIONARY_TYPE_ID = 'dictionary';
+const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
+const STUDY_MODE_OPTIONS = [
+  { id: 'word', label: 'Word' },
+  { id: 'sentence', label: 'Sentence' },
+  { id: 'transformation', label: 'Transformation Mode' },
+];
+const TRANSFORMATION_DIRECTIONS = [
+  { id: 'forward', label: 'Conjugate' },
+  { id: 'reverse', label: 'Un-conjugate' },
+  { id: 'mixed', label: 'Mixed' },
+];
 
 function loadPersistedCurrent(state, verbs) {
   try {
@@ -166,12 +179,19 @@ export default function StudyView() {
     return base;
   }, [verbs, practicePrefs, wordLists, focus]);
 
+  const activeDrillMode = practicePrefs.drillMode || DEFAULT_PREFS.drillMode;
+  const transformationMode = activeDrillMode === 'transformation';
   const listeningPrompt = !!practicePrefs.listeningPrompt;
   const drillDirection = current ? drillDirectionFor(current, practicePrefs) : 'forward';
   const reverseDrill = drillDirection === 'reverse';
   const sourceForm = current ? conjugateItem(current.verb, current.type) : '';
-  const promptType =
+  const configuredPromptType =
     current && !reverseDrill ? pickPromptType(current.verb, current.type, practicePrefs) : null;
+  const promptType =
+    current && !reverseDrill && transformationMode
+      ? configuredPromptType ||
+        pickPromptType(current.verb, current.type, { ...practicePrefs, promptForm: 'random' })
+      : configuredPromptType;
   const promptAudioText = current
     ? reverseDrill
       ? sourceForm
@@ -405,6 +425,28 @@ export default function StudyView() {
     (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden';
   const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
   const typeInfo = getTypeInfo(current.type);
+  const sourceTypeId = reverseDrill ? current.type : promptType || DICTIONARY_TYPE_ID;
+  const targetTypeId = reverseDrill ? DICTIONARY_TYPE_ID : current.type;
+  const sourceTypeInfo =
+    sourceTypeId === DICTIONARY_TYPE_ID ? DICTIONARY_TYPE_INFO : getTypeInfo(sourceTypeId);
+  const targetTypeInfo =
+    targetTypeId === DICTIONARY_TYPE_ID ? DICTIONARY_TYPE_INFO : getTypeInfo(targetTypeId);
+  const transformationAttempt = transformationMode
+    ? {
+        dimension: 'transformation',
+        sourceType: sourceTypeId,
+        targetType: targetTypeId,
+        direction: drillDirection,
+      }
+    : null;
+  const transformationStats = state.transformation || {
+    attempted: 0,
+    correct: 0,
+    byPair: {},
+  };
+  const transformationAccuracy = transformationStats.attempted
+    ? Math.round((transformationStats.correct / transformationStats.attempted) * 100)
+    : 0;
   const reviewExplanation =
     phase === 'reviewing'
       ? reverseDrill
@@ -419,13 +461,21 @@ export default function StudyView() {
     : makeChoices(current, practiceWords);
   const wordType = isAdjective(current.verb) ? 'Adjective' : 'Verb';
   const noChangePrompt = !reverseDrill && promptType === current.type;
-  const taskLabel = reverseDrill ? `Reverse ${typeInfo.label}` : typeInfo.label;
-  const taskHint = reverseDrill
-    ? 'answer with dictionary form'
-    : noChangePrompt
-      ? 'same form; answer may not change'
-      : typeInfo.hint;
-  const taskSub = reverseDrill ? '辞書形' : typeInfo.sub;
+  const taskLabel = transformationMode
+    ? 'Transformation Mode'
+    : reverseDrill
+      ? `Reverse ${typeInfo.label}`
+      : typeInfo.label;
+  const taskHint = transformationMode
+    ? reverseDrill
+      ? 'recover the dictionary form'
+      : targetTypeInfo.hint
+    : reverseDrill
+      ? 'answer with dictionary form'
+      : noChangePrompt
+        ? 'same form; answer may not change'
+        : typeInfo.hint;
+  const taskSub = transformationMode ? targetTypeInfo.sub : reverseDrill ? '辞書形' : typeInfo.sub;
   const taskOverride = reverseDrill
     ? `Reverse drill: identify the dictionary form from ${typeInfo.label} (${sourceForm})`
     : noChangePrompt
@@ -485,6 +535,62 @@ export default function StudyView() {
           practicePrefs.answerMode === 'guided' ? coachRevealed : 0,
         )
       : [];
+
+  function transformationStatsAfter(correct) {
+    if (!transformationAttempt) return state.transformation;
+    return gradeTransformationStats(state.transformation, {
+      ...transformationAttempt,
+      correct,
+    });
+  }
+
+  function resetActiveAttempt() {
+    if (autoAdvanceRef.current) {
+      clearTimeout(autoAdvanceRef.current);
+      autoAdvanceRef.current = null;
+    }
+    setAnswer('');
+    setPhase('answering');
+    setChatOpen(false);
+    setCoachRevealed(0);
+    setGreenRevealed(0);
+    setRevealedMiss(false);
+    setReviewChoiceLabel('');
+    setSelfCheckOpen(false);
+    setTypoGuard(null);
+    setStepHint('');
+    setHintMasked(false);
+    setHintRevealed(false);
+    setCoachChatOpen(false);
+    hadKanaMistakeRef.current = false;
+    wrongSnapshotRef.current = null;
+    setWasCorrected(false);
+    setWasCorrect(false);
+    setCurrent(null);
+  }
+
+  function switchStudyMode(mode) {
+    const nextPrefs = { ...practicePrefs, drillMode: mode };
+    if (mode === 'transformation' && (nextPrefs.promptForm || 'dictionary') === 'dictionary') {
+      nextPrefs.promptForm = 'random';
+    }
+    if (mode !== 'transformation' && activeDrillMode === 'transformation') {
+      nextPrefs.promptForm = 'dictionary';
+    }
+    setPracticePrefs(nextPrefs);
+    resetActiveAttempt();
+  }
+
+  function switchTransformationDirection(direction) {
+    const nextPrefs = {
+      ...practicePrefs,
+      drillMode: 'transformation',
+      drillDirection: direction,
+    };
+    if ((nextPrefs.promptForm || 'dictionary') === 'dictionary') nextPrefs.promptForm = 'random';
+    setPracticePrefs(nextPrefs);
+    resetActiveAttempt();
+  }
 
   async function generateAIClue() {
     if (!current || !geminiKey) return;
@@ -648,6 +754,7 @@ export default function StudyView() {
           reverseDrill ? current.type : promptType,
           reverseDrill ? raw.trim() : normalized,
           expected,
+          transformationAttempt || undefined,
         );
     const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
@@ -663,6 +770,7 @@ export default function StudyView() {
         drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
+      ...(transformationAttempt ? { transformation: transformationStatsAfter(ok) } : {}),
       session: {
         ...bumpSessionMistakePattern(
           {
@@ -788,6 +896,7 @@ export default function StudyView() {
           reverseDrill ? current.type : promptType,
           `self-check: ${label}`,
           expected,
+          transformationAttempt || undefined,
         );
     const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
@@ -803,6 +912,7 @@ export default function StudyView() {
         drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
+      ...(transformationAttempt ? { transformation: transformationStatsAfter(ok) } : {}),
       session: {
         ...bumpSessionMistakePattern(
           {
@@ -890,6 +1000,7 @@ export default function StudyView() {
       reverseDrill ? current.type : promptType,
       '(revealed)',
       expected,
+      transformationAttempt || undefined,
     );
     const mistakeDiagnosis = nextMistakes[0]?.diagnosis || null;
     const nextState = {
@@ -904,6 +1015,7 @@ export default function StudyView() {
         drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
+      ...(transformationAttempt ? { transformation: transformationStatsAfter(false) } : {}),
       session: {
         ...bumpSessionMistakePattern(
           {
@@ -1124,6 +1236,65 @@ export default function StudyView() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          role="group"
+          aria-label="Study mode"
+          className="grid grid-cols-3 gap-1 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-1"
+        >
+          {STUDY_MODE_OPTIONS.map((mode) => {
+            const active = activeDrillMode === mode.id;
+            return (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => switchStudyMode(mode.id)}
+                aria-pressed={active}
+                className={`min-h-10 rounded-lg px-2 py-2 text-xs sm:text-sm font-medium leading-tight transition ${
+                  active
+                    ? 'bg-stone-800 text-white dark:bg-indigo-600'
+                    : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                }`}
+              >
+                {mode.label}
+              </button>
+            );
+          })}
+        </div>
+        {transformationMode && (
+          <div className="flex flex-col gap-2 sm:items-end">
+            <div className="text-xs text-stone-500 dark:text-stone-400 tabular-nums">
+              {transformationStats.correct || 0}/{transformationStats.attempted || 0} transformation
+              {transformationStats.attempted ? ` · ${transformationAccuracy}%` : ''}
+            </div>
+            <div
+              role="group"
+              aria-label="Transformation direction"
+              className="grid grid-cols-3 gap-1 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-1"
+            >
+              {TRANSFORMATION_DIRECTIONS.map((direction) => {
+                const active =
+                  (practicePrefs.drillDirection || DEFAULT_PREFS.drillDirection) === direction.id;
+                return (
+                  <button
+                    key={direction.id}
+                    type="button"
+                    onClick={() => switchTransformationDirection(direction.id)}
+                    aria-pressed={active}
+                    className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                      active
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                    }`}
+                  >
+                    {direction.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
         <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">
           <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
@@ -1303,10 +1474,15 @@ export default function StudyView() {
             {phase === 'answering' ? (
               <>
                 <div className="flex justify-center mb-3">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
+                  <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
                     <span className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
                       {taskLabel}
                     </span>
+                    {transformationMode && (
+                      <span className="text-xs text-indigo-500 dark:text-indigo-400 font-medium">
+                        {sourceTypeInfo.label} -&gt; {targetTypeInfo.label}
+                      </span>
+                    )}
                     {taskSub && (
                       <span
                         className="text-sm text-indigo-500 dark:text-indigo-400 font-medium"

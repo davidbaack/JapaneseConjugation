@@ -12,6 +12,8 @@ import { promptDisplay, formDisplay } from '../utils/display.js';
 import { playPronunciation } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
+const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form' };
+
 export default function MistakesView() {
   const { state, setState, setTab, practicePrefs, activeGeminiKey } = useApp();
   const mistakes = useMemo(() => state.mistakes || [], [state.mistakes]);
@@ -48,6 +50,16 @@ export default function MistakesView() {
     );
   }
 
+  function targetInfoForMistake(m) {
+    return m?.targetType === 'dictionary' ? DICTIONARY_TYPE_INFO : getTypeInfo(m.type);
+  }
+
+  function expectedForMistake(m, item) {
+    if (!m || !item) return '';
+    if (m.targetType === 'dictionary') return m.expected || item.reading;
+    return conjugateItem(item, m.type) || m.expected;
+  }
+
   function retest(m) {
     setActiveKey(m.key);
     setAnswer('');
@@ -58,7 +70,7 @@ export default function MistakesView() {
   function submit() {
     if (!active || !answer.trim()) return;
     const item = itemFromMistake(active);
-    const expected = conjugateItem(item, active.type) || active.expected;
+    const expected = expectedForMistake(active, item);
     const ok = toHiragana(answer) === expected;
     setResult({ ok, expected, item });
     if (ok) {
@@ -71,16 +83,17 @@ export default function MistakesView() {
   }
 
   const activeItem = active ? itemFromMistake(active) : null;
-  const activeExpected = activeItem
-    ? conjugateItem(activeItem, active.type) || active.expected
-    : '';
+  const activeExpected = activeItem ? expectedForMistake(active, activeItem) : '';
   const activePromptView = activeItem
     ? promptDisplay(activeItem, active.promptType, practicePrefs)
     : null;
   const activeExpectedView = activeExpected
-    ? formDisplay(activeExpected, practicePrefs, activeItem, active.type)
+    ? active?.targetType === 'dictionary'
+      ? promptDisplay(activeItem, null, practicePrefs)
+      : formDisplay(activeExpected, practicePrefs, activeItem, active.type)
     : null;
   const activeDiagnosis = diagnosisForMistake(active);
+  const activeTargetInfo = targetInfoForMistake(active);
 
   return (
     <div className="grid lg:grid-cols-[320px_1fr] gap-4 text-left">
@@ -153,8 +166,9 @@ export default function MistakesView() {
                   </span>
                 </div>
                 <div className="text-xs text-stone-500">
-                  {getTypeInfo(m.type).label}
+                  {targetInfoForMistake(m).label}
                   {m.promptType ? ` from ${promptFormLabel(itemFromMistake(m), m.promptType)}` : ''}
+                  {m.dimension === 'transformation' ? ' · transformation' : ''}
                 </div>
                 {diagnosisForMistake(m) && (
                   <div className="mt-1 inline-flex max-w-full rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-300">
@@ -196,7 +210,7 @@ export default function MistakesView() {
                 )}
                 <div className="text-sm text-stone-500 italic mt-2">{active.meaning}</div>
                 <div className="text-xs text-stone-400 mt-1">
-                  Answer with {getTypeInfo(active.type).label}
+                  Answer with {activeTargetInfo.label}
                 </div>
                 {activeDiagnosis && (
                   <div className="mt-3 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/10 px-3 py-2">

@@ -302,6 +302,86 @@ function maxNum(a, b) {
   return Math.max(Number(a) || 0, Number(b) || 0);
 }
 
+export function emptyTransformationStats() {
+  return {
+    attempted: 0,
+    correct: 0,
+    lastAt: null,
+    bySource: {},
+    byTarget: {},
+    byPair: {},
+    byDirection: {},
+  };
+}
+
+function mergeProgressBucket(local = {}, cloud = {}) {
+  local = local || {};
+  cloud = cloud || {};
+  return {
+    attempted: maxNum(local.attempted, cloud.attempted),
+    correct: maxNum(local.correct, cloud.correct),
+    lastAt: maxNum(local.lastAt, cloud.lastAt) || null,
+  };
+}
+
+function mergeProgressMap(local = {}, cloud = {}) {
+  const merged = {};
+  for (const key of new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})])) {
+    merged[key] = mergeProgressBucket(local?.[key], cloud?.[key]);
+  }
+  return merged;
+}
+
+export function mergeTransformationStats(local = {}, cloud = {}) {
+  const bySource = mergeProgressMap(local?.bySource, cloud?.bySource);
+  const byTarget = mergeProgressMap(local?.byTarget, cloud?.byTarget);
+  const byPair = mergeProgressMap(local?.byPair, cloud?.byPair);
+  const byDirection = mergeProgressMap(local?.byDirection, cloud?.byDirection);
+  const pairTotals = Object.values(byPair).reduce(
+    (sum, bucket) => ({
+      attempted: sum.attempted + (bucket.attempted || 0),
+      correct: sum.correct + (bucket.correct || 0),
+    }),
+    { attempted: 0, correct: 0 },
+  );
+  const top = mergeProgressBucket(local, cloud);
+  return {
+    ...emptyTransformationStats(),
+    ...top,
+    attempted: pairTotals.attempted || top.attempted,
+    correct: pairTotals.attempted ? pairTotals.correct : top.correct,
+    bySource,
+    byTarget,
+    byPair,
+    byDirection,
+  };
+}
+
+export function gradeTransformationStats(stats = null, attempt = {}) {
+  const base = { ...emptyTransformationStats(), ...(stats || {}) };
+  const ok = !!attempt.correct;
+  const sourceType = attempt.sourceType || 'dictionary';
+  const targetType = attempt.targetType || 'dictionary';
+  const direction = attempt.direction || 'forward';
+  const now = Date.now();
+  const bump = (bucket = {}) => ({
+    attempted: (bucket.attempted || 0) + 1,
+    correct: (bucket.correct || 0) + (ok ? 1 : 0),
+    lastAt: now,
+  });
+  const pairKey = `${sourceType}->${targetType}`;
+  return {
+    ...base,
+    attempted: (base.attempted || 0) + 1,
+    correct: (base.correct || 0) + (ok ? 1 : 0),
+    lastAt: now,
+    bySource: { ...(base.bySource || {}), [sourceType]: bump(base.bySource?.[sourceType]) },
+    byTarget: { ...(base.byTarget || {}), [targetType]: bump(base.byTarget?.[targetType]) },
+    byPair: { ...(base.byPair || {}), [pairKey]: bump(base.byPair?.[pairKey]) },
+    byDirection: { ...(base.byDirection || {}), [direction]: bump(base.byDirection?.[direction]) },
+  };
+}
+
 // Merge two full SRS state blobs from different devices. Card-level merging
 // ensures that progress graded on device A and device B are both preserved
 // rather than one silently winning the conflict.
@@ -373,6 +453,7 @@ export function mergeCloudState(local, cloud) {
       lastAt: maxNum(local.mock?.lastAt, cloud.mock?.lastAt) || null,
       bySkill: { ...(cloud.mock?.bySkill || {}), ...(local.mock?.bySkill || {}) },
     },
+    transformation: mergeTransformationStats(local.transformation, cloud.transformation),
   };
 }
 
@@ -431,6 +512,7 @@ export function defaultState() {
     },
     reader: { sessions: 0, chars: 0, encounters: 0, wordSeen: {}, lastAt: null },
     production: { attempted: 0, correct: 0, lastScore: 0, lastAt: null },
+    transformation: emptyTransformationStats(),
     reference: normalizeReferenceState(),
     enabledTypes: [
       ...CONJ_TYPES.filter((t) => t.id !== 'plain-present').map((t) => t.id),
@@ -471,6 +553,7 @@ export function mergeState(saved, sessionOverride) {
       wordSeen: (saved && saved.reader && saved.reader.wordSeen) || {},
     },
     production: (saved && saved.production) || base.production,
+    transformation: mergeTransformationStats(base.transformation, saved && saved.transformation),
     reference: normalizeReferenceState(saved && saved.reference ? saved.reference : null),
     daily: (saved && saved.daily) || base.daily,
     classify: (saved && saved.classify) || base.classify,
@@ -533,8 +616,21 @@ export function bumpDaily(daily, correct, dailyGoal) {
   };
 }
 
-export function recordMistake(mistakes, item, type, promptType, userAnswer, expected) {
-  const key = `${item.group}|${item.dict}|${type}|${promptType || 'dictionary'}`;
+export function recordMistake(
+  mistakes,
+  item,
+  type,
+  promptType,
+  userAnswer,
+  expected,
+  options = {},
+) {
+  const dimension = options.dimension || null;
+  const sourceType = options.sourceType || promptType || null;
+  const targetType = options.targetType || type;
+  const key = dimension
+    ? `${item.group}|${item.dict}|${type}|${promptType || 'dictionary'}|${dimension}|${sourceType || 'dictionary'}|${targetType}`
+    : `${item.group}|${item.dict}|${type}|${promptType || 'dictionary'}`;
   const now = Date.now();
   const prior = (mistakes || []).find((m) => m.key === key);
   const mistakeDiagnosis = diagnoseMistake({ item, type, promptType, userAnswer, expected });
@@ -552,6 +648,14 @@ export function recordMistake(mistakes, item, type, promptType, userAnswer, expe
     at: now,
     count: (prior?.count || 0) + 1,
     resolved: false,
+    ...(dimension
+      ? {
+          dimension,
+          sourceType: sourceType || 'dictionary',
+          targetType,
+          direction: options.direction || null,
+        }
+      : {}),
   };
   return [fresh, ...(mistakes || []).filter((m) => m.key !== key)].slice(0, 50);
 }
