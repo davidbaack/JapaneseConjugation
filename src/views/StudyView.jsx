@@ -1809,7 +1809,7 @@ export default function StudyView() {
               subClassName="text-base text-stone-500"
             />
           )}
-          {promptType && !hidePromptText && (
+          {promptType && !hidePromptText && (practicePrefs.showDictionaryForm ?? true) && (
             <div className="text-xs text-stone-400">
               Dictionary: <span lang="ja">{current.verb.dict}</span>
               {current.verb.dict !== current.verb.reading && (
