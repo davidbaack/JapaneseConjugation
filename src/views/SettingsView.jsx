@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { IconVolume, IconRefresh, IconSpark, IconChat, IconCloud } from '../components/Icons.jsx';
+import { IconVolume, IconRefresh, IconCloud } from '../components/Icons.jsx';
 import {
   STARTER_VERBS,
   STARTER_ADJECTIVES,
@@ -10,7 +10,6 @@ import {
   WORD_GROUP_OPTIONS,
 } from '../data/starterWords.js';
 import { ALL_CARD_TYPES, TYPE_PACKS } from '../data/conjugationTypes.js';
-import { AI_FEEDBACK_LEVELS } from '../utils/gemini.js';
 import { normalizePromptFormSetting } from '../utils/conjugator.js';
 import {
   buildPracticePoolSummary,
@@ -47,7 +46,6 @@ export default function SettingsView() {
     session,
     syncStatus,
     syncNow,
-    activeGeminiKey: geminiKey,
     practicePrefs,
     setPracticePrefs,
     speechVoices,
@@ -848,68 +846,6 @@ export default function SettingsView() {
             {activeTypeCount}
           </span>{' '}
           forms selected.
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-        <h3 className="font-medium mb-1 flex items-center gap-2 text-stone-850 dark:text-stone-200">
-          <IconChat className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-          AI Chat (Gemini)
-        </h3>
-        <p className="text-xs text-stone-500 mb-3">
-          Powers AI miss coaching, "Ask Gemini why", and AI verb lookup.
-        </p>
-
-        {geminiKey ? (
-          <div className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-955/20 border border-emerald-250 dark:border-emerald-900 rounded-xl px-3 py-2 mb-3">
-            Active:{' '}
-            {geminiKey === 'proxy'
-              ? 'Gemini API is active via the cloud proxy.'
-              : 'Gemini API is active (configured in environment).'}
-          </div>
-        ) : (
-          <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-955/20 border border-amber-250 dark:border-amber-900 rounded-xl px-3 py-2 mb-3">
-            Gemini is not configured for this build.
-          </div>
-        )}
-
-        <div className="grid sm:grid-cols-2 gap-3 mt-3">
-          <div className="sm:col-span-2">
-            <label className="text-xs text-stone-500 block mb-1">AI feedback</label>
-            <div className="grid grid-cols-2 gap-2">
-              {AI_FEEDBACK_LEVELS.map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, aiFeedbackLevel: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.aiFeedbackLevel || DEFAULT_PREFS.aiFeedbackLevel) === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="sm:col-span-2">
-            <button
-              onClick={() =>
-                setPracticePrefs({
-                  ...practicePrefs,
-                  autoAiExplainErrors: !practicePrefs.autoAiExplainErrors,
-                })
-              }
-              className={`w-full px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center gap-1.5 ${
-                practicePrefs.autoAiExplainErrors
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white dark:bg-stone-955 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-              }`}
-            >
-              <IconSpark className="w-4 h-4" />
-              AI on misses
-            </button>
-          </div>
         </div>
       </div>
 

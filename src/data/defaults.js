@@ -8,7 +8,7 @@ export const DEFAULT_PREFS = {
   autoSpeak: false,
   listeningPrompt: false,
   autoAdvanceCorrect: false,
-  autoAiExplainErrors: false,
+  autoAiExplainErrors: true,
   englishHints: 'show',
   practiceFocus: 'balanced',
   minimalPairSetId: '',
