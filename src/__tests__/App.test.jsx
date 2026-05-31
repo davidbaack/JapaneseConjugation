@@ -39,6 +39,20 @@ describe('App shell', () => {
     await waitFor(() => expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy(), {
       timeout: 5000,
     });
+    expect(screen.getByRole('button', { name: 'Start daily drill' })).toBeTruthy();
+  });
+
+  it('starts the Today launcher with a 10-card drill limit', async () => {
+    render(<App />);
+    const launcher = await screen.findByRole(
+      'button',
+      { name: 'Start daily drill' },
+      { timeout: 5000 },
+    );
+
+    fireEvent.click(launcher);
+
+    await waitFor(() => expect(screen.getByText(/0\/10 drill/i)).toBeTruthy());
   });
 
   it('starts Transform mode from the Study screen with a source-to-target route', async () => {

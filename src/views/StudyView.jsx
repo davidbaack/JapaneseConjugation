@@ -65,6 +65,11 @@ import {
   minimalPairSetMatchesCard,
   recordMinimalPairResult,
 } from '../utils/minimalPairs.js';
+import {
+  buildTodayDrillPlan,
+  practicePrefsForTodayDrill,
+  upsertTodayDrillList,
+} from '../utils/todayDrill.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
@@ -87,6 +92,19 @@ const TRANSFORMATION_DIRECTIONS = [
   { id: 'reverse', label: 'Un-conjugate' },
   { id: 'mixed', label: 'Mixed' },
 ];
+const TEMP_REVIEW_LIMIT_SOURCES = new Set(['today', 'repair']);
+
+function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
+  const source = prefs.reviewLimitSource || '';
+  if (source && !TEMP_REVIEW_LIMIT_SOURCES.has(source)) return 0;
+  const limit = Number(prefs.reviewLimit || 0);
+  return Number.isFinite(limit) && limit > 0 ? limit : 0;
+}
+
+function clearTemporaryReviewLimitPrefs(prefs = DEFAULT_PREFS) {
+  if (!TEMP_REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return prefs;
+  return { ...prefs, reviewLimit: 0, reviewLimitSource: '' };
+}
 
 function transformationRouteText(sourceInfo, targetInfo) {
   return `${sourceInfo.label} -> ${targetInfo.label}`;
@@ -222,6 +240,7 @@ export default function StudyView() {
   const [launchContext, setLaunchContext] = useState(() =>
     focus?.returnTo === 'reference' ? focus : null,
   );
+  const [todayMinimalPairSetIds, setTodayMinimalPairSetIds] = useState([]);
   const inputRef = useRef(null);
   const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
@@ -287,7 +306,20 @@ export default function StudyView() {
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
     [state.session?.mistakePatterns],
   );
+  const todayPlan = useMemo(
+    () => buildTodayDrillPlan(state, verbs, practicePrefs, wordLists),
+    [state, verbs, practicePrefs, wordLists],
+  );
   const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
+  const todayMinimalPairSet = useMemo(() => {
+    if (activeMinimalPairSet || !current) return null;
+    return (
+      todayMinimalPairSetIds
+        .map((setId) => getMinimalPairSet(setId))
+        .find((set) => minimalPairSetMatchesCard(set, current.verb, current.type)) || null
+    );
+  }, [activeMinimalPairSet, current, todayMinimalPairSetIds]);
+  const minimalPairSetForCurrent = activeMinimalPairSet || todayMinimalPairSet;
 
   useEffect(() => {
     // When arriving from Check's "Practice this verb", seed that exact word/form
@@ -465,7 +497,7 @@ export default function StudyView() {
     setReviewBase(state.session.reviewed || 0);
     // state.session.reviewed intentionally omitted — only reset baseline when limit setting changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [practicePrefs.reviewLimit]);
+  }, [practicePrefs.reviewLimit, practicePrefs.reviewLimitSource]);
 
   useEffect(() => {
     return () => {
@@ -495,17 +527,20 @@ export default function StudyView() {
 
   if (!current) {
     return (
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
-        <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
-        <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
-          Enable conjugation types in Settings.
-        </p>
-        <button
-          onClick={() => setTab('settings')}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
-        >
-          Go to Settings
-        </button>
+      <div className="space-y-4">
+        {renderTodayLauncher()}
+        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
+          <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
+          <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
+            Enable conjugation types in Settings.
+          </p>
+          <button
+            onClick={() => setTab('settings')}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+          >
+            Go to Settings
+          </button>
+        </div>
       </div>
     );
   }
@@ -604,10 +639,11 @@ export default function StudyView() {
     : noChangePrompt
       ? `Trick no-change drill: the prompt is already ${typeInfo.label}, so the correct answer is the same form.`
       : '';
-  const minimalPairFeedback = activeMinimalPairSet
-    ? minimalPairFeedbackForCard(activeMinimalPairSet, current.verb, current.type)
+  const minimalPairFeedback = minimalPairSetForCurrent
+    ? minimalPairFeedbackForCard(minimalPairSetForCurrent, current.verb, current.type)
     : null;
-  const reviewLimit = Number(practicePrefs.reviewLimit || 0);
+  const reviewLimit = activeReviewLimitFromPrefs(practicePrefs);
+  const reviewLimitSource = practicePrefs.reviewLimitSource || '';
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const sessionSkipped = state.session?.skipped || 0;
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
@@ -673,7 +709,7 @@ export default function StudyView() {
   function nextMinimalPairProgress(correct) {
     return recordMinimalPairResult(
       state.minimalPairs,
-      activeMinimalPairSet?.id,
+      minimalPairSetForCurrent?.id,
       current?.verb,
       current?.type,
       correct,
@@ -683,7 +719,7 @@ export default function StudyView() {
   function mistakeRecordOptions() {
     return {
       ...(transformationAttempt || {}),
-      ...(activeMinimalPairSet?.id ? { minimalPairSetId: activeMinimalPairSet.id } : {}),
+      ...(minimalPairSetForCurrent?.id ? { minimalPairSetId: minimalPairSetForCurrent.id } : {}),
     };
   }
 
@@ -713,11 +749,11 @@ export default function StudyView() {
   }
 
   function switchStudyMode(mode) {
-    const nextPrefs = {
+    const nextPrefs = clearTemporaryReviewLimitPrefs({
       ...practicePrefs,
       drillMode: mode,
       minimalPairSetId: mode === 'word' ? practicePrefs.minimalPairSetId || '' : '',
-    };
+    });
     if (mode === 'transformation' && (nextPrefs.promptForm || 'dictionary') === 'dictionary') {
       nextPrefs.promptForm = 'random';
     }
@@ -725,19 +761,88 @@ export default function StudyView() {
       nextPrefs.promptForm = 'dictionary';
     }
     setPracticePrefs(nextPrefs);
+    setTodayMinimalPairSetIds([]);
     resetActiveAttempt();
   }
 
   function switchTransformationDirection(direction) {
-    const nextPrefs = {
+    const nextPrefs = clearTemporaryReviewLimitPrefs({
       ...practicePrefs,
       drillMode: 'transformation',
       drillDirection: direction,
       minimalPairSetId: '',
-    };
+    });
     if ((nextPrefs.promptForm || 'dictionary') === 'dictionary') nextPrefs.promptForm = 'random';
     setPracticePrefs(nextPrefs);
+    setTodayMinimalPairSetIds([]);
     resetActiveAttempt();
+  }
+
+  function launchTodayDrill() {
+    if (!todayPlan.available) return;
+    if (setWordLists) setWordLists(upsertTodayDrillList(wordLists, todayPlan));
+    if (setState) {
+      setState((prev) => ({
+        ...prev,
+        enabledTypes: todayPlan.typeIds,
+        session: { ...(prev.session || {}), mistakePatterns: {} },
+      }));
+    }
+    if (setPracticePrefs) {
+      setPracticePrefs(practicePrefsForTodayDrill(practicePrefs, todayPlan));
+    }
+    initialDueRuleIds.current = new Set(todayPlan.dueRuleIds);
+    setCompletedDueIds(new Set());
+    setBonusMode(false);
+    setTodayMinimalPairSetIds(todayPlan.minimalPairSetIds);
+    setFocusWordLock(null);
+    setLaunchContext(null);
+    setReviewBase(state.session?.reviewed || 0);
+    restartTimer();
+    resetActiveAttempt();
+    setTab('study');
+  }
+
+  function renderTodayLauncher() {
+    const chips = [
+      ...(todayPlan.sourceLabels.length ? todayPlan.sourceLabels : ['Core forms']),
+      `${todayPlan.reviewLimit} cards`,
+    ];
+    return (
+      <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-white dark:bg-stone-900 px-4 py-3 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 text-left">
+            <div className="text-xs uppercase tracking-wider text-emerald-700 dark:text-emerald-300 font-semibold">
+              Today
+            </div>
+            <div className="mt-1 text-sm font-semibold text-stone-900 dark:text-stone-100">
+              {todayPlan.title}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {chips.map((chip) => (
+                <span
+                  key={chip}
+                  className="rounded-md border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-2 py-1 text-[11px] text-stone-600 dark:text-stone-300"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+            <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+              {todayPlan.summary}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={launchTodayDrill}
+            disabled={!todayPlan.available}
+            className="min-h-10 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600 dark:disabled:bg-stone-800 dark:disabled:text-stone-400"
+          >
+            Start daily drill
+          </button>
+        </div>
+      </div>
+    );
   }
 
   async function generateAIClue() {
@@ -825,6 +930,7 @@ export default function StudyView() {
       setPracticePrefs({ ...repairPrefsForPlan(practicePrefs, plan), minimalPairSetId: '' });
     }
     setReviewBase(state.session?.reviewed || 0);
+    setTodayMinimalPairSetIds([]);
     restartTimer();
     setChatOpen(false);
     setAnswer('');
@@ -1278,7 +1384,11 @@ export default function StudyView() {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
-          {reviewSetComplete ? 'Review set complete' : 'Timed drill complete'}
+          {reviewSetComplete
+            ? reviewLimitSource === 'repair'
+              ? 'Repair drill complete'
+              : 'Drill complete'
+            : 'Timed drill complete'}
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
           {state.session.correct}/{state.session.reviewed}
@@ -1292,7 +1402,7 @@ export default function StudyView() {
         </div>
         {reviewLimit > 0 && (
           <div className="text-xs text-stone-400 mb-5">
-            {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this set
+            {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this drill
           </div>
         )}
         {sessionMistakePatterns.length > 0 ? (
@@ -1346,7 +1456,7 @@ export default function StudyView() {
           }}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium"
         >
-          {reviewSetComplete ? 'Start another set' : 'Restart timed drill'}
+          {reviewSetComplete ? 'Start another drill' : 'Restart timed drill'}
         </button>
       </div>
     );
@@ -1423,6 +1533,7 @@ export default function StudyView() {
           </button>
         </div>
       )}
+      {renderTodayLauncher()}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div
           role="group"
@@ -1501,7 +1612,8 @@ export default function StudyView() {
                 )}
                 {reviewLimit > 0 && (
                   <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-                    {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} set
+                    {Math.min(reviewsDone, reviewLimit)}/{reviewLimit}{' '}
+                    {reviewLimitSource === 'repair' ? 'repair' : 'drill'}
                   </div>
                 )}
                 {initialDue > 0 && !bonusMode && (
@@ -1722,27 +1834,31 @@ export default function StudyView() {
                     {transformationMode ? transformationRoute : taskLabel}
                   </div>
                 </div>
-                {activeMinimalPairSet && (
+                {minimalPairSetForCurrent && (
                   <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-250">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold uppercase tracking-wider">Minimal pair</span>
-                      <span>{activeMinimalPairSet.label}</span>
+                      <span className="font-semibold uppercase tracking-wider">
+                        {activeMinimalPairSet ? 'Minimal pair' : 'Today contrast'}
+                      </span>
+                      <span>{minimalPairSetForCurrent.label}</span>
                       {reviewsDone > 0 && (
                         <span className="tabular-nums opacity-70">{reviewsDone} this session</span>
                       )}
                     </div>
-                    <button
-                      onClick={() => {
-                        if (setPracticePrefs)
-                          setPracticePrefs(clearMinimalPairPrefs(practicePrefs));
-                        if (setState) setState((prev) => ({ ...prev, enabledTypes: [] }));
-                      }}
-                      className="ml-1 font-bold leading-none hover:text-emerald-950 dark:hover:text-emerald-100 transition"
-                      aria-label="End minimal pair drill"
-                      title="End drill"
-                    >
-                      ×
-                    </button>
+                    {activeMinimalPairSet && (
+                      <button
+                        onClick={() => {
+                          if (setPracticePrefs)
+                            setPracticePrefs(clearMinimalPairPrefs(practicePrefs));
+                          if (setState) setState((prev) => ({ ...prev, enabledTypes: [] }));
+                        }}
+                        className="ml-1 font-bold leading-none hover:text-emerald-950 dark:hover:text-emerald-100 transition"
+                        aria-label="End minimal pair drill"
+                        title="End drill"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 )}
                 {typoGuard && (

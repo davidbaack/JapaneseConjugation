@@ -479,6 +479,7 @@ export function repairPrefsForPlan(practicePrefs = {}, plan) {
     promptForm: 'dictionary',
     durationSec: 0,
     reviewLimit: plan?.reviewLimit || 10,
+    reviewLimitSource: 'repair',
     wordListIds: plan?.wordKeys?.length ? [plan.listId] : [],
   };
 }

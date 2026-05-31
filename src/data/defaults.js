@@ -25,6 +25,7 @@ export const DEFAULT_PREFS = {
   promptForm: 'dictionary',
   durationSec: 0,
   reviewLimit: 0,
+  reviewLimitSource: '',
   jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
   genkiLessons: [],
   minnaLessons: [],

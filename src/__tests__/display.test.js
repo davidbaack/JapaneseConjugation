@@ -10,6 +10,7 @@ import {
   thirdPerson,
   resolveDisplayScripts,
   answerPhaseTaskDetails,
+  mergePracticePrefs,
 } from '../utils/display.js';
 import { filterWordsForPrefs } from '../utils/conjugator.js';
 
@@ -311,5 +312,14 @@ describe('filterWordsForPrefs', () => {
     });
     expect(result.length).toBe(1);
     expect(result[0].group).toBe('ichidan');
+  });
+});
+
+describe('mergePracticePrefs', () => {
+  it('preserves Today drill review limits', () => {
+    expect(mergePracticePrefs({ reviewLimit: 10, reviewLimitSource: 'today' })).toMatchObject({
+      reviewLimit: 10,
+      reviewLimitSource: 'today',
+    });
   });
 });
