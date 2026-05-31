@@ -19,8 +19,8 @@ import { callGemini, aiSystemFromPrefs } from '../utils/gemini.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
 export const CLASSIFY_OPTIONS = [
-  { id: 'ichidan', label: 'る-verb', hint: 'Drop る and attach endings directly.' },
-  { id: 'godan', label: 'う-verb', hint: 'The final kana shifts across あ/い/え/お rows.' },
+  { id: 'ichidan', label: 'ichidan', hint: 'Drop る and attach endings directly.' },
+  { id: 'godan', label: 'godan', hint: 'The final kana shifts across あ/い/え/お rows.' },
   { id: 'suru', label: 'する', hint: 'Irregular する pattern.' },
   { id: 'kuru', label: '来る', hint: 'Irregular 来る pattern.' },
   {

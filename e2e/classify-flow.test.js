@@ -11,12 +11,12 @@ test.describe('Classification drill', () => {
     await expect(page.getByText('Classification drill')).toBeVisible();
 
     // At least the godan/ichidan choices are always present for a verb deck.
-    const ruVerb = page.getByRole('button', { name: 'る-verb', exact: true });
-    const uVerb = page.getByRole('button', { name: 'う-verb', exact: true });
-    await expect(ruVerb.or(uVerb).first()).toBeVisible();
+    const ichidan = page.getByRole('button', { name: 'ichidan', exact: true });
+    const godan = page.getByRole('button', { name: 'godan', exact: true });
+    await expect(ichidan.or(godan).first()).toBeVisible();
 
     // Pick one — exactly one verdict appears regardless of correctness.
-    await ruVerb.or(uVerb).first().click();
+    await ichidan.or(godan).first().click();
     await expect(page.getByText(/Correct\.|Not quite\./).first()).toBeVisible();
 
     // The "It is <group>." explanation is part of the verdict block.
@@ -27,6 +27,6 @@ test.describe('Classification drill', () => {
 
     // Back to an interactive choice (verdict cleared).
     await expect(page.getByText(/Correct\.|Not quite\./)).toHaveCount(0);
-    await expect(ruVerb.or(uVerb).first()).toBeEnabled();
+    await expect(ichidan.or(godan).first()).toBeEnabled();
   });
 });
