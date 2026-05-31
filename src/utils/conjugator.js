@@ -178,6 +178,7 @@ export function resolveDisplayScripts(prefs = DEFAULT_PREFS) {
 export function normalizePromptFormSetting(promptForm) {
   if (promptForm === 'random' || promptForm === 'mixed') return 'random';
   if (promptForm === 'polite-present' || promptForm === 'masu') return 'polite-present';
+  if (promptForm === 'dict-masu') return 'dict-masu';
   return 'dictionary';
 }
 
@@ -192,6 +193,16 @@ export function pickPromptType(item, targetType, prefs = DEFAULT_PREFS) {
         `${item.dict}|${targetType}|${allowTrick ? 'trick' : 'normal'}|${JSON.stringify(resolveDisplayScripts(prefs))}`,
       ) % types.length
     ].id;
+  if (source === 'dict-masu') {
+    const candidates = [null];
+    if (isTypeCompatible(item, 'polite-present') && (allowTrick || 'polite-present' !== targetType))
+      candidates.push('polite-present');
+    if (candidates.length === 1) return null;
+    return candidates[
+      hashString(`dm|${item.dict}|${targetType}|${allowTrick ? 'trick' : 'normal'}`) %
+        candidates.length
+    ];
+  }
   if (isTypeCompatible(item, source) && (allowTrick || source !== targetType)) return source;
   return null;
 }

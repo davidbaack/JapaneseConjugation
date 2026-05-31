@@ -39,6 +39,7 @@ function jaccardSim(a, b) {
 const PROMPT_FORM_OPTIONS = [
   { id: 'dictionary', label: 'Dictionary' },
   { id: 'polite-present', label: 'Masu' },
+  { id: 'dict-masu', label: 'Dict + Masu' },
   { id: 'random', label: 'Mixed' },
 ];
 
@@ -325,7 +326,7 @@ export default function SettingsView() {
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-stone-500 block mb-1">Prompt form</label>
-            <div role="group" aria-label="Prompt form" className="grid grid-cols-3 gap-2">
+            <div role="group" aria-label="Prompt form" className="grid grid-cols-2 gap-2">
               {PROMPT_FORM_OPTIONS.map((o) => (
                 <button
                   key={o.id}
@@ -349,7 +350,8 @@ export default function SettingsView() {
             <div className="mt-2">
               <p className="text-[11px] text-stone-400">
                 Choose the starting form for Transform. Masu uses the polite present when
-                compatible; Mixed rotates compatible source forms.
+                compatible; Dict + Masu alternates between the two; Mixed rotates all compatible
+                source forms.
               </p>
             </div>
           </div>
