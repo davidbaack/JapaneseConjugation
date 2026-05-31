@@ -12,7 +12,7 @@ Japanese verb and adjective conjugation practice with spaced repetition, referen
 - **SRS Levels** — visual breakdown of card maturity across your whole vocabulary
 - **Stats** — session history, daily goal streak, and performance charts
 - **Library** — browse built-in words or add custom verbs and adjectives; organize into named word lists
-- **AI Coaching** — Gemini-powered explanations, conjugation breakdowns, and sentence context (sign in to unlock)
+- **AI Coaching** — Gemini-powered explanations, conjugation breakdowns, and sentence context through the cloud proxy
 - **Speech Synthesis** — hear any conjugated form read aloud using the browser's Web Speech API
 - **Flexible Input** — type romaji (auto-converts to hiragana), kana directly, or use the on-screen kana pad
 - **Answer Modes** — free input, guided kana, multiple choice, or self-check
@@ -50,9 +50,11 @@ npm run dev          # dev server at http://localhost:5173
 
 ## AI coaching
 
-AI coaching is powered by Gemini and enabled automatically when you sign in — no API key setup required. Sign in via **Settings → Cloud Sync** to unlock AI miss coaching, conjugation breakdowns, and sentence context explanations.
+AI coaching is powered by Gemini through the Supabase `gemini-proxy` Edge Function. In the hosted app, AI coaching is available by default without user sign-in; signing in is only needed for cloud sync.
 
-To self-host with your own Gemini key, set `VITE_GEMINI_API_KEY` in your environment before building.
+To self-host, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, add `GEMINI_API_KEY` as a Supabase project secret, and deploy `supabase/functions/gemini-proxy` with `verify_jwt = false` from `supabase/config.toml`. Set `ALLOWED_ORIGIN` to your app origin in production.
+
+For local-only development without the proxy, set `VITE_GEMINI_API_KEY` before building. Direct browser key usage is restricted to localhost.
 
 ## Cloud sync
 

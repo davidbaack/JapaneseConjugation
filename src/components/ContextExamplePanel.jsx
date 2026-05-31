@@ -82,7 +82,7 @@ export function ContextExamplePanel({ item, type, geminiKey, practicePrefs = DEF
         </button>
         {!geminiKey && (
           <div className="text-xs text-indigo-900/60 dark:text-indigo-300/60 self-center">
-            Add a Gemini key for natural examples.
+            Gemini is not configured for natural examples.
           </div>
         )}
       </div>

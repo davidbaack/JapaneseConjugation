@@ -59,7 +59,7 @@ export function ConjugationBreakdown({
     }
 
     if (!geminiKey) {
-      setErr('Please configure a Gemini API key in Settings to use AI explanations.');
+      setErr('Gemini is not configured for this build.');
       return;
     }
 

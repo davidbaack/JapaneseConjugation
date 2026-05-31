@@ -365,7 +365,7 @@ export default function CustomDictionaryViewSub({
             ) : (
               <div className="space-y-3">
                 <p className="text-xs text-amber-705 bg-amber-50 dark:bg-amber-955/20 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
-                  Add a Gemini API key in Settings for AI lookup and suggestions.
+                  Gemini is not configured for AI lookup and suggestions.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>

@@ -115,46 +115,76 @@ function httpError(message, status) {
   return Object.assign(new Error(message || `HTTP ${status}`), { status });
 }
 
-async function executeGeminiRequestOnce(payload, apiKey) {
-  // 1. Try secure Cloud Proxy via Supabase Edge Function if user is logged in
-  if (supabase) {
+async function readJsonResponse(response) {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+}
+
+async function getSupabaseAccessToken() {
+  if (!supabase?.auth?.getSession) return '';
+  try {
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    if (session) {
-      const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL || '';
-      const r = await fetchWithTimeout(`${supabaseUrl}/functions/v1/gemini-proxy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      const d = await r.json();
-      if (!r.ok) throw httpError(d.error, r.status);
-      return d;
-    }
+    return session?.access_token || '';
+  } catch {
+    return '';
+  }
+}
+
+async function executeGeminiProxyRequest(payload) {
+  const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL || '';
+  if (!supabaseUrl) {
+    throw new Error('Gemini proxy is not configured for this build.');
   }
 
-  // 2. Fallback to local environment key (restricted to local development only)
+  const token = await getSupabaseAccessToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const r = await fetchWithTimeout(`${supabaseUrl}/functions/v1/gemini-proxy`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  const d = await readJsonResponse(r);
+  if (!r.ok) throw httpError(d.error, r.status);
+  return d;
+}
+
+async function executeGeminiDirectRequest(payload, apiKey) {
+  const r = await fetchWithTimeout(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  const d = await readJsonResponse(r);
+  if (!r.ok) throw httpError(d.error?.message, r.status);
+  return d;
+}
+
+async function executeGeminiRequestOnce(payload, apiKey) {
+  // Prefer the server-side proxy so the Gemini API key never ships to browsers.
+  // The proxy accepts anonymous learner requests and may include a bearer token
+  // when the user is signed in, but sign-in is not required for AI coaching.
+  if (supabase && apiKey === 'proxy') {
+    return executeGeminiProxyRequest(payload);
+  }
+
+  // Fallback to a local environment key, restricted to local development only.
   const safeApiKey = getLocalApiKey(apiKey);
   if (safeApiKey && safeApiKey !== 'proxy') {
-    const r = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(safeApiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      },
-    );
-    const d = await r.json();
-    if (!r.ok) throw httpError(d.error?.message, r.status);
-    return d;
+    return executeGeminiDirectRequest(payload, safeApiKey);
   }
 
   throw new Error(
-    'Please sign in (Cloud Sync) to use AI features, or configure VITE_GEMINI_API_KEY in local development.',
+    'Gemini is not configured for this build. Configure the cloud proxy or set VITE_GEMINI_API_KEY for local development.',
   );
 }
 

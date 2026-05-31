@@ -2496,7 +2496,7 @@ export default function StudyView() {
                       )
                     ) : (
                       <div className="text-xs text-stone-400 text-center pt-1">
-                        Add a Gemini API key in Settings to enable AI chat.
+                        Gemini is not configured for AI chat.
                       </div>
                     )}
                   </div>

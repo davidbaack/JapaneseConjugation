@@ -873,7 +873,7 @@ export default function ReferenceViewSub({
               </button>
               {!geminiKey && (
                 <div className="mt-1 text-[11px] text-stone-400 text-center">
-                  Add a Gemini key for contextual ranking.
+                  Gemini is not configured for contextual ranking.
                 </div>
               )}
               {lookupAiErr && <div className="mt-2 text-xs text-rose-600">{lookupAiErr}</div>}
@@ -982,7 +982,7 @@ export default function ReferenceViewSub({
               </div>
               {!geminiKey && (
                 <div className="mt-2 text-xs text-stone-500">
-                  Add a Gemini key to verify the real dictionary form, reading, and group.
+                  Gemini is not configured to verify the dictionary form, reading, and group.
                 </div>
               )}
               {scratchAiErr && <div className="mt-2 text-sm text-rose-600">{scratchAiErr}</div>}
@@ -1220,7 +1220,7 @@ export default function ReferenceViewSub({
               )}
               {!geminiKey && (
                 <span className="text-xs text-stone-400">
-                  Add a Gemini key for contextual pair coaching.
+                  Gemini is not configured for contextual pair coaching.
                 </span>
               )}
             </div>
@@ -1301,7 +1301,7 @@ export default function ReferenceViewSub({
             </div>
             {!geminiKey && (
               <div className="mt-2 text-xs text-stone-400">
-                Add a Gemini key for kanji meaning and readings details.
+                Gemini is not configured for kanji meaning and readings details.
               </div>
             )}
             {kanjiErr && <div className="mt-2 text-sm text-rose-600">{kanjiErr}</div>}
@@ -1382,7 +1382,7 @@ export default function ReferenceViewSub({
               reference. For kana-only, use the grid as trace-and-cover.
             </div>
             {!geminiKey && (
-              <div className="mt-2 text-xs text-stone-400">Add a Gemini key in Settings.</div>
+              <div className="mt-2 text-xs text-stone-400">Gemini is not configured.</div>
             )}
             {writingErr && <div className="mt-2 text-sm text-rose-600">{writingErr}</div>}
             {writingText && (
@@ -1464,7 +1464,7 @@ export default function ReferenceViewSub({
             </div>
             {!geminiKey && (
               <div className="mt-2 text-xs text-stone-400">
-                Add a Gemini key in Settings for Tokyo accent coaching.
+                Gemini is not configured for Tokyo accent coaching.
               </div>
             )}
             {accentErr && <div className="mt-2 text-sm text-rose-600">{accentErr}</div>}
@@ -1592,7 +1592,7 @@ export default function ReferenceViewSub({
               </button>
             </div>
             {!geminiKey && (
-              <div className="mt-2 text-xs text-stone-400">Add a Gemini API key in Settings.</div>
+              <div className="mt-2 text-xs text-stone-400">Gemini is not configured.</div>
             )}
             {aiErr && <div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
             {aiText && (

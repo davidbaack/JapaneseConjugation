@@ -278,7 +278,7 @@ export default function ClassificationView() {
               </div>
               {!geminiKey && (
                 <div className="mt-2 text-xs text-stone-400 text-center">
-                  Add a Gemini key in Settings for classification coaching.
+                  Gemini is not configured for classification coaching.
                 </div>
               )}
               {aiErr && <div className="mt-2 text-sm text-rose-600">{aiErr}</div>}

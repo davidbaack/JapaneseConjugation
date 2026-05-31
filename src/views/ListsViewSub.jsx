@@ -635,7 +635,7 @@ export default function ListsViewSub({
           </div>
           {!geminiKey && (
             <div className="mt-2 text-xs text-stone-400">
-              Add a Gemini key in Settings to generate custom drill packs.
+              Gemini is not configured for custom drill packs.
             </div>
           )}
           {aiErr && <div className="mt-2 text-sm text-rose-600">{aiErr}</div>}

@@ -489,7 +489,7 @@ export default function StatsView() {
           </div>
           {!geminiKey && (
             <div className="mt-3 text-xs text-stone-400 text-center">
-              Add a Gemini key in Settings for a personalized 7-day plan.
+              Gemini is not configured for a personalized 7-day plan.
             </div>
           )}
           <div role="status" aria-live="polite">

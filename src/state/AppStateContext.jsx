@@ -39,10 +39,7 @@ function useAppController() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
   const geminiKey = import.meta.env?.VITE_GEMINI_API_KEY || '';
-  const activeGeminiKey = useMemo(
-    () => geminiKey || (session ? 'proxy' : ''),
-    [geminiKey, session],
-  );
+  const activeGeminiKey = useMemo(() => (supabase ? 'proxy' : geminiKey), [geminiKey]);
   const [speechVoices, setSpeechVoices] = useState([]);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const [hydrated, setHydrated] = useState(false);
