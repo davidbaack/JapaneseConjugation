@@ -17,6 +17,7 @@ import {
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import {
   MINIMAL_PAIR_SETS,
+  clearMinimalPairPrefs,
   getMinimalPairSet,
   minimalPairEligibleWords,
   minimalPairStatsSummary,
@@ -224,6 +225,7 @@ export default function StatsView() {
     [minimalPairRecommendations],
   );
   const [showAllPatterns, setShowAllPatterns] = useState(false);
+  const [pendingDrillSetId, setPendingDrillSetId] = useState(null);
   const visiblePatterns = showAllPatterns ? mistakePatterns : mistakePatterns.slice(0, 6);
   const transformation = state.transformation || defaultState().transformation;
   const transformationAccuracy = pct(transformation.correct || 0, transformation.attempted || 0);
@@ -340,18 +342,26 @@ export default function StatsView() {
     }
   }
 
-  function startMinimalPairDrill(setId) {
+  function launchDrill(setId) {
     const set = getMinimalPairSet(setId);
     if (!set) return;
-    if (setState) {
-      setState((prev) => ({ ...prev, enabledTypes: set.typeIds }));
+    if (setState) setState((prev) => ({ ...prev, enabledTypes: set.typeIds }));
+    if (setPracticePrefs) setPracticePrefs(practicePrefsForMinimalPairSet(set, practicePrefs));
+    if (setTab) setTab('study');
+    setPendingDrillSetId(null);
+  }
+
+  function startMinimalPairDrill(setId) {
+    if ((practicePrefs.wordListIds || []).length > 0) {
+      setPendingDrillSetId(setId);
+    } else {
+      launchDrill(setId);
     }
-    if (setPracticePrefs) {
-      setPracticePrefs(practicePrefsForMinimalPairSet(set, practicePrefs));
-    }
-    if (setTab) {
-      setTab('study');
-    }
+  }
+
+  function stopMinimalPairDrill() {
+    if (setPracticePrefs) setPracticePrefs(clearMinimalPairPrefs(practicePrefs));
+    if (setState) setState((prev) => ({ ...prev, enabledTypes: [] }));
   }
 
   async function generatePlan() {
@@ -764,12 +774,44 @@ export default function StatsView() {
               Contrast forms learners commonly confuse, with progress tracked by contrast set.
             </p>
           </div>
-          {minimalPairRecommendations.length > 0 && (
-            <div className="text-[11px] px-2 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/60">
-              Recommended: {minimalPairRecommendations.map((result) => result.set.label).join(', ')}
-            </div>
-          )}
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            {minimalPairRecommendations.length > 0 && (
+              <div className="text-[11px] px-2 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/60">
+                Recommended:{' '}
+                {minimalPairRecommendations.map((result) => result.set.label).join(', ')}
+              </div>
+            )}
+            {practicePrefs.minimalPairSetId && (
+              <button
+                onClick={stopMinimalPairDrill}
+                className="text-xs text-stone-500 hover:text-rose-600 dark:hover:text-rose-400 transition"
+              >
+                Stop drill
+              </button>
+            )}
+          </div>
         </div>
+        {pendingDrillSetId && (
+          <div className="mb-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/15 px-3 py-2.5 text-sm">
+            <p className="text-amber-800 dark:text-amber-200">
+              Starting this drill will clear your active word list. Continue?
+            </p>
+            <div className="flex gap-3 mt-2">
+              <button
+                onClick={() => launchDrill(pendingDrillSetId)}
+                className="text-xs font-medium text-amber-800 dark:text-amber-200 hover:text-amber-950 dark:hover:text-amber-100 transition"
+              >
+                Yes, start drill
+              </button>
+              <button
+                onClick={() => setPendingDrillSetId(null)}
+                className="text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         <div className="grid md:grid-cols-2 gap-2">
           {MINIMAL_PAIR_SETS.map((set) => {
             const eligible = minimalPairEligibleWords(verbs, set);
