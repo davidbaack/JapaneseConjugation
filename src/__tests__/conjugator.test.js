@@ -5,7 +5,11 @@ import {
   conjugateItem,
   isRedundantPracticeType,
 } from '../utils/conjugator.js';
-import { stepCoachHint } from '../utils/conjugatorExplain.js';
+import {
+  getConjugationDebugInfo,
+  inferMistakenConjugationPattern,
+  stepCoachHint,
+} from '../utils/conjugatorExplain.js';
 
 // ─── Test verbs ───────────────────────────────────────────────────────────────
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
@@ -406,6 +410,50 @@ describe('stepCoachHint (offline hint)', () => {
   it('does not mask the unchanged dictionary form of an irregular verb', () => {
     // plain-present of する is する itself — nothing to spoil.
     expect(stepCoachHint(SURU, 'plain-present', '').masked).toBe(false);
+  });
+});
+
+describe('visual conjugation debugger metadata', () => {
+  it('exposes stem, ending, replacement, rule, and result for godan te-form', () => {
+    const debug = getConjugationDebugInfo(KAKU, 'te-form');
+
+    expect(debug.stem).toBe('か');
+    expect(debug.originalEnding).toBe('く');
+    expect(debug.replacement).toBe('いて');
+    expect(debug.result).toBe('かいて');
+    expect(debug.formula.expression).toBe('か + いて = かいて');
+    expect(debug.rule.family).toBe('godan sound change');
+    expect(debug.rule.short).toContain('く -> いて');
+  });
+
+  it('shows common adjective and irregular transformations as structured rules', () => {
+    const adjective = getConjugationDebugInfo(TAKAI, 'adj-plain-past');
+    expect(adjective.stem).toBe('たか');
+    expect(adjective.originalEnding).toBe('い');
+    expect(adjective.replacement).toBe('かった');
+    expect(adjective.rule.family).toBe('i-adjective');
+
+    const irregular = getConjugationDebugInfo(SURU, 'plain-past');
+    expect(irregular.originalEnding).toBe('する');
+    expect(irregular.replacement).toBe('した');
+    expect(irregular.rule.family).toBe('suru irregular');
+  });
+
+  it('infers a likely mistaken godan sound-change pattern', () => {
+    const mistake = inferMistakenConjugationPattern(KAKU, 'te-form', 'かって');
+
+    expect(mistake.kind).toBe('onbin');
+    expect(mistake.userRule).toContain('う/つ/る -> って');
+    expect(mistake.expectedRule).toContain('く -> いて');
+    expect(mistake.expectedResult).toBe('かいて');
+  });
+
+  it('infers when a learner used a different valid target form', () => {
+    const mistake = getConjugationDebugInfo(TABERU, 'plain-past', 'たべない').mistake;
+
+    expect(mistake.kind).toBe('form');
+    expect(mistake.userRule).toContain('Plain Negative');
+    expect(mistake.expectedResult).toBe('たべた');
   });
 });
 

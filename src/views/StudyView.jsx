@@ -1760,6 +1760,7 @@ export default function StudyView() {
                     <ConjugationBreakdown
                       word={current.verb}
                       type={current.type}
+                      userAnswer={revealedMiss ? '' : submittedAnswer}
                       geminiKey={geminiKey}
                       practicePrefs={practicePrefs}
                     />

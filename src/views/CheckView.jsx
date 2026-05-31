@@ -467,6 +467,7 @@ export default function CheckView() {
                     <ConjugationBreakdown
                       word={headForm.word}
                       type={headForm.type}
+                      userAnswer={result.normalized}
                       geminiKey={geminiKey}
                       practicePrefs={practicePrefs}
                     />
@@ -571,6 +572,7 @@ export default function CheckView() {
                     <ConjugationBreakdown
                       word={headForm.word}
                       type={headForm.type}
+                      userAnswer={result.normalized}
                       geminiKey={geminiKey}
                       practicePrefs={practicePrefs}
                     />
