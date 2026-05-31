@@ -1,73 +1,109 @@
-# Katachiya · 動詞と形容詞
+# Katachiya - Japanese Conjugation SRS
 
-Japanese verb and adjective conjugation practice with spaced repetition, reference tables, and AI coaching.
+Katachiya is a React/Vite app for practicing Japanese verb and adjective conjugation. It combines SRS review, transformation drills, lookup/reference tools, timed practice, learner stats, optional Gemini coaching through Supabase, and installable PWA behavior.
 
-## Features
+## Current App Surface
 
-- **SRS Study** — spaced-repetition flash cards covering 30+ conjugation forms for ichidan, godan, suru, kuru verbs and i/na adjectives
-- **Rush Mode** — timed drill with rapid-fire prompts and a live score counter
-- **Classification Drill** — identify verb/adjective groups from dictionary form
-- **Endings Reference** — conjugation pattern tables and a searchable rulebook
-- **Mistakes Tracker** — review and resolve past errors with targeted re-drilling
-- **SRS Levels** — visual breakdown of card maturity across your whole vocabulary
-- **Stats** — session history, daily goal streak, and performance charts
-- **Library** — browse built-in words or add custom verbs and adjectives; organize into named word lists
-- **AI Coaching** — Gemini-powered explanations, conjugation breakdowns, and sentence context through the cloud proxy
-- **Speech Synthesis** — hear any conjugated form read aloud using the browser's Web Speech API
-- **Flexible Input** — type romaji (auto-converts to hiragana), kana directly, or use the on-screen kana pad
-- **Answer Modes** — free input, guided kana, multiple choice, or self-check
-- **Drill Modes** — word-only, sentence context, or Transform practice for moving between forms such as te-form to passive or conjugated form back to dictionary form
-- **Script Modes** — toggle kanji, kana, romaji, furigana, and color-coded conjugation highlighting
-- **JLPT / Genki / Minna Filtering** — limit drills to specific proficiency levels, Genki lessons, or みんなの日本語 lessons
-- **Cloud Sync** — sign in to sync progress, custom words, and word lists across devices
-- **Dark / Light Theme** — respects system preference or override in settings
+The app is organized around these top-level tabs:
+
+- **Study** - SRS flashcards for word, sentence, and Transform practice. Supports forward, reverse, and mixed directions; free input, guided kana, multiple choice, and self-check answer modes; romaji-to-kana conversion; an on-screen kana pad; live kana feedback; deterministic step hints; speech playback; and optional AI clue/chat support.
+- **Conjugation Check** - identifies typed conjugated verbs or adjectives from romaji, kana, or kanji input, then shows the dictionary word, matching form, near misses, pronunciation, and handoffs into Reference or targeted Study practice.
+- **Which Group?** - drills group recognition before conjugation, covering verb classes and adjective classes with per-group accuracy and optional AI explanations.
+- **Endings** - the Ending Lab for rapid te-form/plain-past sound-change practice and plain/polite register switching, with pattern stats, hints, pronunciation, and optional AI memory hooks.
+- **Games** - currently opens Kotoba Rush, a timed typing drill with rapid prompts, combo scoring, and the same configured vocabulary/form filters as the rest of practice.
+- **Insights** - combines overview stats, skill radar, readiness/form accuracy, SRS level breakdowns, mistake history, retests, transformation accuracy, and minimal-pair progress.
+- **Library** - includes reverse lookup, reference tables, lessons, favorites, weak-form drills, word lists, custom verbs/adjectives, vocab pack imports, AI list generation, Anki TSV export, vocab CSV export, and CSV/TSV bulk import.
+- **Settings** - controls answer modes, prompt forms, daily goals, theme, display scripts, furigana, kana feedback, English hints, speech voice, JLPT/Genki/Minna filters, word groups, word lists, form packs, cloud sync, backup/restore, and progress reset.
+
+## Practice Scope
+
+- Built-in starter vocabulary: 30 verbs and 25 adjectives.
+- Word classes: ichidan, godan, suru, kuru, irregular adjective, i-adjective, and na-adjective.
+- Lesson/filter lanes: JLPT N5-N1, 23 Genki lessons, and 50 Minna no Nihongo lessons.
+- Conjugation coverage: 127 selectable form types grouped into packs such as Core, Basics, Everyday Expansion, Advanced Patterns, Compound Challenge, and All forms.
+- Form groups include basic tenses, te-form/stem, volitional/desire, potential, conditionals, progressive, commands/requests, passive, causative, causative-passive, keigo, special forms, and adjectives.
+- Minimal-pair/review support covers contrasts such as ichidan vs godan ru-verbs, i-adjective vs na-adjective, passive vs potential, godan sound-change clusters, and causative vs passive.
 
 ## Stack
 
 | Layer | Tech |
-|---|---|
-| UI | React 19 + Tailwind CSS 4 |
+| --- | --- |
+| UI | React 19, Tailwind CSS 4 |
 | Build | Vite 8 |
+| PWA | vite-plugin-pwa with Workbox |
+| Cloud / AI | Supabase Auth, Supabase table sync, Supabase Edge Function Gemini proxy |
 | Unit tests | Vitest |
-| E2E smoke tests | Playwright (Chromium) |
+| E2E tests | Playwright across Chromium, Firefox, and WebKit |
 
-## Getting started
+## Getting Started
 
 ```bash
 npm install
-npm run dev          # dev server at http://localhost:5173
+npm run dev
 ```
+
+Vite serves the app with the `/JapaneseConjugation/` base path. For production-parity local checks, use the preview server after a build or run the Playwright E2E command, which builds and serves the app automatically.
 
 ## Scripts
 
 | Command | Description |
-|---|---|
-| `npm run dev` | Vite dev server with HMR |
-| `npm run build` | Production build → `dist/` |
-| `npm run preview` | Serve the production build locally |
-| `npm test` | Vitest unit tests |
-| `npm run test:e2e` | Playwright smoke tests (builds first) |
+| --- | --- |
+| `npm run dev` | Start the Vite dev server with HMR. |
+| `npm run build` | Create the production build in `dist/`. |
+| `npm run preview` | Serve the production build locally. |
+| `npm test` | Run the Vitest unit suite once. |
+| `npm run test:watch` | Run Vitest in watch mode. |
+| `npm run test:e2e` | Run Playwright E2E tests. Set `PW_PROJECT=chromium` in PowerShell to scope a run. |
+| `npm run lint` | Lint `src/` with ESLint. |
+| `npm run typecheck` | Run TypeScript checking with `tsc --noEmit`. |
+| `npm run format` | Format source JavaScript/JSX with Prettier. |
+| `npm run format:check` | Check source formatting. |
+| `npm run size` | Check bundle budget after a build. |
+| `npm run ci:fast` | Run format check, lint, typecheck, and unit tests. |
+| `npm run ci` | Run the full local pipeline: fast CI, E2E, build, and size check. |
 
-## AI coaching
+## AI Coaching
 
-AI coaching is powered by Gemini through the Supabase `gemini-proxy` Edge Function. In the hosted app, AI coaching is available by default without user sign-in; signing in is only needed for cloud sync.
+AI features use Gemini through `supabase/functions/gemini-proxy`; the browser client does not support direct Gemini API keys. When `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are present, the app enables AI via the proxy. The proxy accepts anonymous learner requests and can include the user's Supabase auth token when signed in.
 
-To self-host, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, add `GEMINI_API_KEY` as a Supabase project secret, and deploy `supabase/functions/gemini-proxy` with `verify_jwt = false` from `supabase/config.toml`. Set `ALLOWED_ORIGIN` to your app origin in production. The client does not support direct Gemini API keys.
+To self-host AI coaching:
 
-## Cloud sync
+1. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for the app build.
+2. Add `GEMINI_API_KEY` as a Supabase project secret.
+3. Deploy `supabase/functions/gemini-proxy`.
+4. Keep `verify_jwt = false` for the proxy in `supabase/config.toml` if anonymous AI coaching should work.
+5. Set `ALLOWED_ORIGIN` to the production app origin.
 
-Cloud sync keeps your progress, custom vocabulary, and word lists in sync across devices. Open the **Settings** tab and click **Sign In / Sign Up**.
+## Cloud Sync
 
-To self-host, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in your environment and create a `srs_sync` table in Supabase with columns `id` (text, primary key) and `data` (jsonb).
+Cloud sync is optional. Without Supabase configuration, progress saves locally in the browser and manual backup/restore remains available in Settings.
 
-## Project structure
+With Supabase configured, signed-in users can sync SRS state, custom vocabulary, word lists, and practice preferences across devices. The app expects an `srs_sync` table with:
 
-```
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | text | Primary key, set to the Supabase user id. |
+| `data` | jsonb | Full app sync payload. |
+| `updated_at` | timestamptz | Updated on every sync write and used for merge/pull decisions. |
+
+## PWA / Deployment
+
+The app is configured for the `/JapaneseConjugation/` base path and uses `VitePWA` in `vite.config.js` for install prompts, update prompts, offline asset caching, app icons, iOS touch icon support, and navigation fallback. Service-worker behavior is configured through VitePWA; do not edit generated `dist/` output.
+
+## Project Structure
+
+```text
 src/
-  components/   Reusable UI components (kana pad, script display, AI panels)
-  data/         Static word lists, conjugation type definitions, app defaults
-  utils/        Pure logic — conjugator, SRS grading, storage, romaji, display
-  views/        Top-level tab views (Study, Rush, Library, Settings, …)
-e2e/            Playwright smoke tests
-src/__tests__/  Vitest unit tests
+  components/   Shared UI components such as kana input, script display, AI panels, prompts
+  data/         Starter vocabulary, lesson data, form definitions, defaults, vocab packs
+  hooks/        App hooks for AI sentences, cloud auto-sync, focus traps, virtual rows
+  i18n/         String catalog and translation helper
+  state/        Global app state provider and cloud/auth wiring
+  utils/        Conjugation, SRS, storage, display, romaji, AI, speech, backup, drill logic
+  views/        Top-level app tabs and subviews
+  __tests__/    Vitest tests
+e2e/            Playwright E2E tests
+public/         PWA icons and Apple touch icon
+scripts/        Build and bundle helper scripts
+supabase/       Supabase config and Gemini proxy Edge Function
 ```
