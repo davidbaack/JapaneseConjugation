@@ -477,8 +477,8 @@ export function repairPrefsForPlan(practicePrefs = {}, plan) {
     drillMode: 'word',
     drillDirection: 'forward',
     promptForm: 'dictionary',
-    durationSec: 0,
     reviewLimit: plan?.reviewLimit || 10,
+    reviewLimitSource: 'repair',
     wordListIds: plan?.wordKeys?.length ? [plan.listId] : [],
   };
 }

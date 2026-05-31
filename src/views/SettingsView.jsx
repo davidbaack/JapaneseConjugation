@@ -405,56 +405,6 @@ export default function SettingsView() {
             </div>
           </div>
           <div>
-            <label className="text-xs text-stone-500 block mb-1">Drill mode</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'word', label: 'Word only' },
-                { id: 'sentence', label: 'Sentence context' },
-                { id: 'transformation', label: 'Transform' },
-              ].map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, drillMode: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.drillMode || 'word') === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Transform asks for one form from another, like te-form to passive.
-            </p>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Study direction</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'forward', label: 'Conjugate' },
-                { id: 'reverse', label: 'Reverse' },
-                { id: 'mixed', label: 'Mixed' },
-              ].map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, drillDirection: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.drillDirection || DEFAULT_PREFS.drillDirection) === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Reverse shows a conjugated form and asks for the dictionary form.
-            </p>
-          </div>
-          <div>
             <label className="text-xs text-stone-500 block mb-1">Practice focus</label>
             <div className="flex gap-2">
               {[
@@ -520,42 +470,6 @@ export default function SettingsView() {
               }
               className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
             />
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Timed drill</label>
-            <select
-              value={practicePrefs.durationSec || 0}
-              onChange={(e) =>
-                setPracticePrefs({ ...practicePrefs, durationSec: Number(e.target.value) })
-              }
-              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-205 rounded-lg focus:border-indigo-500 focus:outline-none"
-            >
-              <option value="0">Infinite</option>
-              <option value="30">30 seconds</option>
-              <option value="60">60 seconds</option>
-              <option value="120">120 seconds</option>
-              <option value="180">180 seconds</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Review set</label>
-            <select
-              value={practicePrefs.reviewLimit || 0}
-              onChange={(e) =>
-                setPracticePrefs({ ...practicePrefs, reviewLimit: Number(e.target.value) })
-              }
-              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-205 rounded-lg focus:border-indigo-500 focus:outline-none"
-            >
-              <option value="0">Open ended</option>
-              <option value="10">10 cards</option>
-              <option value="20">20 cards</option>
-              <option value="30">30 cards</option>
-              <option value="40">40 cards</option>
-              <option value="50">50 cards</option>
-            </select>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Stops Study after a fixed set; timed drill can still run at the same time.
-            </p>
           </div>
         </div>
       </div>

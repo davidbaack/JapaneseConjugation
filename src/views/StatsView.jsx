@@ -4,7 +4,9 @@ import { ALL_CARD_TYPES, TYPE_LABEL } from '../data/conjugationTypes.js';
 import { RULES, wordKey } from '../utils/conjugator.js';
 import { defaultState } from '../utils/storage.js';
 import {
+  FAST_RESPONSE_MS,
   READINESS_DIMENSIONS,
+  buildConjugationSpeedRows,
   buildReadinessMap,
   launchPrefsForReadinessDimension,
 } from '../utils/readiness.js';
@@ -72,6 +74,35 @@ function srsStatsFor(state, verbs) {
 
 function pct(correct, attempted) {
   return attempted ? Math.round((correct / attempted) * 100) : 0;
+}
+
+function responseTimeLabel(ms) {
+  const value = Number(ms) || 0;
+  if (!value) return '0s';
+  const seconds = value / 1000;
+  return seconds >= 10 ? `${Math.round(seconds)}s` : `${seconds.toFixed(1)}s`;
+}
+
+function speedToneFor(avgMs) {
+  if (avgMs <= FAST_RESPONSE_MS) {
+    return {
+      label: 'quick',
+      text: 'text-emerald-700 dark:text-emerald-300',
+      bar: 'bg-emerald-500',
+    };
+  }
+  if (avgMs <= FAST_RESPONSE_MS * 2) {
+    return {
+      label: 'steady',
+      text: 'text-amber-700 dark:text-amber-300',
+      bar: 'bg-amber-500',
+    };
+  }
+  return {
+    label: 'slow',
+    text: 'text-rose-700 dark:text-rose-300',
+    bar: 'bg-rose-500',
+  };
 }
 
 function formAccuracyRows(state, verbs) {
@@ -204,6 +235,11 @@ export default function StatsView() {
   const radar = useMemo(() => skillRadarScores(state, verbs), [state, verbs]);
   const formRowsData = useMemo(() => formAccuracyRows(state, verbs), [state, verbs]);
   const readinessRows = useMemo(() => buildReadinessMap(state, verbs), [state, verbs]);
+  const speedRows = useMemo(() => buildConjugationSpeedRows(state, verbs), [state, verbs]);
+  const fastestSpeedRow = speedRows.length
+    ? speedRows.reduce((best, row) => (row.avgMs < best.avgMs ? row : best), speedRows[0])
+    : null;
+  const slowestSpeedRow = speedRows[0] || null;
   const readinessVisibleRows = readinessRows;
   const readinessCounts = useMemo(() => {
     const counts = { weak: 0, developing: 0, strong: 0, untested: 0 };
@@ -386,11 +422,19 @@ export default function StatsView() {
               `${row.type.label}: ${row.accuracy}% (${row.correct}/${row.attempted}, ${row.incorrect} misses)`,
           )
           .join('\n') || 'No form accuracy data yet';
+      const speedText =
+        speedRows
+          .slice(0, 8)
+          .map(
+            (row) =>
+              `${row.label}: ${responseTimeLabel(row.avgMs)} avg (${row.correct}/${row.attempted} correct)`,
+          )
+          .join('\n') || 'No completion speed data yet';
       const leechText =
         stats.leeches
           .map((l) => `${l.rule.label} ${TYPE_LABEL[l.rule.type]}: ${l.card.incorrect} misses`)
           .join('\n') || 'No leeches yet';
-      const prompt = `Create a focused Japanese conjugation study plan from these app stats.\n\nSkill radar:\n${radarText}\n\nForm accuracy:\n${formText}\n\nWeak cards:\n${leechText}\n\nGive a 7-day plan with one tiny daily drill, what to do in this app, and one success metric per day. Be concise and practical.`;
+      const prompt = `Create a focused Japanese conjugation study plan from these app stats.\n\nSkill radar:\n${radarText}\n\nForm accuracy:\n${formText}\n\nCompletion speed:\n${speedText}\n\nWeak cards:\n${leechText}\n\nGive a 7-day plan with one tiny daily drill, what to do in this app, and one success metric per day. Be concise and practical.`;
       const reply = await callGemini(
         [{ role: 'user', parts: [{ text: prompt }] }],
         geminiKey,
@@ -516,6 +560,101 @@ export default function StatsView() {
             {stats.totalCorrect} correct / {stats.totalReviews} reviews / {stats.total} rules
           </div>
         </div>
+      </div>
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-medium flex items-center gap-2 text-stone-950 dark:text-stone-50">
+              <IconSpark className="w-4 h-4 text-cyan-600 dark:text-cyan-300" />
+              Completion speed
+            </h3>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Average answer time by conjugation type. Slowest practiced forms appear first.
+            </p>
+          </div>
+          <div className="text-xs text-stone-400 tabular-nums flex-shrink-0">
+            {speedRows.length}/{formRowsData.length} timed
+          </div>
+        </div>
+        {speedRows.length === 0 ? (
+          <p className="text-sm text-stone-500">
+            No timed study attempts yet. Complete a few cards to build this view.
+          </p>
+        ) : (
+          <>
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 border-y border-stone-100 dark:border-stone-800 py-3 mb-3">
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-wider text-stone-400">Fastest</div>
+                <div className="mt-1 flex items-baseline justify-between gap-3">
+                  <span className="truncate text-sm font-medium text-stone-800 dark:text-stone-200">
+                    {fastestSpeedRow?.label}
+                  </span>
+                  <span className="text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                    {responseTimeLabel(fastestSpeedRow?.avgMs)}
+                  </span>
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-wider text-stone-400">Slowest</div>
+                <div className="mt-1 flex items-baseline justify-between gap-3">
+                  <span className="truncate text-sm font-medium text-stone-800 dark:text-stone-200">
+                    {slowestSpeedRow?.label}
+                  </span>
+                  <span className="text-sm font-semibold tabular-nums text-rose-700 dark:text-rose-300">
+                    {responseTimeLabel(slowestSpeedRow?.avgMs)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {speedRows.slice(0, 12).map((row) => {
+                const tone = speedToneFor(row.avgMs);
+                const width = slowestSpeedRow?.avgMs
+                  ? Math.max(6, Math.round((row.avgMs / slowestSpeedRow.avgMs) * 100))
+                  : 0;
+                return (
+                  <div
+                    key={row.typeId}
+                    className="border-b border-stone-100 dark:border-stone-800 pb-2 last:border-b-0 last:pb-0"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-stone-800 dark:text-stone-200 truncate">
+                          {row.label}
+                        </div>
+                        <div className="text-xs text-stone-500 truncate">{row.hint}</div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className={`text-sm font-semibold tabular-nums ${tone.text}`}>
+                          {responseTimeLabel(row.avgMs)}
+                        </div>
+                        <div className="text-[11px] text-stone-500">{tone.label}</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 h-1.5 bg-stone-100 dark:bg-stone-950 rounded-full overflow-hidden border border-stone-100 dark:border-stone-800">
+                      <div
+                        className={`h-full transition-all ${tone.bar}`}
+                        style={{ width: `${width}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-stone-400">
+                      <span>
+                        {row.correct}/{row.attempted} correct
+                      </span>
+                      <span>
+                        {row.correct
+                          ? `${responseTimeLabel(row.correctAvgMs)} correct avg`
+                          : 'no correct reps'}
+                      </span>
+                      <span>{row.fastCorrect} quick correct</span>
+                      {row.fastestMs && <span>{responseTimeLabel(row.fastestMs)} best</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">

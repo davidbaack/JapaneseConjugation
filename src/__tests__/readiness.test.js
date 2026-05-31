@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildConjugationSpeedRows,
   buildReadinessMap,
   defaultReadinessState,
   launchPrefsForReadinessDimension,
@@ -11,6 +12,13 @@ const ICHIDAN_WORD = {
   reading: '\u305f\u3079\u308b',
   meaning: 'to eat',
   group: 'ichidan',
+};
+
+const GODAN_WORD = {
+  dict: '\u66f8\u304f',
+  reading: '\u304b\u304f',
+  meaning: 'to write',
+  group: 'godan',
 };
 
 describe('readiness tracking', () => {
@@ -84,6 +92,47 @@ describe('readiness tracking', () => {
     expect(row.cells.speed.status).toBe('developing');
     expect(row.cells.recognition.status).toBe('weak');
     expect(row.cells.sentence.status).toBe('untested');
+  });
+
+  it('aggregates study completion speed by conjugation type', () => {
+    let readiness = defaultReadinessState();
+    readiness = recordReadinessAttempt(readiness, 'ichidan|plain-past', {
+      correct: true,
+      responseMs: 4000,
+      answerMode: 'input',
+      drillMode: 'word',
+      now: 1000,
+    });
+    readiness = recordReadinessAttempt(readiness, 'godan|plain-past', {
+      correct: false,
+      responseMs: 10000,
+      answerMode: 'input',
+      drillMode: 'word',
+      now: 2000,
+    });
+    readiness = recordReadinessAttempt(readiness, 'ichidan|te-form', {
+      correct: true,
+      responseMs: 15000,
+      answerMode: 'input',
+      drillMode: 'word',
+      now: 3000,
+    });
+
+    const rows = buildConjugationSpeedRows({ enabledTypes: ['plain-past', 'te-form'], readiness }, [
+      ICHIDAN_WORD,
+      GODAN_WORD,
+    ]);
+    const plainPast = rows.find((row) => row.typeId === 'plain-past');
+
+    expect(rows[0]).toMatchObject({ typeId: 'te-form', attempted: 1, avgMs: 15000 });
+    expect(plainPast).toMatchObject({
+      attempted: 2,
+      correct: 1,
+      avgMs: 7000,
+      correctAvgMs: 4000,
+      accuracy: 50,
+      fastCorrect: 1,
+    });
   });
 
   it('returns drill preferences for weak-cell launches', () => {

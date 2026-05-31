@@ -22,7 +22,12 @@ export function scriptModeFromDisplay(ds) {
 }
 
 export function mergePracticePrefs(prefs) {
-  const source = prefs || {};
+  const source = { ...(prefs || {}) };
+  delete source.durationSec;
+  const reviewLimitSource = source.reviewLimitSource === 'repair' ? source.reviewLimitSource : '';
+  const rawReviewLimit = Number(source.reviewLimit || 0);
+  const reviewLimit =
+    reviewLimitSource && Number.isFinite(rawReviewLimit) && rawReviewLimit > 0 ? rawReviewLimit : 0;
   const displayScripts = source.displayScripts
     ? { ...DEFAULT_PREFS.displayScripts, ...source.displayScripts }
     : resolveDisplayScripts(source);
@@ -37,7 +42,14 @@ export function mergePracticePrefs(prefs) {
   ) {
     wordGroups = [...wordGroups, 'irregular-adjective'];
   }
-  return { ...DEFAULT_PREFS, ...source, displayScripts, wordGroups };
+  return {
+    ...DEFAULT_PREFS,
+    ...source,
+    displayScripts,
+    wordGroups,
+    reviewLimit,
+    reviewLimitSource,
+  };
 }
 
 export function formDisplay(kana, prefs = DEFAULT_PREFS, word = null, typeId = null) {
