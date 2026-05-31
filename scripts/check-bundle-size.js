@@ -16,7 +16,8 @@ const ASSET_DIR = 'dist/assets';
 // Budgets in kilobytes (gzipped). Tuned with ~20% headroom over current sizes;
 // bump deliberately (with a note) when a real feature justifies the growth.
 // Bumped 250→260: minimal-pair drills feature added ~6 KB gzipped (May 2026).
-const TOTAL_GZIP_KB = 260;
+// Bumped 260->275: PWA update flow, lessons, and drill feedback added ~10 KB gzipped.
+const TOTAL_GZIP_KB = 275;
 const MAX_CHUNK_GZIP_KB = 70;
 
 const KB = 1024;
