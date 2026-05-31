@@ -37,6 +37,7 @@ import {
   gradeCard,
   bumpDaily,
   gradeTransformationStats,
+  localDateKey,
 } from '../utils/storage.js';
 import { recordReadinessAttempt } from '../utils/readiness.js';
 import {
@@ -67,6 +68,7 @@ import {
 } from '../utils/minimalPairs.js';
 import {
   buildTodayDrillPlan,
+  TODAY_DRILL_LIST_ID,
   practicePrefsForTodayDrill,
   upsertTodayDrillList,
 } from '../utils/todayDrill.js';
@@ -103,6 +105,16 @@ function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
 function clearReviewLimitPrefs(prefs = DEFAULT_PREFS) {
   if (!prefs.reviewLimit && !prefs.reviewLimitSource) return prefs;
   return { ...prefs, reviewLimit: 0, reviewLimitSource: '' };
+}
+
+function isDailyGoalHitToday(daily) {
+  return daily?.date === localDateKey() && !!daily.goalHit;
+}
+
+function dailyCountToday(daily) {
+  if (daily?.date !== localDateKey()) return 0;
+  const count = Number(daily.count || 0);
+  return Number.isFinite(count) && count > 0 ? count : 0;
 }
 
 function transformationRouteText(sourceInfo, targetInfo) {
@@ -188,6 +200,22 @@ function persistCurrent(card) {
   } catch {}
 }
 
+function clearPersistedCurrent() {
+  try {
+    if (typeof sessionStorage === 'undefined') return;
+    sessionStorage.removeItem(STUDY_CURRENT_KEY);
+  } catch {}
+}
+
+function hasPersistedCurrent() {
+  try {
+    if (typeof sessionStorage === 'undefined') return false;
+    return !!sessionStorage.getItem(STUDY_CURRENT_KEY);
+  } catch {
+    return false;
+  }
+}
+
 export default function StudyView() {
   const {
     state,
@@ -201,9 +229,10 @@ export default function StudyView() {
     setWordLists,
     studyFocus: focus,
     clearStudyFocus: onFocusConsumed,
+    hydrated,
   } = useApp();
   const [current, setCurrent] = useState(() =>
-    focus?.word ? null : loadPersistedCurrent(state, verbs),
+    hydrated && !focus?.word ? loadPersistedCurrent(state, verbs) : null,
   );
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');
@@ -233,7 +262,9 @@ export default function StudyView() {
   // SRS daily queue tracking
   const initialDueRuleIds = useRef(null);
   const [completedDueIds, setCompletedDueIds] = useState(() => new Set());
-  const startedGoalHit = useRef(!!(state.daily || {}).goalHit);
+  const startedGoalHit = useRef(isDailyGoalHitToday(state.daily || {}));
+  const seededInitialDailyGoalRef = useRef(false);
+  const autoStartedTodayRef = useRef(false);
   const [bonusMode, setBonusMode] = useState(false);
   const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
   const [launchContext, setLaunchContext] = useState(() =>
@@ -308,7 +339,25 @@ export default function StudyView() {
     () => buildTodayDrillPlan(state, verbs, practicePrefs, wordLists),
     [state, verbs, practicePrefs, wordLists],
   );
+  const daily = state.daily || {};
+  const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
+  const todayCount = dailyCountToday(daily);
+  const todayGoalHit = isDailyGoalHitToday(daily);
   const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
+  const repairDrillActive = practicePrefs.reviewLimitSource === 'repair';
+  const todayDrillActive =
+    activeDrillMode === 'word' &&
+    !practicePrefs.minimalPairSetId &&
+    !practicePrefs.reviewLimitSource &&
+    (practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID);
+  const canResumeTodayDrill =
+    todayDrillActive && daily.date === localDateKey() && hasPersistedCurrent();
+  const specialLaunchActive =
+    !!focus?.word ||
+    !!focusWordLock ||
+    !!launchContext ||
+    repairDrillActive ||
+    !!activeMinimalPairSet;
   const todayMinimalPairSet = useMemo(() => {
     if (activeMinimalPairSet || !current) return null;
     return (
@@ -320,6 +369,7 @@ export default function StudyView() {
   const minimalPairSetForCurrent = activeMinimalPairSet || todayMinimalPairSet;
 
   useEffect(() => {
+    if (!hydrated) return;
     // When arriving from Check's "Practice this verb", seed that exact word/form
     // once. If no rule covers it, fall through to normal selection.
     if (focus?.word && !focusSeededRef.current) {
@@ -336,10 +386,21 @@ export default function StudyView() {
       }
     }
     if (current !== null) return;
+    const persisted = focus?.word ? null : loadPersistedCurrent(state, verbs);
+    if (persisted) {
+      setCurrent(persisted);
+      return;
+    }
     setCurrent(selectNext(state, practiceWords, enabledTypes, null, practicePrefs));
     // state intentionally omitted — this triggers on card change, not every state mutation
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, practiceWords, enabledTypes, practicePrefs, focus]);
+  }, [hydrated, current, practiceWords, enabledTypes, practicePrefs, focus]);
+
+  useEffect(() => {
+    if (!hydrated || seededInitialDailyGoalRef.current) return;
+    seededInitialDailyGoalRef.current = true;
+    if (todayGoalHit) startedGoalHit.current = true;
+  }, [hydrated, todayGoalHit]);
 
   // Persist the active card so a refresh resumes it instead of drawing fresh.
   useEffect(() => {
@@ -498,6 +559,19 @@ export default function StudyView() {
   }, [practicePrefs.reviewLimit, practicePrefs.reviewLimitSource]);
 
   useEffect(() => {
+    if (!hydrated) return;
+    if (autoStartedTodayRef.current) return;
+    if (todayGoalHit) return;
+    if (specialLaunchActive) return;
+    if (canResumeTodayDrill) return;
+    if (!todayPlan.available) return;
+    launchTodayDrill();
+    // launchTodayDrill intentionally omitted so the auto-start decision keys off
+    // the entry conditions, not a freshly allocated function each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, todayGoalHit, specialLaunchActive, canResumeTodayDrill, todayPlan]);
+
+  useEffect(() => {
     return () => {
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
     };
@@ -523,10 +597,18 @@ export default function StudyView() {
     playPronunciation(text, rateVal, practicePrefs.voiceURI);
   }
 
+  if (!hydrated) {
+    return (
+      <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-8 text-center text-sm text-stone-500 dark:text-stone-400">
+        Loading daily drill...
+      </div>
+    );
+  }
+
   if (!current) {
     return (
       <div className="space-y-4">
-        {renderTodayLauncher()}
+        {renderTodayEntry()}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
           <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
           <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
@@ -646,11 +728,10 @@ export default function StudyView() {
   const sessionSkipped = state.session?.skipped || 0;
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
   // Daily SRS queue completion flags
-  const daily = state.daily || {};
-  const dailyGoalTarget = practicePrefs.dailyGoal || 30;
   const initialDue = initialDueRuleIds.current?.size ?? 0;
   const dueQueueDone = initialDue > 0 && completedDueIds.size >= initialDue && !bonusMode;
-  const dailyGoalJustHit = !!daily.goalHit && !startedGoalHit.current && !bonusMode;
+  const dailyGoalJustHit =
+    todayGoalHit && !startedGoalHit.current && seededInitialDailyGoalRef.current && !bonusMode;
   const reviewComplete = dueQueueDone || dailyGoalJustHit;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishHint = englishHintsHidden && phase === 'answering' && !showEnglishHint;
@@ -784,6 +865,8 @@ export default function StudyView() {
 
   function launchTodayDrill() {
     if (!todayPlan.available) return;
+    autoStartedTodayRef.current = true;
+    clearPersistedCurrent();
     if (setWordLists) setWordLists(upsertTodayDrillList(wordLists, todayPlan));
     if (setState) {
       setState((prev) => ({
@@ -846,6 +929,41 @@ export default function StudyView() {
         </div>
       </div>
     );
+  }
+
+  function renderTodayStatus() {
+    const progress = Math.min(todayCount, dailyGoalTarget);
+    const progressPct = Math.min(100, Math.round((progress / dailyGoalTarget) * 100));
+    const statusText = todayGoalHit ? 'Goal reached' : `${progress}/${dailyGoalTarget} today`;
+    const summary = todayGoalHit ? 'Daily goal complete' : todayPlan.summary;
+
+    return (
+      <div className="rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-3 py-2 shadow-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+              {todayGoalHit ? 'Daily goal reached' : 'Today drill'}
+            </div>
+            <div className="truncate text-xs text-stone-500 dark:text-stone-400">{summary}</div>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-medium text-stone-600 dark:text-stone-300">
+            <span className="tabular-nums">{statusText}</span>
+            <span className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
+              <span
+                className={`block h-full ${todayGoalHit ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                style={{ width: progressPct + '%' }}
+              />
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderTodayEntry() {
+    if (specialLaunchActive) return null;
+    if (todayDrillActive || todayGoalHit) return renderTodayStatus();
+    return renderTodayLauncher();
   }
 
   async function generateAIClue() {
@@ -1527,7 +1645,7 @@ export default function StudyView() {
           </button>
         </div>
       )}
-      {renderTodayLauncher()}
+      {renderTodayEntry()}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div
           role="group"

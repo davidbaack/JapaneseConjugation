@@ -290,6 +290,7 @@ function useAppController() {
     activeGeminiKey,
     speechVoices,
     resolvedTheme,
+    hydrated,
     supabase,
     allVerbs,
     allAdjectives,

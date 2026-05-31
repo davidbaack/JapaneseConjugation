@@ -6,6 +6,9 @@ import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-li
 vi.mock('../utils/supabase.js', () => ({ supabase: null }));
 
 import App from '../App.jsx';
+import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
+import { defaultState, localDateKey } from '../utils/storage.js';
+import { TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 
 afterEach(() => {
   cleanup();
@@ -55,17 +58,49 @@ describe('App shell', () => {
     await waitFor(() => expect(screen.getByPlaceholderText(/Type dictionary form/i)).toBeTruthy());
   });
 
-  it('starts the Today launcher against the daily goal', async () => {
+  it('auto-starts the daily drill against the daily goal', async () => {
     render(<App />);
-    const launcher = await screen.findByRole(
-      'button',
-      { name: 'Start daily drill' },
-      { timeout: 5000 },
+
+    await screen.findByText('Today drill', {}, { timeout: 5000 });
+    expect(screen.queryByRole('button', { name: 'Start daily drill' })).toBeNull();
+    await waitFor(() => {
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      expect(raw.practicePrefs.wordListIds).toContain(TODAY_DRILL_LIST_ID);
+    });
+    await waitFor(() => expect(screen.getAllByText(/0\/30 today/i).length).toBeGreaterThan(0));
+  });
+
+  it('does not auto-start a daily drill after today goal is complete', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          daily: {
+            date: localDateKey(),
+            count: DEFAULT_PREFS.dailyGoal,
+            goalHit: true,
+            goalStreak: 1,
+            bestGoalStreak: 1,
+            currentAnswerStreak: 0,
+            bestAnswerStreak: 0,
+          },
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
     );
 
-    fireEvent.click(launcher);
+    render(<App />);
 
-    await waitFor(() => expect(screen.getAllByText(/0\/30 today/i).length).toBeGreaterThan(0));
+    await screen.findByText('Daily goal reached', {}, { timeout: 5000 });
+    await waitFor(() => {
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      expect(raw.practicePrefs.wordListIds || []).not.toContain(TODAY_DRILL_LIST_ID);
+    });
+    expect(screen.queryByRole('button', { name: 'Start daily drill' })).toBeNull();
   });
 
   it('starts Transform mode from the Study screen with a source-to-target route', async () => {
@@ -89,6 +124,27 @@ describe('App shell', () => {
   }, 15000);
 
   it('does not show answer-form endings or target English before answering', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          daily: {
+            date: localDateKey(),
+            count: DEFAULT_PREFS.dailyGoal,
+            goalHit: true,
+            goalStreak: 1,
+            bestGoalStreak: 1,
+            currentAnswerStreak: 0,
+            bestAnswerStreak: 0,
+          },
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
     sessionStorage.setItem(
       'jp-study-current',
       JSON.stringify({
