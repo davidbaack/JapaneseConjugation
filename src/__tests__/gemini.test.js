@@ -62,14 +62,13 @@ describe('Gemini requests', () => {
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer session-token');
   });
 
-  it('keeps direct Gemini keys limited to local development fallback', async () => {
+  it('does not use client-provided Gemini API keys', async () => {
     vi.doMock('../utils/supabase.js', () => ({ supabase: null }));
     const fetchMock = stubGeminiFetch();
 
     const { callGemini } = await import('../utils/gemini.js');
 
-    await expect(callGemini(contents, 'local-dev-key')).resolves.toBe('Proxy works.');
-    expect(fetchMock.mock.calls[0][0]).toContain('generativelanguage.googleapis.com');
-    expect(fetchMock.mock.calls[0][0]).toContain('key=local-dev-key');
+    await expect(callGemini(contents, 'local-dev-key')).rejects.toThrow(/cloud proxy/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

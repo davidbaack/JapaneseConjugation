@@ -52,9 +52,7 @@ npm run dev          # dev server at http://localhost:5173
 
 AI coaching is powered by Gemini through the Supabase `gemini-proxy` Edge Function. In the hosted app, AI coaching is available by default without user sign-in; signing in is only needed for cloud sync.
 
-To self-host, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, add `GEMINI_API_KEY` as a Supabase project secret, and deploy `supabase/functions/gemini-proxy` with `verify_jwt = false` from `supabase/config.toml`. Set `ALLOWED_ORIGIN` to your app origin in production.
-
-For local-only development without the proxy, set `VITE_GEMINI_API_KEY` before building. Direct browser key usage is restricted to localhost.
+To self-host, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, add `GEMINI_API_KEY` as a Supabase project secret, and deploy `supabase/functions/gemini-proxy` with `verify_jwt = false` from `supabase/config.toml`. Set `ALLOWED_ORIGIN` to your app origin in production. The client does not support direct Gemini API keys.
 
 ## Cloud sync
 
