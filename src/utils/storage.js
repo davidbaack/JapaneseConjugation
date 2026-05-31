@@ -410,6 +410,7 @@ export function defaultState() {
     ambient: { sessions: 0, played: 0, lastAt: null },
     game: { played: 0, bestScore: 0, bestCombo: 0, matchBestScore: 0, matchBestStreak: 0 },
     onbin: { attempted: 0, correct: 0, hints: 0, streak: 0, bestStreak: 0, byPattern: {} },
+    register: { attempted: 0, correct: 0, streak: 0, bestStreak: 0, byPattern: {}, byVerb: {} },
     meaning: { attempted: 0, correct: 0, byWord: {} },
     mock: {
       taken: 0,
@@ -452,6 +453,7 @@ export function mergeState(saved, sessionOverride) {
     ambient: (saved && saved.ambient) || base.ambient,
     game: (saved && saved.game) || base.game,
     onbin: (saved && saved.onbin) || base.onbin,
+    register: (saved && saved.register) || base.register,
     meaning: (saved && saved.meaning) || base.meaning,
     mock: (saved && saved.mock) || base.mock,
     reader: {
