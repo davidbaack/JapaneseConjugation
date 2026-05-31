@@ -22,24 +22,121 @@ export function getOfflineTemplateSentence(word, type) {
   const isAdj = isAdjective(word);
   const targetLabel = getTypeInfo(type).label;
   const translation = `Fill in: ${word.dict} (${word.reading}) -> ${targetLabel}`;
+
   if (isAdj) {
-    if (word.group === 'i-adjective') {
+    const isI = word.group === 'i-adjective';
+    if (type.includes('past')) {
       return {
-        sentence: `この物は [______] ですね。`,
-        translation: `${translation} (This thing is [______].)`,
-      };
-    } else {
-      return {
-        sentence: `ここはとても [______] です。`,
-        translation: `${translation} (This place is very [______].)`,
+        sentence: `昨日はとても [______] でした。`,
+        translation: `${translation} (It was very [______] yesterday.)`,
+        cue: isI
+          ? '～かった marks past tense for い-adjectives'
+          : '～でした marks past tense for な-adjectives',
       };
     }
-  } else {
+    if (type.includes('negative')) {
+      return {
+        sentence: `この店はあまり [______] ですか？`,
+        translation: `${translation} (Is this store not very [______]?)`,
+        cue: isI ? '～くない negates an い-adjective' : '～じゃない negates a な-adjective',
+      };
+    }
+    if (isI) {
+      return {
+        sentence: `この料理は [______] ですね。`,
+        translation: `${translation} (This dish is [______], isn't it?)`,
+        cue: 'い-adjective acts directly as predicate before です',
+      };
+    }
     return {
-      sentence: `明日は、 [______] つもりです。`,
-      translation: `${translation} (Tomorrow, I plan to [______].)`,
+      sentence: `ここはとても [______] な場所です。`,
+      translation: `${translation} (This is a very [______] place.)`,
+      cue: 'な-adjective uses な when directly modifying a following noun',
     };
   }
+
+  if (type.includes('te-form')) {
+    return {
+      sentence: `[______]、次の駅で降ります。`,
+      translation: `${translation} (After [______], I get off at the next station.)`,
+      cue: 'て形 connects sequential actions — the second clause follows naturally',
+    };
+  }
+  if (type.includes('potential')) {
+    return {
+      sentence: `私はもう少し日本語が [______] ようになりたい。`,
+      translation: `${translation} (I want to become able to [______] more Japanese.)`,
+      cue: '可能形 expresses ability — the object often takes が instead of を',
+    };
+  }
+  if (type.includes('passive')) {
+    return {
+      sentence: `昨日、先生に [______]。`,
+      translation: `${translation} (Yesterday, I was [______] by the teacher.)`,
+      cue: '受身形 marks receiving an action — the agent is introduced with に',
+    };
+  }
+  if (type.includes('causative')) {
+    return {
+      sentence: `親は子供に野菜を [______]。`,
+      translation: `${translation} (The parent made/let the child [______] vegetables.)`,
+      cue: '使役形 makes or allows someone to act — the person affected uses に',
+    };
+  }
+  if (type === 'volitional' || type === 'polite-volitional') {
+    return {
+      sentence: `一緒に [______]！`,
+      translation: `${translation} (Let's [______] together!)`,
+      cue: "意向形 proposes a shared action or expresses the speaker's intention",
+    };
+  }
+  if (type.includes('conditional')) {
+    return {
+      sentence: `もっと練習 [______]、きっと上手になる。`,
+      translation: `${translation} (If you [______] more, you'll surely improve.)`,
+      cue: '条件形 sets up an if/when clause — the result follows in the next clause',
+    };
+  }
+  if (type.includes('imperative') || type.includes('command')) {
+    return {
+      sentence: `早く [______]！`,
+      translation: `${translation} (Quickly [______]!)`,
+      cue: '命令形 gives a direct command; use sparingly — it can sound abrupt',
+    };
+  }
+  if (type.includes('past')) {
+    return {
+      sentence: `昨日、友達と一緒に [______]。`,
+      translation: `${translation} (Yesterday, I [______] with a friend.)`,
+      cue: '〜た/〜ました marks a completed past action',
+    };
+  }
+  if (type.includes('negative')) {
+    return {
+      sentence: `時間がないから、今日は [______]。`,
+      translation: `${translation} (Because I have no time, I don't [______] today.)`,
+      cue: '〜ない/〜ません negates the verb; から/ので introduces a reason',
+    };
+  }
+  if (type === 'masu-stem') {
+    return {
+      sentence: `[______] たいですか？`,
+      translation: `${translation} (Do you want to [______]?)`,
+      cue: '連用形 (masu-stem) attaches to たい、ながら、and other auxiliaries',
+    };
+  }
+  if (type.includes('polite')) {
+    return {
+      sentence: `毎日、日本語を [______]。`,
+      translation: `${translation} (Every day, I [______] Japanese.)`,
+      cue: '〜ます is used in polite speech for habitual or future actions',
+    };
+  }
+  return {
+    sentence: `明日は [______] つもりです。`,
+    translation: `${translation} (Tomorrow, I plan to [______].)`,
+    cue: '〜つもりです signals intention → requires plain present form',
+  };
 }
 
 const GODAN_ENDING_ROMAJI = {

@@ -1484,8 +1484,11 @@ export default function StudyView() {
               )}
             </div>
           ) : practicePrefs.drillMode === 'sentence' && aiSentence && !aiSentence.loading ? (
-            <div className="text-sm text-stone-500 mt-2 italic">
-              Context: {aiSentence.translation}
+            <div className="space-y-1 mt-2">
+              <div className="text-sm text-stone-500 italic">Context: {aiSentence.translation}</div>
+              {aiSentence.cue && (
+                <div className="text-xs text-indigo-600 dark:text-indigo-400">{aiSentence.cue}</div>
+              )}
             </div>
           ) : (
             <>
