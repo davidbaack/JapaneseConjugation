@@ -9,7 +9,7 @@ import {
   WORD_TYPE_OPTIONS,
   WORD_GROUP_OPTIONS,
 } from '../data/starterWords.js';
-import { ALL_CARD_TYPES, TYPE_PACKS } from '../data/conjugationTypes.js';
+import { ALL_CARD_TYPES, TYPE_PACKS, FORM_GROUPS } from '../data/conjugationTypes.js';
 import { normalizePromptFormSetting } from '../utils/conjugator.js';
 import {
   buildPracticePoolSummary,
@@ -26,6 +26,15 @@ import { speakJapanese } from '../utils/speech.js';
 import { serializeBackup, parseBackup } from '../utils/backup.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { useApp } from '../state/AppStateContext.jsx';
+
+function jaccardSim(a, b) {
+  const sa = new Set(a),
+    sb = new Set(b);
+  let inter = 0;
+  for (const x of sa) if (sb.has(x)) inter++;
+  const union = sa.size + sb.size - inter;
+  return union === 0 ? 0 : inter / union;
+}
 
 const PROMPT_FORM_OPTIONS = [
   { id: 'dictionary', label: 'Dictionary' },
@@ -62,6 +71,7 @@ export default function SettingsView() {
   const [msg, setMsg] = useState('');
   const [copyOk, setCopyOk] = useState(false);
   const [openLessons, setOpenLessons] = useState({ genki: false, minna: false });
+  const [showCustom, setShowCustom] = useState(false);
 
   const exportData = useMemo(
     () => serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
@@ -130,7 +140,29 @@ export default function SettingsView() {
   function applyTypePack(ids) {
     const valid = new Set(ALL_CARD_TYPES.map((t) => t.id));
     const clean = [...new Set((ids || []).filter((id) => valid.has(id)))];
-    if (clean.length) setState({ ...state, enabledTypes: clean });
+    if (clean.length) {
+      setState({ ...state, enabledTypes: clean });
+      setShowCustom(false);
+    }
+  }
+
+  function toggleForm(typeId) {
+    const next = state.enabledTypes.includes(typeId)
+      ? state.enabledTypes.filter((id) => id !== typeId)
+      : [...state.enabledTypes, typeId];
+    if (next.length) setState({ ...state, enabledTypes: next });
+  }
+
+  function toggleGroup(groupTypeIds, allEnabled) {
+    let next;
+    if (allEnabled) {
+      next = state.enabledTypes.filter((id) => !groupTypeIds.includes(id));
+    } else {
+      const cur = new Set(state.enabledTypes);
+      for (const id of groupTypeIds) cur.add(id);
+      next = [...cur];
+    }
+    if (next.length) setState({ ...state, enabledTypes: next });
   }
 
   function reset() {
@@ -215,6 +247,23 @@ export default function SettingsView() {
     [state, settingsWords, practicePrefs, wordLists],
   );
   const activeTypeCount = state.enabledTypes.length;
+
+  const isCustomMode = !typePacks.some((p) => [...p.typeIds].sort().join('|') === enabledKey);
+
+  const closestPackId = useMemo(() => {
+    if (!isCustomMode) return null;
+    let best = null,
+      bestSim = 0;
+    for (const pack of TYPE_PACKS) {
+      const sim = jaccardSim(state.enabledTypes, pack.typeIds);
+      if (sim > bestSim) {
+        bestSim = sim;
+        best = pack.id;
+      }
+    }
+    return bestSim > 0.1 ? best : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabledKey, isCustomMode]);
 
   return (
     <div className="space-y-4 text-left">
@@ -794,6 +843,7 @@ export default function SettingsView() {
           {typePacks.map((pack) => {
             const packKey = [...pack.typeIds].sort().join('|');
             const active = packKey === enabledKey;
+            const isGhost = !active && isCustomMode && pack.id === closestPackId;
             return (
               <button
                 key={pack.id}
@@ -801,7 +851,9 @@ export default function SettingsView() {
                 className={`text-left rounded-xl border px-3 py-3 transition ${
                   active
                     ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900 text-stone-900 dark:text-stone-100'
-                    : 'bg-stone-50 dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-800 dark:text-stone-300 hover:bg-white dark:hover:bg-stone-900 hover:border-indigo-200'
+                    : isGhost
+                      ? 'bg-indigo-50/40 dark:bg-indigo-950/10 border-indigo-200/50 dark:border-indigo-900/30 text-stone-800 dark:text-stone-300 hover:bg-white dark:hover:bg-stone-900'
+                      : 'bg-stone-50 dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-800 dark:text-stone-300 hover:bg-white dark:hover:bg-stone-900 hover:border-indigo-200'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -818,7 +870,95 @@ export default function SettingsView() {
               </button>
             );
           })}
+          <button
+            onClick={() => setShowCustom((v) => !v)}
+            className={`text-left rounded-xl border px-3 py-3 transition ${
+              isCustomMode
+                ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900 text-stone-900 dark:text-stone-100'
+                : 'bg-stone-50 dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-800 dark:text-stone-300 hover:bg-white dark:hover:bg-stone-900 hover:border-indigo-200'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-medium text-stone-800 dark:text-stone-200">Custom</div>
+              <div
+                className={`text-[11px] px-1.5 py-0.5 rounded-full ${isCustomMode ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700'}`}
+              >
+                {state.enabledTypes.length}
+              </div>
+            </div>
+            <div className="text-xs text-stone-500 mt-1">Pick exactly which forms to drill.</div>
+          </button>
         </div>
+        {showCustom && (
+          <div className="mt-3 mb-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/30 dark:bg-indigo-950/10 overflow-y-auto max-h-[60vh]">
+            {FORM_GROUPS.map((group) => {
+              const enabledInGroup = group.typeIds.filter((id) => state.enabledTypes.includes(id));
+              const allEnabled = enabledInGroup.length === group.typeIds.length;
+              return (
+                <div
+                  key={group.id}
+                  className="border-b border-indigo-100 dark:border-indigo-900/50 last:border-b-0"
+                >
+                  <div className="flex items-center justify-between px-3 py-2 bg-indigo-50/60 dark:bg-indigo-950/20">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+                      {group.label}
+                    </span>
+                    <button
+                      onClick={() => toggleGroup(group.typeIds, allEnabled)}
+                      className="text-[11px] px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition"
+                    >
+                      {allEnabled ? 'None' : 'All'}
+                    </button>
+                  </div>
+                  <div className="divide-y divide-stone-100 dark:divide-stone-800/50">
+                    {group.typeIds.map((typeId) => {
+                      const form = ALL_CARD_TYPES.find((t) => t.id === typeId);
+                      if (!form) return null;
+                      const checked = state.enabledTypes.includes(typeId);
+                      return (
+                        <button
+                          key={typeId}
+                          onClick={() => toggleForm(typeId)}
+                          className="w-full text-left flex items-center gap-3 px-3 py-2 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/20 transition"
+                        >
+                          <div
+                            className={`w-4 h-4 rounded flex-shrink-0 border transition ${checked ? 'bg-indigo-600 border-indigo-600' : 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-600'}`}
+                          >
+                            {checked && (
+                              <svg
+                                className="w-full h-full text-white p-0.5"
+                                viewBox="0 0 10 10"
+                                fill="none"
+                              >
+                                <path
+                                  d="M1.5 5l2.5 2.5 4.5-5"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm text-stone-800 dark:text-stone-200">
+                              {form.label}
+                            </div>
+                            {form.sub && (
+                              <div className="text-xs text-stone-500 dark:text-stone-400">
+                                {form.sub}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2 text-xs text-stone-500 dark:text-stone-400">
           Current mix:{' '}
           <span className="font-semibold text-stone-700 dark:text-stone-200">
