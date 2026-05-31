@@ -4,6 +4,8 @@ import {
   conjugateAdjective,
   conjugateItem,
   isRedundantPracticeType,
+  normalizePromptFormSetting,
+  pickPromptType,
 } from '../utils/conjugator.js';
 import {
   getConjugationDebugInfo,
@@ -479,5 +481,21 @@ describe('isRedundantPracticeType', () => {
     expect(isRedundantPracticeType(KAKU, EMPTY, [EMPTY], { skipDuplicateForms: false })).toBe(
       false,
     );
+  });
+});
+
+describe('prompt form settings', () => {
+  it('keeps the restored Dictionary, Masu, and Mixed prompt sources explicit', () => {
+    expect(normalizePromptFormSetting('dictionary')).toBe('dictionary');
+    expect(normalizePromptFormSetting('masu')).toBe('polite-present');
+    expect(normalizePromptFormSetting('polite-present')).toBe('polite-present');
+    expect(normalizePromptFormSetting('mixed')).toBe('random');
+    expect(normalizePromptFormSetting('random')).toBe('random');
+    expect(normalizePromptFormSetting('te-form')).toBe('dictionary');
+  });
+
+  it('uses the Masu source when it is compatible with the prompt word', () => {
+    expect(pickPromptType(TABERU, 'plain-past', { promptForm: 'masu' })).toBe('polite-present');
+    expect(pickPromptType(TAKAI, 'adj-plain-past', { promptForm: 'masu' })).toBeNull();
   });
 });

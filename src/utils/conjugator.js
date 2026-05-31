@@ -175,8 +175,14 @@ export function resolveDisplayScripts(prefs = DEFAULT_PREFS) {
   return { kanji: true, kana: true, romaji: false };
 }
 
+export function normalizePromptFormSetting(promptForm) {
+  if (promptForm === 'random' || promptForm === 'mixed') return 'random';
+  if (promptForm === 'polite-present' || promptForm === 'masu') return 'polite-present';
+  return 'dictionary';
+}
+
 export function pickPromptType(item, targetType, prefs = DEFAULT_PREFS) {
-  const source = prefs.promptForm || 'dictionary';
+  const source = normalizePromptFormSetting(prefs.promptForm);
   const allowTrick = !!prefs.trickQuestions;
   const types = compatibleTypes(item).filter((t) => allowTrick || t.id !== targetType);
   if (source === 'dictionary' || !types.length) return null;

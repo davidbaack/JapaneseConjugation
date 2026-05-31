@@ -17,16 +17,10 @@ import {
   WORD_TYPE_OPTIONS,
   WORD_GROUP_OPTIONS,
 } from '../data/starterWords.js';
-import {
-  ALL_CARD_TYPES,
-  TYPE_PACKS,
-  CONJ_TYPES,
-  ADJ_TYPES,
-  FORM_GROUPS,
-} from '../data/conjugationTypes.js';
+import { ALL_CARD_TYPES, TYPE_PACKS, FORM_GROUPS } from '../data/conjugationTypes.js';
 import { AI_FEEDBACK_LEVELS, AI_GUIDE_TONES } from '../utils/gemini.js';
 import { toHiragana, kanaToRomaji } from '../utils/romaji.js';
-import { typePreviewValues } from '../utils/conjugator.js';
+import { normalizePromptFormSetting, typePreviewValues } from '../utils/conjugator.js';
 import {
   buildPracticePoolSummary,
   weakTypeIdsForState,
@@ -47,6 +41,12 @@ import { useApp } from '../state/AppStateContext.jsx';
 const POLITE_FORM_IDS = ALL_CARD_TYPES.filter(
   (t) => t.id.includes('polite') || t.label.toLowerCase().includes('polite'),
 ).map((t) => t.id);
+
+const PROMPT_FORM_OPTIONS = [
+  { id: 'dictionary', label: 'Dictionary' },
+  { id: 'polite-present', label: 'Masu' },
+  { id: 'random', label: 'Mixed' },
+];
 
 function FormRow({ t, on, previews, practicePrefs, toggle }) {
   return (
@@ -290,6 +290,7 @@ export default function SettingsView() {
           : 'text-stone-600 bg-stone-50 border-stone-250 dark:bg-stone-950 dark:border-stone-850';
 
   const displayScripts = resolveDisplayScripts(practicePrefs);
+  const promptForm = normalizePromptFormSetting(practicePrefs.promptForm);
   const selectedGenkiLessons =
     practicePrefs.genkiLessons === null
       ? []
@@ -476,48 +477,32 @@ export default function SettingsView() {
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-stone-500 block mb-1">Prompt form</label>
-            <select
-              value={practicePrefs.promptForm || 'dictionary'}
-              onChange={(e) => setPracticePrefs({ ...practicePrefs, promptForm: e.target.value })}
-              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
-            >
-              <option value="dictionary">Dictionary form</option>
-              <option value="random">Random compatible source form</option>
-              <optgroup label="Verb source forms">
-                {CONJ_TYPES.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Adjective source forms">
-                {ADJ_TYPES.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-            <div className="mt-2 grid sm:grid-cols-[1fr_auto] gap-2 items-center">
+            <div role="group" aria-label="Prompt form" className="grid grid-cols-3 gap-2">
+              {PROMPT_FORM_OPTIONS.map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() =>
+                    setPracticePrefs({
+                      ...practicePrefs,
+                      promptForm: o.id,
+                      trickQuestions: false,
+                    })
+                  }
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    promptForm === o.id
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2">
               <p className="text-[11px] text-stone-400">
-                Choose the starting form for Transform; incompatible sources fall back to dictionary
-                form.
+                Choose the starting form for Transform. Masu uses the polite present when
+                compatible; Mixed rotates compatible source forms.
               </p>
-              <button
-                onClick={() =>
-                  setPracticePrefs({
-                    ...practicePrefs,
-                    trickQuestions: !practicePrefs.trickQuestions,
-                  })
-                }
-                className={`px-3 py-2 rounded-lg text-sm border transition ${
-                  practicePrefs.trickQuestions
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                }`}
-              >
-                Trick questions {practicePrefs.trickQuestions ? 'on' : 'off'}
-              </button>
             </div>
           </div>
           <div>
@@ -637,7 +622,11 @@ export default function SettingsView() {
           </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Kana feedback while typing</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div
+              role="group"
+              aria-label="Kana feedback while typing"
+              className="grid grid-cols-3 gap-2"
+            >
               {[
                 { id: 'none', label: 'None' },
                 { id: 'color', label: 'Colors' },
@@ -686,7 +675,7 @@ export default function SettingsView() {
           </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Word category label</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div role="group" aria-label="Word category label" className="grid grid-cols-2 gap-2">
               {[
                 { id: true, label: 'Show' },
                 { id: false, label: 'Hide' },
