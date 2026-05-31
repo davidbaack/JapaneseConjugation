@@ -9,8 +9,6 @@ test.describe('Rush mode', () => {
 
     await page.locator('nav').getByRole('tab', { name: 'games', exact: true }).click();
 
-    // The Games tab opens on a hub; pick Kotoba Rush from the menu.
-    await page.getByRole('button', { name: /Kotoba Rush/ }).click();
     await expect(page.getByText('Kotoba Rush').first()).toBeVisible();
 
     const start = page.getByRole('button', { name: 'Start', exact: true });
