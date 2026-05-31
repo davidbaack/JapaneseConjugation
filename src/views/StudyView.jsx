@@ -41,6 +41,7 @@ import {
   gradeCard,
   bumpDaily,
 } from '../utils/storage.js';
+import { recordReadinessAttempt } from '../utils/readiness.js';
 import {
   formDisplay,
   promptDisplay,
@@ -129,6 +130,7 @@ export default function StudyView() {
   const inputRef = useRef(null);
   const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
+  const answerStartedAtRef = useRef(0);
   const hadKanaMistakeRef = useRef(false);
   // Snapshots the typed answer the moment a kana mistake first occurs, so the
   // review panel can show what was actually entered when it went wrong rather
@@ -220,6 +222,10 @@ export default function StudyView() {
       inputRef.current.focus();
     }
   }, [current, phase]);
+
+  useEffect(() => {
+    if (phase === 'answering') answerStartedAtRef.current = Date.now();
+  }, [current?.id, phase]);
 
   useEffect(() => {
     setShowPromptText(!listeningPrompt);
@@ -547,6 +553,7 @@ export default function StudyView() {
     if (choiceValue !== undefined) setAnswer(raw);
     const dict = current.verb.dict,
       rid = current.id;
+    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
     const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
     const newVerbStats = {
       ...state.verbStats,
@@ -570,6 +577,13 @@ export default function StudyView() {
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
       verbStats: newVerbStats,
       mistakes: nextMistakes,
+      readiness: recordReadinessAttempt(state.readiness, rid, {
+        correct: ok,
+        responseMs,
+        answerMode: practicePrefs.answerMode,
+        drillMode: practicePrefs.drillMode,
+        reverseDrill,
+      }),
       session: {
         ...(state.session || {}),
         reviewed: (state.session?.reviewed || 0) + 1,
@@ -654,6 +668,7 @@ export default function StudyView() {
     }
     const dict = current.verb.dict,
       rid = current.id;
+    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
     const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
     const newVerbStats = {
       ...state.verbStats,
@@ -677,6 +692,13 @@ export default function StudyView() {
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
       verbStats: newVerbStats,
       mistakes: nextMistakes,
+      readiness: recordReadinessAttempt(state.readiness, rid, {
+        correct: ok,
+        responseMs,
+        answerMode: practicePrefs.answerMode,
+        drillMode: practicePrefs.drillMode,
+        reverseDrill,
+      }),
       session: {
         ...(state.session || {}),
         reviewed: (state.session?.reviewed || 0) + 1,
@@ -726,6 +748,7 @@ export default function StudyView() {
     }
     const dict = current.verb.dict,
       rid = current.id;
+    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
     const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
     const newVerbStats = {
       ...state.verbStats,
@@ -747,6 +770,13 @@ export default function StudyView() {
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], false) },
       verbStats: newVerbStats,
       mistakes: nextMistakes,
+      readiness: recordReadinessAttempt(state.readiness, rid, {
+        correct: false,
+        responseMs,
+        answerMode: practicePrefs.answerMode,
+        drillMode: practicePrefs.drillMode,
+        reverseDrill,
+      }),
       session: {
         ...(state.session || {}),
         reviewed: (state.session?.reviewed || 0) + 1,

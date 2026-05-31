@@ -1,8 +1,13 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { IconSpark, IconFlame } from '../components/Icons.jsx';
 import { ALL_CARD_TYPES, TYPE_LABEL } from '../data/conjugationTypes.js';
-import { RULES } from '../utils/conjugator.js';
+import { RULES, wordKey } from '../utils/conjugator.js';
 import { defaultState } from '../utils/storage.js';
+import {
+  READINESS_DIMENSIONS,
+  buildReadinessMap,
+  launchPrefsForReadinessDimension,
+} from '../utils/readiness.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
@@ -155,6 +160,12 @@ function skillRadarScores(state, verbs) {
   ];
 }
 
+function readinessListId(ruleId) {
+  return `list-readiness-${Array.from(ruleId)
+    .map((char) => char.charCodeAt(0).toString(36))
+    .join('-')}`;
+}
+
 export default function StatsView() {
   const {
     state,
@@ -170,6 +181,15 @@ export default function StatsView() {
   const stats = useMemo(() => srsStatsFor(state, verbs), [state, verbs]);
   const radar = useMemo(() => skillRadarScores(state, verbs), [state, verbs]);
   const formRowsData = useMemo(() => formAccuracyRows(state, verbs), [state, verbs]);
+  const readinessRows = useMemo(() => buildReadinessMap(state, verbs), [state, verbs]);
+  const readinessVisibleRows = readinessRows;
+  const readinessCounts = useMemo(() => {
+    const counts = { weak: 0, developing: 0, strong: 0, untested: 0 };
+    for (const row of readinessRows) {
+      for (const cell of Object.values(row.cells)) counts[cell.status]++;
+    }
+    return counts;
+  }, [readinessRows]);
   const weakestForms = formRowsData.filter((row) => row.attempted > 0).slice(0, 8);
   const weakest = radar.slice().sort((a, b) => a.score - b.score)[0];
   const [aiText, setAiText] = useState('');
@@ -237,6 +257,35 @@ export default function StatsView() {
     }
   }
 
+  function drillReadinessCell(row, dimensionId) {
+    const rule = RULES.find((r) => r.id === row.ruleId);
+    if (!rule) return;
+    const targetKeys = rule.verbFilter(verbs).map(wordKey);
+    if (!targetKeys.length) return;
+    const listName = `Readiness: ${row.skill}`;
+    const existingList = (wordLists || []).find((l) => l.name === listName);
+    const targetList = {
+      ...(existingList || {
+        id: readinessListId(row.ruleId),
+        name: listName,
+      }),
+      wordKeys: targetKeys.slice(0, 80),
+    };
+    const nextWordLists = (wordLists || []).some((l) => l.id === targetList.id)
+      ? wordLists.map((l) => (l.id === targetList.id ? targetList : l))
+      : [...(wordLists || []), targetList];
+    if (setWordLists) setWordLists(nextWordLists);
+    if (setState) setState((prev) => ({ ...prev, enabledTypes: [row.typeId] }));
+    if (setPracticePrefs) {
+      setPracticePrefs({
+        ...practicePrefs,
+        ...launchPrefsForReadinessDimension(dimensionId, practicePrefs),
+        wordListIds: [targetList.id],
+      });
+    }
+    if (setTab) setTab('study');
+  }
+
   async function generatePlan() {
     if (!geminiKey) return;
     if (aiLoading) {
@@ -285,6 +334,19 @@ export default function StatsView() {
       <div className="text-xs text-stone-500 mt-0.5">{label}</div>
     </div>
   );
+
+  function readinessCellClass(status) {
+    if (status === 'strong') {
+      return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/20 dark:text-emerald-200';
+    }
+    if (status === 'developing') {
+      return 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-900/30';
+    }
+    if (status === 'weak') {
+      return 'border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-900/70 dark:bg-rose-950/20 dark:text-rose-200 dark:hover:bg-rose-900/30';
+    }
+    return 'border-dashed border-stone-300 bg-stone-50 text-stone-500 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-400 dark:hover:bg-stone-900';
+  }
 
   return (
     <div className="space-y-4 text-left">
@@ -368,6 +430,107 @@ export default function StatsView() {
             {stats.totalCorrect} correct / {stats.totalReviews} reviews / {stats.total} rules
           </div>
         </div>
+      </div>
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-medium text-stone-950 dark:text-stone-50">
+              Conjugation readiness map
+            </h3>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Readiness by skill, practice dimension, and response speed.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5 text-[11px] tabular-nums">
+            <span className="px-2 py-1 rounded-md bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-300">
+              {readinessCounts.weak} weak
+            </span>
+            <span className="px-2 py-1 rounded-md bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300">
+              {readinessCounts.developing} developing
+            </span>
+            <span className="px-2 py-1 rounded-md bg-stone-50 dark:bg-stone-950 text-stone-500 dark:text-stone-400">
+              {readinessCounts.untested} untested
+            </span>
+            <span className="px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300">
+              {readinessCounts.strong} strong
+            </span>
+          </div>
+        </div>
+        {readinessVisibleRows.length === 0 ? (
+          <p className="text-sm text-stone-500">No active conjugation skills available.</p>
+        ) : (
+          <div className="overflow-x-auto -mx-2 px-2">
+            <div className="min-w-[780px]">
+              <div className="grid grid-cols-[minmax(190px,1.2fr)_repeat(4,minmax(120px,1fr))] gap-2 px-1 pb-2 text-[11px] font-semibold text-stone-500">
+                <div>Skill</div>
+                {READINESS_DIMENSIONS.map((dimension) => (
+                  <div key={dimension.id}>{dimension.label}</div>
+                ))}
+              </div>
+              <div className="max-h-[32rem] overflow-y-auto pr-1 space-y-2">
+                {readinessVisibleRows.map((row) => (
+                  <div
+                    key={row.ruleId}
+                    className="grid grid-cols-[minmax(190px,1.2fr)_repeat(4,minmax(120px,1fr))] gap-2"
+                  >
+                    <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/70 dark:bg-stone-950/60 px-3 py-2 min-w-0">
+                      <div className="text-sm font-medium text-stone-800 dark:text-stone-100 truncate">
+                        {row.family}
+                      </div>
+                      <div className="text-xs text-stone-500 truncate">
+                        {row.group} / {row.wordCount} word{row.wordCount === 1 ? '' : 's'}
+                      </div>
+                    </div>
+                    {READINESS_DIMENSIONS.map((dimension) => {
+                      const cell = row.cells[dimension.id];
+                      const isSentenceUntested =
+                        dimension.id === 'sentence' && cell.status === 'untested';
+                      const actionable =
+                        cell.status !== 'strong' && row.wordCount > 0 && !isSentenceUntested;
+                      const className = `h-full w-full rounded-xl border px-2.5 py-2 text-left transition ${readinessCellClass(cell.status)} ${
+                        actionable
+                          ? 'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 dark:focus:ring-offset-stone-900'
+                          : ''
+                      }`;
+                      const content = (
+                        <>
+                          <div className="text-xs font-semibold">{cell.label}</div>
+                          <div className="text-[11px] opacity-80 tabular-nums">{cell.detail}</div>
+                          {isSentenceUntested && (
+                            <div className="mt-1 text-[11px] opacity-70">
+                              Needs AI sentence mode
+                            </div>
+                          )}
+                          {actionable && !isSentenceUntested && (
+                            <div className="mt-1 text-[11px] font-medium">
+                              {cell.status === 'untested' ? 'Start' : 'Drill'}
+                            </div>
+                          )}
+                        </>
+                      );
+                      return actionable ? (
+                        <button
+                          key={dimension.id}
+                          type="button"
+                          onClick={() => drillReadinessCell(row, dimension.id)}
+                          className={className}
+                          aria-label={`Start ${dimension.label} drill for ${row.skill}`}
+                          title={dimension.hint}
+                        >
+                          {content}
+                        </button>
+                      ) : (
+                        <div key={dimension.id} className={className} title={dimension.hint}>
+                          {content}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
         <div className="flex items-start justify-between gap-3 mb-3">
