@@ -1453,6 +1453,12 @@ export default function StudyView() {
   // Bonus mode lets the user keep practicing beyond either the due queue or
   // today's goal.
   if (reviewComplete && phase === 'answering') {
+    const sessionCorrect = state.session.correct || 0;
+    const sessionReviewed = state.session.reviewed || 0;
+    const sessionWrong = sessionReviewed - sessionCorrect;
+    const sessionAccuracy = sessionReviewed
+      ? Math.round((sessionCorrect / sessionReviewed) * 100)
+      : 0;
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
@@ -1463,29 +1469,89 @@ export default function StudyView() {
             ? `${completedDueIds.size}/${initialDue}`
             : `${daily.count}/${dailyGoalTarget}`}
         </div>
-        <div className="text-sm text-stone-400 mb-2">
+        <div className="text-sm text-stone-400 mb-3">
           {dueQueueDone ? 'due cards cleared' : 'reviews today'}
         </div>
-        <div className="text-sm text-stone-500 mb-1">
-          Session accuracy:{' '}
-          {state.session.reviewed
-            ? Math.round((state.session.correct / state.session.reviewed) * 100)
-            : 0}
-          %
+        <div className="flex justify-center gap-2 mb-2">
+          <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+            {sessionCorrect} correct
+          </span>
+          <span className="text-stone-300 dark:text-stone-600">·</span>
+          <span className="text-sm font-medium text-rose-600 dark:text-rose-400">
+            {sessionWrong} missed
+          </span>
+          {sessionSkipped > 0 && (
+            <>
+              <span className="text-stone-300 dark:text-stone-600">·</span>
+              <span className="text-sm text-stone-500">{sessionSkipped} skipped</span>
+            </>
+          )}
         </div>
+        <div className="text-sm text-stone-500 mb-1">{sessionAccuracy}% accuracy</div>
+        {(daily.bestAnswerStreak || 0) >= 5 && (
+          <div className="text-xs text-stone-400 mb-1">
+            Best streak: {daily.bestAnswerStreak} in a row
+          </div>
+        )}
         {!!daily.goalStreak && (
-          <div className="text-amber-600 dark:text-amber-400 text-sm mb-4">
+          <div className="text-amber-600 dark:text-amber-400 text-sm mt-1 mb-3">
             🔥 {daily.goalStreak}-day streak
           </div>
         )}
-        {!daily.goalStreak && <div className="mb-4" />}
+        {!daily.goalStreak && <div className="mb-3" />}
+        {sessionMistakePatterns.length > 0 ? (
+          <div className="mb-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/10 px-4 py-3 text-left">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-wider text-rose-700 dark:text-rose-400 font-semibold flex items-center gap-1.5">
+                  <IconFlame className="w-3.5 h-3.5" />
+                  Top mistake pattern
+                </div>
+                <div className="mt-1 text-sm font-medium text-stone-900 dark:text-stone-100">
+                  {sessionMistakePatterns[0].label}
+                </div>
+                <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
+                  {sessionMistakePatterns[0].feedback}
+                </div>
+              </div>
+              <div className="text-xs font-semibold tabular-nums text-rose-700 dark:text-rose-300">
+                {sessionMistakePatterns[0].count}x
+              </div>
+            </div>
+            {sessionMistakePatterns.length > 1 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {sessionMistakePatterns.slice(1, 4).map((pattern) => (
+                  <span
+                    key={pattern.patternId}
+                    className="px-2 py-1 rounded-full border border-rose-200/70 dark:border-rose-900/60 bg-white/70 dark:bg-stone-900/50 text-[11px] text-stone-600 dark:text-stone-300"
+                  >
+                    {pattern.label} ({pattern.count}x)
+                  </span>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => launchRepairDrill(sessionMistakePatterns[0])}
+              className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
+            >
+              Start 10-card repair drill
+            </button>
+          </div>
+        ) : (
+          sessionWrong === 0 &&
+          sessionReviewed > 0 && (
+            <div className="text-xs text-emerald-600 dark:text-emerald-400 mb-4">
+              Perfect session — no missed answers!
+            </div>
+          )
+        )}
         <button
           onClick={() => {
             setBonusMode(true);
             setCurrent(selectNext(state, practiceWords, enabledTypes, current?.id, practicePrefs));
             setPhase('answering');
           }}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium"
+          className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium"
         >
           Keep practicing
         </button>
