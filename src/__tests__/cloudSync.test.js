@@ -20,7 +20,10 @@ import {
   cloudUpsert,
   resolveSyncAction,
   cloudTimestamp,
+  buildSyncPayload,
+  mergeSyncPayload,
 } from '../utils/storage.js';
+import { DEFAULT_PREFS } from '../data/defaults.js';
 
 // Mirror the chainable query-builder shape the Supabase JS client exposes, while
 // keeping each step's mock reachable so we can assert how it was called.
@@ -181,6 +184,20 @@ describe('resolveSyncAction (conflict resolution)', () => {
     );
   });
 
+  it('merges when the cloud row is newer but local data only has custom learner content', () => {
+    const localPayload = buildSyncPayload({
+      state: { cards: {} },
+      customVerbs: [{ dict: 'local', reading: 'local', meaning: 'local word', group: 'godan' }],
+      customAdjectives: [],
+      wordLists: [{ id: 'local-list', name: 'Local list', wordKeys: ['godan:local'] }],
+      practicePrefs: DEFAULT_PREFS,
+    });
+
+    expect(
+      resolveSyncAction({ data: SAMPLE_PAYLOAD, updated_at: newer }, cloudAt - 1000, localPayload),
+    ).toBe('merge');
+  });
+
   it('pushes when local progress is newer than the cloud row', () => {
     expect(resolveSyncAction({ data: SAMPLE_PAYLOAD, updated_at: newer }, cloudAt + 1000)).toBe(
       'push',
@@ -201,6 +218,75 @@ describe('resolveSyncAction (conflict resolution)', () => {
     // cloudAt 0 vs local 0 → in sync; vs local > 0 → local wins.
     expect(resolveSyncAction({ data: SAMPLE_PAYLOAD }, 0)).toBe('noop');
     expect(resolveSyncAction({ data: SAMPLE_PAYLOAD }, 5000)).toBe('push');
+  });
+});
+
+describe('mergeSyncPayload', () => {
+  it('builds one cloud-newer payload without dropping local custom-only data', () => {
+    const localPayload = buildSyncPayload({
+      state: { cards: {} },
+      customVerbs: [{ dict: 'local', reading: 'local', meaning: 'local word', group: 'godan' }],
+      customAdjectives: [],
+      wordLists: [{ id: 'local-list', name: 'Local list', wordKeys: ['godan:local'] }],
+      practicePrefs: DEFAULT_PREFS,
+    });
+    const cloudPayload = buildSyncPayload({
+      state: {
+        cards: { 'godan|plain-past': { reps: 2, interval: 3, nextReview: 10 } },
+        shadow: { attempted: 4, totalRating: 12, byScenario: { te: 4 } },
+      },
+      customVerbs: [{ dict: 'cloud', reading: 'cloud', meaning: 'cloud word', group: 'godan' }],
+      customAdjectives: [
+        {
+          dict: 'cloud-adj',
+          reading: 'cloud-adj',
+          meaning: 'cloud adjective',
+          group: 'i-adjective',
+        },
+      ],
+      wordLists: [{ id: 'cloud-list', name: 'Cloud list', wordKeys: ['godan:cloud'] }],
+      practicePrefs: { ...DEFAULT_PREFS, theme: 'dark', dailyGoal: 20 },
+    });
+
+    const merged = mergeSyncPayload(localPayload, cloudPayload);
+
+    expect(merged.state).toEqual(cloudPayload.state);
+    expect(merged.customVerbs.map((word) => word.dict)).toEqual(['cloud', 'local']);
+    expect(merged.customAdjectives.map((word) => word.dict)).toEqual(['cloud-adj']);
+    expect(merged.wordLists.map((list) => list.id)).toEqual(['cloud-list', 'local-list']);
+    expect(merged.practicePrefs.theme).toBe('dark');
+    expect(merged.practicePrefs.dailyGoal).toBe(20);
+  });
+
+  it('uses local unsynced learner data in the merged payload written back to cloud', () => {
+    const localPayload = buildSyncPayload({
+      state: { cards: { 'local-rule': { reps: 5, interval: 7, nextReview: 200 } } },
+      customVerbs: [{ dict: 'shared', reading: 'local', meaning: 'local meaning', group: 'godan' }],
+      customAdjectives: [],
+      wordLists: [{ id: 'shared-list', name: 'Local name', wordKeys: ['godan:local'] }],
+      practicePrefs: { ...DEFAULT_PREFS, theme: 'light' },
+    });
+    const cloudPayload = buildSyncPayload({
+      state: { cards: { 'cloud-rule': { reps: 1, interval: 1, nextReview: 100 } } },
+      customVerbs: [{ dict: 'shared', reading: 'cloud', meaning: 'cloud meaning', group: 'godan' }],
+      customAdjectives: [],
+      wordLists: [{ id: 'shared-list', name: 'Cloud name', wordKeys: ['godan:cloud'] }],
+      practicePrefs: { ...DEFAULT_PREFS, theme: 'dark', dailyGoal: 10 },
+    });
+
+    const merged = mergeSyncPayload(localPayload, cloudPayload);
+
+    expect(Object.keys(merged.state.cards).sort()).toEqual(['cloud-rule', 'local-rule']);
+    expect(merged.customVerbs).toEqual(localPayload.customVerbs);
+    expect(merged.wordLists).toEqual([
+      {
+        id: 'shared-list',
+        name: 'Local name',
+        wordKeys: ['godan:cloud', 'godan:local'],
+      },
+    ]);
+    expect(merged.practicePrefs.theme).toBe('light');
+    expect(merged.practicePrefs.dailyGoal).toBe(10);
   });
 });
 

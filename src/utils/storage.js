@@ -9,6 +9,7 @@ import {
 } from '../data/conjugationTypes.js';
 import {
   RULES,
+  wordKey,
   isRedundantPracticeType,
   enabledTypeIdsFor,
   filterWordsForPrefs,
@@ -271,6 +272,92 @@ export function cloudTimestamp(cloud) {
   return Number.isNaN(t) ? 0 : t;
 }
 
+function hasKeys(value) {
+  return !!value && typeof value === 'object' && Object.keys(value).length > 0;
+}
+
+function hasItems(value) {
+  return Array.isArray(value) && value.length > 0;
+}
+
+function sameJSON(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function hasCustomPracticePrefs(prefs) {
+  if (!prefs || typeof prefs !== 'object') return false;
+  return Object.keys(prefs).some((key) => !sameJSON(prefs[key], DEFAULT_PREFS[key]));
+}
+
+function hasProgressBucketData(bucket) {
+  if (!bucket || typeof bucket !== 'object') return false;
+  return Object.values(bucket).some((value) => {
+    if (typeof value === 'number') return value > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    if (value && typeof value === 'object') return hasKeys(value);
+    return false;
+  });
+}
+
+function hasLocalStateData(state) {
+  if (!state || typeof state !== 'object') return false;
+  const base = defaultState();
+  return !!(
+    hasKeys(state.cards) ||
+    hasKeys(state.verbStats) ||
+    hasItems(state.mistakes) ||
+    hasProgressBucketData(state.shadow) ||
+    hasProgressBucketData(state.ambient) ||
+    hasProgressBucketData(state.game) ||
+    hasProgressBucketData(state.onbin) ||
+    hasProgressBucketData(state.register) ||
+    hasProgressBucketData(state.meaning) ||
+    hasProgressBucketData(state.mock) ||
+    hasProgressBucketData(state.reader) ||
+    hasProgressBucketData(state.production) ||
+    hasProgressBucketData(state.transformation) ||
+    hasKeys(state.minimalPairs?.bySet) ||
+    hasItems(state.reference?.recentSearches) ||
+    hasItems(state.reference?.history) ||
+    !!state.reference?.selected ||
+    hasItems(state.reference?.weakRules) ||
+    (state.daily &&
+      ((state.daily.count || 0) > 0 ||
+        !!state.daily.goalHit ||
+        (state.daily.goalStreak || 0) > 0 ||
+        (state.daily.bestGoalStreak || 0) > 0 ||
+        (state.daily.currentAnswerStreak || 0) > 0 ||
+        (state.daily.bestAnswerStreak || 0) > 0)) ||
+    hasProgressBucketData(state.classify) ||
+    (Array.isArray(state.enabledTypes) && !sameJSON(state.enabledTypes, base.enabledTypes))
+  );
+}
+
+function normalizeSyncPayload(value) {
+  if (!value || typeof value !== 'object') return {};
+  if (
+    'state' in value ||
+    'customVerbs' in value ||
+    'customAdjectives' in value ||
+    'wordLists' in value ||
+    'practicePrefs' in value
+  ) {
+    return value;
+  }
+  return { state: value };
+}
+
+function hasLocalSyncData(value) {
+  const payload = normalizeSyncPayload(value);
+  return !!(
+    hasLocalStateData(payload.state) ||
+    hasItems(payload.customVerbs) ||
+    hasItems(payload.customAdjectives) ||
+    hasItems(payload.wordLists) ||
+    hasCustomPracticePrefs(payload.practicePrefs)
+  );
+}
+
 // Decide what to do after a cloud fetch, given the timestamp of our last
 // successful sync. This is the conflict-resolution core, kept pure so it can
 // be tested without rendering the app:
@@ -282,12 +369,93 @@ export function resolveSyncAction(cloud, localSyncedAt = 0, localState = null) {
   if (!cloud || !cloud.data) return 'push';
   const cloudAt = cloudTimestamp(cloud);
   if (cloudAt > localSyncedAt) {
-    const hasLocalCards =
-      localState && localState.cards && Object.keys(localState.cards).length > 0;
-    return hasLocalCards ? 'merge' : 'pull';
+    return hasLocalSyncData(localState) ? 'merge' : 'pull';
   }
   if (cloudAt < localSyncedAt) return 'push';
   return 'noop';
+}
+
+export function buildSyncPayload({
+  state,
+  customVerbs,
+  customAdjectives,
+  wordLists,
+  practicePrefs,
+} = {}) {
+  return {
+    state: state || defaultState(),
+    customVerbs: Array.isArray(customVerbs) ? customVerbs : [],
+    customAdjectives: Array.isArray(customAdjectives) ? customAdjectives : [],
+    wordLists: Array.isArray(wordLists) ? wordLists : [],
+    practicePrefs: practicePrefs || DEFAULT_PREFS,
+  };
+}
+
+function syncWordKey(word) {
+  return word && word.group && word.dict ? wordKey(word) : JSON.stringify(word);
+}
+
+function mergeWordArrays(local = [], cloud = []) {
+  const byKey = new Map();
+  for (const word of cloud || []) byKey.set(syncWordKey(word), word);
+  for (const word of local || []) byKey.set(syncWordKey(word), word);
+  return [...byKey.values()];
+}
+
+function mergeListKeys(field, localList, cloudList) {
+  const keys = [...(cloudList?.[field] || []), ...(localList?.[field] || [])];
+  return keys.length ? [...new Set(keys)] : undefined;
+}
+
+function mergeWordLists(local = [], cloud = []) {
+  const byId = new Map();
+  for (const list of cloud || []) {
+    if (list?.id) byId.set(list.id, { ...list });
+  }
+  for (const list of local || []) {
+    if (!list?.id) continue;
+    const existing = byId.get(list.id);
+    if (!existing) {
+      byId.set(list.id, { ...list });
+      continue;
+    }
+    const merged = { ...existing, ...list };
+    const wordKeys = mergeListKeys('wordKeys', list, existing);
+    const words = mergeListKeys('words', list, existing);
+    if (wordKeys) merged.wordKeys = wordKeys;
+    if (words) merged.words = words;
+    byId.set(list.id, merged);
+  }
+  return [...byId.values()];
+}
+
+function mergeSyncPracticePrefs(localPrefs, cloudPrefs) {
+  const merged = { ...(cloudPrefs || {}) };
+  let changed = false;
+  if (localPrefs && typeof localPrefs === 'object') {
+    for (const key of Object.keys(localPrefs)) {
+      if (!sameJSON(localPrefs[key], DEFAULT_PREFS[key])) {
+        merged[key] = localPrefs[key];
+        changed = true;
+      }
+    }
+  }
+  if (changed || hasKeys(merged)) return merged;
+  return localPrefs || DEFAULT_PREFS;
+}
+
+export function mergeSyncPayload(localPayload, cloudPayload) {
+  const local = buildSyncPayload(localPayload);
+  const cloud = buildSyncPayload(cloudPayload);
+  return {
+    state: hasLocalStateData(local.state)
+      ? mergeCloudState(local.state, cloud.state)
+      : cloud.state || local.state,
+    customVerbs: mergeWordArrays(local.customVerbs, cloud.customVerbs),
+    customAdjectives: mergeWordArrays(local.customAdjectives, cloud.customAdjectives),
+    wordLists: mergeWordLists(local.wordLists, cloud.wordLists),
+    practicePrefs: mergeSyncPracticePrefs(local.practicePrefs, cloud.practicePrefs),
+  };
 }
 
 // Merge two SRS card maps: for each card key, keep the card with more reps;
