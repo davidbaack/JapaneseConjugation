@@ -61,7 +61,10 @@ function AppShell() {
                 {t('header.today', { count: daily.count, goal: practicePrefs.dailyGoal })}
               </span>
               <span className="inline-block w-14 h-1.5 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden">
-                <span className="block h-full bg-indigo-500" style={{ width: dailyPct + '%' }} />
+                <span
+                  className={`block h-full ${daily.goalHit ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                  style={{ width: dailyPct + '%' }}
+                />
               </span>
             </div>
             {!!daily.goalStreak && (
