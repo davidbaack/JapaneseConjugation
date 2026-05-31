@@ -27,6 +27,7 @@ import {
   getWordMeta,
   isAdjective,
   promptFormLabel,
+  RULES,
 } from '../utils/conjugator.js';
 import {
   explainItem,
@@ -127,6 +128,11 @@ export default function StudyView() {
   const [typoGuard, setTypoGuard] = useState(null);
   const [kanaPadOpen, setKanaPadOpen] = useState(false);
   const [reviewBase, setReviewBase] = useState(state.session.reviewed || 0);
+  // SRS daily queue tracking
+  const initialDueRuleIds = useRef(null);
+  const [completedDueIds, setCompletedDueIds] = useState(() => new Set());
+  const startedGoalHit = useRef(!!(state.daily || {}).goalHit);
+  const [bonusMode, setBonusMode] = useState(false);
   const inputRef = useRef(null);
   const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
@@ -335,6 +341,21 @@ export default function StudyView() {
     };
   }, []);
 
+  // Snapshot the set of SRS-due rule IDs at session start so the queue size is
+  // fixed even as cards become due or get rescheduled during the session.
+  useEffect(() => {
+    const now = Date.now();
+    initialDueRuleIds.current = new Set(
+      RULES.filter((r) => enabledTypes.includes(r.type))
+        .filter((r) => {
+          const c = state.cards[r.id];
+          return c && c.nextReview <= now;
+        })
+        .map((r) => r.id),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally snapshot only at mount
+
   function speakJapaneseLocal(text, rateVal = 0.85) {
     // Prefer a recorded clip with TTS fallback (improvement #18).
     playPronunciation(text, rateVal, practicePrefs.voiceURI);
@@ -406,6 +427,14 @@ export default function StudyView() {
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const sessionSkipped = state.session?.skipped || 0;
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
+  // Daily SRS queue completion flags
+  const daily = state.daily || {};
+  const dailyGoalTarget = practicePrefs.dailyGoal || 30;
+  const initialDue = initialDueRuleIds.current?.size ?? 0;
+  const dueQueueDone = initialDue > 0 && completedDueIds.size >= initialDue && !bonusMode;
+  const dailyGoalJustHit =
+    initialDue === 0 && !!daily.goalHit && !startedGoalHit.current && !bonusMode;
+  const reviewComplete = dueQueueDone || dailyGoalJustHit;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishHint = englishHintsHidden && phase === 'answering' && !showEnglishHint;
   const coachPreview = toHiragana(answer);
@@ -530,7 +559,7 @@ export default function StudyView() {
       wrongSnapshotRef.current = null;
       setWasCorrected(false);
       setPhase('answering');
-      if (!reviewSetComplete) {
+      if (!reviewSetComplete && !reviewComplete) {
         setCurrent(selectNext(state, practiceWords, enabledTypes, current.id, practicePrefs));
       }
       return;
@@ -572,6 +601,7 @@ export default function StudyView() {
           reverseDrill ? raw.trim() : normalized,
           expected,
         );
+    const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const nextState = {
       ...state,
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
@@ -589,8 +619,11 @@ export default function StudyView() {
         reviewed: (state.session?.reviewed || 0) + 1,
         correct: (state.session?.correct || 0) + (ok ? 1 : 0),
       },
-      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 30),
+      daily: newDaily,
     };
+    if (ok && initialDueRuleIds.current?.has(rid)) {
+      setCompletedDueIds((prev) => new Set([...prev, rid]));
+    }
     setState(nextState);
     setChatOpen(!ok && !!geminiKey && !!practicePrefs.autoAiExplainErrors);
     setReviewChoiceLabel('');
@@ -605,7 +638,19 @@ export default function StudyView() {
     setWasCorrected(finalOk && !ok);
     setWasCorrect(ok);
     setPhase('reviewing');
-    const reviewWillComplete = reviewLimit > 0 && reviewsDone + 1 >= reviewLimit;
+    const willClearDue =
+      initialDue > 0 &&
+      ok &&
+      initialDueRuleIds.current?.has(rid) &&
+      completedDueIds.size + 1 >= initialDue;
+    const willHitDailyGoal =
+      initialDue === 0 &&
+      !startedGoalHit.current &&
+      !bonusMode &&
+      newDaily.goalHit &&
+      !daily.goalHit;
+    const reviewWillComplete =
+      (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) || willClearDue || willHitDailyGoal;
     if (ok && practicePrefs.autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
@@ -687,6 +732,7 @@ export default function StudyView() {
           `self-check: ${label}`,
           expected,
         );
+    const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const nextState = {
       ...state,
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
@@ -704,8 +750,11 @@ export default function StudyView() {
         reviewed: (state.session?.reviewed || 0) + 1,
         correct: (state.session?.correct || 0) + (ok ? 1 : 0),
       },
-      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 30),
+      daily: newDaily,
     };
+    if (ok && initialDueRuleIds.current?.has(rid)) {
+      setCompletedDueIds((prev) => new Set([...prev, rid]));
+    }
     setState(nextState);
     setAnswer('');
     setTypoGuard(null);
@@ -715,7 +764,19 @@ export default function StudyView() {
     setChatOpen(!ok && !!geminiKey && !!practicePrefs.autoAiExplainErrors);
     setWasCorrect(ok);
     setPhase('reviewing');
-    const reviewWillComplete = reviewLimit > 0 && reviewsDone + 1 >= reviewLimit;
+    const willClearDue =
+      initialDue > 0 &&
+      ok &&
+      initialDueRuleIds.current?.has(rid) &&
+      completedDueIds.size + 1 >= initialDue;
+    const willHitDailyGoal =
+      initialDue === 0 &&
+      !startedGoalHit.current &&
+      !bonusMode &&
+      newDaily.goalHit &&
+      !daily.goalHit;
+    const reviewWillComplete =
+      (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) || willClearDue || willHitDailyGoal;
     if (ok && practicePrefs.autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
@@ -782,7 +843,7 @@ export default function StudyView() {
         reviewed: (state.session?.reviewed || 0) + 1,
         correct: state.session?.correct || 0,
       },
-      daily: bumpDaily(state.daily, false, practicePrefs.dailyGoal || 30),
+      daily: bumpDaily(state.daily, false, dailyGoalTarget),
     };
     setState(nextState);
     setAnswer('');
@@ -823,6 +884,48 @@ export default function StudyView() {
     setTypoGuard(null);
     setAnswer('');
     focusAnswerInput();
+  }
+
+  // Daily SRS queue completion screen — shown once when the due queue is cleared
+  // (or the daily goal is hit when there were no due cards). Bonus mode lets the
+  // user keep practicing beyond the goal.
+  if (reviewComplete && phase === 'answering') {
+    return (
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
+        <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
+          {dueQueueDone ? 'SRS queue cleared!' : 'Daily goal reached!'}
+        </div>
+        <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-1">
+          {dueQueueDone ? `${completedDueIds.size}/${initialDue}` : `${daily.count}/${dailyGoalTarget}`}
+        </div>
+        <div className="text-sm text-stone-400 mb-2">
+          {dueQueueDone ? 'due cards cleared' : 'reviews today'}
+        </div>
+        <div className="text-sm text-stone-500 mb-1">
+          Session accuracy:{' '}
+          {state.session.reviewed
+            ? Math.round((state.session.correct / state.session.reviewed) * 100)
+            : 0}
+          %
+        </div>
+        {!!daily.goalStreak && (
+          <div className="text-amber-600 dark:text-amber-400 text-sm mb-4">
+            🔥 {daily.goalStreak}-day streak
+          </div>
+        )}
+        {!daily.goalStreak && <div className="mb-4" />}
+        <button
+          onClick={() => {
+            setBonusMode(true);
+            setCurrent(selectNext(state, practiceWords, enabledTypes, current?.id, practicePrefs));
+            setPhase('answering');
+          }}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium"
+        >
+          Keep practicing
+        </button>
+      </div>
+    );
   }
 
   if ((reviewSetComplete && phase === 'answering') || timeLeft === 0) {
@@ -912,7 +1015,7 @@ export default function StudyView() {
           <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
             JLPT {getWordMeta(current.verb).jlpt}
           </div>
-          {timeLeft !== null || reviewLimit > 0 || !!sessionSkipped ? (
+          {timeLeft !== null || reviewLimit > 0 || !!sessionSkipped || initialDue > 0 || (!daily.goalHit && !bonusMode) ? (
             <div className="flex justify-end mb-3">
               <div className="text-xs text-stone-400 text-right shrink-0">
                 {timeLeft !== null && (
@@ -923,6 +1026,21 @@ export default function StudyView() {
                 {reviewLimit > 0 && (
                   <div className="text-indigo-600 dark:text-indigo-400 font-medium">
                     {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} set
+                  </div>
+                )}
+                {initialDue > 0 && !bonusMode && (
+                  <div className="text-indigo-600 dark:text-indigo-400 font-medium">
+                    {completedDueIds.size}/{initialDue} due
+                  </div>
+                )}
+                {initialDue === 0 && !daily.goalHit && !bonusMode && (
+                  <div className="text-stone-500">
+                    {daily.count}/{dailyGoalTarget} today
+                  </div>
+                )}
+                {bonusMode && (
+                  <div className="text-emerald-600 dark:text-emerald-400 font-medium">
+                    ✓ bonus
                   </div>
                 )}
                 {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
