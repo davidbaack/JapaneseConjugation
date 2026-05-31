@@ -180,6 +180,8 @@ export default function StatsView() {
     () => aggregateDiagnosedMistakes(state.mistakes),
     [state.mistakes],
   );
+  const [showAllPatterns, setShowAllPatterns] = useState(false);
+  const visiblePatterns = showAllPatterns ? mistakePatterns : mistakePatterns.slice(0, 6);
   const weakestForms = formRowsData.filter((row) => row.attempted > 0).slice(0, 8);
   const weakest = radar.slice().sort((a, b) => a.score - b.score)[0];
   const [aiText, setAiText] = useState('');
@@ -491,7 +493,7 @@ export default function StatsView() {
           </p>
         ) : (
           <div className="space-y-2">
-            {mistakePatterns.slice(0, 6).map((pattern, index) => (
+            {visiblePatterns.map((pattern, index) => (
               <div
                 key={pattern.patternId}
                 className="rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-3"
@@ -527,6 +529,16 @@ export default function StatsView() {
                 )}
               </div>
             ))}
+            {mistakePatterns.length > 6 && (
+              <button
+                onClick={() => setShowAllPatterns((v) => !v)}
+                className="w-full text-center text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 py-1 transition"
+              >
+                {showAllPatterns
+                  ? 'Show fewer'
+                  : `Show ${mistakePatterns.length - 6} more pattern${mistakePatterns.length - 6 === 1 ? '' : 's'}`}
+              </button>
+            )}
           </div>
         )}
       </div>

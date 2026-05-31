@@ -434,11 +434,8 @@ function safeListName(label) {
   return `Repair: ${base}`.slice(0, 48);
 }
 
-function safeListId(patternId) {
-  return `repair-${String(patternId || 'mistake')
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '')}`;
+function safeListId() {
+  return 'repair-drill';
 }
 
 export function buildRepairDrillPlan(pattern, words = []) {
@@ -459,7 +456,7 @@ export function buildRepairDrillPlan(pattern, words = []) {
     feedback: pattern?.feedback || '',
     typeIds,
     wordKeys,
-    listId: safeListId(pattern?.patternId),
+    listId: safeListId(),
     listName: safeListName(pattern?.label),
     reviewLimit: 10,
   };

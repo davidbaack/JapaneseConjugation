@@ -516,8 +516,12 @@ export default function StudyView() {
     if (setWordLists && plan.wordKeys.length) {
       setWordLists(upsertRepairWordList(wordLists, plan));
     }
-    if (setState && plan.typeIds.length) {
-      setState((prev) => ({ ...prev, enabledTypes: plan.typeIds }));
+    if (setState) {
+      setState((prev) => ({
+        ...prev,
+        ...(plan.typeIds.length ? { enabledTypes: plan.typeIds } : {}),
+        session: { ...(prev.session || {}), mistakePatterns: {} },
+      }));
     }
     if (setPracticePrefs) {
       setPracticePrefs(repairPrefsForPlan(practicePrefs, plan));
