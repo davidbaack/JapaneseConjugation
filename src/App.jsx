@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { IconCloud } from './components/Icons.jsx';
 import AuthModal from './components/AuthModal.jsx';
 import ViewSkeleton from './components/Skeleton.jsx';
+import UpdatePrompt from './components/UpdatePrompt.jsx';
 import { t } from './i18n/index.js';
 import { AppStateProvider, useApp } from './state/AppStateContext.jsx';
 import { useTablist } from './components/useTablist.js';
@@ -129,6 +130,7 @@ function AppShell() {
         onClose={() => setShowAuthModal(false)}
         supabase={supabase}
       />
+      <UpdatePrompt />
     </div>
   );
 }

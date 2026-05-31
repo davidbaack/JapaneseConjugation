@@ -16,10 +16,14 @@ export default class ErrorBoundary extends React.Component {
     logError(error, { source: 'ErrorBoundary', componentStack: info?.componentStack });
   }
 
-  handleReset() {
+  async handleReset() {
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
     window.location.reload();
   }
 
