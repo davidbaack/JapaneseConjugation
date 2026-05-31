@@ -7,7 +7,11 @@ vi.mock('../utils/supabase.js', () => ({ supabase: null }));
 
 import App from '../App.jsx';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  sessionStorage.clear();
+});
 
 describe('App shell', () => {
   it('renders the header, subtitle, and full nav', async () => {
@@ -54,6 +58,26 @@ describe('App shell', () => {
     expect(screen.getByText(/Prompt form:/i)).toBeTruthy();
     expect(screen.getByText(/From /i)).toBeTruthy();
     expect(screen.getAllByText(/->/).length).toBeGreaterThan(0);
+  }, 15000);
+
+  it('does not show answer-form endings or target English before answering', async () => {
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: '\u8a71\u3059',
+        group: 'godan',
+        type: 'desiderative-past-negative',
+      }),
+    );
+
+    render(<App />);
+
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    expect(screen.getAllByText(/Tai Past Negative/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/did not want to ~/i)).toBeTruthy();
+    expect(screen.getByText(/to speak/i)).toBeTruthy();
+    expect(screen.queryByText('\u305f\u304f\u306a\u304b\u3063\u305f')).toBeNull();
+    expect(screen.queryByText(/did not want to speak/i)).toBeNull();
   }, 15000);
 
   it('mounts every tab without hitting the error boundary', async () => {

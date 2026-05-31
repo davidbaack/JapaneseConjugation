@@ -44,6 +44,7 @@ import {
   formDisplay,
   promptDisplay,
   englishForForm,
+  answerPhaseTaskDetails,
   drillDirectionFor,
   makeChoices,
   makeReverseChoices,
@@ -588,9 +589,14 @@ export default function StudyView() {
       : noChangePrompt
         ? 'same form; answer may not change'
         : typeInfo.hint;
-  const transformationSupportText =
-    targetEnglish && targetEnglish !== promptEnglish ? targetEnglish : taskHint;
   const taskSub = transformationMode ? targetTypeInfo.sub : reverseDrill ? '辞書形' : typeInfo.sub;
+  const answerTaskDetails = answerPhaseTaskDetails({
+    reverseDrill,
+    noChangePrompt,
+    taskHint,
+    taskSub,
+  });
+  const transformationSupportText = answerTaskDetails.supportText;
   const taskOverride = reverseDrill
     ? transformationMode
       ? `Transform: recover the dictionary form from ${typeInfo.label} (${sourceForm})`
@@ -1670,12 +1676,12 @@ export default function StudyView() {
                         <span className="text-xl sm:text-2xl font-bold leading-tight">
                           {targetTypeInfo.label}
                         </span>
-                        {taskSub && (
+                        {answerTaskDetails.sub && (
                           <span
                             className="rounded-lg bg-white/15 px-2 py-1 text-base sm:text-lg font-semibold leading-tight"
                             lang="ja"
                           >
-                            {taskSub}
+                            {answerTaskDetails.sub}
                           </span>
                         )}
                       </div>
@@ -1692,21 +1698,17 @@ export default function StudyView() {
                       <span className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
                         {taskLabel}
                       </span>
-                      {taskSub && (
+                      {answerTaskDetails.sub && (
                         <span
                           className="text-sm text-indigo-500 dark:text-indigo-400 font-medium"
                           lang="ja"
                         >
-                          {taskSub}
+                          {answerTaskDetails.sub}
                         </span>
                       )}
-                      {targetEnglish && targetEnglish !== promptEnglish ? (
+                      {answerTaskDetails.supportText ? (
                         <span className="text-xs text-indigo-400 dark:text-indigo-500">
-                          · {targetEnglish}
-                        </span>
-                      ) : taskHint ? (
-                        <span className="text-xs text-indigo-400 dark:text-indigo-500">
-                          · {taskHint}
+                          · {answerTaskDetails.supportText}
                         </span>
                       ) : null}
                       {current.ruleLabel && practicePrefs.showWordCategory && (

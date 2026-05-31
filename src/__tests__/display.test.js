@@ -9,6 +9,7 @@ import {
   pastParticiple,
   thirdPerson,
   resolveDisplayScripts,
+  answerPhaseTaskDetails,
 } from '../utils/display.js';
 import { filterWordsForPrefs } from '../utils/conjugator.js';
 
@@ -175,6 +176,34 @@ describe('englishForForm', () => {
 
   it('returns meaning for null item', () => {
     expect(englishForForm(null, 'plain-past')).toBe('');
+  });
+});
+
+// --- answerPhaseTaskDetails ---
+describe('answerPhaseTaskDetails', () => {
+  it('hides forward answer-form subtext while keeping a generic form hint', () => {
+    expect(
+      answerPhaseTaskDetails({
+        taskSub: 'takunakatta',
+        taskHint: 'did not want to ~',
+      }),
+    ).toEqual({
+      sub: '',
+      supportText: 'did not want to ~',
+    });
+  });
+
+  it('keeps the dictionary-form cue for reverse drills', () => {
+    expect(
+      answerPhaseTaskDetails({
+        reverseDrill: true,
+        taskSub: 'dictionary form',
+        taskHint: 'answer with dictionary form',
+      }),
+    ).toEqual({
+      sub: 'dictionary form',
+      supportText: 'answer with dictionary form',
+    });
   });
 });
 

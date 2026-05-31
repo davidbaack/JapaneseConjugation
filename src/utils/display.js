@@ -210,6 +210,18 @@ export function mapActionMeaning(meaning, fn) {
   return actionParts(meaning).map(fn).join(' / ');
 }
 
+export function answerPhaseTaskDetails({
+  reverseDrill = false,
+  noChangePrompt = false,
+  taskHint = '',
+  taskSub = '',
+} = {}) {
+  return {
+    sub: reverseDrill ? taskSub : '',
+    supportText: noChangePrompt ? 'same form; answer may not change' : taskHint,
+  };
+}
+
 export function englishForForm(item, type) {
   if (!item) return '';
   if (
