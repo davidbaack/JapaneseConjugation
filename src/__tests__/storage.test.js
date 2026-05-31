@@ -345,6 +345,25 @@ describe('normalizeReferenceState', () => {
     });
     expect(result.history).toHaveLength(1);
   });
+
+  it('preserves selected reference context', () => {
+    const result = normalizeReferenceState({
+      selected: { dict: 'kaku', reading: 'kaku', meaning: 'to write', group: 'godan' },
+    });
+    expect(result.selected).toMatchObject({ dict: 'kaku', group: 'godan' });
+  });
+
+  it('deduplicates weak reference rule pins', () => {
+    const result = normalizeReferenceState({
+      weakRules: [
+        { key: 'godan|te-form', group: 'godan', typeId: 'te-form', label: 'Godan te-form' },
+        { key: 'godan|te-form', group: 'godan', typeId: 'te-form', label: 'Duplicate' },
+        { key: '', group: 'godan', typeId: 'plain-past' },
+      ],
+    });
+    expect(result.weakRules).toHaveLength(1);
+    expect(result.weakRules[0]).toMatchObject({ key: 'godan|te-form', typeId: 'te-form' });
+  });
 });
 
 describe('mergeState', () => {

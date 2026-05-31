@@ -49,6 +49,13 @@ import {
   focusPracticePrefsForWord,
   referenceWithSearch,
   referenceWithHistory,
+  referenceWithSelected,
+  referenceRuleTarget,
+  compareReferenceRuleTarget,
+  referencePracticePrefsForTarget,
+  referenceWithWeakRule,
+  referenceHasWeakRule,
+  weakReferencePracticeTarget,
 } from '../utils/referenceHelpers.js';
 
 export default function ReferenceViewSub({
@@ -62,6 +69,7 @@ export default function ReferenceViewSub({
   practicePrefs = DEFAULT_PREFS,
   setPracticePrefs,
   setTab,
+  practiceWord,
 }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
@@ -103,6 +111,9 @@ export default function ReferenceViewSub({
   const historyWords = reference.history.map(
     (h) => words.find((w) => wordKeyLocal(w) === wordKeyLocal(h)) || h,
   );
+  const referenceSelectedWord = reference.selected
+    ? words.find((w) => wordKeyLocal(w) === wordKeyLocal(reference.selected)) || null
+    : null;
   const matches = useMemo(() => searchWords(query, words), [query, words]);
   const lookupMatches = useMemo(() => formLookupCandidates(query, words), [query, words]);
   const scratchCandidates = useMemo(() => adHocReferenceCandidates(query), [query]);
@@ -125,9 +136,9 @@ export default function ReferenceViewSub({
 
   useEffect(() => {
     if (!selected || !words.some((w) => w.dict === selected.dict)) {
-      setSelected(matches[0] || words[0] || null);
+      setSelected(referenceSelectedWord || matches[0] || words[0] || null);
     }
-  }, [matches, words, selected]);
+  }, [matches, words, selected, referenceSelectedWord]);
 
   useEffect(() => {
     setLookupAiText('');
@@ -154,6 +165,7 @@ export default function ReferenceViewSub({
   const favoritesList = findFavoritesList(wordLists);
   const selectedFavorited = favoriteListHasWord(wordLists, selected);
   const favoriteCount = (favoritesList?.wordKeys || []).length;
+  const weakRuleCount = reference.weakRules.length;
 
   useEffect(() => {
     setCopyTableOk(false);
@@ -199,7 +211,7 @@ export default function ReferenceViewSub({
   function chooseReferenceWord(word, q = query) {
     setSelected(word);
     if (String(q || '').trim()) rememberSearch(q);
-    updateReference((ref) => referenceWithHistory(ref, word));
+    updateReference((ref) => referenceWithSelected(referenceWithHistory(ref, word), word));
   }
 
   function clearReferenceMemory() {
@@ -247,6 +259,148 @@ export default function ReferenceViewSub({
     setPracticePrefs(focusPracticePrefsForWord(practicePrefs, selected));
     setFavoriteMsg(`Drilling only ${selected.dict}.`);
     if (setTab) setTab('study');
+  }
+
+  function applyReferencePracticeTarget(target, sourceWord = selected) {
+    if (!target || !setPracticePrefs) return;
+    const typeIds = target.typeIds?.length ? target.typeIds : [target.typeId].filter(Boolean);
+    setPracticePrefs(referencePracticePrefsForTarget(practicePrefs, target));
+    setState((prev) => {
+      const remembered = sourceWord
+        ? referenceWithSelected(referenceWithHistory(prev.reference, sourceWord), sourceWord)
+        : normalizeReferenceState(prev.reference);
+      return {
+        ...prev,
+        enabledTypes: typeIds.length ? typeIds : prev.enabledTypes,
+        reference: remembered,
+      };
+    });
+  }
+
+  function drillReferenceRow(row) {
+    if (!selected || !row) return;
+    const target = referenceRuleTarget(selected, row.type);
+    applyReferencePracticeTarget(target);
+    setFavoriteMsg(`Drilling ${target?.label || row.type.label}.`);
+    if (practiceWord) {
+      practiceWord(selected, row.type.id, {
+        source: 'reference',
+        launchMode: 'drill',
+        returnTo: 'reference',
+        referenceLabel: target?.label || row.type.label,
+      });
+    } else if (setTab) {
+      setTab('study');
+    }
+  }
+
+  function compareReferenceRow(row) {
+    if (!selected || !row) return;
+    const target = compareReferenceRuleTarget(selected, row.type);
+    applyReferencePracticeTarget(target);
+    setFavoriteMsg(`Comparing ${target?.typeIds?.length || 1} nearby forms.`);
+    if (practiceWord) {
+      practiceWord(selected, row.type.id, {
+        source: 'reference',
+        launchMode: 'compare',
+        returnTo: 'reference',
+        referenceLabel: target?.label || row.type.label,
+      });
+    } else if (setTab) {
+      setTab('study');
+    }
+  }
+
+  function addReferenceWeakRule(row) {
+    if (!selected || !row) return;
+    const target = referenceRuleTarget(selected, row.type);
+    setState((prev) => ({
+      ...prev,
+      reference: referenceWithWeakRule(
+        referenceWithSelected(referenceWithHistory(prev.reference, selected), selected),
+        target,
+      ),
+    }));
+    setFavoriteMsg(`${target?.label || row.type.label} added to weak forms.`);
+  }
+
+  function drillWeakReferenceRules() {
+    const target = weakReferencePracticeTarget(reference);
+    if (!target) return;
+    applyReferencePracticeTarget(target);
+    setFavoriteMsg(`Drilling ${target.label}.`);
+    const seedType = selected
+      ? target.typeIds.find((id) =>
+          isAdjective(selected) ? id.startsWith('adj-') : !id.startsWith('adj-'),
+        )
+      : null;
+    if (practiceWord && selected && target.groups.includes(selected.group) && seedType) {
+      practiceWord(selected, seedType, {
+        source: 'reference',
+        launchMode: 'weak',
+        returnTo: 'reference',
+        referenceLabel: target.label,
+      });
+    } else if (setTab) {
+      setTab('study');
+    }
+  }
+
+  function renderReferenceRowActions(row, mobile = false) {
+    const target = selected ? referenceRuleTarget(selected, row.type) : null;
+    const added = referenceHasWeakRule(reference, target);
+    const buttonBase = mobile
+      ? 'flex-1 min-w-[7rem] px-3 py-2 rounded-lg border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition'
+      : 'h-8 w-8 rounded-lg border inline-flex items-center justify-center transition';
+    const quiet =
+      'border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800';
+    return (
+      <div className={`flex ${mobile ? 'flex-wrap' : 'flex-nowrap'} gap-1.5`}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            drillReferenceRow(row);
+          }}
+          className={`${buttonBase} bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 border-stone-850 dark:border-stone-200`}
+          title={`Drill ${row.type.label}`}
+          aria-label={`Drill ${row.type.label}`}
+        >
+          <IconRefresh className="w-3.5 h-3.5" />
+          <span className={mobile ? '' : 'sr-only'}>Drill</span>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            compareReferenceRow(row);
+          }}
+          className={`${buttonBase} ${quiet}`}
+          title={`Compare ${row.type.label}`}
+          aria-label={`Compare ${row.type.label}`}
+        >
+          <IconList className="w-3.5 h-3.5" />
+          <span className={mobile ? '' : 'sr-only'}>Compare</span>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            addReferenceWeakRule(row);
+          }}
+          className={`${buttonBase} ${
+            added
+              ? 'bg-amber-50 border-amber-250 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-300'
+              : quiet
+          }`}
+          title={`Add ${row.type.label} to weak forms`}
+          aria-label={`Add ${row.type.label} to weak forms`}
+        >
+          <IconStar className="w-3.5 h-3.5" />
+          <span className={mobile ? '' : 'sr-only'}>{added ? 'Added' : 'Weak'}</span>
+        </button>
+      </div>
+    );
   }
 
   async function copyTable() {
@@ -922,6 +1076,14 @@ export default function ReferenceViewSub({
                   Drill favorites
                 </button>
                 <button
+                  onClick={drillWeakReferenceRules}
+                  disabled={!weakRuleCount || !setPracticePrefs}
+                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 disabled:opacity-40 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
+                >
+                  <IconStar className="w-4 h-4" />
+                  Drill weak forms
+                </button>
+                <button
                   onClick={copyTable}
                   className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
                 >
@@ -948,6 +1110,12 @@ export default function ReferenceViewSub({
                 <IconCheck className="w-3.5 h-3.5" />
                 {masteredRows}/{rows.length} forms mastered
               </span>
+              {!!weakRuleCount && (
+                <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-amber-50 text-amber-750">
+                  <IconStar className="w-3.5 h-3.5" />
+                  {weakRuleCount} weak form{weakRuleCount === 1 ? '' : 's'}
+                </span>
+              )}
               {!!dueRows && (
                 <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-amber-50 text-amber-750">
                   {dueRows} due
@@ -1285,6 +1453,7 @@ export default function ReferenceViewSub({
                 <th className="px-4 py-2 text-left font-medium">Answer</th>
                 <th className="px-4 py-2 text-left font-medium">Progress</th>
                 <th className="px-4 py-2 text-left font-medium hidden md:table-cell">Rule</th>
+                <th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
@@ -1343,13 +1512,17 @@ export default function ReferenceViewSub({
                       <td className="px-4 py-2 text-xs text-stone-550 hidden md:table-cell text-left">
                         {r.explanation.rule}
                       </td>
+                      <td className="px-4 py-2 hidden sm:table-cell">
+                        {renderReferenceRowActions(r)}
+                      </td>
                     </tr>
                     {expanded && (
                       <tr className="bg-stone-50/50 dark:bg-stone-950/20">
                         <td
-                          colSpan="4"
+                          colSpan="5"
                           className="px-5 py-4 border-t border-stone-100 dark:border-stone-800 space-y-2.5"
                         >
+                          <div className="sm:hidden">{renderReferenceRowActions(r, true)}</div>
                           <PitchAccentSection
                             word={selected}
                             kanaText={r.answer}

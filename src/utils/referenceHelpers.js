@@ -15,7 +15,7 @@ import {
   isIrregularAdjective,
 } from './conjugator.js';
 import { explainItem, GROUP_NAMES } from './conjugatorExplain.js';
-import { CONJ_TYPES, ADJ_TYPES } from '../data/conjugationTypes.js';
+import { CONJ_TYPES, ADJ_TYPES, ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
 import { normalizeReferenceState, referenceProgressFor, defaultState } from './storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
@@ -422,6 +422,162 @@ export function referenceRows(item, state = defaultState()) {
     ...r,
     progress: referenceProgressFor(state, item, r.type.id),
   }));
+}
+
+export function referenceWithSelected(ref, word) {
+  const current = normalizeReferenceState(ref);
+  if (!word || !word.dict || !word.reading || !word.group) return current;
+  return {
+    ...current,
+    selected: {
+      dict: word.dict,
+      reading: word.reading,
+      meaning: word.meaning || '',
+      group: word.group,
+      selectedAt: Date.now(),
+    },
+  };
+}
+
+export function referenceRuleKey(group, typeId) {
+  return `${group}|${typeId}`;
+}
+
+export function referenceRuleTarget(item, type) {
+  const typeId = typeof type === 'string' ? type : type?.id;
+  const info =
+    typeof type === 'string'
+      ? ALL_CARD_TYPES.find((candidate) => candidate.id === type) || {
+          id: type,
+          label: type,
+          hint: '',
+        }
+      : type;
+  if (!item || !item.group || !typeId) return null;
+  const group = wordGroupId(item);
+  const kind = wordKind(item);
+  return {
+    key: referenceRuleKey(group, typeId),
+    group,
+    typeId,
+    typeIds: [typeId],
+    groups: [group],
+    kinds: [kind],
+    kind,
+    label: `${GROUP_NAMES[group] || group} ${info?.label || typeId}`,
+    hint: info?.hint || '',
+  };
+}
+
+const DIRECT_COMPARE_TYPES = {
+  'plain-past': ['te-form'],
+  'te-form': ['plain-past'],
+  'plain-negative': ['plain-past-negative', 'negative-te'],
+  'plain-past-negative': ['plain-negative'],
+  'polite-present': ['polite-past', 'polite-negative'],
+  'polite-past': ['polite-present'],
+  'polite-negative': ['polite-past-negative', 'plain-negative'],
+  'polite-past-negative': ['polite-negative'],
+  potential: ['passive'],
+  passive: ['potential'],
+  causative: ['short-causative', 'causative-passive'],
+  'short-causative': ['causative'],
+  'causative-passive': ['passive', 'causative'],
+  'conditional-tara': ['conditional-ba', 'conditional-nara'],
+  'conditional-ba': ['conditional-tara'],
+  progressive: ['te-form'],
+  'negative-te': ['te-form', 'plain-negative'],
+  'adj-plain-past': ['adj-te-form'],
+  'adj-te-form': ['adj-plain-past', 'adj-negative-te-form'],
+  'adj-plain-negative': ['adj-plain-past-negative', 'adj-negative-te-form'],
+  'adj-negative-te-form': ['adj-te-form', 'adj-plain-negative'],
+  'adj-conditional': ['adj-tara'],
+  'adj-tara': ['adj-conditional'],
+};
+
+export function compareTypeIdsForReferenceType(typeId) {
+  const valid = new Set(ALL_CARD_TYPES.map((type) => type.id));
+  const direct = (DIRECT_COMPARE_TYPES[typeId] || []).filter((id) => valid.has(id));
+  if (direct.length) return [typeId, ...direct].slice(0, 3);
+
+  const family = FORM_GROUPS.find((group) => group.typeIds.includes(typeId));
+  if (family) {
+    const index = family.typeIds.indexOf(typeId);
+    const neighbors = [family.typeIds[index - 1], family.typeIds[index + 1]].filter((id) =>
+      valid.has(id),
+    );
+    if (neighbors.length) return [typeId, ...neighbors].slice(0, 3);
+  }
+
+  const typeList = typeId.startsWith('adj-') ? ADJ_TYPES : CONJ_TYPES;
+  const index = typeList.findIndex((type) => type.id === typeId);
+  if (index < 0) return [typeId].filter((id) => valid.has(id));
+  return [typeId, typeList[index - 1]?.id, typeList[index + 1]?.id]
+    .filter((id) => valid.has(id))
+    .slice(0, 3);
+}
+
+export function compareReferenceRuleTarget(item, type) {
+  const target = referenceRuleTarget(item, type);
+  if (!target) return null;
+  const typeIds = compareTypeIdsForReferenceType(target.typeId);
+  return {
+    ...target,
+    key: `${target.key}|compare:${typeIds.join('+')}`,
+    typeIds,
+    label: `${target.label} comparison`,
+  };
+}
+
+export function referencePracticePrefsForTarget(prefs = DEFAULT_PREFS, target = null) {
+  const groups = target?.groups?.length ? target.groups : target?.group ? [target.group] : [];
+  const kinds = target?.kinds?.length ? target.kinds : target?.kind ? [target.kind] : [];
+  return {
+    ...prefs,
+    drillDirection: 'forward',
+    practiceFocus: 'balanced',
+    wordListIds: [],
+    jlptLevels: DEFAULT_PREFS.jlptLevels,
+    genkiLessons: [],
+    minnaLessons: [],
+    wordGroups: groups.length ? groups : DEFAULT_PREFS.wordGroups,
+    wordTypes: kinds.length ? kinds : DEFAULT_PREFS.wordTypes,
+  };
+}
+
+export function referenceWithWeakRule(ref, target) {
+  const current = normalizeReferenceState(ref);
+  if (!target?.key || !target.group || !target.typeId) return current;
+  const entry = {
+    key: target.key,
+    group: target.group,
+    typeId: target.typeId,
+    kind: target.kind || (target.group.includes('adjective') ? 'adjective' : 'verb'),
+    label: target.label || target.typeId,
+    hint: target.hint || '',
+    addedAt: Date.now(),
+  };
+  return {
+    ...current,
+    weakRules: [entry, ...current.weakRules.filter((rule) => rule.key !== entry.key)].slice(0, 24),
+  };
+}
+
+export function referenceHasWeakRule(ref, target) {
+  const current = normalizeReferenceState(ref);
+  return !!(target?.key && current.weakRules.some((rule) => rule.key === target.key));
+}
+
+export function weakReferencePracticeTarget(ref) {
+  const weakRules = normalizeReferenceState(ref).weakRules;
+  if (!weakRules.length) return null;
+  return {
+    key: 'reference-weak-rules',
+    label: weakRules.length === 1 ? weakRules[0].label : `${weakRules.length} weak reference rules`,
+    groups: [...new Set(weakRules.map((rule) => rule.group))],
+    typeIds: [...new Set(weakRules.map((rule) => rule.typeId))],
+    kinds: [...new Set(weakRules.map((rule) => rule.kind || 'verb'))],
+  };
 }
 
 export function splitJapaneseMorae(text = '') {

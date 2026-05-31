@@ -152,6 +152,10 @@ export default function StudyView() {
   const [completedDueIds, setCompletedDueIds] = useState(() => new Set());
   const startedGoalHit = useRef(!!(state.daily || {}).goalHit);
   const [bonusMode, setBonusMode] = useState(false);
+  const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
+  const [launchContext, setLaunchContext] = useState(() =>
+    focus?.returnTo === 'reference' ? focus : null,
+  );
   const inputRef = useRef(null);
   const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
@@ -170,14 +174,15 @@ export default function StudyView() {
     // Keep a "Practice this verb" target from Check eligible even if it sits
     // outside the current Study filters, so the reset guard below doesn't
     // discard the focus card the moment it's seeded.
+    const lockedWord = focus?.word || focusWordLock;
     if (
-      focus?.word &&
-      !base.some((w) => w.dict === focus.word.dict && w.group === focus.word.group)
+      lockedWord &&
+      !base.some((w) => w.dict === lockedWord.dict && w.group === lockedWord.group)
     ) {
-      return [...base, focus.word];
+      return [...base, lockedWord];
     }
     return base;
-  }, [verbs, practicePrefs, wordLists, focus]);
+  }, [verbs, practicePrefs, wordLists, focus, focusWordLock]);
 
   const activeDrillMode = practicePrefs.drillMode || DEFAULT_PREFS.drillMode;
   const transformationMode = activeDrillMode === 'transformation';
@@ -216,17 +221,22 @@ export default function StudyView() {
   );
 
   useEffect(() => {
-    if (current !== null) return;
     // When arriving from Check's "Practice this verb", seed that exact word/form
     // once. If no rule covers it, fall through to normal selection.
     if (focus?.word && !focusSeededRef.current) {
       focusSeededRef.current = true;
+      setFocusWordLock(focus.word);
+      if (focus.returnTo === 'reference') setLaunchContext(focus);
       const card = buildFocusCard(state, focus.word, focus.type);
+      onFocusConsumed?.();
       if (card) {
+        setAnswer('');
+        setPhase('answering');
         setCurrent(card);
         return;
       }
     }
+    if (current !== null) return;
     setCurrent(selectNext(state, practiceWords, enabledTypes, null, practicePrefs));
     // state intentionally omitted — this triggers on card change, not every state mutation
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -236,10 +246,6 @@ export default function StudyView() {
   useEffect(() => {
     if (current) persistCurrent(current);
   }, [current]);
-
-  // Clear the one-shot focus when leaving Study, so returning later doesn't
-  // re-seed the same word.
-  useEffect(() => () => onFocusConsumed?.(), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (
@@ -1233,9 +1239,36 @@ export default function StudyView() {
         )}
       </div>
     ) : null;
+  const referenceLaunch = launchContext;
+
+  function returnToReference() {
+    setLaunchContext(null);
+    setFocusWordLock(null);
+    onFocusConsumed?.();
+    setTab('library');
+  }
 
   return (
     <div className="space-y-4">
+      {referenceLaunch && (
+        <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="text-left">
+            <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
+              Reference drill
+            </div>
+            <div className="text-sm text-stone-700 dark:text-stone-250">
+              {referenceLaunch.referenceLabel || 'Focused reference practice'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={returnToReference}
+            className="px-3 py-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white/70 dark:bg-stone-950/40 text-sm text-indigo-700 dark:text-indigo-250 hover:bg-white dark:hover:bg-stone-900 transition"
+          >
+            Back to reference
+          </button>
+        </div>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div
           role="group"

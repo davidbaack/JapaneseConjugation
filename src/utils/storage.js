@@ -467,6 +467,16 @@ export function localDateKey(offsetDays = 0) {
 
 export function normalizeReferenceState(ref = null) {
   if (!ref) ref = {};
+  const selected =
+    ref.selected && ref.selected.dict && ref.selected.reading && ref.selected.group
+      ? {
+          dict: ref.selected.dict,
+          reading: ref.selected.reading,
+          meaning: ref.selected.meaning || '',
+          group: ref.selected.group,
+          selectedAt: ref.selected.selectedAt || Date.now(),
+        }
+      : null;
   const recentSearches = Array.isArray(ref.recentSearches)
     ? ref.recentSearches
         .map((s) => String(s || '').trim())
@@ -486,7 +496,22 @@ export function normalizeReferenceState(ref = null) {
         }))
         .slice(0, 24)
     : [];
-  return { recentSearches, history };
+  const weakRules = Array.isArray(ref.weakRules)
+    ? ref.weakRules
+        .filter((rule) => rule && rule.key && rule.group && rule.typeId)
+        .map((rule) => ({
+          key: String(rule.key),
+          group: String(rule.group),
+          typeId: String(rule.typeId),
+          kind: rule.kind === 'adjective' ? 'adjective' : 'verb',
+          label: String(rule.label || rule.typeId),
+          hint: String(rule.hint || ''),
+          addedAt: Number(rule.addedAt) || Date.now(),
+        }))
+        .filter((rule, index, all) => all.findIndex((other) => other.key === rule.key) === index)
+        .slice(0, 24)
+    : [];
+  return { recentSearches, history, selected, weakRules };
 }
 
 export function defaultState() {

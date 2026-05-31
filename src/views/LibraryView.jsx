@@ -27,6 +27,7 @@ export default function LibraryView() {
     setPracticePrefs,
     activeGeminiKey: geminiKey,
     setTab,
+    practiceWord,
   } = useApp();
   const [subTab, setSubTab] = useState('reference');
   const { tabProps, panelProps } = useTablist(
@@ -75,6 +76,7 @@ export default function LibraryView() {
             practicePrefs={practicePrefs}
             setPracticePrefs={setPracticePrefs}
             setTab={setTab}
+            practiceWord={practiceWord}
           />
         )}
         {subTab === 'lists' && (
