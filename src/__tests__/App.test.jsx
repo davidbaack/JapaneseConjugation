@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-library/react';
 
 // No Supabase configured in tests → auth/sync effects no-op (offline-first path).
 vi.mock('../utils/supabase.js', () => ({ supabase: null }));
@@ -39,6 +39,33 @@ describe('App shell', () => {
     await waitFor(() => expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy(), {
       timeout: 5000,
     });
+    const direction = within(screen.getByRole('group', { name: 'Practice direction' }));
+    expect(direction.getByRole('button', { name: 'Conjugate' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+
+    fireEvent.click(direction.getByRole('button', { name: 'Un-conjugate' }));
+
+    await waitFor(() => {
+      const updatedDirection = within(screen.getByRole('group', { name: 'Practice direction' }));
+      expect(
+        updatedDirection.getByRole('button', { name: 'Un-conjugate' }).getAttribute('aria-pressed'),
+      ).toBe('true');
+    });
+    await waitFor(() => expect(screen.getByPlaceholderText(/Type dictionary form/i)).toBeTruthy());
+  });
+
+  it('starts the Today launcher against the daily goal', async () => {
+    render(<App />);
+    const launcher = await screen.findByRole(
+      'button',
+      { name: 'Start daily drill' },
+      { timeout: 5000 },
+    );
+
+    fireEvent.click(launcher);
+
+    await waitFor(() => expect(screen.getAllByText(/0\/30 today/i).length).toBeGreaterThan(0));
   });
 
   it('starts Transform mode from the Study screen with a source-to-target route', async () => {
@@ -51,8 +78,9 @@ describe('App shell', () => {
 
     fireEvent.click(transformButton);
 
+    const direction = within(screen.getByRole('group', { name: 'Practice direction' }));
     expect(screen.getAllByRole('button', { name: /Conjugate/i }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Un-conjugate' })).toBeTruthy();
+    expect(direction.getByRole('button', { name: 'Un-conjugate' })).toBeTruthy();
     await waitFor(() => expect(screen.getAllByText(/Transform/i).length).toBeGreaterThan(0));
     expect(screen.getByText(/Conjugate to/i)).toBeTruthy();
     expect(screen.getByText(/Prompt form:/i)).toBeTruthy();

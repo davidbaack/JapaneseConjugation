@@ -356,7 +356,7 @@ export function buildConjugationSpeedRows(state, words = []) {
     });
 }
 
-export function launchPrefsForReadinessDimension(dimensionId, currentPrefs = {}) {
+export function launchPrefsForReadinessDimension(dimensionId) {
   const base = {
     practiceFocus: 'weak',
     drillDirection: 'forward',
@@ -364,19 +364,18 @@ export function launchPrefsForReadinessDimension(dimensionId, currentPrefs = {})
     listeningPrompt: false,
   };
   if (dimensionId === 'recognition') {
-    return { ...base, answerMode: 'choice', drillMode: 'word', durationSec: 0 };
+    return { ...base, answerMode: 'choice', drillMode: 'word' };
   }
   if (dimensionId === 'speed') {
     return {
       ...base,
       answerMode: 'input',
       drillMode: 'word',
-      durationSec: currentPrefs.durationSec || 90,
       autoAdvanceCorrect: true,
     };
   }
   if (dimensionId === 'sentence') {
-    return { ...base, answerMode: 'input', drillMode: 'sentence', durationSec: 0 };
+    return { ...base, answerMode: 'input', drillMode: 'sentence' };
   }
-  return { ...base, answerMode: 'input', drillMode: 'word', durationSec: 0 };
+  return { ...base, answerMode: 'input', drillMode: 'word' };
 }

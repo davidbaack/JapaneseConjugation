@@ -19,6 +19,10 @@ describe('SettingsView controls', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'settings', exact: true }));
 
     await screen.findByText('Practice session', {}, { timeout: 5000 });
+    expect(screen.queryByText('Drill mode')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Transform', exact: true })).toBeNull();
+    expect(screen.queryByText('Study direction')).toBeNull();
+    expect(screen.queryByText('Timed drill')).toBeNull();
     expect(screen.getByText('Prompt form')).toBeTruthy();
     const promptForm = within(screen.getByRole('group', { name: 'Prompt form' }));
     expect(promptForm.getByRole('button', { name: 'Dictionary', exact: true })).toBeTruthy();
