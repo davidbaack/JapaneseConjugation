@@ -1,13 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  IconVolume,
-  IconRefresh,
-  IconPen,
-  IconSpark,
-  IconChat,
-  IconCloud,
-} from '../components/Icons.jsx';
-import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import { IconVolume, IconRefresh, IconSpark, IconChat, IconCloud } from '../components/Icons.jsx';
 import {
   STARTER_VERBS,
   STARTER_ADJECTIVES,
@@ -17,10 +9,9 @@ import {
   WORD_TYPE_OPTIONS,
   WORD_GROUP_OPTIONS,
 } from '../data/starterWords.js';
-import { ALL_CARD_TYPES, TYPE_PACKS, FORM_GROUPS } from '../data/conjugationTypes.js';
-import { AI_FEEDBACK_LEVELS, AI_GUIDE_TONES } from '../utils/gemini.js';
-import { toHiragana, kanaToRomaji } from '../utils/romaji.js';
-import { normalizePromptFormSetting, typePreviewValues } from '../utils/conjugator.js';
+import { ALL_CARD_TYPES, TYPE_PACKS } from '../data/conjugationTypes.js';
+import { AI_FEEDBACK_LEVELS } from '../utils/gemini.js';
+import { normalizePromptFormSetting } from '../utils/conjugator.js';
 import {
   buildPracticePoolSummary,
   weakTypeIdsForState,
@@ -28,7 +19,6 @@ import {
   mergeState,
 } from '../utils/storage.js';
 import {
-  formDisplay,
   mergePracticePrefs,
   resolveDisplayScripts,
   scriptModeFromDisplay,
@@ -38,65 +28,11 @@ import { serializeBackup, parseBackup } from '../utils/backup.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
-const POLITE_FORM_IDS = ALL_CARD_TYPES.filter(
-  (t) => t.id.includes('polite') || t.label.toLowerCase().includes('polite'),
-).map((t) => t.id);
-
 const PROMPT_FORM_OPTIONS = [
   { id: 'dictionary', label: 'Dictionary' },
   { id: 'polite-present', label: 'Masu' },
   { id: 'random', label: 'Mixed' },
 ];
-
-function FormRow({ t, on, previews, practicePrefs, toggle }) {
-  return (
-    <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(14rem,auto)_auto] gap-3 items-center py-2 px-3 hover:bg-stone-50 dark:hover:bg-stone-950">
-      <div className="min-w-0">
-        <div className="text-sm font-medium text-stone-850 dark:text-stone-200">{t.label}</div>
-        <div className="text-xs text-stone-500">
-          {t.sub && t.sub + ' · '}
-          {t.hint}
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        {previews.map((p) => {
-          const view = formDisplay(p.answer, practicePrefs, p.item, t.id);
-          return (
-            <div
-              key={`${t.id}-${p.item.dict}`}
-              className="min-w-0 rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 px-2 py-1.5"
-            >
-              <div className="text-[11px] text-stone-400 truncate" lang="ja">
-                {p.item.dict}
-              </div>
-              <ScriptDisplay
-                view={view}
-                className="text-sm font-medium truncate text-stone-800 dark:text-stone-200"
-                subClassName="text-[11px] text-stone-400 truncate"
-              />
-            </div>
-          );
-        })}
-      </div>
-      <button
-        onClick={() => toggle(t.id)}
-        className={`relative w-10 h-6 rounded-full transition flex-shrink-0 justify-self-end ${on ? 'bg-indigo-600' : 'bg-stone-300 dark:bg-stone-700'}`}
-        title={`${on ? 'Disable' : 'Enable'} ${t.label}`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition ${on ? 'translate-x-4' : ''}`}
-        />
-      </button>
-    </div>
-  );
-}
-
-function compactLookupText(s) {
-  return String(s || '')
-    .normalize('NFKC')
-    .replace(/[、。！？\s'"「」『』（）()[\]{}]/g, '')
-    .toLowerCase();
-}
 
 export default function SettingsView() {
   const {
@@ -127,22 +63,12 @@ export default function SettingsView() {
   const [importErr, setImportErr] = useState('');
   const [msg, setMsg] = useState('');
   const [copyOk, setCopyOk] = useState(false);
-  const [typeSearch, setTypeSearch] = useState('');
-  const [openGroups, setOpenGroups] = useState(new Set());
   const [openLessons, setOpenLessons] = useState({ genki: false, minna: false });
 
   const exportData = useMemo(
     () => serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
     [state, customVerbs, customAdjectives, wordLists, practicePrefs],
   );
-
-  function toggle(id) {
-    const has = state.enabledTypes.includes(id);
-    setState({
-      ...state,
-      enabledTypes: has ? state.enabledTypes.filter((t) => t !== id) : [...state.enabledTypes, id],
-    });
-  }
 
   function togglePref(key, id, allIds) {
     const cur = practicePrefs[key] || allIds;
@@ -207,44 +133,6 @@ export default function SettingsView() {
     const valid = new Set(ALL_CARD_TYPES.map((t) => t.id));
     const clean = [...new Set((ids || []).filter((id) => valid.has(id)))];
     if (clean.length) setState({ ...state, enabledTypes: clean });
-  }
-
-  function toggleAllPolite() {
-    if (allPoliteOn) {
-      setState({
-        ...state,
-        enabledTypes: state.enabledTypes.filter((id) => !POLITE_FORM_IDS.includes(id)),
-      });
-    } else {
-      setState({
-        ...state,
-        enabledTypes: [...new Set([...state.enabledTypes, ...POLITE_FORM_IDS])],
-      });
-    }
-  }
-
-  function toggleGroupForms(groupTypeIds) {
-    const allOn = groupTypeIds.every((id) => state.enabledTypes.includes(id));
-    if (allOn) {
-      setState({
-        ...state,
-        enabledTypes: state.enabledTypes.filter((id) => !groupTypeIds.includes(id)),
-      });
-    } else {
-      setState({
-        ...state,
-        enabledTypes: [...new Set([...state.enabledTypes, ...groupTypeIds])],
-      });
-    }
-  }
-
-  function toggleOpenGroup(groupId) {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) next.delete(groupId);
-      else next.add(groupId);
-      return next;
-    });
   }
 
   function reset() {
@@ -328,23 +216,7 @@ export default function SettingsView() {
     () => buildPracticePoolSummary(state, settingsWords, practicePrefs, wordLists),
     [state, settingsWords, practicePrefs, wordLists],
   );
-  const typeNeedle = typeSearch.trim().toLowerCase();
-  const typeNeedleKana = compactLookupText(toHiragana(typeSearch));
-  const visibleCardTypes = ALL_CARD_TYPES.filter((t) => {
-    if (!typeNeedle) return true;
-    const hay = [t.id, t.label, t.sub, t.hint].join(' ').toLowerCase();
-    const kanaHay = compactLookupText(`${t.sub} ${t.hint}`);
-    return (
-      hay.includes(typeNeedle) ||
-      kanaHay.includes(typeNeedleKana) ||
-      kanaToRomaji(t.sub || '')
-        .toLowerCase()
-        .includes(typeNeedle)
-    );
-  });
-
-  const enabledPoliteCount = POLITE_FORM_IDS.filter((id) => state.enabledTypes.includes(id)).length;
-  const allPoliteOn = enabledPoliteCount === POLITE_FORM_IDS.length;
+  const activeTypeCount = state.enabledTypes.length;
 
   return (
     <div className="space-y-4 text-left">
@@ -608,48 +480,9 @@ export default function SettingsView() {
               ))}
             </div>
             <p className="text-[11px] text-stone-400 mt-1">
-              Hides う-verb / る-verb / な-adjective labels during review — identifying the category
-              is part of the training.
+              Hides う-verb / る-verb / な-adjective labels during review so identifying the
+              category stays part of the training.
             </p>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Identical forms</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: true, label: 'Skip' },
-                { id: false, label: 'Keep' },
-              ].map((o) => (
-                <button
-                  key={String(o.id)}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, skipDuplicateForms: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.skipDuplicateForms !== false) === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={() =>
-                setPracticePrefs({
-                  ...practicePrefs,
-                  colorCodeConjugations: practicePrefs.colorCodeConjugations === false,
-                })
-              }
-              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
-                practicePrefs.colorCodeConjugations !== false
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-              }`}
-            >
-              <IconPen className="w-4 h-4 inline-block mr-1.5" />
-              Color segments
-            </button>
           </div>
           <div className="flex items-end">
             <button
@@ -682,21 +515,6 @@ export default function SettingsView() {
             >
               <IconRefresh className="w-4 h-4" />
               Auto next
-            </button>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={() =>
-                setPracticePrefs({ ...practicePrefs, autoSpeak: !practicePrefs.autoSpeak })
-              }
-              className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
-                practicePrefs.autoSpeak
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-              }`}
-            >
-              <IconVolume className="w-4 h-4 inline-block mr-1.5" />
-              Speak answers
             </button>
           </div>
           <div className="flex items-end">
@@ -993,7 +811,7 @@ export default function SettingsView() {
           Conjugation types in scope
         </h3>
         <p className="text-xs text-stone-500 mb-4">
-          Toggle individual forms, or apply a form pack.
+          Choose a focused pack instead of managing dozens of individual forms.
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
           {typePacks.map((pack) => {
@@ -1024,145 +842,13 @@ export default function SettingsView() {
             );
           })}
         </div>
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <button
-            onClick={toggleAllPolite}
-            title={
-              allPoliteOn
-                ? 'Disable all polite (ます/です) forms'
-                : 'Enable all polite (ます/です) forms'
-            }
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-              allPoliteOn
-                ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-                : enabledPoliteCount > 0
-                  ? 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-950/50'
-                  : 'bg-white dark:bg-stone-950 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-800 hover:border-indigo-300 dark:hover:border-indigo-700'
-            }`}
-          >
-            Polite forms
-            <span
-              className={`tabular-nums px-1.5 py-0.5 rounded-full text-xs ${
-                allPoliteOn
-                  ? 'bg-white/20 text-white'
-                  : 'bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400'
-              }`}
-            >
-              {enabledPoliteCount}/{POLITE_FORM_IDS.length}
-            </span>
-          </button>
+        <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2 text-xs text-stone-500 dark:text-stone-400">
+          Current mix:{' '}
+          <span className="font-semibold text-stone-700 dark:text-stone-200">
+            {activeTypeCount}
+          </span>{' '}
+          forms selected.
         </div>
-        <div className="mb-3 grid sm:grid-cols-[1fr_auto] gap-2 items-center">
-          <input
-            value={typeSearch}
-            onChange={(e) => setTypeSearch(e.target.value)}
-            placeholder="Search forms, e.g. passive, たい, ba..."
-            aria-label="Search conjugation forms"
-            className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
-          />
-          <div className="text-xs text-stone-400 tabular-nums text-right">
-            {visibleCardTypes.length}/{ALL_CARD_TYPES.length} forms
-          </div>
-        </div>
-        {typeSearch ? (
-          <>
-            <div className="space-y-2">
-              {visibleCardTypes.map((t) => (
-                <FormRow
-                  key={t.id}
-                  t={t}
-                  on={state.enabledTypes.includes(t.id)}
-                  previews={typePreviewValues(t.id)}
-                  practicePrefs={practicePrefs}
-                  toggle={toggle}
-                />
-              ))}
-            </div>
-            {!visibleCardTypes.length && (
-              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4 text-sm text-stone-500 text-center">
-                No forms match that search.
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="space-y-1">
-            {FORM_GROUPS.map((group) => {
-              const groupTypes = group.typeIds
-                .map((id) => ALL_CARD_TYPES.find((t) => t.id === id))
-                .filter(Boolean);
-              const enabledCount = groupTypes.filter((t) =>
-                state.enabledTypes.includes(t.id),
-              ).length;
-              const allOn = enabledCount === groupTypes.length;
-              const someOn = enabledCount > 0 && !allOn;
-              const isOpen = openGroups.has(group.id);
-              return (
-                <div
-                  key={group.id}
-                  className="rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden"
-                >
-                  <div className="flex items-center gap-2 px-3 py-2.5 bg-stone-50 dark:bg-stone-950">
-                    <button
-                      onClick={() => toggleOpenGroup(group.id)}
-                      className="flex items-center gap-2 flex-1 min-w-0 text-left"
-                    >
-                      <svg
-                        className={`w-3.5 h-3.5 text-stone-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M7.293 4.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <span className="text-sm font-medium text-stone-800 dark:text-stone-200 truncate">
-                        {group.label}
-                      </span>
-                      <span
-                        className={`ml-1 tabular-nums px-1.5 py-0.5 rounded-full text-xs flex-shrink-0 ${
-                          allOn
-                            ? 'bg-indigo-600 text-white'
-                            : someOn
-                              ? 'bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300'
-                              : 'bg-white dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700'
-                        }`}
-                      >
-                        {enabledCount}/{groupTypes.length}
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => toggleGroupForms(group.typeIds)}
-                      className={`flex-shrink-0 text-xs px-2.5 py-1 rounded-lg border transition ${
-                        allOn
-                          ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-                          : 'bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700 hover:border-indigo-300 dark:hover:border-indigo-700'
-                      }`}
-                      title={allOn ? `Disable all ${group.label}` : `Enable all ${group.label}`}
-                    >
-                      {allOn ? 'Disable all' : 'Enable all'}
-                    </button>
-                  </div>
-                  {isOpen && (
-                    <div className="divide-y divide-stone-100 dark:divide-stone-800">
-                      {groupTypes.map((t) => (
-                        <FormRow
-                          key={t.id}
-                          t={t}
-                          on={state.enabledTypes.includes(t.id)}
-                          previews={typePreviewValues(t.id)}
-                          practicePrefs={practicePrefs}
-                          toggle={toggle}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
@@ -1176,7 +862,7 @@ export default function SettingsView() {
 
         {geminiKey ? (
           <div className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-955/20 border border-emerald-250 dark:border-emerald-900 rounded-xl px-3 py-2 mb-3">
-            ✓{' '}
+            Active:{' '}
             {geminiKey === 'proxy'
               ? 'Gemini API is active via the cloud proxy.'
               : 'Gemini API is active (configured in environment).'}
@@ -1188,7 +874,7 @@ export default function SettingsView() {
         )}
 
         <div className="grid sm:grid-cols-2 gap-3 mt-3">
-          <div>
+          <div className="sm:col-span-2">
             <label className="text-xs text-stone-500 block mb-1">AI feedback</label>
             <div className="grid grid-cols-2 gap-2">
               {AI_FEEDBACK_LEVELS.map((o) => (
@@ -1197,24 +883,6 @@ export default function SettingsView() {
                   onClick={() => setPracticePrefs({ ...practicePrefs, aiFeedbackLevel: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     (practicePrefs.aiFeedbackLevel || DEFAULT_PREFS.aiFeedbackLevel) === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Guide tone</label>
-            <div className="grid grid-cols-3 gap-2">
-              {AI_GUIDE_TONES.map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, aiGuideTone: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.aiGuideTone || DEFAULT_PREFS.aiGuideTone) === o.id
                       ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
@@ -1386,7 +1054,7 @@ export default function SettingsView() {
               onClick={copyExport}
               className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"
             >
-              {copyOk ? '✓ Copied' : 'Copy to clipboard'}
+              {copyOk ? 'Copied' : 'Copy to clipboard'}
             </button>
           </div>
         )}
@@ -1398,7 +1066,7 @@ export default function SettingsView() {
                 setImportText(e.target.value);
                 setImportErr('');
               }}
-              placeholder="Paste backup JSON…"
+              placeholder="Paste backup JSON..."
               aria-label="Paste backup JSON to restore"
               className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-250 rounded-lg focus:border-indigo-500 focus:outline-none"
               autoCorrect="off"
@@ -1409,7 +1077,7 @@ export default function SettingsView() {
               {importErr && <div className="text-sm text-rose-600">{importErr}</div>}
             </div>
             <p className="text-xs text-rose-600 dark:text-rose-400">
-              ⚠ Restoring replaces current progress.
+              Warning: Restoring replaces current progress.
             </p>
             <button
               onClick={doImport}

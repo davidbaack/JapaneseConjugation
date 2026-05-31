@@ -30,6 +30,11 @@ describe('SettingsView controls', () => {
     expect(promptForm.getByRole('button', { name: 'Mixed', exact: true })).toBeTruthy();
     expect(screen.queryByRole('option', { name: /Plain Past/i })).toBeNull();
     expect(screen.queryByText(/Trick questions/i)).toBeNull();
+    expect(screen.queryByText('Identical forms')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Color segments', exact: true })).toBeNull();
+    expect(screen.queryByText('Guide tone')).toBeNull();
+    expect(screen.queryByLabelText('Search conjugation forms')).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Speak answers', exact: true })).toHaveLength(1);
 
     expect(screen.getByText('Kana feedback while typing')).toBeTruthy();
     const kanaFeedback = within(screen.getByRole('group', { name: 'Kana feedback while typing' }));
@@ -41,6 +46,9 @@ describe('SettingsView controls', () => {
     const wordCategory = within(screen.getByRole('group', { name: 'Word category label' }));
     expect(wordCategory.getByRole('button', { name: 'Show', exact: true })).toBeTruthy();
     expect(wordCategory.getByRole('button', { name: 'Hide', exact: true })).toBeTruthy();
+
+    expect(screen.getByText('Conjugation types in scope')).toBeTruthy();
+    expect(screen.getByText(/Current mix:/)).toBeTruthy();
 
     await waitFor(() => {
       const raw = localStorage.getItem('jp-verb-srs-v2');

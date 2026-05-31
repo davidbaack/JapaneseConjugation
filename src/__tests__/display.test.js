@@ -326,4 +326,28 @@ describe('mergePracticePrefs', () => {
       reviewLimitSource: 'repair',
     });
   });
+
+  it('resets hidden low-value settings while preserving restored learner controls', () => {
+    const prefs = mergePracticePrefs({
+      skipDuplicateForms: false,
+      trickQuestions: true,
+      colorCodeConjugations: false,
+      aiGuideTone: 'direct',
+      durationSec: 120,
+      kanaMatchDisplay: 'none',
+      showWordCategory: true,
+      promptForm: 'random',
+    });
+
+    expect(prefs).toMatchObject({
+      skipDuplicateForms: true,
+      trickQuestions: false,
+      colorCodeConjugations: true,
+      aiGuideTone: 'sensei',
+      kanaMatchDisplay: 'none',
+      showWordCategory: true,
+      promptForm: 'random',
+    });
+    expect(prefs).not.toHaveProperty('durationSec');
+  });
 });

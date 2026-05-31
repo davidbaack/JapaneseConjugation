@@ -24,6 +24,10 @@ export function scriptModeFromDisplay(ds) {
 export function mergePracticePrefs(prefs) {
   const source = { ...(prefs || {}) };
   delete source.durationSec;
+  delete source.skipDuplicateForms;
+  delete source.trickQuestions;
+  delete source.colorCodeConjugations;
+  delete source.aiGuideTone;
   const reviewLimitSource = source.reviewLimitSource === 'repair' ? source.reviewLimitSource : '';
   const rawReviewLimit = Number(source.reviewLimit || 0);
   const reviewLimit =
