@@ -166,7 +166,7 @@ export function ConjugationBreakdown({
           </div>
         </div>
 
-        {debug.mistake && (
+        {debug.mistake ? (
           <div className="grid sm:grid-cols-2 gap-2 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/15 p-2.5">
             <div>
               <div className="text-[10px] uppercase tracking-wider text-rose-600 dark:text-rose-350 font-semibold">
@@ -194,7 +194,42 @@ export function ConjugationBreakdown({
               {debug.mistake.detail}
             </div>
           </div>
-        )}
+        ) : userAnswer && userAnswer !== debug.result ? (
+          <div className="grid sm:grid-cols-2 gap-2 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/15 p-2.5">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-rose-600 dark:text-rose-350 font-semibold">
+                Your answer
+              </div>
+              <div
+                className="mt-1 text-sm font-semibold text-rose-900 dark:text-rose-200"
+                lang="ja"
+              >
+                {userAnswer}
+              </div>
+              {romajiFor(userAnswer) && (
+                <div className="mt-0.5 text-xs italic text-rose-600/70" lang="ja">
+                  {romajiFor(userAnswer)}
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-emerald-650 dark:text-emerald-350 font-semibold">
+                Correct form
+              </div>
+              <div
+                className="mt-1 text-sm font-semibold text-emerald-900 dark:text-emerald-200"
+                lang="ja"
+              >
+                {debug.result}
+              </div>
+              {romajiFor(debug.result) && (
+                <div className="mt-0.5 text-xs italic text-emerald-600/70" lang="ja">
+                  {romajiFor(debug.result)}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="relative border-l-2 border-indigo-100 dark:border-indigo-900 ml-2 pl-4 space-y-3.5">
