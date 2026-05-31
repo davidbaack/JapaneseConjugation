@@ -140,10 +140,10 @@ export function ChatPanel({
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [display, loading]);
 
-  async function send() {
-    if (!input.trim() || loading) return;
-    const txt = input;
-    setInput('');
+  const REVIEW_CHIPS = ['Explain more simply', 'Give me 3 examples', 'Compare with similar forms'];
+
+  async function sendText(txt) {
+    if (!txt.trim() || loading) return;
     const newDisplay = [...display, { role: 'user', content: txt }];
     setDisplay(newDisplay);
     sendCancelledRef.current = false;
@@ -164,6 +164,13 @@ export function ChatPanel({
         setDisplay([...newDisplay, { role: 'assistant', content: `Error: ${e.message}` }]);
     }
     if (!sendCancelledRef.current) setLoading(false);
+  }
+
+  async function send() {
+    if (!input.trim() || loading) return;
+    const txt = input;
+    setInput('');
+    await sendText(txt);
   }
 
   function cancelSend() {
@@ -206,6 +213,19 @@ export function ChatPanel({
         )}
         <div ref={endRef} />
       </div>
+      {mode === 'review' && display.length > 0 && !loading && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {REVIEW_CHIPS.map((chip) => (
+            <button
+              key={chip}
+              onClick={() => sendText(chip)}
+              className="px-2.5 py-1 text-xs rounded-full border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition"
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex gap-2 mt-2">
         <input
           type="text"
