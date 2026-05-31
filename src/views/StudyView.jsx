@@ -69,8 +69,8 @@ const STUDY_MODE_OPTIONS = [
   { id: 'transformation', label: 'Transformation Mode' },
 ];
 const TRANSFORMATION_DIRECTIONS = [
-  { id: 'forward', label: 'Production' },
-  { id: 'reverse', label: 'Recognition' },
+  { id: 'forward', label: 'Conjugate' },
+  { id: 'reverse', label: 'Un-conjugate' },
   { id: 'mixed', label: 'Mixed' },
 ];
 

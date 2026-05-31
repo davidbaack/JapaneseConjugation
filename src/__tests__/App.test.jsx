@@ -43,8 +43,8 @@ describe('App shell', () => {
 
     fireEvent.click(transformButton);
 
-    expect(screen.getByRole('button', { name: /Production/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Recognition/i })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /Conjugate/i }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Un-conjugate' })).toBeTruthy();
     await waitFor(() =>
       expect(screen.getAllByText(/Transformation Mode/i).length).toBeGreaterThan(0),
     );
