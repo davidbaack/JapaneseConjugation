@@ -6,6 +6,7 @@ import {
   markMistakeResolved,
   localDateKey,
   mergeState,
+  mergeCloudState,
   getCardLevel,
   normalizeReferenceState,
   buildFocusCard,
@@ -318,6 +319,47 @@ describe('mergeState', () => {
     const saved = { enabledTypes: ['plain-past', 'te-form'] }; // no adj- types
     const state = mergeState(saved, null);
     expect(state.enabledTypes.some((id) => id.startsWith('adj-'))).toBe(true);
+  });
+
+  it('backfills readiness for old saves', () => {
+    const state = mergeState({ cards: {} }, null);
+    expect(state.readiness).toEqual({ byRule: {} });
+  });
+});
+
+describe('mergeCloudState', () => {
+  it('merges readiness dimensions from both devices', () => {
+    const merged = mergeCloudState(
+      {
+        cards: {},
+        verbStats: {},
+        mistakes: [],
+        enabledTypes: ['plain-past'],
+        readiness: {
+          byRule: {
+            'ichidan|plain-past': {
+              production: { attempted: 1, correct: 1, totalResponseMs: 5000 },
+            },
+          },
+        },
+      },
+      {
+        cards: {},
+        verbStats: {},
+        mistakes: [],
+        enabledTypes: ['plain-past'],
+        readiness: {
+          byRule: {
+            'ichidan|plain-past': {
+              recognition: { attempted: 2, correct: 1, totalResponseMs: 12000 },
+            },
+          },
+        },
+      },
+    );
+
+    expect(merged.readiness.byRule['ichidan|plain-past'].production.attempted).toBe(1);
+    expect(merged.readiness.byRule['ichidan|plain-past'].recognition.attempted).toBe(2);
   });
 });
 

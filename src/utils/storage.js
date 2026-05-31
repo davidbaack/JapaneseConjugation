@@ -13,6 +13,11 @@ import {
   filterWordsForPrefs,
 } from './conjugator.js';
 import { retryWithBackoff } from './retry.js';
+import {
+  defaultReadinessState,
+  mergeReadinessState,
+  normalizeReadinessState,
+} from './readiness.js';
 
 export const DAY = 86400000;
 
@@ -307,6 +312,7 @@ export function mergeCloudState(local, cloud) {
     cards: mergeCards(local.cards || {}, cloud.cards || {}),
     verbStats: mergeVerbStats(local.verbStats || {}, cloud.verbStats || {}),
     mistakes: mergeMistakes(local.mistakes || [], cloud.mistakes || []),
+    readiness: mergeReadinessState(local.readiness, cloud.readiness),
     enabledTypes: [...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])])],
     daily: (() => {
       const ld = local.daily || {},
@@ -411,6 +417,7 @@ export function defaultState() {
     game: { played: 0, bestScore: 0, bestCombo: 0, matchBestScore: 0, matchBestStreak: 0 },
     onbin: { attempted: 0, correct: 0, hints: 0, streak: 0, bestStreak: 0, byPattern: {} },
     register: { attempted: 0, correct: 0, streak: 0, bestStreak: 0, byPattern: {}, byVerb: {} },
+    readiness: defaultReadinessState(),
     meaning: { attempted: 0, correct: 0, byWord: {} },
     mock: {
       taken: 0,
@@ -454,6 +461,7 @@ export function mergeState(saved, sessionOverride) {
     game: (saved && saved.game) || base.game,
     onbin: (saved && saved.onbin) || base.onbin,
     register: (saved && saved.register) || base.register,
+    readiness: normalizeReadinessState((saved && saved.readiness) || base.readiness),
     meaning: (saved && saved.meaning) || base.meaning,
     mock: (saved && saved.mock) || base.mock,
     reader: {
