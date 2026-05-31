@@ -19,6 +19,12 @@ import {
   mergeReadinessState,
   normalizeReadinessState,
 } from './readiness.js';
+import {
+  getMinimalPairSet,
+  mergeMinimalPairProgress,
+  minimalPairSetMatchesType,
+  minimalPairSetMatchesWord,
+} from './minimalPairs.js';
 
 export const DAY = 86400000;
 
@@ -454,6 +460,7 @@ export function mergeCloudState(local, cloud) {
       bySkill: { ...(cloud.mock?.bySkill || {}), ...(local.mock?.bySkill || {}) },
     },
     transformation: mergeTransformationStats(local.transformation, cloud.transformation),
+    minimalPairs: mergeMinimalPairProgress(local.minimalPairs, cloud.minimalPairs),
   };
 }
 
@@ -538,6 +545,7 @@ export function defaultState() {
     reader: { sessions: 0, chars: 0, encounters: 0, wordSeen: {}, lastAt: null },
     production: { attempted: 0, correct: 0, lastScore: 0, lastAt: null },
     transformation: emptyTransformationStats(),
+    minimalPairs: { bySet: {} },
     reference: normalizeReferenceState(),
     enabledTypes: [
       ...CONJ_TYPES.filter((t) => t.id !== 'plain-present').map((t) => t.id),
@@ -579,6 +587,7 @@ export function mergeState(saved, sessionOverride) {
     },
     production: (saved && saved.production) || base.production,
     transformation: mergeTransformationStats(base.transformation, saved && saved.transformation),
+    minimalPairs: mergeMinimalPairProgress(base.minimalPairs, saved && saved.minimalPairs),
     reference: normalizeReferenceState(saved && saved.reference ? saved.reference : null),
     daily: (saved && saved.daily) || base.daily,
     classify: (saved && saved.classify) || base.classify,
@@ -673,6 +682,7 @@ export function recordMistake(
     at: now,
     count: (prior?.count || 0) + 1,
     resolved: false,
+    minimalPairSetId: options.minimalPairSetId || null,
     ...(dimension
       ? {
           dimension,
@@ -780,11 +790,15 @@ export function pickWeakWeighted(pool, state) {
 export function selectNext(state, verbs, enabledTypes, lastRuleId, prefs = DEFAULT_PREFS) {
   const now = Date.now(),
     pool = [];
+  const minimalPairSet = getMinimalPairSet(prefs.minimalPairSetId);
+  const activeTypes = minimalPairSet ? minimalPairSet.typeIds : enabledTypeIdsFor(enabledTypes);
   for (const rule of RULES) {
-    if (!enabledTypes.includes(rule.type)) continue;
+    if (!activeTypes.includes(rule.type)) continue;
+    if (minimalPairSet && !minimalPairSetMatchesType(minimalPairSet, rule.type)) continue;
     const candidates = rule
       .verbFilter(verbs)
-      .filter((item) => !isRedundantPracticeType(item, rule.type, enabledTypes, prefs));
+      .filter((item) => !minimalPairSet || minimalPairSetMatchesWord(minimalPairSet, item))
+      .filter((item) => !isRedundantPracticeType(item, rule.type, activeTypes, prefs));
     if (!candidates.length) continue;
     pool.push({ rule, candidates });
   }

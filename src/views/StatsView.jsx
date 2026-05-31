@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { IconSpark, IconFlame } from '../components/Icons.jsx';
-import { CONTRAST_SETS } from '../utils/contrastSets.js';
 import { ALL_CARD_TYPES, TYPE_LABEL } from '../data/conjugationTypes.js';
 import { RULES, wordKey } from '../utils/conjugator.js';
 import { defaultState } from '../utils/storage.js';
@@ -16,6 +15,14 @@ import {
   upsertRepairWordList,
 } from '../utils/mistakeDiagnosis.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
+import {
+  MINIMAL_PAIR_SETS,
+  getMinimalPairSet,
+  minimalPairEligibleWords,
+  minimalPairStatsSummary,
+  practicePrefsForMinimalPairSet,
+  recommendMinimalPairSets,
+} from '../utils/minimalPairs.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
 function srsStatsFor(state, verbs) {
@@ -208,6 +215,14 @@ export default function StatsView() {
     () => aggregateDiagnosedMistakes(state.mistakes),
     [state.mistakes],
   );
+  const minimalPairRecommendations = useMemo(
+    () => recommendMinimalPairSets(state, verbs, 2),
+    [state, verbs],
+  );
+  const recommendedMinimalPairIds = useMemo(
+    () => new Set(minimalPairRecommendations.map((result) => result.set.id)),
+    [minimalPairRecommendations],
+  );
   const [showAllPatterns, setShowAllPatterns] = useState(false);
   const visiblePatterns = showAllPatterns ? mistakePatterns : mistakePatterns.slice(0, 6);
   const transformation = state.transformation || defaultState().transformation;
@@ -246,7 +261,7 @@ export default function StatsView() {
       .sort((a, b) => b[1] - a[1])
       .map(([key]) => key);
 
-    let nextPrefs = { ...practicePrefs, practiceFocus: 'weak' };
+    let nextPrefs = { ...practicePrefs, practiceFocus: 'weak', minimalPairSetId: '' };
 
     if (sortedWeakWordKeys.length > 0) {
       const listName = 'Targeted Weaknesses';
@@ -303,6 +318,7 @@ export default function StatsView() {
         ...practicePrefs,
         ...launchPrefsForReadinessDimension(dimensionId, practicePrefs),
         wordListIds: [targetList.id],
+        minimalPairSetId: '',
       });
     }
     if (setTab) setTab('study');
@@ -317,7 +333,21 @@ export default function StatsView() {
       setState((prev) => ({ ...prev, enabledTypes: plan.typeIds }));
     }
     if (setPracticePrefs) {
-      setPracticePrefs(repairPrefsForPlan(practicePrefs, plan));
+      setPracticePrefs({ ...repairPrefsForPlan(practicePrefs, plan), minimalPairSetId: '' });
+    }
+    if (setTab) {
+      setTab('study');
+    }
+  }
+
+  function startMinimalPairDrill(setId) {
+    const set = getMinimalPairSet(setId);
+    if (!set) return;
+    if (setState) {
+      setState((prev) => ({ ...prev, enabledTypes: set.typeIds }));
+    }
+    if (setPracticePrefs) {
+      setPracticePrefs(practicePrefsForMinimalPairSet(set, practicePrefs));
     }
     if (setTab) {
       setTab('study');
@@ -724,28 +754,77 @@ export default function StatsView() {
         )}
       </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
-        <h3 className="font-medium mb-1 flex items-center gap-2 text-stone-950 dark:text-stone-50">
-          Minimal pair drills
-        </h3>
-        <p className="text-xs text-stone-500 mb-3">
-          Drill two easily-confused forms side by side to sharpen the distinction.
-        </p>
-        <div className="grid sm:grid-cols-2 gap-2">
-          {CONTRAST_SETS.map((pair) => (
-            <button
-              key={pair.id}
-              onClick={() => {
-                if (setState) setState((prev) => ({ ...prev, enabledTypes: pair.types }));
-                if (setTab) setTab('study');
-              }}
-              className="text-left px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-800 hover:border-indigo-400 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 transition group"
-            >
-              <div className="text-sm font-medium text-stone-800 dark:text-stone-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition">
-                {pair.label}
-              </div>
-              <div className="text-xs text-stone-500 mt-0.5">{pair.description}</div>
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+          <div>
+            <h3 className="font-medium flex items-center gap-2 text-stone-950 dark:text-stone-50">
+              <IconSpark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              Minimal-pair drills
+            </h3>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Contrast forms learners commonly confuse, with progress tracked by contrast set.
+            </p>
+          </div>
+          {minimalPairRecommendations.length > 0 && (
+            <div className="text-[11px] px-2 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/60">
+              Recommended: {minimalPairRecommendations.map((result) => result.set.label).join(', ')}
+            </div>
+          )}
+        </div>
+        <div className="grid md:grid-cols-2 gap-2">
+          {MINIMAL_PAIR_SETS.map((set) => {
+            const eligible = minimalPairEligibleWords(verbs, set);
+            const setStats = minimalPairStatsSummary(state.minimalPairs, set.id);
+            const active = practicePrefs.minimalPairSetId === set.id;
+            const recommended = recommendedMinimalPairIds.has(set.id);
+            return (
+              <button
+                key={set.id}
+                type="button"
+                onClick={() => startMinimalPairDrill(set.id)}
+                disabled={eligible.length === 0}
+                aria-pressed={active}
+                className={`text-left px-3 py-3 rounded-xl border transition group disabled:opacity-45 disabled:cursor-not-allowed ${
+                  active
+                    ? 'border-indigo-400 bg-indigo-50 dark:border-indigo-700 dark:bg-indigo-950/30'
+                    : recommended
+                      ? 'border-indigo-200 dark:border-indigo-900 hover:border-indigo-400 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/20'
+                      : 'border-stone-200 dark:border-stone-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-stone-50 dark:hover:bg-stone-850'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-stone-800 dark:text-stone-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition">
+                      {set.label}
+                    </div>
+                    <div className="text-xs text-stone-500 mt-0.5">{set.description}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 text-[11px] flex-shrink-0">
+                    {recommended && (
+                      <span className="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
+                        Recommended
+                      </span>
+                    )}
+                    {active && (
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-500">
+                  <span>{eligible.length} eligible words</span>
+                  <span>
+                    {setStats.attempted} attempts
+                    {setStats.attempted ? ` / ${setStats.accuracy}%` : ''}
+                  </span>
+                  <span>{setStats.bestStreak || 0} best streak</span>
+                  <span className="font-medium text-indigo-600 dark:text-indigo-400">
+                    {active ? 'Restart drill' : 'Start drill'}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">

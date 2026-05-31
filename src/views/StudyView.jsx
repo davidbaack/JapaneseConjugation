@@ -57,6 +57,12 @@ import {
   repairPrefsForPlan,
   upsertRepairWordList,
 } from '../utils/mistakeDiagnosis.js';
+import {
+  getMinimalPairSet,
+  minimalPairFeedbackForCard,
+  minimalPairSetMatchesCard,
+  recordMinimalPairResult,
+} from '../utils/minimalPairs.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
@@ -161,6 +167,7 @@ export default function StudyView() {
   const autoAdvanceRef = useRef(null);
   const answerStartedAtRef = useRef(0);
   const hadKanaMistakeRef = useRef(false);
+  const minimalPairSetIdRef = useRef(practicePrefs.minimalPairSetId || '');
   // Snapshots the typed answer the moment a kana mistake first occurs, so the
   // review panel can show what was actually entered when it went wrong rather
   // than the live (possibly self-corrected) input.
@@ -219,6 +226,7 @@ export default function StudyView() {
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
     [state.session?.mistakePatterns],
   );
+  const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
 
   useEffect(() => {
     // When arriving from Check's "Practice this verb", seed that exact word/form
@@ -258,6 +266,33 @@ export default function StudyView() {
       setPhase('answering');
     }
   }, [practiceWords, current]);
+
+  useEffect(() => {
+    if (!current || !activeMinimalPairSet) return;
+    if (minimalPairSetMatchesCard(activeMinimalPairSet, current.verb, current.type)) return;
+    setCurrent(null);
+    setAnswer('');
+    setPhase('answering');
+    setChatOpen(false);
+    setStepHint('');
+    setTypoGuard(null);
+    setWasCorrect(false);
+    setLastDiagnosis(null);
+  }, [current, activeMinimalPairSet]);
+
+  useEffect(() => {
+    const nextSetId = practicePrefs.minimalPairSetId || '';
+    if (minimalPairSetIdRef.current === nextSetId) return;
+    minimalPairSetIdRef.current = nextSetId;
+    setCurrent(null);
+    setAnswer('');
+    setPhase('answering');
+    setChatOpen(false);
+    setStepHint('');
+    setTypoGuard(null);
+    setWasCorrect(false);
+    setLastDiagnosis(null);
+  }, [practicePrefs.minimalPairSetId]);
 
   useEffect(() => {
     if (phase === 'answering' && inputRef.current) {
@@ -487,6 +522,9 @@ export default function StudyView() {
     : noChangePrompt
       ? `Trick no-change drill: the prompt is already ${typeInfo.label}, so the correct answer is the same form.`
       : '';
+  const minimalPairFeedback = activeMinimalPairSet
+    ? minimalPairFeedbackForCard(activeMinimalPairSet, current.verb, current.type)
+    : null;
   const reviewLimit = Number(practicePrefs.reviewLimit || 0);
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const sessionSkipped = state.session?.skipped || 0;
@@ -550,6 +588,23 @@ export default function StudyView() {
     });
   }
 
+  function nextMinimalPairProgress(correct) {
+    return recordMinimalPairResult(
+      state.minimalPairs,
+      activeMinimalPairSet?.id,
+      current?.verb,
+      current?.type,
+      correct,
+    );
+  }
+
+  function mistakeRecordOptions() {
+    return {
+      ...(transformationAttempt || {}),
+      ...(activeMinimalPairSet?.id ? { minimalPairSetId: activeMinimalPairSet.id } : {}),
+    };
+  }
+
   function resetActiveAttempt() {
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
@@ -576,7 +631,11 @@ export default function StudyView() {
   }
 
   function switchStudyMode(mode) {
-    const nextPrefs = { ...practicePrefs, drillMode: mode };
+    const nextPrefs = {
+      ...practicePrefs,
+      drillMode: mode,
+      minimalPairSetId: mode === 'word' ? practicePrefs.minimalPairSetId || '' : '',
+    };
     if (mode === 'transformation' && (nextPrefs.promptForm || 'dictionary') === 'dictionary') {
       nextPrefs.promptForm = 'random';
     }
@@ -592,6 +651,7 @@ export default function StudyView() {
       ...practicePrefs,
       drillMode: 'transformation',
       drillDirection: direction,
+      minimalPairSetId: '',
     };
     if ((nextPrefs.promptForm || 'dictionary') === 'dictionary') nextPrefs.promptForm = 'random';
     setPracticePrefs(nextPrefs);
@@ -671,7 +731,7 @@ export default function StudyView() {
       }));
     }
     if (setPracticePrefs) {
-      setPracticePrefs(repairPrefsForPlan(practicePrefs, plan));
+      setPracticePrefs({ ...repairPrefsForPlan(practicePrefs, plan), minimalPairSetId: '' });
     }
     setReviewBase(state.session?.reviewed || 0);
     restartTimer();
@@ -760,7 +820,7 @@ export default function StudyView() {
           reverseDrill ? current.type : promptType,
           reverseDrill ? raw.trim() : normalized,
           expected,
-          transformationAttempt || undefined,
+          mistakeRecordOptions(),
         );
     const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
@@ -777,6 +837,7 @@ export default function StudyView() {
         reverseDrill,
       }),
       ...(transformationAttempt ? { transformation: transformationStatsAfter(ok) } : {}),
+      minimalPairs: nextMinimalPairProgress(ok),
       session: {
         ...bumpSessionMistakePattern(
           {
@@ -902,7 +963,7 @@ export default function StudyView() {
           reverseDrill ? current.type : promptType,
           `self-check: ${label}`,
           expected,
-          transformationAttempt || undefined,
+          mistakeRecordOptions(),
         );
     const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
@@ -919,6 +980,7 @@ export default function StudyView() {
         reverseDrill,
       }),
       ...(transformationAttempt ? { transformation: transformationStatsAfter(ok) } : {}),
+      minimalPairs: nextMinimalPairProgress(ok),
       session: {
         ...bumpSessionMistakePattern(
           {
@@ -1006,7 +1068,7 @@ export default function StudyView() {
       reverseDrill ? current.type : promptType,
       '(revealed)',
       expected,
-      transformationAttempt || undefined,
+      mistakeRecordOptions(),
     );
     const mistakeDiagnosis = nextMistakes[0]?.diagnosis || null;
     const nextState = {
@@ -1022,6 +1084,7 @@ export default function StudyView() {
         reverseDrill,
       }),
       ...(transformationAttempt ? { transformation: transformationStatsAfter(false) } : {}),
+      minimalPairs: nextMinimalPairProgress(false),
       session: {
         ...bumpSessionMistakePattern(
           {
@@ -1543,6 +1606,12 @@ export default function StudyView() {
                     )}
                   </div>
                 </div>
+                {activeMinimalPairSet && (
+                  <div className="mb-3 inline-flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-250">
+                    <span className="font-semibold uppercase tracking-wider">Minimal pair</span>
+                    <span>{activeMinimalPairSet.label}</span>
+                  </div>
+                )}
                 {typoGuard && (
                   <div className="mb-3 rounded-xl border border-amber-250 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
                     <div className="font-medium">Almost - possible typo.</div>
@@ -2204,6 +2273,31 @@ export default function StudyView() {
                         {expected}
                       </span>
                     </div>
+                    {minimalPairFeedback && (
+                      <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                          Contrast check: {minimalPairFeedback.label}
+                        </div>
+                        <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
+                          {minimalPairFeedback.intro}
+                        </div>
+                        <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                          {minimalPairFeedback.contrasts.map((contrast) => (
+                            <div
+                              key={contrast.id}
+                              className={`rounded-lg border px-2.5 py-2 text-xs ${
+                                contrast.id === minimalPairFeedback.active.id
+                                  ? 'border-emerald-300 bg-white/80 text-emerald-900 dark:border-emerald-800 dark:bg-stone-950/50 dark:text-emerald-200'
+                                  : 'border-stone-200 bg-white/60 text-stone-600 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-300'
+                              }`}
+                            >
+                              <div className="font-semibold">{contrast.label}</div>
+                              <div className="mt-0.5">{contrast.cue}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {diagnostic && (
                       <div className="text-sm text-rose-800 dark:text-rose-300 bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2">
                         <span className="font-medium text-rose-900 dark:text-rose-200">
