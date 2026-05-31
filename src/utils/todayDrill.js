@@ -194,6 +194,7 @@ export function practicePrefsForTodayDrill(prefs = DEFAULT_PREFS, plan) {
     ...prefs,
     drillMode: 'word',
     minimalPairSetId: '',
+    minimalPairReturn: null,
     reviewLimit: 0,
     reviewLimitSource: '',
     wordListIds: plan?.wordKeys?.length ? [TODAY_DRILL_LIST_ID] : [],

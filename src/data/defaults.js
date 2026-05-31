@@ -11,6 +11,7 @@ export const DEFAULT_PREFS = {
   autoAiExplainErrors: true,
   englishHints: 'show',
   minimalPairSetId: '',
+  minimalPairReturn: null,
   skipDuplicateForms: true,
   trickQuestions: false,
   voiceURI: '',

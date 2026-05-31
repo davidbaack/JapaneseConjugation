@@ -61,6 +61,7 @@ import {
   clearMinimalPairPrefs,
   getMinimalPairSet,
   minimalPairFeedbackForCard,
+  minimalPairReturnEnabledTypes,
   minimalPairSetMatchesCard,
   recordMinimalPairResult,
 } from '../utils/minimalPairs.js';
@@ -745,10 +746,13 @@ export default function StudyView() {
   }
 
   function switchStudyMode(mode) {
+    const leavingMinimalPair = mode !== 'word' && activeMinimalPairSet;
+    const basePrefs = leavingMinimalPair ? clearMinimalPairPrefs(practicePrefs) : practicePrefs;
     const nextPrefs = clearReviewLimitPrefs({
-      ...practicePrefs,
+      ...basePrefs,
       drillMode: mode,
-      minimalPairSetId: mode === 'word' ? practicePrefs.minimalPairSetId || '' : '',
+      minimalPairSetId: mode === 'word' ? basePrefs.minimalPairSetId || '' : '',
+      minimalPairReturn: mode === 'word' ? basePrefs.minimalPairReturn || null : null,
     });
     if (mode === 'transformation' && (nextPrefs.promptForm || 'dictionary') === 'dictionary') {
       nextPrefs.promptForm = 'random';
@@ -757,6 +761,10 @@ export default function StudyView() {
       nextPrefs.promptForm = 'dictionary';
     }
     setPracticePrefs(nextPrefs);
+    if (leavingMinimalPair && setState) {
+      const enabledTypes = minimalPairReturnEnabledTypes(practicePrefs);
+      setState((prev) => ({ ...prev, enabledTypes: enabledTypes || [] }));
+    }
     setTodayMinimalPairSetIds([]);
     resetActiveAttempt();
   }
@@ -922,7 +930,11 @@ export default function StudyView() {
       }));
     }
     if (setPracticePrefs) {
-      setPracticePrefs({ ...repairPrefsForPlan(practicePrefs, plan), minimalPairSetId: '' });
+      setPracticePrefs({
+        ...repairPrefsForPlan(practicePrefs, plan),
+        minimalPairSetId: '',
+        minimalPairReturn: null,
+      });
     }
     setReviewBase(state.session?.reviewed || 0);
     setChatOpen(false);
@@ -1833,7 +1845,10 @@ export default function StudyView() {
                         onClick={() => {
                           if (setPracticePrefs)
                             setPracticePrefs(clearMinimalPairPrefs(practicePrefs));
-                          if (setState) setState((prev) => ({ ...prev, enabledTypes: [] }));
+                          if (setState) {
+                            const enabledTypes = minimalPairReturnEnabledTypes(practicePrefs);
+                            setState((prev) => ({ ...prev, enabledTypes: enabledTypes || [] }));
+                          }
                         }}
                         className="ml-1 font-bold leading-none hover:text-emerald-950 dark:hover:text-emerald-100 transition"
                         aria-label="End minimal pair drill"

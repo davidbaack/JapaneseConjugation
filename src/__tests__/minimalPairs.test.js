@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
+  clearMinimalPairPrefs,
   getMinimalPairSet,
   minimalPairEligibleWords,
   minimalPairFeedbackForCard,
+  minimalPairReturnEnabledTypes,
   practicePrefsForMinimalPairSet,
   recommendMinimalPairSets,
   recordMinimalPairResult,
@@ -37,6 +39,56 @@ describe('minimal-pair drill library', () => {
 
     expect(set.typeIds).toContain(card.type);
     expect([TABERU.dict, HASHIRU.dict]).toContain(card.verb.dict);
+  });
+
+  it('restores the prior list, filters, mode, and types after a drill', () => {
+    const set = getMinimalPairSet('ichidan-godan-ru');
+    const original = {
+      drillMode: 'transformation',
+      wordListIds: ['favorites'],
+      wordTypes: ['verb', 'i-adjective'],
+      wordGroups: ['ichidan', 'godan', 'i-adjective'],
+    };
+    const prefs = practicePrefsForMinimalPairSet(set, original, {
+      enabledTypes: ['plain-past', 'te-form'],
+    });
+
+    expect(prefs).toMatchObject({
+      minimalPairSetId: set.id,
+      drillMode: 'word',
+      wordListIds: [],
+      wordTypes: set.wordTypes,
+      wordGroups: set.wordGroups,
+    });
+    expect(minimalPairReturnEnabledTypes(prefs)).toEqual(['plain-past', 'te-form']);
+
+    const restored = clearMinimalPairPrefs(prefs);
+    expect(restored).toMatchObject({
+      minimalPairSetId: '',
+      minimalPairReturn: null,
+      drillMode: 'transformation',
+      wordListIds: ['favorites'],
+      wordTypes: ['verb', 'i-adjective'],
+      wordGroups: ['ichidan', 'godan', 'i-adjective'],
+    });
+  });
+
+  it('keeps the original return snapshot when switching contrast sets', () => {
+    const first = getMinimalPairSet('ichidan-godan-ru');
+    const second = getMinimalPairSet('i-adj-na-adj');
+    const prefs = practicePrefsForMinimalPairSet(
+      second,
+      practicePrefsForMinimalPairSet(
+        first,
+        { wordListIds: ['custom-list'], wordTypes: ['verb'], wordGroups: ['godan'] },
+        { enabledTypes: ['plain-negative'] },
+      ),
+      { enabledTypes: first.typeIds },
+    );
+
+    expect(prefs.minimalPairSetId).toBe(second.id);
+    expect(prefs.minimalPairReturn.wordListIds).toEqual(['custom-list']);
+    expect(minimalPairReturnEnabledTypes(prefs)).toEqual(['plain-negative']);
   });
 
   it('recommends a contrast set after repeated related mistakes', () => {

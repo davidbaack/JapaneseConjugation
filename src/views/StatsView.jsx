@@ -22,6 +22,7 @@ import {
   clearMinimalPairPrefs,
   getMinimalPairSet,
   minimalPairEligibleWords,
+  minimalPairReturnEnabledTypes,
   minimalPairStatsSummary,
   practicePrefsForMinimalPairSet,
   recommendMinimalPairSets,
@@ -261,7 +262,6 @@ export default function StatsView() {
     [minimalPairRecommendations],
   );
   const [showAllPatterns, setShowAllPatterns] = useState(false);
-  const [pendingDrillSetId, setPendingDrillSetId] = useState(null);
   const visiblePatterns = showAllPatterns ? mistakePatterns : mistakePatterns.slice(0, 6);
   const transformation = state.transformation || defaultState().transformation;
   const transformationAccuracy = pct(transformation.correct || 0, transformation.attempted || 0);
@@ -299,7 +299,7 @@ export default function StatsView() {
       .sort((a, b) => b[1] - a[1])
       .map(([key]) => key);
 
-    let nextPrefs = { ...practicePrefs, minimalPairSetId: '' };
+    let nextPrefs = { ...practicePrefs, minimalPairSetId: '', minimalPairReturn: null };
 
     if (sortedWeakWordKeys.length > 0) {
       const listName = 'Targeted Weaknesses';
@@ -357,6 +357,7 @@ export default function StatsView() {
         ...launchPrefsForReadinessDimension(dimensionId, practicePrefs),
         wordListIds: [targetList.id],
         minimalPairSetId: '',
+        minimalPairReturn: null,
       });
     }
     if (setTab) setTab('study');
@@ -371,7 +372,11 @@ export default function StatsView() {
       setState((prev) => ({ ...prev, enabledTypes: plan.typeIds }));
     }
     if (setPracticePrefs) {
-      setPracticePrefs({ ...repairPrefsForPlan(practicePrefs, plan), minimalPairSetId: '' });
+      setPracticePrefs({
+        ...repairPrefsForPlan(practicePrefs, plan),
+        minimalPairSetId: '',
+        minimalPairReturn: null,
+      });
     }
     if (setTab) {
       setTab('study');
@@ -382,22 +387,20 @@ export default function StatsView() {
     const set = getMinimalPairSet(setId);
     if (!set) return;
     if (setState) setState((prev) => ({ ...prev, enabledTypes: set.typeIds }));
-    if (setPracticePrefs) setPracticePrefs(practicePrefsForMinimalPairSet(set, practicePrefs));
-    if (setTab) setTab('study');
-    setPendingDrillSetId(null);
-  }
-
-  function startMinimalPairDrill(setId) {
-    if ((practicePrefs.wordListIds || []).length > 0) {
-      setPendingDrillSetId(setId);
-    } else {
-      launchDrill(setId);
+    if (setPracticePrefs) {
+      setPracticePrefs(
+        practicePrefsForMinimalPairSet(set, practicePrefs, { enabledTypes: state.enabledTypes }),
+      );
     }
+    if (setTab) setTab('study');
   }
 
   function stopMinimalPairDrill() {
     if (setPracticePrefs) setPracticePrefs(clearMinimalPairPrefs(practicePrefs));
-    if (setState) setState((prev) => ({ ...prev, enabledTypes: [] }));
+    if (setState) {
+      const enabledTypes = minimalPairReturnEnabledTypes(practicePrefs);
+      setState((prev) => ({ ...prev, enabledTypes: enabledTypes || [] }));
+    }
   }
 
   async function generatePlan() {
@@ -930,27 +933,6 @@ export default function StatsView() {
             )}
           </div>
         </div>
-        {pendingDrillSetId && (
-          <div className="mb-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/15 px-3 py-2.5 text-sm">
-            <p className="text-amber-800 dark:text-amber-200">
-              Starting this drill will clear your active word list. Continue?
-            </p>
-            <div className="flex gap-3 mt-2">
-              <button
-                onClick={() => launchDrill(pendingDrillSetId)}
-                className="text-xs font-medium text-amber-800 dark:text-amber-200 hover:text-amber-950 dark:hover:text-amber-100 transition"
-              >
-                Yes, start drill
-              </button>
-              <button
-                onClick={() => setPendingDrillSetId(null)}
-                className="text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
         <div className="grid md:grid-cols-2 gap-2">
           {MINIMAL_PAIR_SETS.map((set) => {
             const eligible = minimalPairEligibleWords(verbs, set);
@@ -961,7 +943,7 @@ export default function StatsView() {
               <button
                 key={set.id}
                 type="button"
-                onClick={() => startMinimalPairDrill(set.id)}
+                onClick={() => launchDrill(set.id)}
                 disabled={eligible.length === 0}
                 aria-pressed={active}
                 className={`text-left px-3 py-3 rounded-xl border transition group disabled:opacity-45 disabled:cursor-not-allowed ${
