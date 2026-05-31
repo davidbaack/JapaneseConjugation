@@ -182,7 +182,7 @@ export default function StatsView() {
   const radar = useMemo(() => skillRadarScores(state, verbs), [state, verbs]);
   const formRowsData = useMemo(() => formAccuracyRows(state, verbs), [state, verbs]);
   const readinessRows = useMemo(() => buildReadinessMap(state, verbs), [state, verbs]);
-  const readinessVisibleRows = readinessRows.slice(0, 60);
+  const readinessVisibleRows = readinessRows;
   const readinessCounts = useMemo(() => {
     const counts = { weak: 0, developing: 0, strong: 0, untested: 0 };
     for (const row of readinessRows) {
@@ -340,7 +340,7 @@ export default function StatsView() {
       return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/20 dark:text-emerald-200';
     }
     if (status === 'developing') {
-      return 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-200';
+      return 'border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-900/30';
     }
     if (status === 'weak') {
       return 'border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-900/70 dark:bg-rose-950/20 dark:text-rose-200 dark:hover:bg-rose-900/30';
@@ -483,7 +483,10 @@ export default function StatsView() {
                     </div>
                     {READINESS_DIMENSIONS.map((dimension) => {
                       const cell = row.cells[dimension.id];
-                      const actionable = cell.status !== 'strong' && row.wordCount > 0;
+                      const isSentenceUntested =
+                        dimension.id === 'sentence' && cell.status === 'untested';
+                      const actionable =
+                        cell.status !== 'strong' && row.wordCount > 0 && !isSentenceUntested;
                       const className = `h-full w-full rounded-xl border px-2.5 py-2 text-left transition ${readinessCellClass(cell.status)} ${
                         actionable
                           ? 'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 dark:focus:ring-offset-stone-900'
@@ -493,7 +496,12 @@ export default function StatsView() {
                         <>
                           <div className="text-xs font-semibold">{cell.label}</div>
                           <div className="text-[11px] opacity-80 tabular-nums">{cell.detail}</div>
-                          {actionable && (
+                          {isSentenceUntested && (
+                            <div className="mt-1 text-[11px] opacity-70">
+                              Needs AI sentence mode
+                            </div>
+                          )}
+                          {actionable && !isSentenceUntested && (
                             <div className="mt-1 text-[11px] font-medium">
                               {cell.status === 'untested' ? 'Start' : 'Drill'}
                             </div>
