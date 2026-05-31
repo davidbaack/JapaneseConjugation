@@ -1,14 +1,40 @@
 import React, { useState } from 'react';
 import ReferenceViewSub from './ReferenceViewSub.jsx';
+import LessonsView from './LessonsView.jsx';
 import ListsViewSub from './ListsViewSub.jsx';
 import CustomDictionaryViewSub from './CustomDictionaryViewSub.jsx';
 import { useTablist } from '../components/useTablist.js';
+import { IconBook, IconSpark, IconList, IconPen } from '../components/Icons.jsx';
 import { useApp } from '../state/AppStateContext.jsx';
 
-const LIBRARY_TABS = [
-  { id: 'reference', label: 'Search & Reference', desc: 'Verb & adjective lookup' },
-  { id: 'lists', label: 'Lists & Decks', desc: 'Custom groupings & Anki export' },
-  { id: 'dictionary', label: 'Custom Dictionary', desc: 'Manage custom verbs & adjectives' },
+const PRIMARY_SECTIONS = [
+  {
+    id: 'reference',
+    label: 'Lookup',
+    desc: 'Search forms and launch targeted practice.',
+    Icon: IconBook,
+  },
+  {
+    id: 'lessons',
+    label: 'Lessons',
+    desc: 'Rules, traps, and examples.',
+    Icon: IconSpark,
+  },
+];
+
+const MANAGEMENT_SECTIONS = [
+  {
+    id: 'lists',
+    label: 'Lists',
+    desc: 'Decks and exports.',
+    Icon: IconList,
+  },
+  {
+    id: 'dictionary',
+    label: 'Custom words',
+    desc: 'Your verbs and adjectives.',
+    Icon: IconPen,
+  },
 ];
 
 export default function LibraryView() {
@@ -30,40 +56,95 @@ export default function LibraryView() {
     practiceWord,
   } = useApp();
   const [subTab, setSubTab] = useState('reference');
+  const sections = [...PRIMARY_SECTIONS, ...MANAGEMENT_SECTIONS];
   const { tabProps, panelProps } = useTablist(
-    LIBRARY_TABS.map((t) => t.id),
+    sections.map((t) => t.id),
     subTab,
     setSubTab,
   );
 
   return (
     <div className="space-y-4">
-      {/* Sub-navigation bar */}
-      <div
-        role="tablist"
-        aria-label="Library sections"
-        className="flex border-b border-stone-200 dark:border-stone-800"
-      >
-        {LIBRARY_TABS.map((t) => (
-          <button
-            key={t.id}
-            {...tabProps(t.id)}
-            onClick={() => setSubTab(t.id)}
-            className={`flex-1 pb-3 text-center border-b-2 transition ${
-              subTab === t.id
-                ? 'border-indigo-600 text-indigo-600 font-semibold'
-                : 'border-transparent text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200'
-            }`}
-          >
-            <div className="text-sm">{t.label}</div>
-            <div className="text-xs text-stone-450 dark:text-stone-500 font-normal hidden sm:block">
-              {t.desc}
+      <section className="rounded-xl border border-stone-200 dark:border-stone-850 bg-white dark:bg-stone-900 p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-wider text-stone-500 dark:text-stone-400">
+              Library
             </div>
-          </button>
-        ))}
-      </div>
+            <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
+              Rules and forms for the next drill.
+            </h2>
+          </div>
+          <div className="text-sm text-stone-550 dark:text-stone-400">Lookup, learn, drill.</div>
+        </div>
 
-      <div className="mt-4" {...panelProps(subTab)}>
+        <div role="tablist" aria-label="Library sections" className="mt-4 space-y-3">
+          <div className="grid sm:grid-cols-2 gap-2">
+            {PRIMARY_SECTIONS.map((section) => {
+              const active = subTab === section.id;
+              const SectionIcon = section.Icon;
+              return (
+                <button
+                  key={section.id}
+                  {...tabProps(section.id)}
+                  onClick={() => setSubTab(section.id)}
+                  className={`text-left rounded-lg border p-3 transition ${
+                    active
+                      ? 'border-indigo-300 bg-indigo-50/80 text-indigo-950 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-100'
+                      : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-300 dark:hover:border-stone-700'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-0.5 rounded-lg border p-2 ${
+                        active
+                          ? 'border-indigo-200 bg-white text-indigo-600 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
+                          : 'border-stone-200 bg-stone-50 text-stone-500 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-400'
+                      }`}
+                    >
+                      <SectionIcon className="w-4 h-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{section.label}</span>
+                      <span className="mt-1 block text-xs leading-relaxed opacity-80">
+                        {section.desc}
+                      </span>
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3 dark:border-stone-800">
+            <span className="text-xs uppercase tracking-wider text-stone-450 dark:text-stone-500">
+              Manage
+            </span>
+            {MANAGEMENT_SECTIONS.map((section) => {
+              const active = subTab === section.id;
+              const SectionIcon = section.Icon;
+              return (
+                <button
+                  key={section.id}
+                  {...tabProps(section.id)}
+                  onClick={() => setSubTab(section.id)}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                    active
+                      ? 'border-indigo-300 bg-indigo-50 text-indigo-750 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300'
+                      : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-350 dark:hover:bg-stone-850'
+                  }`}
+                  title={section.desc}
+                >
+                  <SectionIcon className="w-4 h-4" />
+                  {section.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <div {...panelProps(subTab)}>
         {subTab === 'reference' && (
           <ReferenceViewSub
             state={state}
@@ -77,8 +158,10 @@ export default function LibraryView() {
             setPracticePrefs={setPracticePrefs}
             setTab={setTab}
             practiceWord={practiceWord}
+            focused
           />
         )}
+        {subTab === 'lessons' && <LessonsView />}
         {subTab === 'lists' && (
           <ListsViewSub
             words={[...verbs, ...adjectives]}

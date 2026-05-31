@@ -70,6 +70,7 @@ export default function ReferenceViewSub({
   setPracticePrefs,
   setTab,
   practiceWord,
+  focused = false,
 }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
@@ -98,6 +99,7 @@ export default function ReferenceViewSub({
   const [pairAiLoading, setPairAiLoading] = useState(false);
   const [pairAiErr, setPairAiErr] = useState('');
   const [favoriteMsg, setFavoriteMsg] = useState('');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const aiAbortRef = useRef(null);
   const lookupAbortRef = useRef(null);
   const accentAbortRef = useRef(null);
@@ -166,6 +168,7 @@ export default function ReferenceViewSub({
   const selectedFavorited = favoriteListHasWord(wordLists, selected);
   const favoriteCount = (favoritesList?.wordKeys || []).length;
   const weakRuleCount = reference.weakRules.length;
+  const showAdvancedReference = !focused || advancedOpen;
 
   useEffect(() => {
     setCopyTableOk(false);
@@ -1128,7 +1131,29 @@ export default function ReferenceViewSub({
           </div>
         )}
 
-        {transitivePair && (
+        {focused && (
+          <div className="rounded-xl border border-stone-200 bg-white p-4 text-left dark:border-stone-850 dark:bg-stone-900">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-stone-950 dark:text-stone-50">
+                  Advanced reference tools
+                </div>
+                <div className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                  Kanji links, writing practice, pronunciation, AI examples, and verb-pair notes.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((open) => !open)}
+                className="inline-flex items-center justify-center rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850"
+              >
+                {advancedOpen ? 'Hide tools' : 'Show tools'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showAdvancedReference && transitivePair && (
           <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5 text-left">
             <div className="flex items-start justify-between gap-3 pb-3 border-b border-stone-105 dark:border-stone-800">
               <div>
@@ -1208,50 +1233,124 @@ export default function ReferenceViewSub({
           </div>
         )}
 
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
-          <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
-              <IconBook className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              Dictionary & kanji
-            </div>
-            <button
-              onClick={generateKanjiInsight}
-              disabled={!geminiKey}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
-            >
-              <IconSpark className="w-4 h-4" />
-              {kanjiLoading ? 'Cancel' : 'AI kanji'}
-            </button>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {dictionaryLinks.map((link) => (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 text-sm text-stone-600 dark:text-stone-300 transition animate-fade-in"
+        {showAdvancedReference && (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
+            <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
+                <IconBook className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                Dictionary & kanji
+              </div>
+              <button
+                onClick={generateKanjiInsight}
+                disabled={!geminiKey}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
               >
-                {link.label}
-              </a>
-            ))}
-          </div>
-          <div className="mt-3">
-            {selectedKanji.length ? (
-              <div className="flex flex-wrap gap-2">
-                {selectedKanji.map((ch) => (
-                  <div
-                    key={ch}
-                    className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-955 px-3 py-2"
-                  >
+                <IconSpark className="w-4 h-4" />
+                {kanjiLoading ? 'Cancel' : 'AI kanji'}
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {dictionaryLinks.map((link) => (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 text-sm text-stone-600 dark:text-stone-300 transition animate-fade-in"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+            <div className="mt-3">
+              {selectedKanji.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedKanji.map((ch) => (
                     <div
-                      className="text-2xl font-bold text-stone-800 dark:text-stone-200"
+                      key={ch}
+                      className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-955 px-3 py-2"
+                    >
+                      <div
+                        className="text-2xl font-bold text-stone-800 dark:text-stone-200"
+                        lang="ja"
+                      >
+                        {ch}
+                      </div>
+                      <div className="mt-1 flex gap-1.5">
+                        {kanjiDictionaryLinks(ch).map((link) => (
+                          <a
+                            key={link.id}
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-indigo-605 hover:text-indigo-805 dark:text-indigo-400"
+                          >
+                            {link.label}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-stone-400">
+                  No kanji in this dictionary form. Use the dictionary links for kana-only usage
+                  notes.
+                </div>
+              )}
+            </div>
+            {!geminiKey && (
+              <div className="mt-2 text-xs text-stone-400">
+                Add a Gemini key for kanji meaning and readings details.
+              </div>
+            )}
+            {kanjiErr && <div className="mt-2 text-sm text-rose-600">{kanjiErr}</div>}
+            {kanjiText && (
+              <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans border-t border-stone-100 dark:border-stone-800 pt-3 max-h-80 overflow-y-auto">
+                {kanjiText}
+              </div>
+            )}
+          </div>
+        )}
+
+        {showAdvancedReference && (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
+            <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
+                <IconPen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                Handwriting & Stroke
+              </div>
+              <button
+                onClick={generateWritingGuide}
+                disabled={!geminiKey}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
+              >
+                <IconSpark className="w-4 h-4" />
+                {writingLoading ? 'Cancel' : 'AI writing'}
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {writingUnits.map((unit, i) => (
+                <div
+                  key={unit.ch + '-' + i}
+                  className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-955 p-2"
+                >
+                  <div className="relative aspect-square rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 overflow-hidden flex items-center justify-center">
+                    <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-stone-200 dark:border-stone-800" />
+                    <div className="absolute inset-y-0 left-1/2 border-l border-dashed border-stone-200 dark:border-stone-800" />
+                    <div
+                      className="relative text-5xl sm:text-4xl font-semibold text-stone-805 dark:text-stone-205 leading-none"
                       lang="ja"
                     >
-                      {ch}
+                      {unit.ch}
                     </div>
-                    <div className="mt-1 flex gap-1.5">
-                      {kanjiDictionaryLinks(ch).map((link) => (
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-xs uppercase tracking-wider text-stone-400 font-semibold">
+                      {unit.type}
+                    </span>
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {unit.links.map((link) => (
                         <a
                           key={link.id}
                           href={link.url}
@@ -1264,186 +1363,118 @@ export default function ReferenceViewSub({
                       ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-xs text-stone-400">
-                No kanji in this dictionary form. Use the dictionary links for kana-only usage
-                notes.
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 grid sm:grid-cols-3 gap-2">
+              {writingDrill.map((step, i) => (
+                <div
+                  key={step}
+                  className="rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-955 px-3 py-2 text-xs leading-relaxed text-stone-605 dark:text-stone-300"
+                >
+                  <span className="font-semibold text-stone-800 dark:text-stone-200">{i + 1}.</span>{' '}
+                  {step}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 text-xs text-stone-400">
+              KanjiVG opens animated stroke data when available; Jisho is included as a second
+              reference. For kana-only, use the grid as trace-and-cover.
+            </div>
+            {!geminiKey && (
+              <div className="mt-2 text-xs text-stone-400">Add a Gemini key in Settings.</div>
+            )}
+            {writingErr && <div className="mt-2 text-sm text-rose-600">{writingErr}</div>}
+            {writingText && (
+              <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 border-t border-stone-100 dark:border-stone-800 pt-3 font-sans max-h-80 overflow-y-auto">
+                {writingText}
               </div>
             )}
           </div>
-          {!geminiKey && (
-            <div className="mt-2 text-xs text-stone-400">
-              Add a Gemini key for kanji meaning and readings details.
-            </div>
-          )}
-          {kanjiErr && <div className="mt-2 text-sm text-rose-600">{kanjiErr}</div>}
-          {kanjiText && (
-            <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans border-t border-stone-100 dark:border-stone-800 pt-3 max-h-80 overflow-y-auto">
-              {kanjiText}
-            </div>
-          )}
-        </div>
+        )}
 
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
-          <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
-              <IconPen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              Handwriting & Stroke
-            </div>
-            <button
-              onClick={generateWritingGuide}
-              disabled={!geminiKey}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
-            >
-              <IconSpark className="w-4 h-4" />
-              {writingLoading ? 'Cancel' : 'AI writing'}
-            </button>
-          </div>
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {writingUnits.map((unit, i) => (
-              <div
-                key={unit.ch + '-' + i}
-                className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-955 p-2"
-              >
-                <div className="relative aspect-square rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 overflow-hidden flex items-center justify-center">
-                  <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-stone-200 dark:border-stone-800" />
-                  <div className="absolute inset-y-0 left-1/2 border-l border-dashed border-stone-200 dark:border-stone-800" />
-                  <div
-                    className="relative text-5xl sm:text-4xl font-semibold text-stone-805 dark:text-stone-205 leading-none"
-                    lang="ja"
-                  >
-                    {unit.ch}
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="text-xs uppercase tracking-wider text-stone-400 font-semibold">
-                    {unit.type}
-                  </span>
-                  <div className="flex flex-wrap justify-end gap-1">
-                    {unit.links.map((link) => (
-                      <a
-                        key={link.id}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-indigo-605 hover:text-indigo-805 dark:text-indigo-400"
-                      >
-                        {link.label}
-                      </a>
-                    ))}
-                  </div>
-                </div>
+        {showAdvancedReference && (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
+            <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
+                <IconVolume className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                Pronunciation lab
               </div>
-            ))}
-          </div>
-          <div className="mt-3 grid sm:grid-cols-3 gap-2">
-            {writingDrill.map((step, i) => (
-              <div
-                key={step}
-                className="rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-955 px-3 py-2 text-xs leading-relaxed text-stone-605 dark:text-stone-300"
-              >
-                <span className="font-semibold text-stone-800 dark:text-stone-200">{i + 1}.</span>{' '}
-                {step}
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 text-xs text-stone-400">
-            KanjiVG opens animated stroke data when available; Jisho is included as a second
-            reference. For kana-only, use the grid as trace-and-cover.
-          </div>
-          {!geminiKey && (
-            <div className="mt-2 text-xs text-stone-400">Add a Gemini key in Settings.</div>
-          )}
-          {writingErr && <div className="mt-2 text-sm text-rose-600">{writingErr}</div>}
-          {writingText && (
-            <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 border-t border-stone-100 dark:border-stone-800 pt-3 font-sans max-h-80 overflow-y-auto">
-              {writingText}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
-          <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
-              <IconVolume className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              Pronunciation lab
-            </div>
-            <button
-              onClick={generateAccentGuide}
-              disabled={!geminiKey}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
-            >
-              <IconSpark className="w-4 h-4" />
-              {accentLoading ? 'Cancel' : 'AI accent'}
-            </button>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {selectedMorae.map((m, i) => (
-              <span
-                key={m + '-' + i}
-                className="min-w-8 px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-955 text-center text-lg text-stone-850 dark:text-stone-150"
-                lang="ja"
-              >
-                {m}
-              </span>
-            ))}
-          </div>
-          <div className="mt-3 grid sm:grid-cols-3 gap-2">
-            <button
-              onClick={() => speakJapaneseLocal(selected.reading)}
-              className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm inline-flex items-center justify-center gap-1.5 text-stone-700 dark:text-stone-300 font-medium transition"
-            >
-              <IconVolume className="w-4 h-4" />
-              Word
-            </button>
-            <button
-              onClick={() => {
-                if (typeof window === 'undefined' || !window.speechSynthesis) return;
-                window.speechSynthesis.cancel();
-                const u = new SpeechSynthesisUtterance(selected.reading);
-                u.lang = 'ja-JP';
-                u.rate = 0.62;
-                window.speechSynthesis.speak(u);
-              }}
-              className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm inline-flex items-center justify-center gap-1.5 text-stone-700 dark:text-stone-300 font-medium transition"
-            >
-              <IconVolume className="w-4 h-4" />
-              Slow
-            </button>
-            <button
-              onClick={() => speakJapaneseLocal(pronunciationForms.join('、'))}
-              className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm inline-flex items-center justify-center gap-1.5 text-stone-700 dark:text-stone-300 font-medium transition"
-            >
-              <IconVolume className="w-4 h-4" />
-              Forms
-            </button>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {pronunciationForms.map((f) => (
               <button
-                key={f}
-                onClick={() => speakJapaneseLocal(f)}
-                className="px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-850 text-sm text-stone-800 dark:text-stone-200 transition"
-                lang="ja"
+                onClick={generateAccentGuide}
+                disabled={!geminiKey}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
               >
-                {f}
+                <IconSpark className="w-4 h-4" />
+                {accentLoading ? 'Cancel' : 'AI accent'}
               </button>
-            ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {selectedMorae.map((m, i) => (
+                <span
+                  key={m + '-' + i}
+                  className="min-w-8 px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-955 text-center text-lg text-stone-850 dark:text-stone-150"
+                  lang="ja"
+                >
+                  {m}
+                </span>
+              ))}
+            </div>
+            <div className="mt-3 grid sm:grid-cols-3 gap-2">
+              <button
+                onClick={() => speakJapaneseLocal(selected.reading)}
+                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm inline-flex items-center justify-center gap-1.5 text-stone-700 dark:text-stone-300 font-medium transition"
+              >
+                <IconVolume className="w-4 h-4" />
+                Word
+              </button>
+              <button
+                onClick={() => {
+                  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+                  window.speechSynthesis.cancel();
+                  const u = new SpeechSynthesisUtterance(selected.reading);
+                  u.lang = 'ja-JP';
+                  u.rate = 0.62;
+                  window.speechSynthesis.speak(u);
+                }}
+                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm inline-flex items-center justify-center gap-1.5 text-stone-700 dark:text-stone-300 font-medium transition"
+              >
+                <IconVolume className="w-4 h-4" />
+                Slow
+              </button>
+              <button
+                onClick={() => speakJapaneseLocal(pronunciationForms.join('、'))}
+                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm inline-flex items-center justify-center gap-1.5 text-stone-700 dark:text-stone-300 font-medium transition"
+              >
+                <IconVolume className="w-4 h-4" />
+                Forms
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {pronunciationForms.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => speakJapaneseLocal(f)}
+                  className="px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-850 text-sm text-stone-800 dark:text-stone-200 transition"
+                  lang="ja"
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            {!geminiKey && (
+              <div className="mt-2 text-xs text-stone-400">
+                Add a Gemini key in Settings for Tokyo accent coaching.
+              </div>
+            )}
+            {accentErr && <div className="mt-2 text-sm text-rose-600">{accentErr}</div>}
+            {accentText && (
+              <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 border-t border-stone-100 dark:border-stone-800 pt-3 font-sans max-h-80 overflow-y-auto">
+                {accentText}
+              </div>
+            )}
           </div>
-          {!geminiKey && (
-            <div className="mt-2 text-xs text-stone-400">
-              Add a Gemini key in Settings for Tokyo accent coaching.
-            </div>
-          )}
-          {accentErr && <div className="mt-2 text-sm text-rose-600">{accentErr}</div>}
-          {accentText && (
-            <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 border-t border-stone-100 dark:border-stone-800 pt-3 font-sans max-h-80 overflow-y-auto">
-              {accentText}
-            </div>
-          )}
-        </div>
+        )}
 
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 overflow-hidden">
           <table className="w-full text-sm">
@@ -1545,30 +1576,32 @@ export default function ReferenceViewSub({
           </table>
         </div>
 
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
-          <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
-              <IconSpark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              AI examples
+        {showAdvancedReference && (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
+            <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
+                <IconSpark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                AI examples
+              </div>
+              <button
+                onClick={generateExamples}
+                disabled={!geminiKey}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm transition"
+              >
+                {aiLoading ? 'Cancel' : 'Generate'}
+              </button>
             </div>
-            <button
-              onClick={generateExamples}
-              disabled={!geminiKey}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm transition"
-            >
-              {aiLoading ? 'Cancel' : 'Generate'}
-            </button>
+            {!geminiKey && (
+              <div className="mt-2 text-xs text-stone-400">Add a Gemini API key in Settings.</div>
+            )}
+            {aiErr && <div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
+            {aiText && (
+              <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans border-t border-stone-105 dark:border-stone-800 pt-3">
+                {aiText}
+              </div>
+            )}
           </div>
-          {!geminiKey && (
-            <div className="mt-2 text-xs text-stone-400">Add a Gemini API key in Settings.</div>
-          )}
-          {aiErr && <div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
-          {aiText && (
-            <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans border-t border-stone-105 dark:border-stone-800 pt-3">
-              {aiText}
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

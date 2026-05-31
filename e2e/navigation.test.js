@@ -8,7 +8,7 @@ const TABS = [
   { id: 'study', label: 'study' },
   { id: 'check', label: 'Conjugation Check' },
   { id: 'classify', label: 'Which Group?' },
-  { id: 'endings', label: 'て Forms' },
+  { id: 'endings', label: 'Endings' },
   { id: 'games', label: 'games' },
   { id: 'insights', label: 'insights' },
   { id: 'library', label: 'library' },
@@ -21,6 +21,7 @@ const VIEW_ANCHORS = {
   classify: () => /Classification drill/,
   endings: () => /Pattern map/,
   insights: () => /Overview/,
+  library: () => /Rules and forms for the next drill/,
 };
 
 test.describe('Tab navigation', () => {
@@ -52,5 +53,33 @@ test.describe('Tab navigation', () => {
 
     const studyTab = page.locator('nav').getByRole('tab', { name: 'study', exact: true });
     await expect(studyTab).toHaveClass(/font-semibold/);
+  });
+
+  test('lessons are reachable inside library', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('nav').getByRole('tab', { name: 'library', exact: true }).click();
+    const lessonsTab = page.getByRole('tab', { name: /Lessons/ });
+    await expect(lessonsTab).toBeVisible();
+    await lessonsTab.click();
+
+    await expect(page.getByRole('heading', { name: 'Conjugation formation guide' })).toBeVisible();
+    await expect(page.getByText('127/127')).toBeVisible();
+  });
+
+  test('library lookup keeps advanced reference tools collapsed by default', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('nav').getByRole('tab', { name: 'library', exact: true }).click();
+
+    await expect(page.getByRole('tab', { name: /Lookup/ })).toBeVisible();
+    await expect(page.getByText('Advanced reference tools')).toBeVisible();
+    await expect(page.getByText('Dictionary & kanji')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Show tools' }).click();
+    await expect(page.getByText('Dictionary & kanji')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Hide tools' })).toBeVisible();
   });
 });
