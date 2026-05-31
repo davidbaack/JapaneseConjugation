@@ -15,7 +15,8 @@ const ASSET_DIR = 'dist/assets';
 
 // Budgets in kilobytes (gzipped). Tuned with ~20% headroom over current sizes;
 // bump deliberately (with a note) when a real feature justifies the growth.
-const TOTAL_GZIP_KB = 250;
+// Bumped 250→260: minimal-pair drills feature added ~6 KB gzipped (May 2026).
+const TOTAL_GZIP_KB = 260;
 const MAX_CHUNK_GZIP_KB = 70;
 
 const KB = 1024;
