@@ -277,7 +277,9 @@ export default function CheckView() {
               className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-800 rounded-xl bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 focus:border-indigo-500 focus:outline-none transition"
               lang="ja"
               autoComplete="off"
+              autoCapitalize="none"
               autoCorrect="off"
+              enterKeyHint="done"
               spellCheck="false"
             />
             <button

@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IconVolume } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import KanaProgressMeter from '../components/KanaProgressMeter.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import StickyAction from '../components/StickyAction.jsx';
+import { DEFAULT_PREFS } from '../data/defaults.js';
 import { toHiragana } from '../utils/romaji.js';
 import { conjugateItem, getTypeInfo, promptFormLabel } from '../utils/conjugator.js';
 import { explainItem } from '../utils/conjugatorExplain.js';
+import { kanaCoachCells } from '../utils/kanaCoach.js';
 import { bumpDaily, markMistakeResolved } from '../utils/storage.js';
 import { diagnoseMistake } from '../utils/mistakeDiagnosis.js';
 import { promptDisplay, formDisplay } from '../utils/display.js';
@@ -94,6 +97,29 @@ export default function MistakesView() {
     : null;
   const activeDiagnosis = diagnosisForMistake(active);
   const activeTargetInfo = targetInfoForMistake(active);
+  const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
+  const answerPreview = toHiragana(answer);
+  const answerKanaCells =
+    activeExpected && kanaMatchDisplay !== 'none'
+      ? kanaCoachCells(activeExpected, answer, 0, !result)
+      : [];
+  const answerWrongIndex = answerKanaCells.findIndex(
+    (cell) => cell.state === 'wrong' || cell.state === 'extra',
+  );
+  const answerKanaStatus =
+    answerWrongIndex >= 0
+      ? answerKanaCells[answerWrongIndex].state === 'extra'
+        ? 'Extra kana after the answer.'
+        : `Kana ${answerWrongIndex + 1} does not match yet.`
+      : activeExpected && answerPreview === activeExpected
+        ? 'Complete match. Press Enter.'
+        : '';
+  const answerKanaTone =
+    answerWrongIndex >= 0
+      ? 'error'
+      : activeExpected && answerPreview === activeExpected
+        ? 'success'
+        : 'neutral';
 
   return (
     <div className="grid lg:grid-cols-[320px_1fr] gap-4 text-left">
@@ -168,7 +194,7 @@ export default function MistakesView() {
                 <div className="text-xs text-stone-500">
                   {targetInfoForMistake(m).label}
                   {m.promptType ? ` from ${promptFormLabel(itemFromMistake(m), m.promptType)}` : ''}
-                  {m.dimension === 'transformation' ? ' · transformation' : ''}
+                  {m.dimension === 'transformation' ? ' · transform' : ''}
                 </div>
                 {diagnosisForMistake(m) && (
                   <div className="mt-1 inline-flex max-w-full rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-300">
@@ -252,8 +278,19 @@ export default function MistakesView() {
               className="w-full px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-xl focus:border-indigo-500 focus:outline-none transition"
               lang="ja"
               autoComplete="off"
+              autoCapitalize="none"
               autoCorrect="off"
+              enterKeyHint="done"
               spellCheck="false"
+            />
+            <KanaProgressMeter
+              cells={answerKanaCells}
+              mode={kanaMatchDisplay}
+              status={kanaMatchDisplay === 'color-count' ? answerKanaStatus : ''}
+              statusTone={answerKanaTone}
+              size="sm"
+              className="mt-3"
+              ariaLabel="Retest kana progress"
             />
             <StickyAction pad="-mx-5 px-5">
               <button

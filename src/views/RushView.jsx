@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { IconSpark } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import KanaProgressMeter from '../components/KanaProgressMeter.jsx';
 import StickyAction from '../components/StickyAction.jsx';
+import { DEFAULT_PREFS } from '../data/defaults.js';
 import { toHiragana } from '../utils/romaji.js';
+import { kanaCoachCells } from '../utils/kanaCoach.js';
 import {
   filterWordsForPrefs,
   practiceTypesForItem,
@@ -258,6 +261,29 @@ export default function RushView() {
       ? getTypeInfo(round.promptType).label
       : 'Dictionary form'
     : '';
+  const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
+  const answerPreview = toHiragana(answer);
+  const rushKanaCells =
+    round?.expected && kanaMatchDisplay !== 'none'
+      ? kanaCoachCells(round.expected, answer, 0, active && !paused)
+      : [];
+  const rushWrongIndex = rushKanaCells.findIndex(
+    (cell) => cell.state === 'wrong' || cell.state === 'extra',
+  );
+  const rushKanaStatus =
+    rushWrongIndex >= 0
+      ? rushKanaCells[rushWrongIndex].state === 'extra'
+        ? 'Extra kana after the answer.'
+        : `Kana ${rushWrongIndex + 1} does not match yet.`
+      : round?.expected && answerPreview === round.expected
+        ? 'Complete match. Press Enter.'
+        : '';
+  const rushKanaTone =
+    rushWrongIndex >= 0
+      ? 'error'
+      : round?.expected && answerPreview === round.expected
+        ? 'success'
+        : 'neutral';
 
   return (
     <div className="space-y-4">
@@ -412,7 +438,9 @@ export default function RushView() {
                 }
                 lang="ja"
                 autoComplete="off"
+                autoCapitalize="none"
                 autoCorrect="off"
+                enterKeyHint="done"
                 spellCheck="false"
                 className="px-4 py-3 text-xl border-2 border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-xl focus:border-indigo-500 focus:outline-none disabled:bg-stone-50 dark:disabled:bg-stone-900 transition"
               />
@@ -424,6 +452,15 @@ export default function RushView() {
                 Submit
               </button>
             </div>
+            <KanaProgressMeter
+              cells={rushKanaCells}
+              mode={kanaMatchDisplay}
+              status={kanaMatchDisplay === 'color-count' ? rushKanaStatus : ''}
+              statusTone={rushKanaTone}
+              size="sm"
+              className="mt-3"
+              ariaLabel="Rush kana progress"
+            />
           </StickyAction>
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
