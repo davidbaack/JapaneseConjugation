@@ -896,7 +896,9 @@ export default function StudyView() {
           {dueQueueDone ? 'SRS queue cleared!' : 'Daily goal reached!'}
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-1">
-          {dueQueueDone ? `${completedDueIds.size}/${initialDue}` : `${daily.count}/${dailyGoalTarget}`}
+          {dueQueueDone
+            ? `${completedDueIds.size}/${initialDue}`
+            : `${daily.count}/${dailyGoalTarget}`}
         </div>
         <div className="text-sm text-stone-400 mb-2">
           {dueQueueDone ? 'due cards cleared' : 'reviews today'}
@@ -1015,7 +1017,11 @@ export default function StudyView() {
           <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
             JLPT {getWordMeta(current.verb).jlpt}
           </div>
-          {timeLeft !== null || reviewLimit > 0 || !!sessionSkipped || initialDue > 0 || (!daily.goalHit && !bonusMode) ? (
+          {timeLeft !== null ||
+          reviewLimit > 0 ||
+          !!sessionSkipped ||
+          initialDue > 0 ||
+          (!daily.goalHit && !bonusMode) ? (
             <div className="flex justify-end mb-3">
               <div className="text-xs text-stone-400 text-right shrink-0">
                 {timeLeft !== null && (
@@ -1039,9 +1045,7 @@ export default function StudyView() {
                   </div>
                 )}
                 {bonusMode && (
-                  <div className="text-emerald-600 dark:text-emerald-400 font-medium">
-                    ✓ bonus
-                  </div>
+                  <div className="text-emerald-600 dark:text-emerald-400 font-medium">✓ bonus</div>
                 )}
                 {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
                 <div className="text-[9px]">
