@@ -11,6 +11,12 @@ import {
   focusWordInLists,
   referenceWithSearch,
   referenceWithHistory,
+  referenceRuleTarget,
+  compareReferenceRuleTarget,
+  referencePracticePrefsForTarget,
+  referenceWithWeakRule,
+  referenceHasWeakRule,
+  weakReferencePracticeTarget,
 } from '../views/ReferenceViewSub.jsx';
 import {
   parseWordRows,
@@ -115,6 +121,58 @@ describe('formRows', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // searchWords
 // ─────────────────────────────────────────────────────────────────────────────
+describe('reference practice launch helpers', () => {
+  it('maps a reference row to a group and form drill target', () => {
+    const target = referenceRuleTarget(KAKU, { id: 'te-form', label: 'Te-form', hint: '~te' });
+    expect(target).toMatchObject({
+      key: 'godan|te-form',
+      group: 'godan',
+      typeId: 'te-form',
+      typeIds: ['te-form'],
+      kinds: ['verb'],
+    });
+  });
+
+  it('builds a nearby compare target for a row', () => {
+    const target = compareReferenceRuleTarget(KAKU, {
+      id: 'te-form',
+      label: 'Te-form',
+      hint: '~te',
+    });
+    expect(target.typeIds).toContain('te-form');
+    expect(target.typeIds).toContain('plain-past');
+  });
+
+  it('turns a reference target into focused practice prefs', () => {
+    const target = referenceRuleTarget(KAKU, { id: 'te-form', label: 'Te-form' });
+    const prefs = referencePracticePrefsForTarget(
+      {
+        wordGroups: ['ichidan'],
+        wordTypes: ['adjective'],
+        wordListIds: ['favorites'],
+        jlptLevels: ['N5'],
+      },
+      target,
+    );
+    expect(prefs.wordGroups).toEqual(['godan']);
+    expect(prefs.wordTypes).toEqual(['verb']);
+    expect(prefs.wordListIds).toEqual([]);
+    expect(prefs.drillDirection).toBe('forward');
+  });
+
+  it('stores and exposes weak reference rules without duplicates', () => {
+    const target = referenceRuleTarget(KAKU, { id: 'te-form', label: 'Te-form' });
+    const ref = referenceWithWeakRule(referenceWithWeakRule(null, target), target);
+    expect(ref.weakRules).toHaveLength(1);
+    expect(referenceHasWeakRule(ref, target)).toBe(true);
+    expect(weakReferencePracticeTarget(ref)).toMatchObject({
+      groups: ['godan'],
+      typeIds: ['te-form'],
+      kinds: ['verb'],
+    });
+  });
+});
+
 describe('searchWords', () => {
   const words = [TABERU, KAKU, TAKAI, SHIZUKA];
 

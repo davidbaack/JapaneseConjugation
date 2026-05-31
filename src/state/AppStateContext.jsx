@@ -279,8 +279,8 @@ function useAppController() {
   const dailyPct = Math.min(100, Math.round((daily.count / (practicePrefs.dailyGoal || 30)) * 100));
 
   // Cross-view actions, so views don't need ad-hoc callback props.
-  function practiceWord(word, type) {
-    setStudyFocus({ word, type });
+  function practiceWord(word, type, options = {}) {
+    setStudyFocus({ word, type, ...options });
     setTab('study');
   }
   const clearStudyFocus = () => setStudyFocus(null);
