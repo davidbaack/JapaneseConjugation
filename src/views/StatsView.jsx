@@ -157,9 +157,9 @@ function skillRadarScores(state, verbs) {
     },
     {
       id: 'transformation',
-      label: 'Transformation',
+      label: 'Transform',
       score: pct(transformation.correct || 0, transformation.attempted || 0),
-      detail: `${transformation.correct || 0}/${transformation.attempted || 0} transformations`,
+      detail: `${transformation.correct || 0}/${transformation.attempted || 0} transforms`,
     },
     {
       id: 'classification',

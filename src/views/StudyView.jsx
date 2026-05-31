@@ -75,16 +75,74 @@ export { kanaCoachCells, explainReversePrompt };
 const STUDY_CURRENT_KEY = 'jp-study-current';
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
+const TRANSFORMATION_MODE_LABEL = 'Transform';
 const STUDY_MODE_OPTIONS = [
   { id: 'word', label: 'Word' },
   { id: 'sentence', label: 'Sentence' },
-  { id: 'transformation', label: 'Transformation Mode' },
+  { id: 'transformation', label: TRANSFORMATION_MODE_LABEL },
 ];
 const TRANSFORMATION_DIRECTIONS = [
   { id: 'forward', label: 'Conjugate' },
   { id: 'reverse', label: 'Un-conjugate' },
   { id: 'mixed', label: 'Mixed' },
 ];
+
+function transformationRouteText(sourceInfo, targetInfo) {
+  return `${sourceInfo.label} -> ${targetInfo.label}`;
+}
+
+function transformationHintFromBase(baseHint, { reverseDrill, sourceInfo, targetInfo }) {
+  const sourceLabel = sourceInfo?.label || 'source form';
+  const targetLabel = targetInfo?.label || 'target form';
+  const prefix = reverseDrill
+    ? `Work backward from the ${sourceLabel}. Recover the dictionary form before thinking about any new ending.`
+    : `Transform ${sourceLabel} into ${targetLabel}: keep the same word, then rebuild the requested form.`;
+  return {
+    ...baseHint,
+    text: `${prefix} ${baseHint.text}`,
+  };
+}
+
+function transformationReviewExplanation({
+  item,
+  type,
+  reverseDrill,
+  sourceInfo,
+  targetInfo,
+  sourceForm,
+  expected,
+}) {
+  const base = reverseDrill ? explainReversePrompt(item, type) : explainItem(item, type);
+  const route = transformationRouteText(sourceInfo, targetInfo);
+  const derivation =
+    sourceForm && expected && sourceForm !== expected
+      ? `${sourceForm} -> ${expected}`
+      : base.derivation;
+  if (reverseDrill) {
+    return {
+      ...base,
+      intro: `${item.dict} (${item.reading}) was a ${route} transformation.`,
+      rule: `Recognize the prompt as ${sourceInfo.label}, then recover the dictionary form. ${
+        base.rule || ''
+      }`.trim(),
+      derivation,
+    };
+  }
+  return {
+    ...base,
+    intro: `${item.dict} (${item.reading}) was a ${route} transformation.`,
+    rule:
+      sourceInfo.label === DICTIONARY_TYPE_INFO.label
+        ? base.rule
+        : `Recognize the prompt as ${sourceInfo.label}, keep the same word, then build ${
+            targetInfo.label
+          }. ${base.rule || ''}`.trim(),
+    derivation,
+    note: base.note
+      ? `${base.note} The starting form is only the prompt; the answer is the target form.`
+      : 'The starting form is only the prompt; the answer is the target form.',
+  };
+}
 
 function loadPersistedCurrent(state, verbs) {
   try {
@@ -205,13 +263,14 @@ export default function StudyView() {
       ? configuredPromptType ||
         pickPromptType(current.verb, current.type, { ...practicePrefs, promptForm: 'random' })
       : configuredPromptType;
-  const promptAudioText = current
+  const promptSourceForm = current
     ? reverseDrill
       ? sourceForm
       : promptType
         ? conjugateItem(current.verb, promptType)
         : current.verb.reading
     : '';
+  const promptAudioText = current ? promptSourceForm : '';
 
   // Timed-drill clock and (sentence-mode) AI example sentence — extracted hooks.
   const { endAt, timeLeft, restart: restartTimer } = useStudyTimer(practicePrefs.durationSec);
@@ -473,6 +532,7 @@ export default function StudyView() {
     sourceTypeId === DICTIONARY_TYPE_ID ? DICTIONARY_TYPE_INFO : getTypeInfo(sourceTypeId);
   const targetTypeInfo =
     targetTypeId === DICTIONARY_TYPE_ID ? DICTIONARY_TYPE_INFO : getTypeInfo(targetTypeId);
+  const transformationRoute = transformationRouteText(sourceTypeInfo, targetTypeInfo);
   const transformationAttempt = transformationMode
     ? {
         dimension: 'transformation',
@@ -491,9 +551,19 @@ export default function StudyView() {
     : 0;
   const reviewExplanation =
     phase === 'reviewing'
-      ? reverseDrill
-        ? explainReversePrompt(current.verb, current.type)
-        : explainItem(current.verb, current.type)
+      ? transformationMode
+        ? transformationReviewExplanation({
+            item: current.verb,
+            type: current.type,
+            reverseDrill,
+            sourceInfo: sourceTypeInfo,
+            targetInfo: targetTypeInfo,
+            sourceForm: promptSourceForm,
+            expected,
+          })
+        : reverseDrill
+          ? explainReversePrompt(current.verb, current.type)
+          : explainItem(current.verb, current.type)
       : null;
   const explanation = !wasCorrect ? reviewExplanation : null;
   const diagnostic =
@@ -504,10 +574,11 @@ export default function StudyView() {
   const wordType = isAdjective(current.verb) ? 'Adjective' : 'Verb';
   const noChangePrompt = !reverseDrill && promptType === current.type;
   const taskLabel = transformationMode
-    ? 'Transformation Mode'
+    ? TRANSFORMATION_MODE_LABEL
     : reverseDrill
       ? `Reverse ${typeInfo.label}`
       : typeInfo.label;
+  const transformationActionLabel = reverseDrill ? 'Answer with' : 'Conjugate to';
   const taskHint = transformationMode
     ? reverseDrill
       ? 'recover the dictionary form'
@@ -517,9 +588,13 @@ export default function StudyView() {
       : noChangePrompt
         ? 'same form; answer may not change'
         : typeInfo.hint;
+  const transformationSupportText =
+    targetEnglish && targetEnglish !== promptEnglish ? targetEnglish : taskHint;
   const taskSub = transformationMode ? targetTypeInfo.sub : reverseDrill ? '辞書形' : typeInfo.sub;
   const taskOverride = reverseDrill
-    ? `Reverse drill: identify the dictionary form from ${typeInfo.label} (${sourceForm})`
+    ? transformationMode
+      ? `Transform: recover the dictionary form from ${typeInfo.label} (${sourceForm})`
+      : `Reverse drill: identify the dictionary form from ${typeInfo.label} (${sourceForm})`
     : noChangePrompt
       ? `Trick no-change drill: the prompt is already ${typeInfo.label}, so the correct answer is the same form.`
       : '';
@@ -680,7 +755,9 @@ export default function StudyView() {
       }\nTask: ${
         reverseDrill
           ? `identify the dictionary form from ${typeInfo.label} ${sourceForm}`
-          : `transform ${promptFormLabel(current.verb, promptType)} to ${typeInfo.label}`
+          : transformationMode
+            ? `transform ${sourceTypeInfo.label} to ${targetTypeInfo.label} without changing the word`
+            : `transform ${promptFormLabel(current.verb, promptType)} to ${typeInfo.label}`
       }\n\nInclude one semantic hint and one rule cue. Keep it under 30 words.`;
       const reply = await callGemini(
         [{ role: 'user', parts: [{ text: prompt }] }],
@@ -705,9 +782,16 @@ export default function StudyView() {
   function showStepHint() {
     if (!current) return;
     const reveal = hintRevealed || (!!stepHint && hintMasked);
-    const { text, masked } = stepCoachHint(current.verb, current.type, answer, reveal);
-    setStepHint(text);
-    setHintMasked(masked);
+    const baseHint = stepCoachHint(current.verb, current.type, answer, reveal);
+    const nextHint = transformationMode
+      ? transformationHintFromBase(baseHint, {
+          reverseDrill,
+          sourceInfo: sourceTypeInfo,
+          targetInfo: targetTypeInfo,
+        })
+      : baseHint;
+    setStepHint(nextHint.text);
+    setHintMasked(nextHint.masked);
     if (reveal) setHintRevealed(true);
   }
 
@@ -1361,12 +1445,12 @@ export default function StudyView() {
         {transformationMode && (
           <div className="flex flex-col gap-2 sm:items-end">
             <div className="text-xs text-stone-500 dark:text-stone-400 tabular-nums">
-              {transformationStats.correct || 0}/{transformationStats.attempted || 0} transformation
+              {transformationStats.correct || 0}/{transformationStats.attempted || 0} transform
               {transformationStats.attempted ? ` · ${transformationAccuracy}%` : ''}
             </div>
             <div
               role="group"
-              aria-label="Transformation direction"
+              aria-label="Transform direction"
               className="grid grid-cols-3 gap-1 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-1"
             >
               {TRANSFORMATION_DIRECTIONS.map((direction) => {
@@ -1380,7 +1464,7 @@ export default function StudyView() {
                     aria-pressed={active}
                     className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
                       active
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-stone-800 text-white dark:bg-indigo-600'
                         : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
                     }`}
                   >
@@ -1496,11 +1580,14 @@ export default function StudyView() {
           )}
           {promptType && !hidePromptText && (
             <div className="text-xs text-stone-400">
-              Base: <span lang="ja">{current.verb.dict}</span>
+              Dictionary: <span lang="ja">{current.verb.dict}</span>
               {current.verb.dict !== current.verb.reading && (
                 <span lang="ja"> · {current.verb.reading}</span>
               )}
             </div>
+          )}
+          {transformationMode && !hidePromptText && (
+            <div className="mt-1 text-xs text-stone-400">Prompt form: {sourceTypeInfo.label}.</div>
           )}
           {noChangePrompt && !hidePromptText && (
             <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium">
@@ -1573,38 +1660,64 @@ export default function StudyView() {
           <div className="mt-4 flex flex-col gap-1">
             {phase === 'answering' ? (
               <>
-                <div className="flex justify-center mb-3">
-                  <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
-                    <span className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                      {taskLabel}
-                    </span>
-                    {transformationMode && (
-                      <span className="text-xs text-indigo-500 dark:text-indigo-400 font-medium">
-                        {sourceTypeInfo.label} -&gt; {targetTypeInfo.label}
+                <div className="flex justify-center mb-4">
+                  {transformationMode ? (
+                    <div className="max-w-full px-2 text-center">
+                      <div className="text-[10px] font-semibold uppercase text-indigo-500 dark:text-indigo-300">
+                        {transformationActionLabel}
+                      </div>
+                      <div className="mt-1 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl bg-indigo-600 px-5 py-3 text-white shadow-lg shadow-indigo-950/20 dark:bg-indigo-500/95">
+                        <span className="text-xl sm:text-2xl font-bold leading-tight">
+                          {targetTypeInfo.label}
+                        </span>
+                        {taskSub && (
+                          <span
+                            className="rounded-lg bg-white/15 px-2 py-1 text-base sm:text-lg font-semibold leading-tight"
+                            lang="ja"
+                          >
+                            {taskSub}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
+                        <span>From {sourceTypeInfo.label}</span>
+                        <span aria-hidden="true" className="text-indigo-400">
+                          -&gt;
+                        </span>
+                        <span>{transformationSupportText}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
+                      <span className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                        {taskLabel}
                       </span>
-                    )}
-                    {taskSub && (
-                      <span
-                        className="text-sm text-indigo-500 dark:text-indigo-400 font-medium"
-                        lang="ja"
-                      >
-                        {taskSub}
-                      </span>
-                    )}
-                    {targetEnglish && targetEnglish !== promptEnglish ? (
-                      <span className="text-xs text-indigo-400 dark:text-indigo-500">
-                        · {targetEnglish}
-                      </span>
-                    ) : taskHint ? (
-                      <span className="text-xs text-indigo-400 dark:text-indigo-500">
-                        · {taskHint}
-                      </span>
-                    ) : null}
-                    {current.ruleLabel && practicePrefs.showWordCategory && (
-                      <span className="text-xs text-indigo-400 dark:text-indigo-500">
-                        · {current.ruleLabel}
-                      </span>
-                    )}
+                      {taskSub && (
+                        <span
+                          className="text-sm text-indigo-500 dark:text-indigo-400 font-medium"
+                          lang="ja"
+                        >
+                          {taskSub}
+                        </span>
+                      )}
+                      {targetEnglish && targetEnglish !== promptEnglish ? (
+                        <span className="text-xs text-indigo-400 dark:text-indigo-500">
+                          · {targetEnglish}
+                        </span>
+                      ) : taskHint ? (
+                        <span className="text-xs text-indigo-400 dark:text-indigo-500">
+                          · {taskHint}
+                        </span>
+                      ) : null}
+                      {current.ruleLabel && practicePrefs.showWordCategory && (
+                        <span className="text-xs text-indigo-400 dark:text-indigo-500">
+                          · {current.ruleLabel}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="sr-only">
+                    {transformationMode ? transformationRoute : taskLabel}
                   </div>
                 </div>
                 {activeMinimalPairSet && (
@@ -1848,7 +1961,9 @@ export default function StudyView() {
                         className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-transparent caret-stone-850 dark:caret-stone-150 focus:border-indigo-500 focus:outline-none transition"
                         lang="ja"
                         autoComplete="off"
+                        autoCapitalize="none"
                         autoCorrect="off"
+                        enterKeyHint="done"
                         spellCheck="false"
                       />
                       <button
@@ -1951,7 +2066,9 @@ export default function StudyView() {
                         className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-transparent caret-stone-850 dark:caret-stone-150 focus:border-indigo-500 focus:outline-none transition"
                         lang="ja"
                         autoComplete="off"
+                        autoCapitalize="none"
                         autoCorrect="off"
+                        enterKeyHint="done"
                         spellCheck="false"
                       />
                       <button

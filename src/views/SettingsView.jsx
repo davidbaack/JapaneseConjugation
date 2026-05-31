@@ -409,7 +409,7 @@ export default function SettingsView() {
               {[
                 { id: 'word', label: 'Word only' },
                 { id: 'sentence', label: 'Sentence context' },
-                { id: 'transformation', label: 'Transformation' },
+                { id: 'transformation', label: 'Transform' },
               ].map((o) => (
                 <button
                   key={o.id}
@@ -424,6 +424,9 @@ export default function SettingsView() {
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-stone-400 mt-1">
+              Transform asks for one form from another, like te-form to passive.
+            </p>
           </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Study direction</label>
@@ -497,8 +500,8 @@ export default function SettingsView() {
             </select>
             <div className="mt-2 grid sm:grid-cols-[1fr_auto] gap-2 items-center">
               <p className="text-[11px] text-stone-400">
-                Practice transformations like て-form → passive; incompatible sources fall back to
-                dictionary form.
+                Choose the starting form for Transform; incompatible sources fall back to dictionary
+                form.
               </p>
               <button
                 onClick={() =>

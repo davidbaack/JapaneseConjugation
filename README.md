@@ -16,7 +16,7 @@ Japanese verb and adjective conjugation practice with spaced repetition, referen
 - **Speech Synthesis** — hear any conjugated form read aloud using the browser's Web Speech API
 - **Flexible Input** — type romaji (auto-converts to hiragana), kana directly, or use the on-screen kana pad
 - **Answer Modes** — free input, guided kana, multiple choice, or self-check
-- **Drill Modes** — word-only or sentence context; forward (conjugate) or reverse (identify dictionary form)
+- **Drill Modes** — word-only, sentence context, or Transform practice for moving between forms such as te-form to passive or conjugated form back to dictionary form
 - **Script Modes** — toggle kanji, kana, romaji, furigana, and color-coded conjugation highlighting
 - **JLPT / Genki / Minna Filtering** — limit drills to specific proficiency levels, Genki lessons, or みんなの日本語 lessons
 - **Cloud Sync** — sign in to sync progress, custom words, and word lists across devices

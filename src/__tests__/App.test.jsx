@@ -37,18 +37,24 @@ describe('App shell', () => {
     });
   });
 
-  it('starts Transformation Mode from the Study screen', async () => {
+  it('starts Transform mode from the Study screen with a source-to-target route', async () => {
     render(<App />);
-    const transformButton = await screen.findByRole('button', { name: /Transformation Mode/i });
+    const transformButton = await screen.findByRole(
+      'button',
+      { name: 'Transform' },
+      { timeout: 5000 },
+    );
 
     fireEvent.click(transformButton);
 
     expect(screen.getAllByRole('button', { name: /Conjugate/i }).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Un-conjugate' })).toBeTruthy();
-    await waitFor(() =>
-      expect(screen.getAllByText(/Transformation Mode/i).length).toBeGreaterThan(0),
-    );
-  });
+    await waitFor(() => expect(screen.getAllByText(/Transform/i).length).toBeGreaterThan(0));
+    expect(screen.getByText(/Conjugate to/i)).toBeTruthy();
+    expect(screen.getByText(/Prompt form:/i)).toBeTruthy();
+    expect(screen.getByText(/From /i)).toBeTruthy();
+    expect(screen.getAllByText(/->/).length).toBeGreaterThan(0);
+  }, 15000);
 
   it('mounts every tab without hitting the error boundary', async () => {
     render(<App />);
