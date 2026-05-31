@@ -1,9 +1,10 @@
 import { STORAGE_KEY, DEFAULT_PREFS } from '../data/defaults.js';
 import {
   CONJ_TYPES,
-  ADJ_TYPES,
   ALL_CARD_TYPES,
   TYPE_PACKS,
+  LEARNER_DEFAULT_TYPE_IDS,
+  LEGACY_BROAD_DEFAULT_TYPE_IDS,
   INTRODUCED_DEFAULT_TYPE_IDS,
 } from '../data/conjugationTypes.js';
 import {
@@ -27,6 +28,36 @@ import {
 } from './minimalPairs.js';
 
 export const DAY = 86400000;
+
+const LEGACY_VERB_DEFAULT_TYPE_IDS = CONJ_TYPES.filter((t) => t.id !== 'plain-present').map(
+  (t) => t.id,
+);
+const LEGACY_PREINTRO_DEFAULT_TYPE_IDS = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
+  (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
+);
+const LEGACY_VERB_PREINTRO_DEFAULT_TYPE_IDS = LEGACY_VERB_DEFAULT_TYPE_IDS.filter(
+  (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
+);
+
+function sameIdSet(ids, targetIds) {
+  const uniqueIds = [...new Set(ids || [])];
+  if (uniqueIds.length !== targetIds.length) return false;
+  const target = new Set(targetIds);
+  return uniqueIds.every((id) => target.has(id));
+}
+
+function isLegacyBroadDefaultTypeScope(ids) {
+  return (
+    sameIdSet(ids, LEGACY_BROAD_DEFAULT_TYPE_IDS) ||
+    sameIdSet(ids, LEGACY_PREINTRO_DEFAULT_TYPE_IDS) ||
+    sameIdSet(ids, LEGACY_VERB_DEFAULT_TYPE_IDS) ||
+    sameIdSet(ids, LEGACY_VERB_PREINTRO_DEFAULT_TYPE_IDS)
+  );
+}
+
+function normalizeDefaultTypeScope(ids) {
+  return isLegacyBroadDefaultTypeScope(ids) ? [...LEARNER_DEFAULT_TYPE_IDS] : ids;
+}
 
 export function loadAll() {
   try {
@@ -394,13 +425,16 @@ export function gradeTransformationStats(stats = null, attempt = {}) {
 export function mergeCloudState(local, cloud) {
   if (!local) return cloud;
   if (!cloud) return local;
+  const enabledTypes = normalizeDefaultTypeScope([
+    ...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])]),
+  ]);
   return {
     ...local,
     cards: mergeCards(local.cards || {}, cloud.cards || {}),
     verbStats: mergeVerbStats(local.verbStats || {}, cloud.verbStats || {}),
     mistakes: mergeMistakes(local.mistakes || [], cloud.mistakes || []),
     readiness: mergeReadinessState(local.readiness, cloud.readiness),
-    enabledTypes: [...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])])],
+    enabledTypes,
     daily: (() => {
       const ld = local.daily || {},
         cd = cloud.daily || {};
@@ -547,10 +581,7 @@ export function defaultState() {
     transformation: emptyTransformationStats(),
     minimalPairs: { bySet: {} },
     reference: normalizeReferenceState(),
-    enabledTypes: [
-      ...CONJ_TYPES.filter((t) => t.id !== 'plain-present').map((t) => t.id),
-      ...ADJ_TYPES.filter((t) => t.id !== 'adj-plain-present').map((t) => t.id),
-    ],
+    enabledTypes: [...LEARNER_DEFAULT_TYPE_IDS],
     session: { reviewed: 0, correct: 0, skipped: 0, mistakePatterns: {} },
     daily: {
       date: localDateKey(),
@@ -597,22 +628,18 @@ export function mergeState(saved, sessionOverride) {
   if (
     saved &&
     Array.isArray(saved.enabledTypes) &&
+    isLegacyBroadDefaultTypeScope(saved.enabledTypes)
+  ) {
+    merged.enabledTypes = [...LEARNER_DEFAULT_TYPE_IDS];
+  } else if (
+    saved &&
+    Array.isArray(saved.enabledTypes) &&
     !saved.enabledTypes.some((id) => id.startsWith('adj-'))
   ) {
     merged.enabledTypes = [
       ...saved.enabledTypes,
       ...base.enabledTypes.filter((id) => id.startsWith('adj-')),
     ];
-  }
-
-  if (saved && Array.isArray(saved.enabledTypes)) {
-    const enabledSet = new Set(merged.enabledTypes);
-    const previousDefaultIds = base.enabledTypes.filter(
-      (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
-    );
-    if (previousDefaultIds.every((id) => enabledSet.has(id))) {
-      merged.enabledTypes = [...new Set([...merged.enabledTypes, ...INTRODUCED_DEFAULT_TYPE_IDS])];
-    }
   }
 
   return merged;

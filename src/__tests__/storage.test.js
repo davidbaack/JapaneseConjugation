@@ -17,6 +17,12 @@ import {
   DAY,
 } from '../utils/storage.js';
 import { conjugateItem } from '../utils/conjugator.js';
+import {
+  ALL_CARD_TYPES,
+  INTRODUCED_DEFAULT_TYPE_IDS,
+  LEARNER_DEFAULT_TYPE_IDS,
+  LEGACY_BROAD_DEFAULT_TYPE_IDS,
+} from '../data/conjugationTypes.js';
 
 // Mock localStorage for storage tests (mergeState etc. are pure but defaultState references CONJ_TYPES)
 // No localStorage calls in the functions we're testing — they're all pure.
@@ -377,6 +383,32 @@ describe('mergeState', () => {
     expect(state.enabledTypes.length).toBeGreaterThan(0);
   });
 
+  it('starts new learners on the core conjugation scope', () => {
+    const state = defaultState();
+    expect(state.enabledTypes).toEqual(LEARNER_DEFAULT_TYPE_IDS);
+    expect(state.enabledTypes).not.toContain('passive-polite-past-negative');
+    expect(state.enabledTypes).not.toContain('short-causative-passive-polite-past-negative');
+  });
+
+  it('migrates the old broad default scope to the learner default', () => {
+    const state = mergeState({ enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS }, null);
+    expect(state.enabledTypes).toEqual(LEARNER_DEFAULT_TYPE_IDS);
+  });
+
+  it('migrates pre-introduced broad default scopes to the learner default', () => {
+    const preIntroducedIds = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
+      (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
+    );
+    const state = mergeState({ enabledTypes: preIntroducedIds }, null);
+    expect(state.enabledTypes).toEqual(LEARNER_DEFAULT_TYPE_IDS);
+  });
+
+  it('preserves an explicit all-forms scope', () => {
+    const allTypeIds = ALL_CARD_TYPES.map((t) => t.id);
+    const state = mergeState({ enabledTypes: allTypeIds }, null);
+    expect(state.enabledTypes).toEqual(allTypeIds);
+  });
+
   it('preserves saved cards', () => {
     const saved = {
       cards: {
@@ -414,6 +446,24 @@ describe('mergeState', () => {
 });
 
 describe('mergeCloudState', () => {
+  it('does not revive the legacy broad default during cloud merges', () => {
+    const merged = mergeCloudState(
+      { cards: {}, verbStats: {}, mistakes: [], enabledTypes: LEARNER_DEFAULT_TYPE_IDS },
+      { cards: {}, verbStats: {}, mistakes: [], enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS },
+    );
+    expect(merged.enabledTypes).toEqual(LEARNER_DEFAULT_TYPE_IDS);
+  });
+
+  it('preserves explicit all-forms cloud scopes', () => {
+    const allTypeIds = ALL_CARD_TYPES.map((t) => t.id);
+    const merged = mergeCloudState(
+      { cards: {}, verbStats: {}, mistakes: [], enabledTypes: LEARNER_DEFAULT_TYPE_IDS },
+      { cards: {}, verbStats: {}, mistakes: [], enabledTypes: allTypeIds },
+    );
+    expect(new Set(merged.enabledTypes)).toEqual(new Set(allTypeIds));
+    expect(merged.enabledTypes).toHaveLength(allTypeIds.length);
+  });
+
   it('merges readiness dimensions from both devices', () => {
     const merged = mergeCloudState(
       {
