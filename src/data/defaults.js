@@ -10,7 +10,6 @@ export const DEFAULT_PREFS = {
   autoAdvanceCorrect: false,
   autoAiExplainErrors: true,
   englishHints: 'show',
-  practiceFocus: 'balanced',
   minimalPairSetId: '',
   skipDuplicateForms: true,
   trickQuestions: false,

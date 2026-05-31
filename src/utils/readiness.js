@@ -358,7 +358,6 @@ export function buildConjugationSpeedRows(state, words = []) {
 
 export function launchPrefsForReadinessDimension(dimensionId) {
   const base = {
-    practiceFocus: 'weak',
     drillDirection: 'forward',
     promptForm: 'dictionary',
     listeningPrompt: false,

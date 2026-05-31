@@ -840,11 +840,7 @@ export function selectNext(state, verbs, enabledTypes, lastRuleId, prefs = DEFAU
     const c = state.cards[p.rule.id];
     return c && c.nextReview > now;
   });
-  let chosen;
-  if ((prefs.practiceFocus || 'balanced') === 'weak') {
-    const weakPool = [...due, ...future, ...fresh];
-    chosen = pickWeakWeighted(weakPool, state);
-  }
+  let chosen = pickWeakWeighted([...due, ...future, ...fresh], state);
   if (!chosen) {
     if (due.length) {
       due.sort((a, b) => state.cards[a.rule.id].nextReview - state.cards[b.rule.id].nextReview);

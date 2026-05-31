@@ -274,27 +274,6 @@ export default function SettingsView() {
               ))}
             </div>
           </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Practice focus</label>
-            <div className="flex gap-2">
-              {[
-                { id: 'balanced', label: 'Balanced' },
-                { id: 'weak', label: 'Weak spots' },
-              ].map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, practiceFocus: o.id })}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.practiceFocus || 'balanced') === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
           <div className="sm:col-span-2">
             <label className="text-xs text-stone-500 block mb-1">Prompt form</label>
             <div role="group" aria-label="Prompt form" className="grid grid-cols-3 gap-2">

@@ -193,7 +193,6 @@ export function practicePrefsForTodayDrill(prefs = DEFAULT_PREFS, plan) {
   return {
     ...prefs,
     drillMode: 'word',
-    practiceFocus: plan?.sourceCounts?.weak ? 'weak' : prefs.practiceFocus || 'balanced',
     minimalPairSetId: '',
     reviewLimit: 0,
     reviewLimitSource: '',

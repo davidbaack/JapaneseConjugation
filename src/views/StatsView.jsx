@@ -299,7 +299,7 @@ export default function StatsView() {
       .sort((a, b) => b[1] - a[1])
       .map(([key]) => key);
 
-    let nextPrefs = { ...practicePrefs, practiceFocus: 'weak', minimalPairSetId: '' };
+    let nextPrefs = { ...practicePrefs, minimalPairSetId: '' };
 
     if (sortedWeakWordKeys.length > 0) {
       const listName = 'Targeted Weaknesses';

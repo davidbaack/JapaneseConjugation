@@ -86,7 +86,6 @@ describe('today drill planner', () => {
 
     expect(prefs).toMatchObject({
       drillMode: 'word',
-      practiceFocus: 'weak',
       minimalPairSetId: '',
       reviewLimit: 0,
       reviewLimitSource: '',

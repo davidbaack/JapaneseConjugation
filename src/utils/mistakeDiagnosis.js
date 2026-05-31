@@ -473,7 +473,6 @@ export function upsertRepairWordList(wordLists = [], plan) {
 export function repairPrefsForPlan(practicePrefs = {}, plan) {
   return {
     ...practicePrefs,
-    practiceFocus: 'weak',
     drillMode: 'word',
     drillDirection: 'forward',
     promptForm: 'dictionary',

@@ -203,7 +203,6 @@ export function practicePrefsForMinimalPairSet(set, prefs = {}) {
   return {
     ...prefs,
     minimalPairSetId: set?.id || '',
-    practiceFocus: 'weak',
     drillMode: 'word',
     wordListIds: [],
     wordTypes: set?.wordTypes || prefs.wordTypes,

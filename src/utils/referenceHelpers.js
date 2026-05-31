@@ -535,7 +535,6 @@ export function referencePracticePrefsForTarget(prefs = DEFAULT_PREFS, target = 
   return {
     ...prefs,
     drillDirection: 'forward',
-    practiceFocus: 'balanced',
     wordListIds: [],
     jlptLevels: DEFAULT_PREFS.jlptLevels,
     genkiLessons: [],
@@ -763,7 +762,6 @@ export function focusPracticePrefsForWord(prefs = DEFAULT_PREFS, word) {
   const meta = getWordMeta(word);
   return {
     ...prefs,
-    practiceFocus: 'balanced',
     wordListIds: [FOCUS_LIST_ID],
     jlptLevels: [meta.jlpt || 'N3'],
     wordTypes: [wordKind(word)],
