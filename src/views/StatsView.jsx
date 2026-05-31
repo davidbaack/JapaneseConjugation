@@ -3,6 +3,12 @@ import { IconSpark, IconFlame } from '../components/Icons.jsx';
 import { ALL_CARD_TYPES, TYPE_LABEL } from '../data/conjugationTypes.js';
 import { RULES } from '../utils/conjugator.js';
 import { defaultState } from '../utils/storage.js';
+import {
+  aggregateDiagnosedMistakes,
+  buildRepairDrillPlan,
+  repairPrefsForPlan,
+  upsertRepairWordList,
+} from '../utils/mistakeDiagnosis.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
@@ -170,6 +176,10 @@ export default function StatsView() {
   const stats = useMemo(() => srsStatsFor(state, verbs), [state, verbs]);
   const radar = useMemo(() => skillRadarScores(state, verbs), [state, verbs]);
   const formRowsData = useMemo(() => formAccuracyRows(state, verbs), [state, verbs]);
+  const mistakePatterns = useMemo(
+    () => aggregateDiagnosedMistakes(state.mistakes),
+    [state.mistakes],
+  );
   const weakestForms = formRowsData.filter((row) => row.attempted > 0).slice(0, 8);
   const weakest = radar.slice().sort((a, b) => a.score - b.score)[0];
   const [aiText, setAiText] = useState('');
@@ -231,6 +241,22 @@ export default function StatsView() {
     }
     if (setPracticePrefs) {
       setPracticePrefs(nextPrefs);
+    }
+    if (setTab) {
+      setTab('study');
+    }
+  }
+
+  function launchRepairDrill(pattern) {
+    const plan = buildRepairDrillPlan(pattern, verbs);
+    if (setWordLists && plan.wordKeys.length) {
+      setWordLists(upsertRepairWordList(wordLists, plan));
+    }
+    if (setState && plan.typeIds.length) {
+      setState((prev) => ({ ...prev, enabledTypes: plan.typeIds }));
+    }
+    if (setPracticePrefs) {
+      setPracticePrefs(repairPrefsForPlan(practicePrefs, plan));
     }
     if (setTab) {
       setTab('study');
@@ -443,6 +469,66 @@ export default function StatsView() {
             );
           })}
         </div>
+      </div>
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h3 className="font-medium flex items-center gap-2 text-stone-950 dark:text-stone-50">
+              <IconFlame className="w-4 h-4 text-rose-500" />
+              Diagnosed mistake patterns
+            </h3>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Highest-value patterns from missed cards.
+            </p>
+          </div>
+          <div className="text-xs text-stone-400 tabular-nums flex-shrink-0">
+            {mistakePatterns.length} pattern{mistakePatterns.length === 1 ? '' : 's'}
+          </div>
+        </div>
+        {mistakePatterns.length === 0 ? (
+          <p className="text-sm text-stone-500">
+            No diagnosed patterns yet. Ambiguous misses still stay in mistake history.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {mistakePatterns.slice(0, 6).map((pattern, index) => (
+              <div
+                key={pattern.patternId}
+                className="rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-stone-850 dark:text-stone-150">
+                      {pattern.label}
+                    </div>
+                    <div className="text-xs text-stone-500 mt-0.5">{pattern.feedback}</div>
+                    {!!pattern.examples.length && (
+                      <div className="mt-1 text-[11px] text-stone-400 truncate">
+                        Examples: {pattern.examples.map((ex) => ex.dict).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-sm font-semibold tabular-nums text-rose-700 dark:text-rose-350">
+                      {pattern.unresolved} open
+                    </div>
+                    <div className="text-[11px] text-stone-400 tabular-nums">
+                      {pattern.count} total
+                    </div>
+                  </div>
+                </div>
+                {index === 0 && (
+                  <button
+                    onClick={() => launchRepairDrill(pattern)}
+                    className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
+                  >
+                    Start 10-card repair drill
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
         <h3 className="font-medium mb-3 flex items-center gap-2 text-stone-950 dark:text-stone-50">

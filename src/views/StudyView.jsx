@@ -6,6 +6,7 @@ import {
   IconSpark,
   IconChat,
   IconPen,
+  IconFlame,
 } from '../components/Icons.jsx';
 import { playPronunciation } from '../utils/speech.js';
 import { useStudyTimer } from '../hooks/useStudyTimer.js';
@@ -28,12 +29,7 @@ import {
   isAdjective,
   promptFormLabel,
 } from '../utils/conjugator.js';
-import {
-  explainItem,
-  diagnoseItem,
-  stepCoachHint,
-  GROUP_NAMES,
-} from '../utils/conjugatorExplain.js';
+import { explainItem, stepCoachHint, GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import {
   selectNext,
   buildFocusCard,
@@ -51,6 +47,13 @@ import {
   dictionaryAnswerMatches,
   typoGuardForAnswer,
 } from '../utils/display.js';
+import {
+  buildRepairDrillPlan,
+  bumpSessionMistakePattern,
+  rankSessionMistakePatterns,
+  repairPrefsForPlan,
+  upsertRepairWordList,
+} from '../utils/mistakeDiagnosis.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
@@ -95,7 +98,9 @@ export default function StudyView() {
     allWords: verbs,
     activeGeminiKey: geminiKey,
     practicePrefs,
+    setPracticePrefs,
     wordLists,
+    setWordLists,
     studyFocus: focus,
     clearStudyFocus: onFocusConsumed,
   } = useApp();
@@ -122,6 +127,7 @@ export default function StudyView() {
   const [revealedMiss, setRevealedMiss] = useState(false);
   const [reviewChoiceLabel, setReviewChoiceLabel] = useState('');
   const [submittedAnswer, setSubmittedAnswer] = useState('');
+  const [lastDiagnosis, setLastDiagnosis] = useState(null);
   const [selfCheckOpen, setSelfCheckOpen] = useState(false);
   const [typoGuard, setTypoGuard] = useState(null);
   const [kanaPadOpen, setKanaPadOpen] = useState(false);
@@ -176,6 +182,10 @@ export default function StudyView() {
     sourceForm,
     scriptMode: practicePrefs.scriptMode,
   });
+  const sessionMistakePatterns = useMemo(
+    () => rankSessionMistakePatterns(state.session?.mistakePatterns),
+    [state.session?.mistakePatterns],
+  );
 
   useEffect(() => {
     if (current !== null) return;
@@ -376,9 +386,7 @@ export default function StudyView() {
       : null;
   const explanation = !wasCorrect ? reviewExplanation : null;
   const diagnostic =
-    phase === 'reviewing' && !wasCorrect && !reverseDrill && !revealedMiss
-      ? diagnoseItem(current.verb, current.type, answer)
-      : '';
+    phase === 'reviewing' && !wasCorrect && !revealedMiss ? lastDiagnosis?.feedback || '' : '';
   const choices = reverseDrill
     ? makeReverseChoices(current, practiceWords)
     : makeChoices(current, practiceWords);
@@ -503,6 +511,41 @@ export default function StudyView() {
     setCoachChatOpen(true);
   }
 
+  function launchRepairDrill(pattern) {
+    const plan = buildRepairDrillPlan(pattern, verbs);
+    if (setWordLists && plan.wordKeys.length) {
+      setWordLists(upsertRepairWordList(wordLists, plan));
+    }
+    if (setState && plan.typeIds.length) {
+      setState((prev) => ({ ...prev, enabledTypes: plan.typeIds }));
+    }
+    if (setPracticePrefs) {
+      setPracticePrefs(repairPrefsForPlan(practicePrefs, plan));
+    }
+    setReviewBase(state.session?.reviewed || 0);
+    restartTimer();
+    setChatOpen(false);
+    setAnswer('');
+    setCoachRevealed(0);
+    setGreenRevealed(0);
+    setRevealedMiss(false);
+    setReviewChoiceLabel('');
+    setSelfCheckOpen(false);
+    setTypoGuard(null);
+    setStepHint('');
+    setHintMasked(false);
+    setHintRevealed(false);
+    setCoachChatOpen(false);
+    setLastDiagnosis(null);
+    hadKanaMistakeRef.current = false;
+    wrongSnapshotRef.current = null;
+    setWasCorrected(false);
+    setWasCorrect(false);
+    setPhase('answering');
+    setCurrent(null);
+    setTab('study');
+  }
+
   function submit(choiceValue) {
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
@@ -520,6 +563,7 @@ export default function StudyView() {
       setHintMasked(false);
       setHintRevealed(false);
       setCoachChatOpen(false);
+      setLastDiagnosis(null);
       hadKanaMistakeRef.current = false;
       wrongSnapshotRef.current = null;
       setWasCorrected(false);
@@ -565,20 +609,27 @@ export default function StudyView() {
           reverseDrill ? raw.trim() : normalized,
           expected,
         );
+    const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
     const nextState = {
       ...state,
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
       verbStats: newVerbStats,
       mistakes: nextMistakes,
       session: {
-        ...(state.session || {}),
-        reviewed: (state.session?.reviewed || 0) + 1,
-        correct: (state.session?.correct || 0) + (ok ? 1 : 0),
+        ...bumpSessionMistakePattern(
+          {
+            ...(state.session || {}),
+            reviewed: (state.session?.reviewed || 0) + 1,
+            correct: (state.session?.correct || 0) + (ok ? 1 : 0),
+          },
+          mistakeDiagnosis,
+        ),
       },
       daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 30),
     };
     setState(nextState);
     setChatOpen(!ok && !!geminiKey && !!practicePrefs.autoAiExplainErrors);
+    setLastDiagnosis(mistakeDiagnosis);
     setReviewChoiceLabel('');
     setRevealedMiss(false);
     setSelfCheckOpen(false);
@@ -607,6 +658,7 @@ export default function StudyView() {
         setHintMasked(false);
         setHintRevealed(false);
         setCoachChatOpen(false);
+        setLastDiagnosis(null);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
         setWasCorrected(false);
@@ -638,6 +690,7 @@ export default function StudyView() {
     setHintMasked(false);
     setHintRevealed(false);
     setCoachChatOpen(false);
+    setLastDiagnosis(null);
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
     setWasCorrected(false);
@@ -672,15 +725,21 @@ export default function StudyView() {
           `self-check: ${label}`,
           expected,
         );
+    const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
     const nextState = {
       ...state,
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
       verbStats: newVerbStats,
       mistakes: nextMistakes,
       session: {
-        ...(state.session || {}),
-        reviewed: (state.session?.reviewed || 0) + 1,
-        correct: (state.session?.correct || 0) + (ok ? 1 : 0),
+        ...bumpSessionMistakePattern(
+          {
+            ...(state.session || {}),
+            reviewed: (state.session?.reviewed || 0) + 1,
+            correct: (state.session?.correct || 0) + (ok ? 1 : 0),
+          },
+          mistakeDiagnosis,
+        ),
       },
       daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 30),
     };
@@ -691,6 +750,7 @@ export default function StudyView() {
     setRevealedMiss(!ok);
     setSelfCheckOpen(false);
     setChatOpen(!ok && !!geminiKey && !!practicePrefs.autoAiExplainErrors);
+    setLastDiagnosis(mistakeDiagnosis);
     setWasCorrect(ok);
     setPhase('reviewing');
     const reviewWillComplete = reviewLimit > 0 && reviewsDone + 1 >= reviewLimit;
@@ -709,6 +769,7 @@ export default function StudyView() {
         setHintMasked(false);
         setHintRevealed(false);
         setCoachChatOpen(false);
+        setLastDiagnosis(null);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
         setWasCorrected(false);
@@ -742,15 +803,21 @@ export default function StudyView() {
       '(revealed)',
       expected,
     );
+    const mistakeDiagnosis = nextMistakes[0]?.diagnosis || null;
     const nextState = {
       ...state,
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], false) },
       verbStats: newVerbStats,
       mistakes: nextMistakes,
       session: {
-        ...(state.session || {}),
-        reviewed: (state.session?.reviewed || 0) + 1,
-        correct: state.session?.correct || 0,
+        ...bumpSessionMistakePattern(
+          {
+            ...(state.session || {}),
+            reviewed: (state.session?.reviewed || 0) + 1,
+            correct: state.session?.correct || 0,
+          },
+          mistakeDiagnosis,
+        ),
       },
       daily: bumpDaily(state.daily, false, practicePrefs.dailyGoal || 30),
     };
@@ -758,6 +825,7 @@ export default function StudyView() {
     setAnswer('');
     setTypoGuard(null);
     setChatOpen(!!geminiKey && !!practicePrefs.autoAiExplainErrors);
+    setLastDiagnosis(mistakeDiagnosis);
     setReviewChoiceLabel("I don't know");
     setSelfCheckOpen(false);
     setRevealedMiss(true);
@@ -816,7 +884,47 @@ export default function StudyView() {
             {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this set
           </div>
         )}
-        {!reviewLimit && <div className="mb-5" />}
+        {sessionMistakePatterns.length > 0 ? (
+          <div className="mb-5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/10 px-4 py-3 text-left">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-wider text-rose-700 dark:text-rose-400 font-semibold flex items-center gap-1.5">
+                  <IconFlame className="w-3.5 h-3.5" />
+                  Top mistake pattern
+                </div>
+                <div className="mt-1 text-sm font-medium text-stone-900 dark:text-stone-100">
+                  {sessionMistakePatterns[0].label}
+                </div>
+                <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
+                  {sessionMistakePatterns[0].feedback}
+                </div>
+              </div>
+              <div className="text-xs font-semibold tabular-nums text-rose-700 dark:text-rose-300">
+                {sessionMistakePatterns[0].count}x
+              </div>
+            </div>
+            {sessionMistakePatterns.length > 1 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {sessionMistakePatterns.slice(1, 4).map((pattern) => (
+                  <span
+                    key={pattern.patternId}
+                    className="px-2 py-1 rounded-full border border-rose-200/70 dark:border-rose-900/60 bg-white/70 dark:bg-stone-900/50 text-[11px] text-stone-600 dark:text-stone-300"
+                  >
+                    {pattern.label} ({pattern.count}x)
+                  </span>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => launchRepairDrill(sessionMistakePatterns[0])}
+              className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
+            >
+              Start 10-card repair drill
+            </button>
+          </div>
+        ) : (
+          <div className="mb-5" />
+        )}
         <button
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
@@ -1731,8 +1839,9 @@ export default function StudyView() {
                     {diagnostic && (
                       <div className="text-sm text-rose-800 dark:text-rose-300 bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2">
                         <span className="font-medium text-rose-900 dark:text-rose-200">
-                          Likely mix-up:{' '}
+                          Diagnosis:{' '}
                         </span>
+                        {lastDiagnosis?.label ? `${lastDiagnosis.label}. ` : ''}
                         {diagnostic}
                       </div>
                     )}
