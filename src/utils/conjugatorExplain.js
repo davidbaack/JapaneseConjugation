@@ -42,61 +42,322 @@ export function getOfflineTemplateSentence(word, type) {
   }
 }
 
-export function getConjugationSteps(word, type) {
-  const ans = conjugateItem(word, type);
-  const parts = getConjugationParts(word, type, ans);
-  const steps = [];
+const GODAN_ENDING_ROMAJI = {
+  う: 'u',
+  く: 'ku',
+  ぐ: 'gu',
+  す: 'su',
+  つ: 'tsu',
+  ぬ: 'nu',
+  ぶ: 'bu',
+  む: 'mu',
+  る: 'ru',
+};
 
-  steps.push({
-    title: 'Identify Word Type & Group',
-    desc: `"${word.dict}" (${word.reading}) means "${word.meaning}" and is ${GROUP_NAMES[word.group] || word.group}.`,
-  });
+const ONBIN_TAIL_RULES = {
+  'te-form': {
+    て: 'ichidan る -> て (ru -> te)',
+    って: 'う/つ/る -> って (u/tsu/ru -> tte)',
+    んで: 'む/ぶ/ぬ -> んで (mu/bu/nu -> nde)',
+    いて: 'く -> いて (ku -> ite)',
+    いで: 'ぐ -> いで (gu -> ide)',
+    して: 'す -> して (su -> shite)',
+    きて: '来る -> きて (kuru -> kite)',
+  },
+  'plain-past': {
+    た: 'ichidan る -> た (ru -> ta)',
+    った: 'う/つ/る -> った (u/tsu/ru -> tta)',
+    んだ: 'む/ぶ/ぬ -> んだ (mu/bu/nu -> nda)',
+    いた: 'く -> いた (ku -> ita)',
+    いだ: 'ぐ -> いだ (gu -> ida)',
+    した: 'す -> した (su -> shita)',
+    きた: '来る -> きた (kuru -> kita)',
+  },
+};
 
-  let stemDesc = '';
-  if (isAdjective(word)) {
-    if (word.group === 'i-adjective') {
-      const stemVal = adjectiveStem(word);
-      const isIrreg = word.irregular || word.reading === 'いい' || word.reading === 'かっこいい';
-      stemDesc = isIrreg
-        ? `Since this is an irregular い-adjective, change the base ending to "よ" to get the stem: "${stemVal}".`
-        : `Drop the final "い" from the dictionary form to get the stem: "${stemVal}".`;
-    } else {
-      stemDesc = `Remove the final "な" from the dictionary form to get the stem: "${parts.stem}".`;
+const ONBIN_TAIL_ROMAJI = {
+  て: 'te',
+  って: 'tte',
+  んで: 'nde',
+  いて: 'ite',
+  いで: 'ide',
+  して: 'shite',
+  きて: 'kite',
+  た: 'ta',
+  った: 'tta',
+  んだ: 'nda',
+  いた: 'ita',
+  いだ: 'ida',
+  した: 'shita',
+  きた: 'kita',
+};
+
+function typeLabel(type) {
+  return getTypeInfo(type)?.label || TYPE_LABEL[type] || type;
+}
+
+function groupLabel(item) {
+  return GROUP_NAMES[item?.group] || item?.group || 'unknown group';
+}
+
+function originalEndingFor(item) {
+  if (!item) return '';
+  if (isAdjective(item)) {
+    if (item.group === 'i-adjective') return 'い';
+    if (item.group === 'na-adjective') return item.reading?.endsWith('な') ? 'な' : 'な-adj base';
+    return item.reading?.slice(-1) || '';
+  }
+  if (item.group === 'ichidan') return 'る';
+  if (item.group === 'suru') return 'する';
+  if (item.group === 'kuru') return 'くる';
+  return item.reading?.slice(-1) || '';
+}
+
+function fallbackStem(item, ending) {
+  const reading = item?.reading || '';
+  if (!reading) return '';
+  if (ending && reading.endsWith(ending)) return reading.slice(0, -ending.length);
+  if (item?.group === 'suru' && reading.endsWith('する')) return reading.slice(0, -2);
+  if (item?.group === 'kuru' && reading.endsWith('くる')) return reading.slice(0, -2);
+  return reading.slice(0, Math.max(0, reading.length - 1));
+}
+
+function replacementFromParts(parts, expected, stem) {
+  const direct = `${parts?.change || ''}${parts?.suffix || ''}`;
+  if (direct) return direct;
+  if (expected && stem && expected.startsWith(stem)) return expected.slice(stem.length);
+  return expected || '';
+}
+
+function expectedOnbinRule(item, type, replacement) {
+  const ending = originalEndingFor(item);
+  const romaji = GODAN_ENDING_ROMAJI[ending];
+  if (!romaji || !ONBIN_TAIL_RULES[type]) return '';
+  const replacementRomaji = ONBIN_TAIL_ROMAJI[replacement] || replacement;
+  return `${ending} -> ${replacement} (${romaji} -> ${replacementRomaji})`;
+}
+
+function ruleSummaryFor(item, type, parts, expected) {
+  const ending = originalEndingFor(item);
+  const stem = parts.stem || fallbackStem(item, ending);
+  const replacement = replacementFromParts(parts, expected, stem);
+  const label = typeLabel(type);
+
+  if (isAdjective(item)) {
+    if (item.group === 'i-adjective') {
+      const irregular = item.irregular || item.reading === 'いい' || item.reading === 'かっこいい';
+      return {
+        family: irregular ? 'irregular i-adjective' : 'i-adjective',
+        short: irregular
+          ? `irregular いい/よい stem -> ${replacement || expected}`
+          : `drop い -> ${replacement || expected}`,
+        detail: irregular
+          ? 'Use the よ stem, then attach the adjective ending.'
+          : 'Remove the final い, then attach the requested adjective ending.',
+      };
     }
-  } else {
-    if (word.group === 'ichidan') {
-      stemDesc = `Drop the final "る" from the dictionary form to get the stem: "${parts.stem}".`;
-    } else if (word.group === 'godan') {
-      const lastChar = word.reading.slice(-1);
-      const targetVowel = parts.change;
-      stemDesc = `This is a godan verb. Shift its final dictionary hiragana "${lastChar}" to its inflected form "${targetVowel}". The base stem is now "${parts.stem}${parts.change}".`;
-    } else if (word.group === 'suru') {
-      stemDesc = `Conjugate the "する" portion to "${parts.change}". The compound base is "${parts.stem}".`;
-    } else if (word.group === 'kuru') {
-      stemDesc = `The irregular verb 来る root kanji/kana shifts to "${parts.stem}${parts.change}".`;
+    return {
+      family: 'na-adjective',
+      short: `base + ${replacement || expected}`,
+      detail: 'Keep the adjective base and attach the requested copula or connector.',
+    };
+  }
+
+  if (item.group === 'ichidan') {
+    return {
+      family: 'ichidan',
+      short: `drop る -> ${replacement || expected}`,
+      detail: 'Remove the final る and attach the requested ending.',
+    };
+  }
+
+  if (item.group === 'godan') {
+    const onbin = expectedOnbinRule(item, type, replacement);
+    if (onbin && (type === 'te-form' || type === 'plain-past')) {
+      return {
+        family: 'godan sound change',
+        short: onbin,
+        detail: 'Use the godan sound-change cluster for past/te forms.',
+      };
+    }
+    if (parts.change) {
+      return {
+        family: 'godan row shift',
+        short: `${ending} -> ${parts.change}${parts.suffix ? ` + ${parts.suffix}` : ''}`,
+        detail: `Shift the final ${ending} to the needed row, then attach the target ending.`,
+      };
+    }
+    return {
+      family: 'godan',
+      short: replacement ? `${ending} -> ${replacement}` : 'dictionary form',
+      detail: 'Use the dictionary form or the regular godan stem for this target.',
+    };
+  }
+
+  if (item.group === 'suru') {
+    return {
+      family: 'suru irregular',
+      short: `する -> ${replacement || expected}`,
+      detail: 'Conjugate the する part irregularly; keep any compound noun before it.',
+    };
+  }
+
+  if (item.group === 'kuru') {
+    return {
+      family: 'kuru irregular',
+      short: `くる -> ${replacement || expected}`,
+      detail: '来る changes its root sound irregularly by form.',
+    };
+  }
+
+  return {
+    family: item.group || 'rule',
+    short: replacement ? `${ending || 'base'} -> ${replacement}` : label,
+    detail: `Build the ${label} form from the dictionary form.`,
+  };
+}
+
+function inferOnbinMistake(item, type, got, expected, expectedRule) {
+  if (!item || isAdjective(item) || item.group !== 'godan') return null;
+  const rules = ONBIN_TAIL_RULES[type];
+  if (!rules) return null;
+  const stem = item.reading?.slice(0, -1) || '';
+  if (!stem || !got.startsWith(stem) || !expected.startsWith(stem)) return null;
+  const gotTail = got.slice(stem.length);
+  const expectedTail = expected.slice(stem.length);
+  if (!gotTail || gotTail === expectedTail || !rules[gotTail]) return null;
+  return {
+    kind: 'onbin',
+    userAnswer: got,
+    userRule: rules[gotTail],
+    userResult: got,
+    expectedRule: expectedRule.short,
+    expectedResult: expected,
+    detail: 'The stem is right, but the sound-change ending comes from a different godan cluster.',
+  };
+}
+
+export function inferMistakenConjugationPattern(item, type, userAnswer) {
+  const raw = String(userAnswer || '').trim();
+  if (raw.startsWith('self-check:') || raw === '(revealed)') return null;
+  const got = toHiragana(raw);
+  const expected = conjugateItem(item, type);
+  if (!got || !expected || got === expected) return null;
+
+  const expectedParts = getConjugationParts(item, type, expected);
+  const expectedRule = ruleSummaryFor(item, type, expectedParts, expected);
+  const onbin = inferOnbinMistake(item, type, got, expected, expectedRule);
+  if (onbin) return onbin;
+
+  const types = isAdjective(item) ? ADJ_TYPES : CONJ_TYPES;
+  for (const candidate of types) {
+    if (candidate.id === type) continue;
+    if (conjugateItem(item, candidate.id) === got) {
+      const debug = getConjugationDebugInfo(item, candidate.id);
+      return {
+        kind: 'form',
+        userAnswer: got,
+        userRule: `${candidate.label}: ${debug.rule.short}`,
+        userResult: got,
+        expectedRule: expectedRule.short,
+        expectedResult: expected,
+        detail: `That is a valid ${candidate.label.toLowerCase()} form, but this card asks for ${typeLabel(type).toLowerCase()}.`,
+      };
     }
   }
-  steps.push({
-    title: 'Apply Stem & Vowel Shift',
-    desc: stemDesc,
-  });
 
-  const suffixDesc = parts.suffix
-    ? `Append the grammatical suffix "${parts.suffix}" representing the target form (${getTypeInfo(type).label}).`
-    : `No additional grammatical suffix is needed for this form.`;
-  steps.push({
-    title: 'Append Grammatical Suffix',
-    desc: suffixDesc,
-  });
+  const alternateGroups = isAdjective(item)
+    ? [item.group === 'i-adjective' ? 'na-adjective' : 'i-adjective']
+    : ['ichidan', 'godan'].filter((group) => group !== item.group);
+  for (const group of alternateGroups) {
+    const alt = { ...item, group };
+    try {
+      if (conjugateItem(alt, type) === got) {
+        const debug = getConjugationDebugInfo(alt, type);
+        return {
+          kind: 'group',
+          userAnswer: got,
+          userRule: `${groupLabel(alt)}: ${debug.rule.short}`,
+          userResult: got,
+          expectedRule: expectedRule.short,
+          expectedResult: expected,
+          detail: `The answer follows the ${groupLabel(alt)} pattern, not ${groupLabel(item)}.`,
+        };
+      }
+    } catch {}
+  }
 
-  steps.push({
-    title: 'Verify Conjugation Result',
-    desc: `Combine the stem and suffix to get the final form.`,
-    isResult: true,
-    expected: ans,
-  });
+  return null;
+}
 
-  return steps;
+export function getConjugationDebugInfo(word, type, userAnswer = '') {
+  const ans = conjugateItem(word, type);
+  const parts = getConjugationParts(word, type, ans);
+  const originalEnding = originalEndingFor(word);
+  const stem = parts.stem || fallbackStem(word, originalEnding);
+  const replacement = replacementFromParts(parts, ans, stem);
+  const rule = ruleSummaryFor(word, type, parts, ans);
+  const label = typeLabel(type);
+  const source = word?.reading || word?.dict || '';
+  const formula = {
+    stem,
+    originalEnding,
+    replacement,
+    result: ans,
+    expression: replacement ? `${stem} + ${replacement} = ${ans}` : ans,
+  };
+  const steps = [
+    {
+      title: 'Identify Word Type & Group',
+      desc: `"${word.dict}" (${word.reading}) means "${word.meaning}" and is ${GROUP_NAMES[word.group] || word.group}.`,
+      key: 'group',
+      label: 'group',
+      value: groupLabel(word),
+    },
+    {
+      title: 'Split Stem & Ending',
+      desc: `Keep the stem "${stem || source}" and focus on the ending "${originalEnding}".`,
+      key: 'split',
+      label: 'stem',
+      value: stem || source,
+      ending: originalEnding,
+    },
+    {
+      title: 'Apply Rule',
+      desc: `${rule.short}. ${rule.detail}`,
+      key: 'rule',
+      label: 'rule',
+      value: rule.short,
+    },
+    {
+      title: 'Verify Conjugation Result',
+      desc: `Combine the stem and replacement to get the ${label} form.`,
+      key: 'result',
+      label: 'result',
+      value: ans,
+      isResult: true,
+      expected: ans,
+    },
+  ];
+
+  return {
+    source,
+    targetType: type,
+    targetLabel: label,
+    groupLabel: groupLabel(word),
+    stem,
+    originalEnding,
+    replacement,
+    result: ans,
+    formula,
+    rule,
+    steps,
+    mistake: inferMistakenConjugationPattern(word, type, userAnswer),
+  };
+}
+
+export function getConjugationSteps(word, type) {
+  return getConjugationDebugInfo(word, type).steps;
 }
 
 export const GROUP_NAMES = {

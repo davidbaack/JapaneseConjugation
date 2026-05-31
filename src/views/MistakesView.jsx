@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { IconVolume } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import StickyAction from '../components/StickyAction.jsx';
 import { toHiragana } from '../utils/romaji.js';
 import { conjugateItem, getTypeInfo, promptFormLabel } from '../utils/conjugator.js';
@@ -12,7 +13,7 @@ import { playPronunciation } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
 export default function MistakesView() {
-  const { state, setState, setTab, practicePrefs } = useApp();
+  const { state, setState, setTab, practicePrefs, activeGeminiKey } = useApp();
   const mistakes = useMemo(() => state.mistakes || [], [state.mistakes]);
   const open = useMemo(() => mistakes.filter((m) => !m.resolved), [mistakes]);
   const [activeKey, setActiveKey] = useState(open[0]?.key || mistakes[0]?.key || null);
@@ -278,6 +279,20 @@ export default function MistakesView() {
                     {explainItem(result.item, active.type).rule}
                   </div>
                 )}
+              </div>
+            )}
+            {activeItem && activeExpected && (
+              <div className="rounded-xl border border-stone-200 dark:border-stone-850 bg-stone-50/60 dark:bg-stone-950/30 p-4">
+                <div className="text-xs uppercase tracking-wider text-stone-500 font-semibold">
+                  Why the original answer missed
+                </div>
+                <ConjugationBreakdown
+                  word={activeItem}
+                  type={active.type}
+                  userAnswer={result ? (result.ok ? '' : answer) : active.userAnswer}
+                  geminiKey={activeGeminiKey}
+                  practicePrefs={practicePrefs}
+                />
               </div>
             )}
           </div>
