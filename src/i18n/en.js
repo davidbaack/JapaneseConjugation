@@ -12,7 +12,7 @@ export default {
   'nav.study': 'study',
   'nav.check': 'Conjugation Check',
   'nav.classify': 'Which Group?',
-  'nav.endings': 'て Forms',
+  'nav.endings': 'Endings',
   'nav.games': 'games',
   'nav.insights': 'insights',
   'nav.library': 'library',
