@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { IconSpark, IconFlame } from '../components/Icons.jsx';
+import { CONTRAST_SETS } from '../utils/contrastSets.js';
 import { ALL_CARD_TYPES, TYPE_LABEL } from '../data/conjugationTypes.js';
 import { RULES, wordKey } from '../utils/conjugator.js';
 import { defaultState } from '../utils/storage.js';
@@ -721,6 +722,31 @@ export default function StatsView() {
             )}
           </div>
         )}
+      </div>
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+        <h3 className="font-medium mb-1 flex items-center gap-2 text-stone-950 dark:text-stone-50">
+          Minimal pair drills
+        </h3>
+        <p className="text-xs text-stone-500 mb-3">
+          Drill two easily-confused forms side by side to sharpen the distinction.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {CONTRAST_SETS.map((pair) => (
+            <button
+              key={pair.id}
+              onClick={() => {
+                if (setState) setState((prev) => ({ ...prev, enabledTypes: pair.types }));
+                if (setTab) setTab('study');
+              }}
+              className="text-left px-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-800 hover:border-indigo-400 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 transition group"
+            >
+              <div className="text-sm font-medium text-stone-800 dark:text-stone-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition">
+                {pair.label}
+              </div>
+              <div className="text-xs text-stone-500 mt-0.5">{pair.description}</div>
+            </button>
+          ))}
+        </div>
       </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
         <h3 className="font-medium mb-3 flex items-center gap-2 text-stone-950 dark:text-stone-50">
