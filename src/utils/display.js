@@ -507,6 +507,29 @@ export function hashString(s) {
   return Math.abs(h);
 }
 
+function stableChoiceKey(value) {
+  if (value && typeof value === 'object') {
+    if ('dict' in value || 'group' in value) return wordKey(value);
+    if ('id' in value) return String(value.id);
+  }
+  return String(value);
+}
+
+function stableShuffled(arr, seed) {
+  return [...arr]
+    .map((value, index) => ({
+      value,
+      index,
+      rank: hashString(`${seed}|${index}|${stableChoiceKey(value)}`),
+    }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(({ value }) => value);
+}
+
+function choiceSeed(current, mode) {
+  return `${mode}|${current.id}|${current.type}|${wordKey(current.verb)}`;
+}
+
 export function drillDirectionFor(current, prefs = DEFAULT_PREFS) {
   const mode = prefs.drillDirection || 'forward';
   if (mode === 'reverse') return 'reverse';
@@ -520,18 +543,22 @@ export function drillDirectionFor(current, prefs = DEFAULT_PREFS) {
 export function makeChoices(current, verbs) {
   const expected = conjugateItem(current.verb, current.type);
   const types = isAdjective(current.verb) ? ADJ_TYPES : CONJ_TYPES;
+  const seed = choiceSeed(current, 'forward');
   const set = new Set([expected]);
-  for (const t of shuffled(types)) {
+  for (const t of stableShuffled(types, `${seed}|types`)) {
     const v = conjugateItem(current.verb, t.id);
     if (v && v !== expected) set.add(v);
     if (set.size >= 4) break;
   }
-  for (const v of shuffled(verbs.filter((v) => v.group === current.verb.group))) {
+  for (const v of stableShuffled(
+    verbs.filter((v) => v.group === current.verb.group),
+    `${seed}|words`,
+  )) {
     const x = conjugateItem(v, current.type);
     if (x && x !== expected) set.add(x);
     if (set.size >= 4) break;
   }
-  return shuffled([...set].slice(0, 4));
+  return stableShuffled([...set].slice(0, 4), `${seed}|answers`);
 }
 
 export function dictionaryAnswerMatches(raw, item) {
@@ -546,13 +573,15 @@ export function dictionaryAnswerMatches(raw, item) {
 }
 
 export function makeReverseChoices(current, words) {
+  const seed = choiceSeed(current, 'reverse');
   const key = wordKey(current.verb);
   const seen = new Set([key]);
   const choices = [current.verb];
-  for (const w of shuffled(
+  for (const w of stableShuffled(
     words.filter(
       (w) => w.group === current.verb.group || isAdjective(w) === isAdjective(current.verb),
     ),
+    `${seed}|words`,
   )) {
     const k = wordKey(w);
     if (seen.has(k)) continue;
@@ -560,5 +589,5 @@ export function makeReverseChoices(current, words) {
     choices.push(w);
     if (choices.length >= 4) break;
   }
-  return shuffled(choices);
+  return stableShuffled(choices, `${seed}|answers`);
 }

@@ -11,8 +11,11 @@ import {
   resolveDisplayScripts,
   answerPhaseTaskDetails,
   mergePracticePrefs,
+  makeChoices,
+  makeReverseChoices,
 } from '../utils/display.js';
 import { filterWordsForPrefs } from '../utils/conjugator.js';
+import { STARTER_VERBS } from '../data/starterWords.js';
 
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
 const TAKAI = { dict: '高い', reading: 'たかい', meaning: 'expensive', group: 'i-adjective' };
@@ -205,6 +208,31 @@ describe('answerPhaseTaskDetails', () => {
       sub: 'dictionary form',
       supportText: 'answer with dictionary form',
     });
+  });
+});
+
+describe('answer mode choices', () => {
+  const current = {
+    id: 'ichidan|plain-past',
+    verb: STARTER_VERBS[0],
+    type: 'plain-past',
+  };
+
+  it('keeps forward choices stable across rerenders for the same card', () => {
+    const first = makeChoices(current, STARTER_VERBS);
+    expect(first).toHaveLength(4);
+    for (let i = 0; i < 20; i++) {
+      expect(makeChoices(current, STARTER_VERBS)).toEqual(first);
+    }
+  });
+
+  it('keeps reverse choices stable across rerenders for the same card', () => {
+    const first = makeReverseChoices(current, STARTER_VERBS);
+    expect(first).toHaveLength(4);
+    expect(first).toContain(current.verb);
+    for (let i = 0; i < 20; i++) {
+      expect(makeReverseChoices(current, STARTER_VERBS)).toEqual(first);
+    }
   });
 });
 
