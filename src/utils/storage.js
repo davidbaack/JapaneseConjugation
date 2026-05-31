@@ -12,6 +12,7 @@ import {
   enabledTypeIdsFor,
   filterWordsForPrefs,
 } from './conjugator.js';
+import { diagnoseMistake } from './mistakeDiagnosis.js';
 import { retryWithBackoff } from './retry.js';
 import {
   defaultReadinessState,
@@ -435,7 +436,7 @@ export function defaultState() {
       ...CONJ_TYPES.filter((t) => t.id !== 'plain-present').map((t) => t.id),
       ...ADJ_TYPES.filter((t) => t.id !== 'adj-plain-present').map((t) => t.id),
     ],
-    session: { reviewed: 0, correct: 0, skipped: 0 },
+    session: { reviewed: 0, correct: 0, skipped: 0, mistakePatterns: {} },
     daily: {
       date: localDateKey(),
       count: 0,
@@ -536,6 +537,7 @@ export function recordMistake(mistakes, item, type, promptType, userAnswer, expe
   const key = `${item.group}|${item.dict}|${type}|${promptType || 'dictionary'}`;
   const now = Date.now();
   const prior = (mistakes || []).find((m) => m.key === key);
+  const mistakeDiagnosis = diagnoseMistake({ item, type, promptType, userAnswer, expected });
   const fresh = {
     key,
     dict: item.dict,
@@ -546,6 +548,7 @@ export function recordMistake(mistakes, item, type, promptType, userAnswer, expe
     promptType: promptType || null,
     userAnswer,
     expected,
+    diagnosis: mistakeDiagnosis,
     at: now,
     count: (prior?.count || 0) + 1,
     resolved: false,

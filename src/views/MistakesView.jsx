@@ -6,6 +6,7 @@ import { toHiragana } from '../utils/romaji.js';
 import { conjugateItem, getTypeInfo, promptFormLabel } from '../utils/conjugator.js';
 import { explainItem } from '../utils/conjugatorExplain.js';
 import { bumpDaily, markMistakeResolved } from '../utils/storage.js';
+import { diagnoseMistake } from '../utils/mistakeDiagnosis.js';
 import { promptDisplay, formDisplay } from '../utils/display.js';
 import { playPronunciation } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
@@ -30,6 +31,20 @@ export default function MistakesView() {
 
   function itemFromMistake(m) {
     return { dict: m.dict, reading: m.reading, meaning: m.meaning, group: m.group };
+  }
+
+  function diagnosisForMistake(m) {
+    if (!m) return null;
+    return (
+      m.diagnosis ||
+      diagnoseMistake({
+        item: itemFromMistake(m),
+        type: m.type,
+        promptType: m.promptType,
+        userAnswer: m.userAnswer,
+        expected: m.expected,
+      })
+    );
   }
 
   function retest(m) {
@@ -64,6 +79,7 @@ export default function MistakesView() {
   const activeExpectedView = activeExpected
     ? formDisplay(activeExpected, practicePrefs, activeItem, active.type)
     : null;
+  const activeDiagnosis = diagnosisForMistake(active);
 
   return (
     <div className="grid lg:grid-cols-[320px_1fr] gap-4 text-left">
@@ -139,6 +155,11 @@ export default function MistakesView() {
                   {getTypeInfo(m.type).label}
                   {m.promptType ? ` from ${promptFormLabel(itemFromMistake(m), m.promptType)}` : ''}
                 </div>
+                {diagnosisForMistake(m) && (
+                  <div className="mt-1 inline-flex max-w-full rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-300">
+                    <span className="truncate">{diagnosisForMistake(m).label}</span>
+                  </div>
+                )}
                 <div className="text-xs text-stone-450 truncate">
                   You wrote <span lang="ja">{m.userAnswer}</span>; expected{' '}
                   <span lang="ja">{m.expected}</span>
@@ -176,6 +197,19 @@ export default function MistakesView() {
                 <div className="text-xs text-stone-400 mt-1">
                   Answer with {getTypeInfo(active.type).label}
                 </div>
+                {activeDiagnosis && (
+                  <div className="mt-3 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/10 px-3 py-2">
+                    <div className="text-[11px] uppercase tracking-wider text-rose-700 dark:text-rose-400 font-semibold">
+                      Diagnosis
+                    </div>
+                    <div className="text-sm font-medium text-stone-850 dark:text-stone-150 mt-0.5">
+                      {activeDiagnosis.label}
+                    </div>
+                    <div className="text-xs text-stone-600 dark:text-stone-400 mt-0.5">
+                      {activeDiagnosis.feedback}
+                    </div>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => playPronunciation(activeExpected, 0.9, practicePrefs.voiceURI)}

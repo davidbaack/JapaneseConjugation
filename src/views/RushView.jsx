@@ -13,6 +13,7 @@ import {
 } from '../utils/conjugator.js';
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { defaultState, gradeCard, recordMistake, bumpDaily } from '../utils/storage.js';
+import { bumpSessionMistakePattern } from '../utils/mistakeDiagnosis.js';
 import { promptDisplay, shuffled } from '../utils/display.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
@@ -145,6 +146,17 @@ export default function RushView() {
       const dict = current.item.dict;
       const prevVS = s.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
       const prevGame = s.game || defaultState().game;
+      const nextMistakes = ok
+        ? s.mistakes
+        : recordMistake(
+            s.mistakes,
+            current.item,
+            current.type.id,
+            current.promptType,
+            toHiragana(raw),
+            current.expected,
+          );
+      const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
       return {
         ...s,
         cards: { ...s.cards, [rid]: gradeCard(s.cards[rid], ok) },
@@ -155,21 +167,15 @@ export default function RushView() {
             [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
           },
         },
-        mistakes: ok
-          ? s.mistakes
-          : recordMistake(
-              s.mistakes,
-              current.item,
-              current.type.id,
-              current.promptType,
-              toHiragana(raw),
-              current.expected,
-            ),
-        session: {
-          ...s.session,
-          reviewed: s.session.reviewed + 1,
-          correct: s.session.correct + (ok ? 1 : 0),
-        },
+        mistakes: nextMistakes,
+        session: bumpSessionMistakePattern(
+          {
+            ...(s.session || {}),
+            reviewed: (s.session?.reviewed || 0) + 1,
+            correct: (s.session?.correct || 0) + (ok ? 1 : 0),
+          },
+          mistakeDiagnosis,
+        ),
         daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 30) : s.daily,
         game: {
           ...prevGame,
