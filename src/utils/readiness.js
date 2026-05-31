@@ -295,6 +295,67 @@ export function buildReadinessMap(state, words = []) {
   });
 }
 
+export function buildConjugationSpeedRows(state, words = []) {
+  const enabled = new Set(enabledTypeIdsFor(state?.enabledTypes || []));
+  const readiness = normalizeReadinessState(state?.readiness);
+  const byType = new Map();
+
+  for (const rule of RULES) {
+    if (!enabled.has(rule.type)) continue;
+    const candidates = rule.verbFilter(words);
+    if (!candidates.length) continue;
+
+    const metric = normalizeMetric(readiness.byRule[rule.id]?.speed);
+    if (!hasAttempts(metric) || !cleanNumber(metric.totalResponseMs)) continue;
+
+    const type = getTypeInfo(rule.type);
+    const current = byType.get(rule.type) || {
+      typeId: rule.type,
+      label: type.label,
+      hint: type.hint,
+      attempted: 0,
+      correct: 0,
+      totalResponseMs: 0,
+      correctResponseMs: 0,
+      fastCorrect: 0,
+      fastestMs: null,
+      lastMs: null,
+      lastAt: null,
+      ruleCount: 0,
+      wordCount: 0,
+    };
+    const fastest = [current.fastestMs, metric.fastestMs].filter(Boolean);
+    const lastFromMetric = (metric.lastAt || 0) > (current.lastAt || 0);
+    byType.set(rule.type, {
+      ...current,
+      attempted: current.attempted + metric.attempted,
+      correct: current.correct + metric.correct,
+      totalResponseMs: current.totalResponseMs + metric.totalResponseMs,
+      correctResponseMs: current.correctResponseMs + metric.correctResponseMs,
+      fastCorrect: current.fastCorrect + metric.fastCorrect,
+      fastestMs: fastest.length ? Math.min(...fastest) : null,
+      lastMs: lastFromMetric ? metric.lastMs : current.lastMs,
+      lastAt: Math.max(current.lastAt || 0, metric.lastAt || 0) || null,
+      ruleCount: current.ruleCount + 1,
+      wordCount: current.wordCount + candidates.length,
+    });
+  }
+
+  return [...byType.values()]
+    .map((row) => ({
+      ...row,
+      avgMs: Math.round(row.totalResponseMs / row.attempted),
+      correctAvgMs: row.correct ? Math.round(row.correctResponseMs / row.correct) : 0,
+      accuracy: pct(row.correct, row.attempted),
+      fastPct: row.correct ? pct(row.fastCorrect, row.correct) : 0,
+    }))
+    .sort((a, b) => {
+      if (a.avgMs !== b.avgMs) return b.avgMs - a.avgMs;
+      if (a.attempted !== b.attempted) return b.attempted - a.attempted;
+      return a.label.localeCompare(b.label);
+    });
+}
+
 export function launchPrefsForReadinessDimension(dimensionId, currentPrefs = {}) {
   const base = {
     practiceFocus: 'weak',
