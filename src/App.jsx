@@ -4,6 +4,7 @@ import AuthModal from './components/AuthModal.jsx';
 import ViewSkeleton from './components/Skeleton.jsx';
 import { t } from './i18n/index.js';
 import { AppStateProvider, useApp } from './state/AppStateContext.jsx';
+import { useTablist } from './components/useTablist.js';
 
 // Views — lazy-loaded so each gets its own chunk. Each view sources what it
 // needs from the central app state via useApp(), so the shell renders them
@@ -33,6 +34,8 @@ function AppShell() {
     setShowAuthModal,
     supabase,
   } = useApp();
+
+  const { tabProps, panelProps } = useTablist(TABS, tab, setTab);
 
   return (
     <div
@@ -96,9 +99,7 @@ function AppShell() {
           {TABS.map((id) => (
             <button
               key={id}
-              role="tab"
-              aria-selected={tab === id}
-              aria-controls={`panel-${id}`}
+              {...tabProps(id)}
               onClick={() => setTab(id)}
               className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
                 tab === id
@@ -111,14 +112,16 @@ function AppShell() {
           ))}
         </nav>
         <Suspense fallback={<ViewSkeleton />}>
-          {tab === 'study' && <StudyView />}
-          {tab === 'check' && <CheckView />}
-          {tab === 'games' && <GamesView />}
-          {tab === 'endings' && <EndingsView />}
-          {tab === 'classify' && <ClassificationView />}
-          {tab === 'insights' && <InsightsView />}
-          {tab === 'library' && <LibraryView />}
-          {tab === 'settings' && <SettingsView />}
+          <div {...panelProps(tab)}>
+            {tab === 'study' && <StudyView />}
+            {tab === 'check' && <CheckView />}
+            {tab === 'games' && <GamesView />}
+            {tab === 'endings' && <EndingsView />}
+            {tab === 'classify' && <ClassificationView />}
+            {tab === 'insights' && <InsightsView />}
+            {tab === 'library' && <LibraryView />}
+            {tab === 'settings' && <SettingsView />}
+          </div>
         </Suspense>
       </div>
       <AuthModal
