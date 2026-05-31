@@ -84,9 +84,6 @@ export function extractJSON(text) {
   return null;
 }
 
-// Use the auto-updating "-latest" alias so we always get the newest Flash-Lite
-// model without code changes as Google rolls over versions.
-const GEMINI_MODEL = 'gemini-flash-lite-latest';
 const GEMINI_TIMEOUT_MS = 30000;
 
 function fetchWithTimeout(url, options) {
@@ -99,14 +96,6 @@ function fetchWithTimeout(url, options) {
       throw e;
     })
     .finally(() => clearTimeout(timer));
-}
-
-function getLocalApiKey(apiKey) {
-  if (typeof window === 'undefined') return '';
-  const hostname = window.location.hostname;
-  const isLocal =
-    hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
-  return isLocal ? apiKey : '';
 }
 
 // Build an Error that carries the HTTP status so retry logic can tell a
@@ -155,20 +144,6 @@ async function executeGeminiProxyRequest(payload) {
   return d;
 }
 
-async function executeGeminiDirectRequest(payload, apiKey) {
-  const r = await fetchWithTimeout(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    },
-  );
-  const d = await readJsonResponse(r);
-  if (!r.ok) throw httpError(d.error?.message, r.status);
-  return d;
-}
-
 async function executeGeminiRequestOnce(payload, apiKey) {
   // Prefer the server-side proxy so the Gemini API key never ships to browsers.
   // The proxy accepts anonymous learner requests and may include a bearer token
@@ -177,15 +152,7 @@ async function executeGeminiRequestOnce(payload, apiKey) {
     return executeGeminiProxyRequest(payload);
   }
 
-  // Fallback to a local environment key, restricted to local development only.
-  const safeApiKey = getLocalApiKey(apiKey);
-  if (safeApiKey && safeApiKey !== 'proxy') {
-    return executeGeminiDirectRequest(payload, safeApiKey);
-  }
-
-  throw new Error(
-    'Gemini is not configured for this build. Configure the cloud proxy or set VITE_GEMINI_API_KEY for local development.',
-  );
+  throw new Error('Gemini is not configured for this build. Configure the cloud proxy.');
 }
 
 // Retry transient failures (timeouts, 429, 5xx) with backoff so a momentary
