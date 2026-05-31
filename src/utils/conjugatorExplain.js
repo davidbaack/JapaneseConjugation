@@ -139,6 +139,75 @@ export function getOfflineTemplateSentence(word, type) {
   };
 }
 
+// Maps compound form prefixes to their base conjugation type.
+const COMPOUND_BASE_TYPE = {
+  potential: 'potential',
+  passive: 'passive',
+  causative: 'causative',
+};
+
+// Simple endings that follow ichidan verb rules (drop final る, add ending).
+const COMPOUND_SIMPLE_ENDING = {
+  past: 'た',
+  'past-negative': 'なかった',
+  negative: 'ない',
+  polite: 'ます',
+  'polite-past': 'ました',
+  'polite-negative': 'ません',
+  'polite-past-negative': 'ませんでした',
+  'conditional-ba': 'れば',
+};
+
+// For compound forms (e.g. potential-past-negative), show the intermediate
+// form so the learner can see the two-step derivation.
+function buildCompoundDerivation(item, type) {
+  for (const [basePrefix, baseType] of Object.entries(COMPOUND_BASE_TYPE)) {
+    if (type !== baseType && type.startsWith(basePrefix + '-')) {
+      const suffix = type.slice(basePrefix.length + 1);
+      const ending = COMPOUND_SIMPLE_ENDING[suffix];
+      if (!ending) continue;
+      try {
+        const baseForm = conjugateItem(item, baseType);
+        if (!baseForm.endsWith('る')) continue;
+        const baseStem = baseForm.slice(0, -1);
+        const result = conjugateItem(item, type);
+        return `${baseForm} → ${baseStem} + ${ending} = ${result}`;
+      } catch {}
+    }
+  }
+  return null;
+}
+
+// Returns a short "why this rule applies" string for compound and tricky forms.
+function buildReason(item, type) {
+  const group = item.group;
+
+  for (const basePrefix of Object.keys(COMPOUND_BASE_TYPE)) {
+    if (type !== basePrefix && type.startsWith(basePrefix + '-')) {
+      if (COMPOUND_SIMPLE_ENDING[type.slice(basePrefix.length + 1)]) {
+        return `The ${basePrefix} form ends in る — it conjugates further like an ichidan verb. Build the ${basePrefix} form first, then drop る and attach the new ending.`;
+      }
+    }
+  }
+
+  if (type !== 'desiderative' && type.startsWith('desiderative-')) {
+    return 'The desiderative suffix たい acts like an い-adjective — use い-adjective rules for all further modifications.';
+  }
+
+  if (type !== 'progressive' && type.startsWith('progressive-')) {
+    return 'The progressive is て-form + いる. Further modifications (negative, past, polite) change that いる.';
+  }
+
+  if (group === 'godan' && type === 'plain-negative') {
+    const reading = item.reading || '';
+    if (reading.endsWith('う')) {
+      return 'Godan verbs ending in う use わ (not あ) for the negative stem — giving ～わない, not ～あない.';
+    }
+  }
+
+  return '';
+}
+
 const GODAN_ENDING_ROMAJI = {
   う: 'u',
   く: 'ku',
@@ -849,6 +918,9 @@ export function explainItem(item, type) {
   if (!e.rule && type === 'prohibition')
     e.rule = 'Use the dictionary form, then add な for a blunt prohibition.';
   if (!e.rule && type === 'command-nasai') e.rule = 'Use the masu-stem, then add なさい.';
+  e.reason = buildReason(item, type);
+  const compoundDeriv = buildCompoundDerivation(item, type);
+  if (compoundDeriv) e.derivation = compoundDeriv;
   return e;
 }
 

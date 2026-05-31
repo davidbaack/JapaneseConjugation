@@ -2607,6 +2607,11 @@ export default function StudyView() {
                     <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
                       {reviewExplanation.intro}
                     </div>
+                    {reviewExplanation.reason && (
+                      <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+                        {reviewExplanation.reason}
+                      </div>
+                    )}
                     {reviewExplanation.rule && (
                       <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
                         {reviewExplanation.rule}
@@ -2679,6 +2684,11 @@ export default function StudyView() {
                     <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
                       {explanation.intro}
                     </div>
+                    {explanation.reason && (
+                      <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+                        {explanation.reason}
+                      </div>
+                    )}
                     {explanation.rule && (
                       <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
                         {explanation.rule}
