@@ -94,12 +94,31 @@ function suffixPreference(normalized) {
   return null;
 }
 
+function sharedSuffixScore(normalized, candidate) {
+  const suffixes = ['ませんでした', 'ません', 'ました', 'ます'];
+  const suffix = suffixes.find((s) => normalized.endsWith(s));
+  if (!suffix) return 0;
+  return candidate.endsWith(suffix) ? 0 : 1;
+}
+
+function commonPrefixLength(a, b) {
+  const left = Array.from(a || '');
+  const right = Array.from(b || '');
+  const length = Math.min(left.length, right.length);
+  for (let i = 0; i < length; i++) {
+    if (left[i] !== right[i]) return i;
+  }
+  return length;
+}
+
 // identifyConjugation(input, words, options)
 //   input:   raw user string (kana, romaji, or kanji)
 //   words:   active/enabled word set (array of { dict, reading, meaning, group })
 //   options: { typesFor } — (item) => array of type objects ({ id, label, ... })
 //            or type-id strings. Defaults to every form compatible with the
 //            word so the analyzer recognises any valid conjugation.
+//            { includeNearWhenExact } keeps close wrong candidates even when
+//            the input is also a correct conjugation.
 //
 // Returns { input, normalized, exact: [...], near: [...] }
 //   exact: [{ word, type, kana, kanji }]
@@ -108,6 +127,7 @@ export function identifyConjugation(input, words = [], options = {}) {
   const raw = String(input ?? '').trim();
   const normalized = normalizeInput(raw);
   const typesFor = options.typesFor || ((item) => compatibleTypes(item));
+  const includeNearWhenExact = !!options.includeNearWhenExact;
 
   const exact = [];
   const near = [];
@@ -183,8 +203,9 @@ export function identifyConjugation(input, words = [], options = {}) {
     }
   }
 
-  // Near-misses only matter when nothing matched exactly.
-  if (exact.length > 0) {
+  // Most callers only need near-misses when nothing matched exactly. CheckView
+  // opts in to keeping them so learners can see every plausible interpretation.
+  if (exact.length > 0 && !includeNearWhenExact) {
     return { input: raw, normalized, exact, near: [] };
   }
 
@@ -203,16 +224,29 @@ export function identifyConjugation(input, words = [], options = {}) {
     // outright, so it wins even over a closer-by-distance coincidence.
     if (a.regularized !== b.regularized) return a.regularized ? -1 : 1;
     if (a.distance !== b.distance) return a.distance - b.distance;
+    const aSuffix = sharedSuffixScore(normalized, a.kana);
+    const bSuffix = sharedSuffixScore(normalized, b.kana);
+    if (aSuffix !== bSuffix) return aSuffix - bSuffix;
+    const prefixDelta =
+      commonPrefixLength(normalized, b.kana) - commonPrefixLength(normalized, a.kana);
+    if (prefixDelta !== 0) return prefixDelta;
     // Prefer the form the learner's ending was reaching for (て→te, た→past).
     const aWanted = wantSuffix && a.type === wantSuffix ? 0 : 1;
     const bWanted = wantSuffix && b.type === wantSuffix ? 0 : 1;
     if (aWanted !== bWanted) return aWanted - bWanted;
     return a.kana.length - b.kana.length;
   });
-  pool.splice(MAX_NEAR_RESULTS);
-  for (const cand of pool) {
+
+  // When there is already a correct answer, show every equally-close wrong
+  // interpretation so the UI does not flood the learner with weaker guesses.
+  const matchedPool =
+    exact.length > 0 && includeNearWhenExact && pool.length > 0
+      ? pool.filter((cand) => cand.distance === pool[0].distance)
+      : pool.slice(0, MAX_NEAR_RESULTS);
+
+  for (const cand of matchedPool) {
     cand.diff = describeDiff(normalized, cand.kana);
   }
 
-  return { input: raw, normalized, exact, near: pool };
+  return { input: raw, normalized, exact, near: matchedPool };
 }
