@@ -197,6 +197,26 @@ function cardMatchesPractice(card, words, enabledTypes, prefs = DEFAULT_PREFS) {
   return !isRedundantPracticeType(card.verb, card.type, activeTypes, prefs);
 }
 
+function ReviewDisclosure({ tone = 'stone', summary, children }) {
+  const toneClass =
+    tone === 'rose'
+      ? 'border-rose-200 dark:border-rose-900/60 bg-white/70 dark:bg-stone-950/50'
+      : tone === 'emerald'
+        ? 'border-emerald-200 dark:border-emerald-900/60 bg-white/70 dark:bg-stone-950/50'
+        : 'border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-950/50';
+  return (
+    <details className={`rounded-xl border ${toneClass} px-3 py-2`}>
+      <summary className="cursor-pointer list-none text-sm font-semibold text-stone-800 dark:text-stone-100">
+        <span className="inline-flex items-center gap-2">
+          <span>{summary}</span>
+          <span className="text-xs font-medium text-stone-500 dark:text-stone-400">More</span>
+        </span>
+      </summary>
+      <div className="mt-3 space-y-2.5">{children}</div>
+    </details>
+  );
+}
+
 function loadPersistedCurrent(state, words, enabledTypes, prefs) {
   try {
     if (typeof sessionStorage === 'undefined') return null;
@@ -3041,42 +3061,42 @@ export default function StudyView() {
                 />
 
                 {wasCorrect && reviewExplanation && (
-                  <div className="mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-900/50 space-y-2.5 text-left">
-                    <div className="text-xs uppercase tracking-wider text-emerald-700 dark:text-emerald-450 font-medium">
-                      Why this is right
-                    </div>
-                    <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                      {reviewExplanation.intro}
-                    </div>
-                    {reviewExplanation.reason && (
-                      <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
-                        {reviewExplanation.reason}
-                      </div>
-                    )}
-                    {reviewExplanation.rule && (
+                  <div className="mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-900/50 text-left">
+                    <ReviewDisclosure tone="emerald" summary="Why this is right">
                       <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                        {reviewExplanation.rule}
+                        {reviewExplanation.intro}
                       </div>
-                    )}
-                    {reviewExplanation.derivation && reviewExplanation.derivation !== expected && (
-                      <div
-                        className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
-                        lang="ja"
-                      >
-                        {reviewExplanation.derivation}
-                      </div>
-                    )}
-                    {reviewExplanation.note && (
-                      <div className="text-xs text-stone-605 dark:text-stone-400 italic bg-stone-50/80 dark:bg-stone-950/80 rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-800">
-                        {reviewExplanation.note}
-                      </div>
-                    )}
-                    <ConjugationBreakdown
-                      word={current.verb}
-                      type={current.type}
-                      geminiKey={geminiKey}
-                      practicePrefs={practicePrefs}
-                    />
+                      {reviewExplanation.reason && (
+                        <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+                          {reviewExplanation.reason}
+                        </div>
+                      )}
+                      {reviewExplanation.rule && (
+                        <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                          {reviewExplanation.rule}
+                        </div>
+                      )}
+                      {reviewExplanation.derivation &&
+                        reviewExplanation.derivation !== expected && (
+                          <div
+                            className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
+                            lang="ja"
+                          >
+                            {reviewExplanation.derivation}
+                          </div>
+                        )}
+                      {reviewExplanation.note && (
+                        <div className="text-xs text-stone-605 dark:text-stone-400 italic bg-stone-50/80 dark:bg-stone-950/80 rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-800">
+                          {reviewExplanation.note}
+                        </div>
+                      )}
+                      <ConjugationBreakdown
+                        word={current.verb}
+                        type={current.type}
+                        geminiKey={geminiKey}
+                        practicePrefs={practicePrefs}
+                      />
+                    </ReviewDisclosure>
                   </div>
                 )}
 
@@ -3093,11 +3113,8 @@ export default function StudyView() {
                         <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                           Contrast check: {minimalPairFeedback.label}
                         </div>
-                        <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
-                          {minimalPairFeedback.intro}
-                        </div>
                         {minimalPairFeedback.masuDiagnostic && (
-                          <div className="mt-2 border-l-2 border-emerald-300 dark:border-emerald-700 pl-3 text-sm text-stone-700 dark:text-stone-300">
+                          <div className="mt-1 border-l-2 border-emerald-300 dark:border-emerald-700 pl-3 text-sm text-stone-700 dark:text-stone-300">
                             <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                               Masu check
                             </div>
@@ -3116,7 +3133,49 @@ export default function StudyView() {
                             </div>
                           </div>
                         )}
-                        <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                        {!minimalPairFeedback.masuDiagnostic && (
+                          <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
+                            {minimalPairFeedback.intro}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {diagnostic && (
+                      <div className="text-sm text-rose-800 dark:text-rose-300 bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2">
+                        <span className="font-medium text-rose-900 dark:text-rose-200">
+                          Diagnosis:{' '}
+                        </span>
+                        {lastDiagnosis?.label ? `${lastDiagnosis.label}. ` : ''}
+                        {diagnostic}
+                      </div>
+                    )}
+                    {!minimalPairFeedback && (
+                      <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                        {explanation.intro}
+                      </div>
+                    )}
+                    {explanation.rule && (
+                      <div className="rounded-lg bg-white/70 dark:bg-stone-900/70 px-3 py-2 text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                        <span className="font-semibold text-stone-900 dark:text-stone-100">
+                          Rule:{' '}
+                        </span>
+                        {explanation.rule}
+                      </div>
+                    )}
+                    {explanation.derivation && explanation.derivation !== expected && (
+                      <div
+                        className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
+                        lang="ja"
+                      >
+                        {explanation.derivation}
+                      </div>
+                    )}
+                    {minimalPairFeedback && (
+                      <ReviewDisclosure tone="emerald" summary="Full contrast details">
+                        <div className="text-sm text-stone-700 dark:text-stone-300">
+                          {minimalPairFeedback.intro}
+                        </div>
+                        <div className="grid gap-1.5 sm:grid-cols-2">
                           {minimalPairFeedback.contrasts.map((contrast) => (
                             <div
                               key={contrast.id}
@@ -3131,76 +3190,54 @@ export default function StudyView() {
                             </div>
                           ))}
                         </div>
-                      </div>
+                      </ReviewDisclosure>
                     )}
-                    {diagnostic && (
-                      <div className="text-sm text-rose-800 dark:text-rose-300 bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2">
-                        <span className="font-medium text-rose-900 dark:text-rose-200">
-                          Diagnosis:{' '}
-                        </span>
-                        {lastDiagnosis?.label ? `${lastDiagnosis.label}. ` : ''}
-                        {diagnostic}
-                      </div>
-                    )}
-                    <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                      {explanation.intro}
-                    </div>
-                    {explanation.reason && (
-                      <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
-                        {explanation.reason}
-                      </div>
-                    )}
-                    {explanation.rule && (
+                    <ReviewDisclosure tone="rose" summary="Full rule path">
                       <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                        {explanation.rule}
+                        {explanation.intro}
                       </div>
-                    )}
-                    {explanation.derivation && explanation.derivation !== expected && (
-                      <div
-                        className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
-                        lang="ja"
-                      >
-                        {explanation.derivation}
-                      </div>
-                    )}
-                    {explanation.note && (
-                      <div className="text-xs text-stone-600 dark:text-stone-400 italic bg-stone-50/80 dark:bg-stone-950/80 rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-800">
-                        {explanation.note}
-                      </div>
-                    )}
-                    <ConjugationBreakdown
-                      word={current.verb}
-                      type={current.type}
-                      userAnswer={revealedMiss ? '' : submittedAnswer}
-                      geminiKey={geminiKey}
-                      practicePrefs={practicePrefs}
-                    />
-                    {geminiKey ? (
-                      !chatOpen ? (
-                        <button
-                          onClick={() => setChatOpen(true)}
-                          aria-expanded={chatOpen}
-                          className="w-full mt-1 py-2 border border-rose-200 dark:border-rose-900 hover:bg-rose-100/50 dark:hover:bg-rose-950/50 rounded-xl text-sm text-rose-700 dark:text-rose-450 flex items-center justify-center gap-1.5 transition"
-                        >
-                          <IconChat className="w-4 h-4" /> Ask Gemini why
-                        </button>
-                      ) : (
-                        <ChatPanel
-                          verb={current.verb}
-                          type={current.type}
-                          userAnswer={revealedMiss ? '(revealed)' : submittedAnswer}
-                          expected={expected}
-                          explanation={explanation}
-                          geminiKey={geminiKey}
-                          practicePrefs={practicePrefs}
-                          taskOverride={taskOverride}
-                          wasCorrected={wasCorrected}
-                        />
-                      )
-                    ) : (
-                      <div className="text-xs text-stone-400 text-center pt-1">
-                        Gemini is not configured for AI chat.
-                      </div>
+                      {explanation.reason && (
+                        <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+                          {explanation.reason}
+                        </div>
+                      )}
+                      {explanation.note && (
+                        <div className="text-xs text-stone-600 dark:text-stone-400 italic bg-stone-50/80 dark:bg-stone-950/80 rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-800">
+                          {explanation.note}
+                        </div>
+                      )}
+                      <ConjugationBreakdown
+                        word={current.verb}
+                        type={current.type}
+                        userAnswer={revealedMiss ? '' : submittedAnswer}
+                        geminiKey={geminiKey}
+                        practicePrefs={practicePrefs}
+                      />
+                    </ReviewDisclosure>
+                    {geminiKey && (
+                      <ReviewDisclosure tone="rose" summary="Ask Gemini why">
+                        {!chatOpen ? (
+                          <button
+                            onClick={() => setChatOpen(true)}
+                            aria-expanded={chatOpen}
+                            className="w-full py-2 border border-rose-200 dark:border-rose-900 hover:bg-rose-100/50 dark:hover:bg-rose-950/50 rounded-xl text-sm text-rose-700 dark:text-rose-450 flex items-center justify-center gap-1.5 transition"
+                          >
+                            <IconChat className="w-4 h-4" /> Ask Gemini why
+                          </button>
+                        ) : (
+                          <ChatPanel
+                            verb={current.verb}
+                            type={current.type}
+                            userAnswer={revealedMiss ? '(revealed)' : submittedAnswer}
+                            expected={expected}
+                            explanation={explanation}
+                            geminiKey={geminiKey}
+                            practicePrefs={practicePrefs}
+                            taskOverride={taskOverride}
+                            wasCorrected={wasCorrected}
+                          />
+                        )}
+                      </ReviewDisclosure>
                     )}
                   </div>
                 )}

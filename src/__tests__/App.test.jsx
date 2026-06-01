@@ -166,6 +166,56 @@ describe('App shell', () => {
     expect(screen.queryByText(/did not want to speak/i)).toBeNull();
   }, 15000);
 
+  it('keeps deep answer teaching collapsed after an incorrect miss', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          enabledTypes: ['plain-past'],
+          daily: {
+            date: localDateKey(),
+            count: DEFAULT_PREFS.dailyGoal,
+            goalHit: true,
+            goalStreak: 1,
+            bestGoalStreak: 1,
+            currentAnswerStreak: 0,
+            bestAnswerStreak: 0,
+          },
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: '\u8a71\u3059',
+        group: 'godan',
+        type: 'plain-negative',
+        word: {
+          dict: '\u8a71\u3059',
+          reading: '\u306f\u306a\u3059',
+          meaning: 'to speak',
+          group: 'godan',
+        },
+      }),
+    );
+
+    render(<App />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'zzz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+
+    await screen.findAllByText('Not quite.', {}, { timeout: 5000 });
+    expect(screen.getByText(/Rule:/)).toBeTruthy();
+    expect(screen.getByText('Full rule path').closest('details')?.hasAttribute('open')).toBe(false);
+    expect(screen.queryByText('Gemini is not configured for AI chat.')).toBeNull();
+  }, 15000);
+
   it('mounts every tab without hitting the error boundary', async () => {
     render(<App />);
     // Each nav button's accessible name is its catalog label.
