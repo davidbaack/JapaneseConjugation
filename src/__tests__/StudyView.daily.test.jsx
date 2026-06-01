@@ -316,7 +316,7 @@ describe('StudyView daily startup guards', () => {
     expect(screen.queryByText('No cards available')).toBeNull();
   });
 
-  it('checks a final spoken answer in speak answer mode', async () => {
+  it('automatically checks a final spoken answer in speak answer mode', async () => {
     window.SpeechRecognition = FakeSpeechRecognition;
     const setState = vi.fn();
     const clearStudyFocus = vi.fn();
@@ -331,8 +331,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    const mic = await screen.findByRole('button', { name: 'Speak answer' }, { timeout: 5000 });
-    fireEvent.click(mic);
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
     expect(FakeSpeechRecognition.instance?.lang).toBe('ja-JP');
 
     act(() => {

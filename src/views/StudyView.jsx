@@ -377,6 +377,7 @@ export default function StudyView() {
   const hadKanaMistakeRef = useRef(false);
   const speechRecognitionRef = useRef(null);
   const speechSubmittedRef = useRef(false);
+  const speechAutoStartKeyRef = useRef('');
   const minimalPairSetIdRef = useRef(practicePrefs.minimalPairSetId || '');
   // Snapshots the typed answer the moment a kana mistake first occurs, so the
   // review panel can show what was actually entered when it went wrong rather
@@ -406,6 +407,7 @@ export default function StudyView() {
 
   const activeDrillMode = practicePrefs.drillMode || DEFAULT_PREFS.drillMode;
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
+  const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
   const kanaAssist = resolveKanaAssist(practicePrefs);
   const typedAnswerMode = answerMode === 'input';
   const transformationMode = activeDrillMode === 'transformation';
@@ -654,6 +656,7 @@ export default function StudyView() {
 
   useEffect(() => {
     speechSubmittedRef.current = false;
+    speechAutoStartKeyRef.current = '';
     setSpeechError('');
     if (speechRecognitionRef.current) {
       try {
@@ -663,6 +666,19 @@ export default function StudyView() {
     }
     setSpeechListening(false);
   }, [current?.id, phase, answerMode]);
+
+  useEffect(() => {
+    if (!current || phase !== 'answering') return;
+    if (answerMode !== 'speak') return;
+    if (!speechRecognitionAvailable) return;
+    if (speechListening || speechRecognitionRef.current) return;
+    const autoStartKey = `${current.id}:speak`;
+    if (speechAutoStartKeyRef.current === autoStartKey) return;
+    speechAutoStartKeyRef.current = autoStartKey;
+    startSpeechAnswer({ auto: true });
+    // startSpeechAnswer closes over the current spoken-answer targets.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id, phase, answerMode, speechRecognitionAvailable, speechListening]);
 
   useEffect(() => {
     setTypoGuard(null);
@@ -779,7 +795,6 @@ export default function StudyView() {
   const spokenAnswerTargets = reverseDrill
     ? [current.verb.reading, current.verb.dict]
     : [expected, surfaceFormFor(current.verb, current.type)];
-  const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
   const speechMatch =
     answerMode === 'speak' && answer.trim()
       ? spokenAnswerResult(spokenAnswerTargets, answer)
@@ -961,9 +976,11 @@ export default function StudyView() {
     setSpeechListening(false);
   }
 
-  function startSpeechAnswer() {
+  function startSpeechAnswer(options = {}) {
+    const auto = options.auto === true;
     if (!current || phase !== 'answering') return;
-    if (speechListening) {
+    if (speechListening || speechRecognitionRef.current) {
+      if (auto) return;
       stopSpeechRecognition();
       return;
     }
@@ -2440,7 +2457,7 @@ export default function StudyView() {
                       </div>
                       <button
                         type="button"
-                        onClick={startSpeechAnswer}
+                        onClick={() => startSpeechAnswer()}
                         disabled={!speechRecognitionAvailable}
                         className={`min-h-12 px-4 py-3 rounded-xl font-medium transition inline-flex items-center justify-center gap-2 ${
                           speechListening
