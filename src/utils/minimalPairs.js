@@ -36,7 +36,8 @@ export const MINIMAL_PAIR_SETS = [
   {
     id: 'ichidan-godan-ru',
     label: 'Ichidan ru vs godan ru',
-    description: 'Mixes ru-ending ichidan verbs with godan verbs that only look like ru-verbs.',
+    description:
+      'Mixes drop-る ichidan verbs with godan verbs that only look like they should drop る.',
     typeIds: ['plain-past', 'te-form', 'plain-negative', 'potential'],
     wordTypes: ['verb'],
     wordGroups: ['ichidan', 'godan'],

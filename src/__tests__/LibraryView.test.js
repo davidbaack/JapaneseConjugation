@@ -30,6 +30,8 @@ import {
 // Test fixtures
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
 const KAKU = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan' };
+const KAERU = { dict: '帰る', reading: 'かえる', meaning: 'to return home', group: 'godan' };
+const HASHIRU = { dict: '走る', reading: 'はしる', meaning: 'to run', group: 'godan' };
 const SURU = { dict: 'する', reading: 'する', meaning: 'to do', group: 'suru' };
 const KURU = { dict: '来る', reading: 'くる', meaning: 'to come', group: 'kuru' };
 const TAKAI = {
@@ -52,11 +54,18 @@ const II = {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('classifyHint', () => {
   it('mentions ichidan for ichidan verbs', () => {
-    expect(classifyHint(TABERU)).toMatch(/ichidan/i);
+    expect(classifyHint(TABERU)).toContain('ichidan: drop る');
+    expect(classifyHint(TABERU)).toContain('食べない');
   });
 
   it('mentions godan for godan verbs', () => {
-    expect(classifyHint(KAKU)).toMatch(/godan/i);
+    expect(classifyHint(KAKU)).toContain('godan: row-shift');
+    expect(classifyHint(KAKU)).toContain('書かない');
+  });
+
+  it('mentions godan traps for る-ending godan verbs', () => {
+    expect(classifyHint(KAERU)).toContain('帰る and 走る');
+    expect(classifyHint(HASHIRU)).toContain('still godan');
   });
 
   it('mentions する for suru verbs', () => {

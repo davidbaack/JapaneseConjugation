@@ -126,7 +126,7 @@ export const LESSON_SECTIONS = [
     title: 'Potential',
     kana: '可能形',
     summary:
-      'Potential forms mean can do or be able to do. Once formed, the potential behaves mostly like a new ru-verb for negatives, past, politeness, and conditionals.',
+      'Potential forms mean can do or be able to do. Once formed, the potential behaves mostly like an ichidan-style る form for negatives, past, politeness, and conditionals.',
     build: 'Ichidan: drop る + られる. Godan: e-row + る. する -> できる. 来る -> こられる.',
     variants:
       'Negative, past, polite, and ba variants conjugate the potential base: 食べられる -> 食べられない / 食べられました / 食べられれば.',
@@ -196,7 +196,7 @@ export const LESSON_SECTIONS = [
       'Passive forms mean “is done by someone” or “was affected by someone’s action.” Japanese also uses passive for unpleasant affected experiences.',
     build: 'Ichidan: drop る + られる. Godan: a-row + れる. する -> される. 来る -> こられる.',
     variants:
-      'After you build the passive る-form, conjugate it like a ru-verb: られない, られた, られます, られれば.',
+      'After you build the passive る-form, conjugate it with the drop-る pattern: られない, られた, られます, られれば.',
     watch:
       'The doer is usually marked with に. Passive and potential can look identical for ichidan verbs, so read by context.',
     examples: [
@@ -213,7 +213,7 @@ export const LESSON_SECTIONS = [
     build:
       'Long causative: ichidan stem + させる; godan a-row + せる; する -> させる; 来る -> こさせる.',
     variants:
-      'Long causatives conjugate like ru-verbs. Short causative is more casual: ichidan + さす, godan a-row + す, する -> さす, 来る -> こさす; then it behaves like a す-ending godan verb.',
+      'Long causatives conjugate with the drop-る pattern. Short causative is more casual: ichidan + さす, godan a-row + す, する -> さす, 来る -> こさす; then it behaves like a す-ending godan verb.',
     watch:
       'The short form is common in speech but not always appropriate in formal writing. Use the long form when unsure.',
     examples: [
@@ -230,7 +230,7 @@ export const LESSON_SECTIONS = [
     build:
       'Long form: build the causative and make it passive, usually ending in させられる or せられる. する -> させられる. 来る -> こさせられる.',
     variants:
-      'Once formed, treat it like a ru-verb for polite, past, negative, and ba forms. Short causative-passive often compresses godan forms to a-row + される: 書かされる.',
+      'Once formed, treat it with the drop-る pattern for polite, past, negative, and ba forms. Short causative-passive often compresses godan forms to a-row + される: 書かされる.',
     watch:
       'Short causative-passive is not available for every verb shape; final す godan verbs avoid the short shortcut.',
     examples: [

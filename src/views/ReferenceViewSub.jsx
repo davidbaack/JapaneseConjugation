@@ -20,6 +20,7 @@ import { normalizeReferenceState } from '../utils/storage.js';
 import { formDisplay, promptDisplay } from '../utils/display.js';
 import { callGemini, aiSystemFromPrefs, extractJSON, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 
 // Pure helpers now live in utils/referenceHelpers.js; re-export them so existing
 // importers (CheckView, ListsViewSub, tests) keep working, and import the ones
@@ -889,7 +890,7 @@ export default function ReferenceViewSub({
                       Scratch conjugator
                     </div>
                     <span className="text-xs rounded-full bg-white dark:bg-stone-800 px-2 py-0.5 text-indigo-700 dark:text-indigo-300">
-                      {GROUP_NAMES[scratchCandidate.group] || scratchCandidate.group}
+                      {groupDisplayLabel(scratchCandidate.group)}
                     </span>
                   </div>
                   <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
@@ -911,7 +912,7 @@ export default function ReferenceViewSub({
                               : 'bg-white border-indigo-100 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:text-stone-400'
                           }`}
                         >
-                          {GROUP_NAMES[c.group] || c.group}
+                          {groupDisplayLabel(c.group)}
                         </button>
                       ))}
                     </div>
@@ -967,8 +968,7 @@ export default function ReferenceViewSub({
                     {scratchCandidate.dict}
                   </div>
                   <div className="text-sm text-stone-500 mt-1">
-                    {GROUP_NAMES[scratchCandidate.group] || scratchCandidate.group} ·{' '}
-                    {scratchCandidate.sourceNote}
+                    {groupDisplayLabel(scratchCandidate.group)} · {scratchCandidate.sourceNote}
                   </div>
                 </div>
                 <button
@@ -1048,7 +1048,14 @@ export default function ReferenceViewSub({
                   subClassName="text-stone-500 mt-1"
                 />
                 <div className="text-sm text-stone-605 italic mt-2">{selected.meaning}</div>
-                <div className="text-xs text-stone-400 mt-1">{GROUP_NAMES[selected.group]}</div>
+                <div className="text-xs text-stone-500 dark:text-stone-400 mt-1">
+                  {groupDisplayLabel(selected.group)}
+                </div>
+                {groupAliasText(selected.group) && (
+                  <div className="text-[11px] text-stone-400 mt-0.5">
+                    {groupAliasText(selected.group)}
+                  </div>
+                )}
               </div>
               <div className="flex flex-wrap gap-2 sm:justify-end">
                 <button

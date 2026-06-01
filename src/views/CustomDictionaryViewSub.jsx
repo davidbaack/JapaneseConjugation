@@ -5,6 +5,12 @@ import { getSuggestedWord, lookupWordWithGemini } from '../utils/gemini.js';
 import { useTablist } from '../components/useTablist.js';
 import { validateWord, sanitizeField, FIELD_LIMITS } from '../utils/validateWord.js';
 import { useVirtualRows } from '../hooks/useVirtualRows.js';
+import {
+  VERB_GROUP_IDS,
+  groupAliasText,
+  groupDisplayLabel,
+  groupSentenceLabel,
+} from '../utils/groupDisplay.js';
 
 // Windowing tuning for the dictionary table.
 const ROW_HEIGHT = 53; // approximate rendered row height in px
@@ -154,21 +160,18 @@ export default function CustomDictionaryViewSub({
     doAdd(word);
   }
 
-  const groupLabel = isAdj
-    ? { 'i-adjective': 'い-adjective', 'na-adjective': 'な-adjective' }
-    : { ichidan: 'る-verb', godan: 'う-verb', suru: 'irregular', kuru: 'irregular' };
-
-  const groupLong = isAdj
-    ? {
-        'i-adjective': 'い-adjective (conjugates with かった/くない/くて)',
-        'na-adjective': 'な-adjective (conjugates with だった/ではない/で)',
-      }
-    : {
-        ichidan: 'る-verb (ichidan / Group 2)',
-        godan: 'う-verb (godan / Group 1)',
-        suru: 'irregular する (Group 3)',
-        kuru: 'irregular 来る (Group 3)',
-      };
+  const groupLabelFor = (group) => groupDisplayLabel(group);
+  const groupLongFor = (group) => groupSentenceLabel(group);
+  const manualGroupOptions = isAdj
+    ? [
+        { id: 'i-adjective', label: groupDisplayLabel('i-adjective') },
+        { id: 'na-adjective', label: groupDisplayLabel('na-adjective') },
+      ]
+    : VERB_GROUP_IDS.map((id) => ({
+        id,
+        label: groupDisplayLabel(id),
+        aliasText: groupAliasText(id),
+      }));
 
   return (
     <div className="space-y-4">
@@ -339,7 +342,7 @@ export default function CustomDictionaryViewSub({
                       {suggestion.meaning}
                     </div>
                     <div className="text-xs text-stone-400 dark:text-stone-500 mt-1">
-                      {groupLong[suggestion.group]}
+                      {groupLongFor(suggestion.group)}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -405,41 +408,25 @@ export default function CustomDictionaryViewSub({
                 </div>
                 <div>
                   <label className="text-xs text-stone-500 block mb-1">Group</label>
-                  <div className="flex gap-2">
-                    {isAdj
-                      ? [
-                          { id: 'i-adjective', label: 'い-adj' },
-                          { id: 'na-adjective', label: 'な-adj' },
-                        ].map((g) => (
-                          <button
-                            key={g.id}
-                            onClick={() => setMf({ ...mf, group: g.id })}
-                            className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${
-                              mf.group === g.id
-                                ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                                : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                            }`}
-                          >
-                            {g.label}
-                          </button>
-                        ))
-                      : [
-                          { id: 'ichidan', label: 'る-verb' },
-                          { id: 'godan', label: 'う-verb' },
-                          { id: 'suru', label: 'suru' },
-                        ].map((g) => (
-                          <button
-                            key={g.id}
-                            onClick={() => setMf({ ...mf, group: g.id })}
-                            className={`flex-1 px-3 py-2 rounded-lg text-sm border transition ${
-                              mf.group === g.id
-                                ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                                : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                            }`}
-                          >
-                            {g.label}
-                          </button>
-                        ))}
+                  <div className={`grid gap-2 ${isAdj ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                    {manualGroupOptions.map((g) => (
+                      <button
+                        key={g.id}
+                        onClick={() => setMf({ ...mf, group: g.id })}
+                        className={`px-3 py-2 rounded-lg text-sm border transition ${
+                          mf.group === g.id
+                            ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                            : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                        }`}
+                      >
+                        <span className="block leading-tight">{g.label}</span>
+                        {g.aliasText && (
+                          <span className="mt-0.5 block text-[10px] leading-tight opacity-70">
+                            {g.aliasText}
+                          </span>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 </div>
                 <div role="status" aria-live="polite">
@@ -514,7 +501,7 @@ export default function CustomDictionaryViewSub({
                       </td>
                       <td className="px-4 py-2 text-xs">
                         <div className="text-stone-505 dark:text-stone-405">
-                          {groupLabel[v.group]}
+                          {groupLabelFor(v.group)}
                         </div>
                         {acc !== null && (
                           <div

@@ -1,6 +1,7 @@
 import { ALL_CARD_TYPES, getTypeInfo } from '../data/conjugationTypes.js';
 import { compatibleTypes, conjugateItem, isAdjective, wordKey } from './conjugator.js';
 import { toHiragana } from './romaji.js';
+import { groupDisplayLabel } from './groupDisplay.js';
 
 const K = {
   U: '\u3046',
@@ -49,15 +50,6 @@ const ONBIN_LABELS = {
   su: 'su',
   iku: 'iku exception',
   ichidan: 'ichidan ru',
-};
-
-const GROUP_LABELS = {
-  ichidan: 'ichidan',
-  godan: 'godan',
-  suru: 'suru irregular',
-  kuru: 'kuru irregular',
-  'i-adjective': 'i-adjective',
-  'na-adjective': 'na-adjective',
 };
 
 const CATEGORY_LABELS = {
@@ -189,7 +181,7 @@ function alternateGroupDiagnosis(item, type, got) {
         category: 'adjective-type-confusion',
         patternId: `adjective-type:${item.group}:${type}`,
         label: `${CATEGORY_LABELS['adjective-type-confusion']}: ${getTypeInfo(type).label}`,
-        feedback: `You used the ${GROUP_LABELS[otherGroup]} pattern, but this word is ${GROUP_LABELS[item.group]}.`,
+        feedback: `You used the ${groupDisplayLabel(otherGroup)} pattern, but this word is ${groupDisplayLabel(item.group)}.`,
         item,
         type,
         repairTypeIds: [type],
@@ -206,7 +198,7 @@ function alternateGroupDiagnosis(item, type, got) {
       category: 'verb-group-confusion',
       patternId: `verb-group:${item.group}:${type}`,
       label: `${CATEGORY_LABELS['verb-group-confusion']}: ${getTypeInfo(type).label}`,
-      feedback: `You conjugated this as ${GROUP_LABELS[otherGroup]}, but this word is ${GROUP_LABELS[item.group] || item.group}.`,
+      feedback: `You conjugated this as ${groupDisplayLabel(otherGroup)}, but this word is ${groupDisplayLabel(item.group)}.`,
       item,
       type,
       repairTypeIds: [type],

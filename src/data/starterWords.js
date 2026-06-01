@@ -1,3 +1,5 @@
+import { WORD_GROUP_DISPLAY_OPTIONS } from '../utils/groupDisplay.js';
+
 export const STARTER_VERBS = [
   { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' },
   { dict: '見る', reading: 'みる', meaning: 'to see / watch', group: 'ichidan' },
@@ -77,15 +79,7 @@ export const WORD_TYPE_OPTIONS = [
   { id: 'na-adjective', label: 'な-adjectives' },
 ];
 
-export const WORD_GROUP_OPTIONS = [
-  { id: 'ichidan', label: 'る-verb' },
-  { id: 'godan', label: 'う-verb' },
-  { id: 'suru', label: 'する' },
-  { id: 'kuru', label: '来る' },
-  { id: 'irregular-adjective', label: 'irregular adj' },
-  { id: 'i-adjective', label: 'い-adj' },
-  { id: 'na-adjective', label: 'な-adj' },
-];
+export const WORD_GROUP_OPTIONS = WORD_GROUP_DISPLAY_OPTIONS;
 
 export const WORD_META = {
   食べる: { jlpt: 'N5', lesson: 3, minnaLesson: 6 },

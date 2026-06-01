@@ -13,19 +13,32 @@ import {
   conjugate,
   conjugateAdjective,
   isIrregularAdjective,
+  surfaceFormFor,
 } from './conjugator.js';
 import { explainItem, GROUP_NAMES } from './conjugatorExplain.js';
 import { CONJ_TYPES, ADJ_TYPES, ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
 import { normalizeReferenceState, referenceProgressFor, defaultState } from './storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import {
+  VERB_GROUP_IDS,
+  groupAliasText,
+  groupDisplayLabel,
+  groupRecognitionClue,
+  groupTrapText,
+} from './groupDisplay.js';
 
 export function classifyHint(word) {
-  if (word.group === 'ichidan')
-    return `${word.reading} is ichidan: remove る to make forms like ${conjugate(word, 'polite-present')}.`;
-  if (word.group === 'godan')
-    return `${word.reading} is godan: the final ${word.reading.slice(-1)} shifts rows, as in ${conjugate(word, 'plain-negative')}.`;
-  if (word.group === 'suru') return 'する is irregular: する, した, しない, して, できる.';
-  if (word.group === 'kuru') return '来る is irregular: くる, きた, こない, きて.';
+  if (VERB_GROUP_IDS.includes(word.group)) {
+    const example = surfaceFormFor(word, 'plain-negative') || conjugate(word, 'plain-negative');
+    return [
+      `${groupDisplayLabel(word.group)}: ${groupRecognitionClue(word)}`,
+      groupAliasText(word.group),
+      `Example: ${word.dict} -> ${example}.`,
+      groupTrapText(word),
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
   if (isIrregularAdjective(word)) {
     return `${word.reading} is an irregular い-adjective: present stays ${word.reading}, but other forms use よ, as in ${conjugateAdjective(word, 'adj-plain-past')} and ${conjugateAdjective(word, 'adj-plain-negative')}.`;
   }

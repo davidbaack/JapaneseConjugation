@@ -36,6 +36,7 @@ import {
   surfaceFormFor,
 } from '../utils/conjugator.js';
 import { explainItem, stepCoachHint, GROUP_NAMES } from '../utils/conjugatorExplain.js';
+import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 import {
   selectNext,
   buildFocusCard,
@@ -2088,7 +2089,8 @@ export default function StudyView() {
 
           {phase === 'reviewing' && practicePrefs.showWordCategory && (
             <div className="text-xs text-stone-400 mt-1">
-              {GROUP_NAMES[current.verb.group]} · {wordType}
+              {groupDisplayLabel(current.verb.group)} · {wordType}
+              {groupAliasText(current.verb.group) ? ` · ${groupAliasText(current.verb.group)}` : ''}
             </div>
           )}
           <div className="mt-4 flex flex-col gap-1">

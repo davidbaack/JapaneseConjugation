@@ -29,4 +29,14 @@ describe('ConjugationBreakdown', () => {
     expect(screen.getAllByText(/く -> いて/).length).toBeGreaterThan(0);
     expect(screen.getByText(/kaku -> kaite/)).toBeTruthy();
   });
+
+  it('connects group choice to the conjugation rule', () => {
+    render(<ConjugationBreakdown word={KAKU} type="plain-negative" />);
+
+    expect(
+      screen.getByText(
+        'Because this is godan: row-shift, 書く uses the か row for negative: 書かない.',
+      ),
+    ).toBeTruthy();
+  });
 });
