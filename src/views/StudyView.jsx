@@ -36,7 +36,6 @@ import {
   isAdjective,
   isRedundantPracticeType,
   promptFormLabel,
-  RULES,
   surfaceFormFor,
 } from '../utils/conjugator.js';
 import { explainItem, stepCoachHint, GROUP_NAMES } from '../utils/conjugatorExplain.js';
@@ -79,12 +78,7 @@ import {
   minimalPairSetMatchesCard,
   recordMinimalPairResult,
 } from '../utils/minimalPairs.js';
-import {
-  buildTodayDrillPlan,
-  TODAY_DRILL_LIST_ID,
-  practicePrefsForTodayDrill,
-  upsertTodayDrillList,
-} from '../utils/todayDrill.js';
+import { TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
@@ -347,8 +341,12 @@ export default function StudyView() {
     studyFocus: focus,
     clearStudyFocus: onFocusConsumed,
     session,
-    showAuth,
     hydrated,
+    todayPlan,
+    todayDrillActive: contextTodayDrillActive,
+    srsQueue,
+    startTodayDrill,
+    markSrsQueueCompleted,
   } = useApp();
   const [current, setCurrent] = useState(null);
   const [answer, setAnswer] = useState('');
@@ -379,9 +377,6 @@ export default function StudyView() {
   const [speechListening, setSpeechListening] = useState(false);
   const [speechError, setSpeechError] = useState('');
   const [reviewBase, setReviewBase] = useState(state.session.reviewed || 0);
-  // SRS daily queue tracking
-  const initialDueRuleIds = useRef(null);
-  const [completedDueIds, setCompletedDueIds] = useState(() => new Set());
   const startedGoalHit = useRef(isDailyGoalHitToday(state.daily || {}));
   const seededInitialDailyGoalRef = useRef(false);
   const autoStartedTodayRef = useRef(false);
@@ -465,10 +460,6 @@ export default function StudyView() {
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
     [state.session?.mistakePatterns],
   );
-  const todayPlan = useMemo(
-    () => buildTodayDrillPlan(state, verbs, practicePrefs, wordLists),
-    [state, verbs, practicePrefs, wordLists],
-  );
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const signedIn = !!session?.user;
@@ -476,9 +467,10 @@ export default function StudyView() {
   const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
   const repairDrillActive = practicePrefs.reviewLimitSource === 'repair';
   const todayDrillActive =
-    !practicePrefs.minimalPairSetId &&
-    !practicePrefs.reviewLimitSource &&
-    (practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID);
+    contextTodayDrillActive ??
+    (!practicePrefs.minimalPairSetId &&
+      !practicePrefs.reviewLimitSource &&
+      (practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID));
   const canResumePersistedCurrent = hasPersistedCurrent();
   const canResumeTodayDrill =
     todayDrillActive && daily.date === localDateKey() && canResumePersistedCurrent;
@@ -733,6 +725,7 @@ export default function StudyView() {
     if (autoStartedTodayRef.current) return;
     if (todayGoalHit) return;
     if (specialLaunchActive) return;
+    if (todayDrillActive) return;
     if (canResumePersistedCurrent) return;
     if (canResumeTodayDrill) return;
     if (!todayPlan.available) return;
@@ -745,6 +738,7 @@ export default function StudyView() {
     signedIn,
     todayGoalHit,
     specialLaunchActive,
+    todayDrillActive,
     canResumePersistedCurrent,
     canResumeTodayDrill,
     todayPlan,
@@ -762,21 +756,6 @@ export default function StudyView() {
     };
   }, []);
 
-  // Snapshot the set of SRS-due rule IDs at session start so the queue size is
-  // fixed even as cards become due or get rescheduled during the session.
-  useEffect(() => {
-    const now = Date.now();
-    initialDueRuleIds.current = new Set(
-      RULES.filter((r) => enabledTypes.includes(r.type))
-        .filter((r) => {
-          const c = state.cards[r.id];
-          return c && c.nextReview <= now;
-        })
-        .map((r) => r.id),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally snapshot only at mount
-
   function speakJapaneseLocal(text, rateVal = 0.85) {
     // Prefer a recorded clip with TTS fallback (improvement #18).
     playPronunciation(text, rateVal, practicePrefs.voiceURI);
@@ -793,7 +772,6 @@ export default function StudyView() {
   if (!current) {
     return (
       <div className="space-y-4">
-        {renderTodayEntry()}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
           <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
           <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
@@ -920,8 +898,10 @@ export default function StudyView() {
   const sessionSkipped = state.session?.skipped || 0;
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
   // Daily SRS queue completion flags
-  const initialDue = initialDueRuleIds.current?.size ?? 0;
-  const dueQueueDone = initialDue > 0 && completedDueIds.size >= initialDue && !bonusMode;
+  const queuedDueRuleIds = srsQueue?.dueRuleIds || [];
+  const completedDueCount = srsQueue?.completedDueRuleIds?.length || 0;
+  const initialDue = queuedDueRuleIds.length;
+  const dueQueueDone = initialDue > 0 && completedDueCount >= initialDue && !bonusMode;
   const dailyGoalJustHit =
     todayGoalHit && !startedGoalHit.current && seededInitialDailyGoalRef.current && !bonusMode;
   const reviewComplete = dueQueueDone || dailyGoalJustHit;
@@ -1127,19 +1107,8 @@ export default function StudyView() {
     if (!todayPlan.available) return;
     autoStartedTodayRef.current = true;
     clearPersistedCurrent();
-    if (setWordLists) setWordLists(upsertTodayDrillList(wordLists, todayPlan));
-    if (setState) {
-      setState((prev) => ({
-        ...prev,
-        enabledTypes: todayPlan.typeIds,
-        session: { ...(prev.session || {}), mistakePatterns: {} },
-      }));
-    }
-    if (setPracticePrefs) {
-      setPracticePrefs(practicePrefsForTodayDrill(practicePrefs, todayPlan));
-    }
-    initialDueRuleIds.current = new Set(todayPlan.dueRuleIds);
-    setCompletedDueIds(new Set());
+    const launched = startTodayDrill?.(todayPlan);
+    if (launched === false) return;
     setBonusMode(false);
     setTodayMinimalPairSetIds(todayPlan.minimalPairSetIds);
     setFocusWordLock(null);
@@ -1147,129 +1116,6 @@ export default function StudyView() {
     setReviewBase(state.session?.reviewed || 0);
     resetActiveAttempt();
     setTab('study');
-  }
-
-  function renderTodayLauncher() {
-    const dueCount = todayPlan.sourceCounts?.due || 0;
-    const secondaryChips = [
-      ...(todayPlan.sourceCounts?.weak ? [`${todayPlan.sourceCounts.weak} weak`] : []),
-      ...(todayPlan.sourceCounts?.minimalPairs
-        ? [`${todayPlan.sourceCounts.minimalPairs} contrast`]
-        : []),
-      ...(!todayPlan.sourceLabels.length ? ['Core forms'] : []),
-    ];
-    const fLabel = todayPlan.forecastLabel;
-    return (
-      <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-white dark:bg-stone-900 px-4 py-3 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 text-left">
-            <div className="text-xs uppercase tracking-wider text-emerald-700 dark:text-emerald-300 font-semibold">
-              Today
-            </div>
-            <div className="mt-1 text-sm font-semibold text-stone-900 dark:text-stone-100">
-              {todayPlan.title}
-            </div>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {dueCount > 0 && (
-                <span className="rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
-                  {dueCount} due now
-                </span>
-              )}
-              {secondaryChips.map((chip) => (
-                <span
-                  key={chip}
-                  className="rounded-md border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-2 py-1 text-[11px] text-stone-600 dark:text-stone-300"
-                >
-                  {chip}
-                </span>
-              ))}
-              {fLabel && (
-                <span className="rounded-md border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-2 py-1 text-[11px] text-stone-500 dark:text-stone-400">
-                  then: {fLabel}
-                </span>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={launchTodayDrill}
-            disabled={!todayPlan.available}
-            className="min-h-10 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600 dark:disabled:bg-stone-800 dark:disabled:text-stone-400"
-          >
-            Start review
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  function renderTodayStatus() {
-    const dueCleared = completedDueIds.size;
-    const dueTotal = initialDueRuleIds.current?.size ?? 0;
-    const hasDue = dueTotal > 0;
-    const progressPct = hasDue ? Math.min(100, Math.round((dueCleared / dueTotal) * 100)) : 0;
-    const queueDone = hasDue && dueCleared >= dueTotal;
-    const statusText = hasDue ? `${dueCleared}/${dueTotal} cleared` : todayPlan.summary;
-    const fLabel = todayPlan.forecastLabel;
-
-    return (
-      <div className="rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-3 py-2 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-              {queueDone ? 'Queue cleared' : 'SRS Queue'}
-            </div>
-            {fLabel && (
-              <div className="truncate text-xs text-stone-500 dark:text-stone-400">
-                up next: {fLabel}
-              </div>
-            )}
-          </div>
-          {hasDue && (
-            <div className="flex items-center gap-2 text-xs font-medium text-stone-600 dark:text-stone-300">
-              <span className="tabular-nums">{statusText}</span>
-              <span className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
-                <span
-                  className={`block h-full ${queueDone ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                  style={{ width: progressPct + '%' }}
-                />
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function renderSignInBar() {
-    return (
-      <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 shadow-sm dark:border-indigo-900/70 dark:bg-indigo-950/25">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-              Sign in to save SRS progress
-            </div>
-            <div className="text-xs text-stone-600 dark:text-stone-300">
-              Sync your review queue and daily goal across devices.
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={showAuth}
-            className="min-h-9 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-          >
-            Sign in
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  function renderTodayEntry() {
-    if (specialLaunchActive) return null;
-    if (!signedIn) return renderSignInBar();
-    if (todayDrillActive || todayGoalHit) return renderTodayStatus();
-    return renderTodayLauncher();
   }
 
   async function generateAIClue() {
@@ -1490,9 +1336,7 @@ export default function StudyView() {
       },
       daily: newDaily,
     };
-    if (ok && initialDueRuleIds.current?.has(rid)) {
-      setCompletedDueIds((prev) => new Set([...prev, rid]));
-    }
+    if (ok && queuedDueRuleIds.includes(rid)) markSrsQueueCompleted?.(rid);
     setState(nextState);
     setChatOpen(!ok && !!geminiKey && !!practicePrefs.autoAiExplainErrors);
     setLastDiagnosis(mistakeDiagnosis);
@@ -1509,10 +1353,7 @@ export default function StudyView() {
     setWasCorrect(ok);
     setPhase('reviewing');
     const willClearDue =
-      initialDue > 0 &&
-      ok &&
-      initialDueRuleIds.current?.has(rid) &&
-      completedDueIds.size + 1 >= initialDue;
+      initialDue > 0 && ok && queuedDueRuleIds.includes(rid) && completedDueCount + 1 >= initialDue;
     const willHitDailyGoal =
       !startedGoalHit.current && !bonusMode && newDaily.goalHit && !daily.goalHit;
     const reviewWillComplete =
@@ -1630,9 +1471,7 @@ export default function StudyView() {
       },
       daily: newDaily,
     };
-    if (ok && initialDueRuleIds.current?.has(rid)) {
-      setCompletedDueIds((prev) => new Set([...prev, rid]));
-    }
+    if (ok && queuedDueRuleIds.includes(rid)) markSrsQueueCompleted?.(rid);
     setState(nextState);
     setAnswer('');
     setTypoGuard(null);
@@ -1644,10 +1483,7 @@ export default function StudyView() {
     setWasCorrect(ok);
     setPhase('reviewing');
     const willClearDue =
-      initialDue > 0 &&
-      ok &&
-      initialDueRuleIds.current?.has(rid) &&
-      completedDueIds.size + 1 >= initialDue;
+      initialDue > 0 && ok && queuedDueRuleIds.includes(rid) && completedDueCount + 1 >= initialDue;
     const willHitDailyGoal =
       !startedGoalHit.current && !bonusMode && newDaily.goalHit && !daily.goalHit;
     const reviewWillComplete =
@@ -1788,7 +1624,7 @@ export default function StudyView() {
           {dueQueueDone ? 'Queue cleared!' : 'Session complete'}
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-1">
-          {dueQueueDone ? `${completedDueIds.size}/${initialDue}` : sessionReviewed}
+          {dueQueueDone ? `${completedDueCount}/${initialDue}` : sessionReviewed}
         </div>
         <div className="text-sm text-stone-400 mb-3">
           {dueQueueDone ? 'due cards cleared' : 'cards reviewed'}
@@ -2041,7 +1877,6 @@ export default function StudyView() {
           </button>
         </div>
       )}
-      {renderTodayEntry()}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div
           role="group"
@@ -2127,7 +1962,7 @@ export default function StudyView() {
                 )}
                 {initialDue > 0 && !bonusMode && (
                   <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-                    {completedDueIds.size}/{initialDue} due
+                    {completedDueCount}/{initialDue} due
                   </div>
                 )}
                 {bonusMode && (

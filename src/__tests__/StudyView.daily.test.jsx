@@ -6,7 +6,7 @@ import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
 import { conjugateItem, wordKey } from '../utils/conjugator.js';
 import { defaultState } from '../utils/storage.js';
-import { TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
+import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
 
@@ -17,7 +17,7 @@ vi.mock('../state/AppStateContext.jsx', () => ({
 import StudyView from '../views/StudyView.jsx';
 
 function makeApp(overrides = {}) {
-  return {
+  const base = {
     state: defaultState(),
     setState: vi.fn(),
     setTab: vi.fn(),
@@ -33,6 +33,25 @@ function makeApp(overrides = {}) {
     showAuth: vi.fn(),
     hydrated: true,
     ...overrides,
+  };
+  const todayDrillActive =
+    !base.practicePrefs.minimalPairSetId &&
+    !base.practicePrefs.reviewLimitSource &&
+    (base.practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID);
+  return {
+    ...base,
+    todayPlan:
+      overrides.todayPlan ||
+      buildTodayDrillPlan(base.state, base.allWords, base.practicePrefs, base.wordLists),
+    todayDrillActive: overrides.todayDrillActive ?? todayDrillActive,
+    srsQueue: overrides.srsQueue || {
+      date: base.state.daily.date,
+      dueRuleIds: [],
+      completedDueRuleIds: [],
+      startedAt: null,
+    },
+    startTodayDrill: overrides.startTodayDrill || vi.fn(() => true),
+    markSrsQueueCompleted: overrides.markSrsQueueCompleted || vi.fn(),
   };
 }
 
@@ -92,7 +111,6 @@ function persistStudyCard(word, type) {
     }),
   );
 }
-
 class FakeSpeechRecognition {
   static instance = null;
 
@@ -144,82 +162,62 @@ afterEach(() => {
 
 describe('StudyView daily startup guards', () => {
   it('auto-starts today for signed-in learners', async () => {
-    const setPracticePrefs = vi.fn();
-    const setWordLists = vi.fn();
-    mockedApp.value = makeApp({ setPracticePrefs, setWordLists });
+    const app = makeApp();
+    mockedApp.value = app;
 
     render(<StudyView />);
 
-    await waitFor(() => expect(setWordLists).toHaveBeenCalled());
-    expect(launchedToday(setPracticePrefs)).toBe(true);
+    await waitFor(() => expect(app.startTodayDrill).toHaveBeenCalled());
   });
 
-  it('shows a sign-in bar instead of auto-starting today while signed out', async () => {
-    const setPracticePrefs = vi.fn();
-    const setWordLists = vi.fn();
+  it('does not auto-start today while signed out', async () => {
     const showAuth = vi.fn();
-    mockedApp.value = makeApp({
+    const app = makeApp({
       session: null,
-      setPracticePrefs,
-      setWordLists,
       showAuth,
     });
+    mockedApp.value = app;
 
     render(<StudyView />);
 
-    expect(await screen.findByText('Sign in to save SRS progress')).toBeTruthy();
-    expect(screen.queryByText('SRS Queue')).toBeNull();
-    expect(setWordLists).not.toHaveBeenCalled();
-    expect(launchedToday(setPracticePrefs)).toBe(false);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(showAuth).toHaveBeenCalled();
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
   it('does not auto-start today over a focused word launch', async () => {
-    const setPracticePrefs = vi.fn();
-    const setWordLists = vi.fn();
     const clearStudyFocus = vi.fn();
-    mockedApp.value = makeApp({
-      setPracticePrefs,
-      setWordLists,
+    const app = makeApp({
       clearStudyFocus,
       studyFocus: {
         word: STARTER_VERBS[0],
         type: 'plain-past',
       },
     });
+    mockedApp.value = app;
 
     render(<StudyView />);
 
     await waitFor(() => expect(clearStudyFocus).toHaveBeenCalled());
-    expect(setWordLists).not.toHaveBeenCalled();
-    expect(launchedToday(setPracticePrefs)).toBe(false);
+    expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
   it('does not auto-start today over a repair drill', async () => {
-    const setPracticePrefs = vi.fn();
-    const setWordLists = vi.fn();
-    mockedApp.value = makeApp({
-      setPracticePrefs,
-      setWordLists,
+    const app = makeApp({
       practicePrefs: {
         ...DEFAULT_PREFS,
         reviewLimit: 10,
         reviewLimitSource: 'repair',
       },
     });
+    mockedApp.value = app;
 
     render(<StudyView />);
 
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    expect(setWordLists).not.toHaveBeenCalled();
-    expect(launchedToday(setPracticePrefs)).toBe(false);
+    expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
   it('does not auto-start today over a persisted study card', async () => {
-    const setPracticePrefs = vi.fn();
-    const setWordLists = vi.fn();
     const target = STARTER_VERBS[0];
     sessionStorage.setItem(
       'jp-study-current',
@@ -232,13 +230,13 @@ describe('StudyView daily startup guards', () => {
         word: target,
       }),
     );
-    mockedApp.value = makeApp({ setPracticePrefs, setWordLists });
+    const app = makeApp();
+    mockedApp.value = app;
 
     render(<StudyView />);
 
     await screen.findByText(target.meaning, {}, { timeout: 5000 });
-    expect(setWordLists).not.toHaveBeenCalled();
-    expect(launchedToday(setPracticePrefs)).toBe(false);
+    expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
   it('restores a persisted study card when vocabulary metadata changes', async () => {
