@@ -400,7 +400,20 @@ describe('stepCoachHint (offline hint)', () => {
 
   it('flags where a wrong kana goes off course', () => {
     const { text } = stepCoachHint(MATSU, TYPE, 'まと'); // 2nd kana wrong
-    expect(text).toMatch(/kana 2 goes off course/);
+    expect(text).toContain('You are at 「ま」; build the potential form first');
+    expect(text).toContain('「と」 is not the next kana');
+    expect(text).not.toContain(ANSWER);
+  });
+
+  it('guides 来る compound mistakes with the missing intermediate form', () => {
+    const answer = conjugateItem(KURU, TYPE); // こられなかった
+    const { text, masked } = stepCoachHint(KURU, TYPE, 'kore');
+    expect(masked).toBe(false);
+    expect(text).toContain('First make the potential form: こられる');
+    expect(text).toContain('You are at 「こ」; build the potential form first: こられる');
+    expect(text).toContain('「れ」 comes later');
+    expect(text).toContain('なかった');
+    expect(text).not.toContain(answer);
   });
 
   it('accepts romaji input and converts it', () => {
