@@ -300,13 +300,14 @@ const sampleWords = [
   { dict: '来る', reading: 'くる', meaning: 'to come', group: 'kuru', jlpt: 'N5' },
   { dict: '高い', reading: 'たかい', meaning: 'expensive', group: 'i-adjective', jlpt: 'N5' },
   { dict: '静か', reading: 'しずか', meaning: 'quiet', group: 'na-adjective', jlpt: 'N5' },
+  { dict: '学生', reading: 'がくせい', meaning: 'student', group: 'noun', jlpt: 'N5' },
 ];
 
 describe('filterWordsForPrefs', () => {
   it('returns all words with default prefs', () => {
     const result = filterWordsForPrefs(sampleWords, {
       jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
-      wordTypes: ['verb', 'i-adjective', 'na-adjective'],
+      wordTypes: ['verb', 'i-adjective', 'na-adjective', 'noun'],
       wordGroups: [
         'ichidan',
         'godan',
@@ -315,6 +316,7 @@ describe('filterWordsForPrefs', () => {
         'irregular-adjective',
         'i-adjective',
         'na-adjective',
+        'noun',
       ],
       genkiLessons: [],
       wordListIds: [],
@@ -325,7 +327,7 @@ describe('filterWordsForPrefs', () => {
   it('filters by JLPT level', () => {
     const result = filterWordsForPrefs(sampleWords, {
       jlptLevels: ['N2'], // words are N5, so none pass
-      wordTypes: ['verb', 'i-adjective', 'na-adjective'],
+      wordTypes: ['verb', 'i-adjective', 'na-adjective', 'noun'],
       wordGroups: [
         'ichidan',
         'godan',
@@ -334,6 +336,7 @@ describe('filterWordsForPrefs', () => {
         'irregular-adjective',
         'i-adjective',
         'na-adjective',
+        'noun',
       ],
       genkiLessons: [],
       wordListIds: [],
@@ -352,18 +355,65 @@ describe('filterWordsForPrefs', () => {
     const groups = result.map((w) => w.group);
     expect(groups).not.toContain('i-adjective');
     expect(groups).not.toContain('na-adjective');
+    expect(groups).not.toContain('noun');
+  });
+
+  it('filters by wordTypes (noun only)', () => {
+    const result = filterWordsForPrefs(sampleWords, {
+      jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
+      wordTypes: ['noun'],
+      wordGroups: ['noun'],
+      genkiLessons: [],
+      wordListIds: [],
+    });
+    expect(result.map((w) => w.group)).toEqual(['noun']);
   });
 
   it('filters by wordGroups', () => {
     const result = filterWordsForPrefs(sampleWords, {
       jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
-      wordTypes: ['verb', 'i-adjective', 'na-adjective'],
+      wordTypes: ['verb', 'i-adjective', 'na-adjective', 'noun'],
       wordGroups: ['ichidan'],
       genkiLessons: [],
       wordListIds: [],
     });
     expect(result.length).toBe(1);
     expect(result[0].group).toBe('ichidan');
+  });
+
+  it('matches array-backed Genki and Minna lesson metadata', () => {
+    const result = filterWordsForPrefs(
+      [
+        {
+          dict: '比べる',
+          reading: 'くらべる',
+          meaning: 'to compare',
+          group: 'ichidan',
+          jlpt: 'N3',
+          lessons: [18, 21],
+          minnaLessons: [35, 36],
+        },
+      ],
+      {
+        jlptLevels: ['N3'],
+        wordTypes: ['verb'],
+        wordGroups: ['ichidan'],
+        genkiLessons: [21],
+        minnaLessons: null,
+        wordListIds: [],
+      },
+    );
+    expect(result).toHaveLength(1);
+
+    const minnaResult = filterWordsForPrefs(result, {
+      jlptLevels: ['N3'],
+      wordTypes: ['verb'],
+      wordGroups: ['ichidan'],
+      genkiLessons: null,
+      minnaLessons: [36],
+      wordListIds: [],
+    });
+    expect(minnaResult).toHaveLength(1);
   });
 });
 

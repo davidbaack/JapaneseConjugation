@@ -456,6 +456,12 @@ describe('parseWordRows', () => {
     expect(rows[0].group).toBe('godan');
   });
 
+  it('parses noun rows for copula practice', () => {
+    const rows = parseWordRows('学生,がくせい,student,noun');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].group).toBe('noun');
+  });
+
   it('skips rows with fewer than 4 columns', () => {
     expect(parseWordRows('食べる\tたべる\tto eat')).toHaveLength(0);
   });
@@ -467,6 +473,17 @@ describe('parseWordRows', () => {
   it('handles multiple rows', () => {
     const text = '食べる\tたべる\tto eat\tichidan\n書く\tかく\tto write\tgodan';
     expect(parseWordRows(text)).toHaveLength(2);
+  });
+
+  it('parses JLPT, Genki, and Minna lesson metadata', () => {
+    const rows = parseWordRows('書く,かく,to write,godan,verb,N5,3;6,6;7');
+    expect(rows[0]).toMatchObject({
+      jlpt: 'N5',
+      lesson: 3,
+      lessons: [3, 6],
+      minnaLesson: 6,
+      minnaLessons: [6, 7],
+    });
   });
 });
 
@@ -557,6 +574,17 @@ describe('buildVocabularyCsv', () => {
   it('each row ends with a newline', () => {
     const csv = buildVocabularyCsv(list, [TABERU]);
     expect(csv.endsWith('\n')).toBe(true);
+  });
+
+  it('exports all Genki and Minna lesson tags', () => {
+    const tagged = {
+      ...TABERU,
+      lessons: [3, 6],
+      minnaLessons: [6, 7],
+      jlpt: 'N5',
+    };
+    const csv = buildVocabularyCsv(list, [tagged]);
+    expect(csv).toContain('3;6,6;7');
   });
 });
 

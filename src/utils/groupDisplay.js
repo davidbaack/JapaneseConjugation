@@ -82,6 +82,18 @@ export const GROUP_DISPLAY = {
     example: '静か -> 静かではない',
     trap: '',
   },
+  noun: {
+    id: 'noun',
+    kind: 'noun',
+    label: 'noun',
+    shortLabel: 'noun',
+    aliasText: 'uses copula forms',
+    decoder: 'keep the noun, attach だ/です/copula endings.',
+    recognition:
+      'Nouns do not conjugate themselves; the copula after the noun carries tense and polarity.',
+    example: '学生 -> 学生ではない',
+    trap: 'Do not treat noun-only textbook vocabulary as a fake する verb unless it is actually a する entry.',
+  },
 };
 
 export const GROUP_DECODER_ROWS = [
@@ -106,14 +118,21 @@ export const GROUP_DECODER_ROWS = [
 ];
 
 export const WORD_GROUP_DISPLAY_OPTIONS = Object.freeze(
-  ['ichidan', 'godan', 'suru', 'kuru', 'irregular-adjective', 'i-adjective', 'na-adjective'].map(
-    (id) => ({
-      id,
-      label: GROUP_DISPLAY[id].label,
-      shortLabel: GROUP_DISPLAY[id].shortLabel,
-      aliasText: GROUP_DISPLAY[id].aliasText,
-    }),
-  ),
+  [
+    'ichidan',
+    'godan',
+    'suru',
+    'kuru',
+    'irregular-adjective',
+    'i-adjective',
+    'na-adjective',
+    'noun',
+  ].map((id) => ({
+    id,
+    label: GROUP_DISPLAY[id].label,
+    shortLabel: GROUP_DISPLAY[id].shortLabel,
+    aliasText: GROUP_DISPLAY[id].aliasText,
+  })),
 );
 
 export const GROUP_SENTENCE_LABELS = Object.freeze(

@@ -15,7 +15,7 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['apple-touch-icon.png'],
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,ico}'],
+        globPatterns: ['**/*.{js,css,html,svg,ico,json}'],
         cleanupOutdatedCaches: true,
         navigateFallback: '/JapaneseConjugation/index.html',
         navigateFallbackDenylist: [/\.[^/?]+$/],

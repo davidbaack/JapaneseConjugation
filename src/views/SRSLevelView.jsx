@@ -48,8 +48,9 @@ export default function SRSLevelView() {
     'exception-いく',
     'i-adjective',
     'na-adjective',
+    'noun',
   ];
-  const COL_HEADS = ['る', 'う', 'する', '来る', '行く', 'い形', 'な形'];
+  const COL_HEADS = ['る', 'う', 'する', '来る', '行く', 'い形', 'な形', '名詞'];
 
   return (
     <div className="space-y-4 text-left">

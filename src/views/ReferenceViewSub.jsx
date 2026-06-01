@@ -530,7 +530,9 @@ export default function ReferenceViewSub({
     setAccentText('');
     try {
       const keyForms = pronunciationForms.map((f) => `${f} (${kanaToRomaji(f)})`).join(', ');
-      const prompt = `Create a compact pronunciation and Tokyo pitch-accent coaching note for this Japanese ${isAdjective(selected) ? 'adjective' : 'verb'}.\n\nWord: ${selected.dict}\nReading: ${selected.reading}\nMeaning: ${selected.meaning}\nClass: ${GROUP_NAMES[selected.group] || selected.group}\nUseful conjugated forms to mention: ${keyForms}\n\nIf the exact accent is uncertain, say so clearly instead of pretending certainty. Include: likely accent label/number if known, mora-by-mora pitch shape in plain text, how pitch may shift in common conjugated forms, one shadowing drill, and one learner mistake to listen for. Keep it short and practical.`;
+      const selectedKind =
+        selected.group === 'noun' ? 'noun' : isAdjective(selected) ? 'adjective' : 'verb';
+      const prompt = `Create a compact pronunciation and Tokyo pitch-accent coaching note for this Japanese ${selectedKind}.\n\nWord: ${selected.dict}\nReading: ${selected.reading}\nMeaning: ${selected.meaning}\nClass: ${GROUP_NAMES[selected.group] || selected.group}\nUseful conjugated forms to mention: ${keyForms}\n\nIf the exact accent is uncertain, say so clearly instead of pretending certainty. Include: likely accent label/number if known, mora-by-mora pitch shape in plain text, how pitch may shift in common conjugated forms, one shadowing drill, and one learner mistake to listen for. Keep it short and practical.`;
       const reply = await callGemini(
         [{ role: 'user', parts: [{ text: prompt }] }],
         geminiKey,
@@ -631,7 +633,7 @@ export default function ReferenceViewSub({
     setScratchAiErr('');
     setScratchAiText('');
     try {
-      const prompt = `Identify this Japanese conjugation reference query and verify its real dictionary entry.\n\nQuery: ${query}\nLocal guess: ${scratchCandidate.dict} (${scratchCandidate.reading}), ${GROUP_NAMES[scratchCandidate.group] || scratchCandidate.group}\n\nReturn ONLY JSON with this exact shape:\n{"words":[{"dict":"dictionary form or adjective stem","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective","evidence":"why this group is right"}]}\n\nIf the query is an impossible or incomplete Japanese dictionary form, return {"words":[]}.`;
+      const prompt = `Identify this Japanese conjugation reference query and verify its real dictionary entry.\n\nQuery: ${query}\nLocal guess: ${scratchCandidate.dict} (${scratchCandidate.reading}), ${GROUP_NAMES[scratchCandidate.group] || scratchCandidate.group}\n\nReturn ONLY JSON with this exact shape:\n{"words":[{"dict":"dictionary form, noun, or adjective stem","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective|noun","evidence":"why this group is right"}]}\n\nIf the query is an impossible or incomplete Japanese dictionary form, return {"words":[]}.`;
       const reply = await callGemini(
         [{ role: 'user', parts: [{ text: prompt }] }],
         geminiKey,
