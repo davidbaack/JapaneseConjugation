@@ -21,9 +21,11 @@ const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 
 const TABS = ['study', 'check', 'classify', 'endings', 'games', 'insights', 'library', 'settings'];
 
-function SRSQueueBar() {
+export function SRSQueueBar() {
   const {
     state,
+    tab,
+    setTab,
     practicePrefs,
     session,
     syncStatus,
@@ -106,6 +108,8 @@ function SRSQueueBar() {
     daily.goalStreak ? `${daily.goalStreak} day streak` : '',
   ].filter(Boolean);
   const canStart = !todayDrillActive && !todayGoalHit && todayPlan.available;
+  const canResumeQueue = tab !== 'study' && todayDrillActive && hasDueQueue && !queueDone;
+  const showStudyAction = canStart || canResumeQueue;
 
   return (
     <section
@@ -153,13 +157,16 @@ function SRSQueueBar() {
               />
             </div>
           </div>
-          {canStart && (
+          {showStudyAction && (
             <button
               type="button"
-              onClick={() => startTodayDrill(todayPlan)}
+              onClick={() => {
+                if (canStart) startTodayDrill(todayPlan);
+                else setTab('study');
+              }}
               className="min-h-9 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
             >
-              Start review
+              {canStart ? 'Start review' : 'Go study'}
             </button>
           )}
         </div>
