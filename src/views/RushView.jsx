@@ -4,7 +4,6 @@ import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaProgressMeter from '../components/KanaProgressMeter.jsx';
 import StickyAction from '../components/StickyAction.jsx';
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import { toHiragana } from '../utils/romaji.js';
 import { kanaCoachCells } from '../utils/kanaCoach.js';
 import {
   filterWordsForPrefs,
@@ -18,6 +17,12 @@ import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { defaultState, gradeCard, recordMistake, bumpDaily } from '../utils/storage.js';
 import { bumpSessionMistakePattern } from '../utils/mistakeDiagnosis.js';
 import { promptDisplay, shuffled } from '../utils/display.js';
+import {
+  isRushAnswerCorrect,
+  normalizeRushAnswer,
+  rushLimitForWave,
+  rushWaveForCleared,
+} from '../utils/rush.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
 export default function RushView() {
@@ -45,6 +50,7 @@ export default function RushView() {
   const [feedback, setFeedback] = useState(null);
   const [recent, setRecent] = useState([]);
   const advanceRef = useRef(null);
+  const compositionRef = useRef(false);
   const resolvingRef = useRef(false);
 
   useEffect(() => {
@@ -95,8 +101,8 @@ export default function RushView() {
       });
       return;
     }
-    const nextWave = 1 + Math.floor(nextCleared / 5);
-    const limit = Math.max(3600, 8500 - Math.min(nextWave - 1, 9) * 520);
+    const nextWave = rushWaveForCleared(nextCleared);
+    const limit = rushLimitForWave(nextWave);
     resolvingRef.current = false;
     setWave(nextWave);
     setRound({ ...next, limit });
@@ -156,7 +162,7 @@ export default function RushView() {
             current.item,
             current.type.id,
             current.promptType,
-            toHiragana(raw),
+            normalizeRushAnswer(raw),
             current.expected,
           );
       const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
@@ -189,12 +195,12 @@ export default function RushView() {
     });
   }
 
-  function resolveRound(ok, reason = 'answer') {
+  function resolveRound(ok, reason = 'answer', rawOverride = answer) {
     if (resolvingRef.current) return;
     if (!round) return;
     resolvingRef.current = true;
     const current = round;
-    const raw = answer.trim();
+    const raw = String(rawOverride || '').trim();
     setRound(null);
     if (ok) {
       const left = Math.max(0, deadline - Date.now());
@@ -217,7 +223,7 @@ export default function RushView() {
             prompt: current.prompt.main,
             type: current.type.label,
             expected: current.expected,
-            answer: toHiragana(raw),
+            answer: normalizeRushAnswer(raw),
           },
           ...r,
         ].slice(0, 5),
@@ -238,7 +244,7 @@ export default function RushView() {
             prompt: current.prompt.main,
             type: current.type.label,
             expected: current.expected,
-            answer: raw ? toHiragana(raw) : '--',
+            answer: raw ? normalizeRushAnswer(raw) : '--',
           },
           ...r,
         ].slice(0, 5),
@@ -248,10 +254,17 @@ export default function RushView() {
     }
   }
 
+  function maybeAutoSubmit(nextAnswer) {
+    if (!active || paused || !round || resolvingRef.current) return;
+    if (isRushAnswerCorrect(nextAnswer, round.expected)) {
+      resolveRound(true, 'answer', nextAnswer);
+    }
+  }
+
   function submit() {
     if (!round) return;
-    const ok = toHiragana(answer) === round.expected;
-    resolveRound(ok, ok ? 'answer' : 'wrong');
+    const ok = isRushAnswerCorrect(answer, round.expected);
+    resolveRound(ok, ok ? 'answer' : 'wrong', answer);
   }
 
   const pct = round ? Math.max(0, Math.min(100, Math.round((timeLeft / round.limit) * 100))) : 0;
@@ -262,7 +275,7 @@ export default function RushView() {
       : 'Dictionary form'
     : '';
   const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
-  const answerPreview = toHiragana(answer);
+  const answerPreview = normalizeRushAnswer(answer);
   const rushKanaCells =
     round?.expected && kanaMatchDisplay !== 'none'
       ? kanaCoachCells(round.expected, answer, 0, active && !paused)
@@ -276,7 +289,7 @@ export default function RushView() {
         ? 'Extra kana after the answer.'
         : `Kana ${rushWrongIndex + 1} does not match yet.`
       : round?.expected && answerPreview === round.expected
-        ? 'Complete match. Press Enter.'
+        ? 'Complete match.'
         : '';
   const rushKanaTone =
     rushWrongIndex >= 0
@@ -424,7 +437,20 @@ export default function RushView() {
             <div className="grid sm:grid-cols-[1fr_auto] gap-2">
               <input
                 value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
+                onChange={(e) => {
+                  const nextAnswer = e.target.value;
+                  setAnswer(nextAnswer);
+                  if (!compositionRef.current) maybeAutoSubmit(nextAnswer);
+                }}
+                onCompositionStart={() => {
+                  compositionRef.current = true;
+                }}
+                onCompositionEnd={(e) => {
+                  compositionRef.current = false;
+                  const nextAnswer = e.currentTarget.value;
+                  setAnswer(nextAnswer);
+                  maybeAutoSubmit(nextAnswer);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
