@@ -11,7 +11,7 @@ export const GROUP_DISPLAY = {
     decoder: 'remove final る, attach ending.',
     recognition: 'The final る drops away before most endings attach.',
     example: '食べる -> 食べない',
-    trap: 'Not every る-ending verb is ichidan; 帰る and 走る are godan.',
+    trap: 'Not every る-ending verb is ichidan; 帰る, 入る, 走る, and 切る are godan.',
   },
   godan: {
     id: 'godan',
@@ -23,7 +23,7 @@ export const GROUP_DISPLAY = {
     decoder: 'final kana moves rows, then ending attaches.',
     recognition: 'The final kana is the moving part; it shifts rows for each ending.',
     example: '書く -> 書かない',
-    trap: '帰る and 走る are godan even though they end in る.',
+    trap: '帰る, 入る, 走る, and 切る are godan even though they end in る.',
   },
   suru: {
     id: 'suru',
@@ -200,7 +200,7 @@ export function groupRecognitionClue(word) {
 
 export function groupTrapText(word) {
   if (word?.group === 'godan' && (word.reading || '').endsWith('る')) {
-    return `${word.dict} is one of the る-ending godan traps, like 帰る and 走る.`;
+    return `${word.dict} is one of the る-ending godan traps, like 帰る, 入る, 走る, and 切る.`;
   }
   return getGroupDisplay(word?.group).trap;
 }

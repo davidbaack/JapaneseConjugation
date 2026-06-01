@@ -26,6 +26,7 @@ import {
   groupRecognitionClue,
   groupTrapText,
 } from '../utils/groupDisplay.js';
+import { ruMasuDiagnostic } from '../utils/ruVerbDiagnostics.js';
 
 const VERB_CLASSIFY_OPTIONS = VERB_GROUP_IDS.map((id) => {
   const meta = getGroupDisplay(id);
@@ -60,10 +61,13 @@ function negativeExample(word) {
 export function classifyHint(word) {
   if (VERB_GROUP_IDS.includes(word.group)) {
     const trap = groupTrapText(word);
+    const masuDiagnostic = ruMasuDiagnostic(word);
     return [
       `${groupDisplayLabel(word.group)}: ${groupRecognitionClue(word)}`,
       getGroupDisplay(word.group).aliasText,
       `Example: ${negativeExample(word)}.`,
+      masuDiagnostic &&
+        `Masu check: ${masuDiagnostic.dict} -> ${masuDiagnostic.politeSurface}. ${masuDiagnostic.contrast}`,
       trap,
     ]
       .filter(Boolean)
@@ -86,6 +90,7 @@ export function classificationTeachingMoment(word) {
       clue: groupRecognitionClue(word),
       example: negativeExample(word),
       trap: groupTrapText(word),
+      masuDiagnostic: ruMasuDiagnostic(word),
     };
   }
 
@@ -96,6 +101,7 @@ export function classificationTeachingMoment(word) {
     clue: classifyHint(word),
     example: `${word.dict} -> ${conjugateAdjective(word, adjectiveExampleType)}`,
     trap: '',
+    masuDiagnostic: null,
   };
 }
 
@@ -365,6 +371,24 @@ export default function ClassificationView() {
                   <div>
                     <span className="font-semibold text-stone-850 dark:text-stone-150">Trap: </span>
                     {teaching.trap}
+                  </div>
+                )}
+                {teaching?.masuDiagnostic && (
+                  <div className="border-l-2 border-indigo-300 dark:border-indigo-700 pl-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-indigo-650 dark:text-indigo-350">
+                      Masu check
+                    </div>
+                    <div className="mt-1">
+                      <span lang="ja" className="font-semibold text-stone-900 dark:text-stone-100">
+                        {teaching.masuDiagnostic.dict}
+                        {' -> '}
+                        {teaching.masuDiagnostic.politeSurface}
+                      </span>
+                      <span className="ml-2">{teaching.masuDiagnostic.clue}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                      {teaching.masuDiagnostic.contrast}
+                    </div>
                   </div>
                 )}
               </div>

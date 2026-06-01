@@ -26,14 +26,18 @@ import {
   groupRecognitionClue,
   groupTrapText,
 } from './groupDisplay.js';
+import { ruMasuDiagnostic } from './ruVerbDiagnostics.js';
 
 export function classifyHint(word) {
   if (VERB_GROUP_IDS.includes(word.group)) {
     const example = surfaceFormFor(word, 'plain-negative') || conjugate(word, 'plain-negative');
+    const masuDiagnostic = ruMasuDiagnostic(word);
     return [
       `${groupDisplayLabel(word.group)}: ${groupRecognitionClue(word)}`,
       groupAliasText(word.group),
       `Example: ${word.dict} -> ${example}.`,
+      masuDiagnostic &&
+        `Masu check: ${masuDiagnostic.dict} -> ${masuDiagnostic.politeSurface}. ${masuDiagnostic.contrast}`,
       groupTrapText(word),
     ]
       .filter(Boolean)

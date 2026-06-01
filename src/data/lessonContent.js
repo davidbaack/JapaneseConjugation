@@ -72,6 +72,45 @@ export const ONBIN_ROWS = [
   { ending: '行く', te: 'って', ta: 'った', example: '行く -> 行って / 行った' },
 ];
 
+export const RU_MASU_DIAGNOSTIC_ROWS = [
+  {
+    dict: '食べる',
+    polite: '食べます',
+    group: 'ichidan',
+    clue: '食べ goes straight into ます, so final る dropped.',
+  },
+  {
+    dict: '見る',
+    polite: '見ます',
+    group: 'ichidan',
+    clue: '見 keeps the same stem before ます.',
+  },
+  {
+    dict: '走る',
+    polite: '走ります',
+    group: 'godan',
+    clue: 'る becomes り before ます, so it row-shifts.',
+  },
+  {
+    dict: '帰る',
+    polite: '帰ります',
+    group: 'godan',
+    clue: 'The り before ます marks a godan る trap.',
+  },
+  {
+    dict: '切る',
+    polite: '切ります',
+    group: 'godan',
+    clue: 'Homophone warning: to cut is godan.',
+  },
+  {
+    dict: '着る',
+    polite: '着ます',
+    group: 'ichidan',
+    clue: 'Homophone warning: to wear is ichidan.',
+  },
+];
+
 export const LESSON_SECTIONS = [
   lessonFromGroup('basic-tenses', {
     title: 'Plain and Polite Basics',
