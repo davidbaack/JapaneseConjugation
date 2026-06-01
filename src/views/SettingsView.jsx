@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { IconVolume, IconRefresh, IconCloud } from '../components/Icons.jsx';
 import {
-  STARTER_VERBS,
-  STARTER_ADJECTIVES,
   JLPT_LEVELS,
   GENKI_LESSONS,
   MINNA_LESSONS,
@@ -70,6 +68,7 @@ export default function SettingsView() {
     speechVoices,
     resolvedTheme,
     supabase,
+    allWords,
     showAuth: onShowAuth,
   } = useApp();
   const [confirmReset, setConfirmReset] = useState(false);
@@ -250,10 +249,7 @@ export default function SettingsView() {
     },
   ];
   const enabledKey = [...state.enabledTypes].sort().join('|');
-  const settingsWords = useMemo(
-    () => [...STARTER_VERBS, ...customVerbs, ...STARTER_ADJECTIVES, ...customAdjectives],
-    [customVerbs, customAdjectives],
-  );
+  const settingsWords = useMemo(() => allWords || [], [allWords]);
   const poolSummary = useMemo(
     () => buildPracticePoolSummary(state, settingsWords, practicePrefs, wordLists),
     [state, settingsWords, practicePrefs, wordLists],
@@ -389,7 +385,7 @@ export default function SettingsView() {
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-stone-500 block mb-1">Theme</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { id: 'light', label: 'Light' },
                 { id: 'dark', label: 'Dark' },
@@ -815,7 +811,7 @@ export default function SettingsView() {
                 {selectedWordGroups.length}/{WORD_GROUP_OPTIONS.length}
               </span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
               {WORD_GROUP_OPTIONS.map((o) => (
                 <button
                   key={o.id}

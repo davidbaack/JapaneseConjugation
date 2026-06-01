@@ -28,18 +28,57 @@ export function normalizeJlptLevel(value) {
   return m ? m[0] : null;
 }
 
+function normalizeLessonList(...values) {
+  return [
+    ...new Set(
+      values
+        .flatMap((value) => (Array.isArray(value) ? value : value == null ? [] : [value]))
+        .map(Number)
+        .filter((n) => Number.isInteger(n) && n > 0),
+    ),
+  ].sort((a, b) => a - b);
+}
+
 export function getWordMeta(word) {
   const embedded = {};
   const jlpt = normalizeJlptLevel(word?.jlpt || word?.level);
   if (jlpt) embedded.jlpt = jlpt;
-  if (word?.lesson) embedded.lesson = Number(word.lesson) || null;
-  if (word?.minnaLesson) embedded.minnaLesson = Number(word.minnaLesson) || null;
+  const lessons = normalizeLessonList(word?.lessons, word?.genkiLessons, word?.lesson);
+  const minnaLessons = normalizeLessonList(word?.minnaLessons, word?.minnaLesson);
+  if (lessons.length) {
+    embedded.lessons = lessons;
+    embedded.lesson = lessons[0];
+  }
+  if (minnaLessons.length) {
+    embedded.minnaLessons = minnaLessons;
+    embedded.minnaLesson = minnaLessons[0];
+  }
+  const mapped = WORD_META[word?.dict] || {};
+  const mappedLessons = normalizeLessonList(mapped.lessons, mapped.genkiLessons, mapped.lesson);
+  const mappedMinnaLessons = normalizeLessonList(mapped.minnaLessons, mapped.minnaLesson);
+  const mergedLessons = normalizeLessonList(mappedLessons, embedded.lessons, embedded.lesson);
+  const mergedMinnaLessons = normalizeLessonList(
+    mappedMinnaLessons,
+    embedded.minnaLessons,
+    embedded.minnaLesson,
+  );
   return {
     jlpt: 'N3',
     lesson: null,
+    lessons: [],
     minnaLesson: null,
-    ...(WORD_META[word?.dict] || {}),
-    ...embedded,
+    minnaLessons: [],
+    ...mapped,
+    ...(mergedLessons.length
+      ? { lesson: mappedLessons[0] || lessons[0] || mergedLessons[0], lessons: mergedLessons }
+      : {}),
+    ...(mergedMinnaLessons.length
+      ? {
+          minnaLesson: mappedMinnaLessons[0] || minnaLessons[0] || mergedMinnaLessons[0],
+          minnaLessons: mergedMinnaLessons,
+        }
+      : {}),
+    ...(!mapped.jlpt && embedded.jlpt ? { jlpt: embedded.jlpt } : {}),
   };
 }
 
@@ -56,6 +95,7 @@ export function isIrregularAdjective(word) {
 }
 
 export function wordKind(word) {
+  if (word?.group === 'noun') return 'noun';
   return isAdjective(word) ? word.group : 'verb';
 }
 
@@ -101,10 +141,16 @@ export function filterWordsForPrefs(words, prefs = DEFAULT_PREFS, wordLists = []
     : null;
   return words.filter((w) => {
     const meta = getWordMeta(w);
+    const genkiLessons = meta.lessons?.length ? meta.lessons : meta.lesson ? [meta.lesson] : [];
+    const minnaLessons = meta.minnaLessons?.length
+      ? meta.minnaLessons
+      : meta.minnaLesson
+        ? [meta.minnaLesson]
+        : [];
     const passesLesson =
       (!lessonFilter && !minnaFilter) ||
-      (lessonFilter && lessonFilter.has(meta.lesson)) ||
-      (minnaFilter && minnaFilter.has(meta.minnaLesson));
+      (lessonFilter && genkiLessons.some((lesson) => lessonFilter.has(lesson))) ||
+      (minnaFilter && minnaLessons.some((lesson) => minnaFilter.has(lesson)));
     return (
       levels.includes(meta.jlpt) &&
       types.includes(wordKind(w)) &&
@@ -126,7 +172,7 @@ export function typePreviewValues(typeId) {
 }
 
 export function compatibleTypes(item) {
-  return isAdjective(item) ? ADJ_TYPES : CONJ_TYPES;
+  return isAdjective(item) || item?.group === 'noun' ? ADJ_TYPES : CONJ_TYPES;
 }
 
 export function isTypeCompatible(item, typeId) {
@@ -209,7 +255,10 @@ export function pickPromptType(item, targetType, prefs = DEFAULT_PREFS) {
 }
 
 export function promptFormLabel(item, promptType) {
-  if (!promptType) return isAdjective(item) ? 'Dictionary adjective' : 'Dictionary verb';
+  if (!promptType) {
+    if (item?.group === 'noun') return 'Dictionary noun';
+    return isAdjective(item) ? 'Dictionary adjective' : 'Dictionary verb';
+  }
   return getTypeInfo(promptType).label;
 }
 
@@ -877,7 +926,31 @@ export function conjugateAdjective(adj, type) {
   return '';
 }
 
+export function conjugateNoun(noun, type) {
+  const stem = noun.reading;
+  const M = {
+    'adj-plain-present': stem + 'だ',
+    'adj-plain-past': stem + 'だった',
+    'adj-plain-negative': stem + 'ではない',
+    'adj-plain-past-negative': stem + 'ではなかった',
+    'adj-polite-present': stem + 'です',
+    'adj-polite-past': stem + 'でした',
+    'adj-polite-negative': stem + 'ではありません',
+    'adj-polite-past-negative': stem + 'ではありませんでした',
+    'adj-te-form': stem + 'で',
+    'adj-negative-te-form': negativeTeConnectiveForm(stem + 'ではない'),
+    'adj-attributive': stem + 'の',
+    'adj-conditional': stem + 'なら',
+    'adj-negative-conditional': negativeBaForm(stem + 'ではない'),
+    'adj-tara': stem + 'だったら',
+    'adj-negative-tara': stem + 'ではなかったら',
+    'adj-naru': stem + 'になる',
+  };
+  return M[type] || '';
+}
+
 export function conjugateItem(item, type) {
+  if (item.group === 'noun') return conjugateNoun(item, type);
   return item.group === 'i-adjective' || item.group === 'na-adjective'
     ? conjugateAdjective(item, type)
     : conjugate(item, type);
@@ -887,15 +960,18 @@ export function getConjugationParts(word, type, answer) {
   const ans = answer || conjugateItem(word, type);
   if (!ans) return { stem: '', change: '', suffix: '' };
 
-  const isAdj = isAdjective(word);
   const reading = word.reading;
   const dict = word.dict;
   const group = word.group;
+  const isAdj = isAdjective(word);
+  const isNominal = isAdj || group === 'noun';
 
   let stem = '';
-  if (isAdj) {
+  if (isNominal) {
     if (group === 'i-adjective') {
       stem = adjectiveStem(word);
+    } else if (group === 'noun') {
+      stem = reading;
     } else {
       stem = reading.replace(/な$/, '');
     }
@@ -948,7 +1024,7 @@ export function getConjugationParts(word, type, answer) {
   let change = '';
   let suffix = remainder;
 
-  if (isAdj) {
+  if (isNominal) {
     if (group === 'i-adjective') {
       if (remainder.startsWith('か')) {
         change = 'か';
@@ -1054,6 +1130,7 @@ export function surfaceStemPair(item) {
   }
   if (item.group === 'na-adjective')
     return { readingStem: item.reading.replace(/な$/, ''), dictStem: item.dict.replace(/な$/, '') };
+  if (item.group === 'noun') return { readingStem: item.reading, dictStem: item.dict };
   return { readingStem: item.reading.slice(0, -1), dictStem: item.dict.slice(0, -1) };
 }
 
@@ -1098,7 +1175,7 @@ export const RULES = (() => {
       verbFilter: (verbs) => verbs.filter((v) => v.group === 'godan' && v.reading.endsWith('いく')),
     });
   }
-  for (const g of ['i-adjective', 'na-adjective']) {
+  for (const g of ['i-adjective', 'na-adjective', 'noun']) {
     for (const t of ADJ_TYPES) {
       rules.push({
         id: `${g}|${t.id}`,

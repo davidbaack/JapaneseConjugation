@@ -55,6 +55,7 @@ export function normalizeGroup(g) {
   if (v.includes('kuru')) return 'kuru';
   if (v.includes('i-adjective')) return 'i-adjective';
   if (v.includes('na-adjective')) return 'na-adjective';
+  if (v.includes('noun')) return 'noun';
   return null;
 }
 
@@ -263,6 +264,7 @@ export function normalizeScannerGroup(v) {
     v.includes('な形容詞')
   )
     return 'na-adjective';
+  if (v.includes('noun') || v.includes('名詞')) return 'noun';
   return normalizeGroup(v);
 }
 

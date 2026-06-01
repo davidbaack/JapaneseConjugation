@@ -7,6 +7,7 @@ import {
   isAdjective,
   conjugate,
   conjugateAdjective,
+  conjugateNoun,
   conjugateItem,
   getConjugationParts,
   adjectiveStem,
@@ -798,7 +799,43 @@ export function explainAdjective(adj, type) {
   return { intro, rule, derivation, note };
 }
 
+export function explainNoun(noun, type) {
+  const result = conjugateNoun(noun, type);
+  const s = noun.reading;
+  const intro = `${noun.dict} (${noun.reading}) is ${GROUP_NAMES[noun.group]}.`;
+  const M = {
+    'adj-plain-present': ['Add だ for the plain predicative form.', `${s} + だ = ${result}`],
+    'adj-plain-past': ['Add だった.', `${s} + だった = ${result}`],
+    'adj-plain-negative': ['Add ではない.', `${s} + ではない = ${result}`],
+    'adj-plain-past-negative': ['Add ではなかった.', `${s} + ではなかった = ${result}`],
+    'adj-polite-present': ['Add です.', `${s} + です = ${result}`],
+    'adj-polite-past': ['Add でした.', `${s} + でした = ${result}`],
+    'adj-polite-negative': ['Add ではありません.', `${s} + ではありません = ${result}`],
+    'adj-polite-past-negative': [
+      'Add ではありませんでした.',
+      `${s} + ではありませんでした = ${result}`,
+    ],
+    'adj-te-form': ['Use で to connect noun predicates.', `${s} + で = ${result}`],
+    'adj-negative-te-form': [
+      'Make the plain negative, then replace ない with なくて.',
+      `${s} + ではなくて = ${result}`,
+    ],
+    'adj-attributive': ['Use の before a following noun.', `${s} + の = ${result}`],
+    'adj-conditional': ['Use なら for the common conditional.', `${s} + なら = ${result}`],
+    'adj-negative-conditional': [
+      'Make the plain negative, then replace ない with なければ.',
+      `${s} + ではなければ = ${result}`,
+    ],
+    'adj-tara': ['Plain past + ら.', `${s} + だった + ら = ${result}`],
+    'adj-negative-tara': ['Plain past negative + ら.', `${s} + ではなかった + ら = ${result}`],
+    'adj-naru': ['Add になる.', `${s} + になる = ${result}`],
+  };
+  const [rule, derivation] = M[type] || ['', result];
+  return { intro, rule, derivation, note: '' };
+}
+
 export function explainItem(item, type) {
+  if (item?.group === 'noun') return explainNoun(item, type);
   if (isAdjective(item)) return explainAdjective(item, type);
   const e = explainConjugation(item, type);
   const common = {
@@ -1039,6 +1076,29 @@ export function diagnoseItem(item, type, userAnswer) {
 export function contextSentenceFor(item, type) {
   const form = conjugateItem(item, type);
   const label = (TYPE_LABEL[type] || type).toLowerCase();
+  if (item.group === 'noun') {
+    const topic = 'この人';
+    const M = {
+      'adj-plain-present': [`${topic}は${form}。`, 'Plain noun predicate with だ.'],
+      'adj-plain-past': [`昨日は${form}。`, 'Past noun predicate.'],
+      'adj-plain-negative': [`${topic}は${form}。`, 'Negative noun predicate.'],
+      'adj-plain-past-negative': [`昨日は${form}。`, 'Past negative noun predicate.'],
+      'adj-polite-present': [`${topic}は${form}。`, 'Polite noun predicate.'],
+      'adj-polite-past': [`昨日は${form}。`, 'Polite past noun predicate.'],
+      'adj-polite-negative': [`${topic}は${form}。`, 'Polite negative noun predicate.'],
+      'adj-polite-past-negative': [`昨日は${form}。`, 'Polite past negative noun predicate.'],
+      'adj-te-form': [`${form}、学生です。`, 'Connects a noun predicate to another description.'],
+      'adj-negative-te-form': [`${form}、先生です。`, 'Connects a negative noun predicate.'],
+      'adj-attributive': [`${form}本です。`, 'Uses の before a following noun.'],
+      'adj-conditional': [`${form}、行きます。`, 'Conditional noun predicate.'],
+      'adj-negative-conditional': [`${form}、行きません。`, 'Negative conditional noun predicate.'],
+      'adj-tara': [`${form}、行きます。`, 'たら conditional noun predicate.'],
+      'adj-negative-tara': [`${form}、行きません。`, 'Negative たら noun predicate.'],
+      'adj-naru': [`来年${form}。`, 'Becomes that noun/status.'],
+    };
+    const [sentence, note] = M[type] || [`${topic}は${form}。`, `Noun ${label} form in context.`];
+    return { sentence, note };
+  }
   if (isAdjective(item)) {
     const place = 'この場所';
     const M = {

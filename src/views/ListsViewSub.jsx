@@ -22,6 +22,16 @@ import { VOCAB_PACKS, AI_LIST_TARGETS } from '../data/vocabPacks.js';
 
 // Helper functions for CSV/TSV export and imports
 export function parseWordRows(text) {
+  const parseLessonList = (value) =>
+    [
+      ...new Set(
+        String(value || '')
+          .split(/[;|/]/)
+          .map(Number)
+          .filter((n) => Number.isInteger(n) && n > 0),
+      ),
+    ].sort((a, b) => a - b);
+
   return text
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -41,19 +51,23 @@ export function parseWordRows(text) {
               groupText.includes('na-adj') ||
               cols[3].includes('な')
             ? 'na-adjective'
-            : null);
+            : groupText.includes('noun') || groupText.includes('名詞')
+              ? 'noun'
+              : null);
       if (!group) return null;
       const reading = toHiragana(cols[1]);
       if (!isAllKana(reading)) return null;
       const jlpt = normalizeJlptLevel(cols[5] || cols[4]);
-      const lesson = Number(cols[6] || '') || null;
+      const lessons = parseLessonList(cols[6]);
+      const minnaLessons = parseLessonList(cols[7]);
       return {
         dict: cols[0],
         reading,
         meaning: cols[2],
         group,
         ...(jlpt ? { jlpt } : {}),
-        ...(lesson ? { lesson } : {}),
+        ...(lessons.length ? { lessons, lesson: lessons[0] } : {}),
+        ...(minnaLessons.length ? { minnaLessons, minnaLesson: minnaLessons[0] } : {}),
       };
     })
     .filter(Boolean);
@@ -105,7 +119,17 @@ export function wordsForList(list, words) {
 
 export function buildVocabularyCsv(list, words) {
   const rows = [
-    ['dictionary', 'reading', 'meaning', 'group', 'kind', 'jlpt', 'genki_lesson', 'list'],
+    [
+      'dictionary',
+      'reading',
+      'meaning',
+      'group',
+      'kind',
+      'jlpt',
+      'genki_lesson',
+      'minna_lesson',
+      'list',
+    ],
   ];
   for (const word of wordsForList(list, words)) {
     const meta = getWordMeta(word);
@@ -114,9 +138,10 @@ export function buildVocabularyCsv(list, words) {
       word.reading,
       word.meaning,
       word.group,
-      isAdjective(word) ? 'adjective' : 'verb',
+      word.group === 'noun' ? 'noun' : isAdjective(word) ? 'adjective' : 'verb',
       meta.jlpt || '',
-      meta.lesson || '',
+      meta.lessons?.length ? meta.lessons.join(';') : meta.lesson || '',
+      meta.minnaLessons?.length ? meta.minnaLessons.join(';') : meta.minnaLesson || '',
       list.name || 'Study list',
     ]);
   }
@@ -345,7 +370,7 @@ export default function ListsViewSub({
     setAiRows([]);
     setMsg('');
     try {
-      const prompt = `Build a targeted Japanese conjugation drill list.\n\nTarget level/course: ${aiTarget}\nTopic or situation: ${aiTopic || 'general daily life'}\nDesired size: ${count} words\nAvoid words already in the active list when possible: ${avoid || 'none'}\n\nReturn ONLY JSON with this exact shape:\n{"words":[{"dict":"Japanese dictionary form or adjective stem","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective","jlpt":"N5|N4|N3|N2|N1","reason":"why this is useful for conjugation practice"}]}\n\nUse real, common learner-appropriate words. Mix verbs and adjectives when useful. Prefer words that exercise different conjugation patterns. JLPT labels are community estimates, so be practical instead of pretending official certainty.`;
+      const prompt = `Build a targeted Japanese conjugation drill list.\n\nTarget level/course: ${aiTarget}\nTopic or situation: ${aiTopic || 'general daily life'}\nDesired size: ${count} words\nAvoid words already in the active list when possible: ${avoid || 'none'}\n\nReturn ONLY JSON with this exact shape:\n{"words":[{"dict":"Japanese dictionary form, noun, or adjective stem","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective|noun","jlpt":"N5|N4|N3|N2|N1","reason":"why this is useful for conjugation practice"}]}\n\nUse real, common learner-appropriate words. Mix verbs, adjectives, and noun/counter copula practice when useful. Prefer words that exercise different conjugation patterns. JLPT labels are community estimates, so be practical instead of pretending official certainty.`;
       const reply = await callGemini(
         [{ role: 'user', parts: [{ text: prompt }] }],
         geminiKey,
@@ -722,7 +747,7 @@ export default function ListsViewSub({
                     {w.dict}
                   </span>
                   <span className="text-[11px] text-stone-400">
-                    {isAdjective(w) ? 'adj' : 'verb'}
+                    {w.group === 'noun' ? 'noun' : isAdjective(w) ? 'adj' : 'verb'}
                   </span>
                 </div>
                 <div className="text-xs text-stone-500" lang="ja">
@@ -766,8 +791,8 @@ export default function ListsViewSub({
             Bulk import into list
           </h3>
           <p className="text-xs text-stone-500 mb-3">
-            Paste CSV/TSV rows: dictionary, reading, meaning, group. Groups: ichidan, godan, suru,
-            kuru, i-adjective, na-adjective.
+            Paste CSV/TSV rows: dictionary, reading, meaning, group, optional JLPT, Genki lesson,
+            Minna lesson.
           </p>
           <textarea
             value={importText}
@@ -775,7 +800,9 @@ export default function ListsViewSub({
               setImportText(e.target.value);
               setMsg('');
             }}
-            placeholder={'始める,はじめる,to begin,ichidan\n有名,ゆうめい,famous,na-adjective'}
+            placeholder={
+              '始める,はじめる,to begin,ichidan\n有名,ゆうめい,famous,na-adjective\n学生,がくせい,student,noun'
+            }
             aria-label="Paste CSV or TSV rows to bulk import"
             className="w-full h-28 px-3 py-2 text-sm font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
             autoCorrect="off"

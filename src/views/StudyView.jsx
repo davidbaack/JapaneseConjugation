@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import {
   IconCheck,
   IconX,
@@ -411,7 +411,7 @@ export default function StudyView() {
   }, [activeMinimalPairSet, current, todayMinimalPairSetIds]);
   const minimalPairSetForCurrent = activeMinimalPairSet || todayMinimalPairSet;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!hydrated) return;
     // When arriving from Check's "Practice this verb", seed that exact word/form
     // once. If no rule covers it, fall through to normal selection.

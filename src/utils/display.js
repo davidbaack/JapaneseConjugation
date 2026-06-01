@@ -67,12 +67,27 @@ export function mergePracticePrefs(prefs) {
   ) {
     wordGroups = [...wordGroups, 'irregular-adjective'];
   }
+  if (
+    Array.isArray(source.wordGroups) &&
+    oldAllGroups.every((id) => source.wordGroups.includes(id)) &&
+    !wordGroups.includes('noun')
+  ) {
+    wordGroups = [...wordGroups, 'noun'];
+  }
+  const oldAllTypes = ['verb', 'i-adjective', 'na-adjective'];
+  const wordTypes =
+    Array.isArray(source.wordTypes) &&
+    oldAllTypes.every((id) => source.wordTypes.includes(id)) &&
+    !source.wordTypes.includes('noun')
+      ? [...source.wordTypes, 'noun']
+      : source.wordTypes;
   return {
     ...DEFAULT_PREFS,
     ...source,
     answerMode,
     kanaAssist,
     displayScripts,
+    ...(wordTypes ? { wordTypes } : {}),
     wordGroups,
     reviewLimit,
     reviewLimitSource,

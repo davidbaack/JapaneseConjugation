@@ -17,6 +17,7 @@ import { DEFAULT_PREFS } from '../data/defaults.js';
 import { getJapaneseVoices } from '../utils/speech.js';
 import { mergePracticePrefs } from '../utils/display.js';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
+import { loadVerbLexicon } from '../data/verbLexicon.js';
 import { supabase } from '../utils/supabase.js';
 import { useCloudAutoSync } from '../hooks/useCloudAutoSync.js';
 
@@ -33,6 +34,14 @@ function useAppController() {
   const [customVerbs, setCustomVerbs] = useState([]);
   const [customAdjectives, setCustomAdjectives] = useState([]);
   const [wordLists, setWordLists] = useState([]);
+  const [builtInVerbs, setBuiltInVerbs] = useState(STARTER_VERBS);
+  const [builtInAdjectives, setBuiltInAdjectives] = useState(STARTER_ADJECTIVES);
+  const [builtInNouns, setBuiltInNouns] = useState([]);
+  const [vocabStatus, setVocabStatus] = useState({
+    kind: 'starter',
+    count: STARTER_VERBS.length + STARTER_ADJECTIVES.length,
+    message: '',
+  });
   const [practicePrefs, setPracticePrefs] = useState(DEFAULT_PREFS);
   const [session, setSession] = useState(null);
   // A { word, type } the user asked to practise from Check; consumed by Study.
@@ -88,6 +97,48 @@ function useAppController() {
 
       return () => subscription.unsubscribe();
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof fetch !== 'function' || import.meta.env.MODE === 'test') return undefined;
+    let cancelled = false;
+
+    function startLoad() {
+      const starterCount = STARTER_VERBS.length + STARTER_ADJECTIVES.length;
+      setVocabStatus({ kind: 'loading', count: starterCount, message: '' });
+      loadVerbLexicon()
+        .then((data) => {
+          if (cancelled) return;
+          setBuiltInVerbs(data.verbs);
+          setBuiltInAdjectives(data.adjectives);
+          setBuiltInNouns(data.nouns);
+          setVocabStatus({
+            kind: 'ready',
+            count: data.verbs.length + data.adjectives.length + data.nouns.length,
+            message: '',
+          });
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          setVocabStatus({
+            kind: 'fallback',
+            count: starterCount,
+            message: error?.message || 'Using starter vocabulary',
+          });
+        });
+    }
+
+    const idleId =
+      typeof window !== 'undefined' && window.requestIdleCallback
+        ? window.requestIdleCallback(startLoad, { timeout: 1500 })
+        : null;
+    const timerId = idleId === null ? setTimeout(startLoad, 750) : null;
+
+    return () => {
+      cancelled = true;
+      if (idleId !== null) window.cancelIdleCallback?.(idleId);
+      if (timerId !== null) clearTimeout(timerId);
+    };
   }, []);
 
   // Cloud sync trigger on login / session restoration
@@ -248,12 +299,15 @@ function useAppController() {
     }
   }
 
-  const allVerbs = useMemo(() => [...STARTER_VERBS, ...customVerbs], [customVerbs]);
+  const allVerbs = useMemo(() => [...builtInVerbs, ...customVerbs], [builtInVerbs, customVerbs]);
   const allAdjectives = useMemo(
-    () => [...STARTER_ADJECTIVES, ...customAdjectives],
-    [customAdjectives],
+    () => [...builtInAdjectives, ...customAdjectives],
+    [builtInAdjectives, customAdjectives],
   );
-  const allWords = useMemo(() => [...allVerbs, ...allAdjectives], [allVerbs, allAdjectives]);
+  const allWords = useMemo(
+    () => [...allVerbs, ...allAdjectives, ...builtInNouns],
+    [allVerbs, allAdjectives, builtInNouns],
+  );
   const daily = state.daily || defaultState().daily;
   const dailyPct = Math.min(100, Math.round((daily.count / (practicePrefs.dailyGoal || 30)) * 100));
 
@@ -286,6 +340,7 @@ function useAppController() {
     setShowAuthModal,
     showAuth,
     syncStatus,
+    vocabStatus,
     syncNow,
     activeGeminiKey,
     speechVoices,
@@ -294,6 +349,7 @@ function useAppController() {
     supabase,
     allVerbs,
     allAdjectives,
+    builtInNouns,
     allWords,
     daily,
     dailyPct,

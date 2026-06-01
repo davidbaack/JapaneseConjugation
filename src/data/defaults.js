@@ -30,7 +30,7 @@ export const DEFAULT_PREFS = {
   jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
   genkiLessons: [],
   minnaLessons: [],
-  wordTypes: ['verb', 'i-adjective', 'na-adjective'],
+  wordTypes: ['verb', 'i-adjective', 'na-adjective', 'noun'],
   wordGroups: [
     'ichidan',
     'godan',
@@ -39,6 +39,7 @@ export const DEFAULT_PREFS = {
     'irregular-adjective',
     'i-adjective',
     'na-adjective',
+    'noun',
   ],
   wordListIds: [],
   drillMode: 'word',

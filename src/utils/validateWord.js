@@ -18,6 +18,7 @@ export const VALID_GROUPS = new Set([
   'kuru',
   'i-adjective',
   'na-adjective',
+  'noun',
 ]);
 
 // Control chars (C0 + DEL + C1) and zero-width / BOM format characters. These
