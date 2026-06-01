@@ -6,6 +6,7 @@ import {
   GODAN_ROW_KEYS,
   LESSON_SECTIONS,
   ONBIN_ROWS,
+  RU_MASU_DIAGNOSTIC_ROWS,
   getLessonCoverage,
 } from '../data/lessonContent.js';
 import { useApp } from '../state/AppStateContext.jsx';
@@ -238,6 +239,68 @@ export default function LessonsView() {
                           </td>
                           <td lang="ja" className="px-4 py-2 text-stone-500">
                             {row.example}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800">
+              <div className="bg-stone-50 dark:bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-800 dark:text-stone-200">
+                る-verb traps: masu check
+              </div>
+              <div className="grid gap-4 p-4 lg:grid-cols-[16rem_1fr]">
+                <div className="text-sm leading-relaxed text-stone-650 dark:text-stone-300">
+                  <p>
+                    <span className="font-semibold text-stone-850 dark:text-stone-100">
+                      -いる/-える is a clue, not a guarantee.
+                    </span>{' '}
+                    If the polite form keeps the same stem before ます, it behaves as ichidan. If
+                    final る becomes り before ます, it is godan.
+                  </p>
+                  <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
+                    Kanji and okurigana help, but pairs like 切る and 着る still need the dictionary
+                    group or a known polite form.
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[34rem] text-sm">
+                    <thead className="text-left text-xs uppercase tracking-wide text-stone-500">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">dictionary</th>
+                        <th className="px-3 py-2 font-medium">ます form</th>
+                        <th className="px-3 py-2 font-medium">class</th>
+                        <th className="px-3 py-2 font-medium">why</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
+                      {RU_MASU_DIAGNOSTIC_ROWS.map((row) => (
+                        <tr key={`${row.dict}-${row.group}`}>
+                          <td
+                            lang="ja"
+                            className="px-3 py-2 font-semibold text-stone-850 dark:text-stone-100"
+                          >
+                            {row.dict}
+                          </td>
+                          <td lang="ja" className="px-3 py-2 text-stone-700 dark:text-stone-250">
+                            {row.polite}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`rounded-md px-2 py-1 text-[11px] font-semibold ${
+                                row.group === 'ichidan'
+                                  ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/25 dark:text-emerald-300'
+                                  : 'bg-amber-50 text-amber-800 dark:bg-amber-950/25 dark:text-amber-300'
+                              }`}
+                            >
+                              {row.group}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-stone-550 dark:text-stone-350">
+                            {row.clue}
                           </td>
                         </tr>
                       ))}

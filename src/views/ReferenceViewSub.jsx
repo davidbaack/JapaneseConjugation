@@ -21,6 +21,7 @@ import { formDisplay, promptDisplay } from '../utils/display.js';
 import { callGemini, aiSystemFromPrefs, extractJSON, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
+import { ruMasuDiagnostic } from '../utils/ruVerbDiagnostics.js';
 
 // Pure helpers now live in utils/referenceHelpers.js; re-export them so existing
 // importers (CheckView, ListsViewSub, tests) keep working, and import the ones
@@ -132,6 +133,7 @@ export default function ReferenceViewSub({
   );
   const showScratch = !!(query.trim() && scratchCandidate && !scratchMatchesKnown);
   const scratchRows = showScratch ? formRows(scratchCandidate) : [];
+  const scratchMasuDiagnostic = showScratch ? ruMasuDiagnostic(scratchCandidate) : null;
   const transitivePair = selected ? transitivePairFor(selected, words) : null;
   const transitivePartnerView = transitivePair
     ? promptDisplay(transitivePair.partner, null, practicePrefs)
@@ -157,6 +159,7 @@ export default function ReferenceViewSub({
 
   const rows = selected ? referenceRows(selected, state) : [];
   const selectedView = selected ? promptDisplay(selected, null, practicePrefs) : null;
+  const selectedMasuDiagnostic = selected ? ruMasuDiagnostic(selected) : null;
   const selectedMorae = selected ? splitJapaneseMorae(selected.reading) : [];
   const pronunciationForms = selected ? pronunciationPracticeForms(selected) : [];
   const selectedKanji = selected ? kanjiCharsFor(selected.dict) : [];
@@ -902,6 +905,19 @@ export default function ReferenceViewSub({
                     </span>
                     . {scratchCandidate.sourceNote}
                   </div>
+                  {scratchMasuDiagnostic && (
+                    <div className="mt-2 border-l-2 border-indigo-300 dark:border-indigo-700 pl-3 text-xs text-stone-600 dark:text-stone-350">
+                      <span className="font-semibold text-indigo-750 dark:text-indigo-300">
+                        Masu check:{' '}
+                      </span>
+                      <span lang="ja" className="font-semibold text-stone-800 dark:text-stone-100">
+                        {scratchMasuDiagnostic.dict}
+                        {' -> '}
+                        {scratchMasuDiagnostic.politeSurface}
+                      </span>
+                      <span className="ml-1">{scratchMasuDiagnostic.contrast}</span>
+                    </div>
+                  )}
                   {scratchCandidates.length > 1 && (
                     <div className="mt-2 flex gap-1.5">
                       {scratchCandidates.map((c, i) => (
@@ -1056,6 +1072,24 @@ export default function ReferenceViewSub({
                 {groupAliasText(selected.group) && (
                   <div className="text-[11px] text-stone-400 mt-0.5">
                     {groupAliasText(selected.group)}
+                  </div>
+                )}
+                {selectedMasuDiagnostic && (
+                  <div className="mt-3 border-l-2 border-indigo-300 dark:border-indigo-700 pl-3 text-xs leading-relaxed text-stone-600 dark:text-stone-350">
+                    <div className="font-semibold uppercase tracking-wide text-indigo-650 dark:text-indigo-300">
+                      Masu check
+                    </div>
+                    <div className="mt-0.5">
+                      <span lang="ja" className="font-semibold text-stone-900 dark:text-stone-100">
+                        {selectedMasuDiagnostic.dict}
+                        {' -> '}
+                        {selectedMasuDiagnostic.politeSurface}
+                      </span>
+                      <span className="ml-2">{selectedMasuDiagnostic.clue}</span>
+                    </div>
+                    <div className="mt-0.5 text-stone-500 dark:text-stone-400">
+                      {selectedMasuDiagnostic.contrast}
+                    </div>
                   </div>
                 )}
               </div>

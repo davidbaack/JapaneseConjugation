@@ -300,6 +300,7 @@ export default function ListsViewSub({
     let verbs = customVerbs,
       adjs = customAdjectives;
     let nextLists = [...wordLists];
+    const existingWordKeys = new Set(words.map(wordKey));
     const enableIds = [];
     for (const pack of packs) {
       const id = 'pack-' + pack.id;
@@ -310,8 +311,10 @@ export default function ListsViewSub({
         jlpt: normalizeJlptLevel(w.jlpt) || normalizeJlptLevel(pack.level) || getWordMeta(w).jlpt,
       }));
       for (const w of packWords) {
-        if (isAdjective(w)) adjs = addUniqueWord(adjs, w);
-        else verbs = addUniqueWord(verbs, w);
+        if (!existingWordKeys.has(wordKey(w))) {
+          if (isAdjective(w)) adjs = addUniqueWord(adjs, w);
+          else verbs = addUniqueWord(verbs, w);
+        }
         keys.add(wordKey(w));
       }
       if (existing) {

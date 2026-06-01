@@ -64,8 +64,9 @@ describe('classifyHint', () => {
   });
 
   it('mentions godan traps for る-ending godan verbs', () => {
-    expect(classifyHint(KAERU)).toContain('帰る and 走る');
+    expect(classifyHint(KAERU)).toContain('帰る, 入る, 走る, and 切る');
     expect(classifyHint(HASHIRU)).toContain('still godan');
+    expect(classifyHint(HASHIRU)).toContain('走る -> 走ります');
   });
 
   it('mentions する for suru verbs', () => {

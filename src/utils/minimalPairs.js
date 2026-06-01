@@ -1,4 +1,5 @@
 import { wordKey } from './conjugator.js';
+import { ruMasuDiagnostic } from './ruVerbDiagnostics.js';
 
 const VERB_GROUPS = ['ichidan', 'godan', 'suru', 'kuru'];
 const GODAN_ONBIN_ENDINGS = ['う', 'つ', 'る', 'む', 'ぶ', 'ぬ', 'く', 'ぐ', 'す'];
@@ -37,7 +38,7 @@ export const MINIMAL_PAIR_SETS = [
     id: 'ichidan-godan-ru',
     label: 'Ichidan ru vs godan ru',
     description:
-      'Mixes drop-る ichidan verbs with godan verbs that only look like they should drop る.',
+      'Mixes drop-る ichidan verbs with godan る traps; use the ます form to check the class.',
     typeIds: ['plain-past', 'te-form', 'plain-negative', 'potential'],
     wordTypes: ['verb'],
     wordGroups: ['ichidan', 'godan'],
@@ -50,12 +51,12 @@ export const MINIMAL_PAIR_SETS = [
       {
         id: 'ichidan-ru',
         label: 'Ichidan ru',
-        cue: 'Drop final ru, then add the ending: taberu -> tabeta / tabete.',
+        cue: 'Drop final ru, then add the ending: taberu -> tabemasu / tabeta / tabete.',
       },
       {
         id: 'godan-ru',
         label: 'Godan ru',
-        cue: 'Treat final ru as a godan ending: hashiru -> hashitta / hashitte.',
+        cue: 'Final ru row-shifts to ri before masu: hashiru -> hashirimasu / hashitta.',
       },
     ],
   },
@@ -262,6 +263,7 @@ export function minimalPairFeedbackForCard(set, word, typeId) {
     active,
     intro: `This drill is testing ${active.label} against the nearby pattern, so check the class before applying the ending.`,
     contrasts: set.contrasts,
+    masuDiagnostic: set.id === 'ichidan-godan-ru' ? ruMasuDiagnostic(word) : null,
   };
 }
 

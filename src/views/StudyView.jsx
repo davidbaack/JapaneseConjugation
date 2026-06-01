@@ -186,12 +186,30 @@ function loadPersistedCurrent(state, verbs) {
     if (!raw) return null;
     const saved = JSON.parse(raw);
     if (!saved?.dict || !saved?.type) return null;
-    const word = verbs.find((w) => w.dict === saved.dict && w.group === saved.group);
-    if (!word) return null;
+    const resolvedWord = verbs.find((w) => w.dict === saved.dict && w.group === saved.group);
+    if (!resolvedWord) return null;
+    const word =
+      saved.word?.dict === saved.dict && saved.word?.group === saved.group
+        ? saved.word
+        : resolvedWord;
     return buildFocusCard(state, word, saved.type);
   } catch {
     return null;
   }
+}
+
+function snapshotStudyWord(word) {
+  return {
+    dict: word.dict,
+    reading: word.reading,
+    meaning: word.meaning,
+    group: word.group,
+    ...(word.jlpt ? { jlpt: word.jlpt } : {}),
+    ...(word.lesson ? { lesson: word.lesson } : {}),
+    ...(word.lessons ? { lessons: word.lessons } : {}),
+    ...(word.minnaLesson ? { minnaLesson: word.minnaLesson } : {}),
+    ...(word.minnaLessons ? { minnaLessons: word.minnaLessons } : {}),
+  };
 }
 
 function persistCurrent(card) {
@@ -200,7 +218,12 @@ function persistCurrent(card) {
     if (!card?.verb?.dict) return;
     sessionStorage.setItem(
       STUDY_CURRENT_KEY,
-      JSON.stringify({ dict: card.verb.dict, group: card.verb.group, type: card.type }),
+      JSON.stringify({
+        dict: card.verb.dict,
+        group: card.verb.group,
+        type: card.type,
+        word: snapshotStudyWord(card.verb),
+      }),
     );
   } catch {}
 }
@@ -430,11 +453,21 @@ export default function StudyView() {
     }
     if (current !== null) return;
     const persisted = focus?.word ? null : loadPersistedCurrent(state, verbs);
-    if (persisted) {
+    const persistedEligible =
+      persisted &&
+      practiceWords.some(
+        (word) => word.dict === persisted.verb.dict && word.group === persisted.verb.group,
+      ) &&
+      (!activeMinimalPairSet ||
+        minimalPairSetMatchesCard(activeMinimalPairSet, persisted.verb, persisted.type));
+    if (persistedEligible) {
       setCurrent(persisted);
       return;
     }
-    setCurrent(selectNext(state, practiceWords, enabledTypes, null, practicePrefs));
+    const nextCard = selectNext(state, practiceWords, enabledTypes, null, practicePrefs);
+    if (nextCard) {
+      setCurrent((existing) => existing || nextCard);
+    }
     // state intentionally omitted — this triggers on card change, not every state mutation
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, current, practiceWords, enabledTypes, practicePrefs, focus]);
@@ -2989,6 +3022,26 @@ export default function StudyView() {
                         <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
                           {minimalPairFeedback.intro}
                         </div>
+                        {minimalPairFeedback.masuDiagnostic && (
+                          <div className="mt-2 border-l-2 border-emerald-300 dark:border-emerald-700 pl-3 text-sm text-stone-700 dark:text-stone-300">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                              Masu check
+                            </div>
+                            <div className="mt-0.5">
+                              <span
+                                lang="ja"
+                                className="font-semibold text-stone-900 dark:text-stone-100"
+                              >
+                                {minimalPairFeedback.masuDiagnostic.dict}
+                                {' -> '}
+                                {minimalPairFeedback.masuDiagnostic.politeSurface}
+                              </span>
+                              <span className="ml-2">
+                                {minimalPairFeedback.masuDiagnostic.contrast}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                         <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
                           {minimalPairFeedback.contrasts.map((contrast) => (
                             <div
