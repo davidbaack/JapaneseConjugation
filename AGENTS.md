@@ -3,6 +3,7 @@
 ## Repo Workflow
 
 - Check `git status --short` before editing. This worktree is often dirty; do not overwrite unrelated user changes.
+- Treat this project as still in active development: optimize for the desired current product shape, and do not preserve or migrate old functionality unless the user explicitly asks for it.
 - Keep learner-facing parity work narrow and validate against the current checkout before claiming completion.
 - If the user asks to refresh from remote, use `git pull --ff-only` only after local changes are safely handled.
 - Before committing non-trivial changes, run the deploy smoke test with `npm run ci`.
