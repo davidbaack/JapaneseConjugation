@@ -26,11 +26,13 @@ import { callGemini, aiSystemFromPrefs } from '../utils/gemini.js';
 import { toHiragana, toHiraganaProgress } from '../utils/romaji.js';
 import {
   conjugateItem,
+  enabledTypeIdsFor,
   filterWordsForPrefs,
   pickPromptType,
   getTypeInfo,
   getWordMeta,
   isAdjective,
+  isRedundantPracticeType,
   promptFormLabel,
   RULES,
   surfaceFormFor,
@@ -179,17 +181,51 @@ function transformationReviewExplanation({
   };
 }
 
-function loadPersistedCurrent(state, verbs) {
+function sameStudyWord(a, b) {
+  return !!a && !!b && a.dict === b.dict && a.group === b.group;
+}
+
+function cardMatchesPractice(card, words, enabledTypes, prefs = DEFAULT_PREFS) {
+  if (!card?.verb || !card?.type) return false;
+  if (!words.some((word) => sameStudyWord(word, card.verb))) return false;
+  const minimalPairSet = getMinimalPairSet(prefs.minimalPairSetId);
+  const activeTypes = minimalPairSet ? minimalPairSet.typeIds : enabledTypeIdsFor(enabledTypes);
+  if (!activeTypes.includes(card.type)) return false;
+  if (minimalPairSet && !minimalPairSetMatchesCard(minimalPairSet, card.verb, card.type)) {
+    return false;
+  }
+  return !isRedundantPracticeType(card.verb, card.type, activeTypes, prefs);
+}
+
+function loadPersistedCurrent(state, words, enabledTypes, prefs) {
   try {
     if (typeof sessionStorage === 'undefined') return null;
     const raw = sessionStorage.getItem(STUDY_CURRENT_KEY);
     if (!raw) return null;
     const saved = JSON.parse(raw);
-    if (!saved?.dict || !saved?.type) return null;
-    const word = verbs.find((w) => w.dict === saved.dict && w.group === saved.group);
-    if (!word) return null;
-    return buildFocusCard(state, word, saved.type);
+    if (!saved?.dict || !saved?.type) {
+      clearPersistedCurrent();
+      return null;
+    }
+    const word = words.find(
+      (w) =>
+        w.dict === saved.dict &&
+        w.group === saved.group &&
+        (!saved.reading || w.reading === saved.reading) &&
+        (!saved.meaning || w.meaning === saved.meaning),
+    );
+    if (!word) {
+      clearPersistedCurrent();
+      return null;
+    }
+    const card = buildFocusCard(state, word, saved.type);
+    if (!card || !cardMatchesPractice(card, words, enabledTypes, prefs)) {
+      clearPersistedCurrent();
+      return null;
+    }
+    return card;
   } catch {
+    clearPersistedCurrent();
     return null;
   }
 }
@@ -200,7 +236,13 @@ function persistCurrent(card) {
     if (!card?.verb?.dict) return;
     sessionStorage.setItem(
       STUDY_CURRENT_KEY,
-      JSON.stringify({ dict: card.verb.dict, group: card.verb.group, type: card.type }),
+      JSON.stringify({
+        dict: card.verb.dict,
+        reading: card.verb.reading,
+        meaning: card.verb.meaning,
+        group: card.verb.group,
+        type: card.type,
+      }),
     );
   } catch {}
 }
@@ -268,9 +310,7 @@ export default function StudyView() {
     clearStudyFocus: onFocusConsumed,
     hydrated,
   } = useApp();
-  const [current, setCurrent] = useState(() =>
-    hydrated && !focus?.word ? loadPersistedCurrent(state, verbs) : null,
-  );
+  const [current, setCurrent] = useState(null);
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');
   const [wasCorrect, setWasCorrect] = useState(false);
@@ -325,7 +365,10 @@ export default function StudyView() {
   const typingHintRef = useRef(null);
   const aiHintAbortRef = useRef(null);
 
-  const enabledTypes = state.enabledTypes.length > 0 ? state.enabledTypes : ['plain-past'];
+  const enabledTypes = useMemo(
+    () => (state.enabledTypes?.length ? state.enabledTypes : ['plain-past']),
+    [state.enabledTypes],
+  );
   const practiceWords = useMemo(() => {
     const base = filterWordsForPrefs(verbs, practicePrefs, wordLists);
     // Keep a "Practice this verb" target from Check eligible even if it sits
@@ -429,7 +472,9 @@ export default function StudyView() {
       }
     }
     if (current !== null) return;
-    const persisted = focus?.word ? null : loadPersistedCurrent(state, verbs);
+    const persisted = focus?.word
+      ? null
+      : loadPersistedCurrent(state, practiceWords, enabledTypes, practicePrefs);
     if (persisted) {
       setCurrent(persisted);
       return;
@@ -451,16 +496,13 @@ export default function StudyView() {
   }, [current]);
 
   useEffect(() => {
-    if (
-      current &&
-      practiceWords.length &&
-      !practiceWords.some((w) => w.dict === current.verb.dict && w.group === current.verb.group)
-    ) {
+    if (current && !cardMatchesPractice(current, practiceWords, enabledTypes, practicePrefs)) {
+      clearPersistedCurrent();
       setCurrent(null);
       setAnswer('');
       setPhase('answering');
     }
-  }, [practiceWords, current]);
+  }, [practiceWords, enabledTypes, practicePrefs, current]);
 
   useEffect(() => {
     if (!current || !activeMinimalPairSet) return;

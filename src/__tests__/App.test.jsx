@@ -123,11 +123,14 @@ describe('App shell', () => {
   }, 15000);
 
   it('does not show answer-form endings or target English before answering', async () => {
+    const savedState = defaultState();
+    const savedType = 'desiderative-past-negative';
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         state: {
-          ...defaultState(),
+          ...savedState,
+          enabledTypes: [...savedState.enabledTypes, savedType],
           daily: {
             date: localDateKey(),
             count: DEFAULT_PREFS.dailyGoal,
@@ -149,7 +152,7 @@ describe('App shell', () => {
       JSON.stringify({
         dict: '\u8a71\u3059',
         group: 'godan',
-        type: 'desiderative-past-negative',
+        type: savedType,
       }),
     );
 
