@@ -118,12 +118,6 @@ function isDailyGoalHitToday(daily) {
   return daily?.date === localDateKey() && !!daily.goalHit;
 }
 
-function dailyCountToday(daily) {
-  if (daily?.date !== localDateKey()) return 0;
-  const count = Number(daily.count || 0);
-  return Number.isFinite(count) && count > 0 ? count : 0;
-}
-
 function transformationRouteText(sourceInfo, targetInfo) {
   return `${sourceInfo.label} -> ${targetInfo.label}`;
 }
@@ -384,7 +378,6 @@ export default function StudyView() {
   );
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
-  const todayCount = dailyCountToday(daily);
   const todayGoalHit = isDailyGoalHitToday(daily);
   const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
   const repairDrillActive = practicePrefs.reviewLimitSource === 'repair';
