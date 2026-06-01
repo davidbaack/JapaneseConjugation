@@ -1027,10 +1027,15 @@ export default function StudyView() {
   }
 
   function renderTodayLauncher() {
-    const chips = [
-      ...(todayPlan.sourceLabels.length ? todayPlan.sourceLabels : ['Core forms']),
-      `${todayPlan.reviewLimit} cards`,
+    const dueCount = todayPlan.sourceCounts?.due || 0;
+    const secondaryChips = [
+      ...(todayPlan.sourceCounts?.weak ? [`${todayPlan.sourceCounts.weak} weak`] : []),
+      ...(todayPlan.sourceCounts?.minimalPairs
+        ? [`${todayPlan.sourceCounts.minimalPairs} contrast`]
+        : []),
+      ...(!todayPlan.sourceLabels.length ? ['Core forms'] : []),
     ];
+    const fLabel = todayPlan.forecastLabel;
     return (
       <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-white dark:bg-stone-900 px-4 py-3 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1042,7 +1047,12 @@ export default function StudyView() {
               {todayPlan.title}
             </div>
             <div className="mt-1 flex flex-wrap gap-1.5">
-              {chips.map((chip) => (
+              {dueCount > 0 && (
+                <span className="rounded-md border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                  {dueCount} due now
+                </span>
+              )}
+              {secondaryChips.map((chip) => (
                 <span
                   key={chip}
                   className="rounded-md border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-2 py-1 text-[11px] text-stone-600 dark:text-stone-300"
@@ -1050,9 +1060,11 @@ export default function StudyView() {
                   {chip}
                 </span>
               ))}
-            </div>
-            <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              {todayPlan.summary}
+              {fLabel && (
+                <span className="rounded-md border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-2 py-1 text-[11px] text-stone-500 dark:text-stone-400">
+                  then: {fLabel}
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -1061,7 +1073,7 @@ export default function StudyView() {
             disabled={!todayPlan.available}
             className="min-h-10 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-600 dark:disabled:bg-stone-800 dark:disabled:text-stone-400"
           >
-            Start daily drill
+            Start review
           </button>
         </div>
       </div>
@@ -1069,29 +1081,38 @@ export default function StudyView() {
   }
 
   function renderTodayStatus() {
-    const progress = Math.min(todayCount, dailyGoalTarget);
-    const progressPct = Math.min(100, Math.round((progress / dailyGoalTarget) * 100));
-    const statusText = todayGoalHit ? 'Goal reached' : `${progress}/${dailyGoalTarget} today`;
-    const summary = todayGoalHit ? 'Daily goal complete' : todayPlan.summary;
+    const dueCleared = completedDueIds.size;
+    const dueTotal = initialDueRuleIds.current?.size ?? 0;
+    const hasDue = dueTotal > 0;
+    const progressPct = hasDue ? Math.min(100, Math.round((dueCleared / dueTotal) * 100)) : 0;
+    const queueDone = hasDue && dueCleared >= dueTotal;
+    const statusText = hasDue ? `${dueCleared}/${dueTotal} cleared` : todayPlan.summary;
+    const fLabel = todayPlan.forecastLabel;
 
     return (
       <div className="rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-3 py-2 shadow-sm">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-              {todayGoalHit ? 'Daily goal reached' : 'Today drill'}
+              {queueDone ? 'Queue cleared' : 'SRS Queue'}
             </div>
-            <div className="truncate text-xs text-stone-500 dark:text-stone-400">{summary}</div>
+            {fLabel && (
+              <div className="truncate text-xs text-stone-500 dark:text-stone-400">
+                up next: {fLabel}
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-2 text-xs font-medium text-stone-600 dark:text-stone-300">
-            <span className="tabular-nums">{statusText}</span>
-            <span className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
-              <span
-                className={`block h-full ${todayGoalHit ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                style={{ width: progressPct + '%' }}
-              />
-            </span>
-          </div>
+          {hasDue && (
+            <div className="flex items-center gap-2 text-xs font-medium text-stone-600 dark:text-stone-300">
+              <span className="tabular-nums">{statusText}</span>
+              <span className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
+                <span
+                  className={`block h-full ${queueDone ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                  style={{ width: progressPct + '%' }}
+                />
+              </span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1594,9 +1615,8 @@ export default function StudyView() {
     focusAnswerInput();
   }
 
-  // Daily SRS queue completion screen — shown once when the due queue is cleared
-  // Bonus mode lets the user keep practicing beyond either the due queue or
-  // today's goal.
+  // SRS queue completion screen — shown once when the due queue is cleared
+  // or the session limit is reached. Bonus mode lets the user keep practicing.
   if (reviewComplete && phase === 'answering') {
     const sessionCorrect = state.session.correct || 0;
     const sessionReviewed = state.session.reviewed || 0;
@@ -1604,18 +1624,17 @@ export default function StudyView() {
     const sessionAccuracy = sessionReviewed
       ? Math.round((sessionCorrect / sessionReviewed) * 100)
       : 0;
+    const fLabel = todayPlan.forecastLabel;
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
-          {dueQueueDone ? 'SRS queue cleared!' : 'Daily goal reached!'}
+          {dueQueueDone ? 'Queue cleared!' : 'Session complete'}
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-1">
-          {dueQueueDone
-            ? `${completedDueIds.size}/${initialDue}`
-            : `${daily.count}/${dailyGoalTarget}`}
+          {dueQueueDone ? `${completedDueIds.size}/${initialDue}` : sessionReviewed}
         </div>
         <div className="text-sm text-stone-400 mb-3">
-          {dueQueueDone ? 'due cards cleared' : 'reviews today'}
+          {dueQueueDone ? 'due cards cleared' : 'cards reviewed'}
         </div>
         <div className="flex justify-center gap-2 mb-2">
           <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
@@ -1633,6 +1652,15 @@ export default function StudyView() {
           )}
         </div>
         <div className="text-sm text-stone-500 mb-1">{sessionAccuracy}% accuracy</div>
+        {fLabel && (
+          <div className="mt-3 mb-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 px-4 py-2.5">
+            <div className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1">
+              Coming up
+            </div>
+            <div className="text-xs text-stone-600 dark:text-stone-300">{fLabel}</div>
+          </div>
+        )}
+        {!fLabel && <div className="mb-3" />}
         {(daily.bestAnswerStreak || 0) >= 5 && (
           <div className="text-xs text-stone-400 mb-1">
             Best streak: {daily.bestAnswerStreak} in a row
@@ -1943,11 +1971,6 @@ export default function StudyView() {
                 {initialDue > 0 && !bonusMode && (
                   <div className="text-indigo-600 dark:text-indigo-400 font-medium">
                     {completedDueIds.size}/{initialDue} due
-                  </div>
-                )}
-                {!daily.goalHit && !bonusMode && (
-                  <div className="text-stone-500">
-                    {daily.count}/{dailyGoalTarget} today
                   </div>
                 )}
                 {bonusMode && (

@@ -61,13 +61,12 @@ describe('App shell', () => {
   it('auto-starts the daily drill against the daily goal', async () => {
     render(<App />);
 
-    await screen.findByText('Today drill', {}, { timeout: 5000 });
-    expect(screen.queryByRole('button', { name: 'Start daily drill' })).toBeNull();
+    await screen.findByText('SRS Queue', {}, { timeout: 5000 });
+    expect(screen.queryByRole('button', { name: 'Start review' })).toBeNull();
     await waitFor(() => {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
       expect(raw.practicePrefs.wordListIds).toContain(TODAY_DRILL_LIST_ID);
     });
-    await waitFor(() => expect(screen.getAllByText(/0\/30 today/i).length).toBeGreaterThan(0));
   });
 
   it('does not auto-start a daily drill after today goal is complete', async () => {
@@ -95,12 +94,12 @@ describe('App shell', () => {
 
     render(<App />);
 
-    await screen.findByText('Daily goal reached', {}, { timeout: 5000 });
+    await screen.findByText('SRS Queue', {}, { timeout: 5000 });
     await waitFor(() => {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
       expect(raw.practicePrefs.wordListIds || []).not.toContain(TODAY_DRILL_LIST_ID);
     });
-    expect(screen.queryByRole('button', { name: 'Start daily drill' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start review' })).toBeNull();
   });
 
   it('starts Transform mode from the Study screen with a source-to-target route', async () => {

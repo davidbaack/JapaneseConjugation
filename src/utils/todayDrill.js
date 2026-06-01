@@ -60,6 +60,43 @@ function wordWeakScore(state, word) {
   return statScore + mistakeScore;
 }
 
+function buildForecast(state, rulesWithCandidates) {
+  const now = Date.now();
+  const HOUR = 3600000;
+  const DAY = 86400000;
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  const endOfTodayMs = endOfToday.getTime();
+  const endOfTomorrow = endOfTodayMs + DAY;
+
+  const future = rulesWithCandidates
+    .map(({ rule }) => state?.cards?.[rule.id])
+    .filter((c) => c && c.nextReview > now)
+    .map((c) => c.nextReview)
+    .sort((a, b) => a - b);
+
+  return {
+    in1h: future.filter((t) => t <= now + HOUR).length,
+    in4h: future.filter((t) => t > now + HOUR && t <= now + 4 * HOUR).length,
+    today: future.filter((t) => t > now + 4 * HOUR && t <= endOfTodayMs).length,
+    tomorrow: future.filter((t) => t > endOfTodayMs && t <= endOfTomorrow).length,
+    week: future.filter((t) => t > endOfTomorrow && t <= now + 7 * DAY).length,
+    nextDueAt: future[0] || null,
+  };
+}
+
+export function forecastLabel(forecast) {
+  if (!forecast) return '';
+  const parts = [
+    forecast.in1h && `${forecast.in1h} in 1h`,
+    forecast.in4h && `${forecast.in4h} in 4h`,
+    forecast.today && `${forecast.today} later today`,
+    forecast.tomorrow && `${forecast.tomorrow} tomorrow`,
+    forecast.week && `${forecast.week} this week`,
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
 function rankedWords(words, state) {
   return [...words].sort(
     (a, b) => wordWeakScore(state, b) - wordWeakScore(state, a) || a.dict.localeCompare(b.dict),
@@ -161,6 +198,8 @@ export function buildTodayDrillPlan(
     sourceCounts.minimalPairs ? `${sourceCounts.minimalPairs} contrast` : '',
   ].filter(Boolean);
 
+  const upcomingForecast = buildForecast(state, rulesWithCandidates);
+
   return {
     available: usableTypeIds.length > 0 && availableWords.length > 0,
     reviewLimit: options.reviewLimit || dailyGoalReviewLimit(state, prefs),
@@ -170,6 +209,8 @@ export function buildTodayDrillPlan(
     minimalPairSetIds: minimalPairRecommendations.map((result) => result.set.id),
     sourceCounts,
     sourceLabels,
+    upcomingForecast,
+    forecastLabel: forecastLabel(upcomingForecast),
     title: sourceLabels.length ? 'Today drill' : 'Core warmup',
     summary: sourceLabels.length
       ? sourceLabels.join(' / ')

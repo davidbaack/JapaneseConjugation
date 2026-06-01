@@ -29,6 +29,29 @@ import {
 } from '../utils/minimalPairs.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
+function srsForecastFor(state) {
+  const now = Date.now();
+  const HOUR = 3600000;
+  const DAY = 86400000;
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  const endOfTodayMs = endOfToday.getTime();
+  const endOfTomorrow = endOfTodayMs + DAY;
+
+  const future = RULES.map((rule) => state?.cards?.[rule.id])
+    .filter((c) => c && c.nextReview > now)
+    .map((c) => c.nextReview)
+    .sort((a, b) => a - b);
+
+  return {
+    in1h: future.filter((t) => t <= now + HOUR).length,
+    in4h: future.filter((t) => t > now + HOUR && t <= now + 4 * HOUR).length,
+    today: future.filter((t) => t > now + 4 * HOUR && t <= endOfTodayMs).length,
+    tomorrow: future.filter((t) => t > endOfTodayMs && t <= endOfTomorrow).length,
+    week: future.filter((t) => t > endOfTomorrow && t <= now + 7 * DAY).length,
+  };
+}
+
 function srsStatsFor(state, verbs) {
   const now = Date.now();
   let totalReviews = 0,
@@ -233,6 +256,7 @@ export default function StatsView() {
     setWordLists,
   } = useApp();
   const stats = useMemo(() => srsStatsFor(state, verbs), [state, verbs]);
+  const srsForecast = useMemo(() => srsForecastFor(state), [state]);
   const radar = useMemo(() => skillRadarScores(state, verbs), [state, verbs]);
   const formRowsData = useMemo(() => formAccuracyRows(state, verbs), [state, verbs]);
   const readinessRows = useMemo(() => buildReadinessMap(state, verbs), [state, verbs]);
@@ -489,6 +513,44 @@ export default function StatsView() {
           }
         />
       </div>
+      {(srsForecast.in1h > 0 ||
+        srsForecast.in4h > 0 ||
+        srsForecast.today > 0 ||
+        srsForecast.tomorrow > 0 ||
+        srsForecast.week > 0) && (
+        <div className="rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/50 px-4 py-2.5">
+          <div className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1.5">
+            Upcoming reviews
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {srsForecast.in1h > 0 && (
+              <span className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">
+                {srsForecast.in1h} in 1h
+              </span>
+            )}
+            {srsForecast.in4h > 0 && (
+              <span className="text-xs text-stone-600 dark:text-stone-300">
+                {srsForecast.in4h} in 4h
+              </span>
+            )}
+            {srsForecast.today > 0 && (
+              <span className="text-xs text-stone-600 dark:text-stone-300">
+                {srsForecast.today} later today
+              </span>
+            )}
+            {srsForecast.tomorrow > 0 && (
+              <span className="text-xs text-stone-600 dark:text-stone-300">
+                {srsForecast.tomorrow} tomorrow
+              </span>
+            )}
+            {srsForecast.week > 0 && (
+              <span className="text-xs text-stone-500 dark:text-stone-400">
+                {srsForecast.week} this week
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       <div className="grid lg:grid-cols-[1fr_280px] gap-4">
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
           <div className="flex items-start justify-between gap-3 mb-4">
