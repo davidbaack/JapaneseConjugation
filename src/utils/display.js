@@ -215,8 +215,35 @@ export function cleanEnglishAction(meaning = '') {
   return (
     String(meaning || '')
       .trim()
+      .split(';')[0]
+      .trim()
       .replace(/^to\s+/i, '') || 'do it'
   );
+}
+
+function beComplement(action) {
+  const match = String(action || '').match(/^be\s+(.+)$/i);
+  return match ? match[1] : '';
+}
+
+function presentPhrase(action) {
+  const complement = beComplement(action);
+  return complement ? `is ${complement}` : action;
+}
+
+function pastPhrase(action) {
+  const complement = beComplement(action);
+  return complement ? `was ${complement}` : `did ${action}`;
+}
+
+function negativePhrase(action) {
+  const complement = beComplement(action);
+  return complement ? `is not ${complement}` : `do not ${action}`;
+}
+
+function pastNegativePhrase(action) {
+  const complement = beComplement(action);
+  return complement ? `was not ${complement}` : `did not ${action}`;
 }
 
 export function pastParticiple(action) {
@@ -390,14 +417,18 @@ export function englishForForm(item, type) {
     return M[type] || base;
   }
   const action = cleanEnglishAction(item.meaning);
+  const present = presentPhrase(action);
+  const past = pastPhrase(action);
+  const negative = negativePhrase(action);
+  const pastNegative = pastNegativePhrase(action);
   const M = {
-    'plain-past': `did ${action}`,
-    'plain-negative': `do not ${action}`,
-    'plain-past-negative': `did not ${action}`,
-    'polite-present': `${action} (polite)`,
-    'polite-past': `did ${action} (polite)`,
-    'polite-negative': `do not ${action} (polite)`,
-    'polite-past-negative': `did not ${action} (polite)`,
+    'plain-past': past,
+    'plain-negative': negative,
+    'plain-past-negative': pastNegative,
+    'polite-present': `${present} (polite)`,
+    'polite-past': `${past} (polite)`,
+    'polite-negative': `${negative} (polite)`,
+    'polite-past-negative': `${pastNegative} (polite)`,
     'masu-stem': `${action} stem`,
     'polite-volitional': `let's ${action} (polite)`,
     'polite-te': `${action} and... (polite)`,

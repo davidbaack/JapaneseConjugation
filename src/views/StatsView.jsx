@@ -150,7 +150,7 @@ function formAccuracyRows(state) {
       const attempted = correct + incorrect;
       return {
         type: t,
-        rules: cardCount,
+        cards: cardCount,
         correct,
         incorrect,
         attempted,
@@ -159,7 +159,7 @@ function formAccuracyRows(state) {
         fresh,
       };
     })
-    .filter((row) => row.rules > 0)
+    .filter((row) => row.cards > 0)
     .sort((a, b) => {
       const aUntried = a.attempted ? 0 : 1;
       const bUntried = b.attempted ? 0 : 1;
@@ -643,7 +643,7 @@ export default function StatsView() {
             />
           </div>
           <div className="text-xs text-stone-500 mt-2">
-            {stats.totalCorrect} correct / {stats.totalReviews} reviews / {stats.total} rules
+            {stats.totalCorrect} correct / {stats.totalReviews} reviews / {stats.total} cards
           </div>
         </div>
       </div>

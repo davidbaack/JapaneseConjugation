@@ -48,6 +48,10 @@ describe('cleanEnglishAction', () => {
     expect(cleanEnglishAction('run fast')).toBe('run fast');
   });
 
+  it('uses the first semicolon-separated learner gloss', () => {
+    expect(cleanEnglishAction('to be different; to differ; wrong')).toBe('be different');
+  });
+
   it('returns fallback for empty', () => {
     expect(cleanEnglishAction('')).toBe('do it');
     expect(cleanEnglishAction(null)).toBe('do it');
@@ -171,6 +175,17 @@ describe('englishForForm', () => {
     expect(englishForForm(TABERU, 'obligation')).toBe('must eat');
     expect(englishForForm(TABERU, 'permission')).toBe('may eat');
     expect(englishForForm(TABERU, 'request-kudasai')).toBe('please eat');
+  });
+
+  it('uses natural wording for stative "to be" verb glosses', () => {
+    const chigau = {
+      dict: '違う',
+      reading: 'ちがう',
+      meaning: 'to be different; to differ; wrong',
+      group: 'godan',
+    };
+    expect(englishForForm(chigau, 'plain-past')).toBe('was different');
+    expect(englishForForm(chigau, 'plain-negative')).toBe('is not different');
   });
 
   it('generates correct English for adjective forms', () => {

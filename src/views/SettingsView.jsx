@@ -13,6 +13,8 @@ import {
   weakTypeIdsForState,
   defaultState,
   mergeState,
+  dailyNewCardLimit,
+  bonusNewCardLimit,
 } from '../utils/storage.js';
 import {
   mergePracticePrefs,
@@ -258,6 +260,8 @@ export default function SettingsView() {
     () => buildPracticePoolSummary(state, settingsWords, practicePrefs, wordLists),
     [state, settingsWords, practicePrefs, wordLists],
   );
+  const automaticNewCards = dailyNewCardLimit(practicePrefs);
+  const automaticBonusNewCards = bonusNewCardLimit(practicePrefs);
   const activeTypeCount = state.enabledTypes.length;
 
   const isCustomMode = !typePacks.some((p) => [...p.typeIds].sort().join('|') === enabledKey);
@@ -407,7 +411,9 @@ export default function SettingsView() {
               }
               className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
             />
-            <p className="text-[11px] text-stone-400 mt-1">0 uses the automatic daily pace.</p>
+            <p className="text-[11px] text-stone-400 mt-1">
+              0 = Auto: {automaticNewCards}/day, then {automaticBonusNewCards} per bonus batch.
+            </p>
           </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Daily goal</label>

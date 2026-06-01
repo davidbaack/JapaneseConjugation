@@ -6,7 +6,7 @@ import { useTablist } from '../components/useTablist.js';
 
 const INSIGHTS_TABS = [
   { id: 'overview', label: 'Overview', desc: 'Skills & form accuracy' },
-  { id: 'mastery', label: 'Mastery', desc: 'SRS levels by rule' },
+  { id: 'mastery', label: 'Mastery', desc: 'SRS card levels' },
   { id: 'mistakes', label: 'Mistakes', desc: 'History & retest' },
 ];
 
