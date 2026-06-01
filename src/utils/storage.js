@@ -7,7 +7,14 @@ import {
   LEGACY_BROAD_DEFAULT_TYPE_IDS,
   INTRODUCED_DEFAULT_TYPE_IDS,
 } from '../data/conjugationTypes.js';
-import { RULES, wordKey, enabledTypeIdsFor, filterWordsForPrefs } from './conjugator.js';
+import {
+  RULES,
+  wordKey,
+  wordKind,
+  getWordMeta,
+  enabledTypeIdsFor,
+  filterWordsForPrefs,
+} from './conjugator.js';
 import { diagnoseMistake } from './mistakeDiagnosis.js';
 import { retryWithBackoff } from './retry.js';
 import {
@@ -20,6 +27,8 @@ import { mergePracticePrefs } from './display.js';
 import { buildRuleCandidates } from './ruleCandidates.js';
 
 export const DAY = 86400000;
+export const SRS_SCHEMA_VERSION = 3;
+export const DICTIONARY_TYPE_ID = 'dictionary';
 
 const LEGACY_VERB_DEFAULT_TYPE_IDS = CONJ_TYPES.filter((t) => t.id !== 'plain-present').map(
   (t) => t.id,
@@ -49,6 +58,56 @@ function isLegacyBroadDefaultTypeScope(ids) {
 
 function normalizeDefaultTypeScope(ids) {
   return isLegacyBroadDefaultTypeScope(ids) ? [...LEARNER_DEFAULT_TYPE_IDS] : ids;
+}
+
+export function wordSrsKey(word) {
+  if (!word) return '';
+  return `${wordKind(word)}:${word.group}:${word.dict}:${word.reading}`;
+}
+
+export function cardIdFor(word, targetTypeId) {
+  const key = wordSrsKey(word);
+  return key && targetTypeId ? `${key}|${targetTypeId}` : '';
+}
+
+export function typeIdFromCardId(cardId) {
+  const id = String(cardId || '');
+  const marker = id.lastIndexOf('|');
+  return marker >= 0 ? id.slice(marker + 1) : id;
+}
+
+export function wordKeyFromCardId(cardId) {
+  const id = String(cardId || '');
+  const marker = id.lastIndexOf('|');
+  return marker >= 0 ? id.slice(0, marker) : '';
+}
+
+export function dailyNewCardLimit(prefs = DEFAULT_PREFS) {
+  const explicit = Number(prefs?.newCardsPerDay || 0);
+  if (Number.isFinite(explicit) && explicit > 0) return Math.round(explicit);
+  const dailyGoal = Number(prefs?.dailyGoal || DEFAULT_PREFS.dailyGoal);
+  const goal = Number.isFinite(dailyGoal) && dailyGoal > 0 ? dailyGoal : DEFAULT_PREFS.dailyGoal;
+  return Math.min(8, Math.ceil(goal * 0.3));
+}
+
+export function bonusNewCardLimit(prefs = DEFAULT_PREFS) {
+  return Math.max(2, Math.floor(dailyNewCardLimit(prefs) / 2));
+}
+
+function newCardsIntroducedToday(state = {}) {
+  const today = localDateKey();
+  return Object.values(state.cards || {}).filter((card) => card?.introducedDate === today).length;
+}
+
+function wordPriority(word, wordLists = []) {
+  const meta = getWordMeta(word);
+  const listBoost = (wordLists || []).some((list) => (list.wordKeys || []).includes(wordKey(word)))
+    ? -10000
+    : 0;
+  const genki = Number(meta.lesson || meta.lessons?.[0] || 999);
+  const minna = Number(meta.minnaLesson || meta.minnaLessons?.[0] || 999);
+  const jlptRank = { N5: 0, N4: 1, N3: 2, N2: 3, N1: 4 }[meta.jlpt] ?? 9;
+  return listBoost + Math.min(genki, minna) * 100 + jlptRank * 10 + wordKey(word).length;
 }
 
 export function loadAll() {
@@ -587,13 +646,46 @@ export function gradeTransformationStats(stats = null, attempt = {}) {
 export function mergeCloudState(local, cloud) {
   if (!local) return cloud;
   if (!cloud) return local;
+  const normalizedLocal =
+    local.schemaVersion === SRS_SCHEMA_VERSION
+      ? local
+      : {
+          ...local,
+          schemaVersion: SRS_SCHEMA_VERSION,
+          cards: {},
+          verbStats: {},
+          retryQueue: [],
+          readiness: defaultReadinessState(),
+          transformation: emptyTransformationStats(),
+          enabledTypes: [...LEARNER_DEFAULT_TYPE_IDS],
+        };
+  const normalizedCloud =
+    cloud.schemaVersion === SRS_SCHEMA_VERSION
+      ? cloud
+      : {
+          ...cloud,
+          schemaVersion: SRS_SCHEMA_VERSION,
+          cards: {},
+          verbStats: {},
+          retryQueue: [],
+          readiness: defaultReadinessState(),
+          transformation: emptyTransformationStats(),
+          enabledTypes: [...LEARNER_DEFAULT_TYPE_IDS],
+        };
+  local = normalizedLocal;
+  cloud = normalizedCloud;
   const enabledTypes = normalizeDefaultTypeScope([
     ...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])]),
   ]);
   return {
     ...local,
+    schemaVersion: SRS_SCHEMA_VERSION,
     cards: mergeCards(local.cards || {}, cloud.cards || {}),
     verbStats: mergeVerbStats(local.verbStats || {}, cloud.verbStats || {}),
+    retryQueue: [...new Set([...(local.retryQueue || []), ...(cloud.retryQueue || [])])].slice(
+      0,
+      20,
+    ),
     mistakes: mergeMistakes(local.mistakes || [], cloud.mistakes || []),
     readiness: mergeReadinessState(local.readiness, cloud.readiness),
     enabledTypes,
@@ -719,8 +811,10 @@ export function normalizeReferenceState(ref = null) {
 
 export function defaultState() {
   return {
+    schemaVersion: SRS_SCHEMA_VERSION,
     cards: {},
     verbStats: {},
+    retryQueue: [],
     mistakes: [],
     shadow: { attempted: 0, totalRating: 0, byScenario: {} },
     ambient: { sessions: 0, played: 0, lastAt: null },
@@ -760,17 +854,27 @@ export function defaultState() {
 
 export function mergeState(saved, sessionOverride) {
   const base = defaultState();
+  const oldSrsSchema = !saved || saved.schemaVersion !== SRS_SCHEMA_VERSION;
   const merged = {
     ...base,
     ...(saved || {}),
-    verbStats: (saved && saved.verbStats) || {},
+    schemaVersion: SRS_SCHEMA_VERSION,
+    cards: oldSrsSchema ? {} : (saved && saved.cards) || {},
+    verbStats: oldSrsSchema ? {} : (saved && saved.verbStats) || {},
+    retryQueue: oldSrsSchema
+      ? []
+      : Array.isArray(saved && saved.retryQueue)
+        ? saved.retryQueue
+        : [],
     mistakes: Array.isArray(saved && saved.mistakes) ? saved.mistakes : [],
     shadow: (saved && saved.shadow) || base.shadow,
     ambient: (saved && saved.ambient) || base.ambient,
     game: (saved && saved.game) || base.game,
     onbin: (saved && saved.onbin) || base.onbin,
     register: (saved && saved.register) || base.register,
-    readiness: normalizeReadinessState((saved && saved.readiness) || base.readiness),
+    readiness: oldSrsSchema
+      ? defaultReadinessState()
+      : normalizeReadinessState((saved && saved.readiness) || base.readiness),
     meaning: (saved && saved.meaning) || base.meaning,
     mock: (saved && saved.mock) || base.mock,
     reader: {
@@ -779,7 +883,9 @@ export function mergeState(saved, sessionOverride) {
       wordSeen: (saved && saved.reader && saved.reader.wordSeen) || {},
     },
     production: (saved && saved.production) || base.production,
-    transformation: mergeTransformationStats(base.transformation, saved && saved.transformation),
+    transformation: oldSrsSchema
+      ? emptyTransformationStats()
+      : mergeTransformationStats(base.transformation, saved && saved.transformation),
     minimalPairs: mergeMinimalPairProgress(base.minimalPairs, saved && saved.minimalPairs),
     reference: normalizeReferenceState(saved && saved.reference ? saved.reference : null),
     daily: (saved && saved.daily) || base.daily,
@@ -787,7 +893,9 @@ export function mergeState(saved, sessionOverride) {
     session: sessionOverride || base.session,
   };
 
-  if (
+  if (oldSrsSchema) {
+    merged.enabledTypes = [...LEARNER_DEFAULT_TYPE_IDS];
+  } else if (
     saved &&
     Array.isArray(saved.enabledTypes) &&
     isLegacyBroadDefaultTypeScope(saved.enabledTypes)
@@ -892,6 +1000,7 @@ export function markMistakeResolved(mistakes, key) {
 
 export function gradeCard(card, correct) {
   const now = Date.now();
+  const isNew = !card;
   if (!card)
     card = {
       ease: 2.5,
@@ -911,6 +1020,9 @@ export function gradeCard(card, correct) {
     // drift toward longer intervals over time.
     const ease = Math.min(2.5, card.ease + 0.1);
     return {
+      ...(isNew ? { introducedDate: localDateKey(), createdAt: now } : {}),
+      ...(card.introducedDate ? { introducedDate: card.introducedDate } : {}),
+      ...(card.createdAt ? { createdAt: card.createdAt } : {}),
       ease,
       reps: card.reps + 1,
       interval: iv,
@@ -921,6 +1033,9 @@ export function gradeCard(card, correct) {
     };
   }
   return {
+    ...(isNew ? { introducedDate: localDateKey(), createdAt: now } : {}),
+    ...(card.introducedDate ? { introducedDate: card.introducedDate } : {}),
+    ...(card.createdAt ? { createdAt: card.createdAt } : {}),
     ease: Math.max(1.3, card.ease - 0.2),
     reps: 0,
     interval: 0,
@@ -931,18 +1046,37 @@ export function gradeCard(card, correct) {
   };
 }
 
-export function ruleWeakScore(state, ruleId) {
-  const card = (state.cards || {})[ruleId] || {};
+export function cardWeakScore(state, cardId, word = null, typeId = null) {
+  const resolvedType = typeId || typeIdFromCardId(cardId);
+  const card = (state.cards || {})[cardId] || {};
   const reviews = (card.correct || 0) + (card.incorrect || 0);
   const missRate = reviews ? (card.incorrect || 0) / reviews : 0;
   const unresolved = (state.mistakes || [])
-    .filter((m) => !m.resolved && ruleId.endsWith(`|${m.type}`))
+    .filter(
+      (m) =>
+        !m.resolved &&
+        (!resolvedType || m.type === resolvedType) &&
+        (!word || (m.dict === word.dict && m.group === word.group)),
+    )
     .reduce((sum, m) => sum + (m.count || 1), 0);
-  const verbStats = Object.values(state.verbStats || {})
-    .map((vs) => vs[ruleId])
-    .filter(Boolean);
-  const verbMisses = verbStats.reduce((sum, s) => sum + (s.incorrect || 0), 0);
-  return (card.incorrect || 0) * 2 + missRate * 4 + unresolved * 3 + verbMisses;
+  return (card.incorrect || 0) * 2 + missRate * 4 + unresolved * 3;
+}
+
+export function ruleWeakScore(state, ruleId) {
+  const cards = state.cards || {};
+  if (cards[ruleId]) return cardWeakScore(state, ruleId);
+  const typeId = typeIdFromCardId(ruleId);
+  let score = 0;
+  for (const [cardId, card] of Object.entries(cards)) {
+    if (typeIdFromCardId(cardId) !== typeId) continue;
+    const reviews = (card.correct || 0) + (card.incorrect || 0);
+    const missRate = reviews ? (card.incorrect || 0) / reviews : 0;
+    score += (card.incorrect || 0) * 2 + missRate * 4;
+  }
+  const unresolved = (state.mistakes || [])
+    .filter((m) => !m.resolved && m.type === typeId)
+    .reduce((sum, m) => sum + (m.count || 1), 0);
+  return score + unresolved * 3;
 }
 
 export function weakTypeIdsForState(state, fallbackIds = []) {
@@ -965,7 +1099,10 @@ export function weakTypeIdsForState(state, fallbackIds = []) {
 }
 
 export function pickWeakWeighted(pool, state) {
-  const scored = pool.map((p) => ({ ...p, weakScore: ruleWeakScore(state, p.rule.id) }));
+  const scored = pool.map((p) => ({
+    ...p,
+    weakScore: cardWeakScore(state, p.id || p.rule.id, p.verb, p.type || p.rule.type),
+  }));
   if (!scored.some((p) => p.weakScore > 0)) return null;
   const weights = scored.map((p) => 1 + p.weakScore * p.weakScore);
   let r = Math.random() * weights.reduce((a, b) => a + b, 0);
@@ -976,53 +1113,122 @@ export function pickWeakWeighted(pool, state) {
   return scored[scored.length - 1];
 }
 
+function buildWordFormCandidates(
+  words,
+  enabledTypes,
+  prefs = DEFAULT_PREFS,
+  ruleCandidates = null,
+) {
+  const readingPractice = (prefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'reading';
+  const pool = ruleCandidates || buildRuleCandidates(words, enabledTypes, prefs);
+  const entries = [];
+  const seen = new Set();
+  for (const { rule, candidates } of pool) {
+    for (const verb of candidates) {
+      const type = readingPractice ? DICTIONARY_TYPE_ID : rule.type;
+      const id = cardIdFor(verb, type);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      entries.push({
+        id,
+        verb,
+        type,
+        sourceType: readingPractice ? rule.type : null,
+        rule,
+        ruleLabel: rule.label,
+      });
+    }
+  }
+  return entries;
+}
+
+function formPriority(typeId) {
+  const index = LEARNER_DEFAULT_TYPE_IDS.indexOf(typeId);
+  return index >= 0 ? index : LEARNER_DEFAULT_TYPE_IDS.length + 100;
+}
+
+function candidateSortScore(entry, wordLists = []) {
+  return formPriority(entry.type) * 100000 + wordPriority(entry.verb, wordLists);
+}
+
 export function selectNext(
   state,
   verbs,
   enabledTypes,
-  lastRuleId,
+  lastCardId,
   prefs = DEFAULT_PREFS,
   ruleCandidates = null,
+  options = {},
 ) {
   const now = Date.now();
   const minimalPairSet = getMinimalPairSet(prefs.minimalPairSetId);
-  const pool =
+  const candidates =
     ruleCandidates ||
     buildRuleCandidates(verbs, enabledTypes, prefs, {
       minimalPairSet,
     });
+  const pool = buildWordFormCandidates(verbs, enabledTypes, prefs, candidates);
   if (!pool.length) return null;
-  const avail = pool.length > 1 ? pool.filter((p) => p.rule.id !== lastRuleId) : pool;
+  const avail = pool.length > 1 ? pool.filter((p) => p.id !== lastCardId) : pool;
+  const retryIds = new Set(state.retryQueue || []);
+  const retry = avail.filter((p) => retryIds.has(p.id));
   const due = avail.filter((p) => {
-    const c = state.cards[p.rule.id];
+    const c = state.cards[p.id];
     return c && c.nextReview <= now;
   });
-  const fresh = avail.filter((p) => !state.cards[p.rule.id]);
+  const freshLimit = options.bonusMode ? bonusNewCardLimit(prefs) : dailyNewCardLimit(prefs);
+  const canIntroduceFresh = newCardsIntroducedToday(state) < freshLimit;
+  const fresh = canIntroduceFresh ? avail.filter((p) => !state.cards[p.id]) : [];
   const future = avail.filter((p) => {
-    const c = state.cards[p.rule.id];
+    const c = state.cards[p.id];
     return c && c.nextReview > now;
   });
-  let chosen = pickWeakWeighted([...due, ...future, ...fresh], state);
+  const nearDue = options.bonusMode
+    ? future.filter((p) => state.cards[p.id].nextReview <= now + DAY)
+    : [];
+  const reviewed = avail.filter((p) => state.cards[p.id]);
+  const dueIds = new Set(due.map((p) => p.id));
+  const retryCandidateIds = new Set(retry.map((p) => p.id));
+  const weak = reviewed
+    .filter((p) => !dueIds.has(p.id) && !retryCandidateIds.has(p.id))
+    .map((p) => ({
+      ...p,
+      weakScore: cardWeakScore(state, p.id, p.verb, p.type),
+    }))
+    .filter((p) => p.weakScore > 0);
+  let chosen = pickWeakWeighted(due, state);
   if (!chosen) {
     if (due.length) {
-      due.sort((a, b) => state.cards[a.rule.id].nextReview - state.cards[b.rule.id].nextReview);
+      due.sort((a, b) => state.cards[a.id].nextReview - state.cards[b.id].nextReview);
       const sl = due.slice(0, Math.min(5, due.length));
       chosen = sl[Math.floor(Math.random() * sl.length)];
+    } else if (retry.length) {
+      chosen = pickWeakWeighted(retry, state) || retry[Math.floor(Math.random() * retry.length)];
+    } else if (weak.length) {
+      weak.sort((a, b) => b.weakScore - a.weakScore);
+      chosen = weak[0];
     } else if (fresh.length) {
-      chosen = fresh[Math.floor(Math.random() * fresh.length)];
+      fresh.sort(
+        (a, b) =>
+          candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists),
+      );
+      chosen = fresh[0];
+    } else if (nearDue.length) {
+      nearDue.sort((a, b) => state.cards[a.id].nextReview - state.cards[b.id].nextReview);
+      chosen = nearDue[0];
     } else {
-      future.sort((a, b) => state.cards[a.rule.id].nextReview - state.cards[b.rule.id].nextReview);
+      future.sort((a, b) => state.cards[a.id].nextReview - state.cards[b.id].nextReview);
       chosen = future[0];
     }
   }
   if (!chosen) return null;
-  const verb = pickVerb(chosen.candidates, chosen.rule.id, state.verbStats);
   return {
-    id: chosen.rule.id,
-    verb,
-    type: chosen.rule.type,
-    card: state.cards[chosen.rule.id],
-    ruleLabel: chosen.rule.label,
+    id: chosen.id,
+    verb: chosen.verb,
+    type: chosen.type,
+    sourceType: chosen.sourceType,
+    card: state.cards[chosen.id],
+    ruleLabel: chosen.ruleLabel,
   };
 }
 
@@ -1034,13 +1240,27 @@ export function selectNext(
 // and any other rule quirks resolve themselves.
 export function buildFocusCard(state, word, type) {
   if (!word || !type) return null;
+  if (type === DICTIONARY_TYPE_ID) {
+    const sourceRule = RULES.find((r) => r.verbFilter([word]).length === 1);
+    return sourceRule
+      ? {
+          id: cardIdFor(word, DICTIONARY_TYPE_ID),
+          verb: word,
+          type: DICTIONARY_TYPE_ID,
+          sourceType: sourceRule.type,
+          card: state.cards[cardIdFor(word, DICTIONARY_TYPE_ID)],
+          ruleLabel: sourceRule.label,
+        }
+      : null;
+  }
   const rule = RULES.find((r) => r.type === type && r.verbFilter([word]).length === 1);
   if (!rule) return null;
+  const id = cardIdFor(word, rule.type);
   return {
-    id: rule.id,
+    id,
     verb: word,
     type: rule.type,
-    card: state.cards[rule.id],
+    card: state.cards[id],
     ruleLabel: rule.label,
   };
 }
@@ -1060,12 +1280,15 @@ export function buildPracticePoolSummary(state, words, prefs = DEFAULT_PREFS, wo
     fresh = 0,
     weak = 0,
     mastered = 0;
-  for (const { rule } of activeRules) {
-    const card = (state.cards || {})[rule.id];
-    if (!card) fresh++;
-    else if (card.nextReview <= now) due++;
-    if (ruleWeakScore(state, rule.id) > 0) weak++;
-    if (card && card.reps > 0 && getCardLevel(card) >= 4) mastered++;
+  for (const { rule, candidates } of activeRules) {
+    for (const word of candidates) {
+      const id = cardIdFor(word, rule.type);
+      const card = (state.cards || {})[id];
+      if (!card) fresh++;
+      else if (card.nextReview <= now) due++;
+      if (cardWeakScore(state, id, word, rule.type) > 0) weak++;
+      if (card && card.reps > 0 && getCardLevel(card) >= 4) mastered++;
+    }
   }
   return {
     words: filtered.length,
@@ -1173,19 +1396,11 @@ export function getCardLevel(card) {
 }
 
 export function referenceRuleIdFor(item, typeId) {
-  if (!item || !typeId) return '';
-  if (
-    item.group === 'godan' &&
-    (typeId === 'plain-past' || typeId === 'te-form') &&
-    String(item.reading || '').endsWith('いく')
-  ) {
-    return `exception-いく|${typeId}`;
-  }
-  return `${item.group}|${typeId}`;
+  return cardIdFor(item, typeId);
 }
 
 export function referenceProgressFor(state, item, typeId) {
-  const ruleId = referenceRuleIdFor(item, typeId);
+  const ruleId = cardIdFor(item, typeId);
   const card = (state.cards || {})[ruleId];
   const level = getCardLevel(card);
   const levelInfo = SRS_LEVELS[level] || SRS_LEVELS[0];

@@ -43,12 +43,29 @@ export function mergePracticePrefs(prefs) {
   const source = { ...(prefs || {}) };
   const answerMode = normalizeAnswerMode(source.answerMode);
   const kanaAssist = resolveKanaAssist(source);
+  const reviewStyle = ['auto', 'forms', 'reading'].includes(source.reviewStyle)
+    ? source.reviewStyle
+    : DEFAULT_PREFS.reviewStyle;
+  const sourceFormStrategy = ['auto', 'dictionary', 'masu', 'mixed'].includes(
+    source.sourceFormStrategy,
+  )
+    ? source.sourceFormStrategy
+    : source.promptForm === 'random' || source.promptForm === 'mixed'
+      ? 'mixed'
+      : source.promptForm === 'polite-present' || source.promptForm === 'masu'
+        ? 'masu'
+        : DEFAULT_PREFS.sourceFormStrategy;
+  const rawNewCardsPerDay = Number(source.newCardsPerDay || 0);
+  const newCardsPerDay =
+    Number.isFinite(rawNewCardsPerDay) && rawNewCardsPerDay > 0 ? Math.round(rawNewCardsPerDay) : 0;
   delete source.kanaMatchDisplay;
   delete source.durationSec;
   delete source.skipDuplicateForms;
   delete source.trickQuestions;
   delete source.colorCodeConjugations;
   delete source.aiGuideTone;
+  delete source.drillMode;
+  delete source.drillDirection;
   const reviewLimitSource = source.reviewLimitSource === 'repair' ? source.reviewLimitSource : '';
   const rawReviewLimit = Number(source.reviewLimit || 0);
   const reviewLimit =
@@ -87,6 +104,15 @@ export function mergePracticePrefs(prefs) {
     answerMode,
     kanaAssist,
     displayScripts,
+    reviewStyle,
+    sourceFormStrategy,
+    newCardsPerDay,
+    promptForm:
+      sourceFormStrategy === 'mixed'
+        ? 'random'
+        : sourceFormStrategy === 'masu'
+          ? 'polite-present'
+          : 'dictionary',
     ...(wordTypes ? { wordTypes } : {}),
     wordGroups,
     reviewLimit,
@@ -644,16 +670,6 @@ function stableShuffled(arr, seed) {
 
 function choiceSeed(current, mode) {
   return `${mode}|${current.id}|${current.type}|${wordKey(current.verb)}`;
-}
-
-export function drillDirectionFor(current, prefs = DEFAULT_PREFS) {
-  const mode = prefs.drillDirection || 'forward';
-  if (mode === 'reverse') return 'reverse';
-  if (mode === 'mixed')
-    return hashString(`${current?.id || ''}|${current?.verb?.dict || ''}|reverse`) % 2 === 0
-      ? 'reverse'
-      : 'forward';
-  return 'forward';
 }
 
 export function makeChoices(current, verbs) {

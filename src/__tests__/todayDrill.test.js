@@ -6,7 +6,7 @@ import {
   practicePrefsForTodayDrill,
   upsertTodayDrillList,
 } from '../utils/todayDrill.js';
-import { defaultState } from '../utils/storage.js';
+import { cardIdFor, defaultState } from '../utils/storage.js';
 
 const TABERU = {
   dict: '\u98df\u3079\u308b',
@@ -33,7 +33,7 @@ describe('today drill planner', () => {
     const state = {
       ...defaultState(),
       cards: {
-        'godan|plain-past': {
+        [cardIdFor(HASHIRU, 'plain-past')]: {
           reps: 1,
           interval: 1,
           ease: 2.3,
@@ -91,16 +91,18 @@ describe('today drill planner', () => {
     const lists = upsertTodayDrillList([], plan);
 
     expect(prefs).toMatchObject({
-      drillMode: 'transformation',
-      promptForm: 'random',
+      reviewStyle: 'auto',
+      sourceFormStrategy: 'auto',
+      promptForm: 'dictionary',
       minimalPairSetId: '',
       reviewLimit: 0,
       reviewLimitSource: '',
       wordListIds: [TODAY_DRILL_LIST_ID],
     });
+    expect(prefs.drillMode).toBeUndefined();
     expect(
       practicePrefsForTodayDrill({ ...DEFAULT_PREFS, drillMode: 'sentence' }, plan).drillMode,
-    ).toBe('sentence');
+    ).toBeUndefined();
     expect(lists).toEqual([
       {
         id: TODAY_DRILL_LIST_ID,

@@ -643,7 +643,9 @@ export function referencePracticePrefsForTarget(prefs = DEFAULT_PREFS, target = 
   const kinds = target?.kinds?.length ? target.kinds : target?.kind ? [target.kind] : [];
   return {
     ...prefs,
-    drillDirection: 'forward',
+    reviewStyle: 'forms',
+    sourceFormStrategy: 'dictionary',
+    promptForm: 'dictionary',
     wordListIds: [],
     jlptLevels: DEFAULT_PREFS.jlptLevels,
     genkiLessons: [],

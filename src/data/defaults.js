@@ -6,7 +6,6 @@ export const ANSWER_MODES = ['input', 'choice', 'self-check', 'speak'];
 
 export const DEFAULT_PREFS = {
   answerMode: 'input',
-  drillDirection: 'forward',
   autoSpeak: false,
   listeningPrompt: false,
   autoAdvanceCorrect: false,
@@ -25,6 +24,9 @@ export const DEFAULT_PREFS = {
   displayScripts: { kanji: true, kana: true, romaji: false },
   furigana: true,
   promptForm: 'dictionary',
+  reviewStyle: 'auto',
+  sourceFormStrategy: 'auto',
+  newCardsPerDay: 0,
   reviewLimit: 0,
   reviewLimitSource: '',
   jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
@@ -42,7 +44,6 @@ export const DEFAULT_PREFS = {
     'noun',
   ],
   wordListIds: [],
-  drillMode: 'word',
   colorCodeConjugations: true,
   kanaAssist: 'live',
   showWordCategory: false,

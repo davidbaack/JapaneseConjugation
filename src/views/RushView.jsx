@@ -10,10 +10,9 @@ import {
   pickPromptType,
   conjugateItem,
   getTypeInfo,
-  RULES,
 } from '../utils/conjugator.js';
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
-import { defaultState, gradeCard, recordMistake, bumpDaily } from '../utils/storage.js';
+import { cardIdFor, defaultState, gradeCard, recordMistake, bumpDaily } from '../utils/storage.js';
 import { bumpSessionMistakePattern } from '../utils/mistakeDiagnosis.js';
 import { kanaMatchDisplayForPrefs, promptDisplay, shuffled } from '../utils/display.js';
 import {
@@ -143,14 +142,10 @@ export default function RushView() {
     setAnswer('');
   }
 
-  function matchingRule(item, typeId) {
-    return RULES.find((r) => r.type === typeId && r.verbFilter([item]).length);
-  }
-
   function recordRushAttempt(current, ok, raw, nextScore, nextCombo) {
     setState((s) => {
-      const rule = matchingRule(current.item, current.type.id);
-      const rid = rule?.id || `${current.item.group}-${current.type.id}`;
+      const rid =
+        cardIdFor(current.item, current.type.id) || `${current.item.group}-${current.type.id}`;
       const dict = current.item.dict;
       const prevVS = s.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
       const prevGame = s.game || defaultState().game;

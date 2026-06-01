@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
 import { conjugateItem, wordKey } from '../utils/conjugator.js';
-import { defaultState } from '../utils/storage.js';
+import { cardIdFor, defaultState } from '../utils/storage.js';
 import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
@@ -408,17 +408,16 @@ describe('StudyView daily startup guards', () => {
     expect(within(helper).getByText(firstKana)).toBeTruthy();
   });
 
-  it('shows a non-spoiler kana preview while typing reverse answers', async () => {
+  it('shows a non-spoiler kana preview while typing reading-practice answers', async () => {
     const target = STARTER_VERBS[0];
-    const type = 'plain-past';
     mockedApp.value = makeApp({
       practicePrefs: {
         ...DEFAULT_PREFS,
-        drillDirection: 'reverse',
+        reviewStyle: 'reading',
       },
       studyFocus: {
         word: target,
-        type,
+        type: 'dictionary',
       },
     });
 
@@ -438,19 +437,17 @@ describe('StudyView daily startup guards', () => {
     expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
   });
 
-  it('shows SRS queue progress for an active Today drill in Transform mode', async () => {
+  it('shows SRS queue progress for an active Today drill in the Review flow', async () => {
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
-    const dueRuleId = `${target.group}|${type}`;
+    const dueCardId = cardIdFor(target, type);
     persistStudyCard(target, type);
 
     mockedApp.value = makeApp({
-      state: stateWithDueRule(dueRuleId),
+      state: stateWithDueRule(dueCardId),
       allWords: [target],
       practicePrefs: {
         ...DEFAULT_PREFS,
-        drillMode: 'transformation',
-        promptForm: 'random',
         wordListIds: [TODAY_DRILL_LIST_ID],
       },
       wordLists: [todayListFor(target)],
@@ -459,17 +456,16 @@ describe('StudyView daily startup guards', () => {
     render(<StudyView />);
 
     expect(await screen.findByText('0/1 due')).toBeTruthy();
-    expect(
-      (await screen.findByRole('button', { name: 'Transform' })).getAttribute('aria-pressed'),
-    ).toBe('true');
+    expect(screen.getByText('Review')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
   });
 
-  it('counts a correct Transform answer toward the SRS queue and daily progress', async () => {
+  it('counts a correct Review answer toward the SRS queue and daily progress', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
-    const dueRuleId = `${target.group}|${type}`;
-    const state = stateWithDueRule(dueRuleId);
+    const dueCardId = cardIdFor(target, type);
+    const state = stateWithDueRule(dueCardId);
     const markSrsQueueCompleted = vi.fn();
     persistStudyCard(target, type);
 
@@ -480,8 +476,6 @@ describe('StudyView daily startup guards', () => {
       allWords: [target],
       practicePrefs: {
         ...DEFAULT_PREFS,
-        drillMode: 'transformation',
-        promptForm: 'random',
         wordListIds: [TODAY_DRILL_LIST_ID],
       },
       wordLists: [todayListFor(target)],
@@ -498,10 +492,10 @@ describe('StudyView daily startup guards', () => {
       .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
 
     expect(nextState).toBeTruthy();
-    expect(nextState.cards[dueRuleId].correct).toBe(1);
+    expect(nextState.cards[dueCardId].correct).toBe(1);
     expect(nextState.daily.count).toBe(1);
-    expect(nextState.transformation.attempted).toBe(1);
-    expect(markSrsQueueCompleted).toHaveBeenCalledWith(dueRuleId);
+    expect(nextState.transformation.attempted).toBe(0);
+    expect(markSrsQueueCompleted).toHaveBeenCalledWith(dueCardId);
   });
 
   it('keeps direct kana pending until a miss, then grades retyped kana immediately', async () => {

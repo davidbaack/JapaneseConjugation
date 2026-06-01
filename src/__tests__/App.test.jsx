@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-library/react';
+import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react';
 
 // No Supabase configured in tests → auth/sync effects no-op (offline-first path).
 vi.mock('../utils/supabase.js', () => ({ supabase: null }));
@@ -42,20 +42,10 @@ describe('App shell', () => {
     await waitFor(() => expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy(), {
       timeout: 5000,
     });
-    const direction = within(screen.getByRole('group', { name: 'Practice direction' }));
-    expect(direction.getByRole('button', { name: 'Conjugate' }).getAttribute('aria-pressed')).toBe(
-      'true',
-    );
-
-    fireEvent.click(direction.getByRole('button', { name: 'Un-conjugate' }));
-
-    await waitFor(() => {
-      const updatedDirection = within(screen.getByRole('group', { name: 'Practice direction' }));
-      expect(
-        updatedDirection.getByRole('button', { name: 'Un-conjugate' }).getAttribute('aria-pressed'),
-      ).toBe('true');
-    });
-    await waitFor(() => expect(screen.getByPlaceholderText(/Type dictionary form/i)).toBeTruthy());
+    expect(screen.getByText('Review')).toBeTruthy();
+    expect(screen.getByText('Form practice')).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
   });
 
   it('shows a sign-in prompt instead of signed-out SRS counters', async () => {
@@ -102,24 +92,17 @@ describe('App shell', () => {
     expect(screen.queryByRole('button', { name: 'Start review' })).toBeNull();
   });
 
-  it('starts Transform mode from the Study screen with a source-to-target route', async () => {
+  it('shows the single Review flow instead of legacy Study mode controls', async () => {
     render(<App />);
-    const transformButton = await screen.findByRole(
-      'button',
-      { name: 'Transform' },
-      { timeout: 5000 },
-    );
-
-    fireEvent.click(transformButton);
-
-    const direction = within(screen.getByRole('group', { name: 'Practice direction' }));
-    expect(screen.getAllByRole('button', { name: /Conjugate/i }).length).toBeGreaterThan(0);
-    expect(direction.getByRole('button', { name: 'Un-conjugate' })).toBeTruthy();
-    await waitFor(() => expect(screen.getAllByText(/Transform/i).length).toBeGreaterThan(0));
-    expect(screen.getByText(/Conjugate to/i)).toBeTruthy();
-    expect(screen.getByText(/Prompt form:/i)).toBeTruthy();
-    expect(screen.getByText(/From /i)).toBeTruthy();
-    expect(screen.getAllByText(/->/).length).toBeGreaterThan(0);
+    await screen.findByText('Review', {}, { timeout: 5000 });
+    expect(screen.getByText('Form practice')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Word', exact: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sentence', exact: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Transform', exact: true })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Study mode' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();
+    expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
+    expect(screen.queryByText(/Prompt form:/i)).toBeNull();
   }, 15000);
 
   it('does not show answer-form endings or target English before answering', async () => {

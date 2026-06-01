@@ -19,11 +19,6 @@ export const READINESS_DIMENSIONS = [
     label: 'Speed',
     hint: 'Answer accurately before the form needs deliberate reconstruction.',
   },
-  {
-    id: 'sentence',
-    label: 'Sentence use',
-    hint: 'Use the form inside a short sentence context.',
-  },
 ];
 
 const DIMENSION_IDS = new Set(READINESS_DIMENSIONS.map((dimension) => dimension.id));
@@ -127,12 +122,7 @@ export function normalizeReadinessState(readiness) {
   return { byRule };
 }
 
-export function readinessDimensionForAttempt({
-  answerMode = 'input',
-  drillMode = 'word',
-  reverseDrill = false,
-} = {}) {
-  if (drillMode === 'sentence') return 'sentence';
+export function readinessDimensionForAttempt({ answerMode = 'input', reverseDrill = false } = {}) {
   if (reverseDrill || answerMode === 'choice' || answerMode === 'self-check') {
     return 'recognition';
   }
@@ -268,7 +258,6 @@ export function buildReadinessMap(state, words = []) {
       recognition: statusForAccuracy(metrics.recognition),
       production: statusForAccuracy(productionMetric, usedLegacyProduction && !!productionMetric),
       speed: statusForSpeed(metrics.speed),
-      sentence: statusForAccuracy(metrics.sentence),
     };
     const weakestWeight = Math.min(
       ...Object.values(cells).map((cell) => STATUS_WEIGHT[cell.status]),
@@ -358,23 +347,20 @@ export function buildConjugationSpeedRows(state, words = []) {
 
 export function launchPrefsForReadinessDimension(dimensionId) {
   const base = {
-    drillDirection: 'forward',
+    reviewStyle: 'forms',
+    sourceFormStrategy: 'dictionary',
     promptForm: 'dictionary',
     listeningPrompt: false,
   };
   if (dimensionId === 'recognition') {
-    return { ...base, answerMode: 'choice', drillMode: 'word' };
+    return { ...base, answerMode: 'choice', reviewStyle: 'auto' };
   }
   if (dimensionId === 'speed') {
     return {
       ...base,
       answerMode: 'input',
-      drillMode: 'word',
       autoAdvanceCorrect: true,
     };
   }
-  if (dimensionId === 'sentence') {
-    return { ...base, answerMode: 'input', drillMode: 'sentence' };
-  }
-  return { ...base, answerMode: 'input', drillMode: 'word' };
+  return { ...base, answerMode: 'input' };
 }

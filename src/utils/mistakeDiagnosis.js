@@ -465,8 +465,8 @@ export function upsertRepairWordList(wordLists = [], plan) {
 export function repairPrefsForPlan(practicePrefs = {}, plan) {
   return {
     ...practicePrefs,
-    drillMode: 'word',
-    drillDirection: 'forward',
+    reviewStyle: 'forms',
+    sourceFormStrategy: 'dictionary',
     promptForm: 'dictionary',
     reviewLimit: plan?.reviewLimit || 10,
     reviewLimitSource: 'repair',

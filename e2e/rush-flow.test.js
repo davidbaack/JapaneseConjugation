@@ -38,6 +38,7 @@ test.describe('Rush mode', () => {
           key,
           JSON.stringify({
             state: {
+              schemaVersion: 3,
               enabledTypes: ['plain-past'],
               daily: {
                 date: localDate,

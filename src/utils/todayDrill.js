@@ -2,7 +2,7 @@ import { ALL_CARD_TYPES, TYPE_PACKS } from '../data/conjugationTypes.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { enabledTypeIdsFor, filterWordsForPrefs, wordKey } from './conjugator.js';
 import { minimalPairSetMatchesWord, recommendMinimalPairSets } from './minimalPairs.js';
-import { localDateKey, ruleWeakScore, weakTypeIdsForState } from './storage.js';
+import { cardIdFor, cardWeakScore, localDateKey, weakTypeIdsForState } from './storage.js';
 import { buildRuleCandidates, ruleCandidateTypeSet } from './ruleCandidates.js';
 
 export const TODAY_DRILL_LIST_ID = 'list-today-drill';
@@ -11,8 +11,6 @@ export const TODAY_DRILL_LIMIT = 10;
 
 const MAX_TYPES = 8;
 const MAX_WORDS = 18;
-const SRS_DRILL_MODES = new Set(['word', 'sentence', 'transformation']);
-
 function pushUnique(target, values, limit = Infinity) {
   for (const value of values || []) {
     if (!value || target.includes(value)) continue;
@@ -60,7 +58,9 @@ function buildForecast(state, rulesWithCandidates) {
   const endOfTomorrow = endOfTodayMs + DAY;
 
   const future = rulesWithCandidates
-    .map(({ rule }) => state?.cards?.[rule.id])
+    .flatMap(({ rule, candidates }) =>
+      candidates.map((word) => state?.cards?.[cardIdFor(word, rule.type)]),
+    )
     .filter((c) => c && c.nextReview > now)
     .map((c) => c.nextReview)
     .sort((a, b) => a - b);
@@ -109,17 +109,38 @@ export function buildTodayDrillPlan(
   const candidateTypeIds = ruleCandidateTypeSet(rulesWithCandidates);
 
   const dueRules = rulesWithCandidates
-    .filter(({ rule }) => {
-      const card = state?.cards?.[rule.id];
-      return card && card.nextReview <= now;
+    .map((entry) => ({
+      ...entry,
+      dueCandidates: entry.candidates.filter((word) => {
+        const card = state?.cards?.[cardIdFor(word, entry.rule.type)];
+        return card && card.nextReview <= now;
+      }),
+    }))
+    .filter((entry) => entry.dueCandidates.length)
+    .sort((a, b) => {
+      const aNext = Math.min(
+        ...a.dueCandidates.map(
+          (word) => state.cards[cardIdFor(word, a.rule.type)]?.nextReview || 0,
+        ),
+      );
+      const bNext = Math.min(
+        ...b.dueCandidates.map(
+          (word) => state.cards[cardIdFor(word, b.rule.type)]?.nextReview || 0,
+        ),
+      );
+      return aNext - bNext;
     })
-    .sort(
-      (a, b) =>
-        (state.cards[a.rule.id]?.nextReview || 0) - (state.cards[b.rule.id]?.nextReview || 0),
-    );
+    .map(({ dueCandidates, ...entry }) => ({ ...entry, candidates: dueCandidates }));
 
   const weakRuleEntries = rulesWithCandidates
-    .map((entry) => ({ ...entry, score: ruleWeakScore(state || {}, entry.rule.id) }))
+    .map((entry) => ({
+      ...entry,
+      score: entry.candidates.reduce(
+        (sum, word) =>
+          sum + cardWeakScore(state || {}, cardIdFor(word, entry.rule.type), word, entry.rule.type),
+        0,
+      ),
+    }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score);
 
@@ -189,7 +210,9 @@ export function buildTodayDrillPlan(
     reviewLimit: options.reviewLimit || dailyGoalReviewLimit(state, prefs),
     typeIds: usableTypeIds,
     wordKeys,
-    dueRuleIds: dueRules.map(({ rule }) => rule.id),
+    dueRuleIds: dueRules.flatMap(({ rule, candidates }) =>
+      candidates.map((word) => cardIdFor(word, rule.type)),
+    ),
     minimalPairSetIds: minimalPairRecommendations.map((result) => result.set.id),
     sourceCounts,
     sourceLabels,
@@ -215,18 +238,20 @@ export function upsertTodayDrillList(wordLists = [], plan) {
 }
 
 export function practicePrefsForTodayDrill(prefs = DEFAULT_PREFS, plan) {
-  const drillMode = SRS_DRILL_MODES.has(prefs?.drillMode)
-    ? prefs.drillMode
-    : DEFAULT_PREFS.drillMode;
-  const promptForm =
-    drillMode === 'transformation' &&
-    (prefs?.promptForm || DEFAULT_PREFS.promptForm) === 'dictionary'
-      ? 'random'
-      : prefs?.promptForm;
+  const basePrefs = { ...(prefs || DEFAULT_PREFS) };
+  delete basePrefs.drillMode;
+  delete basePrefs.drillDirection;
+  const sourceFormStrategy = basePrefs.sourceFormStrategy || DEFAULT_PREFS.sourceFormStrategy;
   return {
-    ...prefs,
-    drillMode,
-    ...(promptForm ? { promptForm } : {}),
+    ...basePrefs,
+    reviewStyle: basePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle,
+    sourceFormStrategy,
+    promptForm:
+      sourceFormStrategy === 'mixed'
+        ? 'random'
+        : sourceFormStrategy === 'masu'
+          ? 'polite-present'
+          : 'dictionary',
     minimalPairSetId: '',
     minimalPairReturn: null,
     reviewLimit: 0,

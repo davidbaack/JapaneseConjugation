@@ -22,6 +22,7 @@ import {
   cloudTimestamp,
   buildSyncPayload,
   mergeSyncPayload,
+  SRS_SCHEMA_VERSION,
 } from '../utils/storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
@@ -260,14 +261,20 @@ describe('mergeSyncPayload', () => {
 
   it('uses local unsynced learner data in the merged payload written back to cloud', () => {
     const localPayload = buildSyncPayload({
-      state: { cards: { 'local-rule': { reps: 5, interval: 7, nextReview: 200 } } },
+      state: {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        cards: { 'local-rule': { reps: 5, interval: 7, nextReview: 200 } },
+      },
       customVerbs: [{ dict: 'shared', reading: 'local', meaning: 'local meaning', group: 'godan' }],
       customAdjectives: [],
       wordLists: [{ id: 'shared-list', name: 'Local name', wordKeys: ['godan:local'] }],
       practicePrefs: { ...DEFAULT_PREFS, theme: 'light' },
     });
     const cloudPayload = buildSyncPayload({
-      state: { cards: { 'cloud-rule': { reps: 1, interval: 1, nextReview: 100 } } },
+      state: {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        cards: { 'cloud-rule': { reps: 1, interval: 1, nextReview: 100 } },
+      },
       customVerbs: [{ dict: 'shared', reading: 'cloud', meaning: 'cloud meaning', group: 'godan' }],
       customAdjectives: [],
       wordLists: [{ id: 'shared-list', name: 'Cloud name', wordKeys: ['godan:cloud'] }],

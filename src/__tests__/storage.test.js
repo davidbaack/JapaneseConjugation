@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { DEFAULT_PREFS } from '../data/defaults.js';
 import {
   gradeCard,
   bumpDaily,
@@ -10,8 +11,12 @@ import {
   getCardLevel,
   normalizeReferenceState,
   buildFocusCard,
+  cardIdFor,
+  dailyNewCardLimit,
   defaultState,
+  bonusNewCardLimit,
   selectNext,
+  SRS_SCHEMA_VERSION,
   gradeTransformationStats,
   mergeTransformationStats,
   DAY,
@@ -386,6 +391,12 @@ describe('mergeState', () => {
   it('starts new learners on the core conjugation scope', () => {
     const state = defaultState();
     expect(state.enabledTypes).toEqual(LEARNER_DEFAULT_TYPE_IDS);
+    expect(state.enabledTypes).not.toContain('request-kudasai');
+    expect(state.enabledTypes).not.toContain('permission');
+    expect(state.enabledTypes).not.toContain('obligation');
+    expect(state.enabledTypes).not.toContain('potential-polite');
+    expect(state.enabledTypes).not.toContain('desiderative-polite');
+    expect(state.enabledTypes).not.toContain('progressive-polite');
     expect(state.enabledTypes).not.toContain('passive-polite-past-negative');
     expect(state.enabledTypes).not.toContain('short-causative-passive-polite-past-negative');
   });
@@ -405,14 +416,17 @@ describe('mergeState', () => {
 
   it('preserves an explicit all-forms scope', () => {
     const allTypeIds = ALL_CARD_TYPES.map((t) => t.id);
-    const state = mergeState({ enabledTypes: allTypeIds }, null);
+    const state = mergeState({ schemaVersion: SRS_SCHEMA_VERSION, enabledTypes: allTypeIds }, null);
     expect(state.enabledTypes).toEqual(allTypeIds);
   });
 
-  it('preserves saved cards', () => {
+  it('preserves saved cards from the current SRS schema', () => {
+    const word = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+    const cardId = cardIdFor(word, 'plain-past');
     const saved = {
+      schemaVersion: SRS_SCHEMA_VERSION,
       cards: {
-        'ichidan|plain-past': {
+        [cardId]: {
           reps: 3,
           interval: 8,
           ease: 2.5,
@@ -424,7 +438,27 @@ describe('mergeState', () => {
       },
     };
     const state = mergeState(saved, null);
-    expect(state.cards['ichidan|plain-past'].reps).toBe(3);
+    expect(state.cards[cardId].reps).toBe(3);
+  });
+
+  it('resets legacy rule-keyed cards during the word-form migration', () => {
+    const state = mergeState(
+      {
+        cards: {
+          'ichidan|plain-past': {
+            reps: 3,
+            interval: 8,
+            ease: 2.5,
+            nextReview: 9999999999999,
+            correct: 3,
+            incorrect: 0,
+            lastSeen: 1,
+          },
+        },
+      },
+      null,
+    );
+    expect(state.cards).toEqual({});
   });
 
   it('uses sessionOverride for session', () => {
@@ -457,8 +491,20 @@ describe('mergeCloudState', () => {
   it('preserves explicit all-forms cloud scopes', () => {
     const allTypeIds = ALL_CARD_TYPES.map((t) => t.id);
     const merged = mergeCloudState(
-      { cards: {}, verbStats: {}, mistakes: [], enabledTypes: LEARNER_DEFAULT_TYPE_IDS },
-      { cards: {}, verbStats: {}, mistakes: [], enabledTypes: allTypeIds },
+      {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        cards: {},
+        verbStats: {},
+        mistakes: [],
+        enabledTypes: LEARNER_DEFAULT_TYPE_IDS,
+      },
+      {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        cards: {},
+        verbStats: {},
+        mistakes: [],
+        enabledTypes: allTypeIds,
+      },
     );
     expect(new Set(merged.enabledTypes)).toEqual(new Set(allTypeIds));
     expect(merged.enabledTypes).toHaveLength(allTypeIds.length);
@@ -467,6 +513,7 @@ describe('mergeCloudState', () => {
   it('merges readiness dimensions from both devices', () => {
     const merged = mergeCloudState(
       {
+        schemaVersion: SRS_SCHEMA_VERSION,
         cards: {},
         verbStats: {},
         mistakes: [],
@@ -480,6 +527,7 @@ describe('mergeCloudState', () => {
         },
       },
       {
+        schemaVersion: SRS_SCHEMA_VERSION,
         cards: {},
         verbStats: {},
         mistakes: [],
@@ -502,22 +550,32 @@ describe('mergeCloudState', () => {
 describe('buildFocusCard', () => {
   const state = defaultState();
 
+  it('gives built-in and custom duplicate words the same SRS card id', () => {
+    const builtIn = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+    const custom = { ...builtIn, meaning: 'custom gloss' };
+    expect(cardIdFor(custom, 'plain-past')).toBe(cardIdFor(builtIn, 'plain-past'));
+  });
+
   it('builds a card matching the word group and requested form', () => {
     const word = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
     const card = buildFocusCard(state, word, 'plain-past');
-    expect(card).toMatchObject({ id: 'ichidan|plain-past', verb: word, type: 'plain-past' });
+    expect(card).toMatchObject({
+      id: cardIdFor(word, 'plain-past'),
+      verb: word,
+      type: 'plain-past',
+    });
   });
 
-  it('routes the 行く exception to its dedicated rule for plain-past', () => {
+  it('uses the shared word-form key even when an exception rule supplies the answer', () => {
     const iku = { dict: '行く', reading: 'いく', meaning: 'to go', group: 'godan' };
     const card = buildFocusCard(state, iku, 'plain-past');
-    expect(card.id).toBe('exception-いく|plain-past');
+    expect(card.id).toBe(cardIdFor(iku, 'plain-past'));
   });
 
-  it('uses the ordinary godan rule for 行く on non-exception forms', () => {
+  it('uses the same word-form key shape for non-exception forms', () => {
     const iku = { dict: '行く', reading: 'いく', meaning: 'to go', group: 'godan' };
     const card = buildFocusCard(state, iku, 'polite-present');
-    expect(card.id).toBe('godan|polite-present');
+    expect(card.id).toBe(cardIdFor(iku, 'polite-present'));
   });
 
   it('returns null when no rule covers the word/form', () => {
@@ -545,5 +603,68 @@ describe('selectNext never serves an unconjugatable (blank) card', () => {
     const card = selectNext(freshState(), GODAN, enabled, null, { skipDuplicateForms: false });
     expect(card).not.toBeNull();
     expect(conjugateItem(card.verb, card.type)).toBe('かかされる');
+  });
+});
+
+describe('word-form SRS selection', () => {
+  const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+  const KAKU = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan' };
+
+  it('schedules due cards by exact word-form card id', () => {
+    const dueCardId = cardIdFor(TABERU, 'plain-past');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [dueCardId]: {
+          reps: 1,
+          interval: 1,
+          ease: 2.5,
+          nextReview: 1,
+          correct: 1,
+          incorrect: 0,
+          lastSeen: 1,
+        },
+      },
+    };
+    const card = selectNext(state, [TABERU, KAKU], ['plain-past'], null, DEFAULT_PREFS);
+    expect(card.id).toBe(dueCardId);
+    expect(card.type).toBe('plain-past');
+    expect(card.verb).toBe(TABERU);
+  });
+
+  it('uses dictionary target cards for reading practice without adding dictionary to core', () => {
+    const card = selectNext(defaultState(), [TABERU], ['plain-past'], null, {
+      ...DEFAULT_PREFS,
+      reviewStyle: 'reading',
+    });
+    expect(LEARNER_DEFAULT_TYPE_IDS).not.toContain('dictionary');
+    expect(card.id).toBe(cardIdFor(TABERU, 'dictionary'));
+    expect(card.type).toBe('dictionary');
+    expect(card.sourceType).toBe('plain-past');
+  });
+
+  it('caps new cards by daily goal and uses a smaller bonus-study batch', () => {
+    expect(dailyNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(3);
+    expect(bonusNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(2);
+    const introduced = {};
+    for (let i = 0; i < 3; i += 1) {
+      introduced[`synthetic-${i}`] = {
+        introducedDate: localDateKey(),
+        reps: 1,
+        interval: 1,
+        ease: 2.5,
+        nextReview: Date.now() + DAY,
+        correct: 1,
+        incorrect: 0,
+      };
+    }
+    const card = selectNext(
+      { ...defaultState(), cards: introduced },
+      [TABERU, KAKU],
+      ['plain-past'],
+      null,
+      { ...DEFAULT_PREFS, dailyGoal: 10 },
+    );
+    expect(card).toBeNull();
   });
 });

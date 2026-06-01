@@ -8,7 +8,6 @@ import {
   WORD_GROUP_OPTIONS,
 } from '../data/starterWords.js';
 import { ALL_CARD_TYPES, TYPE_PACKS, FORM_GROUPS } from '../data/conjugationTypes.js';
-import { normalizePromptFormSetting } from '../utils/conjugator.js';
 import {
   buildPracticePoolSummary,
   weakTypeIdsForState,
@@ -35,11 +34,17 @@ function jaccardSim(a, b) {
   return union === 0 ? 0 : inter / union;
 }
 
-const PROMPT_FORM_OPTIONS = [
+const REVIEW_STYLE_OPTIONS = [
+  { id: 'auto', label: 'Auto' },
+  { id: 'forms', label: 'Forms only' },
+  { id: 'reading', label: 'Reading practice' },
+];
+
+const SOURCE_FORM_OPTIONS = [
+  { id: 'auto', label: 'Auto' },
   { id: 'dictionary', label: 'Dictionary' },
-  { id: 'polite-present', label: 'Masu' },
-  { id: 'dict-masu', label: 'Dict + Masu' },
-  { id: 'random', label: 'Mixed' },
+  { id: 'masu', label: 'Masu' },
+  { id: 'mixed', label: 'Mixed' },
 ];
 
 const ANSWER_MODE_OPTIONS = [
@@ -217,7 +222,8 @@ export default function SettingsView() {
 
   const displayScripts = resolveDisplayScripts(practicePrefs);
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
-  const promptForm = normalizePromptFormSetting(practicePrefs.promptForm);
+  const reviewStyle = practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle;
+  const sourceFormStrategy = practicePrefs.sourceFormStrategy || DEFAULT_PREFS.sourceFormStrategy;
   const selectedGenkiLessons =
     practicePrefs.genkiLessons === null
       ? []
@@ -238,7 +244,7 @@ export default function SettingsView() {
     !practicePrefs.voiceURI || speechVoices.some((v) => v.voiceURI === practicePrefs.voiceURI);
   const weakPackIds = weakTypeIdsForState(state, state.enabledTypes);
   const typePacks = [
-    ...TYPE_PACKS,
+    ...TYPE_PACKS.filter((pack) => ['basics', 'core', 'advanced'].includes(pack.id)),
     {
       id: 'weak',
       label: 'Weak mix',
@@ -329,20 +335,19 @@ export default function SettingsView() {
             </div>
           </div>
           <div className="sm:col-span-2">
-            <label className="text-xs text-stone-500 block mb-1">Prompt form</label>
-            <div role="group" aria-label="Prompt form" className="grid grid-cols-2 gap-2">
-              {PROMPT_FORM_OPTIONS.map((o) => (
+            <label className="text-xs text-stone-500 block mb-1">Review style</label>
+            <div role="group" aria-label="Review style" className="grid grid-cols-3 gap-2">
+              {REVIEW_STYLE_OPTIONS.map((o) => (
                 <button
                   key={o.id}
                   onClick={() =>
                     setPracticePrefs({
                       ...practicePrefs,
-                      promptForm: o.id,
-                      trickQuestions: false,
+                      reviewStyle: o.id,
                     })
                   }
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    promptForm === o.id
+                    reviewStyle === o.id
                       ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
@@ -353,11 +358,56 @@ export default function SettingsView() {
             </div>
             <div className="mt-2">
               <p className="text-[11px] text-stone-400">
-                Choose the starting form for Transform. Masu uses the polite present when
-                compatible; Dict + Masu alternates between the two; Mixed rotates all compatible
-                source forms.
+                Auto keeps daily review seamless. Forms only sticks to production prompts. Reading
+                practice asks you to recover the dictionary form.
               </p>
             </div>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs text-stone-500 block mb-1">Source forms</label>
+            <div role="group" aria-label="Source forms" className="grid grid-cols-2 gap-2">
+              {SOURCE_FORM_OPTIONS.map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() =>
+                    setPracticePrefs({
+                      ...practicePrefs,
+                      sourceFormStrategy: o.id,
+                      promptForm:
+                        o.id === 'mixed'
+                          ? 'random'
+                          : o.id === 'masu'
+                            ? 'polite-present'
+                            : 'dictionary',
+                    })
+                  }
+                  className={`px-3 py-2 rounded-lg text-sm border transition ${
+                    sourceFormStrategy === o.id
+                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-stone-500 block mb-1">New cards/day</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={practicePrefs.newCardsPerDay || 0}
+              onChange={(e) =>
+                setPracticePrefs({
+                  ...practicePrefs,
+                  newCardsPerDay: Math.max(0, Number(e.target.value) || 0),
+                })
+              }
+              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+            />
+            <p className="text-[11px] text-stone-400 mt-1">0 uses the automatic daily pace.</p>
           </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Daily goal</label>

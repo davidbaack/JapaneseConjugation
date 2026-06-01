@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe('SettingsView controls', () => {
-  it('shows restored prompt form settings without global kana assist controls', async () => {
+  it('shows review settings without legacy study-mode controls', async () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings', exact: true }));
@@ -30,11 +30,19 @@ describe('SettingsView controls', () => {
     expect(answerMode.getByRole('button', { name: 'Speak answer', exact: true })).toBeTruthy();
     expect(answerMode.queryByRole('button', { name: 'Free input', exact: true })).toBeNull();
     expect(answerMode.queryByRole('button', { name: 'Guided kana', exact: true })).toBeNull();
-    expect(screen.getByText('Prompt form')).toBeTruthy();
-    const promptForm = within(screen.getByRole('group', { name: 'Prompt form' }));
-    expect(promptForm.getByRole('button', { name: 'Dictionary', exact: true })).toBeTruthy();
-    expect(promptForm.getByRole('button', { name: 'Masu', exact: true })).toBeTruthy();
-    expect(promptForm.getByRole('button', { name: 'Mixed', exact: true })).toBeTruthy();
+    expect(screen.queryByText('Prompt form')).toBeNull();
+    expect(screen.getByText('Review style')).toBeTruthy();
+    const reviewStyle = within(screen.getByRole('group', { name: 'Review style' }));
+    expect(reviewStyle.getByRole('button', { name: 'Auto', exact: true })).toBeTruthy();
+    expect(reviewStyle.getByRole('button', { name: 'Forms only', exact: true })).toBeTruthy();
+    expect(reviewStyle.getByRole('button', { name: 'Reading practice', exact: true })).toBeTruthy();
+    expect(screen.getByText('Source forms')).toBeTruthy();
+    const sourceForms = within(screen.getByRole('group', { name: 'Source forms' }));
+    expect(sourceForms.getByRole('button', { name: 'Auto', exact: true })).toBeTruthy();
+    expect(sourceForms.getByRole('button', { name: 'Dictionary', exact: true })).toBeTruthy();
+    expect(sourceForms.getByRole('button', { name: 'Masu', exact: true })).toBeTruthy();
+    expect(sourceForms.getByRole('button', { name: 'Mixed', exact: true })).toBeTruthy();
+    expect(screen.getByText('New cards/day')).toBeTruthy();
     expect(screen.queryByRole('option', { name: /Plain Past/i })).toBeNull();
     expect(screen.queryByText(/Trick questions/i)).toBeNull();
     expect(screen.queryByText('Identical forms')).toBeNull();
@@ -70,11 +78,12 @@ describe('SettingsView controls', () => {
       expect(JSON.parse(raw).practicePrefs.showWordCategory).toBe(true);
     });
 
-    fireEvent.click(promptForm.getByRole('button', { name: 'Masu', exact: true }));
+    fireEvent.click(sourceForms.getByRole('button', { name: 'Masu', exact: true }));
 
     await waitFor(() => {
       const raw = localStorage.getItem('jp-verb-srs-v2');
       expect(raw).toBeTruthy();
+      expect(JSON.parse(raw).practicePrefs.sourceFormStrategy).toBe('masu');
       expect(JSON.parse(raw).practicePrefs.promptForm).toBe('polite-present');
     });
 

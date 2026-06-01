@@ -27,7 +27,6 @@ describe('readiness tracking', () => {
       correct: true,
       responseMs: 5200,
       answerMode: 'input',
-      drillMode: 'word',
       now: 1000,
     });
 
@@ -41,26 +40,24 @@ describe('readiness tracking', () => {
     });
   });
 
-  it('routes choice and sentence drills into their own dimensions', () => {
+  it('routes choice and reading drills into recognition', () => {
     let readiness = defaultReadinessState();
     readiness = recordReadinessAttempt(readiness, 'ichidan|plain-past', {
       correct: false,
       responseMs: 9000,
       answerMode: 'choice',
-      drillMode: 'word',
       now: 1000,
     });
     readiness = recordReadinessAttempt(readiness, 'ichidan|plain-past', {
       correct: true,
       responseMs: 7000,
       answerMode: 'input',
-      drillMode: 'sentence',
+      reverseDrill: true,
       now: 2000,
     });
 
     const metrics = readiness.byRule['ichidan|plain-past'];
-    expect(metrics.recognition).toMatchObject({ attempted: 1, correct: 0 });
-    expect(metrics.sentence).toMatchObject({ attempted: 1, correct: 1 });
+    expect(metrics.recognition).toMatchObject({ attempted: 2, correct: 1 });
     expect(metrics.speed).toMatchObject({ attempted: 2, correct: 1 });
   });
 
@@ -71,7 +68,6 @@ describe('readiness tracking', () => {
         correct: true,
         responseMs: 5000,
         answerMode: 'input',
-        drillMode: 'word',
         now,
       });
     }
@@ -79,7 +75,6 @@ describe('readiness tracking', () => {
       correct: false,
       responseMs: 11000,
       answerMode: 'choice',
-      drillMode: 'word',
       now: 4000,
     });
 
@@ -91,7 +86,7 @@ describe('readiness tracking', () => {
     expect(row.cells.production.status).toBe('strong');
     expect(row.cells.speed.status).toBe('developing');
     expect(row.cells.recognition.status).toBe('weak');
-    expect(row.cells.sentence.status).toBe('untested');
+    expect(row.cells.sentence).toBeUndefined();
   });
 
   it('aggregates study completion speed by conjugation type', () => {
@@ -100,21 +95,18 @@ describe('readiness tracking', () => {
       correct: true,
       responseMs: 4000,
       answerMode: 'input',
-      drillMode: 'word',
       now: 1000,
     });
     readiness = recordReadinessAttempt(readiness, 'godan|plain-past', {
       correct: false,
       responseMs: 10000,
       answerMode: 'input',
-      drillMode: 'word',
       now: 2000,
     });
     readiness = recordReadinessAttempt(readiness, 'ichidan|te-form', {
       correct: true,
       responseMs: 15000,
       answerMode: 'input',
-      drillMode: 'word',
       now: 3000,
     });
 
@@ -138,16 +130,17 @@ describe('readiness tracking', () => {
   it('returns drill preferences for weak-cell launches', () => {
     expect(launchPrefsForReadinessDimension('recognition')).toMatchObject({
       answerMode: 'choice',
-      drillMode: 'word',
-    });
-    expect(launchPrefsForReadinessDimension('sentence')).toMatchObject({
-      answerMode: 'input',
-      drillMode: 'sentence',
+      reviewStyle: 'auto',
     });
     expect(launchPrefsForReadinessDimension('speed')).toMatchObject({
       answerMode: 'input',
-      drillMode: 'word',
+      reviewStyle: 'forms',
+      sourceFormStrategy: 'dictionary',
       autoAdvanceCorrect: true,
+    });
+    expect(launchPrefsForReadinessDimension('production')).toMatchObject({
+      answerMode: 'input',
+      reviewStyle: 'forms',
     });
   });
 });

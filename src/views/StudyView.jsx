@@ -16,7 +16,6 @@ import {
   playPronunciation,
   speechRecognitionErrorMessage,
 } from '../utils/speech.js';
-import { useAISentence } from '../hooks/useAISentence.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
@@ -46,7 +45,6 @@ import {
   recordMistake,
   gradeCard,
   bumpDaily,
-  gradeTransformationStats,
   localDateKey,
 } from '../utils/storage.js';
 import { recordReadinessAttempt } from '../utils/readiness.js';
@@ -55,7 +53,6 @@ import {
   promptDisplay,
   englishForForm,
   answerPhaseTaskDetails,
-  drillDirectionFor,
   makeChoices,
   makeReverseChoices,
   dictionaryAnswerMatches,
@@ -91,28 +88,12 @@ export { kanaCoachCells, explainReversePrompt };
 const STUDY_CURRENT_KEY = 'jp-study-current';
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
-const TRANSFORMATION_MODE_LABEL = 'Transform';
-const STUDY_MODE_OPTIONS = [
-  { id: 'word', label: 'Word' },
-  { id: 'sentence', label: 'Sentence' },
-  { id: 'transformation', label: TRANSFORMATION_MODE_LABEL },
-];
-const PRACTICE_DIRECTIONS = [
-  { id: 'forward', label: 'Conjugate' },
-  { id: 'reverse', label: 'Un-conjugate' },
-  { id: 'mixed', label: 'Mixed' },
-];
 const REVIEW_LIMIT_SOURCES = new Set(['repair']);
 
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
   const limit = Number(prefs.reviewLimit || 0);
   return Number.isFinite(limit) && limit > 0 ? limit : 0;
-}
-
-function clearReviewLimitPrefs(prefs = DEFAULT_PREFS) {
-  if (!prefs.reviewLimit && !prefs.reviewLimitSource) return prefs;
-  return { ...prefs, reviewLimit: 0, reviewLimitSource: '' };
 }
 
 function isDailyGoalHitToday(daily) {
@@ -128,7 +109,7 @@ function transformationHintFromBase(baseHint, { reverseDrill, sourceInfo, target
   const targetLabel = targetInfo?.label || 'target form';
   const prefix = reverseDrill
     ? `Work backward from the ${sourceLabel}. Recover the dictionary form before thinking about any new ending.`
-    : `Transform ${sourceLabel} into ${targetLabel}: keep the same word, then rebuild the requested form.`;
+    : `Change ${sourceLabel} into ${targetLabel}: keep the same word, then rebuild the requested form.`;
   return {
     ...baseHint,
     text: `${prefix} ${baseHint.text}`,
@@ -185,6 +166,9 @@ function cardMatchesPractice(card, words, enabledTypes, prefs = DEFAULT_PREFS) {
   if (!words.some((word) => sameStudyWord(word, card.verb))) return false;
   const minimalPairSet = getMinimalPairSet(prefs.minimalPairSetId);
   const activeTypes = minimalPairSet ? minimalPairSet.typeIds : enabledTypeIdsFor(enabledTypes);
+  if (card.type === DICTIONARY_TYPE_ID) {
+    return (prefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'reading' || !!card.sourceType;
+  }
   if (!activeTypes.includes(card.type)) return false;
   if (minimalPairSet && !minimalPairSetMatchesCard(minimalPairSet, card.verb, card.type)) {
     return false;
@@ -241,7 +225,7 @@ function loadPersistedCurrent(state, words, enabledTypes, prefs) {
       clearPersistedCurrent();
       return null;
     }
-    return card;
+    return saved.sourceType ? { ...card, sourceType: saved.sourceType } : card;
   } catch {
     clearPersistedCurrent();
     return null;
@@ -274,6 +258,7 @@ function persistCurrent(card) {
         meaning: card.verb.meaning,
         group: card.verb.group,
         type: card.type,
+        sourceType: card.sourceType || null,
         word: snapshotStudyWord(card.verb),
       }),
     );
@@ -423,11 +408,10 @@ export default function StudyView() {
     return base;
   }, [verbs, practicePrefs, wordLists, focus, focusWordLock]);
 
-  const activeDrillMode = practicePrefs.drillMode || DEFAULT_PREFS.drillMode;
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
   const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
   const typedAnswerMode = answerMode === 'input';
-  const transformationMode = activeDrillMode === 'transformation';
+  const transformationMode = false;
   const listeningPrompt = !!practicePrefs.listeningPrompt;
   const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
   const practiceRuleCandidates = useMemo(
@@ -437,16 +421,29 @@ export default function StudyView() {
       }),
     [practiceWords, enabledTypes, practicePrefs, activeMinimalPairSet],
   );
-  const drillDirection = current ? drillDirectionFor(current, practicePrefs) : 'forward';
-  const reverseDrill = drillDirection === 'reverse';
-  const sourceForm = current ? conjugateItem(current.verb, current.type) : '';
+  const reverseDrill = current?.type === DICTIONARY_TYPE_ID;
+  const sourceTypeForReading = current?.sourceType || 'plain-past';
+  const sourceForm = current
+    ? reverseDrill
+      ? conjugateItem(current.verb, sourceTypeForReading)
+      : conjugateItem(current.verb, current.type)
+    : '';
+  const sourceStrategyPrefs = useMemo(() => {
+    const strategy = practicePrefs.sourceFormStrategy || DEFAULT_PREFS.sourceFormStrategy;
+    if (strategy === 'mixed') return { ...practicePrefs, promptForm: 'random' };
+    if (strategy === 'masu') return { ...practicePrefs, promptForm: 'polite-present' };
+    if (strategy === 'dictionary') return { ...practicePrefs, promptForm: 'dictionary' };
+    const reps = current?.card?.reps || 0;
+    return {
+      ...practicePrefs,
+      promptForm: reps >= 2 ? 'random' : reps >= 1 ? 'dict-masu' : 'dictionary',
+    };
+  }, [current?.card?.reps, practicePrefs]);
   const configuredPromptType =
-    current && !reverseDrill ? pickPromptType(current.verb, current.type, practicePrefs) : null;
-  const promptType =
-    current && !reverseDrill && transformationMode
-      ? configuredPromptType ||
-        pickPromptType(current.verb, current.type, { ...practicePrefs, promptForm: 'random' })
-      : configuredPromptType;
+    current && !reverseDrill
+      ? pickPromptType(current.verb, current.type, sourceStrategyPrefs)
+      : null;
+  const promptType = current && !reverseDrill ? configuredPromptType : null;
   const promptSourceForm = current
     ? reverseDrill
       ? sourceForm
@@ -456,15 +453,6 @@ export default function StudyView() {
     : '';
   const promptAudioText = current ? promptSourceForm : '';
 
-  // Sentence-mode AI example sentence.
-  const aiSentence = useAISentence({
-    current,
-    drillMode: practicePrefs.drillMode,
-    geminiKey,
-    reverseDrill,
-    sourceForm,
-    scriptMode: practicePrefs.scriptMode,
-  });
   const sessionMistakePatterns = useMemo(
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
     [state.session?.mistakePatterns],
@@ -530,6 +518,7 @@ export default function StudyView() {
       null,
       practicePrefs,
       practiceRuleCandidates,
+      { bonusMode, wordLists },
     );
     if (nextCard) {
       setCurrent((existing) => existing || nextCard);
@@ -650,7 +639,7 @@ export default function StudyView() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (current && phase === 'reviewing' && practicePrefs.autoSpeak) {
-      speakJapaneseLocal(conjugateItem(current.verb, current.type), 0.9);
+      speakJapaneseLocal(expected, 0.9);
     }
     // speakJapaneseLocal is defined inline and omitted to avoid infinite re-runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -812,14 +801,15 @@ export default function StudyView() {
   }
 
   const expected = reverseDrill ? current.verb.reading : sourceForm;
+  const practicedType = reverseDrill ? sourceTypeForReading : current.type;
   const promptView = reverseDrill
-    ? formDisplay(sourceForm, practicePrefs, current.verb, current.type)
+    ? formDisplay(sourceForm, practicePrefs, current.verb, practicedType)
     : promptDisplay(current.verb, promptType, practicePrefs);
   const expectedView = reverseDrill
     ? promptDisplay(current.verb, null, practicePrefs)
     : formDisplay(expected, practicePrefs, current.verb, current.type);
   const promptEnglish = reverseDrill
-    ? englishForForm(current.verb, current.type)
+    ? englishForForm(current.verb, practicedType)
     : englishForForm(current.verb, promptType);
   const targetEnglish = reverseDrill
     ? englishForForm(current.verb, null)
@@ -834,45 +824,25 @@ export default function StudyView() {
   const englishHintsHidden =
     (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden';
   const kanaMatchDisplay = 'color-count';
-  const typeInfo = getTypeInfo(current.type);
-  const sourceTypeId = reverseDrill ? current.type : promptType || DICTIONARY_TYPE_ID;
-  const targetTypeId = reverseDrill ? DICTIONARY_TYPE_ID : current.type;
+  const typeInfo = reverseDrill ? DICTIONARY_TYPE_INFO : getTypeInfo(current.type);
+  const sourceTypeId = reverseDrill ? sourceTypeForReading : promptType || DICTIONARY_TYPE_ID;
+  const targetTypeId = current.type;
   const sourceTypeInfo =
     sourceTypeId === DICTIONARY_TYPE_ID ? DICTIONARY_TYPE_INFO : getTypeInfo(sourceTypeId);
   const targetTypeInfo =
     targetTypeId === DICTIONARY_TYPE_ID ? DICTIONARY_TYPE_INFO : getTypeInfo(targetTypeId);
   const transformationRoute = transformationRouteText(sourceTypeInfo, targetTypeInfo);
-  const transformationAttempt = transformationMode
-    ? {
-        dimension: 'transformation',
-        sourceType: sourceTypeId,
-        targetType: targetTypeId,
-        direction: drillDirection,
-      }
-    : null;
-  const transformationStats = state.transformation || {
-    attempted: 0,
-    correct: 0,
-    byPair: {},
-  };
-  const transformationAccuracy = transformationStats.attempted
-    ? Math.round((transformationStats.correct / transformationStats.attempted) * 100)
-    : 0;
   const reviewExplanation =
     phase === 'reviewing'
-      ? transformationMode
-        ? transformationReviewExplanation({
-            item: current.verb,
-            type: current.type,
-            reverseDrill,
-            sourceInfo: sourceTypeInfo,
-            targetInfo: targetTypeInfo,
-            sourceForm: promptSourceForm,
-            expected,
-          })
-        : reverseDrill
-          ? explainReversePrompt(current.verb, current.type)
-          : explainItem(current.verb, current.type)
+      ? transformationReviewExplanation({
+          item: current.verb,
+          type: reverseDrill ? sourceTypeForReading : current.type,
+          reverseDrill,
+          sourceInfo: sourceTypeInfo,
+          targetInfo: targetTypeInfo,
+          sourceForm: promptSourceForm,
+          expected,
+        })
       : null;
   const explanation = !wasCorrect ? reviewExplanation : null;
   const diagnostic =
@@ -882,21 +852,13 @@ export default function StudyView() {
     : makeChoices(current, practiceWords);
   const wordType = isAdjective(current.verb) ? 'Adjective' : 'Verb';
   const noChangePrompt = !reverseDrill && promptType === current.type;
-  const taskLabel = transformationMode
-    ? TRANSFORMATION_MODE_LABEL
-    : reverseDrill
-      ? `Un-conjugate ${typeInfo.label}`
-      : typeInfo.label;
+  const taskLabel = reverseDrill ? `Recover dictionary form` : typeInfo.label;
   const transformationActionLabel = reverseDrill ? 'Answer with' : 'Conjugate to';
-  const taskHint = transformationMode
-    ? reverseDrill
-      ? 'recover the dictionary form'
-      : targetTypeInfo.hint
-    : reverseDrill
-      ? 'answer with dictionary form'
-      : noChangePrompt
-        ? 'same form; answer may not change'
-        : typeInfo.hint;
+  const taskHint = reverseDrill
+    ? 'answer with dictionary form'
+    : noChangePrompt
+      ? 'same form; answer may not change'
+      : targetTypeInfo.hint || typeInfo.hint;
   const taskSub = transformationMode ? targetTypeInfo.sub : reverseDrill ? '辞書形' : typeInfo.sub;
   const answerTaskDetails = answerPhaseTaskDetails({
     reverseDrill,
@@ -907,7 +869,7 @@ export default function StudyView() {
   const transformationSupportText = answerTaskDetails.supportText;
   const taskOverride = reverseDrill
     ? transformationMode
-      ? `Transform: recover the dictionary form from ${typeInfo.label} (${sourceForm})`
+      ? `Reading: recover the dictionary form from ${typeInfo.label} (${sourceForm})`
       : `Un-conjugate: identify the dictionary form from ${typeInfo.label} (${sourceForm})`
     : noChangePrompt
       ? `Trick no-change drill: the prompt is already ${typeInfo.label}, so the correct answer is the same form.`
@@ -974,14 +936,6 @@ export default function StudyView() {
       ? kanaCoachCells(expected, reviewAnswerSource, coachRevealed)
       : [];
 
-  function transformationStatsAfter(correct) {
-    if (!transformationAttempt) return state.transformation;
-    return gradeTransformationStats(state.transformation, {
-      ...transformationAttempt,
-      correct,
-    });
-  }
-
   function nextMinimalPairProgress(correct) {
     return recordMinimalPairResult(
       state.minimalPairs,
@@ -994,7 +948,6 @@ export default function StudyView() {
 
   function mistakeRecordOptions() {
     return {
-      ...(transformationAttempt || {}),
       ...(minimalPairSetForCurrent?.id ? { minimalPairSetId: minimalPairSetForCurrent.id } : {}),
     };
   }
@@ -1092,43 +1045,6 @@ export default function StudyView() {
     setWasCorrected(false);
     setWasCorrect(false);
     setCurrent(null);
-  }
-
-  function switchStudyMode(mode) {
-    const leavingMinimalPair = mode !== 'word' && activeMinimalPairSet;
-    const basePrefs = leavingMinimalPair ? clearMinimalPairPrefs(practicePrefs) : practicePrefs;
-    const nextPrefs = clearReviewLimitPrefs({
-      ...basePrefs,
-      drillMode: mode,
-      minimalPairSetId: mode === 'word' ? basePrefs.minimalPairSetId || '' : '',
-      minimalPairReturn: mode === 'word' ? basePrefs.minimalPairReturn || null : null,
-    });
-    if (mode === 'transformation' && (nextPrefs.promptForm || 'dictionary') === 'dictionary') {
-      nextPrefs.promptForm = 'random';
-    }
-    if (mode !== 'transformation' && activeDrillMode === 'transformation') {
-      nextPrefs.promptForm = 'dictionary';
-    }
-    setPracticePrefs(nextPrefs);
-    if (leavingMinimalPair && setState) {
-      const enabledTypes = minimalPairReturnEnabledTypes(practicePrefs);
-      setState((prev) => ({ ...prev, enabledTypes: enabledTypes || [] }));
-    }
-    setTodayMinimalPairSetIds([]);
-    resetActiveAttempt();
-  }
-
-  function switchPracticeDirection(direction) {
-    const nextPrefs = clearReviewLimitPrefs({
-      ...practicePrefs,
-      drillDirection: direction,
-    });
-    if (transformationMode && (nextPrefs.promptForm || 'dictionary') === 'dictionary') {
-      nextPrefs.promptForm = 'random';
-    }
-    setPracticePrefs(nextPrefs);
-    setTodayMinimalPairSetIds([]);
-    resetActiveAttempt();
   }
 
   function launchTodayDrill() {
@@ -1296,6 +1212,7 @@ export default function StudyView() {
             current.id,
             practicePrefs,
             practiceRuleCandidates,
+            { bonusMode, wordLists },
           ),
         );
       }
@@ -1339,7 +1256,7 @@ export default function StudyView() {
           state.mistakes,
           current.verb,
           current.type,
-          reverseDrill ? current.type : promptType,
+          reverseDrill ? sourceTypeForReading : promptType,
           spoken || reverseDrill ? raw.trim() : normalized,
           expected,
           mistakeRecordOptions(),
@@ -1349,6 +1266,9 @@ export default function StudyView() {
     const nextState = {
       ...state,
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
+      retryQueue: ok
+        ? (state.retryQueue || []).filter((id) => id !== rid)
+        : [...new Set([...(state.retryQueue || []), rid])].slice(-20),
       verbStats: newVerbStats,
       mistakes: nextMistakes,
       readiness: recordReadinessAttempt(state.readiness, rid, {
@@ -1356,10 +1276,8 @@ export default function StudyView() {
         responseMs,
         answerMode,
         kanaAssist: 'live',
-        drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
-      ...(transformationAttempt ? { transformation: transformationStatsAfter(ok) } : {}),
       minimalPairs: nextMinimalPairProgress(ok),
       session: {
         ...bumpSessionMistakePattern(
@@ -1422,6 +1340,7 @@ export default function StudyView() {
             current.id,
             practicePrefs,
             practiceRuleCandidates,
+            { bonusMode, wordLists },
           ),
         );
       }, 850);
@@ -1465,6 +1384,7 @@ export default function StudyView() {
         current.id,
         practicePrefs,
         practiceRuleCandidates,
+        { bonusMode, wordLists },
       ),
     );
   }
@@ -1492,7 +1412,7 @@ export default function StudyView() {
           state.mistakes,
           current.verb,
           current.type,
-          reverseDrill ? current.type : promptType,
+          reverseDrill ? sourceTypeForReading : promptType,
           `self-check: ${label}`,
           expected,
           mistakeRecordOptions(),
@@ -1502,6 +1422,9 @@ export default function StudyView() {
     const nextState = {
       ...state,
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
+      retryQueue: ok
+        ? (state.retryQueue || []).filter((id) => id !== rid)
+        : [...new Set([...(state.retryQueue || []), rid])].slice(-20),
       verbStats: newVerbStats,
       mistakes: nextMistakes,
       readiness: recordReadinessAttempt(state.readiness, rid, {
@@ -1509,10 +1432,8 @@ export default function StudyView() {
         responseMs,
         answerMode,
         kanaAssist: 'live',
-        drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
-      ...(transformationAttempt ? { transformation: transformationStatsAfter(ok) } : {}),
       minimalPairs: nextMinimalPairProgress(ok),
       session: {
         ...bumpSessionMistakePattern(
@@ -1570,6 +1491,7 @@ export default function StudyView() {
             current.id,
             practicePrefs,
             practiceRuleCandidates,
+            { bonusMode, wordLists },
           ),
         );
       }, 850);
@@ -1598,7 +1520,7 @@ export default function StudyView() {
       state.mistakes,
       current.verb,
       current.type,
-      reverseDrill ? current.type : promptType,
+      reverseDrill ? sourceTypeForReading : promptType,
       '(revealed)',
       expected,
       mistakeRecordOptions(),
@@ -1607,6 +1529,7 @@ export default function StudyView() {
     const nextState = {
       ...state,
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], false) },
+      retryQueue: [...new Set([...(state.retryQueue || []), rid])].slice(-20),
       verbStats: newVerbStats,
       mistakes: nextMistakes,
       readiness: recordReadinessAttempt(state.readiness, rid, {
@@ -1614,10 +1537,8 @@ export default function StudyView() {
         responseMs,
         answerMode,
         kanaAssist: 'live',
-        drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
-      ...(transformationAttempt ? { transformation: transformationStatsAfter(false) } : {}),
       minimalPairs: nextMinimalPairProgress(false),
       session: {
         ...bumpSessionMistakePattern(
@@ -1786,6 +1707,7 @@ export default function StudyView() {
                 current?.id,
                 practicePrefs,
                 practiceRuleCandidates,
+                { bonusMode: true, wordLists },
               ),
             );
             setPhase('answering');
@@ -1875,6 +1797,7 @@ export default function StudyView() {
                 current.id,
                 practicePrefs,
                 practiceRuleCandidates,
+                { bonusMode, wordLists },
               ),
             );
             setAnswer('');
@@ -1919,7 +1842,7 @@ export default function StudyView() {
             <ChatPanel
               mode="coach"
               verb={current.verb}
-              type={current.type}
+              type={practicedType}
               userAnswer={coachSeedAnswer}
               geminiKey={geminiKey}
               practicePrefs={practicePrefs}
@@ -1959,70 +1882,21 @@ export default function StudyView() {
           </button>
         </div>
       )}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div
-          role="group"
-          aria-label="Study mode"
-          className="grid grid-cols-3 gap-1 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-1"
-        >
-          {STUDY_MODE_OPTIONS.map((mode) => {
-            const active = activeDrillMode === mode.id;
-            return (
-              <button
-                key={mode.id}
-                type="button"
-                onClick={() => switchStudyMode(mode.id)}
-                aria-pressed={active}
-                className={`min-h-10 rounded-lg px-2 py-2 text-xs sm:text-sm font-medium leading-tight transition ${
-                  active
-                    ? 'bg-stone-800 text-white dark:bg-indigo-600'
-                    : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
-                }`}
-              >
-                {mode.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex flex-col gap-2 sm:items-end">
-          {transformationMode && (
-            <div className="text-xs text-stone-500 dark:text-stone-400 tabular-nums sm:pr-1">
-              {transformationStats.correct || 0}/{transformationStats.attempted || 0} transform
-              {transformationStats.attempted ? ` · ${transformationAccuracy}%` : ''}
-            </div>
-          )}
-          <div
-            role="group"
-            aria-label="Practice direction"
-            className="grid grid-cols-3 gap-1 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-1"
-          >
-            {PRACTICE_DIRECTIONS.map((direction) => {
-              const active =
-                (practicePrefs.drillDirection || DEFAULT_PREFS.drillDirection) === direction.id;
-              return (
-                <button
-                  key={direction.id}
-                  type="button"
-                  onClick={() => switchPracticeDirection(direction.id)}
-                  aria-pressed={active}
-                  title={
-                    direction.id === 'forward'
-                      ? 'Dictionary or source form to target form'
-                      : direction.id === 'reverse'
-                        ? 'Conjugated form to dictionary form'
-                        : 'Alternate both directions'
-                  }
-                  className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
-                    active
-                      ? 'bg-stone-800 text-white dark:bg-indigo-600'
-                      : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
-                  }`}
-                >
-                  {direction.label}
-                </button>
-              );
-            })}
+      <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3">
+        <div className="text-left">
+          <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
+            Review
           </div>
+          <div className="text-sm text-stone-600 dark:text-stone-300">
+            {reverseDrill ? 'Reading practice' : 'Form practice'}
+          </div>
+        </div>
+        <div className="text-xs text-stone-400 text-right">
+          {(practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'forms'
+            ? 'Forms only'
+            : (practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'reading'
+              ? 'Reading'
+              : 'Auto'}
         </div>
       </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
@@ -2095,30 +1969,12 @@ export default function StudyView() {
                 </button>
               </div>
             </div>
-          ) : practicePrefs.drillMode === 'sentence' && aiSentence ? (
-            aiSentence.loading ? (
-              <div className="text-xl sm:text-2xl text-stone-400 italic py-6 animate-pulse">
-                Generating sentence context...
-              </div>
-            ) : aiSentence.err ? (
-              <div className="text-rose-500 py-6 text-sm">{aiSentence.err}</div>
-            ) : (
-              <div
-                className="text-2xl sm:text-3xl font-medium mb-4 text-center leading-relaxed tracking-wide text-stone-850 dark:text-stone-150"
-                lang="ja"
-              >
-                {aiSentence.sentence}
-              </div>
-            )
           ) : (
             <ScriptDisplay
               view={promptView}
               className="text-4xl sm:text-5xl font-medium mb-2 text-stone-900 dark:text-stone-100"
               subClassName="text-base text-stone-500"
             />
-          )}
-          {transformationMode && !hidePromptText && (
-            <div className="mt-1 text-xs text-stone-400">Prompt form: {sourceTypeInfo.label}.</div>
           )}
           {noChangePrompt && !hidePromptText && (
             <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium">
@@ -2163,13 +2019,6 @@ export default function StudyView() {
                     Retry
                   </button>
                 </div>
-              )}
-            </div>
-          ) : practicePrefs.drillMode === 'sentence' && aiSentence && !aiSentence.loading ? (
-            <div className="space-y-1 mt-2">
-              <div className="text-sm text-stone-500 italic">Context: {aiSentence.translation}</div>
-              {aiSentence.cue && (
-                <div className="text-xs text-indigo-600 dark:text-indigo-400">{aiSentence.cue}</div>
               )}
             </div>
           ) : (
@@ -2319,7 +2168,7 @@ export default function StudyView() {
                           <ScriptDisplay
                             view={expectedView}
                             word={current.verb}
-                            type={current.type}
+                            type={practicedType}
                             colorHighlight={practicePrefs.colorCodeConjugations !== false}
                             className="text-2xl font-semibold text-stone-900 dark:text-stone-100"
                             subClassName="text-xs text-stone-500 mt-1"
@@ -2962,7 +2811,7 @@ export default function StudyView() {
                               <ScriptDisplay
                                 view={expectedView}
                                 word={current.verb}
-                                type={current.type}
+                                type={practicedType}
                                 colorHighlight={practicePrefs.colorCodeConjugations !== false}
                                 className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
                                 subClassName="text-xs text-stone-500 mt-1"
@@ -3039,7 +2888,7 @@ export default function StudyView() {
                         <ScriptDisplay
                           view={expectedView}
                           word={current.verb}
-                          type={current.type}
+                          type={practicedType}
                           colorHighlight={practicePrefs.colorCodeConjugations !== false}
                           className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
                           subClassName="text-xs text-stone-500 mt-1"
@@ -3063,7 +2912,7 @@ export default function StudyView() {
 
                 <ContextExamplePanel
                   item={current.verb}
-                  type={current.type}
+                  type={practicedType}
                   geminiKey={geminiKey}
                   practicePrefs={practicePrefs}
                 />
@@ -3100,7 +2949,7 @@ export default function StudyView() {
                       )}
                       <ConjugationBreakdown
                         word={current.verb}
-                        type={current.type}
+                        type={practicedType}
                         geminiKey={geminiKey}
                         practicePrefs={practicePrefs}
                       />
@@ -3216,7 +3065,7 @@ export default function StudyView() {
                       )}
                       <ConjugationBreakdown
                         word={current.verb}
-                        type={current.type}
+                        type={practicedType}
                         userAnswer={revealedMiss ? '' : submittedAnswer}
                         geminiKey={geminiKey}
                         practicePrefs={practicePrefs}
@@ -3235,7 +3084,7 @@ export default function StudyView() {
                         ) : (
                           <ChatPanel
                             verb={current.verb}
-                            type={current.type}
+                            type={practicedType}
                             userAnswer={revealedMiss ? '(revealed)' : submittedAnswer}
                             expected={expected}
                             explanation={explanation}

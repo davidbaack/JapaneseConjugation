@@ -211,7 +211,6 @@ function minimalPairReturnFromPrefs(prefs = {}, options = {}) {
   const wordTypes = copyArray(prefs.wordTypes);
   const wordGroups = copyArray(prefs.wordGroups);
   const enabledTypes = copyArray(options.enabledTypes);
-  if (typeof prefs.drillMode === 'string') snapshot.drillMode = prefs.drillMode;
   if (wordListIds) snapshot.wordListIds = wordListIds;
   if (wordTypes) snapshot.wordTypes = wordTypes;
   if (wordGroups) snapshot.wordGroups = wordGroups;
@@ -223,7 +222,6 @@ function restoreMinimalPairReturn(prefs = {}) {
   const saved = prefs.minimalPairReturn;
   if (!saved || typeof saved !== 'object') return { ...prefs };
   const restored = { ...prefs };
-  if (typeof saved.drillMode === 'string') restored.drillMode = saved.drillMode;
   if (Array.isArray(saved.wordListIds)) restored.wordListIds = [...saved.wordListIds];
   if (Array.isArray(saved.wordTypes)) restored.wordTypes = [...saved.wordTypes];
   if (Array.isArray(saved.wordGroups)) restored.wordGroups = [...saved.wordGroups];
@@ -244,7 +242,6 @@ export function practicePrefsForMinimalPairSet(set, prefs = {}, options = {}) {
     ...prefs,
     minimalPairSetId: set?.id || '',
     minimalPairReturn,
-    drillMode: 'word',
     wordListIds: [],
     wordTypes: set?.wordTypes || prefs.wordTypes,
     wordGroups: set?.wordGroups || prefs.wordGroups,

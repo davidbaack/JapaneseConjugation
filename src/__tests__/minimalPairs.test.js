@@ -43,10 +43,9 @@ describe('minimal-pair drill library', () => {
     expect([TABERU.dict, HASHIRU.dict]).toContain(card.verb.dict);
   });
 
-  it('restores the prior list, filters, mode, and types after a drill', () => {
+  it('restores the prior list, filters, and types after a drill', () => {
     const set = getMinimalPairSet('ichidan-godan-ru');
     const original = {
-      drillMode: 'transformation',
       wordListIds: ['favorites'],
       wordTypes: ['verb', 'i-adjective'],
       wordGroups: ['ichidan', 'godan', 'i-adjective'],
@@ -57,7 +56,6 @@ describe('minimal-pair drill library', () => {
 
     expect(prefs).toMatchObject({
       minimalPairSetId: set.id,
-      drillMode: 'word',
       wordListIds: [],
       wordTypes: set.wordTypes,
       wordGroups: set.wordGroups,
@@ -68,7 +66,6 @@ describe('minimal-pair drill library', () => {
     expect(restored).toMatchObject({
       minimalPairSetId: '',
       minimalPairReturn: null,
-      drillMode: 'transformation',
       wordListIds: ['favorites'],
       wordTypes: ['verb', 'i-adjective'],
       wordGroups: ['ichidan', 'godan', 'i-adjective'],

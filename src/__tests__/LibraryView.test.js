@@ -167,7 +167,8 @@ describe('reference practice launch helpers', () => {
     expect(prefs.wordGroups).toEqual(['godan']);
     expect(prefs.wordTypes).toEqual(['verb']);
     expect(prefs.wordListIds).toEqual([]);
-    expect(prefs.drillDirection).toBe('forward');
+    expect(prefs.reviewStyle).toBe('forms');
+    expect(prefs.sourceFormStrategy).toBe('dictionary');
   });
 
   it('stores and exposes weak reference rules without duplicates', () => {

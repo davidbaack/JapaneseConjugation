@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { IconSpark, IconFlame } from '../components/Icons.jsx';
 import { ALL_CARD_TYPES, TYPE_LABEL } from '../data/conjugationTypes.js';
 import { RULES, wordKey } from '../utils/conjugator.js';
-import { defaultState } from '../utils/storage.js';
+import { defaultState, typeIdFromCardId, wordKeyFromCardId } from '../utils/storage.js';
 import {
   FAST_RESPONSE_MS,
   READINESS_DIMENSIONS,
@@ -38,7 +38,7 @@ function srsForecastFor(state) {
   const endOfTodayMs = endOfToday.getTime();
   const endOfTomorrow = endOfTodayMs + DAY;
 
-  const future = RULES.map((rule) => state?.cards?.[rule.id])
+  const future = Object.values(state?.cards || {})
     .filter((c) => c && c.nextReview > now)
     .map((c) => c.nextReview)
     .sort((a, b) => a - b);
@@ -52,7 +52,7 @@ function srsForecastFor(state) {
   };
 }
 
-function srsStatsFor(state, verbs) {
+function srsStatsFor(state) {
   const now = Date.now();
   let totalReviews = 0,
     totalCorrect = 0,
@@ -62,13 +62,10 @@ function srsStatsFor(state, verbs) {
     fresh = 0,
     total = 0;
   const leeches = [];
-  const enabled = state.enabledTypes || [];
-
-  for (const rule of RULES) {
-    if (!enabled.includes(rule.type)) continue;
-    if (!rule.verbFilter(verbs).length) continue;
+  for (const [id, c] of Object.entries(state.cards || {})) {
+    const typeId = typeIdFromCardId(id);
+    if (typeId === 'dictionary') continue;
     total++;
-    const c = state.cards[rule.id];
     if (!c) {
       fresh++;
       continue;
@@ -79,7 +76,7 @@ function srsStatsFor(state, verbs) {
     if (c.interval >= 30) mastered++;
     else learning++;
     if (c.incorrect >= 3 && c.incorrect > c.correct * 0.5) {
-      leeches.push({ id: rule.id, rule, card: c });
+      leeches.push({ id, typeId, card: c });
     }
   }
   leeches.sort((a, b) => b.card.incorrect - a.card.incorrect);
@@ -129,7 +126,7 @@ function speedToneFor(avgMs) {
   };
 }
 
-function formAccuracyRows(state, verbs) {
+function formAccuracyRows(state) {
   const enabled =
     state.enabledTypes && state.enabledTypes.length
       ? state.enabledTypes
@@ -138,17 +135,14 @@ function formAccuracyRows(state, verbs) {
   const now = Date.now();
   return ALL_CARD_TYPES.filter((t) => enabled.includes(t.id))
     .map((t) => {
-      const rules = RULES.filter((r) => r.type === t.id && r.verbFilter(verbs).length > 0);
       let correct = 0,
         incorrect = 0,
         due = 0,
         fresh = 0;
-      for (const rule of rules) {
-        const card = cards[rule.id];
-        if (!card) {
-          fresh++;
-          continue;
-        }
+      let cardCount = 0;
+      for (const [cardId, card] of Object.entries(cards)) {
+        if (typeIdFromCardId(cardId) !== t.id) continue;
+        cardCount++;
         correct += card.correct || 0;
         incorrect += card.incorrect || 0;
         if (card.nextReview <= now) due++;
@@ -156,7 +150,7 @@ function formAccuracyRows(state, verbs) {
       const attempted = correct + incorrect;
       return {
         type: t,
-        rules: rules.length,
+        rules: cardCount,
         correct,
         incorrect,
         attempted,
@@ -176,12 +170,52 @@ function formAccuracyRows(state, verbs) {
     });
 }
 
-function skillRadarScores(state, verbs) {
-  const srs = srsStatsFor(state, verbs);
+function wordAccuracyRows(state) {
+  const rows = new Map();
+  for (const [cardId, card] of Object.entries(state.cards || {})) {
+    const word = wordKeyFromCardId(cardId);
+    if (!word) continue;
+    const row = rows.get(word) || { word, correct: 0, incorrect: 0, due: 0, cards: 0 };
+    row.correct += card.correct || 0;
+    row.incorrect += card.incorrect || 0;
+    row.due += card.nextReview <= Date.now() ? 1 : 0;
+    row.cards += 1;
+    rows.set(word, row);
+  }
+  return [...rows.values()]
+    .map((row) => ({
+      ...row,
+      attempted: row.correct + row.incorrect,
+      accuracy: pct(row.correct, row.correct + row.incorrect),
+    }))
+    .sort((a, b) => {
+      if (a.attempted && b.attempted && a.accuracy !== b.accuracy) return a.accuracy - b.accuracy;
+      if (a.incorrect !== b.incorrect) return b.incorrect - a.incorrect;
+      return a.word.localeCompare(b.word);
+    });
+}
+
+function weakCardRows(state) {
+  const now = Date.now();
+  return Object.entries(state.cards || {})
+    .map(([cardId, card]) => ({
+      cardId,
+      word: wordKeyFromCardId(cardId),
+      typeId: typeIdFromCardId(cardId),
+      correct: card.correct || 0,
+      incorrect: card.incorrect || 0,
+      due: card.nextReview <= now,
+    }))
+    .filter((row) => row.correct + row.incorrect > 0)
+    .sort((a, b) => b.incorrect - a.incorrect || Number(b.due) - Number(a.due))
+    .slice(0, 12);
+}
+
+function skillRadarScores(state) {
+  const srs = srsStatsFor(state);
   const meaning = state.meaning || defaultState().meaning;
   const classify = state.classify || defaultState().classify;
   const mock = state.mock || defaultState().mock;
-  const transformation = state.transformation || defaultState().transformation;
   const daily = state.daily || defaultState().daily;
   const retention = srs.total ? Math.round((srs.mastered / srs.total) * 100) : 0;
   const consistency = Math.min(
@@ -202,19 +236,13 @@ function skillRadarScores(state, verbs) {
       id: 'retention',
       label: 'Retention',
       score: retention,
-      detail: `${srs.mastered}/${srs.total || 0} rules mastered`,
+      detail: `${srs.mastered}/${srs.total || 0} cards mastered`,
     },
     {
       id: 'vocabulary',
       label: 'Meaning',
       score: pct(meaning.correct || 0, meaning.attempted || 0),
       detail: `${meaning.correct || 0}/${meaning.attempted || 0} meaning checks`,
-    },
-    {
-      id: 'transformation',
-      label: 'Transform',
-      score: pct(transformation.correct || 0, transformation.attempted || 0),
-      detail: `${transformation.correct || 0}/${transformation.attempted || 0} transforms`,
     },
     {
       id: 'classification',
@@ -255,10 +283,12 @@ export default function StatsView() {
     wordLists,
     setWordLists,
   } = useApp();
-  const stats = useMemo(() => srsStatsFor(state, verbs), [state, verbs]);
+  const stats = useMemo(() => srsStatsFor(state), [state]);
   const srsForecast = useMemo(() => srsForecastFor(state), [state]);
-  const radar = useMemo(() => skillRadarScores(state, verbs), [state, verbs]);
-  const formRowsData = useMemo(() => formAccuracyRows(state, verbs), [state, verbs]);
+  const radar = useMemo(() => skillRadarScores(state), [state]);
+  const formRowsData = useMemo(() => formAccuracyRows(state), [state]);
+  const wordRowsData = useMemo(() => wordAccuracyRows(state), [state]);
+  const weakCardsData = useMemo(() => weakCardRows(state), [state]);
   const readinessRows = useMemo(() => buildReadinessMap(state, verbs), [state, verbs]);
   const speedRows = useMemo(() => buildConjugationSpeedRows(state, verbs), [state, verbs]);
   const fastestSpeedRow = speedRows.length
@@ -287,8 +317,6 @@ export default function StatsView() {
   );
   const [showAllPatterns, setShowAllPatterns] = useState(false);
   const visiblePatterns = showAllPatterns ? mistakePatterns : mistakePatterns.slice(0, 6);
-  const transformation = state.transformation || defaultState().transformation;
-  const transformationAccuracy = pct(transformation.correct || 0, transformation.attempted || 0);
   const weakestForms = formRowsData.filter((row) => row.attempted > 0).slice(0, 8);
   const weakest = radar.slice().sort((a, b) => a.score - b.score)[0];
   const [aiText, setAiText] = useState('');
@@ -459,7 +487,7 @@ export default function StatsView() {
           .join('\n') || 'No completion speed data yet';
       const leechText =
         stats.leeches
-          .map((l) => `${l.rule.label} ${TYPE_LABEL[l.rule.type]}: ${l.card.incorrect} misses`)
+          .map((l) => `${TYPE_LABEL[l.typeId] || l.typeId}: ${l.card.incorrect} misses`)
           .join('\n') || 'No leeches yet';
       const prompt = `Create a focused Japanese conjugation study plan from these app stats.\n\nSkill radar:\n${radarText}\n\nForm accuracy:\n${formText}\n\nCompletion speed:\n${speedText}\n\nWeak cards:\n${leechText}\n\nGive a 7-day plan with one tiny daily drill, what to do in this app, and one success metric per day. Be concise and practical.`;
       const reply = await callGemini(
@@ -504,14 +532,7 @@ export default function StatsView() {
         <Stat label="Learning" value={stats.learning} />
         <Stat label="Mastered" value={stats.mastered} />
         <Stat label="New" value={stats.fresh} />
-        <Stat
-          label="Transform"
-          value={
-            transformation.attempted
-              ? `${transformationAccuracy}%`
-              : `${transformation.correct || 0}/${transformation.attempted || 0}`
-          }
-        />
+        <Stat label="Weak cards" value={weakCardsData.length} />
       </div>
       {(srsForecast.in1h > 0 ||
         srsForecast.in4h > 0 ||
@@ -623,6 +644,78 @@ export default function StatsView() {
           </div>
           <div className="text-xs text-stone-500 mt-2">
             {stats.totalCorrect} correct / {stats.totalReviews} reviews / {stats.total} rules
+          </div>
+        </div>
+      </div>
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+          <h3 className="font-medium text-stone-950 dark:text-stone-50">Word proficiency</h3>
+          <p className="text-xs text-stone-500 mt-0.5 mb-3">
+            Lowest practiced words first, rolled up from their active word-form cards.
+          </p>
+          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+            {wordRowsData.slice(0, 12).map((row) => (
+              <div
+                key={row.word}
+                className="rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-2"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-stone-800 dark:text-stone-200 truncate">
+                      {row.word}
+                    </div>
+                    <div className="text-xs text-stone-500">
+                      {row.cards} form{row.cards === 1 ? '' : 's'} / {row.due} due
+                    </div>
+                  </div>
+                  <div className="text-right text-xs tabular-nums text-stone-500">
+                    <div className="font-semibold text-stone-800 dark:text-stone-200">
+                      {row.attempted ? `${row.accuracy}%` : 'new'}
+                    </div>
+                    <div>
+                      {row.correct}/{row.attempted}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {wordRowsData.length === 0 && (
+              <p className="text-sm text-stone-500">No word-form SRS attempts yet.</p>
+            )}
+          </div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+          <h3 className="font-medium text-stone-950 dark:text-stone-50">Exact weak cards</h3>
+          <p className="text-xs text-stone-500 mt-0.5 mb-3">
+            Specific word + form cards with the most misses.
+          </p>
+          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+            {weakCardsData.map((row) => (
+              <div
+                key={row.cardId}
+                className="rounded-xl border border-stone-200 dark:border-stone-800 px-3 py-2"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-stone-800 dark:text-stone-200 truncate">
+                      {row.word}
+                    </div>
+                    <div className="text-xs text-stone-500 truncate">
+                      {TYPE_LABEL[row.typeId] || row.typeId}
+                    </div>
+                  </div>
+                  <div className="text-right text-xs tabular-nums text-stone-500">
+                    <div className="font-semibold text-rose-700 dark:text-rose-300">
+                      {row.incorrect} miss{row.incorrect === 1 ? '' : 'es'}
+                    </div>
+                    <div>{row.due ? 'due now' : `${row.correct} correct`}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {weakCardsData.length === 0 && (
+              <p className="text-sm text-stone-500">No weak word-form cards yet.</p>
+            )}
           </div>
         </div>
       </div>
@@ -751,7 +844,7 @@ export default function StatsView() {
         ) : (
           <div className="overflow-x-auto -mx-2 px-2">
             <div className="min-w-[780px]">
-              <div className="grid grid-cols-[minmax(190px,1.2fr)_repeat(4,minmax(120px,1fr))] gap-2 px-1 pb-2 text-[11px] font-semibold text-stone-500">
+              <div className="grid grid-cols-[minmax(190px,1.2fr)_repeat(3,minmax(120px,1fr))] gap-2 px-1 pb-2 text-[11px] font-semibold text-stone-500">
                 <div>Skill</div>
                 {READINESS_DIMENSIONS.map((dimension) => (
                   <div key={dimension.id}>{dimension.label}</div>
@@ -761,7 +854,7 @@ export default function StatsView() {
                 {readinessVisibleRows.map((row) => (
                   <div
                     key={row.ruleId}
-                    className="grid grid-cols-[minmax(190px,1.2fr)_repeat(4,minmax(120px,1fr))] gap-2"
+                    className="grid grid-cols-[minmax(190px,1.2fr)_repeat(3,minmax(120px,1fr))] gap-2"
                   >
                     <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/70 dark:bg-stone-950/60 px-3 py-2 min-w-0">
                       <div className="text-sm font-medium text-stone-800 dark:text-stone-100 truncate">
@@ -773,10 +866,7 @@ export default function StatsView() {
                     </div>
                     {READINESS_DIMENSIONS.map((dimension) => {
                       const cell = row.cells[dimension.id];
-                      const isSentenceUntested =
-                        dimension.id === 'sentence' && cell.status === 'untested';
-                      const actionable =
-                        cell.status !== 'strong' && row.wordCount > 0 && !isSentenceUntested;
+                      const actionable = cell.status !== 'strong' && row.wordCount > 0;
                       const className = `h-full w-full rounded-xl border px-2.5 py-2 text-left transition ${readinessCellClass(cell.status)} ${
                         actionable
                           ? 'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 dark:focus:ring-offset-stone-900'
@@ -786,12 +876,7 @@ export default function StatsView() {
                         <>
                           <div className="text-xs font-semibold">{cell.label}</div>
                           <div className="text-[11px] opacity-80 tabular-nums">{cell.detail}</div>
-                          {isSentenceUntested && (
-                            <div className="mt-1 text-[11px] opacity-70">
-                              Needs AI sentence mode
-                            </div>
-                          )}
-                          {actionable && !isSentenceUntested && (
+                          {actionable && (
                             <div className="mt-1 text-[11px] font-medium">
                               {cell.status === 'untested' ? 'Start' : 'Drill'}
                             </div>
@@ -888,7 +973,7 @@ export default function StatsView() {
                   <span>{row.due} due</span>
                   {row.fresh > 0 && (
                     <span>
-                      {row.fresh} new rule{row.fresh === 1 ? '' : 's'}
+                      {row.fresh} new card{row.fresh === 1 ? '' : 's'}
                     </span>
                   )}
                 </div>
@@ -1068,9 +1153,9 @@ export default function StatsView() {
               >
                 <div>
                   <span className="font-medium text-stone-700 dark:text-stone-300">
-                    {l.rule.label}
+                    {l.id.split('|')[0]}
                   </span>
-                  <span className="text-xs text-stone-400 ml-2">{TYPE_LABEL[l.rule.type]}</span>
+                  <span className="text-xs text-stone-400 ml-2">{TYPE_LABEL[l.typeId]}</span>
                 </div>
                 <div className="text-xs text-rose-600 dark:text-rose-450">
                   {l.card.incorrect} miss{l.card.incorrect === 1 ? '' : 'es'}
