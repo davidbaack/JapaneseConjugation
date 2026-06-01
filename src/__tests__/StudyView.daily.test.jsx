@@ -143,6 +143,30 @@ describe('StudyView daily startup guards', () => {
     expect(launchedToday(setPracticePrefs)).toBe(false);
   });
 
+  it('does not auto-start today over a persisted study card', async () => {
+    const setPracticePrefs = vi.fn();
+    const setWordLists = vi.fn();
+    const target = STARTER_VERBS[0];
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: target.dict,
+        reading: target.reading,
+        meaning: target.meaning,
+        group: target.group,
+        type: 'plain-past',
+        word: target,
+      }),
+    );
+    mockedApp.value = makeApp({ setPracticePrefs, setWordLists });
+
+    render(<StudyView />);
+
+    await screen.findByText(target.meaning, {}, { timeout: 5000 });
+    expect(setWordLists).not.toHaveBeenCalled();
+    expect(launchedToday(setPracticePrefs)).toBe(false);
+  });
+
   it('ignores a persisted card when its form is no longer enabled', async () => {
     sessionStorage.setItem(
       'jp-study-current',

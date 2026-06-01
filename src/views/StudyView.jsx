@@ -455,8 +455,9 @@ export default function StudyView() {
     !practicePrefs.minimalPairSetId &&
     !practicePrefs.reviewLimitSource &&
     (practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID);
+  const canResumePersistedCurrent = hasPersistedCurrent();
   const canResumeTodayDrill =
-    todayDrillActive && daily.date === localDateKey() && hasPersistedCurrent();
+    todayDrillActive && daily.date === localDateKey() && canResumePersistedCurrent;
   const specialLaunchActive =
     !!focus?.word ||
     !!focusWordLock ||
@@ -682,13 +683,21 @@ export default function StudyView() {
     if (autoStartedTodayRef.current) return;
     if (todayGoalHit) return;
     if (specialLaunchActive) return;
+    if (canResumePersistedCurrent) return;
     if (canResumeTodayDrill) return;
     if (!todayPlan.available) return;
     launchTodayDrill();
     // launchTodayDrill intentionally omitted so the auto-start decision keys off
     // the entry conditions, not a freshly allocated function each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, todayGoalHit, specialLaunchActive, canResumeTodayDrill, todayPlan]);
+  }, [
+    hydrated,
+    todayGoalHit,
+    specialLaunchActive,
+    canResumePersistedCurrent,
+    canResumeTodayDrill,
+    todayPlan,
+  ]);
 
   useEffect(() => {
     return () => {
