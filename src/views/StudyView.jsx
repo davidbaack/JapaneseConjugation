@@ -2228,18 +2228,12 @@ export default function StudyView() {
                           />
                           <div className="text-xs text-stone-500 mt-2">{targetEnglish}</div>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 mt-3">
+                        <div className="grid grid-cols-2 gap-2 mt-3">
                           <button
                             onClick={() => gradeSelfCheck(true, 'Remembered')}
                             className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition"
                           >
                             Remembered
-                          </button>
-                          <button
-                            onClick={() => gradeSelfCheck(false, 'Unsure')}
-                            className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-sm font-medium transition"
-                          >
-                            Unsure
                           </button>
                           <button
                             onClick={() => gradeSelfCheck(false, 'Missed')}
