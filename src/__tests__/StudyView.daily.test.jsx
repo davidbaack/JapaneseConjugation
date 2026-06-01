@@ -408,6 +408,36 @@ describe('StudyView daily startup guards', () => {
     expect(within(helper).getByText(firstKana)).toBeTruthy();
   });
 
+  it('shows a non-spoiler kana preview while typing reverse answers', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        drillDirection: 'reverse',
+      },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(
+      /Type dictionary form/i,
+      {},
+      { timeout: 5000 },
+    );
+    fireEvent.change(input, { target: { value: 'oki' } });
+
+    const preview = screen.getByRole('status', { name: 'Kana preview' });
+    expect(within(preview).getByText('お')).toBeTruthy();
+    expect(within(preview).getByText('き')).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Live kana help' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
+  });
+
   it('shows SRS queue progress for an active Today drill in Transform mode', async () => {
     const target = STARTER_VERBS[0];
     const type = 'plain-past';

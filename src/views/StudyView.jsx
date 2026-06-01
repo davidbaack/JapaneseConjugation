@@ -935,6 +935,11 @@ export default function StudyView() {
   const liveKana = typedAnswerMode && !reverseDrill;
   const coachPreview = toHiragana(answer);
   const coachProgress = toHiraganaProgress(answer);
+  const typedKanaPreview = coachProgress.trim();
+  const rawAnswerPreview = answer.trim();
+  const showReverseKanaPreview =
+    typedAnswerMode && reverseDrill && typedKanaPreview && typedKanaPreview !== rawAnswerPreview;
+  const reverseKanaPreviewCells = showReverseKanaPreview ? Array.from(typedKanaPreview) : [];
   const preview = coachPreview;
   const holdKanaFeedback = phase === 'answering' && !hadKanaMistakeRef.current;
   const coachCells = guidedKana
@@ -2666,76 +2671,34 @@ export default function StudyView() {
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        value={answer}
-                        onChange={(e) => {
-                          setTypoGuard(null);
-                          const newVal = e.target.value;
-                          if (liveKanaVisible && !reverseDrill) {
-                            const cells = kanaCoachCells(expected, newVal, coachRevealed, true);
-                            if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
-                              if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = newVal;
-                              hadKanaMistakeRef.current = true;
-                            }
-                          }
-                          setAnswer(newVal);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            if (answer.trim()) submit();
-                          } else if (e.key === 'Escape') {
-                            e.preventDefault();
-                            skipCurrent();
-                          }
-                        }}
-                        placeholder={
-                          reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'
-                        }
-                        aria-label={
-                          reverseDrill
-                            ? 'Type the dictionary form'
-                            : 'Type your answer in romaji or kana'
-                        }
-                        className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-transparent caret-stone-850 dark:caret-stone-150 focus:border-indigo-500 focus:outline-none transition"
-                        lang="ja"
-                        autoComplete="off"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        enterKeyHint="done"
-                        spellCheck="false"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setKanaPadOpen((v) => !v)}
-                        className={`shrink-0 p-2 rounded-lg border inline-flex items-center justify-center aspect-square transition ${
-                          kanaPadOpen
-                            ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
-                            : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
-                        }`}
-                        title="Kana pad"
+                    {showReverseKanaPreview && (
+                      <div
+                        role="status"
+                        aria-label="Kana preview"
+                        className="mb-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3"
                       >
-                        <IconPen className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <KanaInputPad
-                      open={kanaPadOpen}
-                      onToggle={() => setKanaPadOpen((v) => !v)}
-                      onInsert={insertAnswerText}
-                      onBackspace={backspaceAnswerText}
-                      onClear={clearAnswerText}
-                      onSubmit={() => submit()}
-                      canSubmit={!!answer.trim()}
-                      noToggle
-                    />
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                            Kana
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
+                          {reverseKanaPreviewCells.map((kana, i) => (
+                            <div
+                              key={`${kana}-${i}`}
+                              className="w-9 h-10 sm:w-10 sm:h-11 rounded-xl border border-stone-300 bg-white text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 flex items-center justify-center text-lg font-medium tabular-nums transition"
+                            >
+                              {kana}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {!!liveCells.length && liveKana && (
                       <div
                         role="group"
                         aria-label="Live kana help"
-                        className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3"
+                        className="mb-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3"
                       >
                         <div className="mb-2 flex items-center justify-between gap-2">
                           <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
@@ -2812,6 +2775,71 @@ export default function StudyView() {
                         )}
                       </div>
                     )}
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={answer}
+                        onChange={(e) => {
+                          setTypoGuard(null);
+                          const newVal = e.target.value;
+                          if (liveKanaVisible && !reverseDrill) {
+                            const cells = kanaCoachCells(expected, newVal, coachRevealed, true);
+                            if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
+                              if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = newVal;
+                              hadKanaMistakeRef.current = true;
+                            }
+                          }
+                          setAnswer(newVal);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (answer.trim()) submit();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            skipCurrent();
+                          }
+                        }}
+                        placeholder={
+                          reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'
+                        }
+                        aria-label={
+                          reverseDrill
+                            ? 'Type the dictionary form'
+                            : 'Type your answer in romaji or kana'
+                        }
+                        className="flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-transparent caret-stone-850 dark:caret-stone-150 focus:border-indigo-500 focus:outline-none transition"
+                        lang="ja"
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        enterKeyHint="done"
+                        spellCheck="false"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setKanaPadOpen((v) => !v)}
+                        className={`shrink-0 p-2 rounded-lg border inline-flex items-center justify-center aspect-square transition ${
+                          kanaPadOpen
+                            ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
+                            : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
+                        }`}
+                        title="Kana pad"
+                      >
+                        <IconPen className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <KanaInputPad
+                      open={kanaPadOpen}
+                      onToggle={() => setKanaPadOpen((v) => !v)}
+                      onInsert={insertAnswerText}
+                      onBackspace={backspaceAnswerText}
+                      onClear={clearAnswerText}
+                      onSubmit={() => submit()}
+                      canSubmit={!!answer.trim()}
+                      noToggle
+                    />
                     <StickyAction className="mt-3">
                       <button
                         onClick={() => submit()}
