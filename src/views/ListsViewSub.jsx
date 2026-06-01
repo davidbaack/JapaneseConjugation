@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { IconPlus, IconSpark } from '../components/Icons.jsx';
+import { IconCloud, IconPlus, IconSpark } from '../components/Icons.jsx';
 import { searchWords } from './ReferenceViewSub.jsx';
 import {
   isAdjective,
@@ -19,6 +19,12 @@ import {
   parseScannerAIWords,
 } from '../utils/gemini.js';
 import { VOCAB_PACKS, AI_LIST_TARGETS } from '../data/vocabPacks.js';
+import {
+  buildWanikaniImport,
+  getWanikaniScope,
+  WANIKANI_IMPORT_SCOPES,
+  wanikaniListId,
+} from '../utils/wanikani.js';
 
 // Helper functions for CSV/TSV export and imports
 export function parseWordRows(text) {
@@ -194,8 +200,21 @@ export default function ListsViewSub({
   const [aiRows, setAiRows] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiErr, setAiErr] = useState('');
+  const [wkToken, setWkToken] = useState('');
+  const [wkScope, setWkScope] = useState('passed');
+  const [wkLoading, setWkLoading] = useState(false);
+  const [wkErr, setWkErr] = useState('');
+  const [wkSummary, setWkSummary] = useState(null);
   const aiAbortRef = useRef(null);
+  const wkAbortRef = useRef(null);
   const active = wordLists.find((l) => l.id === activeId) || wordLists[0] || null;
+
+  useEffect(() => {
+    return () => {
+      aiAbortRef.current?.abort();
+      wkAbortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeId && wordLists[0]) setActiveId(wordLists[0].id);
@@ -270,6 +289,35 @@ export default function ListsViewSub({
     setMsg(`Imported ${rows.length} row${rows.length === 1 ? '' : 's'} into ${active.name}.`);
   }
 
+  function importRowsToList(rows, listId, listName, { enable = false } = {}) {
+    let verbs = customVerbs,
+      adjs = customAdjectives;
+    let nextLists = [...wordLists];
+    const existing = nextLists.find((l) => l.id === listId);
+    const keys = new Set(existing?.wordKeys || []);
+    const existingWordKeys = new Set(words.map(wordKey));
+    for (const row of rows) {
+      const key = wordKey(row);
+      if (!existingWordKeys.has(key)) {
+        if (isAdjective(row)) adjs = addUniqueWord(adjs, row);
+        else verbs = addUniqueWord(verbs, row);
+      }
+      keys.add(key);
+    }
+    const nextList = { id: listId, name: listName, wordKeys: [...keys] };
+    nextLists = existing
+      ? nextLists.map((l) => (l.id === listId ? { ...l, ...nextList } : l))
+      : [...nextLists, nextList];
+
+    setCustomVerbs(verbs);
+    setCustomAdjectives(adjs);
+    setWordLists(nextLists);
+    setActiveId(listId);
+    if (enable && !selectedIds.includes(listId)) {
+      setPracticePrefs({ ...practicePrefs, wordListIds: [...selectedIds, listId] });
+    }
+  }
+
   function importPacks(packs) {
     if (!packs.length) return [];
     let verbs = customVerbs,
@@ -321,6 +369,51 @@ export default function ListsViewSub({
     const ids = new Set(packs.map((p) => 'pack-' + p.id));
     setPracticePrefs({ ...practicePrefs, wordListIds: selectedIds.filter((x) => !ids.has(x)) });
     setMsg(`Disabled ${packs.length} ${level} pack${packs.length === 1 ? '' : 's'}. Lists kept.`);
+  }
+
+  async function importWaniKani() {
+    if (wkLoading) {
+      wkAbortRef.current?.abort();
+      wkAbortRef.current = null;
+      setWkLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    wkAbortRef.current = controller;
+    setWkLoading(true);
+    setWkErr('');
+    setWkSummary(null);
+    setMsg('');
+    try {
+      const result = await buildWanikaniImport(wkToken, wkScope, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (!result.words.length) {
+        setWkErr(
+          `No conjugatable verbs or adjectives found. Skipped ${result.skipped} unsupported item${
+            result.skipped === 1 ? '' : 's'
+          }.`,
+        );
+        return;
+      }
+      const scope = getWanikaniScope(wkScope);
+      const listId = wanikaniListId(scope.id);
+      importRowsToList(result.words, listId, scope.listName, { enable: true });
+      setWkSummary(result);
+      setMsg(
+        `Imported ${result.words.length} WaniKani word${
+          result.words.length === 1 ? '' : 's'
+        } into ${scope.listName} and enabled it for drills.`,
+      );
+    } catch (e) {
+      if (e?.name === 'AbortError') {
+        setMsg('WaniKani import canceled.');
+      } else {
+        setWkErr(e.message || 'WaniKani import failed.');
+      }
+    } finally {
+      if (wkAbortRef.current === controller) wkAbortRef.current = null;
+      setWkLoading(false);
+    }
   }
 
   async function generateAIList() {
@@ -571,6 +664,91 @@ export default function ListsViewSub({
               );
             })}
           </div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 className="font-medium flex items-center gap-2 text-stone-800 dark:text-stone-200">
+                <IconCloud className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                WaniKani import
+              </h3>
+              <p className="text-xs text-stone-500">
+                Bring over conjugatable verbs and adjectives from your WaniKani progress.
+              </p>
+            </div>
+            <button
+              onClick={importWaniKani}
+              disabled={!wkLoading && !wkToken.trim()}
+              aria-label="Import WaniKani words"
+              className="px-3 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-xl font-medium text-sm"
+            >
+              {wkLoading ? 'Cancel' : 'Import'}
+            </button>
+          </div>
+          <div className="grid md:grid-cols-[1fr_180px] gap-3">
+            <div>
+              <label className="text-xs text-stone-500 block mb-1">API token</label>
+              <input
+                type="password"
+                value={wkToken}
+                onChange={(e) => {
+                  setWkToken(e.target.value);
+                  setWkErr('');
+                  setWkSummary(null);
+                }}
+                placeholder="WaniKani v2 token"
+                aria-label="WaniKani API token"
+                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-sky-500 focus:outline-none"
+                autoCorrect="off"
+                spellCheck="false"
+              />
+              <div className="mt-1 text-[11px] text-stone-400">Held only in this tab.</div>
+            </div>
+            <div>
+              <label className="text-xs text-stone-500 block mb-1">Scope</label>
+              <select
+                value={wkScope}
+                onChange={(e) => {
+                  setWkScope(e.target.value);
+                  setWkErr('');
+                  setWkSummary(null);
+                }}
+                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-sky-500 focus:outline-none"
+              >
+                {WANIKANI_IMPORT_SCOPES.map((scope) => (
+                  <option key={scope.id} value={scope.id}>
+                    {scope.label}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-1 text-[11px] text-stone-400">
+                {getWanikaniScope(wkScope).description}
+              </div>
+            </div>
+          </div>
+          {wkErr && <div className="mt-2 text-sm text-rose-600">{wkErr}</div>}
+          {wkSummary && (
+            <div className="mt-3 grid sm:grid-cols-3 gap-2 text-xs">
+              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2">
+                <div className="text-stone-400">Matched</div>
+                <div className="font-medium text-stone-800 dark:text-stone-200">
+                  {wkSummary.assignments}
+                </div>
+              </div>
+              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2">
+                <div className="text-stone-400">Imported</div>
+                <div className="font-medium text-stone-800 dark:text-stone-200">
+                  {wkSummary.words.length}
+                </div>
+              </div>
+              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2">
+                <div className="text-stone-400">Skipped</div>
+                <div className="font-medium text-stone-800 dark:text-stone-200">
+                  {wkSummary.skipped}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
           <div className="flex items-start justify-between gap-3 mb-3">
