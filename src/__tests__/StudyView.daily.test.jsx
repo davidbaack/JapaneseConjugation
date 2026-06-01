@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
-import { conjugateItem } from '../utils/conjugator.js';
+import { conjugateItem, wordKey } from '../utils/conjugator.js';
 import { defaultState } from '../utils/storage.js';
 import { TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 
@@ -51,6 +51,45 @@ function goalHitState() {
 function launchedToday(setPracticePrefs) {
   return setPracticePrefs.mock.calls.some(([prefs]) =>
     (prefs?.wordListIds || []).includes(TODAY_DRILL_LIST_ID),
+  );
+}
+
+function stateWithDueRule(ruleId) {
+  return {
+    ...defaultState(),
+    cards: {
+      [ruleId]: {
+        ease: 2.5,
+        interval: 1,
+        reps: 1,
+        nextReview: 1,
+        correct: 0,
+        incorrect: 0,
+        lastSeen: 0,
+      },
+    },
+  };
+}
+
+function todayListFor(word) {
+  return {
+    id: TODAY_DRILL_LIST_ID,
+    name: "Today's Drill",
+    wordKeys: [wordKey(word)],
+  };
+}
+
+function persistStudyCard(word, type) {
+  sessionStorage.setItem(
+    'jp-study-current',
+    JSON.stringify({
+      dict: word.dict,
+      reading: word.reading,
+      meaning: word.meaning,
+      group: word.group,
+      type,
+      word,
+    }),
   );
 }
 
@@ -365,5 +404,70 @@ describe('StudyView daily startup guards', () => {
 
     await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
     expect(screen.queryByText('Self-corrected.')).toBeNull();
+  });
+
+  it('shows SRS queue progress for an active Today drill in Transform mode', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const dueRuleId = `${target.group}|${type}`;
+    persistStudyCard(target, type);
+
+    mockedApp.value = makeApp({
+      state: stateWithDueRule(dueRuleId),
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        drillMode: 'transformation',
+        promptForm: 'random',
+        wordListIds: [TODAY_DRILL_LIST_ID],
+      },
+      wordLists: [todayListFor(target)],
+    });
+
+    render(<StudyView />);
+
+    expect(await screen.findByText('SRS Queue')).toBeTruthy();
+    expect(screen.getByText('0/1 cleared')).toBeTruthy();
+    expect(
+      (await screen.findByRole('button', { name: 'Transform' })).getAttribute('aria-pressed'),
+    ).toBe('true');
+  });
+
+  it('counts a correct Transform answer toward the SRS queue and daily progress', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const dueRuleId = `${target.group}|${type}`;
+    const state = stateWithDueRule(dueRuleId);
+    persistStudyCard(target, type);
+
+    mockedApp.value = makeApp({
+      state,
+      setState,
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        drillMode: 'transformation',
+        promptForm: 'random',
+        wordListIds: [TODAY_DRILL_LIST_ID],
+      },
+      wordLists: [todayListFor(target)],
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    const nextState = setState.mock.calls
+      .map(([arg]) => arg)
+      .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
+
+    expect(nextState).toBeTruthy();
+    expect(nextState.cards[dueRuleId].correct).toBe(1);
+    expect(nextState.daily.count).toBe(1);
+    expect(nextState.transformation.attempted).toBe(1);
+    expect(screen.getByText('1/1 cleared')).toBeTruthy();
   });
 });
