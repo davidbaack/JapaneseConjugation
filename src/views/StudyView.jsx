@@ -920,8 +920,9 @@ export default function StudyView() {
   const coachPreview = toHiragana(answer);
   const coachProgress = toHiraganaProgress(answer);
   const preview = coachPreview;
+  const holdKanaFeedback = phase === 'answering' && !hadKanaMistakeRef.current;
   const coachCells = guidedKana
-    ? kanaCoachCells(expected, answer, coachRevealed, phase === 'answering', greenRevealed)
+    ? kanaCoachCells(expected, answer, coachRevealed, holdKanaFeedback, greenRevealed)
     : [];
   const coachWrongIndex = coachCells.findIndex((c) => c.state === 'wrong');
   const coachTypedCount = Array.from(coachProgress).length;
@@ -935,7 +936,7 @@ export default function StudyView() {
           ? 'Extra kana after the answer.'
           : '';
   const liveCells = liveKana
-    ? kanaCoachCells(expected, answer, coachRevealed, phase === 'answering', greenRevealed)
+    ? kanaCoachCells(expected, answer, coachRevealed, holdKanaFeedback, greenRevealed)
     : [];
   const liveWrongIndex = liveCells.findIndex((c) => c.state === 'wrong' || c.state === 'extra');
   const liveStatus =

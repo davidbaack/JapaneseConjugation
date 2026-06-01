@@ -479,4 +479,34 @@ describe('StudyView daily startup guards', () => {
     expect(nextState.transformation.attempted).toBe(1);
     expect(screen.getByText('1/1 cleared')).toBeTruthy();
   });
+
+  it('keeps direct kana pending until a miss, then grades retyped kana immediately', async () => {
+    mockedApp.value = makeApp({
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'live',
+      },
+      studyFocus: {
+        word: STARTER_VERBS[0],
+        type: 'plain-past',
+      },
+    });
+
+    const { container } = render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'たべ' } });
+
+    await waitFor(() => {
+      expect(container.querySelectorAll('.border-emerald-300').length).toBe(1);
+    });
+
+    fireEvent.change(input, { target: { value: 'たなこ' } });
+    await waitFor(() => expect(screen.getByText('Kana 2 does not match yet.')).toBeTruthy());
+
+    fireEvent.change(input, { target: { value: 'たべ' } });
+    await waitFor(() => {
+      expect(container.querySelectorAll('.border-emerald-300').length).toBe(2);
+    });
+  });
 });

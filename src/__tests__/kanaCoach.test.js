@@ -13,6 +13,26 @@ describe('kanaCoachCells green water-mark', () => {
     expect(states(cells)).toEqual(['correct', 'correct', 'pending', 'empty']);
   });
 
+  it('keeps directly typed kana pending before a mistake', () => {
+    const cells = kanaCoachCells(expected, 'たべ', 0, true, 0);
+    expect(states(cells)).toEqual(['correct', 'pending', 'empty', 'empty']);
+  });
+
+  it('keeps directly typed wrong kana pending before a mistake', () => {
+    const cells = kanaCoachCells(expected, 'たな', 0, true, 0);
+    expect(states(cells)).toEqual(['correct', 'pending', 'empty', 'empty']);
+  });
+
+  it('can grade directly typed kana immediately after a mistake', () => {
+    const cells = kanaCoachCells(expected, 'たべ', 0, false, 0);
+    expect(states(cells)).toEqual(['correct', 'correct', 'empty', 'empty']);
+  });
+
+  it('can flag directly typed wrong kana immediately after a mistake', () => {
+    const cells = kanaCoachCells(expected, 'たな', 0, false, 0);
+    expect(states(cells)).toEqual(['correct', 'wrong', 'empty', 'empty']);
+  });
+
   it('keeps already-green kana green after a backspace (refills emptied cells)', () => {
     // Typed up to "たべま" so two kana committed green (water-mark = 2),
     // then backspaced down to just "た".
