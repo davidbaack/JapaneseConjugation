@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
@@ -259,25 +259,34 @@ describe('StudyView daily startup guards', () => {
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
   });
 
-  it('does not count a corrected mid-type kana mistake when kana assist is off', async () => {
+  it('controls live kana help from the Study answer box', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
     mockedApp.value = makeApp({
       practicePrefs: {
         ...DEFAULT_PREFS,
         kanaAssist: 'off',
       },
       studyFocus: {
-        word: STARTER_VERBS[0],
-        type: 'plain-past',
+        word: target,
+        type,
       },
     });
 
     render(<StudyView />);
 
-    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.change(input, { target: { value: 'tadeta' } });
-    fireEvent.change(input, { target: { value: 'tabeta' } });
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    const helper = await screen.findByRole('group', { name: 'Live kana help' }, { timeout: 5000 });
+    const firstKana = Array.from(conjugateItem(target, type))[0];
 
-    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
-    expect(screen.queryByText('Self-corrected.')).toBeNull();
+    fireEvent.click(within(helper).getByRole('button', { name: 'Reveal next kana' }));
+    expect(within(helper).getByText(firstKana)).toBeTruthy();
+
+    fireEvent.click(within(helper).getByRole('button', { name: 'Hide live kana help' }));
+    expect(within(helper).getByRole('button', { name: 'Show live kana help' })).toBeTruthy();
+    expect(within(helper).queryByText(firstKana)).toBeNull();
+
+    fireEvent.click(within(helper).getByRole('button', { name: 'Show live kana help' }));
+    expect(within(helper).getByText(firstKana)).toBeTruthy();
   });
 });

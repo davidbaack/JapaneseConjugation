@@ -8,6 +8,8 @@ import {
   IconPen,
   IconFlame,
   IconMic,
+  IconEye,
+  IconEyeOff,
 } from '../components/Icons.jsx';
 import {
   getSpeechRecognitionConstructor,
@@ -58,9 +60,7 @@ import {
   makeChoices,
   makeReverseChoices,
   dictionaryAnswerMatches,
-  kanaMatchDisplayForPrefs,
   normalizeAnswerMode,
-  resolveKanaAssist,
   typoGuardForAnswer,
   spokenAnswerResult,
 } from '../utils/display.js';
@@ -354,6 +354,7 @@ export default function StudyView() {
   const [selfCheckOpen, setSelfCheckOpen] = useState(false);
   const [typoGuard, setTypoGuard] = useState(null);
   const [kanaPadOpen, setKanaPadOpen] = useState(false);
+  const [liveKanaVisible, setLiveKanaVisible] = useState(true);
   const [speechListening, setSpeechListening] = useState(false);
   const [speechError, setSpeechError] = useState('');
   const [reviewBase, setReviewBase] = useState(state.session.reviewed || 0);
@@ -405,7 +406,6 @@ export default function StudyView() {
 
   const activeDrillMode = practicePrefs.drillMode || DEFAULT_PREFS.drillMode;
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
-  const kanaAssist = resolveKanaAssist(practicePrefs);
   const typedAnswerMode = answerMode === 'input';
   const transformationMode = activeDrillMode === 'transformation';
   const listeningPrompt = !!practicePrefs.listeningPrompt;
@@ -607,7 +607,7 @@ export default function StudyView() {
   useEffect(() => {
     setCoachRevealed(0);
     setGreenRevealed(0);
-  }, [current?.id, answerMode, kanaAssist]);
+  }, [current?.id, answerMode]);
 
   useEffect(() => {
     if (!current) return;
@@ -628,7 +628,6 @@ export default function StudyView() {
     if (phase !== 'answering') return;
     if (reverseDrill) return;
     if (!typedAnswerMode) return;
-    if (kanaAssist === 'off') return;
     const cells = kanaCoachCells(sourceForm, answer, 0, true, 0);
     let committed = 0;
     for (const c of cells) {
@@ -773,7 +772,7 @@ export default function StudyView() {
       : null;
   const englishHintsHidden =
     (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden';
-  const kanaMatchDisplay = kanaMatchDisplayForPrefs(practicePrefs);
+  const kanaMatchDisplay = 'color-count';
   const typeInfo = getTypeInfo(current.type);
   const sourceTypeId = reverseDrill ? current.type : promptType || DICTIONARY_TYPE_ID;
   const targetTypeId = reverseDrill ? DICTIONARY_TYPE_ID : current.type;
@@ -868,8 +867,9 @@ export default function StudyView() {
   const reviewComplete = dueQueueDone || dailyGoalJustHit;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishHint = englishHintsHidden && phase === 'answering' && !showEnglishHint;
-  const guidedKana = typedAnswerMode && kanaAssist === 'guided';
-  const liveKana = typedAnswerMode && kanaAssist === 'live';
+  // Guided kana is now an in-box "reveal next" action, not a separate mode.
+  const guidedKana = false;
+  const liveKana = typedAnswerMode && !reverseDrill;
   const coachPreview = toHiragana(answer);
   const coachProgress = toHiraganaProgress(answer);
   const preview = coachPreview;
@@ -887,10 +887,9 @@ export default function StudyView() {
         : coachTypedCount > expectedKanaCount
           ? 'Extra kana after the answer.'
           : '';
-  const liveCells =
-    liveKana && !reverseDrill
-      ? kanaCoachCells(expected, answer, 0, phase === 'answering', greenRevealed)
-      : [];
+  const liveCells = liveKana
+    ? kanaCoachCells(expected, answer, coachRevealed, phase === 'answering', greenRevealed)
+    : [];
   const liveWrongIndex = liveCells.findIndex((c) => c.state === 'wrong' || c.state === 'extra');
   const liveStatus =
     liveWrongIndex >= 0
@@ -902,8 +901,8 @@ export default function StudyView() {
         : '';
   const reviewAnswerSource = phase === 'reviewing' && submittedAnswer ? submittedAnswer : answer;
   const reviewKanaCells =
-    typedAnswerMode && kanaAssist !== 'off' && !reverseDrill
-      ? kanaCoachCells(expected, reviewAnswerSource, guidedKana ? coachRevealed : 0)
+    typedAnswerMode && !reverseDrill
+      ? kanaCoachCells(expected, reviewAnswerSource, coachRevealed)
       : [];
 
   function transformationStatsAfter(correct) {
@@ -1246,6 +1245,13 @@ export default function StudyView() {
     if (reveal) setHintRevealed(true);
   }
 
+  function revealNextKana() {
+    if (!current || reverseDrill || phase !== 'answering') return;
+    setLiveKanaVisible(true);
+    setCoachRevealed(Math.min(expectedKanaCount, Math.max(coachRevealed, coachTypedCount) + 1));
+    focusAnswerInput();
+  }
+
   // Opens a continuous AI chat for deeper help, seeded with the current
   // attempt. Snapshot the typed answer so the chat doesn't re-init on keypress.
   function openCoachChat() {
@@ -1335,7 +1341,7 @@ export default function StudyView() {
       : spoken
         ? spokenAnswerResult(spokenAnswerTargets, raw).ok
         : normalized === expected;
-    const ok = finalOk && (spoken || !(kanaMatchDisplay !== 'none' && hadKanaMistakeRef.current));
+    const ok = finalOk && (spoken || !hadKanaMistakeRef.current);
     const nearMiss =
       choiceValue === undefined && !spoken && !ok
         ? typoGuardForAnswer(raw, normalized, expected, current.verb, reverseDrill)
@@ -1378,7 +1384,7 @@ export default function StudyView() {
         correct: ok,
         responseMs,
         answerMode,
-        kanaAssist,
+        kanaAssist: 'live',
         drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
@@ -1518,7 +1524,7 @@ export default function StudyView() {
         correct: ok,
         responseMs,
         answerMode,
-        kanaAssist,
+        kanaAssist: 'live',
         drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
@@ -1619,7 +1625,7 @@ export default function StudyView() {
         correct: false,
         responseMs,
         answerMode,
-        kanaAssist,
+        kanaAssist: 'live',
         drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
@@ -1655,10 +1661,9 @@ export default function StudyView() {
 
   function insertAnswerText(text) {
     setTypoGuard(null);
-    if (typedAnswerMode && kanaMatchDisplay !== 'none' && (guidedKana || !reverseDrill)) {
+    if (typedAnswerMode && liveKanaVisible && !reverseDrill) {
       const newVal = answer + text;
-      const revealed = guidedKana ? coachRevealed : 0;
-      const cells = kanaCoachCells(expected, newVal, revealed, true);
+      const cells = kanaCoachCells(expected, newVal, coachRevealed, true);
       if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
         hadKanaMistakeRef.current = true;
       }
@@ -2669,8 +2674,8 @@ export default function StudyView() {
                         onChange={(e) => {
                           setTypoGuard(null);
                           const newVal = e.target.value;
-                          if (kanaMatchDisplay !== 'none' && !reverseDrill) {
-                            const cells = kanaCoachCells(expected, newVal, 0, true);
+                          if (liveKanaVisible && !reverseDrill) {
+                            const cells = kanaCoachCells(expected, newVal, coachRevealed, true);
                             if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
                               if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = newVal;
                               hadKanaMistakeRef.current = true;
@@ -2726,49 +2731,87 @@ export default function StudyView() {
                       canSubmit={!!answer.trim()}
                       noToggle
                     />
-                    {!!liveCells.length &&
-                      kanaMatchDisplay !== 'none' &&
-                      (kanaMatchDisplay === 'color-count' ||
-                        liveCells.some((c) => c.state !== 'empty')) && (
-                        <div className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3">
-                          <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                            {(kanaMatchDisplay === 'color-count'
-                              ? liveCells
-                              : liveCells.filter((c) => c.state !== 'empty')
-                            ).map((cell, i) => {
-                              const cls =
-                                cell.state === 'correct'
-                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
-                                  : cell.state === 'wrong' || cell.state === 'extra'
-                                    ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
-                                    : cell.state === 'pending'
-                                      ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
-                                      : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
-                              return (
-                                <div
-                                  key={i}
-                                  className={`w-9 h-10 sm:w-10 sm:h-11 rounded-xl border flex items-center justify-center text-lg font-medium tabular-nums transition ${cls}`}
-                                >
-                                  {cell.shown || '·'}
-                                </div>
-                              );
-                            })}
+                    {!!liveCells.length && liveKana && (
+                      <div
+                        role="group"
+                        aria-label="Live kana help"
+                        className="mt-3 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                            Kana
                           </div>
-                          {kanaMatchDisplay === 'color-count' && liveStatus && (
-                            <div
-                              className={`mt-2 text-xs text-center ${
-                                liveWrongIndex >= 0
-                                  ? 'text-rose-700'
-                                  : preview === expected
-                                    ? 'text-emerald-700'
-                                    : 'text-stone-500'
-                              }`}
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setLiveKanaVisible((v) => !v)}
+                              aria-label={
+                                liveKanaVisible ? 'Hide live kana help' : 'Show live kana help'
+                              }
+                              title={
+                                liveKanaVisible ? 'Hide live kana help' : 'Show live kana help'
+                              }
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-600 transition hover:bg-stone-100 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
                             >
-                              {liveStatus}
-                            </div>
-                          )}
+                              {liveKanaVisible ? (
+                                <IconEyeOff className="w-4 h-4" />
+                              ) : (
+                                <IconEye className="w-4 h-4" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={revealNextKana}
+                              disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
+                              aria-label="Reveal next kana"
+                              title="Reveal next kana"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                            >
+                              <IconSpark className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                      )}
+                        {liveKanaVisible && (
+                          <>
+                            <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
+                              {liveCells.map((cell, i) => {
+                                const cls =
+                                  cell.state === 'correct'
+                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
+                                    : cell.state === 'wrong' || cell.state === 'extra'
+                                      ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
+                                      : cell.state === 'pending'
+                                        ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
+                                        : cell.state === 'hint'
+                                          ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-805 dark:text-amber-300'
+                                          : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`w-9 h-10 sm:w-10 sm:h-11 rounded-xl border flex items-center justify-center text-lg font-medium tabular-nums transition ${cls}`}
+                                  >
+                                    {cell.shown || '·'}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {liveStatus && (
+                              <div
+                                className={`mt-2 text-xs text-center ${
+                                  liveWrongIndex >= 0
+                                    ? 'text-rose-700'
+                                    : preview === expected
+                                      ? 'text-emerald-700'
+                                      : 'text-stone-500'
+                                }`}
+                              >
+                                {liveStatus}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
                     <StickyAction className="mt-3">
                       <button
                         onClick={() => submit()}
