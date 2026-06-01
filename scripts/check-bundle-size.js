@@ -17,9 +17,11 @@ const ASSET_DIR = 'dist/assets';
 // bump deliberately (with a note) when a real feature justifies the growth.
 // Bumped 250→260: minimal-pair drills feature added ~6 KB gzipped (May 2026).
 // Bumped 260->275: PWA update flow, lessons, and drill feedback added ~10 KB gzipped.
-// Bumped 275->280: expanded textbook coverage and noun-copula practice add a
-// small amount of app code; Supabase-enabled builds remain under this cap.
-const TOTAL_GZIP_KB = 280;
+// Bumped 275->280: expanded textbook coverage and noun-copula practice added a
+// small amount of app code; Supabase-enabled builds remained under that cap.
+// Bumped 280->285: global SRS queue shell work added a small amount of app code;
+// measured Supabase-enabled deploy build is ~282 KB gzipped.
+const TOTAL_GZIP_KB = 285;
 const MAX_CHUNK_GZIP_KB = 70;
 
 const KB = 1024;
