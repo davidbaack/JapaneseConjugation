@@ -19,7 +19,6 @@ import {
   mergePracticePrefs,
   normalizeAnswerMode,
   resolveDisplayScripts,
-  resolveKanaAssist,
   scriptModeFromDisplay,
 } from '../utils/display.js';
 import { speakJapanese } from '../utils/speech.js';
@@ -218,7 +217,6 @@ export default function SettingsView() {
 
   const displayScripts = resolveDisplayScripts(practicePrefs);
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
-  const kanaAssist = resolveKanaAssist(practicePrefs);
   const promptForm = normalizePromptFormSetting(practicePrefs.promptForm);
   const selectedGenkiLessons =
     practicePrefs.genkiLessons === null
@@ -440,34 +438,6 @@ export default function SettingsView() {
               Furigana {practicePrefs.furigana !== false ? 'on' : 'off'}
             </button>
           </div>
-          {answerMode === 'input' && (
-            <div>
-              <label className="text-xs text-stone-500 block mb-1">Kana help while typing</label>
-              <div
-                role="group"
-                aria-label="Kana help while typing"
-                className="grid grid-cols-3 gap-2"
-              >
-                {[
-                  { id: 'off', label: 'Off' },
-                  { id: 'live', label: 'Live' },
-                  { id: 'guided', label: 'Guided' },
-                ].map((o) => (
-                  <button
-                    key={o.id}
-                    onClick={() => setPracticePrefs({ ...practicePrefs, kanaAssist: o.id })}
-                    className={`px-3 py-2 rounded-lg text-sm border transition ${
-                      kanaAssist === o.id
-                        ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                        : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                    }`}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           <div>
             <label className="text-xs text-stone-500 block mb-1">English hints</label>
             <div className="grid grid-cols-2 gap-2">

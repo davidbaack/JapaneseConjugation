@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe('SettingsView controls', () => {
-  it('shows the restored prompt form and kana assist settings', async () => {
+  it('shows restored prompt form settings without global kana assist controls', async () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings', exact: true }));
@@ -43,11 +43,8 @@ describe('SettingsView controls', () => {
     expect(screen.queryByLabelText('Search conjugation forms')).toBeNull();
     expect(screen.getAllByRole('button', { name: 'Speak answers', exact: true })).toHaveLength(1);
 
-    expect(screen.getByText('Kana help while typing')).toBeTruthy();
-    const kanaHelp = within(screen.getByRole('group', { name: 'Kana help while typing' }));
-    expect(kanaHelp.getByRole('button', { name: 'Off', exact: true })).toBeTruthy();
-    expect(kanaHelp.getByRole('button', { name: 'Live', exact: true })).toBeTruthy();
-    expect(kanaHelp.getByRole('button', { name: 'Guided', exact: true })).toBeTruthy();
+    expect(screen.queryByText('Kana help while typing')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Kana help while typing' })).toBeNull();
 
     expect(screen.getByText('Word category label')).toBeTruthy();
     const wordCategory = within(screen.getByRole('group', { name: 'Word category label' }));
@@ -81,14 +78,6 @@ describe('SettingsView controls', () => {
       expect(JSON.parse(raw).practicePrefs.promptForm).toBe('polite-present');
     });
 
-    fireEvent.click(kanaHelp.getByRole('button', { name: 'Guided', exact: true }));
-
-    await waitFor(() => {
-      const raw = localStorage.getItem('jp-verb-srs-v2');
-      const prefs = JSON.parse(raw).practicePrefs;
-      expect(prefs.answerMode).toBe('input');
-      expect(prefs.kanaAssist).toBe('guided');
-      expect(prefs).not.toHaveProperty('kanaMatchDisplay');
-    });
+    expect(screen.queryByRole('button', { name: 'Guided', exact: true })).toBeNull();
   });
 });
