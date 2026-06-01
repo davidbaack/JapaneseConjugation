@@ -202,6 +202,34 @@ describe('StudyView daily startup guards', () => {
     expect(launchedToday(setPracticePrefs)).toBe(false);
   });
 
+  it('restores a persisted study card when vocabulary metadata changes', async () => {
+    const target = STARTER_VERBS[0];
+    const refreshedTarget = {
+      ...target,
+      meaning: `${target.meaning} (refreshed)`,
+      jlpt: 'N5',
+    };
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: target.dict,
+        reading: target.reading,
+        meaning: target.meaning,
+        group: target.group,
+        type: 'plain-past',
+        word: target,
+      }),
+    );
+    mockedApp.value = makeApp({ allWords: [refreshedTarget, STARTER_VERBS[1]] });
+
+    render(<StudyView />);
+
+    await screen.findByText(target.meaning, {}, { timeout: 5000 });
+    const raw = sessionStorage.getItem('jp-study-current');
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw).dict).toBe(target.dict);
+  });
+
   it('ignores a persisted card when its form is no longer enabled', async () => {
     sessionStorage.setItem(
       'jp-study-current',

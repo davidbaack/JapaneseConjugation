@@ -207,21 +207,20 @@ function loadPersistedCurrent(state, words, enabledTypes, prefs) {
       clearPersistedCurrent();
       return null;
     }
+    const snapshotWord =
+      saved.word?.dict === saved.dict && saved.word?.group === saved.group ? saved.word : null;
     const resolvedWord = words.find(
       (w) =>
         w.dict === saved.dict &&
         w.group === saved.group &&
         (!saved.reading || w.reading === saved.reading) &&
-        (!saved.meaning || w.meaning === saved.meaning),
+        (snapshotWord || !saved.meaning || w.meaning === saved.meaning),
     );
-    if (!resolvedWord) {
+    if (!snapshotWord && !resolvedWord) {
       clearPersistedCurrent();
       return null;
     }
-    const word =
-      saved.word?.dict === saved.dict && saved.word?.group === saved.group
-        ? saved.word
-        : resolvedWord;
+    const word = snapshotWord || resolvedWord;
     const card = buildFocusCard(state, word, saved.type);
     if (!card || !cardMatchesPractice(card, words, enabledTypes, prefs)) {
       clearPersistedCurrent();

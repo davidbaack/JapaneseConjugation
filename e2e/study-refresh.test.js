@@ -1,5 +1,20 @@
 import { test, expect } from '@playwright/test';
 
+async function readStoredCurrent(page) {
+  return page.evaluate(() => sessionStorage.getItem('jp-study-current'));
+}
+
+async function waitForStableStoredCurrent(page) {
+  let last = await readStoredCurrent(page);
+  for (let i = 0; i < 15; i += 1) {
+    await page.waitForTimeout(100);
+    const next = await readStoredCurrent(page);
+    if (next && next === last) return next;
+    last = next;
+  }
+  return last;
+}
+
 // Reloading the Study tab should resume the same card rather than drawing a
 // fresh verb. The active card is persisted to sessionStorage and restored on
 // mount, so both the stored descriptor and the visible prompt must be stable
@@ -13,7 +28,7 @@ test.describe('Study refresh persistence', () => {
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
 
     // The active card is persisted to sessionStorage.
-    const before = await page.evaluate(() => sessionStorage.getItem('jp-study-current'));
+    const before = await waitForStableStoredCurrent(page);
     expect(before).toBeTruthy();
 
     // The prompt block (word + meaning + task) is derived entirely from the
@@ -25,8 +40,7 @@ test.describe('Study refresh persistence', () => {
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
 
     // Same descriptor and same visible prompt after the reload.
-    const after = await page.evaluate(() => sessionStorage.getItem('jp-study-current'));
-    expect(after).toBe(before);
+    await expect.poll(() => readStoredCurrent(page)).toBe(before);
 
     const promptAfter = await page.locator('.text-center.relative').first().innerText();
     expect(promptAfter).toBe(promptBefore);
