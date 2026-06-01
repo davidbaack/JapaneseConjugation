@@ -38,17 +38,18 @@ function makeApp(overrides = {}) {
     !base.practicePrefs.minimalPairSetId &&
     !base.practicePrefs.reviewLimitSource &&
     (base.practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID);
+  const todayPlan =
+    overrides.todayPlan ||
+    buildTodayDrillPlan(base.state, base.allWords, base.practicePrefs, base.wordLists);
   return {
     ...base,
-    todayPlan:
-      overrides.todayPlan ||
-      buildTodayDrillPlan(base.state, base.allWords, base.practicePrefs, base.wordLists),
+    todayPlan,
     todayDrillActive: overrides.todayDrillActive ?? todayDrillActive,
     srsQueue: overrides.srsQueue || {
       date: base.state.daily.date,
-      dueRuleIds: [],
+      dueRuleIds: todayDrillActive ? [...(todayPlan.dueRuleIds || [])] : [],
       completedDueRuleIds: [],
-      startedAt: null,
+      startedAt: todayDrillActive ? Date.now() : null,
     },
     startTodayDrill: overrides.startTodayDrill || vi.fn(() => true),
     markSrsQueueCompleted: overrides.markSrsQueueCompleted || vi.fn(),
@@ -65,12 +66,6 @@ function goalHitState() {
       goalHit: true,
     },
   };
-}
-
-function launchedToday(setPracticePrefs) {
-  return setPracticePrefs.mock.calls.some(([prefs]) =>
-    (prefs?.wordListIds || []).includes(TODAY_DRILL_LIST_ID),
-  );
 }
 
 function stateWithDueRule(ruleId) {
@@ -433,8 +428,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    expect(await screen.findByText('SRS Queue')).toBeTruthy();
-    expect(screen.getByText('0/1 cleared')).toBeTruthy();
+    expect(await screen.findByText('0/1 due')).toBeTruthy();
     expect(
       (await screen.findByRole('button', { name: 'Transform' })).getAttribute('aria-pressed'),
     ).toBe('true');
@@ -446,11 +440,13 @@ describe('StudyView daily startup guards', () => {
     const type = 'plain-past';
     const dueRuleId = `${target.group}|${type}`;
     const state = stateWithDueRule(dueRuleId);
+    const markSrsQueueCompleted = vi.fn();
     persistStudyCard(target, type);
 
     mockedApp.value = makeApp({
       state,
       setState,
+      markSrsQueueCompleted,
       allWords: [target],
       practicePrefs: {
         ...DEFAULT_PREFS,
@@ -475,7 +471,7 @@ describe('StudyView daily startup guards', () => {
     expect(nextState.cards[dueRuleId].correct).toBe(1);
     expect(nextState.daily.count).toBe(1);
     expect(nextState.transformation.attempted).toBe(1);
-    expect(screen.getByText('1/1 cleared')).toBeTruthy();
+    expect(markSrsQueueCompleted).toHaveBeenCalledWith(dueRuleId);
   });
 
   it('keeps direct kana pending until a miss, then grades retyped kana immediately', async () => {
