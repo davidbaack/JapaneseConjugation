@@ -161,9 +161,13 @@ const COMPOUND_SIMPLE_ENDING = {
   'conditional-ba': 'れば',
 };
 
-// For compound forms (e.g. potential-past-negative), show the intermediate
-// form so the learner can see the two-step derivation.
-function buildCompoundDerivation(item, type) {
+const COMPOUND_BASE_LABEL = {
+  potential: 'potential',
+  passive: 'passive',
+  causative: 'causative',
+};
+
+function compoundBuildInfo(item, type) {
   for (const [basePrefix, baseType] of Object.entries(COMPOUND_BASE_TYPE)) {
     if (type !== baseType && type.startsWith(basePrefix + '-')) {
       const suffix = type.slice(basePrefix.length + 1);
@@ -174,11 +178,89 @@ function buildCompoundDerivation(item, type) {
         if (!baseForm.endsWith('る')) continue;
         const baseStem = baseForm.slice(0, -1);
         const result = conjugateItem(item, type);
-        return `${baseForm} → ${baseStem} + ${ending} = ${result}`;
+        return { basePrefix, baseType, baseForm, baseStem, ending, result };
       } catch {}
     }
   }
   return null;
+}
+
+function safeCompoundRecipe(info) {
+  if (!info) return '';
+  const baseLabel = COMPOUND_BASE_LABEL[info.basePrefix] || info.basePrefix;
+  return `First make the ${baseLabel} form: ${info.baseForm}. Then drop final る and add ${info.ending}.`;
+}
+
+function quoteKana(value) {
+  return `「${value}」`;
+}
+
+function kanaPrefixPhrase(count) {
+  return count === 1 ? 'first kana' : `first ${count} kana`;
+}
+
+function prefixStatus(correct, got) {
+  const prefix = quoteKana(got.slice(0, correct));
+  return correct === 1
+    ? `Your first kana (${prefix}) is on track.`
+    : `Your ${kanaPrefixPhrase(correct)} (${prefix}) are on track.`;
+}
+
+function positionHint(type, got, expected, correct, compound) {
+  const actual = got[correct] || '';
+  const expectedNext = expected[correct] || '';
+
+  if (compound) {
+    const baseLabel = COMPOUND_BASE_LABEL[compound.basePrefix] || compound.basePrefix;
+    if (correct < compound.baseForm.length) {
+      const prefix = got.slice(0, correct);
+      let detail = prefix
+        ? `You are at ${quoteKana(prefix)}; build the ${baseLabel} form first: ${compound.baseForm}.`
+        : `Build the ${baseLabel} form first: ${compound.baseForm}.`;
+      if (actual) {
+        const later = compound.baseForm.indexOf(actual, correct + 1);
+        detail +=
+          later !== -1
+            ? ` ${quoteKana(actual)} comes later in that form; keep the kana order from ${compound.baseForm}.`
+            : ` ${quoteKana(actual)} is not the next kana in that form.`;
+      }
+      return detail;
+    }
+    if (correct >= compound.baseStem.length) {
+      return `The ${baseLabel} base is done; after ${compound.baseStem}, add ${compound.ending}.`;
+    }
+    return `Make ${compound.baseForm}, drop final る, then attach ${compound.ending}.`;
+  }
+
+  if (expectedNext && actual)
+    return `The next kana should be ${quoteKana(expectedNext)}, not ${quoteKana(actual)}.`;
+  if (expectedNext) return `The next kana should be ${quoteKana(expectedNext)}.`;
+  return `Re-check the requested ${typeLabel(type).toLowerCase()} form.`;
+}
+
+function continuationHint(expected, correct, compound) {
+  if (compound) {
+    const baseLabel = COMPOUND_BASE_LABEL[compound.basePrefix] || compound.basePrefix;
+    if (correct < compound.baseForm.length) {
+      return `Keep building the ${baseLabel} form first: ${compound.baseForm}.`;
+    }
+    if (correct >= compound.baseStem.length) {
+      return `Now add ${compound.ending}.`;
+    }
+    return `Drop final る from ${compound.baseForm}, then add ${compound.ending}.`;
+  }
+
+  const expectedNext = expected[correct] || '';
+  return expectedNext
+    ? `The next kana is ${quoteKana(expectedNext)}.`
+    : 'Apply the next step above.';
+}
+
+// For compound forms (e.g. potential-past-negative), show the intermediate
+// form so the learner can see the two-step derivation.
+function buildCompoundDerivation(item, type) {
+  const info = compoundBuildInfo(item, type);
+  return info ? `${info.baseForm} → ${info.baseStem} + ${info.ending} = ${info.result}` : null;
 }
 
 // Returns a short "why this rule applies" string for compound and tricky forms.
@@ -1001,7 +1083,7 @@ export function explainItem(item, type) {
 
 // Deterministic, offline hint shown when the student clicks "Hint" while
 // answering. It states how the (possibly multi-step) form is built and where
-// the student currently is, without revealing any kana they haven't typed yet.
+// the student currently is without printing the full final answer on first hint.
 //
 // Irregular forms (する, 来る, よい-based adjectives…) have no derivable rule —
 // their "rule" text spells out the answer. To keep the first hint spoiler-free,
@@ -1010,7 +1092,8 @@ export function explainItem(item, type) {
 export function stepCoachHint(item, type, typed, reveal = false) {
   const expected = conjugateItem(item, type);
   const exp = explainItem(item, type);
-  let recipe = [exp.rule, exp.note].filter(Boolean).join(' ').trim();
+  const compound = compoundBuildInfo(item, type);
+  let recipe = [exp.rule, exp.note, safeCompoundRecipe(compound)].filter(Boolean).join(' ').trim();
   // Only a genuine transformation can spoil — the unchanged dictionary form can't.
   const wouldReveal = !!expected && expected !== item.reading && recipe.includes(expected);
   let masked = false;
@@ -1026,14 +1109,14 @@ export function stepCoachHint(item, type, typed, reveal = false) {
   if (!got) {
     status = `You haven't typed anything yet — start from the dictionary form ${item.reading}, then work through the steps above.`;
   } else if (correct === 0) {
-    status = `The very beginning doesn't match yet — re-check the first step above.`;
+    status = `The very beginning doesn't match yet. ${positionHint(type, got, expected, correct, compound)}`;
   } else if (correct < got.length) {
-    status = `Your first ${correct} kana (「${got.slice(0, correct)}」) are on track, but kana ${correct + 1} goes off course — re-check the next step above.`;
+    status = `${prefixStatus(correct, got)} ${positionHint(type, got, expected, correct, compound)}`;
   } else if (correct >= expected.length) {
     status = `That's the full length — press Enter to check it.`;
   } else {
     const remaining = expected.length - correct;
-    status = `「${got}」 is correct so far — ${remaining} more kana to go. Apply the next step above.`;
+    status = `「${got}」 is correct so far — ${remaining} more kana to go. ${continuationHint(expected, correct, compound)}`;
   }
   return { text: recipe ? `${recipe}\n\n${status}` : status, masked };
 }
