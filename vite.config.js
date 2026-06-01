@@ -17,6 +17,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,json}'],
         cleanupOutdatedCaches: true,
+        clientsClaim: true,
         navigateFallback: '/JapaneseConjugation/index.html',
         navigateFallbackDenylist: [/\.[^/?]+$/],
       },
