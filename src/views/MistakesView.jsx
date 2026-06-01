@@ -4,14 +4,13 @@ import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaProgressMeter from '../components/KanaProgressMeter.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import StickyAction from '../components/StickyAction.jsx';
-import { DEFAULT_PREFS } from '../data/defaults.js';
 import { toHiragana } from '../utils/romaji.js';
 import { conjugateItem, getTypeInfo, promptFormLabel } from '../utils/conjugator.js';
 import { explainItem } from '../utils/conjugatorExplain.js';
 import { kanaCoachCells } from '../utils/kanaCoach.js';
 import { bumpDaily, markMistakeResolved } from '../utils/storage.js';
 import { diagnoseMistake } from '../utils/mistakeDiagnosis.js';
-import { promptDisplay, formDisplay } from '../utils/display.js';
+import { promptDisplay, formDisplay, kanaMatchDisplayForPrefs } from '../utils/display.js';
 import { playPronunciation } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
@@ -97,7 +96,7 @@ export default function MistakesView() {
     : null;
   const activeDiagnosis = diagnosisForMistake(active);
   const activeTargetInfo = targetInfoForMistake(active);
-  const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
+  const kanaMatchDisplay = kanaMatchDisplayForPrefs(practicePrefs);
   const answerPreview = toHiragana(answer);
   const answerKanaCells =
     activeExpected && kanaMatchDisplay !== 'none'

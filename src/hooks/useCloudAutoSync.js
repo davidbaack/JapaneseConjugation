@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { saveAll, cloudUpsert } from '../utils/storage.js';
+import { saveAll, cloudUpsert, buildSyncPayload } from '../utils/storage.js';
 import { supabase } from '../utils/supabase.js';
 import { logWarn } from '../utils/logger.js';
 
@@ -28,14 +28,21 @@ export function useCloudAutoSync({
   useEffect(() => {
     if (!hydrated) return;
     const dummySync = { enabled: !!session };
-    saveAll(
+    const syncPayload = buildSyncPayload({
       state,
       customVerbs,
       customAdjectives,
       wordLists,
+      practicePrefs,
+    });
+    saveAll(
+      syncPayload.state,
+      syncPayload.customVerbs,
+      syncPayload.customAdjectives,
+      syncPayload.wordLists,
       dummySync,
       lastSyncedAtRef.current,
-      practicePrefs,
+      syncPayload.practicePrefs,
     );
 
     if (session?.user && supabase) {
@@ -43,10 +50,18 @@ export function useCloudAutoSync({
       pushTimer.current = setTimeout(async () => {
         setSyncStatus((s) => ({ ...s, kind: 'syncing', message: 'Saving to cloud…' }));
         try {
-          await cloudUpsert({ state, customVerbs, customAdjectives, wordLists, practicePrefs });
+          await cloudUpsert(syncPayload);
           const now = Date.now();
           lastSyncedAtRef.current = now;
-          saveAll(state, customVerbs, customAdjectives, wordLists, dummySync, now, practicePrefs);
+          saveAll(
+            syncPayload.state,
+            syncPayload.customVerbs,
+            syncPayload.customAdjectives,
+            syncPayload.wordLists,
+            dummySync,
+            now,
+            syncPayload.practicePrefs,
+          );
           setSyncStatus({ kind: 'ok', message: 'Saved to cloud', at: now });
         } catch (e) {
           logWarn(e, { source: 'useCloudAutoSync.push' });

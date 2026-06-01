@@ -381,6 +381,7 @@ describe('mergePracticePrefs', () => {
 
   it('resets hidden low-value settings while preserving restored learner controls', () => {
     const prefs = mergePracticePrefs({
+      answerMode: 'speak',
       skipDuplicateForms: false,
       trickQuestions: true,
       colorCodeConjugations: false,
@@ -389,23 +390,41 @@ describe('mergePracticePrefs', () => {
       kanaMatchDisplay: 'none',
       showWordCategory: true,
       promptForm: 'random',
-      answerMode: 'speak',
     });
 
     expect(prefs).toMatchObject({
+      answerMode: 'speak',
+      kanaAssist: 'off',
       skipDuplicateForms: true,
       trickQuestions: false,
       colorCodeConjugations: true,
       aiGuideTone: 'sensei',
-      kanaMatchDisplay: 'none',
       showWordCategory: true,
       promptForm: 'random',
-      answerMode: 'speak',
     });
+    expect(prefs).not.toHaveProperty('kanaMatchDisplay');
     expect(prefs).not.toHaveProperty('durationSec');
   });
 
   it('falls back to free input for unknown answer modes', () => {
     expect(mergePracticePrefs({ answerMode: 'legacy-speech' }).answerMode).toBe('input');
+  });
+
+  it('migrates legacy guided answer mode into kana assist', () => {
+    expect(mergePracticePrefs({ answerMode: 'guided' })).toMatchObject({
+      answerMode: 'input',
+      kanaAssist: 'guided',
+    });
+  });
+
+  it('migrates legacy kana feedback display into kana assist levels', () => {
+    expect(mergePracticePrefs({ kanaMatchDisplay: 'none' })).toMatchObject({
+      answerMode: 'input',
+      kanaAssist: 'off',
+    });
+    expect(mergePracticePrefs({ kanaMatchDisplay: 'color' })).toMatchObject({
+      answerMode: 'input',
+      kanaAssist: 'live',
+    });
   });
 });

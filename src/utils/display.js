@@ -1,4 +1,4 @@
-import { ANSWER_MODES, DEFAULT_PREFS } from '../data/defaults.js';
+import { DEFAULT_PREFS } from '../data/defaults.js';
 import { toHiragana, kanaToRomaji } from './romaji.js';
 import { conjugateItem, surfaceFormFor, isAdjective, wordKey } from './conjugator.js';
 import { CONJ_TYPES, ADJ_TYPES } from '../data/conjugationTypes.js';
@@ -21,17 +21,35 @@ export function scriptModeFromDisplay(ds) {
   return 'kanji';
 }
 
+export function normalizeAnswerMode(value) {
+  return ['input', 'choice', 'self-check', 'speak'].includes(value)
+    ? value
+    : DEFAULT_PREFS.answerMode;
+}
+
+export function resolveKanaAssist(prefs = DEFAULT_PREFS) {
+  if (['off', 'live', 'guided'].includes(prefs?.kanaAssist)) return prefs.kanaAssist;
+  if (prefs?.answerMode === 'guided') return 'guided';
+  if (prefs?.kanaMatchDisplay === 'none') return 'off';
+  if (['color', 'color-count'].includes(prefs?.kanaMatchDisplay)) return 'live';
+  return DEFAULT_PREFS.kanaAssist;
+}
+
+export function kanaMatchDisplayForPrefs(prefs = DEFAULT_PREFS) {
+  return resolveKanaAssist(prefs) === 'off' ? 'none' : 'color-count';
+}
+
 export function mergePracticePrefs(prefs) {
   const source = { ...(prefs || {}) };
+  const answerMode = normalizeAnswerMode(source.answerMode);
+  const kanaAssist = resolveKanaAssist(source);
+  delete source.kanaMatchDisplay;
   delete source.durationSec;
   delete source.skipDuplicateForms;
   delete source.trickQuestions;
   delete source.colorCodeConjugations;
   delete source.aiGuideTone;
   const reviewLimitSource = source.reviewLimitSource === 'repair' ? source.reviewLimitSource : '';
-  const answerMode = ANSWER_MODES.includes(source.answerMode)
-    ? source.answerMode
-    : DEFAULT_PREFS.answerMode;
   const rawReviewLimit = Number(source.reviewLimit || 0);
   const reviewLimit =
     reviewLimitSource && Number.isFinite(rawReviewLimit) && rawReviewLimit > 0 ? rawReviewLimit : 0;
@@ -52,9 +70,10 @@ export function mergePracticePrefs(prefs) {
   return {
     ...DEFAULT_PREFS,
     ...source,
+    answerMode,
+    kanaAssist,
     displayScripts,
     wordGroups,
-    answerMode,
     reviewLimit,
     reviewLimitSource,
   };

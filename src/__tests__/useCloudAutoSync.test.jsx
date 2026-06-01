@@ -2,16 +2,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
-// The hook only touches two storage helpers and the Supabase client; replace
-// both with spies so we can drive the debounced-push behavior deterministically
-// (fake timers) without a real network or DOM-heavy App render.
+// The hook only mutates through two storage helpers and the Supabase client;
+// replace those with spies while keeping the real payload normalizer.
 const { saveAll, cloudUpsert } = vi.hoisted(() => ({
   saveAll: vi.fn(),
   cloudUpsert: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../utils/supabase.js', () => ({ supabase: { _fake: true } }));
-vi.mock('../utils/storage.js', () => ({ saveAll, cloudUpsert }));
+vi.mock('../utils/storage.js', async () => {
+  const actual = await vi.importActual('../utils/storage.js');
+  return { ...actual, saveAll, cloudUpsert };
+});
 
 import { useCloudAutoSync, PUSH_DEBOUNCE_MS } from '../hooks/useCloudAutoSync.js';
 
@@ -74,6 +76,26 @@ describe('useCloudAutoSync', () => {
 
     expect(cloudUpsert).toHaveBeenCalledTimes(1);
     expect(cloudUpsert).toHaveBeenCalledWith(expect.objectContaining({ state: { v: 4 } }));
+  });
+
+  it('normalizes legacy kana answer preferences before cloud upsert', async () => {
+    renderHook((p) => useCloudAutoSync(p), {
+      initialProps: props({
+        practicePrefs: {
+          answerMode: 'guided',
+          kanaMatchDisplay: 'none',
+        },
+      }),
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+
+    const payload = cloudUpsert.mock.calls[0][0];
+    expect(payload.practicePrefs.answerMode).toBe('input');
+    expect(payload.practicePrefs.kanaAssist).toBe('guided');
+    expect(payload.practicePrefs).not.toHaveProperty('kanaMatchDisplay');
   });
 
   it('does not push before the debounce window elapses', async () => {

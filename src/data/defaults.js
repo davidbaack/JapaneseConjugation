@@ -2,7 +2,7 @@ export const STORAGE_KEY = 'jp-verb-srs-v2';
 
 export const DEFAULT_SYNC = { url: '', anonKey: '', syncId: '', enabled: false };
 
-export const ANSWER_MODES = ['input', 'guided', 'choice', 'self-check', 'speak'];
+export const ANSWER_MODES = ['input', 'choice', 'self-check', 'speak'];
 
 export const DEFAULT_PREFS = {
   answerMode: 'input',
@@ -43,6 +43,6 @@ export const DEFAULT_PREFS = {
   wordListIds: [],
   drillMode: 'word',
   colorCodeConjugations: true,
-  kanaMatchDisplay: 'color-count',
+  kanaAssist: 'live',
   showWordCategory: false,
 };
