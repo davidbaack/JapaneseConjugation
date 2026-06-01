@@ -509,4 +509,33 @@ describe('StudyView daily startup guards', () => {
       expect(container.querySelectorAll('.border-emerald-300').length).toBe(2);
     });
   });
+
+  it('focuses the review advance button without asking the browser to scroll', async () => {
+    const originalFocus = window.HTMLButtonElement.prototype.focus;
+    const focusSpy = vi.fn();
+    window.HTMLButtonElement.prototype.focus = focusSpy;
+    mockedApp.value = makeApp({
+      studyFocus: {
+        word: STARTER_VERBS[0],
+        type: 'plain-past',
+      },
+    });
+
+    try {
+      render(<StudyView />);
+
+      const input = await screen.findByPlaceholderText(
+        /Type romaji or kana/i,
+        {},
+        { timeout: 5000 },
+      );
+      fireEvent.change(input, { target: { value: 'zzzz' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      await waitFor(() => expect(screen.getAllByText('Not quite.').length).toBeGreaterThan(0));
+      await waitFor(() => expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true }));
+    } finally {
+      window.HTMLButtonElement.prototype.focus = originalFocus;
+    }
+  });
 });

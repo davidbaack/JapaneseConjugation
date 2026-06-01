@@ -392,6 +392,7 @@ export default function StudyView() {
   );
   const [todayMinimalPairSetIds, setTodayMinimalPairSetIds] = useState([]);
   const inputRef = useRef(null);
+  const nextButtonRef = useRef(null);
   const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
   const answerStartedAtRef = useRef(0);
@@ -603,6 +604,18 @@ export default function StudyView() {
       typingHintRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [stepHint]);
+
+  useEffect(() => {
+    if (phase !== 'reviewing') return;
+    const button = nextButtonRef.current;
+    if (!button || typeof window === 'undefined') return;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    button.focus({ preventScroll: true });
+    if (window.scrollX !== scrollX || window.scrollY !== scrollY) {
+      window.scrollTo(scrollX, scrollY);
+    }
+  }, [current?.id, phase]);
 
   // Handle TTS speech synthesis inside StudyView
   useEffect(() => {
@@ -3299,8 +3312,8 @@ export default function StudyView() {
 
                 <StickyAction className="mt-3">
                   <button
+                    ref={nextButtonRef}
                     onClick={() => submit()}
-                    autoFocus
                     className="w-full py-2.5 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl font-medium shadow-lg transition"
                   >
                     Next (Enter)

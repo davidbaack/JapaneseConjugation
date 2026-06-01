@@ -71,7 +71,7 @@ export function ChatPanel({
   const [display, setDisplay] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
-  const endRef = useRef(null);
+  const logRef = useRef(null);
   const sendCancelledRef = useRef(false);
   /* eslint-disable react-hooks/exhaustive-deps */
   const context = useMemo(
@@ -137,7 +137,9 @@ export function ChatPanel({
   }, [context, geminiKey, systemText]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const log = logRef.current;
+    if (!log) return;
+    log.scrollTop = log.scrollHeight;
   }, [display, loading]);
 
   const REVIEW_CHIPS = ['Explain more simply', 'Give me 3 examples', 'Compare with similar forms'];
@@ -190,6 +192,7 @@ export function ChatPanel({
         role="log"
         aria-live="polite"
         aria-busy={loading}
+        ref={logRef}
         className="space-y-2 max-h-96 overflow-y-auto pb-1"
       >
         {loading && !display.length && (
@@ -211,7 +214,6 @@ export function ChatPanel({
             Gemini is thinking…
           </div>
         )}
-        <div ref={endRef} />
       </div>
       {mode === 'review' && display.length > 0 && !loading && (
         <div className="flex flex-wrap gap-1.5 mt-2">
