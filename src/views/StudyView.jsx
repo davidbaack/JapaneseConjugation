@@ -220,7 +220,7 @@ function loadPersistedCurrent(state, words, enabledTypes, prefs) {
     }
     const word =
       saved.word?.dict === saved.dict && saved.word?.group === saved.group
-        ? { ...resolvedWord, ...saved.word }
+        ? saved.word
         : resolvedWord;
     const card = buildFocusCard(state, word, saved.type);
     if (!card || !cardMatchesPractice(card, words, enabledTypes, prefs)) {
