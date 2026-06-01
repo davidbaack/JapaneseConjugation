@@ -86,6 +86,16 @@ With Supabase configured, signed-in users can sync SRS state, custom vocabulary,
 | `data` | jsonb | Full app sync payload. |
 | `updated_at` | timestamptz | Updated on every sync write and used for merge/pull decisions. |
 
+The tracked migration in `supabase/migrations/20260601133136_create_srs_sync.sql` creates this table, enables row-level security, grants access to authenticated users, and adds owner-only policies. Users can only select, insert, update, or delete the row whose `id` matches `auth.uid()::text`; anonymous users have no table policy.
+
+To self-host cloud sync:
+
+1. Create or link a Supabase project.
+2. Apply the migrations with `supabase db push`, or paste the migration SQL into the Supabase SQL editor.
+3. Enable the auth providers you want learners to use in the Supabase dashboard.
+4. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for the app build. Never ship a service-role key to the browser.
+5. Sign in as a test user, complete one review, then confirm `public.srs_sync` contains exactly one row with that user's id, a JSON `data` payload, and a fresh `updated_at`.
+
 ## PWA / Deployment
 
 The app is configured for the `/JapaneseConjugation/` base path and uses `VitePWA` in `vite.config.js` for install prompts, update prompts, offline asset caching, app icons, iOS touch icon support, and navigation fallback. Service-worker behavior is configured through VitePWA; do not edit generated `dist/` output.
@@ -111,5 +121,5 @@ src/
 e2e/            Playwright E2E tests
 public/         PWA icons and Apple touch icon
 scripts/        Build and bundle helper scripts
-supabase/       Supabase config and Gemini proxy Edge Function
+supabase/       Supabase config, database migrations, and Gemini proxy Edge Function
 ```
