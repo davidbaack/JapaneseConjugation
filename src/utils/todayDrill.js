@@ -16,6 +16,7 @@ export const TODAY_DRILL_LIMIT = 10;
 
 const MAX_TYPES = 8;
 const MAX_WORDS = 18;
+const SRS_DRILL_MODES = new Set(['word', 'sentence', 'transformation']);
 
 function pushUnique(target, values, limit = Infinity) {
   for (const value of values || []) {
@@ -231,9 +232,18 @@ export function upsertTodayDrillList(wordLists = [], plan) {
 }
 
 export function practicePrefsForTodayDrill(prefs = DEFAULT_PREFS, plan) {
+  const drillMode = SRS_DRILL_MODES.has(prefs?.drillMode)
+    ? prefs.drillMode
+    : DEFAULT_PREFS.drillMode;
+  const promptForm =
+    drillMode === 'transformation' &&
+    (prefs?.promptForm || DEFAULT_PREFS.promptForm) === 'dictionary'
+      ? 'random'
+      : prefs?.promptForm;
   return {
     ...prefs,
-    drillMode: 'word',
+    drillMode,
+    ...(promptForm ? { promptForm } : {}),
     minimalPairSetId: '',
     minimalPairReturn: null,
     reviewLimit: 0,

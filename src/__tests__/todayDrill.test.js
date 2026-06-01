@@ -79,18 +79,28 @@ describe('today drill planner', () => {
     };
 
     const prefs = practicePrefsForTodayDrill(
-      { ...DEFAULT_PREFS, reviewLimit: 0, minimalPairSetId: 'godan-onbin' },
+      {
+        ...DEFAULT_PREFS,
+        drillMode: 'transformation',
+        promptForm: 'dictionary',
+        reviewLimit: 0,
+        minimalPairSetId: 'godan-onbin',
+      },
       plan,
     );
     const lists = upsertTodayDrillList([], plan);
 
     expect(prefs).toMatchObject({
-      drillMode: 'word',
+      drillMode: 'transformation',
+      promptForm: 'random',
       minimalPairSetId: '',
       reviewLimit: 0,
       reviewLimitSource: '',
       wordListIds: [TODAY_DRILL_LIST_ID],
     });
+    expect(
+      practicePrefsForTodayDrill({ ...DEFAULT_PREFS, drillMode: 'sentence' }, plan).drillMode,
+    ).toBe('sentence');
     expect(lists).toEqual([
       {
         id: TODAY_DRILL_LIST_ID,

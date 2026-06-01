@@ -475,7 +475,6 @@ export default function StudyView() {
   const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
   const repairDrillActive = practicePrefs.reviewLimitSource === 'repair';
   const todayDrillActive =
-    activeDrillMode === 'word' &&
     !practicePrefs.minimalPairSetId &&
     !practicePrefs.reviewLimitSource &&
     (practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID);
