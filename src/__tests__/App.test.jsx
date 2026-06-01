@@ -58,18 +58,18 @@ describe('App shell', () => {
     await waitFor(() => expect(screen.getByPlaceholderText(/Type dictionary form/i)).toBeTruthy());
   });
 
-  it('auto-starts the daily drill against the daily goal', async () => {
+  it('shows a sign-in prompt instead of signed-out SRS counters', async () => {
     render(<App />);
 
-    await screen.findByText('SRS Queue', {}, { timeout: 5000 });
+    await screen.findByText('Sign in to save SRS progress', {}, { timeout: 5000 });
+    expect(screen.queryByText('SRS Queue')).toBeNull();
+    expect(screen.queryByText('0/0 this session')).toBeNull();
+    expect(screen.queryByText('0/30 today')).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Sign in' }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Start review' })).toBeNull();
-    await waitFor(() => {
-      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      expect(raw.practicePrefs.wordListIds).toContain(TODAY_DRILL_LIST_ID);
-    });
   });
 
-  it('does not auto-start a daily drill after today goal is complete', async () => {
+  it('does not auto-start a daily drill while signed out', async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -94,7 +94,7 @@ describe('App shell', () => {
 
     render(<App />);
 
-    await screen.findByText('SRS Queue', {}, { timeout: 5000 });
+    await screen.findByText('Sign in to save SRS progress', {}, { timeout: 5000 });
     await waitFor(() => {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
       expect(raw.practicePrefs.wordListIds || []).not.toContain(TODAY_DRILL_LIST_ID);

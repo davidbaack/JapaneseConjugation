@@ -37,6 +37,7 @@ function AppShell() {
   } = useApp();
 
   const { tabProps, panelProps } = useTablist(TABS, tab, setTab);
+  const signedIn = !!session?.user;
 
   return (
     <div
@@ -54,29 +55,41 @@ function AppShell() {
             </h1>
           </div>
           <div className="text-xs text-stone-500 text-right">
-            <div>
-              {t('header.session', {
-                correct: state.session.correct,
-                reviewed: state.session.reviewed,
-              })}
-            </div>
-            <div className="mt-1 flex items-center justify-end gap-2">
-              <span>
-                {t('header.today', { count: daily.count, goal: practicePrefs.dailyGoal })}
-              </span>
-              <span className="inline-block w-14 h-1.5 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden">
-                <span
-                  className={`block h-full ${daily.goalHit ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                  style={{ width: dailyPct + '%' }}
-                />
-              </span>
-            </div>
-            {!!daily.goalStreak && (
-              <div className="text-amber-600 dark:text-amber-400 mt-0.5">
-                {t('header.goalStreak', { days: daily.goalStreak })}
-              </div>
+            {signedIn ? (
+              <>
+                <div>
+                  {t('header.session', {
+                    correct: state.session.correct,
+                    reviewed: state.session.reviewed,
+                  })}
+                </div>
+                <div className="mt-1 flex items-center justify-end gap-2">
+                  <span>
+                    {t('header.today', { count: daily.count, goal: practicePrefs.dailyGoal })}
+                  </span>
+                  <span className="inline-block w-14 h-1.5 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden">
+                    <span
+                      className={`block h-full ${daily.goalHit ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                      style={{ width: dailyPct + '%' }}
+                    />
+                  </span>
+                </div>
+                {!!daily.goalStreak && (
+                  <div className="text-amber-600 dark:text-amber-400 mt-0.5">
+                    {t('header.goalStreak', { days: daily.goalStreak })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAuthModal(true)}
+                className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 font-semibold text-stone-700 transition hover:bg-stone-100 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
+              >
+                Sign in
+              </button>
             )}
-            {session && (
+            {signedIn && (
               <div
                 className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind === 'error' ? 'text-rose-500' : syncStatus.kind === 'syncing' ? 'text-amber-500' : 'text-emerald-600'}`}
               >

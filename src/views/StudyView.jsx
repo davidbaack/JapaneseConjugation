@@ -308,6 +308,8 @@ export default function StudyView() {
     setWordLists,
     studyFocus: focus,
     clearStudyFocus: onFocusConsumed,
+    session,
+    showAuth,
     hydrated,
   } = useApp();
   const [current, setCurrent] = useState(null);
@@ -428,6 +430,7 @@ export default function StudyView() {
   );
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
+  const signedIn = !!session?.user;
   const todayGoalHit = isDailyGoalHitToday(daily);
   const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
   const repairDrillActive = practicePrefs.reviewLimitSource === 'repair';
@@ -657,6 +660,7 @@ export default function StudyView() {
 
   useEffect(() => {
     if (!hydrated) return;
+    if (!signedIn) return;
     if (autoStartedTodayRef.current) return;
     if (todayGoalHit) return;
     if (specialLaunchActive) return;
@@ -666,7 +670,7 @@ export default function StudyView() {
     // launchTodayDrill intentionally omitted so the auto-start decision keys off
     // the entry conditions, not a freshly allocated function each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, todayGoalHit, specialLaunchActive, canResumeTodayDrill, todayPlan]);
+  }, [hydrated, signedIn, todayGoalHit, specialLaunchActive, canResumeTodayDrill, todayPlan]);
 
   useEffect(() => {
     return () => {
@@ -1157,8 +1161,33 @@ export default function StudyView() {
     );
   }
 
+  function renderSignInBar() {
+    return (
+      <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 shadow-sm dark:border-indigo-900/70 dark:bg-indigo-950/25">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+              Sign in to save SRS progress
+            </div>
+            <div className="text-xs text-stone-600 dark:text-stone-300">
+              Sync your review queue and daily goal across devices.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={showAuth}
+            className="min-h-9 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+          >
+            Sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   function renderTodayEntry() {
     if (specialLaunchActive) return null;
+    if (!signedIn) return renderSignInBar();
     if (todayDrillActive || todayGoalHit) return renderTodayStatus();
     return renderTodayLauncher();
   }

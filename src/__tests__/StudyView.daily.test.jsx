@@ -29,6 +29,8 @@ function makeApp(overrides = {}) {
     setWordLists: vi.fn(),
     studyFocus: null,
     clearStudyFocus: vi.fn(),
+    session: { user: { id: 'test-user' } },
+    showAuth: vi.fn(),
     hydrated: true,
     ...overrides,
   };
@@ -102,6 +104,39 @@ afterEach(() => {
 });
 
 describe('StudyView daily startup guards', () => {
+  it('auto-starts today for signed-in learners', async () => {
+    const setPracticePrefs = vi.fn();
+    const setWordLists = vi.fn();
+    mockedApp.value = makeApp({ setPracticePrefs, setWordLists });
+
+    render(<StudyView />);
+
+    await waitFor(() => expect(setWordLists).toHaveBeenCalled());
+    expect(launchedToday(setPracticePrefs)).toBe(true);
+  });
+
+  it('shows a sign-in bar instead of auto-starting today while signed out', async () => {
+    const setPracticePrefs = vi.fn();
+    const setWordLists = vi.fn();
+    const showAuth = vi.fn();
+    mockedApp.value = makeApp({
+      session: null,
+      setPracticePrefs,
+      setWordLists,
+      showAuth,
+    });
+
+    render(<StudyView />);
+
+    expect(await screen.findByText('Sign in to save SRS progress')).toBeTruthy();
+    expect(screen.queryByText('SRS Queue')).toBeNull();
+    expect(setWordLists).not.toHaveBeenCalled();
+    expect(launchedToday(setPracticePrefs)).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(showAuth).toHaveBeenCalled();
+  });
+
   it('does not auto-start today over a focused word launch', async () => {
     const setPracticePrefs = vi.fn();
     const setWordLists = vi.fn();
