@@ -43,6 +43,14 @@ const PROMPT_FORM_OPTIONS = [
   { id: 'random', label: 'Mixed' },
 ];
 
+const ANSWER_MODE_OPTIONS = [
+  { id: 'input', label: 'Free input' },
+  { id: 'guided', label: 'Guided kana' },
+  { id: 'choice', label: 'Choices' },
+  { id: 'self-check', label: 'Self-check' },
+  { id: 'speak', label: 'Speak answer' },
+];
+
 export default function SettingsView() {
   const {
     state,
@@ -301,15 +309,14 @@ export default function SettingsView() {
         </div>
 
         <div className="grid sm:grid-cols-2 gap-3">
-          <div>
+          <div className="sm:col-span-2">
             <label className="text-xs text-stone-500 block mb-1">Answer mode</label>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-              {[
-                { id: 'input', label: 'Free input' },
-                { id: 'guided', label: 'Guided kana' },
-                { id: 'choice', label: 'Choices' },
-                { id: 'self-check', label: 'Self-check' },
-              ].map((o) => (
+            <div
+              role="group"
+              aria-label="Answer mode"
+              className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2"
+            >
+              {ANSWER_MODE_OPTIONS.map((o) => (
                 <button
                   key={o.id}
                   onClick={() => setPracticePrefs({ ...practicePrefs, answerMode: o.id })}

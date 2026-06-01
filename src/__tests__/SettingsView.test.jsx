@@ -23,6 +23,9 @@ describe('SettingsView controls', () => {
     expect(screen.queryByRole('button', { name: 'Transform', exact: true })).toBeNull();
     expect(screen.queryByText('Study direction')).toBeNull();
     expect(screen.queryByText('Timed drill')).toBeNull();
+    const answerMode = within(screen.getByRole('group', { name: 'Answer mode' }));
+    expect(answerMode.getByRole('button', { name: 'Free input', exact: true })).toBeTruthy();
+    expect(answerMode.getByRole('button', { name: 'Speak answer', exact: true })).toBeTruthy();
     expect(screen.getByText('Prompt form')).toBeTruthy();
     const promptForm = within(screen.getByRole('group', { name: 'Prompt form' }));
     expect(promptForm.getByRole('button', { name: 'Dictionary', exact: true })).toBeTruthy();

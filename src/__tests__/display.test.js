@@ -13,6 +13,7 @@ import {
   mergePracticePrefs,
   makeChoices,
   makeReverseChoices,
+  spokenAnswerResult,
 } from '../utils/display.js';
 import { filterWordsForPrefs } from '../utils/conjugator.js';
 import { STARTER_VERBS } from '../data/starterWords.js';
@@ -236,6 +237,29 @@ describe('answer mode choices', () => {
   });
 });
 
+describe('spokenAnswerResult', () => {
+  it('accepts exact kana or kanji spoken surfaces', () => {
+    expect(
+      spokenAnswerResult(['\u305f\u3079\u305f', '\u98df\u3079\u305f'], '\u305f\u3079\u305f'),
+    ).toMatchObject({
+      ok: true,
+      score: 100,
+    });
+    expect(
+      spokenAnswerResult(['\u305f\u3079\u305f', '\u98df\u3079\u305f'], '\u98df\u3079\u305f'),
+    ).toMatchObject({
+      ok: true,
+      score: 100,
+    });
+  });
+
+  it('scores but does not accept near spoken misses', () => {
+    const result = spokenAnswerResult(['\u305f\u3079\u305f'], '\u305f\u3079\u3066');
+    expect(result.ok).toBe(false);
+    expect(result.score).toBeGreaterThan(0);
+  });
+});
+
 // ─── resolveDisplayScripts ───────────────────────────────────────────────────
 describe('resolveDisplayScripts', () => {
   it('returns kanji+kana by default', () => {
@@ -365,6 +389,7 @@ describe('mergePracticePrefs', () => {
       kanaMatchDisplay: 'none',
       showWordCategory: true,
       promptForm: 'random',
+      answerMode: 'speak',
     });
 
     expect(prefs).toMatchObject({
@@ -375,7 +400,12 @@ describe('mergePracticePrefs', () => {
       kanaMatchDisplay: 'none',
       showWordCategory: true,
       promptForm: 'random',
+      answerMode: 'speak',
     });
     expect(prefs).not.toHaveProperty('durationSec');
+  });
+
+  it('falls back to free input for unknown answer modes', () => {
+    expect(mergePracticePrefs({ answerMode: 'legacy-speech' }).answerMode).toBe('input');
   });
 });

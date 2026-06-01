@@ -21,6 +21,23 @@ export function pickSpeechVoice(voiceURI) {
   return null;
 }
 
+export function getSpeechRecognitionConstructor() {
+  if (typeof window === 'undefined') return null;
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+export function speechRecognitionErrorMessage(error) {
+  const messages = {
+    'not-allowed': 'Microphone permission was blocked.',
+    'service-not-allowed': 'Speech input is blocked in this browser.',
+    'audio-capture': 'No microphone was found.',
+    'no-speech': 'No speech was heard. Try again.',
+    network: 'Speech input could not reach the browser service.',
+    aborted: 'Speech input was stopped.',
+  };
+  return messages[error] || 'Speech input stopped before an answer was heard.';
+}
+
 export function speakJapanese(text, rate = 0.9, voiceURI = '', onEnd = null) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();

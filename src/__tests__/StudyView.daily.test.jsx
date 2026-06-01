@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
+import { conjugateItem } from '../utils/conjugator.js';
 import { defaultState } from '../utils/storage.js';
 import { TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 
@@ -39,11 +40,53 @@ function launchedToday(setPracticePrefs) {
   );
 }
 
+class FakeSpeechRecognition {
+  static instance = null;
+
+  constructor() {
+    FakeSpeechRecognition.instance = this;
+    this.continuous = false;
+    this.interimResults = false;
+    this.lang = '';
+    this.maxAlternatives = 1;
+  }
+
+  start() {
+    this.onstart?.();
+  }
+
+  stop() {
+    this.onend?.();
+  }
+
+  abort() {
+    this.onend?.();
+  }
+
+  emitFinal(transcript) {
+    const result = {
+      0: { transcript },
+      isFinal: true,
+      length: 1,
+    };
+    this.onresult?.({
+      resultIndex: 0,
+      results: {
+        0: result,
+        length: 1,
+      },
+    });
+  }
+}
+
 afterEach(() => {
   cleanup();
   localStorage.clear();
   sessionStorage.clear();
   vi.clearAllMocks();
+  delete window.SpeechRecognition;
+  delete window.webkitSpeechRecognition;
+  FakeSpeechRecognition.instance = null;
 });
 
 describe('StudyView daily startup guards', () => {
@@ -86,5 +129,35 @@ describe('StudyView daily startup guards', () => {
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(setWordLists).not.toHaveBeenCalled();
     expect(launchedToday(setPracticePrefs)).toBe(false);
+  });
+
+  it('checks a final spoken answer in speak answer mode', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const setState = vi.fn();
+    const clearStudyFocus = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      clearStudyFocus,
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+
+    render(<StudyView />);
+
+    const mic = await screen.findByRole('button', { name: 'Speak answer' }, { timeout: 5000 });
+    fireEvent.click(mic);
+    expect(FakeSpeechRecognition.instance?.lang).toBe('ja-JP');
+
+    act(() => {
+      FakeSpeechRecognition.instance.emitFinal(conjugateItem(target, type));
+    });
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
+    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
   });
 });

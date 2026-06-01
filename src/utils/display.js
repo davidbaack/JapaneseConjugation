@@ -1,4 +1,4 @@
-import { DEFAULT_PREFS } from '../data/defaults.js';
+import { ANSWER_MODES, DEFAULT_PREFS } from '../data/defaults.js';
 import { toHiragana, kanaToRomaji } from './romaji.js';
 import { conjugateItem, surfaceFormFor, isAdjective, wordKey } from './conjugator.js';
 import { CONJ_TYPES, ADJ_TYPES } from '../data/conjugationTypes.js';
@@ -29,6 +29,9 @@ export function mergePracticePrefs(prefs) {
   delete source.colorCodeConjugations;
   delete source.aiGuideTone;
   const reviewLimitSource = source.reviewLimitSource === 'repair' ? source.reviewLimitSource : '';
+  const answerMode = ANSWER_MODES.includes(source.answerMode)
+    ? source.answerMode
+    : DEFAULT_PREFS.answerMode;
   const rawReviewLimit = Number(source.reviewLimit || 0);
   const reviewLimit =
     reviewLimitSource && Number.isFinite(rawReviewLimit) && rawReviewLimit > 0 ? rawReviewLimit : 0;
@@ -51,6 +54,7 @@ export function mergePracticePrefs(prefs) {
     ...source,
     displayScripts,
     wordGroups,
+    answerMode,
     reviewLimit,
     reviewLimitSource,
   };
@@ -490,6 +494,30 @@ export function speechSimilarity(target, heard) {
   const b = normalizeJapaneseText(heard);
   if (!a || !b) return null;
   return Math.max(0, Math.round((1 - editDistance(a, b) / Math.max(a.length, b.length)) * 100));
+}
+
+export function spokenAnswerResult(targets, heard) {
+  const list = Array.isArray(targets) ? targets : [targets];
+  const normalizedHeard = normalizeJapaneseText(heard);
+  const candidates = [];
+  for (const target of list) {
+    const normalized = normalizeJapaneseText(target);
+    if (!normalized || candidates.some((candidate) => candidate.normalized === normalized))
+      continue;
+    candidates.push({ raw: target, normalized });
+  }
+  if (!normalizedHeard || !candidates.length) {
+    return { ok: false, score: null, matched: '', heard: normalizedHeard };
+  }
+  let best = { raw: '', score: 0 };
+  for (const candidate of candidates) {
+    if (candidate.normalized === normalizedHeard) {
+      return { ok: true, score: 100, matched: candidate.raw, heard: normalizedHeard };
+    }
+    const score = speechSimilarity(candidate.normalized, normalizedHeard) || 0;
+    if (score > best.score) best = { raw: candidate.raw, score };
+  }
+  return { ok: false, score: best.score, matched: best.raw, heard: normalizedHeard };
 }
 
 export function shuffled(arr) {

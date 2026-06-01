@@ -7,8 +7,13 @@ import {
   IconChat,
   IconPen,
   IconFlame,
+  IconMic,
 } from '../components/Icons.jsx';
-import { playPronunciation } from '../utils/speech.js';
+import {
+  getSpeechRecognitionConstructor,
+  playPronunciation,
+  speechRecognitionErrorMessage,
+} from '../utils/speech.js';
 import { useAISentence } from '../hooks/useAISentence.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
@@ -28,6 +33,7 @@ import {
   isAdjective,
   promptFormLabel,
   RULES,
+  surfaceFormFor,
 } from '../utils/conjugator.js';
 import { explainItem, stepCoachHint, GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import {
@@ -50,6 +56,7 @@ import {
   makeReverseChoices,
   dictionaryAnswerMatches,
   typoGuardForAnswer,
+  spokenAnswerResult,
 } from '../utils/display.js';
 import {
   buildRepairDrillPlan,
@@ -200,6 +207,38 @@ function persistCurrent(card) {
   } catch {}
 }
 
+function speechAlternativesFromEvent(event) {
+  const transcripts = [];
+  let isFinal = false;
+  const results = event?.results;
+  if (!results) return { transcripts, isFinal };
+  for (let i = event.resultIndex || 0; i < results.length; i += 1) {
+    const result = results[i];
+    if (!result) continue;
+    isFinal = isFinal || !!result.isFinal;
+    for (let j = 0; j < result.length; j += 1) {
+      const transcript = result[j]?.transcript?.trim();
+      if (transcript) transcripts.push(transcript);
+    }
+  }
+  return { transcripts, isFinal };
+}
+
+function bestSpeechAlternative(transcripts, targets) {
+  let best = '';
+  let bestScore = -1;
+  for (const transcript of transcripts) {
+    const result = spokenAnswerResult(targets, transcript);
+    if (result.ok) return transcript;
+    const score = result.score ?? 0;
+    if (score > bestScore) {
+      best = transcript;
+      bestScore = score;
+    }
+  }
+  return best || transcripts[0] || '';
+}
+
 function clearPersistedCurrent() {
   try {
     if (typeof sessionStorage === 'undefined') return;
@@ -258,6 +297,8 @@ export default function StudyView() {
   const [selfCheckOpen, setSelfCheckOpen] = useState(false);
   const [typoGuard, setTypoGuard] = useState(null);
   const [kanaPadOpen, setKanaPadOpen] = useState(false);
+  const [speechListening, setSpeechListening] = useState(false);
+  const [speechError, setSpeechError] = useState('');
   const [reviewBase, setReviewBase] = useState(state.session.reviewed || 0);
   // SRS daily queue tracking
   const initialDueRuleIds = useRef(null);
@@ -276,6 +317,8 @@ export default function StudyView() {
   const autoAdvanceRef = useRef(null);
   const answerStartedAtRef = useRef(0);
   const hadKanaMistakeRef = useRef(false);
+  const speechRecognitionRef = useRef(null);
+  const speechSubmittedRef = useRef(false);
   const minimalPairSetIdRef = useRef(practicePrefs.minimalPairSetId || '');
   // Snapshots the typed answer the moment a kana mistake first occurs, so the
   // review panel can show what was actually entered when it went wrong rather
@@ -543,6 +586,18 @@ export default function StudyView() {
   }, [current?.id, phase, practicePrefs.answerMode]);
 
   useEffect(() => {
+    speechSubmittedRef.current = false;
+    setSpeechError('');
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.abort?.();
+      } catch {}
+      speechRecognitionRef.current = null;
+    }
+    setSpeechListening(false);
+  }, [current?.id, phase, practicePrefs.answerMode]);
+
+  useEffect(() => {
     setTypoGuard(null);
   }, [current?.id, phase]);
 
@@ -574,6 +629,12 @@ export default function StudyView() {
   useEffect(() => {
     return () => {
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+      if (speechRecognitionRef.current) {
+        try {
+          speechRecognitionRef.current.abort?.();
+        } catch {}
+        speechRecognitionRef.current = null;
+      }
     };
   }, []);
 
@@ -638,6 +699,14 @@ export default function StudyView() {
   const targetEnglish = reverseDrill
     ? englishForForm(current.verb, null)
     : englishForForm(current.verb, current.type);
+  const spokenAnswerTargets = reverseDrill
+    ? [current.verb.reading, current.verb.dict]
+    : [expected, surfaceFormFor(current.verb, current.type)];
+  const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
+  const speechMatch =
+    practicePrefs.answerMode === 'speak' && answer.trim()
+      ? spokenAnswerResult(spokenAnswerTargets, answer)
+      : null;
   const englishHintsHidden =
     (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden';
   const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
@@ -801,11 +870,79 @@ export default function StudyView() {
     };
   }
 
+  function stopSpeechRecognition() {
+    const recognition = speechRecognitionRef.current;
+    if (!recognition) {
+      setSpeechListening(false);
+      return;
+    }
+    try {
+      recognition.stop?.();
+    } catch {
+      try {
+        recognition.abort?.();
+      } catch {}
+    }
+    speechRecognitionRef.current = null;
+    setSpeechListening(false);
+  }
+
+  function startSpeechAnswer() {
+    if (!current || phase !== 'answering') return;
+    if (speechListening) {
+      stopSpeechRecognition();
+      return;
+    }
+    const SpeechRecognition = getSpeechRecognitionConstructor();
+    if (!SpeechRecognition) {
+      setSpeechError('Speech input is not available in this browser.');
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognition();
+      speechRecognitionRef.current = recognition;
+      speechSubmittedRef.current = false;
+      recognition.lang = 'ja-JP';
+      recognition.interimResults = true;
+      recognition.continuous = false;
+      recognition.maxAlternatives = 5;
+      recognition.onstart = () => {
+        setSpeechError('');
+        setSpeechListening(true);
+      };
+      recognition.onerror = (event) => {
+        setSpeechError(speechRecognitionErrorMessage(event?.error));
+        setSpeechListening(false);
+      };
+      recognition.onend = () => {
+        if (speechRecognitionRef.current === recognition) speechRecognitionRef.current = null;
+        setSpeechListening(false);
+      };
+      recognition.onresult = (event) => {
+        const { transcripts, isFinal } = speechAlternativesFromEvent(event);
+        const transcript = bestSpeechAlternative(transcripts, spokenAnswerTargets);
+        if (!transcript) return;
+        setAnswer(transcript);
+        setSpeechError('');
+        if (isFinal && !speechSubmittedRef.current) {
+          speechSubmittedRef.current = true;
+          submit(transcript, { spoken: true });
+        }
+      };
+      recognition.start();
+    } catch {
+      speechRecognitionRef.current = null;
+      setSpeechListening(false);
+      setSpeechError('Speech input could not start in this browser.');
+    }
+  }
+
   function resetActiveAttempt() {
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
+    stopSpeechRecognition();
     setAnswer('');
     setPhase('answering');
     setChatOpen(false);
@@ -1077,11 +1214,12 @@ export default function StudyView() {
     setTab('study');
   }
 
-  function submit(choiceValue) {
+  function submit(choiceValue, options = {}) {
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
+    if (options.spoken) stopSpeechRecognition();
     if (phase === 'reviewing') {
       setChatOpen(false);
       setAnswer('');
@@ -1106,13 +1244,18 @@ export default function StudyView() {
     }
     const raw = choiceValue !== undefined ? choiceValue : answer;
     if (!raw.trim()) return;
-    const normalized = choiceValue !== undefined ? raw : toHiragana(raw);
+    const spoken = !!options.spoken;
+    const normalized = choiceValue !== undefined && !spoken ? raw : toHiragana(raw);
     const finalOk = reverseDrill
-      ? dictionaryAnswerMatches(raw, current.verb)
-      : normalized === expected;
-    const ok = finalOk && !(kanaMatchDisplay !== 'none' && hadKanaMistakeRef.current);
+      ? spoken
+        ? spokenAnswerResult(spokenAnswerTargets, raw).ok
+        : dictionaryAnswerMatches(raw, current.verb)
+      : spoken
+        ? spokenAnswerResult(spokenAnswerTargets, raw).ok
+        : normalized === expected;
+    const ok = finalOk && (spoken || !(kanaMatchDisplay !== 'none' && hadKanaMistakeRef.current));
     const nearMiss =
-      choiceValue === undefined && !ok
+      choiceValue === undefined && !spoken && !ok
         ? typoGuardForAnswer(raw, normalized, expected, current.verb, reverseDrill)
         : null;
     if (nearMiss && typoGuard?.key !== nearMiss.key) {
@@ -1138,7 +1281,7 @@ export default function StudyView() {
           current.verb,
           current.type,
           reverseDrill ? current.type : promptType,
-          reverseDrill ? raw.trim() : normalized,
+          spoken || reverseDrill ? raw.trim() : normalized,
           expected,
           mistakeRecordOptions(),
         );
@@ -1227,6 +1370,7 @@ export default function StudyView() {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
+    stopSpeechRecognition();
     const nextState = {
       ...state,
       session: { ...(state.session || {}), skipped: (state.session?.skipped || 0) + 1 },
@@ -1360,6 +1504,7 @@ export default function StudyView() {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
+    stopSpeechRecognition();
     const dict = current.verb.dict,
       rid = current.id;
     const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
@@ -2105,6 +2250,119 @@ export default function StudyView() {
                         </div>
                       </>
                     )}
+                  </div>
+                ) : practicePrefs.answerMode === 'speak' ? (
+                  <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
+                    <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
+                      Speak answer
+                    </div>
+                    <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={inputRef}
+                            id="spoken-answer"
+                            type="text"
+                            value={answer}
+                            onChange={(e) => {
+                              setSpeechError('');
+                              setAnswer(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (answer.trim()) submit(answer, { spoken: true });
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                skipCurrent();
+                              }
+                            }}
+                            placeholder="Heard Japanese answer..."
+                            aria-label="Heard spoken answer"
+                            className="w-full min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
+                            lang="ja"
+                            autoComplete="off"
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            enterKeyHint="done"
+                            spellCheck="false"
+                          />
+                        </div>
+                        <div className="mt-2 min-h-5 text-xs">
+                          {speechListening ? (
+                            <span role="status" className="text-indigo-600 dark:text-indigo-400">
+                              Listening for Japanese...
+                            </span>
+                          ) : speechMatch ? (
+                            <span
+                              className={
+                                speechMatch.ok
+                                  ? 'text-emerald-700 dark:text-emerald-400'
+                                  : 'text-stone-500 dark:text-stone-400'
+                              }
+                            >
+                              {speechMatch.ok
+                                ? 'Exact match heard.'
+                                : speechMatch.score !== null
+                                  ? `Closest match ${speechMatch.score}%.`
+                                  : ''}
+                            </span>
+                          ) : speechRecognitionAvailable ? (
+                            <span className="text-stone-500 dark:text-stone-400">
+                              Microphone ready.
+                            </span>
+                          ) : (
+                            <span className="text-amber-700 dark:text-amber-400">
+                              Speech input is not available in this browser.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={startSpeechAnswer}
+                        disabled={!speechRecognitionAvailable}
+                        className={`min-h-12 px-4 py-3 rounded-xl font-medium transition inline-flex items-center justify-center gap-2 ${
+                          speechListening
+                            ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                            : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:hover:bg-indigo-600'
+                        }`}
+                      >
+                        <IconMic className="w-4 h-4" />
+                        {speechListening ? 'Stop listening' : 'Speak answer'}
+                      </button>
+                    </div>
+                    {speechError && (
+                      <div
+                        role="alert"
+                        className="mt-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300"
+                      >
+                        {speechError}
+                      </div>
+                    )}
+                    <StickyAction className="mt-3">
+                      <button
+                        onClick={() => submit(answer, { spoken: true })}
+                        disabled={!answer.trim()}
+                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
+                      >
+                        Check spoken answer
+                      </button>
+                    </StickyAction>
+                    <div className="grid sm:grid-cols-2 gap-2 mt-3">
+                      <button
+                        onClick={revealAnswer}
+                        className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
+                      >
+                        Reveal
+                      </button>
+                      <button
+                        onClick={skipCurrent}
+                        className="py-2.5 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
+                      >
+                        Skip
+                      </button>
+                    </div>
                   </div>
                 ) : practicePrefs.answerMode === 'choice' ? (
                   <>
