@@ -1,10 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+const workers = process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : isCI ? 1 : 4;
+
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30000,
-  workers: process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : 4,
-  retries: process.env.CI ? 1 : 0,
+  timeout: isCI ? 60000 : 30000,
+  workers,
+  retries: isCI ? 1 : 0,
   use: {
     headless: true,
     baseURL: 'http://localhost:4173/JapaneseConjugation/',
