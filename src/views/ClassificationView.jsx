@@ -11,18 +11,28 @@ import {
   conjugateAdjective,
   conjugateItem,
   getWordMeta,
+  surfaceFormFor,
 } from '../utils/conjugator.js';
 import { defaultState, bumpDaily } from '../utils/storage.js';
 import { promptDisplay } from '../utils/display.js';
 import { TYPE_LABEL } from '../data/conjugationTypes.js';
 import { callGemini, aiSystemFromPrefs } from '../utils/gemini.js';
 import { useApp } from '../state/AppStateContext.jsx';
+import {
+  GROUP_DECODER_ROWS,
+  VERB_GROUP_IDS,
+  getGroupDisplay,
+  groupDisplayLabel,
+  groupRecognitionClue,
+  groupTrapText,
+} from '../utils/groupDisplay.js';
 
-export const CLASSIFY_OPTIONS = [
-  { id: 'ichidan', label: 'ichidan', hint: 'Drop る and attach endings directly.' },
-  { id: 'godan', label: 'godan', hint: 'The final kana shifts across あ/い/え/お rows.' },
-  { id: 'suru', label: 'する', hint: 'Irregular する pattern.' },
-  { id: 'kuru', label: '来る', hint: 'Irregular 来る pattern.' },
+const VERB_CLASSIFY_OPTIONS = VERB_GROUP_IDS.map((id) => {
+  const meta = getGroupDisplay(id);
+  return { id, label: meta.label, hint: meta.decoder, aliasText: meta.aliasText };
+});
+
+const ADJECTIVE_CLASSIFY_OPTIONS = [
   {
     id: 'irregular-adjective',
     label: 'irregular い-adjective',
@@ -40,19 +50,53 @@ export const CLASSIFY_OPTIONS = [
   },
 ];
 
+export const CLASSIFY_OPTIONS = [...VERB_CLASSIFY_OPTIONS, ...ADJECTIVE_CLASSIFY_OPTIONS];
+
+function negativeExample(word) {
+  const answer = surfaceFormFor(word, 'plain-negative') || conjugate(word, 'plain-negative');
+  return `${word.dict} -> ${answer}`;
+}
+
 export function classifyHint(word) {
-  if (word.group === 'ichidan')
-    return `${word.reading} is ichidan: remove る to make forms like ${conjugate(word, 'polite-present')}.`;
-  if (word.group === 'godan')
-    return `${word.reading} is godan: the final ${word.reading.slice(-1)} shifts rows, as in ${conjugate(word, 'plain-negative')}.`;
-  if (word.group === 'suru') return 'する is irregular: する, した, しない, して, できる.';
-  if (word.group === 'kuru') return '来る is irregular: くる, きた, こない, きて.';
+  if (VERB_GROUP_IDS.includes(word.group)) {
+    const trap = groupTrapText(word);
+    return [
+      `${groupDisplayLabel(word.group)}: ${groupRecognitionClue(word)}`,
+      getGroupDisplay(word.group).aliasText,
+      `Example: ${negativeExample(word)}.`,
+      trap,
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
   if (isIrregularAdjective(word)) {
     return `${word.reading} is an irregular い-adjective: present stays ${word.reading}, but other forms use よ, as in ${conjugateAdjective(word, 'adj-plain-past')} and ${conjugateAdjective(word, 'adj-plain-negative')}.`;
   }
   if (word.group === 'i-adjective')
     return `${word.reading} conjugates as an い-adjective: ${conjugateAdjective(word, 'adj-plain-past')}, ${conjugateAdjective(word, 'adj-plain-negative')}.`;
   return `${word.reading} is a な-adjective: ${conjugateAdjective(word, 'adj-attributive')} + noun, or ${conjugateAdjective(word, 'adj-polite-present')}.`;
+}
+
+export function classificationTeachingMoment(word) {
+  const displayGroup = classifyGroupId(word);
+  if (VERB_GROUP_IDS.includes(displayGroup)) {
+    return {
+      label: groupDisplayLabel(displayGroup),
+      aliasText: getGroupDisplay(displayGroup).aliasText,
+      clue: groupRecognitionClue(word),
+      example: negativeExample(word),
+      trap: groupTrapText(word),
+    };
+  }
+
+  const adjectiveExampleType = 'adj-plain-negative';
+  return {
+    label: groupDisplayLabel(displayGroup),
+    aliasText: '',
+    clue: classifyHint(word),
+    example: `${word.dict} -> ${conjugateAdjective(word, adjectiveExampleType)}`,
+    trap: '',
+  };
 }
 
 export default function ClassificationView() {
@@ -199,6 +243,7 @@ export default function ClassificationView() {
 
   const realAcc = stats.attempted ? Math.round((stats.correct / stats.attempted) * 100) : 0;
   const currentView = promptDisplay(current, null, practicePrefs);
+  const teaching = result ? classificationTeachingMoment(current) : null;
 
   return (
     <div className="space-y-4">
@@ -234,6 +279,23 @@ export default function ClassificationView() {
           />
           <div className="text-sm text-stone-400 italic mt-2">{current.meaning}</div>
         </div>
+        <div className="mb-4 rounded-xl border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/55 dark:bg-indigo-950/20 px-3 py-3">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-350">
+            Group decoder
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            {GROUP_DECODER_ROWS.map((row) => (
+              <div key={row.id} className="min-w-0">
+                <div className="text-xs font-semibold text-stone-850 dark:text-stone-150">
+                  {row.label}
+                </div>
+                <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-350">
+                  {row.decoder}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="grid sm:grid-cols-3 gap-2">
           {allowed.map((o) => (
             <button
@@ -248,7 +310,12 @@ export default function ClassificationView() {
                     : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 text-stone-750 dark:text-stone-250'
               }`}
             >
-              {o.label}
+              <span className="block">{o.label}</span>
+              {o.aliasText && (
+                <span className="mt-0.5 block text-[11px] font-normal opacity-75">
+                  {o.aliasText}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -263,18 +330,43 @@ export default function ClassificationView() {
             >
               <span role="status" aria-live="polite" className="sr-only">
                 {result.ok ? 'Correct.' : 'Not quite.'} It is{' '}
-                {CLASSIFY_OPTIONS.find((o) => o.id === correctGroup)?.label}.
+                {teaching?.label || CLASSIFY_OPTIONS.find((o) => o.id === correctGroup)?.label}.
               </span>
               <div
                 className={`font-medium text-sm ${result.ok ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}
               >
                 {result.ok ? 'Correct.' : 'Not quite.'}{' '}
                 <span className="font-normal">
-                  It is {CLASSIFY_OPTIONS.find((o) => o.id === correctGroup)?.label}.
+                  It is{' '}
+                  {teaching?.label || CLASSIFY_OPTIONS.find((o) => o.id === correctGroup)?.label}.
                 </span>
               </div>
-              <div className="text-sm text-stone-705 dark:text-stone-300 mt-2">
-                {classifyHint(current)}
+              {teaching?.aliasText && (
+                <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                  {teaching.aliasText}
+                </div>
+              )}
+              <div className="mt-3 grid gap-2 text-sm text-stone-705 dark:text-stone-300">
+                <div>
+                  <span className="font-semibold text-stone-850 dark:text-stone-150">
+                    Recognition clue:{' '}
+                  </span>
+                  {teaching?.clue || classifyHint(current)}
+                </div>
+                {teaching?.example && (
+                  <div>
+                    <span className="font-semibold text-stone-850 dark:text-stone-150">
+                      Example:{' '}
+                    </span>
+                    <span lang="ja">{teaching.example}</span>
+                  </div>
+                )}
+                {teaching?.trap && (
+                  <div>
+                    <span className="font-semibold text-stone-850 dark:text-stone-150">Trap: </span>
+                    {teaching.trap}
+                  </div>
+                )}
               </div>
               {!geminiKey && (
                 <div className="mt-2 text-xs text-stone-400 text-center">

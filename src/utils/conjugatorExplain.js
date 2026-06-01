@@ -16,7 +16,9 @@ import {
   O_ROW,
   PAST_END,
   TE_END,
+  surfaceFormFor,
 } from './conjugator.js';
+import { GROUP_SENTENCE_LABELS, groupDisplayLabel, groupSentenceLabel } from './groupDisplay.js';
 
 export function getOfflineTemplateSentence(word, type) {
   const isAdj = isAdjective(word);
@@ -263,7 +265,7 @@ function typeLabel(type) {
 }
 
 function groupLabel(item) {
-  return GROUP_NAMES[item?.group] || item?.group || 'unknown group';
+  return groupSentenceLabel(item?.group) || item?.group || 'unknown group';
 }
 
 function originalEndingFor(item) {
@@ -383,6 +385,49 @@ function ruleSummaryFor(item, type, parts, expected) {
   };
 }
 
+function targetName(type) {
+  return type === 'plain-negative' ? 'negative' : typeLabel(type).toLowerCase();
+}
+
+function groupRuleConnection(item, type, parts, expected) {
+  if (!item || isAdjective(item)) return '';
+  const label = groupDisplayLabel(item.group);
+  const surface = surfaceFormFor(item, type) || expected;
+  const ending = originalEndingFor(item);
+  const replacement = replacementFromParts(
+    parts,
+    expected,
+    parts.stem || fallbackStem(item, ending),
+  );
+  const target = targetName(type);
+
+  if (item.group === 'ichidan') {
+    if (type === 'plain-present')
+      return `Because this is ${label}, the dictionary form stays as-is.`;
+    return `Because this is ${label}, ${item.dict} removes final る before the ending: ${surface}.`;
+  }
+
+  if (item.group === 'godan') {
+    if (parts.change) {
+      return `Because this is ${label}, ${item.dict} uses the ${parts.change} row for ${target}: ${surface}.`;
+    }
+    if (replacement && type !== 'plain-present') {
+      return `Because this is ${label}, ${item.dict}'s final ${ending} uses the ${replacement} sound change here: ${surface}.`;
+    }
+    return `Because this is ${label}, ${item.dict} keeps the dictionary-form ending here: ${surface}.`;
+  }
+
+  if (item.group === 'suru') {
+    return `Because this is ${label}, the する core changes irregularly for ${target}: ${surface}.`;
+  }
+
+  if (item.group === 'kuru') {
+    return `Because this is ${label}, 来る changes its root sound for ${target}: ${surface}.`;
+  }
+
+  return '';
+}
+
 function inferOnbinMistake(item, type, got, expected, expectedRule) {
   if (!item || isAdjective(item) || item.group !== 'godan') return null;
   const rules = ONBIN_TAIL_RULES[type];
@@ -475,7 +520,7 @@ export function getConjugationDebugInfo(word, type, userAnswer = '') {
   const steps = [
     {
       title: 'Identify Word Type & Group',
-      desc: `"${word.dict}" (${word.reading}) means "${word.meaning}" and is ${GROUP_NAMES[word.group] || word.group}.`,
+      desc: `"${word.dict}" (${word.reading}) means "${word.meaning}" and is ${groupSentenceLabel(word.group)}.`,
       key: 'group',
       label: 'group',
       value: groupLabel(word),
@@ -517,6 +562,7 @@ export function getConjugationDebugInfo(word, type, userAnswer = '') {
     result: ans,
     formula,
     rule,
+    groupConnection: groupRuleConnection(word, type, parts, ans),
     steps,
     mistake: inferMistakenConjugationPattern(word, type, userAnswer),
   };
@@ -526,15 +572,7 @@ export function getConjugationSteps(word, type) {
   return getConjugationDebugInfo(word, type).steps;
 }
 
-export const GROUP_NAMES = {
-  ichidan: 'an ichidan verb (る-verb / Group 2)',
-  godan: 'a godan verb (う-verb / Group 1)',
-  suru: 'irregular (the verb する, Group 3)',
-  kuru: 'irregular (the verb 来る, Group 3)',
-  'irregular-adjective': 'an irregular い-adjective',
-  'i-adjective': 'an い-adjective',
-  'na-adjective': 'a な-adjective',
-};
+export const GROUP_NAMES = GROUP_SENTENCE_LABELS;
 
 export function explainConjugation(verb, type) {
   const { reading, group, dict } = verb;
@@ -975,7 +1013,7 @@ export function diagnose(verb, type, userAnswer) {
     try {
       const alt = conjugate({ ...verb, group: g }, type);
       if (alt === got)
-        return `You conjugated this as a ${g === 'ichidan' ? 'る-verb' : 'う-verb'}, but ${verb.dict} is ${verb.group === 'ichidan' ? 'ichidan' : verb.group === 'godan' ? 'godan' : 'irregular'}.`;
+        return `You conjugated this as ${groupDisplayLabel(g)}, but ${verb.dict} is ${groupDisplayLabel(verb.group)}.`;
     } catch {}
   }
   return '';

@@ -15,6 +15,7 @@ import {
   MINNA_LESSONS,
 } from '../data/starterWords.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { groupDisplayLabel, groupShortLabel } from './groupDisplay.js';
 
 // ============================================================================
 // DATA FILTERING & METADATA HELPERS
@@ -1075,7 +1076,6 @@ export function surfaceFormFor(item, typeId) {
 // ============================================================================
 export const RULES = (() => {
   const rules = [];
-  const short = { ichidan: 'る-verb', godan: 'う-verb', suru: 'する', kuru: '来る' };
   for (const g of ['ichidan', 'godan', 'suru', 'kuru']) {
     for (const t of CONJ_TYPES) {
       const ikuEx = g === 'godan' && (t.id === 'plain-past' || t.id === 'te-form');
@@ -1083,7 +1083,7 @@ export const RULES = (() => {
         id: `${g}|${t.id}`,
         group: g,
         type: t.id,
-        label: short[g],
+        label: groupDisplayLabel(g),
         verbFilter: (verbs) =>
           verbs.filter((v) => v.group === g && (!ikuEx || !v.reading.endsWith('いく'))),
       });
@@ -1098,14 +1098,13 @@ export const RULES = (() => {
       verbFilter: (verbs) => verbs.filter((v) => v.group === 'godan' && v.reading.endsWith('いく')),
     });
   }
-  const adjShort = { 'i-adjective': 'い-adj', 'na-adjective': 'な-adj' };
   for (const g of ['i-adjective', 'na-adjective']) {
     for (const t of ADJ_TYPES) {
       rules.push({
         id: `${g}|${t.id}`,
         group: g,
         type: t.id,
-        label: adjShort[g],
+        label: groupShortLabel(g),
         verbFilter: (words) => words.filter((w) => w.group === g),
       });
     }

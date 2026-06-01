@@ -515,8 +515,8 @@ export default function SettingsView() {
               ))}
             </div>
             <p className="text-[11px] text-stone-400 mt-1">
-              Hides う-verb / る-verb / な-adjective labels during review so identifying the
-              category stays part of the training.
+              Hides group labels during review so identifying drop-る, row-shift, irregular, or
+              adjective category stays part of the training.
             </p>
           </div>
           <div className="flex items-end">
@@ -830,12 +830,18 @@ export default function SettingsView() {
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
                 >
-                  {o.label}
+                  <span className="block leading-tight">{o.label}</span>
+                  {o.aliasText && (
+                    <span className="mt-0.5 block text-[10px] leading-tight opacity-70">
+                      {o.aliasText}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
             <p className="text-[11px] text-stone-400 mt-1">
-              Refines every drill and review deck after JLPT, lesson, and word-list filters.
+              Refines every drill and review deck after JLPT, lesson, and word-list filters. Older
+              textbook names are shown only as “also called” aliases.
             </p>
           </div>
         </div>

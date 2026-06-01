@@ -52,6 +52,10 @@ describe('SettingsView controls', () => {
 
     expect(screen.getByText('Conjugation types in scope')).toBeTruthy();
     expect(screen.getByText(/Current mix:/)).toBeTruthy();
+    expect(screen.getByText(/drop-る, row-shift, irregular/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /ichidan: drop る/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /godan: row-shift/ })).toBeTruthy();
+    expect(screen.queryByText(/Hides う-verb \/ る-verb/)).toBeNull();
 
     await waitFor(() => {
       const raw = localStorage.getItem('jp-verb-srs-v2');

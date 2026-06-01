@@ -161,6 +161,11 @@ export function ConjugationBreakdown({
           <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-350 leading-relaxed">
             {debug.rule.detail}
           </div>
+          {debug.groupConnection && (
+            <div className="mt-2 rounded-lg border border-indigo-100 dark:border-indigo-900/60 bg-white/75 dark:bg-stone-900/70 px-2.5 py-2 text-xs text-indigo-900 dark:text-indigo-100 leading-relaxed">
+              {debug.groupConnection}
+            </div>
+          )}
           <div className="mt-2 text-sm text-center font-mono text-stone-900 dark:text-stone-100 bg-white/80 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-800 rounded-lg px-2 py-1.5 break-words">
             {debug.formula.expression}
           </div>
