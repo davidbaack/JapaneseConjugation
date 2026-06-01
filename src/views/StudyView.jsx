@@ -78,6 +78,7 @@ import {
   minimalPairSetMatchesCard,
   recordMinimalPairResult,
 } from '../utils/minimalPairs.js';
+import { buildRuleCandidates } from '../utils/ruleCandidates.js';
 import { TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import StickyAction from '../components/StickyAction.jsx';
@@ -428,6 +429,14 @@ export default function StudyView() {
   const typedAnswerMode = answerMode === 'input';
   const transformationMode = activeDrillMode === 'transformation';
   const listeningPrompt = !!practicePrefs.listeningPrompt;
+  const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
+  const practiceRuleCandidates = useMemo(
+    () =>
+      buildRuleCandidates(practiceWords, enabledTypes, practicePrefs, {
+        minimalPairSet: activeMinimalPairSet,
+      }),
+    [practiceWords, enabledTypes, practicePrefs, activeMinimalPairSet],
+  );
   const drillDirection = current ? drillDirectionFor(current, practicePrefs) : 'forward';
   const reverseDrill = drillDirection === 'reverse';
   const sourceForm = current ? conjugateItem(current.verb, current.type) : '';
@@ -464,7 +473,6 @@ export default function StudyView() {
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const signedIn = !!session?.user;
   const todayGoalHit = isDailyGoalHitToday(daily);
-  const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
   const repairDrillActive = practicePrefs.reviewLimitSource === 'repair';
   const todayDrillActive =
     contextTodayDrillActive ??
@@ -515,13 +523,28 @@ export default function StudyView() {
       setCurrent(persisted);
       return;
     }
-    const nextCard = selectNext(state, practiceWords, enabledTypes, null, practicePrefs);
+    const nextCard = selectNext(
+      state,
+      practiceWords,
+      enabledTypes,
+      null,
+      practicePrefs,
+      practiceRuleCandidates,
+    );
     if (nextCard) {
       setCurrent((existing) => existing || nextCard);
     }
     // state intentionally omitted — this triggers on card change, not every state mutation
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, current, practiceWords, enabledTypes, practicePrefs, focus]);
+  }, [
+    hydrated,
+    current,
+    practiceWords,
+    enabledTypes,
+    practicePrefs,
+    practiceRuleCandidates,
+    focus,
+  ]);
 
   useEffect(() => {
     if (!hydrated || seededInitialDailyGoalRef.current) return;
@@ -1260,7 +1283,16 @@ export default function StudyView() {
       setWasCorrected(false);
       setPhase('answering');
       if (!reviewSetComplete && !reviewComplete) {
-        setCurrent(selectNext(state, practiceWords, enabledTypes, current.id, practicePrefs));
+        setCurrent(
+          selectNext(
+            state,
+            practiceWords,
+            enabledTypes,
+            current.id,
+            practicePrefs,
+            practiceRuleCandidates,
+          ),
+        );
       }
       return;
     }
@@ -1377,7 +1409,16 @@ export default function StudyView() {
         wrongSnapshotRef.current = null;
         setWasCorrected(false);
         setPhase('answering');
-        setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
+        setCurrent(
+          selectNext(
+            nextState,
+            practiceWords,
+            enabledTypes,
+            current.id,
+            practicePrefs,
+            practiceRuleCandidates,
+          ),
+        );
       }, 850);
     }
   }
@@ -1411,7 +1452,16 @@ export default function StudyView() {
     setWasCorrected(false);
     setPhase('answering');
     setWasCorrect(false);
-    setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
+    setCurrent(
+      selectNext(
+        nextState,
+        practiceWords,
+        enabledTypes,
+        current.id,
+        practicePrefs,
+        practiceRuleCandidates,
+      ),
+    );
   }
 
   function gradeSelfCheck(ok, label) {
@@ -1507,7 +1557,16 @@ export default function StudyView() {
         wrongSnapshotRef.current = null;
         setWasCorrected(false);
         setPhase('answering');
-        setCurrent(selectNext(nextState, practiceWords, enabledTypes, current.id, practicePrefs));
+        setCurrent(
+          selectNext(
+            nextState,
+            practiceWords,
+            enabledTypes,
+            current.id,
+            practicePrefs,
+            practiceRuleCandidates,
+          ),
+        );
       }, 850);
     }
   }
@@ -1714,7 +1773,16 @@ export default function StudyView() {
         <button
           onClick={() => {
             setBonusMode(true);
-            setCurrent(selectNext(state, practiceWords, enabledTypes, current?.id, practicePrefs));
+            setCurrent(
+              selectNext(
+                state,
+                practiceWords,
+                enabledTypes,
+                current?.id,
+                practicePrefs,
+                practiceRuleCandidates,
+              ),
+            );
             setPhase('answering');
           }}
           className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium"
@@ -1794,7 +1862,16 @@ export default function StudyView() {
         <button
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
-            setCurrent(selectNext(state, practiceWords, enabledTypes, current.id, practicePrefs));
+            setCurrent(
+              selectNext(
+                state,
+                practiceWords,
+                enabledTypes,
+                current.id,
+                practicePrefs,
+                practiceRuleCandidates,
+              ),
+            );
             setAnswer('');
             setPhase('answering');
           }}

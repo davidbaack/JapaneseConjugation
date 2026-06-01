@@ -1,14 +1,9 @@
 import { ALL_CARD_TYPES, TYPE_PACKS } from '../data/conjugationTypes.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import {
-  RULES,
-  enabledTypeIdsFor,
-  filterWordsForPrefs,
-  isRedundantPracticeType,
-  wordKey,
-} from './conjugator.js';
+import { enabledTypeIdsFor, filterWordsForPrefs, wordKey } from './conjugator.js';
 import { minimalPairSetMatchesWord, recommendMinimalPairSets } from './minimalPairs.js';
 import { localDateKey, ruleWeakScore, weakTypeIdsForState } from './storage.js';
+import { buildRuleCandidates, ruleCandidateTypeSet } from './ruleCandidates.js';
 
 export const TODAY_DRILL_LIST_ID = 'list-today-drill';
 export const TODAY_DRILL_LIST_NAME = "Today's Drill";
@@ -39,12 +34,6 @@ function selectableWords(words, prefs, wordLists) {
   const scopedPrefs = { ...DEFAULT_PREFS, ...prefs, wordListIds: [] };
   const filtered = filterWordsForPrefs(words || [], scopedPrefs, wordLists || []);
   return filtered.length ? filtered : words || [];
-}
-
-function candidatesForRule(rule, words, activeTypes, prefs) {
-  return rule
-    .verbFilter(words)
-    .filter((item) => !isRedundantPracticeType(item, rule.type, activeTypes, prefs));
 }
 
 function wordWeakScore(state, word) {
@@ -104,12 +93,6 @@ function rankedWords(words, state) {
   );
 }
 
-function typeHasCandidates(typeId, rules, words, activeTypes, prefs) {
-  return rules.some(
-    (rule) => rule.type === typeId && candidatesForRule(rule, words, activeTypes, prefs).length > 0,
-  );
-}
-
 export function buildTodayDrillPlan(
   state,
   words,
@@ -120,10 +103,10 @@ export function buildTodayDrillPlan(
   const now = options.now || Date.now();
   const availableWords = selectableWords(words, prefs, wordLists);
   const activeTypes = enabledTypeIdsFor(state?.enabledTypes);
-  const rulesWithCandidates = RULES.map((rule) => ({
-    rule,
-    candidates: candidatesForRule(rule, availableWords, activeTypes, prefs),
-  })).filter((entry) => activeTypes.includes(entry.rule.type) && entry.candidates.length > 0);
+  const rulesWithCandidates = buildRuleCandidates(availableWords, activeTypes, prefs, {
+    activeTypes,
+  });
+  const candidateTypeIds = ruleCandidateTypeSet(rulesWithCandidates);
 
   const dueRules = rulesWithCandidates
     .filter(({ rule }) => {
@@ -141,7 +124,7 @@ export function buildTodayDrillPlan(
     .sort((a, b) => b.score - a.score);
 
   const weakTypeIds = weakTypeIdsForState(state || {}, activeTypes).filter((typeId) =>
-    typeHasCandidates(typeId, RULES, availableWords, activeTypes, prefs),
+    candidateTypeIds.has(typeId),
   );
 
   const minimalPairRecommendations = recommendMinimalPairSets(state || {}, availableWords, 2);
@@ -178,7 +161,7 @@ export function buildTodayDrillPlan(
 
   const usableTypeIds = typeIds
     .filter((typeId) => ALL_CARD_TYPES.some((type) => type.id === typeId))
-    .filter((typeId) => typeHasCandidates(typeId, RULES, availableWords, activeTypes, prefs))
+    .filter((typeId) => candidateTypeIds.has(typeId))
     .slice(0, MAX_TYPES);
 
   const wordKeys = [];

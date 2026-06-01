@@ -226,21 +226,88 @@ export function wordKeyLocal(word) {
   return `${word.group}:${word.dict}`;
 }
 
+const wordSearchCache = new WeakMap();
+const answerRowsCache = new WeakMap();
+const formRowsCache = new WeakMap();
+
+function canCacheObject(value) {
+  return !!value && (typeof value === 'object' || typeof value === 'function');
+}
+
+function wordSearchData(word) {
+  if (!canCacheObject(word)) {
+    return {
+      dict: word?.dict || '',
+      reading: word?.reading || '',
+      romaji: kanaToRomaji(word?.reading || ''),
+      meaning: String(word?.meaning || '').toLowerCase(),
+      group: String(GROUP_NAMES[word?.group] || '').toLowerCase(),
+    };
+  }
+  const cached = wordSearchCache.get(word);
+  if (cached) return cached;
+  const data = {
+    dict: word.dict || '',
+    reading: word.reading || '',
+    romaji: kanaToRomaji(word.reading || ''),
+    meaning: String(word.meaning || '').toLowerCase(),
+    group: String(GROUP_NAMES[word.group] || '').toLowerCase(),
+  };
+  wordSearchCache.set(word, data);
+  return data;
+}
+
+function lookupRows(item) {
+  return answerRows(item);
+}
+
+function lookupSurface(item, row) {
+  if (!row || Object.hasOwn(row, 'surface')) return row?.surface || '';
+  row.surface = surfaceFormForLocal(item, row.type.id);
+  row.surfaceVariants = lookupVariantValues(row.surface);
+  return row.surface || '';
+}
+
+function answerRows(item) {
+  const build = () => {
+    const types = isAdjective(item) ? ADJ_TYPES : CONJ_TYPES;
+    return types.map((type) => {
+      const answer = conjugateItem(item, type.id);
+      const answerRomaji = kanaToRomaji(answer);
+      return {
+        type,
+        answer,
+        answerRomaji,
+        answerVariants: [answer, compactLookupText(answer), answerRomaji.toLowerCase()].filter(
+          Boolean,
+        ),
+      };
+    });
+  };
+  if (!canCacheObject(item)) return build();
+  const cached = answerRowsCache.get(item);
+  if (cached) return cached;
+  const rows = build();
+  answerRowsCache.set(item, rows);
+  return rows;
+}
+
 export function searchWords(query, words) {
   const q = query.trim().toLowerCase();
   if (!q) return words;
   const h = toHiragana(q);
   return words.filter((w) => {
+    const search = wordSearchData(w);
     if (
-      w.dict.includes(query) ||
-      w.reading.includes(h) ||
-      kanaToRomaji(w.reading).includes(q) ||
-      w.meaning.toLowerCase().includes(q) ||
-      GROUP_NAMES[w.group].toLowerCase().includes(q)
+      search.dict.includes(query) ||
+      search.reading.includes(h) ||
+      search.romaji.includes(q) ||
+      search.meaning.includes(q) ||
+      search.group.includes(q)
     )
       return true;
-    return formRows(w).some(
-      (r) => r.answer === h || r.answer.includes(h) || kanaToRomaji(r.answer).includes(q),
+    return answerRows(w).some(
+      (r) => r.answer === h || r.answer.includes(h) || r.answerRomaji.includes(q),
     );
   });
 }
@@ -312,32 +379,46 @@ export function formLookupCandidates(query, words) {
     ].filter(Boolean),
   );
   const allowContext = /[\u3040-\u30ff\u3400-\u9fff]/.test(raw);
+  const includeSurfaceVariants = /[\u3400-\u9fff]/.test(raw);
   const exact = [],
     context = [],
     seen = new Set();
   for (const word of words) {
-    for (const row of formRows(word)) {
-      const surface = surfaceFormForLocal(word, row.type.id);
-      const variants = [...lookupVariantValues(row.answer), ...lookupVariantValues(surface)];
+    for (const row of lookupRows(word)) {
       const key = `${wordKeyLocal(word)}|${row.type.id}|${row.answer}`;
-      const exactHit = variants.find((v) => queryVariants.has(v));
-      const contextHit =
+      let exactHit = row.answerVariants.find((v) => queryVariants.has(v));
+      let contextHit =
         allowContext &&
         !exactHit &&
-        variants.find((v) => {
+        row.answerVariants.find((v) => {
           const min = /^[a-z]+$/.test(v) ? 4 : 2;
           return (
             v.length >= min && [...queryVariants].some((q) => q.length > v.length && q.includes(v))
           );
         });
+      if (!exactHit && !contextHit && includeSurfaceVariants) {
+        lookupSurface(word, row);
+        exactHit = row.surfaceVariants.find((v) => queryVariants.has(v));
+        contextHit =
+          allowContext &&
+          !exactHit &&
+          row.surfaceVariants.find((v) => {
+            const min = /^[a-z]+$/.test(v) ? 4 : 2;
+            return (
+              v.length >= min &&
+              [...queryVariants].some((q) => q.length > v.length && q.includes(v))
+            );
+          });
+      }
       if ((exactHit || contextHit) && !seen.has(key)) {
         seen.add(key);
+        const surface = lookupSurface(word, row);
         (exactHit ? exact : context).push({
           word,
           type: row.type,
           answer: row.answer,
           surface: surface || row.answer,
-          explanation: row.explanation,
+          explanation: explainItem(word, row.type.id),
           matchKind: exactHit ? 'exact' : 'in context',
           hitText: exactHit || contextHit || row.answer,
         });
@@ -429,12 +510,20 @@ export function adHocReferenceCandidates(query) {
 }
 
 export function formRows(item) {
-  const types = isAdjective(item) ? ADJ_TYPES : CONJ_TYPES;
-  return types.map((t) => ({
-    type: t,
-    answer: conjugateItem(item, t.id),
-    explanation: explainItem(item, t.id),
-  }));
+  const build = () => {
+    const types = isAdjective(item) ? ADJ_TYPES : CONJ_TYPES;
+    return types.map((t) => ({
+      type: t,
+      answer: conjugateItem(item, t.id),
+      explanation: explainItem(item, t.id),
+    }));
+  };
+  if (!canCacheObject(item)) return build();
+  const cached = formRowsCache.get(item);
+  if (cached) return cached;
+  const rows = build();
+  formRowsCache.set(item, rows);
+  return rows;
 }
 
 export function referenceRows(item, state = defaultState()) {

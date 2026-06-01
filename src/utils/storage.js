@@ -7,13 +7,7 @@ import {
   LEGACY_BROAD_DEFAULT_TYPE_IDS,
   INTRODUCED_DEFAULT_TYPE_IDS,
 } from '../data/conjugationTypes.js';
-import {
-  RULES,
-  wordKey,
-  isRedundantPracticeType,
-  enabledTypeIdsFor,
-  filterWordsForPrefs,
-} from './conjugator.js';
+import { RULES, wordKey, enabledTypeIdsFor, filterWordsForPrefs } from './conjugator.js';
 import { diagnoseMistake } from './mistakeDiagnosis.js';
 import { retryWithBackoff } from './retry.js';
 import {
@@ -21,13 +15,9 @@ import {
   mergeReadinessState,
   normalizeReadinessState,
 } from './readiness.js';
-import {
-  getMinimalPairSet,
-  mergeMinimalPairProgress,
-  minimalPairSetMatchesType,
-  minimalPairSetMatchesWord,
-} from './minimalPairs.js';
+import { getMinimalPairSet, mergeMinimalPairProgress } from './minimalPairs.js';
 import { mergePracticePrefs } from './display.js';
+import { buildRuleCandidates } from './ruleCandidates.js';
 
 export const DAY = 86400000;
 
@@ -986,21 +976,21 @@ export function pickWeakWeighted(pool, state) {
   return scored[scored.length - 1];
 }
 
-export function selectNext(state, verbs, enabledTypes, lastRuleId, prefs = DEFAULT_PREFS) {
-  const now = Date.now(),
-    pool = [];
+export function selectNext(
+  state,
+  verbs,
+  enabledTypes,
+  lastRuleId,
+  prefs = DEFAULT_PREFS,
+  ruleCandidates = null,
+) {
+  const now = Date.now();
   const minimalPairSet = getMinimalPairSet(prefs.minimalPairSetId);
-  const activeTypes = minimalPairSet ? minimalPairSet.typeIds : enabledTypeIdsFor(enabledTypes);
-  for (const rule of RULES) {
-    if (!activeTypes.includes(rule.type)) continue;
-    if (minimalPairSet && !minimalPairSetMatchesType(minimalPairSet, rule.type)) continue;
-    const candidates = rule
-      .verbFilter(verbs)
-      .filter((item) => !minimalPairSet || minimalPairSetMatchesWord(minimalPairSet, item))
-      .filter((item) => !isRedundantPracticeType(item, rule.type, activeTypes, prefs));
-    if (!candidates.length) continue;
-    pool.push({ rule, candidates });
-  }
+  const pool =
+    ruleCandidates ||
+    buildRuleCandidates(verbs, enabledTypes, prefs, {
+      minimalPairSet,
+    });
   if (!pool.length) return null;
   const avail = pool.length > 1 ? pool.filter((p) => p.rule.id !== lastRuleId) : pool;
   const due = avail.filter((p) => {
@@ -1060,23 +1050,17 @@ export function buildPracticePoolSummary(state, words, prefs = DEFAULT_PREFS, wo
   const enabled = enabledTypeIdsFor(state.enabledTypes);
   const now = Date.now();
   const activeTypes = new Set();
-  const activeRules = [];
+  const activeRules = buildRuleCandidates(filtered, enabled, prefs, { activeTypes: enabled });
   let prompts = 0;
-  for (const rule of RULES) {
-    if (!enabled.includes(rule.type)) continue;
-    const candidates = rule
-      .verbFilter(filtered)
-      .filter((item) => !isRedundantPracticeType(item, rule.type, enabled, prefs));
-    if (!candidates.length) continue;
+  for (const { rule, candidates } of activeRules) {
     prompts += candidates.length;
     activeTypes.add(rule.type);
-    activeRules.push(rule);
   }
   let due = 0,
     fresh = 0,
     weak = 0,
     mastered = 0;
-  for (const rule of activeRules) {
+  for (const { rule } of activeRules) {
     const card = (state.cards || {})[rule.id];
     if (!card) fresh++;
     else if (card.nextReview <= now) due++;
