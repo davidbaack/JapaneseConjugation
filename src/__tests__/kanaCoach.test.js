@@ -13,6 +13,11 @@ describe('kanaCoachCells green water-mark', () => {
     expect(states(cells)).toEqual(['correct', 'correct', 'pending', 'empty']);
   });
 
+  it('marks every kana green when the typed answer is a complete match', () => {
+    const cells = kanaCoachCells('きた', 'kita', 0, true, 0);
+    expect(states(cells)).toEqual(['correct', 'correct']);
+  });
+
   it('keeps already-green kana green after a backspace (refills emptied cells)', () => {
     // Typed up to "たべま" so two kana committed green (water-mark = 2),
     // then backspaced down to just "た".

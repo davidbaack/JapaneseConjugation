@@ -12,6 +12,8 @@ export function kanaCoachCells(
 ) {
   const target = Array.from(expected || '');
   const typed = Array.from(toHiraganaProgress(input || ''));
+  const completeMatch =
+    typed.length === target.length && target.every((kana, i) => typed[i] === kana);
   // Trailing 'n' is held pending in progress mode; commit it as 'ん' when context confirms it
   if (
     typed.length < target.length &&
@@ -30,7 +32,10 @@ export function kanaCoachCells(
     let state;
     if (got) {
       if (got === expectedKana) {
-        state = pendingLast && i === lastTypedIndex && !greenRevealedCell ? 'pending' : 'correct';
+        state =
+          pendingLast && i === lastTypedIndex && !greenRevealedCell && !completeMatch
+            ? 'pending'
+            : 'correct';
       } else {
         state = pendingLast && i === lastTypedIndex ? 'pending' : 'wrong';
       }
