@@ -165,18 +165,15 @@ describe('StudyView daily startup guards', () => {
     await waitFor(() => expect(app.startTodayDrill).toHaveBeenCalled());
   });
 
-  it('does not auto-start today while signed out', async () => {
-    const showAuth = vi.fn();
+  it('auto-starts today while signed out', async () => {
     const app = makeApp({
       session: null,
-      showAuth,
     });
     mockedApp.value = app;
 
     render(<StudyView />);
 
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
+    await waitFor(() => expect(app.startTodayDrill).toHaveBeenCalled());
   });
 
   it('does not auto-start today over a focused word launch', async () => {

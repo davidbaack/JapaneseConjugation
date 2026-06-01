@@ -37,35 +37,10 @@ export function SRSQueueBar() {
     todayDrillActive,
     srsQueue,
     startTodayDrill,
+    supabase,
   } = useApp();
   const signedIn = !!session?.user;
-
-  if (!signedIn) {
-    return (
-      <section
-        aria-label="SRS queue"
-        className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 shadow-sm dark:border-indigo-900/70 dark:bg-indigo-950/25"
-      >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-              Sign in to save SRS progress
-            </div>
-            <div className="text-xs text-stone-600 dark:text-stone-300">
-              Sync your review queue and daily goal across devices.
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={showAuth}
-            className="min-h-9 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-          >
-            Sign in
-          </button>
-        </div>
-      </section>
-    );
-  }
+  const cloudSyncAvailable = !!supabase;
 
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
   const dueCleared = srsQueue?.completedDueRuleIds?.length || 0;
@@ -87,14 +62,16 @@ export function SRSQueueBar() {
         : todayPlan.available
           ? 'Ready'
           : 'No cards';
-  const syncText =
-    syncStatus.kind === 'syncing'
+  const syncText = !signedIn
+    ? t('sync.local')
+    : syncStatus.kind === 'syncing'
       ? t('sync.syncing')
       : syncStatus.kind === 'error'
         ? t('sync.error')
         : t('sync.synced');
-  const syncTone =
-    syncStatus.kind === 'error'
+  const syncTone = !signedIn
+    ? 'text-stone-500 dark:text-stone-400'
+    : syncStatus.kind === 'error'
       ? 'text-rose-600 dark:text-rose-400'
       : syncStatus.kind === 'syncing'
         ? 'text-amber-600 dark:text-amber-400'
@@ -167,6 +144,15 @@ export function SRSQueueBar() {
               className="min-h-9 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
             >
               {canStart ? 'Start review' : 'Go study'}
+            </button>
+          )}
+          {!signedIn && cloudSyncAvailable && (
+            <button
+              type="button"
+              onClick={showAuth}
+              className="min-h-9 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50 dark:border-indigo-800 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+            >
+              Sign in to sync
             </button>
           )}
         </div>

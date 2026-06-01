@@ -8,9 +8,11 @@ test.describe('Study flow', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Sign in to save SRS progress')).toBeVisible();
-    await expect(page.getByText('0/0 this session')).toHaveCount(0);
-    await expect(page.getByText('0/30 today')).toHaveCount(0);
+    const queue = page.getByRole('region', { name: 'SRS queue' });
+    await expect(queue.getByText('SRS Queue')).toBeVisible();
+    await expect(queue.getByText('local')).toBeVisible();
+    await expect(page.getByText('Sign in to save SRS progress')).toHaveCount(0);
+    await expect(queue.getByText('0/30 today')).toBeVisible();
 
     // Forward (conjugate) drill renders a free-text answer box.
     const input = page.getByPlaceholder('Type romaji or kana...');

@@ -18,6 +18,7 @@ function appState(overrides = {}) {
     setTab: vi.fn(),
     practicePrefs: { dailyGoal: 30 },
     session: { user: { id: 'learner' } },
+    supabase: { _configured: true },
     syncStatus: { kind: 'ok' },
     daily: { count: 4, goalStreak: 0 },
     dailyPct: 13,
@@ -43,6 +44,33 @@ afterEach(() => {
 });
 
 describe('SRSQueueBar', () => {
+  it('starts a local review while signed out', () => {
+    const app = appState({
+      session: null,
+    });
+    mockedApp.value = app;
+
+    render(<SRSQueueBar />);
+
+    expect(screen.getByText('SRS Queue')).toBeTruthy();
+    expect(screen.getByText('local')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Start review' }));
+
+    expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
+  });
+
+  it('keeps sign-in scoped to cloud sync', () => {
+    const app = appState({
+      session: null,
+      supabase: null,
+    });
+    mockedApp.value = app;
+
+    render(<SRSQueueBar />);
+
+    expect(screen.queryByRole('button', { name: 'Sign in to sync' })).toBeNull();
+  });
+
   it('starts a ready review from the queue bar', () => {
     const app = appState();
     mockedApp.value = app;

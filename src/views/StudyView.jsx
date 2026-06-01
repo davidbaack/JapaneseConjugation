@@ -326,7 +326,6 @@ export default function StudyView() {
     setWordLists,
     studyFocus: focus,
     clearStudyFocus: onFocusConsumed,
-    session,
     hydrated,
     todayPlan,
     todayDrillActive: contextTodayDrillActive,
@@ -459,7 +458,6 @@ export default function StudyView() {
   );
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
-  const signedIn = !!session?.user;
   const todayGoalHit = isDailyGoalHitToday(daily);
   const repairDrillActive = practicePrefs.reviewLimitSource === 'repair';
   const todayDrillActive =
@@ -733,7 +731,6 @@ export default function StudyView() {
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!signedIn) return;
     if (autoStartedTodayRef.current) return;
     if (todayGoalHit) return;
     if (specialLaunchActive) return;
@@ -747,7 +744,6 @@ export default function StudyView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     hydrated,
-    signedIn,
     todayGoalHit,
     specialLaunchActive,
     todayDrillActive,

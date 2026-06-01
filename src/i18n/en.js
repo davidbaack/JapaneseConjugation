@@ -25,6 +25,7 @@ export default {
   'sync.syncing': 'syncing',
   'sync.error': 'sync error',
   'sync.synced': 'synced',
+  'sync.local': 'local',
 
   'common.loading': 'Loading…',
 };
