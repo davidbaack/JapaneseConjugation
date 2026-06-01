@@ -2,15 +2,15 @@ import { test, expect } from '@playwright/test';
 
 // Exercises the core SRS loop on the default Study tab with the default
 // answer mode ("input"): a card is shown, the learner submits an answer,
-// review feedback appears, and advancing returns to the answering phase
-// with the session counter incremented.
+// review feedback appears, and advancing returns to the answering phase.
 test.describe('Study flow', () => {
-  test('answering a card shows feedback, advances, and counts the review', async ({ page }) => {
+  test('answering a card shows feedback and advances', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Session counter starts at 0/0.
-    await expect(page.getByText('0/0 this session')).toBeVisible();
+    await expect(page.getByText('Sign in to save SRS progress')).toBeVisible();
+    await expect(page.getByText('0/0 this session')).toHaveCount(0);
+    await expect(page.getByText('0/30 today')).toHaveCount(0);
 
     // Forward (conjugate) drill renders a free-text answer box.
     const input = page.getByPlaceholder('Type romaji or kana...');
@@ -28,9 +28,6 @@ test.describe('Study flow', () => {
     const next = page.getByRole('button', { name: 'Next (Enter)' });
     await expect(next).toBeVisible();
 
-    // The review is recorded immediately (denominator goes 0 -> 1).
-    await expect(page.getByText(/\/1 this session/)).toBeVisible();
-
     // Advancing returns to the answering phase with a fresh input.
     await next.click();
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
@@ -46,6 +43,5 @@ test.describe('Study flow', () => {
 
     // Revealing grades the card as missed and drops into the review phase.
     await expect(page.getByRole('button', { name: 'Next (Enter)' })).toBeVisible();
-    await expect(page.getByText(/\/1 this session/)).toBeVisible();
   });
 });
