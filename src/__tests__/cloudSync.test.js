@@ -288,6 +288,26 @@ describe('mergeSyncPayload', () => {
     expect(merged.practicePrefs.theme).toBe('light');
     expect(merged.practicePrefs.dailyGoal).toBe(10);
   });
+
+  it('normalizes legacy kana answer preferences before merging sync payloads', () => {
+    const guidedLocal = mergeSyncPayload(
+      { practicePrefs: { answerMode: 'guided' } },
+      { practicePrefs: { ...DEFAULT_PREFS, kanaAssist: 'off' } },
+    );
+
+    expect(guidedLocal.practicePrefs.answerMode).toBe('input');
+    expect(guidedLocal.practicePrefs.kanaAssist).toBe('guided');
+    expect(guidedLocal.practicePrefs).not.toHaveProperty('kanaMatchDisplay');
+
+    const offLocal = mergeSyncPayload(
+      { practicePrefs: { kanaMatchDisplay: 'none' } },
+      { practicePrefs: { ...DEFAULT_PREFS, kanaAssist: 'guided' } },
+    );
+
+    expect(offLocal.practicePrefs.answerMode).toBe('input');
+    expect(offLocal.practicePrefs.kanaAssist).toBe('off');
+    expect(offLocal.practicePrefs).not.toHaveProperty('kanaMatchDisplay');
+  });
 });
 
 describe('when Supabase is not configured', () => {

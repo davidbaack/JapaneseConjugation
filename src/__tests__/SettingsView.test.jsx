@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe('SettingsView controls', () => {
-  it('shows the restored prompt form and kana feedback settings', async () => {
+  it('shows the restored prompt form and kana assist settings', async () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('tab', { name: 'settings', exact: true }));
@@ -35,12 +35,18 @@ describe('SettingsView controls', () => {
     expect(screen.queryByText('Guide tone')).toBeNull();
     expect(screen.queryByLabelText('Search conjugation forms')).toBeNull();
     expect(screen.getAllByRole('button', { name: 'Speak answers', exact: true })).toHaveLength(1);
+    const answerMode = within(screen.getByText('Answer mode').parentElement);
+    expect(answerMode.getByRole('button', { name: 'Type answer', exact: true })).toBeTruthy();
+    expect(answerMode.getByRole('button', { name: 'Choices', exact: true })).toBeTruthy();
+    expect(answerMode.getByRole('button', { name: 'Self-check', exact: true })).toBeTruthy();
+    expect(answerMode.queryByRole('button', { name: 'Free input', exact: true })).toBeNull();
+    expect(answerMode.queryByRole('button', { name: 'Guided kana', exact: true })).toBeNull();
 
-    expect(screen.getByText('Kana feedback while typing')).toBeTruthy();
-    const kanaFeedback = within(screen.getByRole('group', { name: 'Kana feedback while typing' }));
-    expect(kanaFeedback.getByRole('button', { name: 'None', exact: true })).toBeTruthy();
-    expect(kanaFeedback.getByRole('button', { name: 'Colors', exact: true })).toBeTruthy();
-    expect(kanaFeedback.getByRole('button', { name: 'Colors + count', exact: true })).toBeTruthy();
+    expect(screen.getByText('Kana help while typing')).toBeTruthy();
+    const kanaHelp = within(screen.getByRole('group', { name: 'Kana help while typing' }));
+    expect(kanaHelp.getByRole('button', { name: 'Off', exact: true })).toBeTruthy();
+    expect(kanaHelp.getByRole('button', { name: 'Live', exact: true })).toBeTruthy();
+    expect(kanaHelp.getByRole('button', { name: 'Guided', exact: true })).toBeTruthy();
 
     expect(screen.getByText('Word category label')).toBeTruthy();
     const wordCategory = within(screen.getByRole('group', { name: 'Word category label' }));
@@ -68,6 +74,16 @@ describe('SettingsView controls', () => {
       const raw = localStorage.getItem('jp-verb-srs-v2');
       expect(raw).toBeTruthy();
       expect(JSON.parse(raw).practicePrefs.promptForm).toBe('polite-present');
+    });
+
+    fireEvent.click(kanaHelp.getByRole('button', { name: 'Guided', exact: true }));
+
+    await waitFor(() => {
+      const raw = localStorage.getItem('jp-verb-srs-v2');
+      const prefs = JSON.parse(raw).practicePrefs;
+      expect(prefs.answerMode).toBe('input');
+      expect(prefs.kanaAssist).toBe('guided');
+      expect(prefs).not.toHaveProperty('kanaMatchDisplay');
     });
   });
 });

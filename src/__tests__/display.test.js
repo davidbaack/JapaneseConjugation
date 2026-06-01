@@ -357,6 +357,7 @@ describe('mergePracticePrefs', () => {
 
   it('resets hidden low-value settings while preserving restored learner controls', () => {
     const prefs = mergePracticePrefs({
+      answerMode: 'guided',
       skipDuplicateForms: false,
       trickQuestions: true,
       colorCodeConjugations: false,
@@ -368,14 +369,27 @@ describe('mergePracticePrefs', () => {
     });
 
     expect(prefs).toMatchObject({
+      answerMode: 'input',
+      kanaAssist: 'guided',
       skipDuplicateForms: true,
       trickQuestions: false,
       colorCodeConjugations: true,
       aiGuideTone: 'sensei',
-      kanaMatchDisplay: 'none',
       showWordCategory: true,
       promptForm: 'random',
     });
+    expect(prefs).not.toHaveProperty('kanaMatchDisplay');
     expect(prefs).not.toHaveProperty('durationSec');
+  });
+
+  it('migrates legacy kana feedback display into kana assist levels', () => {
+    expect(mergePracticePrefs({ kanaMatchDisplay: 'none' })).toMatchObject({
+      answerMode: 'input',
+      kanaAssist: 'off',
+    });
+    expect(mergePracticePrefs({ kanaMatchDisplay: 'color' })).toMatchObject({
+      answerMode: 'input',
+      kanaAssist: 'live',
+    });
   });
 });

@@ -41,6 +41,6 @@ export const DEFAULT_PREFS = {
   wordListIds: [],
   drillMode: 'word',
   colorCodeConjugations: true,
-  kanaMatchDisplay: 'color-count',
+  kanaAssist: 'live',
   showWordCategory: false,
 };

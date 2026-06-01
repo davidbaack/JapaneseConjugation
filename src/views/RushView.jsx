@@ -3,7 +3,6 @@ import { IconSpark } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaProgressMeter from '../components/KanaProgressMeter.jsx';
 import StickyAction from '../components/StickyAction.jsx';
-import { DEFAULT_PREFS } from '../data/defaults.js';
 import { toHiragana } from '../utils/romaji.js';
 import { kanaCoachCells } from '../utils/kanaCoach.js';
 import {
@@ -17,7 +16,7 @@ import {
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { defaultState, gradeCard, recordMistake, bumpDaily } from '../utils/storage.js';
 import { bumpSessionMistakePattern } from '../utils/mistakeDiagnosis.js';
-import { promptDisplay, shuffled } from '../utils/display.js';
+import { kanaMatchDisplayForPrefs, promptDisplay, shuffled } from '../utils/display.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
 export default function RushView() {
@@ -261,7 +260,7 @@ export default function RushView() {
       ? getTypeInfo(round.promptType).label
       : 'Dictionary form'
     : '';
-  const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
+  const kanaMatchDisplay = kanaMatchDisplayForPrefs(practicePrefs);
   const answerPreview = toHiragana(answer);
   const rushKanaCells =
     round?.expected && kanaMatchDisplay !== 'none'

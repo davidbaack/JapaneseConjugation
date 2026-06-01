@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
@@ -86,5 +86,27 @@ describe('StudyView daily startup guards', () => {
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(setWordLists).not.toHaveBeenCalled();
     expect(launchedToday(setPracticePrefs)).toBe(false);
+  });
+
+  it('does not count a corrected mid-type kana mistake when kana assist is off', async () => {
+    mockedApp.value = makeApp({
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'off',
+      },
+      studyFocus: {
+        word: STARTER_VERBS[0],
+        type: 'plain-past',
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'tadeta' } });
+    fireEvent.change(input, { target: { value: 'tabeta' } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    expect(screen.queryByText('Self-corrected.')).toBeNull();
   });
 });

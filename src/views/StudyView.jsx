@@ -49,6 +49,9 @@ import {
   makeChoices,
   makeReverseChoices,
   dictionaryAnswerMatches,
+  kanaMatchDisplayForPrefs,
+  normalizeAnswerMode,
+  resolveKanaAssist,
   typoGuardForAnswer,
 } from '../utils/display.js';
 import {
@@ -301,6 +304,9 @@ export default function StudyView() {
   }, [verbs, practicePrefs, wordLists, focus, focusWordLock]);
 
   const activeDrillMode = practicePrefs.drillMode || DEFAULT_PREFS.drillMode;
+  const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
+  const kanaAssist = resolveKanaAssist(practicePrefs);
+  const typedAnswerMode = answerMode === 'input';
   const transformationMode = activeDrillMode === 'transformation';
   const listeningPrompt = !!practicePrefs.listeningPrompt;
   const drillDirection = current ? drillDirectionFor(current, practicePrefs) : 'forward';
@@ -500,13 +506,13 @@ export default function StudyView() {
   useEffect(() => {
     setCoachRevealed(0);
     setGreenRevealed(0);
-  }, [current?.id, practicePrefs.answerMode]);
+  }, [current?.id, answerMode, kanaAssist]);
 
   useEffect(() => {
     if (!current) return;
     if (phase !== 'answering') return;
     if (reverseDrill) return;
-    if (!['input', 'guided'].includes(practicePrefs.answerMode)) return;
+    if (!typedAnswerMode) return;
     const exp = reverseDrill ? current.verb.reading : sourceForm;
     const preview = toHiragana(answer);
     if (exp && preview === exp) {
@@ -520,8 +526,8 @@ export default function StudyView() {
     if (!current) return;
     if (phase !== 'answering') return;
     if (reverseDrill) return;
-    if (!['input', 'guided'].includes(practicePrefs.answerMode)) return;
-    if ((practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay) === 'none') return;
+    if (!typedAnswerMode) return;
+    if (kanaAssist === 'off') return;
     const cells = kanaCoachCells(sourceForm, answer, 0, true, 0);
     let committed = 0;
     for (const c of cells) {
@@ -540,17 +546,17 @@ export default function StudyView() {
 
   useEffect(() => {
     setSelfCheckOpen(false);
-  }, [current?.id, phase, practicePrefs.answerMode]);
+  }, [current?.id, phase, answerMode]);
 
   useEffect(() => {
     setTypoGuard(null);
   }, [current?.id, phase]);
 
   useEffect(() => {
-    if (!['input', 'guided'].includes(practicePrefs.answerMode)) {
+    if (!typedAnswerMode) {
       setKanaPadOpen(false);
     }
-  }, [practicePrefs.answerMode]);
+  }, [typedAnswerMode]);
 
   useEffect(() => {
     setReviewBase(state.session.reviewed || 0);
@@ -640,7 +646,7 @@ export default function StudyView() {
     : englishForForm(current.verb, current.type);
   const englishHintsHidden =
     (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden';
-  const kanaMatchDisplay = practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay;
+  const kanaMatchDisplay = kanaMatchDisplayForPrefs(practicePrefs);
   const typeInfo = getTypeInfo(current.type);
   const sourceTypeId = reverseDrill ? current.type : promptType || DICTIONARY_TYPE_ID;
   const targetTypeId = reverseDrill ? DICTIONARY_TYPE_ID : current.type;
@@ -735,13 +741,14 @@ export default function StudyView() {
   const reviewComplete = dueQueueDone || dailyGoalJustHit;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishHint = englishHintsHidden && phase === 'answering' && !showEnglishHint;
+  const guidedKana = typedAnswerMode && kanaAssist === 'guided';
+  const liveKana = typedAnswerMode && kanaAssist === 'live';
   const coachPreview = toHiragana(answer);
   const coachProgress = toHiraganaProgress(answer);
   const preview = coachPreview;
-  const coachCells =
-    practicePrefs.answerMode === 'guided'
-      ? kanaCoachCells(expected, answer, coachRevealed, phase === 'answering', greenRevealed)
-      : [];
+  const coachCells = guidedKana
+    ? kanaCoachCells(expected, answer, coachRevealed, phase === 'answering', greenRevealed)
+    : [];
   const coachWrongIndex = coachCells.findIndex((c) => c.state === 'wrong');
   const coachTypedCount = Array.from(coachProgress).length;
   const expectedKanaCount = Array.from(expected).length;
@@ -754,7 +761,7 @@ export default function StudyView() {
           ? 'Extra kana after the answer.'
           : '';
   const liveCells =
-    practicePrefs.answerMode === 'input' && !reverseDrill
+    liveKana && !reverseDrill
       ? kanaCoachCells(expected, answer, 0, phase === 'answering', greenRevealed)
       : [];
   const liveWrongIndex = liveCells.findIndex((c) => c.state === 'wrong' || c.state === 'extra');
@@ -768,12 +775,8 @@ export default function StudyView() {
         : '';
   const reviewAnswerSource = phase === 'reviewing' && submittedAnswer ? submittedAnswer : answer;
   const reviewKanaCells =
-    ['input', 'guided'].includes(practicePrefs.answerMode) && !reverseDrill
-      ? kanaCoachCells(
-          expected,
-          reviewAnswerSource,
-          practicePrefs.answerMode === 'guided' ? coachRevealed : 0,
-        )
+    typedAnswerMode && kanaAssist !== 'off' && !reverseDrill
+      ? kanaCoachCells(expected, reviewAnswerSource, guidedKana ? coachRevealed : 0)
       : [];
 
   function transformationStatsAfter(correct) {
@@ -1152,7 +1155,8 @@ export default function StudyView() {
       readiness: recordReadinessAttempt(state.readiness, rid, {
         correct: ok,
         responseMs,
-        answerMode: practicePrefs.answerMode,
+        answerMode,
+        kanaAssist,
         drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
@@ -1290,7 +1294,8 @@ export default function StudyView() {
       readiness: recordReadinessAttempt(state.readiness, rid, {
         correct: ok,
         responseMs,
-        answerMode: practicePrefs.answerMode,
+        answerMode,
+        kanaAssist,
         drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
@@ -1389,7 +1394,8 @@ export default function StudyView() {
       readiness: recordReadinessAttempt(state.readiness, rid, {
         correct: false,
         responseMs,
-        answerMode: practicePrefs.answerMode,
+        answerMode,
+        kanaAssist,
         drillMode: practicePrefs.drillMode,
         reverseDrill,
       }),
@@ -1425,9 +1431,9 @@ export default function StudyView() {
 
   function insertAnswerText(text) {
     setTypoGuard(null);
-    if (kanaMatchDisplay !== 'none' && (practicePrefs.answerMode === 'guided' || !reverseDrill)) {
+    if (typedAnswerMode && kanaMatchDisplay !== 'none' && (guidedKana || !reverseDrill)) {
       const newVal = answer + text;
-      const revealed = practicePrefs.answerMode === 'guided' ? coachRevealed : 0;
+      const revealed = guidedKana ? coachRevealed : 0;
       const cells = kanaCoachCells(expected, newVal, revealed, true);
       if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
         hadKanaMistakeRef.current = true;
@@ -2042,7 +2048,7 @@ export default function StudyView() {
                   </div>
                 )}
 
-                {practicePrefs.answerMode === 'self-check' ? (
+                {answerMode === 'self-check' ? (
                   <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
                     <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
                       Self-check deck
@@ -2106,7 +2112,7 @@ export default function StudyView() {
                       </>
                     )}
                   </div>
-                ) : practicePrefs.answerMode === 'choice' ? (
+                ) : answerMode === 'choice' ? (
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {reverseDrill
@@ -2161,7 +2167,7 @@ export default function StudyView() {
                       </button>
                     </div>
                   </>
-                ) : practicePrefs.answerMode === 'guided' ? (
+                ) : guidedKana ? (
                   <>
                     <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3 mb-3">
                       <div className="flex flex-wrap justify-center gap-1.5" lang="ja">

@@ -19,7 +19,9 @@ import {
 } from '../utils/storage.js';
 import {
   mergePracticePrefs,
+  normalizeAnswerMode,
   resolveDisplayScripts,
+  resolveKanaAssist,
   scriptModeFromDisplay,
 } from '../utils/display.js';
 import { speakJapanese } from '../utils/speech.js';
@@ -209,6 +211,8 @@ export default function SettingsView() {
           : 'text-stone-600 bg-stone-50 border-stone-250 dark:bg-stone-950 dark:border-stone-850';
 
   const displayScripts = resolveDisplayScripts(practicePrefs);
+  const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
+  const kanaAssist = resolveKanaAssist(practicePrefs);
   const promptForm = normalizePromptFormSetting(practicePrefs.promptForm);
   const selectedGenkiLessons =
     practicePrefs.genkiLessons === null
@@ -303,10 +307,9 @@ export default function SettingsView() {
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-stone-500 block mb-1">Answer mode</label>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'input', label: 'Free input' },
-                { id: 'guided', label: 'Guided kana' },
+                { id: 'input', label: 'Type answer' },
                 { id: 'choice', label: 'Choices' },
                 { id: 'self-check', label: 'Self-check' },
               ].map((o) => (
@@ -314,7 +317,7 @@ export default function SettingsView() {
                   key={o.id}
                   onClick={() => setPracticePrefs({ ...practicePrefs, answerMode: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    practicePrefs.answerMode === o.id
+                    answerMode === o.id
                       ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
@@ -434,35 +437,34 @@ export default function SettingsView() {
               Furigana {practicePrefs.furigana !== false ? 'on' : 'off'}
             </button>
           </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Kana feedback while typing</label>
-            <div
-              role="group"
-              aria-label="Kana feedback while typing"
-              className="grid grid-cols-3 gap-2"
-            >
-              {[
-                { id: 'none', label: 'None' },
-                { id: 'color', label: 'Colors' },
-                { id: 'color-count', label: 'Colors + count' },
-              ].map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, kanaMatchDisplay: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.kanaMatchDisplay || DEFAULT_PREFS.kanaMatchDisplay) === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
+          {answerMode === 'input' && (
+            <div>
+              <label className="text-xs text-stone-500 block mb-1">Kana help while typing</label>
+              <div
+                role="group"
+                aria-label="Kana help while typing"
+                className="grid grid-cols-3 gap-2"
+              >
+                {[
+                  { id: 'off', label: 'Off' },
+                  { id: 'live', label: 'Live' },
+                  { id: 'guided', label: 'Guided' },
+                ].map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => setPracticePrefs({ ...practicePrefs, kanaAssist: o.id })}
+                    className={`px-3 py-2 rounded-lg text-sm border transition ${
+                      kanaAssist === o.id
+                        ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                        : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Colors + count always shown after submitting.
-            </p>
-          </div>
+          )}
           <div>
             <label className="text-xs text-stone-500 block mb-1">English hints</label>
             <div className="grid grid-cols-2 gap-2">

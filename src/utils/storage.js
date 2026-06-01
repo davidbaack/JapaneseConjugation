@@ -27,6 +27,7 @@ import {
   minimalPairSetMatchesType,
   minimalPairSetMatchesWord,
 } from './minimalPairs.js';
+import { mergePracticePrefs } from './display.js';
 
 export const DAY = 86400000;
 
@@ -94,7 +95,7 @@ export function saveAll(
     wordLists,
     syncConfig,
     lastSyncedAt,
-    practicePrefs,
+    practicePrefs: mergePracticePrefs(practicePrefs),
   });
   try {
     localStorage.setItem(STORAGE_KEY, payload);
@@ -286,7 +287,8 @@ function sameJSON(a, b) {
 
 function hasCustomPracticePrefs(prefs) {
   if (!prefs || typeof prefs !== 'object') return false;
-  return Object.keys(prefs).some((key) => !sameJSON(prefs[key], DEFAULT_PREFS[key]));
+  const normalized = mergePracticePrefs(prefs);
+  return Object.keys(normalized).some((key) => !sameJSON(normalized[key], DEFAULT_PREFS[key]));
 }
 
 function hasProgressBucketData(bucket) {
@@ -387,7 +389,7 @@ export function buildSyncPayload({
     customVerbs: Array.isArray(customVerbs) ? customVerbs : [],
     customAdjectives: Array.isArray(customAdjectives) ? customAdjectives : [],
     wordLists: Array.isArray(wordLists) ? wordLists : [],
-    practicePrefs: practicePrefs || DEFAULT_PREFS,
+    practicePrefs: mergePracticePrefs(practicePrefs),
   };
 }
 
@@ -430,18 +432,20 @@ function mergeWordLists(local = [], cloud = []) {
 }
 
 function mergeSyncPracticePrefs(localPrefs, cloudPrefs) {
-  const merged = { ...(cloudPrefs || {}) };
+  const local = localPrefs ? mergePracticePrefs(localPrefs) : null;
+  const cloud = cloudPrefs ? mergePracticePrefs(cloudPrefs) : null;
+  const merged = { ...(cloud || {}) };
   let changed = false;
-  if (localPrefs && typeof localPrefs === 'object') {
-    for (const key of Object.keys(localPrefs)) {
-      if (!sameJSON(localPrefs[key], DEFAULT_PREFS[key])) {
-        merged[key] = localPrefs[key];
+  if (local) {
+    for (const key of Object.keys(local)) {
+      if (!sameJSON(local[key], DEFAULT_PREFS[key])) {
+        merged[key] = local[key];
         changed = true;
       }
     }
   }
-  if (changed || hasKeys(merged)) return merged;
-  return localPrefs || DEFAULT_PREFS;
+  if (changed || hasKeys(merged)) return mergePracticePrefs(merged);
+  return local || DEFAULT_PREFS;
 }
 
 export function mergeSyncPayload(localPayload, cloudPayload) {

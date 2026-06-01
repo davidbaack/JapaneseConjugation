@@ -21,8 +21,27 @@ export function scriptModeFromDisplay(ds) {
   return 'kanji';
 }
 
+export function normalizeAnswerMode(value) {
+  return ['input', 'choice', 'self-check'].includes(value) ? value : DEFAULT_PREFS.answerMode;
+}
+
+export function resolveKanaAssist(prefs = DEFAULT_PREFS) {
+  if (['off', 'live', 'guided'].includes(prefs?.kanaAssist)) return prefs.kanaAssist;
+  if (prefs?.answerMode === 'guided') return 'guided';
+  if (prefs?.kanaMatchDisplay === 'none') return 'off';
+  if (['color', 'color-count'].includes(prefs?.kanaMatchDisplay)) return 'live';
+  return DEFAULT_PREFS.kanaAssist;
+}
+
+export function kanaMatchDisplayForPrefs(prefs = DEFAULT_PREFS) {
+  return resolveKanaAssist(prefs) === 'off' ? 'none' : 'color-count';
+}
+
 export function mergePracticePrefs(prefs) {
   const source = { ...(prefs || {}) };
+  const answerMode = normalizeAnswerMode(source.answerMode);
+  const kanaAssist = resolveKanaAssist(source);
+  delete source.kanaMatchDisplay;
   delete source.durationSec;
   delete source.skipDuplicateForms;
   delete source.trickQuestions;
@@ -49,6 +68,8 @@ export function mergePracticePrefs(prefs) {
   return {
     ...DEFAULT_PREFS,
     ...source,
+    answerMode,
+    kanaAssist,
     displayScripts,
     wordGroups,
     reviewLimit,
