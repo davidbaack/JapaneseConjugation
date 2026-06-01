@@ -50,6 +50,22 @@ describe('identifyConjugation', () => {
     expect(hit).toBeTruthy();
   });
 
+  it('can keep close wrong candidates after an exact match', () => {
+    const res = identifyConjugation('kaemasu', ALL, { includeNearWhenExact: true });
+    expect(res.normalized).toBe('かえます');
+    expect(res.exact.some((e) => e.word.reading === 'かう' && e.type === 'potential-polite')).toBe(
+      true,
+    );
+    const closeWrong = res.near.find(
+      (e) => e.word.reading === 'かえる' && e.type === 'polite-present',
+    );
+    expect(res.near[0]).toMatchObject({ word: { reading: 'かえる' }, type: 'polite-present' });
+    expect(res.near.every((e) => e.distance === res.near[0].distance)).toBe(true);
+    expect(closeWrong).toBeTruthy();
+    expect(closeWrong.kana).toBe('かえります');
+    expect(closeWrong.diff.summary).toBeTruthy();
+  });
+
   it('finds an exact match for a godan verb (のんだ = past of 飲む)', () => {
     const res = identifyConjugation('のんだ', ALL);
     const hit = res.exact.find((e) => e.word.reading === 'のむ' && e.type === 'plain-past');
