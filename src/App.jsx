@@ -21,23 +21,157 @@ const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 
 const TABS = ['study', 'check', 'classify', 'endings', 'games', 'insights', 'library', 'settings'];
 
-function AppShell() {
+function SRSQueueBar() {
   const {
-    tab,
-    setTab,
     state,
     practicePrefs,
     session,
     syncStatus,
     daily,
     dailyPct,
-    showAuthModal,
-    setShowAuthModal,
-    supabase,
+    showAuth,
+    todayPlan,
+    todayGoalHit,
+    todayDrillActive,
+    srsQueue,
+    startTodayDrill,
   } = useApp();
+  const signedIn = !!session?.user;
+
+  if (!signedIn) {
+    return (
+      <section
+        aria-label="SRS queue"
+        className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 shadow-sm dark:border-indigo-900/70 dark:bg-indigo-950/25"
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+              Sign in to save SRS progress
+            </div>
+            <div className="text-xs text-stone-600 dark:text-stone-300">
+              Sync your review queue and daily goal across devices.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={showAuth}
+            className="min-h-9 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+          >
+            Sign in
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const dueTotal = srsQueue?.dueRuleIds?.length || 0;
+  const dueCleared = srsQueue?.completedDueRuleIds?.length || 0;
+  const hasDueQueue = dueTotal > 0;
+  const queueDone = hasDueQueue && dueCleared >= dueTotal;
+  const upcoming = todayPlan.forecastLabel;
+  const dueNow = todayPlan.sourceCounts?.due || 0;
+  const progressPct = hasDueQueue
+    ? Math.min(100, Math.round((dueCleared / dueTotal) * 100))
+    : dailyPct;
+  const progressMax = hasDueQueue ? dueTotal : practicePrefs.dailyGoal || 30;
+  const progressNow = hasDueQueue ? dueCleared : Math.min(daily.count || 0, progressMax);
+  const statusText = hasDueQueue
+    ? `${dueCleared}/${dueTotal} cleared`
+    : todayGoalHit
+      ? 'Daily goal complete'
+      : dueNow
+        ? `${dueNow} due now`
+        : todayPlan.available
+          ? 'Ready'
+          : 'No cards';
+  const syncText =
+    syncStatus.kind === 'syncing'
+      ? t('sync.syncing')
+      : syncStatus.kind === 'error'
+        ? t('sync.error')
+        : t('sync.synced');
+  const syncTone =
+    syncStatus.kind === 'error'
+      ? 'text-rose-600 dark:text-rose-400'
+      : syncStatus.kind === 'syncing'
+        ? 'text-amber-600 dark:text-amber-400'
+        : 'text-emerald-700 dark:text-emerald-400';
+  const sessionReviewed = state.session?.reviewed || 0;
+  const sessionCorrect = state.session?.correct || 0;
+  const dailyGoal = practicePrefs.dailyGoal || 30;
+  const chips = [
+    `${daily.count || 0}/${dailyGoal} today`,
+    `${sessionCorrect}/${sessionReviewed} session`,
+    daily.goalStreak ? `${daily.goalStreak} day streak` : '',
+  ].filter(Boolean);
+  const canStart = !todayDrillActive && !todayGoalHit && todayPlan.available;
+
+  return (
+    <section
+      aria-label="SRS queue"
+      className="mb-4 rounded-lg border border-stone-200 bg-white px-3 py-2 shadow-sm dark:border-stone-800 dark:bg-stone-900"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+              {queueDone ? 'Queue cleared' : 'SRS Queue'}
+            </div>
+            <div className={`flex items-center gap-1 text-[11px] ${syncTone}`}>
+              <IconCloud className="h-3 w-3" />
+              <span>{syncText}</span>
+            </div>
+          </div>
+          <div className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">
+            {upcoming ? `up next: ${upcoming}` : todayPlan.summary}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {chips.map((chip) => (
+              <span
+                key={chip}
+                className="rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-[11px] font-medium text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300"
+              >
+                {chip}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 sm:justify-end">
+          <div className="min-w-[7.5rem] shrink-0 text-right text-xs font-semibold text-stone-700 dark:text-stone-200">
+            <div className="tabular-nums">{statusText}</div>
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={progressMax}
+              aria-valuenow={progressNow}
+              className="mt-1 inline-block h-1.5 w-20 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
+            >
+              <span
+                className={`block h-full ${queueDone || todayGoalHit ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                style={{ width: progressPct + '%' }}
+              />
+            </div>
+          </div>
+          {canStart && (
+            <button
+              type="button"
+              onClick={() => startTodayDrill(todayPlan)}
+              className="min-h-9 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            >
+              Start review
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AppShell() {
+  const { tab, setTab, showAuthModal, setShowAuthModal, supabase } = useApp();
 
   const { tabProps, panelProps } = useTablist(TABS, tab, setTab);
-  const signedIn = !!session?.user;
 
   return (
     <div
@@ -45,7 +179,7 @@ function AppShell() {
       style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif' }}
     >
       <div className="max-w-4xl mx-auto px-4 py-3 sm:py-6">
-        <header className="mb-4 sm:mb-6 flex items-center justify-between">
+        <header className="mb-4 sm:mb-6">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
               {t('app.title')}{' '}
@@ -54,61 +188,11 @@ function AppShell() {
               <span className="font-normal">{t('app.subtitle')}</span>
             </h1>
           </div>
-          <div className="text-xs text-stone-500 text-right">
-            {signedIn ? (
-              <>
-                <div>
-                  {t('header.session', {
-                    correct: state.session.correct,
-                    reviewed: state.session.reviewed,
-                  })}
-                </div>
-                <div className="mt-1 flex items-center justify-end gap-2">
-                  <span>
-                    {t('header.today', { count: daily.count, goal: practicePrefs.dailyGoal })}
-                  </span>
-                  <span className="inline-block w-14 h-1.5 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden">
-                    <span
-                      className={`block h-full ${daily.goalHit ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                      style={{ width: dailyPct + '%' }}
-                    />
-                  </span>
-                </div>
-                {!!daily.goalStreak && (
-                  <div className="text-amber-600 dark:text-amber-400 mt-0.5">
-                    {t('header.goalStreak', { days: daily.goalStreak })}
-                  </div>
-                )}
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowAuthModal(true)}
-                className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 font-semibold text-stone-700 transition hover:bg-stone-100 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
-              >
-                Sign in
-              </button>
-            )}
-            {signedIn && (
-              <div
-                className={`flex items-center justify-end gap-1 mt-0.5 ${syncStatus.kind === 'error' ? 'text-rose-500' : syncStatus.kind === 'syncing' ? 'text-amber-500' : 'text-emerald-600'}`}
-              >
-                <IconCloud className="w-3 h-3" />
-                <span>
-                  {syncStatus.kind === 'syncing'
-                    ? t('sync.syncing')
-                    : syncStatus.kind === 'error'
-                      ? t('sync.error')
-                      : t('sync.synced')}
-                </span>
-              </div>
-            )}
-          </div>
         </header>
         <nav
           role="tablist"
           aria-label="App sections"
-          className="flex flex-wrap gap-1 mb-4 sm:mb-6 p-1 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800"
+          className="mb-3 flex flex-wrap gap-1 rounded-xl border border-stone-200 bg-white p-1 dark:border-stone-800 dark:bg-stone-900"
         >
           {TABS.map((id) => (
             <button
@@ -125,6 +209,7 @@ function AppShell() {
             </button>
           ))}
         </nav>
+        <SRSQueueBar />
         <Suspense fallback={<ViewSkeleton />}>
           <div {...panelProps(tab)}>
             {tab === 'study' && <StudyView />}

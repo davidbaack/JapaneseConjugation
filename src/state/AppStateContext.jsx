@@ -12,6 +12,7 @@ import {
   buildSyncPayload,
   mergeSyncPayload,
   pruneAICache,
+  localDateKey,
 } from '../utils/storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { getJapaneseVoices } from '../utils/speech.js';
@@ -20,6 +21,12 @@ import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
 import { loadVerbLexicon } from '../data/verbLexicon.js';
 import { supabase } from '../utils/supabase.js';
 import { useCloudAutoSync } from '../hooks/useCloudAutoSync.js';
+import {
+  buildTodayDrillPlan,
+  practicePrefsForTodayDrill,
+  TODAY_DRILL_LIST_ID,
+  upsertTodayDrillList,
+} from '../utils/todayDrill.js';
 
 // Centralized global app state (improvement #6). All the SRS/customs/prefs
 // state, the hydration + cloud-sync effects, theme/voice wiring, and the
@@ -27,6 +34,15 @@ import { useCloudAutoSync } from '../hooks/useCloudAutoSync.js';
 // prop-drilled into every view. Views read what they need via useApp(), and
 // App is just the shell that renders them.
 const AppStateContext = createContext(null);
+
+function isTodayDrillPractice(prefs = DEFAULT_PREFS) {
+  return (
+    (prefs.drillMode || DEFAULT_PREFS.drillMode) === 'word' &&
+    !prefs.minimalPairSetId &&
+    !prefs.reviewLimitSource &&
+    (prefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID)
+  );
+}
 
 function useAppController() {
   const [tab, setTab] = useState('study');
@@ -48,6 +64,12 @@ function useAppController() {
   const [studyFocus, setStudyFocus] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
+  const [srsQueue, setSrsQueue] = useState(() => ({
+    date: localDateKey(),
+    dueRuleIds: [],
+    completedDueRuleIds: [],
+    startedAt: null,
+  }));
   const activeGeminiKey = supabase ? 'proxy' : '';
   const [speechVoices, setSpeechVoices] = useState([]);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
@@ -310,6 +332,37 @@ function useAppController() {
   );
   const daily = state.daily || defaultState().daily;
   const dailyPct = Math.min(100, Math.round((daily.count / (practicePrefs.dailyGoal || 30)) * 100));
+  const todayPlan = useMemo(
+    () => buildTodayDrillPlan(state, allWords, practicePrefs, wordLists),
+    [state, allWords, practicePrefs, wordLists],
+  );
+  const todayKey = localDateKey();
+  const todayGoalHit = daily.date === todayKey && !!daily.goalHit;
+  const todayDrillActive = isTodayDrillPractice(practicePrefs);
+  const activeSrsQueue = useMemo(() => {
+    if (srsQueue.date !== todayKey) {
+      return { date: todayKey, dueRuleIds: [], completedDueRuleIds: [], startedAt: null };
+    }
+    const dueRuleIds = [...new Set(srsQueue.dueRuleIds || [])];
+    const completedDueRuleIds = [...new Set(srsQueue.completedDueRuleIds || [])].filter((id) =>
+      dueRuleIds.includes(id),
+    );
+    return { ...srsQueue, dueRuleIds, completedDueRuleIds };
+  }, [srsQueue, todayKey]);
+
+  useEffect(() => {
+    if (!hydrated || !todayDrillActive) return;
+    setSrsQueue((prev) => {
+      const today = localDateKey();
+      if (prev.date === today && prev.startedAt) return prev;
+      return {
+        date: today,
+        dueRuleIds: [...(todayPlan.dueRuleIds || [])],
+        completedDueRuleIds: [],
+        startedAt: Date.now(),
+      };
+    });
+  }, [hydrated, todayDrillActive, todayPlan]);
 
   // Cross-view actions, so views don't need ad-hoc callback props.
   function practiceWord(word, type, options = {}) {
@@ -318,6 +371,45 @@ function useAppController() {
   }
   const clearStudyFocus = () => setStudyFocus(null);
   const showAuth = () => setShowAuthModal(true);
+
+  function startTodayDrill(plan = todayPlan) {
+    const drillPlan = plan || todayPlan;
+    if (!drillPlan?.available) return false;
+    try {
+      sessionStorage.removeItem('jp-study-current');
+    } catch {}
+    setWordLists((prev) => upsertTodayDrillList(prev, drillPlan));
+    setState((prev) => ({
+      ...prev,
+      enabledTypes: drillPlan.typeIds,
+      session: { ...(prev.session || {}), mistakePatterns: {} },
+    }));
+    setPracticePrefs((prev) => practicePrefsForTodayDrill(prev, drillPlan));
+    setSrsQueue({
+      date: localDateKey(),
+      dueRuleIds: [...(drillPlan.dueRuleIds || [])],
+      completedDueRuleIds: [],
+      startedAt: Date.now(),
+    });
+    setStudyFocus(null);
+    setTab('study');
+    return true;
+  }
+
+  function markSrsQueueCompleted(ruleId) {
+    if (!ruleId) return;
+    setSrsQueue((prev) => {
+      const today = localDateKey();
+      const dueRuleIds = prev.date === today ? prev.dueRuleIds || [] : [];
+      if (!dueRuleIds.includes(ruleId)) return prev;
+      const completedDueRuleIds = prev.completedDueRuleIds || [];
+      if (completedDueRuleIds.includes(ruleId)) return prev;
+      return {
+        ...prev,
+        completedDueRuleIds: [...completedDueRuleIds, ruleId],
+      };
+    });
+  }
 
   return {
     tab,
@@ -353,6 +445,12 @@ function useAppController() {
     allWords,
     daily,
     dailyPct,
+    todayPlan,
+    todayGoalHit,
+    todayDrillActive,
+    srsQueue: activeSrsQueue,
+    startTodayDrill,
+    markSrsQueueCompleted,
   };
 }
 
