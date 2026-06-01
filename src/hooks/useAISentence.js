@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { callGemini, extractJSON } from '../utils/gemini.js';
 import { getTypeInfo } from '../data/conjugationTypes.js';
-import { getWordMeta } from '../utils/conjugator.js';
+import { getWordMeta, surfaceFormFor } from '../utils/conjugator.js';
 import { getOfflineTemplateSentence } from '../utils/conjugatorExplain.js';
+import { normalizeSentenceBlankForTarget } from '../utils/display.js';
 import { getAICache, setAICache } from '../utils/storage.js';
 
 // Fill-in-the-blank sentence for the "sentence" drill mode (improvement #4 —
@@ -10,6 +11,12 @@ import { getAICache, setAICache } from '../utils/storage.js';
 // a level-appropriate sentence containing the target form as a blank, and
 // falls back to an offline template on any failure or when AI is unavailable.
 // Keyed on the card id so it doesn't refetch on unrelated re-renders.
+function normalizeSentenceResultForTarget(result, targets) {
+  const sentence = normalizeSentenceBlankForTarget(result?.sentence || '', targets);
+  if (!sentence.includes('[______]')) return null;
+  return { ...result, sentence };
+}
+
 export function useAISentence({
   current,
   drillMode,
@@ -28,8 +35,21 @@ export function useAISentence({
 
     const key = `${current.verb.group}:${current.verb.dict}|${current.type}`;
 
-    const cached = getAICache('katachiya_ai_sentence_cache', key);
+    const expectedVal = reverseDrill ? current.verb.reading : sourceForm;
+    const targetVariants = [
+      expectedVal,
+      reverseDrill ? current.verb.dict : surfaceFormFor(current.verb, current.type),
+    ];
+
+    const cached = normalizeSentenceResultForTarget(
+      getAICache('katachiya_ai_sentence_cache', key),
+      targetVariants,
+    );
     if (cached) {
+      setAICache('katachiya_ai_sentence_cache', key, {
+        sentence: cached.sentence,
+        translation: cached.translation,
+      });
       setAiSentence({
         sentence: cached.sentence,
         translation: cached.translation,
@@ -47,7 +67,6 @@ export function useAISentence({
 
     setAiSentence({ sentence: '', translation: '', loading: true, err: '' });
 
-    const expectedVal = reverseDrill ? current.verb.reading : sourceForm;
     const targetLabel = getTypeInfo(current.type).label;
     const jlptLevel = getWordMeta(current.verb).jlpt || 'N5';
     const scriptPref =
@@ -60,6 +79,7 @@ export function useAISentence({
 ${scriptPref}
 The sentence must naturally contain the word "${current.verb.dict}" (${current.verb.reading}) conjugated into its "${targetLabel}" form (which is "${expectedVal}").
 In the sentence, replace the conjugated form with a blank "[______]".
+The blank must replace the entire target form; do not leave particles, endings, or helper words from that target next to the blank.
 
 Return ONLY valid JSON (no markdown formatting, no code block backticks):
 {"sentence": "Japanese sentence with [______]", "translation": "English translation"}
@@ -78,7 +98,11 @@ Keep it concise and clear.`;
         if (cancelled) return;
         const data = extractJSON(reply);
         if (data && data.sentence && data.translation) {
-          const resultObj = { sentence: data.sentence, translation: data.translation };
+          const resultObj = normalizeSentenceResultForTarget(
+            { sentence: data.sentence, translation: data.translation },
+            targetVariants,
+          );
+          if (!resultObj) throw new Error('Invalid sentence blank from AI.');
           setAICache('katachiya_ai_sentence_cache', key, resultObj);
           setAiSentence({ ...resultObj, loading: false, err: '' });
         } else {

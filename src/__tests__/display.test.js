@@ -13,6 +13,7 @@ import {
   mergePracticePrefs,
   makeChoices,
   makeReverseChoices,
+  normalizeSentenceBlankForTarget,
   spokenAnswerResult,
 } from '../utils/display.js';
 import { filterWordsForPrefs } from '../utils/conjugator.js';
@@ -257,6 +258,29 @@ describe('spokenAnswerResult', () => {
     const result = spokenAnswerResult(['\u305f\u3079\u305f'], '\u305f\u3079\u3066');
     expect(result.ok).toBe(false);
     expect(result.score).toBeGreaterThan(0);
+  });
+});
+
+describe('normalizeSentenceBlankForTarget', () => {
+  it('moves target-form suffixes left outside the blank back into the answer', () => {
+    expect(
+      normalizeSentenceBlankForTarget(
+        '\u5371\u306a\u3044\u3067\u3059\u304b\u3089\u3001\u3053\u3053\u3067[______]\u3067\u304f\u3060\u3055\u3044\u3002',
+        [
+          '\u306f\u3057\u3089\u306a\u3044\u3067\u304f\u3060\u3055\u3044',
+          '\u8d70\u3089\u306a\u3044\u3067\u304f\u3060\u3055\u3044',
+        ],
+      ),
+    ).toBe('\u5371\u306a\u3044\u3067\u3059\u304b\u3089\u3001\u3053\u3053\u3067[______]\u3002');
+  });
+
+  it('does not remove nearby words that are not part of the target form', () => {
+    expect(
+      normalizeSentenceBlankForTarget(
+        '\u3053\u3053\u3067[______]\u3067\u304f\u3060\u3055\u3044\u3002',
+        ['\u306f\u3057\u3063\u3066'],
+      ),
+    ).toBe('\u3053\u3053\u3067[______]\u3067\u304f\u3060\u3055\u3044\u3002');
   });
 });
 

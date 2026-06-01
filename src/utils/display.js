@@ -131,6 +131,60 @@ export function normalizeJapaneseText(s) {
     .toLowerCase();
 }
 
+const SENTENCE_BLANK = '[______]';
+
+function uniqueNonEmptyStrings(values) {
+  return [...new Set(values.map((value) => String(value || '').normalize('NFKC')).filter(Boolean))];
+}
+
+function longestTargetEdgeMatch(text, targets, edge) {
+  const boundaryMatch = edge === 'suffix' ? text.match(/^\s*/) : text.match(/\s*$/);
+  const boundary = boundaryMatch ? boundaryMatch[0] : '';
+  const body =
+    edge === 'suffix'
+      ? text.slice(boundary.length)
+      : text.slice(0, Math.max(0, text.length - boundary.length));
+  let best = '';
+  for (const target of targets) {
+    const chars = Array.from(target);
+    for (let len = chars.length; len >= 2; len -= 1) {
+      const candidate =
+        edge === 'suffix' ? chars.slice(chars.length - len).join('') : chars.slice(0, len).join('');
+      const matches = edge === 'suffix' ? body.startsWith(candidate) : body.endsWith(candidate);
+      if (matches && candidate.length > best.length) {
+        best = candidate;
+        break;
+      }
+    }
+  }
+  return best ? { boundary, match: best } : null;
+}
+
+export function normalizeSentenceBlankForTarget(sentence, targets = []) {
+  const raw = String(sentence || '');
+  const parts = raw.split(SENTENCE_BLANK);
+  if (parts.length !== 2) return raw;
+
+  let [before, after] = parts;
+  const targetList = uniqueNonEmptyStrings(Array.isArray(targets) ? targets : [targets]);
+  if (!targetList.length) return raw;
+
+  const followingMatch = longestTargetEdgeMatch(after, targetList, 'suffix');
+  if (followingMatch) {
+    after = after.slice(followingMatch.boundary.length + followingMatch.match.length);
+  }
+
+  const precedingMatch = longestTargetEdgeMatch(before, targetList, 'prefix');
+  if (precedingMatch) {
+    before = before.slice(
+      0,
+      before.length - precedingMatch.boundary.length - precedingMatch.match.length,
+    );
+  }
+
+  return `${before}${SENTENCE_BLANK}${after}`;
+}
+
 export function cleanEnglishAction(meaning = '') {
   return (
     String(meaning || '')
