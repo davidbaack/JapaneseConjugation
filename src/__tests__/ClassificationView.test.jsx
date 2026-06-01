@@ -13,7 +13,12 @@ describe('classification teaching moments', () => {
     expect(moment.label).toBe('ichidan: drop る');
     expect(moment.clue).toContain('drops');
     expect(moment.example).toBe('食べる -> 食べない');
+    expect(moment.masuDiagnostic).toMatchObject({
+      politeSurface: '食べます',
+      kind: 'stem-kept',
+    });
     expect(classifyHint(TABERU)).toContain('also called る-verb');
+    expect(classifyHint(TABERU)).toContain('食べる -> 食べます');
   });
 
   it('teaches 書く as godan row-shift', () => {
@@ -24,8 +29,13 @@ describe('classification teaching moments', () => {
     expect(moment.example).toBe('書く -> 書かない');
   });
 
-  it('calls out 帰る and 走る as godan る-ending exceptions', () => {
-    expect(classificationTeachingMoment(KAERU).trap).toContain('帰る and 走る');
+  it('calls out common godan る-ending exceptions', () => {
+    expect(classificationTeachingMoment(KAERU).trap).toContain('帰る, 入る, 走る, and 切る');
     expect(classificationTeachingMoment(HASHIRU).clue).toContain('still godan');
+    expect(classificationTeachingMoment(KAERU).masuDiagnostic).toMatchObject({
+      politeSurface: '帰ります',
+      kind: 'ri-shift',
+    });
+    expect(classifyHint(HASHIRU)).toContain('走る -> 走ります');
   });
 });

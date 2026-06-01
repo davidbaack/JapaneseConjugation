@@ -207,17 +207,21 @@ function loadPersistedCurrent(state, words, enabledTypes, prefs) {
       clearPersistedCurrent();
       return null;
     }
-    const word = words.find(
+    const resolvedWord = words.find(
       (w) =>
         w.dict === saved.dict &&
         w.group === saved.group &&
         (!saved.reading || w.reading === saved.reading) &&
         (!saved.meaning || w.meaning === saved.meaning),
     );
-    if (!word) {
+    if (!resolvedWord) {
       clearPersistedCurrent();
       return null;
     }
+    const word =
+      saved.word?.dict === saved.dict && saved.word?.group === saved.group
+        ? { ...resolvedWord, ...saved.word }
+        : resolvedWord;
     const card = buildFocusCard(state, word, saved.type);
     if (!card || !cardMatchesPractice(card, words, enabledTypes, prefs)) {
       clearPersistedCurrent();
@@ -228,6 +232,20 @@ function loadPersistedCurrent(state, words, enabledTypes, prefs) {
     clearPersistedCurrent();
     return null;
   }
+}
+
+function snapshotStudyWord(word) {
+  return {
+    dict: word.dict,
+    reading: word.reading,
+    meaning: word.meaning,
+    group: word.group,
+    ...(word.jlpt ? { jlpt: word.jlpt } : {}),
+    ...(word.lesson ? { lesson: word.lesson } : {}),
+    ...(word.lessons ? { lessons: word.lessons } : {}),
+    ...(word.minnaLesson ? { minnaLesson: word.minnaLesson } : {}),
+    ...(word.minnaLessons ? { minnaLessons: word.minnaLessons } : {}),
+  };
 }
 
 function persistCurrent(card) {
@@ -242,6 +260,7 @@ function persistCurrent(card) {
         meaning: card.verb.meaning,
         group: card.verb.group,
         type: card.type,
+        word: snapshotStudyWord(card.verb),
       }),
     );
   } catch {}
@@ -479,7 +498,10 @@ export default function StudyView() {
       setCurrent(persisted);
       return;
     }
-    setCurrent(selectNext(state, practiceWords, enabledTypes, null, practicePrefs));
+    const nextCard = selectNext(state, practiceWords, enabledTypes, null, practicePrefs);
+    if (nextCard) {
+      setCurrent((existing) => existing || nextCard);
+    }
     // state intentionally omitted — this triggers on card change, not every state mutation
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, current, practiceWords, enabledTypes, practicePrefs, focus]);
@@ -3031,6 +3053,26 @@ export default function StudyView() {
                         <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
                           {minimalPairFeedback.intro}
                         </div>
+                        {minimalPairFeedback.masuDiagnostic && (
+                          <div className="mt-2 border-l-2 border-emerald-300 dark:border-emerald-700 pl-3 text-sm text-stone-700 dark:text-stone-300">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                              Masu check
+                            </div>
+                            <div className="mt-0.5">
+                              <span
+                                lang="ja"
+                                className="font-semibold text-stone-900 dark:text-stone-100"
+                              >
+                                {minimalPairFeedback.masuDiagnostic.dict}
+                                {' -> '}
+                                {minimalPairFeedback.masuDiagnostic.politeSurface}
+                              </span>
+                              <span className="ml-2">
+                                {minimalPairFeedback.masuDiagnostic.contrast}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                         <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
                           {minimalPairFeedback.contrasts.map((contrast) => (
                             <div

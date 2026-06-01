@@ -46,7 +46,7 @@ describe('group display metadata', () => {
     const hashiru = { dict: '走る', reading: 'はしる', meaning: 'to run', group: 'godan' };
 
     expect(groupRecognitionClue(kaeru)).toContain('still godan');
-    expect(groupTrapText(kaeru)).toContain('帰る and 走る');
+    expect(groupTrapText(kaeru)).toContain('帰る, 入る, 走る, and 切る');
     expect(groupTrapText(hashiru)).toContain('る-ending godan traps');
   });
 });

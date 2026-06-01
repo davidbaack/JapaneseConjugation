@@ -37,6 +37,8 @@ describe('minimal-pair drill library', () => {
     const prefs = practicePrefsForMinimalPairSet(set, {});
     const card = selectNext(defaultState(), [TABERU, HASHIRU, KAKU], [], null, prefs);
 
+    expect(set.description).toContain('ます form');
+    expect(set.contrasts.find((c) => c.id === 'godan-ru')?.cue).toContain('hashirimasu');
     expect(set.typeIds).toContain(card.type);
     expect([TABERU.dict, HASHIRU.dict]).toContain(card.verb.dict);
   });
@@ -133,5 +135,15 @@ describe('minimal-pair drill library', () => {
 
     expect(feedback.active.id).toBe('i-adjective');
     expect(feedback.contrasts.map((c) => c.id)).toEqual(['i-adjective', 'na-adjective']);
+  });
+
+  it('adds the masu diagnostic to ichidan/godan ru feedback', () => {
+    const set = getMinimalPairSet('ichidan-godan-ru');
+    const feedback = minimalPairFeedbackForCard(set, HASHIRU, 'plain-past');
+
+    expect(feedback.masuDiagnostic).toMatchObject({
+      politeSurface: '走ります',
+      kind: 'ri-shift',
+    });
   });
 });
