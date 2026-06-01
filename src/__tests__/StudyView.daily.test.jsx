@@ -34,6 +34,18 @@ function makeApp(overrides = {}) {
   };
 }
 
+function goalHitState() {
+  const state = defaultState();
+  return {
+    ...state,
+    daily: {
+      ...state.daily,
+      count: DEFAULT_PREFS.dailyGoal,
+      goalHit: true,
+    },
+  };
+}
+
 function launchedToday(setPracticePrefs) {
   return setPracticePrefs.mock.calls.some(([prefs]) =>
     (prefs?.wordListIds || []).includes(TODAY_DRILL_LIST_ID),
@@ -129,6 +141,92 @@ describe('StudyView daily startup guards', () => {
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(setWordLists).not.toHaveBeenCalled();
     expect(launchedToday(setPracticePrefs)).toBe(false);
+  });
+
+  it('ignores a persisted card when its form is no longer enabled', async () => {
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: STARTER_VERBS[0].dict,
+        group: STARTER_VERBS[0].group,
+        type: 'passive',
+      }),
+    );
+    mockedApp.value = makeApp({ state: goalHitState() });
+
+    render(<StudyView />);
+
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitFor(() => {
+      const raw = sessionStorage.getItem('jp-study-current');
+      expect(raw).toBeTruthy();
+      expect(JSON.parse(raw).type).not.toBe('passive');
+    });
+    expect(screen.queryByText('No cards available')).toBeNull();
+  });
+
+  it('ignores a persisted card outside the current word list', async () => {
+    const staleWord = STARTER_VERBS[0];
+    const allowedWord = STARTER_VERBS[1];
+    const list = {
+      id: 'focused-list',
+      name: 'Focused List',
+      wordKeys: [`${allowedWord.group}:${allowedWord.dict}`],
+    };
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: staleWord.dict,
+        group: staleWord.group,
+        type: 'plain-past',
+      }),
+    );
+    mockedApp.value = makeApp({
+      state: goalHitState(),
+      allWords: [staleWord, allowedWord],
+      practicePrefs: { ...DEFAULT_PREFS, wordListIds: [list.id] },
+      wordLists: [list],
+    });
+
+    render(<StudyView />);
+
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitFor(() => {
+      const raw = sessionStorage.getItem('jp-study-current');
+      expect(raw).toBeTruthy();
+      expect(JSON.parse(raw).dict).toBe(allowedWord.dict);
+    });
+    expect(screen.queryByText('No cards available')).toBeNull();
+  });
+
+  it('restores the exact persisted word when duplicate dictionary entries exist', async () => {
+    const baseWord = {
+      dict: '開ける',
+      reading: 'あける',
+      meaning: 'to open',
+      group: 'ichidan',
+      jlpt: 'N5',
+    };
+    const exactWord = { ...baseWord, meaning: 'to open (v.t.)' };
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: exactWord.dict,
+        reading: exactWord.reading,
+        meaning: exactWord.meaning,
+        group: exactWord.group,
+        type: 'polite-present',
+      }),
+    );
+    mockedApp.value = makeApp({
+      state: goalHitState(),
+      allWords: [baseWord, exactWord],
+    });
+
+    render(<StudyView />);
+
+    await screen.findByText('to open (v.t.)', {}, { timeout: 5000 });
+    expect(screen.queryByText('No cards available')).toBeNull();
   });
 
   it('checks a final spoken answer in speak answer mode', async () => {
