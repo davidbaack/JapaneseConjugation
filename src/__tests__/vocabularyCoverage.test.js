@@ -44,6 +44,15 @@ describe('expanded vocabulary lexicon', () => {
     }
   });
 
+  it('keeps JLPT-only verbs and adjectives only when they are common', () => {
+    for (const word of [...verbs, ...adjectives]) {
+      const meta = getWordMeta(word);
+      const hasLessonCoverage = Boolean(meta.lessons.length || meta.minnaLessons.length);
+      if (!meta.jlpt || hasLessonCoverage) continue;
+      expect(meta.common).toBe(true);
+    }
+  });
+
   it('covers every configured Genki and Minna lesson with at least one practice word', () => {
     expect(missingLessons(words, 'lessons', 23)).toEqual([]);
     expect(missingLessons(words, 'minnaLessons', 50)).toEqual([]);

@@ -68,6 +68,7 @@ export function getWordMeta(word) {
     lessons: [],
     minnaLesson: null,
     minnaLessons: [],
+    common: false,
     ...mapped,
     ...(mergedLessons.length
       ? { lesson: mappedLessons[0] || lessons[0] || mergedLessons[0], lessons: mergedLessons }
@@ -79,6 +80,7 @@ export function getWordMeta(word) {
         }
       : {}),
     ...(!mapped.jlpt && embedded.jlpt ? { jlpt: embedded.jlpt } : {}),
+    ...(!mapped.common && word?.common ? { common: true } : {}),
   };
 }
 

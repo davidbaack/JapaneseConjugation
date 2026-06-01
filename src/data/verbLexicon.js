@@ -5,7 +5,7 @@ const BASE_URL = import.meta.env?.BASE_URL || '/';
 export const VERB_LEXICON_URL = `${BASE_URL}data/verb-lexicon.json`;
 
 export function inflateVerbRow(row) {
-  const [dict, reading, meaning, group, jlpt, genkiLessons, minnaLessons] = row || [];
+  const [dict, reading, meaning, group, jlpt, genkiLessons, minnaLessons, common] = row || [];
   if (!dict || !reading || !group) return null;
   const cleanGenki = Array.isArray(genkiLessons) ? genkiLessons : [];
   const cleanMinna = Array.isArray(minnaLessons) ? minnaLessons : [];
@@ -17,6 +17,7 @@ export function inflateVerbRow(row) {
     ...(jlpt ? { jlpt } : {}),
     ...(cleanGenki.length ? { lessons: cleanGenki, lesson: cleanGenki[0] } : {}),
     ...(cleanMinna.length ? { minnaLessons: cleanMinna, minnaLesson: cleanMinna[0] } : {}),
+    ...(common ? { common: true } : {}),
   };
 }
 
@@ -54,6 +55,7 @@ function mergeVerbMetadata(target, source) {
     source.minnaLesson,
   );
   if (source.jlpt && !target.jlpt) target.jlpt = source.jlpt;
+  if (source.common && !target.common) target.common = true;
   if (lessons.length) {
     target.lessons = lessons;
     target.lesson = lessons[0];

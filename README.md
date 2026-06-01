@@ -94,7 +94,7 @@ The app is configured for the `/JapaneseConjugation/` base path and uses `VitePW
 
 Built-in expanded vocabulary coverage lives in `public/data/verb-lexicon.json` so it can be cached with the app without inflating the main JavaScript bundle. Regenerate it with `npm run vocab:build`.
 
-The generated lexicon includes app-practiceable verbs, adjectives, and noun-copula items. It combines JLPT level estimates and Genki lesson tags from `elzup/jlpt-word-list`, Minna no Nihongo lesson tags from Mohammad Akhlaghi's public CSV, and JMdict part-of-speech data to avoid guessing whether a row is a verb, adjective, or noun. JLPT vocabulary levels are learner-study estimates; the JLPT organizers do not publish a complete official vocabulary list.
+The generated lexicon includes app-practiceable verbs, adjectives, and noun-copula items. It combines JLPT level estimates and Genki lesson tags from `elzup/jlpt-word-list`, Minna no Nihongo lesson tags from Mohammad Akhlaghi's public CSV, and JMdict part-of-speech/commonness data to avoid guessing whether a row is a verb, adjective, noun, or useful JLPT-only practice word. JLPT vocabulary levels are learner-study estimates; the JLPT organizers do not publish a complete official vocabulary list.
 
 ## Project Structure
 

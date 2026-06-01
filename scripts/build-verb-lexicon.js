@@ -10,6 +10,15 @@ const JMDICT_RELEASE_URL =
 const OUT_PATH = join('public', 'data', 'verb-lexicon.json');
 
 const LEVEL_RANK = { N5: 0, N4: 1, N3: 2, N2: 3, N1: 4 };
+const SURU_SUFFIX = '\u3059\u308b';
+const PRACTICE_GROUPS = new Set([
+  'ichidan',
+  'godan',
+  'suru',
+  'kuru',
+  'i-adjective',
+  'na-adjective',
+]);
 const VERB_ENDINGS = new Set(['う', 'く', 'ぐ', 'す', 'つ', 'ぬ', 'ぶ', 'む', 'る']);
 const ICHIDAN_HINTS = new Set([
   'え',
@@ -200,6 +209,15 @@ function jmdictSurface(value) {
   return cleanTerm(value).replace(/な$/, '').trim();
 }
 
+function stripSuruSuffix(value) {
+  const clean = cleanTerm(value);
+  return clean.endsWith(SURU_SUFFIX) ? clean.slice(0, -SURU_SUFFIX.length) : clean;
+}
+
+function entryIsCommon(entry) {
+  return [...(entry?.kanji || []), ...(entry?.kana || [])].some((form) => form.common);
+}
+
 function posSet(entry) {
   return new Set((entry?.sense || []).flatMap((sense) => sense.partOfSpeech || []));
 }
@@ -249,26 +267,47 @@ function buildJmdictIndex(jmdict) {
   return index;
 }
 
+function entryHasSurface(entry, surface) {
+  return [...(entry?.kanji || []), ...(entry?.kana || [])].some((form) => form.text === surface);
+}
+
+function rankJmdictEntry(entry, cleanDict, cleanReading) {
+  const dictStem = stripSuruSuffix(cleanDict);
+  const readingStem = stripSuruSuffix(cleanReading);
+  const exactDict = entryHasSurface(entry, cleanDict);
+  const exactReading = entryHasSurface(entry, cleanReading);
+  const stemMatch =
+    (dictStem !== cleanDict && entryHasSurface(entry, dictStem)) ||
+    (readingStem !== cleanReading && entryHasSurface(entry, readingStem));
+  return (
+    (exactDict && exactReading ? 16 : 0) +
+    (exactReading ? 8 : 0) +
+    (exactDict ? 4 : 0) +
+    (stemMatch ? 2 : 0) +
+    (entryIsCommon(entry) ? 1 : 0)
+  );
+}
+
 function findJmdictEntry(index, dict, reading) {
+  const cleanDict = cleanTerm(dict);
+  const cleanReading = cleanTerm(reading);
   const keys = [
-    cleanTerm(dict),
-    cleanTerm(reading),
+    cleanDict,
+    cleanReading,
     jmdictSurface(dict),
     jmdictSurface(reading),
+    stripSuruSuffix(cleanDict),
+    stripSuruSuffix(cleanReading),
   ].filter(Boolean);
   const candidates = [...new Set(keys.flatMap((key) => index.get(key) || []))];
   if (!candidates.length) return null;
-  const cleanDict = cleanTerm(dict);
-  const cleanReading = cleanTerm(reading);
-  return (
-    candidates.find(
-      (entry) =>
-        (entry.kanji || []).some((kanji) => kanji.text === cleanDict) &&
-        (entry.kana || []).some((kana) => kana.text === cleanReading),
-    ) ||
-    candidates.find((entry) => (entry.kana || []).some((kana) => kana.text === cleanReading)) ||
-    candidates[0]
-  );
+  return candidates
+    .map((entry, order) => ({
+      entry,
+      order,
+      score: rankJmdictEntry(entry, cleanDict, cleanReading),
+    }))
+    .sort((a, b) => b.score - a.score || a.order - b.order)[0].entry;
 }
 
 function normalizeSupportedWord(row, jmdictIndex) {
@@ -294,6 +333,7 @@ function normalizeSupportedWord(row, jmdictIndex) {
     reading,
     meaning: row.meaning,
     group,
+    common: entryIsCommon(entry),
   };
 }
 
@@ -310,11 +350,13 @@ function mergeWord(map, word) {
       jlpt: word.jlpt || '',
       genkiLessons: uniqueSorted(word.genkiLessons || [], 1, 23),
       minnaLessons: uniqueSorted(word.minnaLessons || [], 1, 50),
+      common: Boolean(word.common),
     });
     return;
   }
   existing.jlpt = easierLevel(existing.jlpt, word.jlpt);
   existing.meaning = existing.meaning || normalizeMeaning(word.meaning);
+  existing.common = existing.common || Boolean(word.common);
   existing.genkiLessons = uniqueSorted(
     [...existing.genkiLessons, ...(word.genkiLessons || [])],
     1,
@@ -389,7 +431,24 @@ function rowFromVerb(word) {
     word.jlpt,
     word.genkiLessons,
     word.minnaLessons,
+    Boolean(word.common),
   ];
+}
+
+function hasLessonCoverage(word) {
+  return Boolean(word.genkiLessons?.length || word.minnaLessons?.length);
+}
+
+function isLowUsePracticeWord(word) {
+  return PRACTICE_GROUPS.has(word.group) && word.jlpt && !hasLessonCoverage(word) && !word.common;
+}
+
+function countByJlpt(words) {
+  const counts = {};
+  for (const word of words) {
+    if (word.jlpt) counts[word.jlpt] = (counts[word.jlpt] || 0) + 1;
+  }
+  return counts;
 }
 
 async function fetchText(url) {
@@ -483,8 +542,12 @@ async function main() {
     });
   }
 
-  const rows = [...words.values()]
-    .filter((word) => word.jlpt || word.genkiLessons.length || word.minnaLessons.length)
+  const candidateWords = [...words.values()].filter(
+    (word) => word.jlpt || word.genkiLessons.length || word.minnaLessons.length,
+  );
+  const trimmedLowUseWords = candidateWords.filter(isLowUsePracticeWord);
+  const rows = candidateWords
+    .filter((word) => !isLowUsePracticeWord(word))
     .sort((a, b) => {
       const levelDiff = (LEVEL_RANK[a.jlpt] ?? 9) - (LEVEL_RANK[b.jlpt] ?? 9);
       return (
@@ -495,9 +558,19 @@ async function main() {
   const verbs = rows.filter((row) => ['ichidan', 'godan', 'suru', 'kuru'].includes(row[3]));
   const adjectives = rows.filter((row) => ['i-adjective', 'na-adjective'].includes(row[3]));
   const nouns = rows.filter((row) => row[3] === 'noun');
+  const trimmedLowUse = {
+    total: trimmedLowUseWords.length,
+    verbs: trimmedLowUseWords.filter((word) =>
+      ['ichidan', 'godan', 'suru', 'kuru'].includes(word.group),
+    ).length,
+    adjectives: trimmedLowUseWords.filter((word) =>
+      ['i-adjective', 'na-adjective'].includes(word.group),
+    ).length,
+    byJlpt: countByJlpt(trimmedLowUseWords),
+  };
 
   const payload = {
-    schema: 2,
+    schema: 3,
     generatedAt: new Date().toISOString(),
     sources: [
       {
@@ -515,11 +588,28 @@ async function main() {
       {
         name: 'JMdict Simplified',
         url: JMDICT_RELEASE_URL,
-        license: 'JMdict/EDRDG license; used for part-of-speech classification',
-        use: 'Verb and adjective classification',
+        license: 'JMdict/EDRDG license; used for part-of-speech and commonness signals',
+        use: 'Verb/adjective classification and common priority markers',
       },
     ],
-    columns: ['dict', 'reading', 'meaning', 'group', 'jlpt', 'genkiLessons', 'minnaLessons'],
+    trimPolicy: {
+      appliesTo: 'JLPT-tagged verbs and adjectives',
+      keepIf: ['Genki lesson tag', 'Minna no Nihongo lesson tag', 'JMdict common priority marker'],
+      removeIf: 'JLPT-only and not marked common by JMdict',
+    },
+    stats: {
+      trimmedLowUse,
+    },
+    columns: [
+      'dict',
+      'reading',
+      'meaning',
+      'group',
+      'jlpt',
+      'genkiLessons',
+      'minnaLessons',
+      'common',
+    ],
     verbs,
     adjectives,
     nouns,
@@ -533,6 +623,8 @@ async function main() {
     verbs: verbs.length,
     adjectives: adjectives.length,
     nouns: nouns.length,
+    common: rows.filter((row) => row[7]).length,
+    trimmedLowUse,
     jlpt: {},
     genkiLessons: new Set(),
     minnaLessons: new Set(),
@@ -549,6 +641,8 @@ async function main() {
         verbs: counts.verbs,
         adjectives: counts.adjectives,
         nouns: counts.nouns,
+        common: counts.common,
+        trimmedLowUse: counts.trimmedLowUse,
         jlpt: counts.jlpt,
         genkiLessonCount: counts.genkiLessons.size,
         minnaLessonCount: counts.minnaLessons.size,
