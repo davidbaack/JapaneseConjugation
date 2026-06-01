@@ -24,7 +24,6 @@ import {
 } from '../utils/display.js';
 import { speakJapanese } from '../utils/speech.js';
 import { serializeBackup, parseBackup } from '../utils/backup.js';
-import { DEFAULT_PREFS } from '../data/defaults.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
 function jaccardSim(a, b) {
@@ -468,30 +467,6 @@ export default function SettingsView() {
               </div>
             </div>
           )}
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">English hints</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'show', label: 'Show' },
-                { id: 'hidden', label: 'Hide' },
-              ].map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, englishHints: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Hidden mode can still ask Gemini for a non-answer clue.
-            </p>
-          </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Word category label</label>
             <div role="group" aria-label="Word category label" className="grid grid-cols-2 gap-2">

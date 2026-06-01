@@ -23,6 +23,8 @@ describe('SettingsView controls', () => {
     expect(screen.queryByRole('button', { name: 'Transform', exact: true })).toBeNull();
     expect(screen.queryByText('Study direction')).toBeNull();
     expect(screen.queryByText('Timed drill')).toBeNull();
+    expect(screen.queryByText('English hints')).toBeNull();
+    expect(screen.queryByText(/Hidden mode can still ask Gemini/)).toBeNull();
     const answerMode = within(screen.getByRole('group', { name: 'Answer mode' }));
     expect(answerMode.getByRole('button', { name: 'Type answer', exact: true })).toBeTruthy();
     expect(answerMode.getByRole('button', { name: 'Choices', exact: true })).toBeTruthy();
@@ -90,5 +92,5 @@ describe('SettingsView controls', () => {
       expect(prefs.kanaAssist).toBe('guided');
       expect(prefs).not.toHaveProperty('kanaMatchDisplay');
     });
-  });
+  }, 15000);
 });

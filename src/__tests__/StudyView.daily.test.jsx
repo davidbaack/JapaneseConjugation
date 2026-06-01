@@ -202,6 +202,45 @@ describe('StudyView daily startup guards', () => {
     expect(launchedToday(setPracticePrefs)).toBe(false);
   });
 
+  it('lets learners toggle English hints from the Study card', async () => {
+    const target = STARTER_VERBS[0];
+    const visiblePrefs = { ...DEFAULT_PREFS, englishHints: 'show' };
+    let setPracticePrefs = vi.fn();
+    mockedApp.value = makeApp({
+      setPracticePrefs,
+      practicePrefs: visiblePrefs,
+      studyFocus: { word: target, type: 'plain-past' },
+    });
+
+    render(<StudyView />);
+
+    expect(await screen.findByText(target.meaning, {}, { timeout: 5000 })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide English hint' }));
+    expect(setPracticePrefs).toHaveBeenCalledWith({
+      ...visiblePrefs,
+      englishHints: 'hidden',
+    });
+
+    cleanup();
+    const hiddenPrefs = { ...DEFAULT_PREFS, englishHints: 'hidden' };
+    setPracticePrefs = vi.fn();
+    mockedApp.value = makeApp({
+      setPracticePrefs,
+      practicePrefs: hiddenPrefs,
+      studyFocus: { word: target, type: 'plain-past' },
+    });
+
+    render(<StudyView />);
+
+    expect(await screen.findByText('English hint hidden.', {}, { timeout: 5000 })).toBeTruthy();
+    expect(screen.queryByText(target.meaning)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show English hint' }));
+    expect(setPracticePrefs).toHaveBeenCalledWith({
+      ...hiddenPrefs,
+      englishHints: 'show',
+    });
+  });
+
   it('restores a persisted study card when vocabulary metadata changes', async () => {
     const target = STARTER_VERBS[0];
     const refreshedTarget = {

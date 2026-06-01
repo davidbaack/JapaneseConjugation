@@ -8,6 +8,8 @@ import {
   IconPen,
   IconFlame,
   IconMic,
+  IconEye,
+  IconEyeOff,
 } from '../components/Icons.jsx';
 import {
   getSpeechRecognitionConstructor,
@@ -337,7 +339,6 @@ export default function StudyView() {
   const [wasCorrected, setWasCorrected] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [showPromptText, setShowPromptText] = useState(false);
-  const [showEnglishHint, setShowEnglishHint] = useState(false);
   const [aiHintText, setAiHintText] = useState('');
   const [aiHintLoading, setAiHintLoading] = useState(false);
   const [aiHintErr, setAiHintErr] = useState('');
@@ -573,7 +574,6 @@ export default function StudyView() {
   }, [current?.id, listeningPrompt]);
 
   useEffect(() => {
-    setShowEnglishHint(false);
     setAiHintText('');
     setAiHintErr('');
     setAiHintLoading(false);
@@ -895,7 +895,7 @@ export default function StudyView() {
     todayGoalHit && !startedGoalHit.current && seededInitialDailyGoalRef.current && !bonusMode;
   const reviewComplete = dueQueueDone || dailyGoalJustHit;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
-  const hideEnglishHint = englishHintsHidden && phase === 'answering' && !showEnglishHint;
+  const hideEnglishHint = englishHintsHidden && phase === 'answering';
   const guidedKana = typedAnswerMode && kanaAssist === 'guided';
   const liveKana = typedAnswerMode && kanaAssist === 'live';
   const coachPreview = toHiragana(answer);
@@ -1089,6 +1089,13 @@ export default function StudyView() {
     setPracticePrefs(nextPrefs);
     setTodayMinimalPairSetIds([]);
     resetActiveAttempt();
+  }
+
+  function toggleEnglishHintVisibility() {
+    setPracticePrefs({
+      ...practicePrefs,
+      englishHints: englishHintsHidden ? 'show' : 'hidden',
+    });
   }
 
   function launchTodayDrill() {
@@ -2175,19 +2182,24 @@ export default function StudyView() {
           )}
 
           {hideEnglishHint ? (
-            <div className="mt-3 max-w-md mx-auto rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2 text-xs text-stone-500">
+            <div className="mt-2 max-w-md mx-auto text-xs text-stone-500">
               <div className="flex flex-wrap items-center justify-center gap-2">
-                <span>English hint hidden until review.</span>
+                <span>English hint hidden.</span>
                 <button
-                  onClick={() => setShowEnglishHint(true)}
-                  className="px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-750 dark:text-stone-300"
+                  type="button"
+                  aria-pressed="false"
+                  aria-label="Show English hint"
+                  title="Show English hint"
+                  onClick={toggleEnglishHintVisibility}
+                  className="inline-flex h-7 items-center gap-1 rounded-full border border-stone-200 dark:border-stone-800 bg-white/80 dark:bg-stone-900/80 px-2.5 text-[11px] font-semibold text-stone-650 dark:text-stone-300 transition hover:border-indigo-300 hover:text-indigo-650 dark:hover:border-indigo-700 dark:hover:text-indigo-300"
                 >
-                  Show hint
+                  <IconEye className="w-3.5 h-3.5" />
+                  Show
                 </button>
                 <button
                   onClick={generateAIClue}
                   disabled={!geminiKey}
-                  className="px-2 py-1 rounded-lg border border-indigo-200 bg-white hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 dark:bg-stone-900 dark:border-stone-800 dark:text-indigo-400 inline-flex items-center gap-1"
+                  className="inline-flex h-7 items-center gap-1 rounded-full border border-indigo-200 bg-white/80 hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 dark:bg-stone-900/80 dark:border-stone-800 dark:text-indigo-400 px-2.5 text-[11px] font-semibold"
                 >
                   <IconSpark className="w-3.5 h-3.5" />
                   {aiHintLoading ? 'Cancel' : 'AI clue'}
@@ -2212,14 +2224,44 @@ export default function StudyView() {
             </div>
           ) : practicePrefs.drillMode === 'sentence' && aiSentence && !aiSentence.loading ? (
             <div className="space-y-1 mt-2">
-              <div className="text-sm text-stone-500 italic">Context: {aiSentence.translation}</div>
+              <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-stone-500 italic">
+                <span>Context: {aiSentence.translation}</span>
+                {phase === 'answering' && (
+                  <button
+                    type="button"
+                    aria-pressed="true"
+                    aria-label="Hide English hint"
+                    title="Hide English hint"
+                    onClick={toggleEnglishHintVisibility}
+                    className="inline-flex h-7 items-center gap-1 rounded-full border border-stone-200 dark:border-stone-800 bg-white/80 dark:bg-stone-900/80 px-2.5 text-[11px] font-semibold not-italic text-stone-650 dark:text-stone-300 transition hover:border-indigo-300 hover:text-indigo-650 dark:hover:border-indigo-700 dark:hover:text-indigo-300"
+                  >
+                    <IconEyeOff className="w-3.5 h-3.5" />
+                    Hide
+                  </button>
+                )}
+              </div>
               {aiSentence.cue && (
                 <div className="text-xs text-indigo-600 dark:text-indigo-400">{aiSentence.cue}</div>
               )}
             </div>
           ) : (
             <>
-              <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-sm text-stone-500 italic">
+                <span>{promptEnglish}</span>
+                {phase === 'answering' && (
+                  <button
+                    type="button"
+                    aria-pressed="true"
+                    aria-label="Hide English hint"
+                    title="Hide English hint"
+                    onClick={toggleEnglishHintVisibility}
+                    className="inline-flex h-7 items-center gap-1 rounded-full border border-stone-200 dark:border-stone-800 bg-white/80 dark:bg-stone-900/80 px-2.5 text-[11px] font-semibold not-italic text-stone-650 dark:text-stone-300 transition hover:border-indigo-300 hover:text-indigo-650 dark:hover:border-indigo-700 dark:hover:text-indigo-300"
+                  >
+                    <IconEyeOff className="w-3.5 h-3.5" />
+                    Hide
+                  </button>
+                )}
+              </div>
               {aiHintText && phase === 'answering' && (
                 <div className="mt-2 text-xs text-stone-500 max-w-md mx-auto rounded-lg border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 max-h-32 overflow-y-auto">
                   {aiHintText}
