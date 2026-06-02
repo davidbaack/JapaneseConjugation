@@ -10,7 +10,9 @@ import {
   IconMic,
   IconEye,
   IconEyeOff,
+  IconPlus,
 } from '../components/Icons.jsx';
+import { FORM_GROUPS } from '../data/conjugationTypes.js';
 import {
   getSpeechRecognitionConstructor,
   playPronunciation,
@@ -313,6 +315,192 @@ function hasPersistedCurrent() {
   }
 }
 
+function StudyFocusBar({
+  allWords,
+  sessionFilterWord,
+  onWordChange,
+  sessionFilterFormGroupId,
+  onFormGroupChange,
+}) {
+  const [wordQuery, setWordQuery] = useState('');
+  const [mode, setMode] = useState(null); // null | 'word' | 'form'
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (mode === 'word') inputRef.current?.focus();
+  }, [mode]);
+
+  const searchResults = useMemo(() => {
+    if (!wordQuery.trim()) return [];
+    const q = wordQuery.trim().toLowerCase();
+    return allWords
+      .filter(
+        (w) =>
+          w.dict?.includes(wordQuery) ||
+          w.reading?.includes(wordQuery) ||
+          w.meaning?.toLowerCase().includes(q),
+      )
+      .slice(0, 8);
+  }, [wordQuery, allWords]);
+
+  const hasFilter = !!sessionFilterWord || !!sessionFilterFormGroupId;
+  const activeFormGroup = sessionFilterFormGroupId
+    ? FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId)
+    : null;
+
+  if (!hasFilter && mode === null) {
+    return (
+      <div className="flex justify-end">
+        <button
+          onClick={() => setMode('word')}
+          className="text-xs text-stone-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition flex items-center gap-1 py-1"
+        >
+          <IconPlus className="w-3 h-3" /> Focus
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {sessionFilterWord && (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-700 dark:text-indigo-300">
+            <span lang="ja">{sessionFilterWord.dict}</span>
+            <span className="text-indigo-300 dark:text-indigo-600">·</span>
+            <span>{sessionFilterWord.meaning}</span>
+            <button
+              onClick={() => {
+                onWordChange(null);
+                setWordQuery('');
+              }}
+              className="ml-0.5 text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-200"
+              aria-label="Remove word filter"
+            >
+              <IconX className="w-3 h-3" />
+            </button>
+          </span>
+        )}
+        {activeFormGroup && (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 text-xs text-violet-700 dark:text-violet-300">
+            {activeFormGroup.label}
+            <button
+              onClick={() => onFormGroupChange(null)}
+              className="ml-0.5 text-violet-400 hover:text-violet-600 dark:hover:text-violet-200"
+              aria-label="Remove form filter"
+            >
+              <IconX className="w-3 h-3" />
+            </button>
+          </span>
+        )}
+        {!sessionFilterWord && (
+          <button
+            onClick={() => setMode(mode === 'word' ? null : 'word')}
+            className={`text-xs px-2.5 py-1 rounded-full border transition ${
+              mode === 'word'
+                ? 'border-indigo-300 bg-indigo-50 text-indigo-600 dark:border-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300'
+                : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-700 dark:hover:text-indigo-300'
+            }`}
+          >
+            + Word
+          </button>
+        )}
+        {!sessionFilterFormGroupId && (
+          <button
+            onClick={() => setMode(mode === 'form' ? null : 'form')}
+            className={`text-xs px-2.5 py-1 rounded-full border transition ${
+              mode === 'form'
+                ? 'border-violet-300 bg-violet-50 text-violet-600 dark:border-violet-700 dark:bg-violet-950/30 dark:text-violet-300'
+                : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-violet-300 hover:text-violet-600 dark:hover:border-violet-700 dark:hover:text-violet-300'
+            }`}
+          >
+            + Form
+          </button>
+        )}
+        {hasFilter && (
+          <button
+            onClick={() => {
+              onWordChange(null);
+              onFormGroupChange(null);
+              setMode(null);
+              setWordQuery('');
+            }}
+            className="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition ml-auto"
+          >
+            Clear all
+          </button>
+        )}
+        {!hasFilter && mode !== null && (
+          <button
+            onClick={() => setMode(null)}
+            className="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition ml-auto"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+
+      {mode === 'word' && (
+        <div>
+          <input
+            ref={inputRef}
+            type="text"
+            value={wordQuery}
+            onChange={(e) => setWordQuery(e.target.value)}
+            placeholder="Search by word, reading, or meaning…"
+            className="w-full rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 px-3 py-2 text-sm text-stone-800 dark:text-stone-200 placeholder-stone-400 outline-none focus:border-indigo-300 dark:focus:border-indigo-600"
+          />
+          {searchResults.length > 0 && (
+            <div className="mt-1 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 divide-y divide-stone-100 dark:divide-stone-800 max-h-48 overflow-y-auto">
+              {searchResults.map((word) => (
+                <button
+                  key={`${word.dict}-${word.group}`}
+                  onClick={() => {
+                    onWordChange(word);
+                    setWordQuery('');
+                    setMode(null);
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-stone-50 dark:hover:bg-stone-800 transition"
+                >
+                  <span lang="ja" className="font-medium text-stone-900 dark:text-stone-100">
+                    {word.dict}
+                  </span>
+                  <span className="text-stone-400 text-xs" lang="ja">
+                    {word.reading}
+                  </span>
+                  <span className="text-stone-500 text-xs ml-auto truncate max-w-[120px]">
+                    {word.meaning}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          {wordQuery.trim() && !searchResults.length && (
+            <div className="mt-1 text-xs text-stone-400 px-1">No matches</div>
+          )}
+        </div>
+      )}
+
+      {mode === 'form' && (
+        <div className="flex flex-wrap gap-1.5">
+          {FORM_GROUPS.map((group) => (
+            <button
+              key={group.id}
+              onClick={() => {
+                onFormGroupChange(group.id);
+                setMode(null);
+              }}
+              className="px-2.5 py-1 rounded-full border text-xs transition border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:hover:border-violet-700 dark:hover:bg-violet-950/20 dark:hover:text-violet-300"
+            >
+              {group.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function StudyView() {
   const {
     state,
@@ -368,6 +556,8 @@ export default function StudyView() {
   const autoStartedTodayRef = useRef(false);
   const [bonusMode, setBonusMode] = useState(false);
   const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
+  const [sessionFilterWord, setSessionFilterWord] = useState(null);
+  const [sessionFilterFormGroupId, setSessionFilterFormGroupId] = useState(null);
   const [launchContext, setLaunchContext] = useState(() =>
     focus?.returnTo === 'reference' ? focus : null,
   );
@@ -389,26 +579,47 @@ export default function StudyView() {
   const typingHintRef = useRef(null);
   const aiHintAbortRef = useRef(null);
 
-  const enabledTypes = useMemo(
-    () => (state.enabledTypes?.length ? state.enabledTypes : ['plain-past']),
-    [state.enabledTypes],
-  );
+  const enabledTypes = useMemo(() => {
+    if (sessionFilterFormGroupId) {
+      const group = FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId);
+      if (group?.typeIds?.length) return group.typeIds;
+    }
+    return state.enabledTypes?.length ? state.enabledTypes : ['plain-past'];
+  }, [state.enabledTypes, sessionFilterFormGroupId]);
   const practiceWords = useMemo(() => {
     const base = filterWordsForStudyScope(verbs, { cards: state.cards }, practicePrefs, wordLists, {
       builtInWords,
     });
+    // Apply session word filter if set
+    let words = base;
+    if (sessionFilterWord) {
+      words = base.filter(
+        (w) => w.dict === sessionFilterWord.dict && w.group === sessionFilterWord.group,
+      );
+      // Always include the target word even if it falls outside the current scope
+      if (!words.length) words = [sessionFilterWord];
+    }
     // Keep a "Practice this verb" target from Check eligible even if it sits
     // outside the current Study filters, so the reset guard below doesn't
     // discard the focus card the moment it's seeded.
     const lockedWord = focus?.word || focusWordLock;
     if (
       lockedWord &&
-      !base.some((w) => w.dict === lockedWord.dict && w.group === lockedWord.group)
+      !words.some((w) => w.dict === lockedWord.dict && w.group === lockedWord.group)
     ) {
-      return [...base, lockedWord];
+      return [...words, lockedWord];
     }
-    return base;
-  }, [verbs, state.cards, practicePrefs, wordLists, builtInWords, focus, focusWordLock]);
+    return words;
+  }, [
+    verbs,
+    state.cards,
+    practicePrefs,
+    wordLists,
+    builtInWords,
+    focus,
+    focusWordLock,
+    sessionFilterWord,
+  ]);
 
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
   const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
@@ -781,19 +992,49 @@ export default function StudyView() {
   }
 
   if (!current) {
+    const hasSessionFilter = !!(sessionFilterWord || sessionFilterFormGroupId);
     return (
       <div className="space-y-4">
+        {hasSessionFilter && (
+          <StudyFocusBar
+            allWords={verbs}
+            sessionFilterWord={sessionFilterWord}
+            onWordChange={setSessionFilterWord}
+            sessionFilterFormGroupId={sessionFilterFormGroupId}
+            onFormGroupChange={setSessionFilterFormGroupId}
+          />
+        )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
-          <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
-          <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
-            Enable conjugation types in Settings.
-          </p>
-          <button
-            onClick={() => setTab('settings')}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
-          >
-            Go to Settings
-          </button>
+          {hasSessionFilter ? (
+            <>
+              <p className="text-stone-600 dark:text-stone-300 mb-2">No cards for this focus</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
+                Try a different word or form type.
+              </p>
+              <button
+                onClick={() => {
+                  setSessionFilterWord(null);
+                  setSessionFilterFormGroupId(null);
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+              >
+                Clear focus
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
+                Enable conjugation types in Settings.
+              </p>
+              <button
+                onClick={() => setTab('settings')}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+              >
+                Go to Settings
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -1881,6 +2122,13 @@ export default function StudyView() {
           </button>
         </div>
       )}
+      <StudyFocusBar
+        allWords={verbs}
+        sessionFilterWord={sessionFilterWord}
+        onWordChange={setSessionFilterWord}
+        sessionFilterFormGroupId={sessionFilterFormGroupId}
+        onFormGroupChange={setSessionFilterFormGroupId}
+      />
       <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3">
         <div className="text-left">
           <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
