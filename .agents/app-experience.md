@@ -27,6 +27,14 @@ confirms the new direction, update this document in the same change.
 - Reviews opens to a dashboard instead of auto-starting a card.
 - The dashboard shows due count, Start/Continue Reviews, session progress,
   upcoming review timing, and strong/weak form-family signals.
+- The dashboard is the single Reviews surface. A brand-new learner sees only a
+  short intro plus one Start action; returning-user signals (stat tiles, streak,
+  upcoming-review forecast, form-family strength, Retest misses) are
+  progressively disclosed once there is real history. Do not stack separate
+  queue, progress, or staged "core path" panels above it, and once a card is
+  active the card takes focus rather than sitting below status panels.
+- Removing the current word or form family is a deliberate, secondary action
+  (kept out of the way of Skip) and is reversible from Library.
 - The main review stream mixes due cards, weak cards, and a small auto-trickle
   of new word-form cards.
 - If no cards are due, Reviews should still offer a useful core warmup.

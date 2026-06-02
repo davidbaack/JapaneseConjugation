@@ -61,6 +61,7 @@ import {
   spokenAnswerResult,
 } from '../utils/display.js';
 import {
+  aggregateDiagnosedMistakes,
   buildRepairDrillPlan,
   bumpSessionMistakePattern,
   rankSessionMistakePatterns,
@@ -571,6 +572,8 @@ function ReviewsDashboard({
   todayDrillActive,
   onStart,
   onStartRecommendation,
+  onRetestMisses,
+  retestCount = 0,
 }) {
   const dailyGoal = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
@@ -585,6 +588,18 @@ function ReviewsDashboard({
   const strengthRows = formFamilyStrengthRows(state);
   const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
   const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
+  const weakCount = strengthRows.filter((row) => row.status === 'weak').length;
+  const streak = daily.goalStreak || 0;
+  // Progressive disclosure: the forecast, form-family strength, and stat tiles
+  // are returning-user signals. A brand-new learner with no history sees only a
+  // clean hero and a single Start action — not a wall of zeros.
+  const hasHistory =
+    strengthRows.some((row) => row.attempted > 0) ||
+    (daily.count || 0) > 0 ||
+    streak > 0 ||
+    dueTotal > 0 ||
+    recommendations.length > 0 ||
+    retestCount > 0;
 
   return (
     <section className="space-y-4" aria-label="Reviews dashboard">
@@ -595,31 +610,35 @@ function ReviewsDashboard({
               Reviews
             </div>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
-              Start with what is ready now.
+              {hasHistory ? 'Start with what is ready now.' : 'Begin with the core forms.'}
             </h2>
             <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
-              Due cards come first. If the queue is light, Reviews adds weak forms and textbook core
-              warmup cards.
+              {hasHistory
+                ? 'Due cards come first. If the queue is light, Reviews adds weak forms and textbook core warmup cards.'
+                : 'Reviews builds from the most common textbook verbs and adjectives, then grows as you answer. Press Start to begin.'}
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {[
-                ['Due now', dashboardDue],
-                ['Today', `${daily.count || 0}/${dailyGoal}`],
-                ['Weak forms', strengthRows.filter((row) => row.status === 'weak').length],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-950"
-                >
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
-                    {label}
+            {hasHistory && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {[
+                  ['Due now', dashboardDue],
+                  ['Today', `${daily.count || 0}/${dailyGoal}`],
+                  ['Weak forms', weakCount],
+                  ...(streak > 0 ? [['Streak', `${streak} day${streak === 1 ? '' : 's'}`]] : []),
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-950"
+                  >
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+                      {label}
+                    </div>
+                    <div className="mt-0.5 text-lg font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+                      {value}
+                    </div>
                   </div>
-                  <div className="mt-0.5 text-lg font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-                    {value}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/20">
             <div className="flex items-center justify-between gap-3">
@@ -656,6 +675,15 @@ function ReviewsDashboard({
                   ? 'Start Reviews'
                   : 'Start Core Warmup'}
             </button>
+            {retestCount > 0 && (
+              <button
+                type="button"
+                onClick={onRetestMisses}
+                className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-stone-800"
+              >
+                Retest {retestCount} miss{retestCount === 1 ? '' : 'es'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -704,63 +732,65 @@ function ReviewsDashboard({
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
-            Upcoming reviews
-          </div>
-          <div className="grid grid-cols-5 gap-2">
-            {reviewForecastRows(todayPlan.upcomingForecast).map(([label, value]) => (
-              <div
-                key={label}
-                className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-center dark:border-stone-800 dark:bg-stone-950"
-              >
-                <div className="text-base font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-                  {value}
-                </div>
-                <div className="mt-0.5 text-[10px] uppercase tracking-wider text-stone-500">
-                  {label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
-            Form families
-          </div>
-          <div className="space-y-2">
-            {rowsToShow.map((row) => {
-              const tone =
-                row.status === 'strong'
-                  ? 'bg-emerald-500'
-                  : row.status === 'weak'
-                    ? 'bg-rose-500'
-                    : row.status === 'developing'
-                      ? 'bg-amber-500'
-                      : 'bg-stone-300';
-              return (
-                <div key={row.id}>
-                  <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="font-medium text-stone-700 dark:text-stone-200">
-                      {row.label}
-                    </span>
-                    <span className="tabular-nums text-stone-500">
-                      {row.attempted ? `${row.accuracy}%` : 'new'}
-                    </span>
+      {hasHistory && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
+              Upcoming reviews
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {reviewForecastRows(todayPlan.upcomingForecast).map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-center dark:border-stone-800 dark:bg-stone-950"
+                >
+                  <div className="text-base font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+                    {value}
                   </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
-                    <span
-                      className={`block h-full ${tone}`}
-                      style={{ width: `${row.attempted ? row.accuracy : 8}%` }}
-                    />
+                  <div className="mt-0.5 text-[10px] uppercase tracking-wider text-stone-500">
+                    {label}
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
+              Form families
+            </div>
+            <div className="space-y-2">
+              {rowsToShow.map((row) => {
+                const tone =
+                  row.status === 'strong'
+                    ? 'bg-emerald-500'
+                    : row.status === 'weak'
+                      ? 'bg-rose-500'
+                      : row.status === 'developing'
+                        ? 'bg-amber-500'
+                        : 'bg-stone-300';
+                return (
+                  <div key={row.id}>
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="font-medium text-stone-700 dark:text-stone-200">
+                        {row.label}
+                      </span>
+                      <span className="tabular-nums text-stone-500">
+                        {row.attempted ? `${row.accuracy}%` : 'new'}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
+                      <span
+                        className={`block h-full ${tone}`}
+                        style={{ width: `${row.attempted ? row.accuracy : 8}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }
@@ -940,6 +970,12 @@ export default function StudyView() {
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
     [state.session?.mistakePatterns],
   );
+  // Retestable misses power the dashboard's "Retest misses" affordance. Only
+  // count them when they actually aggregate into a repair pattern we can drill.
+  const retestableMisses = useMemo(() => {
+    const open = (state.mistakes || []).filter((mistake) => !mistake.resolved);
+    return aggregateDiagnosedMistakes(open).length ? open.length : 0;
+  }, [state.mistakes]);
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const todayGoalHit = isDailyGoalHitToday(daily);
@@ -1246,6 +1282,8 @@ export default function StudyView() {
           todayDrillActive={todayDrillActive}
           onStart={beginReviews}
           onStartRecommendation={startReviewRecommendation}
+          onRetestMisses={launchMistakeRetest}
+          retestCount={retestableMisses}
         />
       </div>
     );
@@ -1594,6 +1632,30 @@ export default function StudyView() {
       };
     });
     setSessionFilterFormGroupId(groupId);
+    setDashboardOpen(false);
+    setCurrent(null);
+  }
+
+  // Build a focused repair drill from the learner's open misses and drop
+  // straight into it, leaving the dashboard for the active card.
+  function launchMistakeRetest() {
+    const openMistakes = (state.mistakes || []).filter((mistake) => !mistake.resolved);
+    const patterns = aggregateDiagnosedMistakes(openMistakes);
+    if (!openMistakes.length || !patterns.length) return;
+    const plan = buildRepairDrillPlan(patterns[0], verbs || []);
+    if (plan.wordKeys.length) {
+      setWordLists(upsertRepairWordList(wordLists, plan));
+    }
+    if (plan.typeIds.length) {
+      setState((prev) => ({ ...prev, enabledTypes: plan.typeIds }));
+    }
+    setPracticePrefs({
+      ...repairPrefsForPlan(practicePrefs, plan),
+      minimalPairSetId: '',
+      minimalPairReturn: null,
+    });
+    setSessionFilterWord(null);
+    setSessionFilterFormGroupId(null);
     setDashboardOpen(false);
     setCurrent(null);
   }
@@ -2475,22 +2537,6 @@ export default function StudyView() {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={removeCurrentWordFromReviews}
-            className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-stone-800 dark:text-stone-300 dark:hover:border-rose-900 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
-          >
-            Remove word
-          </button>
-          {currentFormFamily && (
-            <button
-              type="button"
-              onClick={removeCurrentFormFamilyFromReviews}
-              className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-stone-800 dark:text-stone-300 dark:hover:border-rose-900 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
-            >
-              Remove {currentFormFamily.label}
-            </button>
-          )}
           <div className="text-xs text-stone-400 text-right">
             {(practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'forms'
               ? 'Forms only'
@@ -2498,6 +2544,39 @@ export default function StudyView() {
                 ? 'Reading'
                 : 'Auto'}
           </div>
+          <details className="relative">
+            <summary className="flex cursor-pointer list-none items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800">
+              Adjust scope
+            </summary>
+            <div className="absolute right-0 z-10 mt-1 w-64 rounded-lg border border-stone-200 bg-white p-2 text-left shadow-lg dark:border-stone-800 dark:bg-stone-900">
+              <p className="px-1 pb-1.5 text-[11px] leading-snug text-stone-500 dark:text-stone-400">
+                Suspends this from automatic Reviews. SRS history is kept — restore it anytime in
+                Library. To move on without changing scope, use Skip.
+              </p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  removeCurrentWordFromReviews();
+                  e.currentTarget.closest('details')?.removeAttribute('open');
+                }}
+                className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-stone-700 transition hover:bg-rose-50 hover:text-rose-700 dark:text-stone-200 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
+              >
+                Remove this word from Reviews
+              </button>
+              {currentFormFamily && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    removeCurrentFormFamilyFromReviews();
+                    e.currentTarget.closest('details')?.removeAttribute('open');
+                  }}
+                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-stone-700 transition hover:bg-rose-50 hover:text-rose-700 dark:text-stone-200 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
+                >
+                  Remove {currentFormFamily.label} forms from Reviews
+                </button>
+              )}
+            </div>
+          </details>
         </div>
       </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">

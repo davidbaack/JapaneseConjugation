@@ -9,7 +9,7 @@ const TABS = [
 ];
 
 const VIEW_ANCHORS = {
-  study: () => /Start with what is ready now/,
+  study: () => /Begin with the core forms|Start with what is ready now/,
   lessons: () => /Conjugation formation guide/,
   library: () => /What Reviews is allowed to show/,
   lab: () => /Check a conjugation/,
@@ -40,9 +40,10 @@ test.describe('Tab navigation', () => {
 
     const reviewsTab = page.locator('nav').getByRole('tab', { name: 'Reviews', exact: true });
     await expect(reviewsTab).toHaveClass(/font-semibold/);
-    await expect(page.getByRole('region', { name: 'Review progress' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Retest misses' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Reviews dashboard' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Start Reviews|Start Core Warmup|Continue Reviews/ }),
+    ).toBeVisible();
   });
 
   test('library exposes inventory, lookup, lists, and custom words', async ({ page }) => {

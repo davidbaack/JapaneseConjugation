@@ -36,25 +36,48 @@ describe('App shell', () => {
     }
   });
 
-  it('lazy-loads the default Study view without crashing', async () => {
+  it('lazy-loads a clean Reviews dashboard for a brand-new learner', async () => {
     render(<App />);
     // The Suspense skeleton resolves to the Reviews dashboard.
     expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
-    expect(screen.getByText('Start with what is ready now.')).toBeTruthy();
-    expect(screen.getByText('Upcoming reviews')).toBeTruthy();
-    expect(screen.getByText('Form families')).toBeTruthy();
+    // New learner (no history): a single clear Start, no wall of zeros, and no
+    // returning-user signals until there is history to show.
+    expect(screen.getByText('Begin with the core forms.')).toBeTruthy();
+    expect(screen.queryByText('Upcoming reviews')).toBeNull();
+    expect(screen.queryByText('Form families')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
   });
 
-  it('shows local SRS counters while signed out', async () => {
+  it('reveals forecast and form-family signals once there is review history', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          daily: {
+            date: localDateKey(),
+            count: 5,
+            goalHit: false,
+            goalStreak: 2,
+            bestGoalStreak: 2,
+            currentAnswerStreak: 0,
+            bestAnswerStreak: 0,
+          },
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+
     render(<App />);
 
-    await screen.findByText('Reviews Queue', {}, { timeout: 5000 });
-    expect(screen.getByText('local')).toBeTruthy();
-    expect(screen.getByText('0/0 session')).toBeTruthy();
-    expect(screen.getByText('0/30 today')).toBeTruthy();
-    expect(screen.queryByText('Sign in to save SRS progress')).toBeNull();
+    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+    expect(screen.getByText('Start with what is ready now.')).toBeTruthy();
+    expect(screen.getByText('Upcoming reviews')).toBeTruthy();
+    expect(screen.getByText('Form families')).toBeTruthy();
   });
 
   it('does not auto-start a daily drill after today is complete while signed out', async () => {
@@ -82,7 +105,7 @@ describe('App shell', () => {
 
     render(<App />);
 
-    await screen.findByText('Reviews Queue', {}, { timeout: 5000 });
+    await screen.findByRole('region', { name: 'Reviews dashboard' }, { timeout: 5000 });
     await waitFor(() => {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
       expect(raw.practicePrefs.wordListIds || []).not.toContain(TODAY_DRILL_LIST_ID);

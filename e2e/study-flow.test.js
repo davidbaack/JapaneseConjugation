@@ -8,14 +8,11 @@ test.describe('Study flow', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const queue = page.getByRole('region', { name: 'SRS queue' });
-    await expect(queue.getByText('Reviews Queue')).toBeVisible();
-    await expect(queue.getByText('local')).toBeVisible();
+    const dashboard = page.getByRole('region', { name: 'Reviews dashboard' });
+    await expect(dashboard).toBeVisible();
     await expect(page.getByText('Sign in to save SRS progress')).toHaveCount(0);
-    await expect(queue.getByText('0/30 today')).toBeVisible();
 
-    await page
-      .getByRole('region', { name: 'Reviews dashboard' })
+    await dashboard
       .getByRole('button', { name: /Start Reviews|Start Core Warmup|Continue Reviews/ })
       .click();
 
