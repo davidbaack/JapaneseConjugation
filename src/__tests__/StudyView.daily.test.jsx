@@ -194,6 +194,20 @@ describe('StudyView daily startup guards', () => {
     expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
   });
 
+  it('returns to the Reviews dashboard from an active card via Overview', async () => {
+    const target = STARTER_VERBS[0];
+    persistStudyCard(target, 'plain-past');
+    mockedApp.value = makeApp();
+
+    render(<StudyView />);
+
+    await startReviewsFromDashboard();
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Reviews overview' }));
+    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+  });
+
   it('does not auto-start today over a focused word launch', async () => {
     const clearStudyFocus = vi.fn();
     const app = makeApp({

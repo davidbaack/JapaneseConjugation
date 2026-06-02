@@ -2528,12 +2528,24 @@ export default function StudyView() {
         onFormGroupChange={chooseFocusFormGroup}
       />
       <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3">
-        <div className="text-left">
-          <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
-            Review
-          </div>
-          <div className="text-sm text-stone-600 dark:text-stone-300">
-            {reverseDrill ? 'Reading practice' : 'Form practice'}
+        <div className="flex items-center gap-2.5">
+          {!specialLaunchActive && (
+            <button
+              type="button"
+              onClick={() => setDashboardOpen(true)}
+              aria-label="Back to Reviews overview"
+              className="shrink-0 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 hover:text-stone-700 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"
+            >
+              ← Overview
+            </button>
+          )}
+          <div className="text-left">
+            <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
+              Review
+            </div>
+            <div className="text-sm text-stone-600 dark:text-stone-300">
+              {reverseDrill ? 'Reading practice' : 'Form practice'}
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
