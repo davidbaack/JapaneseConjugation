@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
 import { conjugateItem, wordKey } from '../utils/conjugator.js';
+import { englishForForm } from '../utils/display.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
 import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 
@@ -227,7 +228,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await screen.findByText(target.meaning, {}, { timeout: 5000 });
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
@@ -253,10 +254,48 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await screen.findByText(target.meaning, {}, { timeout: 5000 });
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     const raw = sessionStorage.getItem('jp-study-current');
     expect(raw).toBeTruthy();
     expect(JSON.parse(raw).dict).toBe(target.dict);
+  });
+
+  it('hides English meaning and reveal controls while answering by default', async () => {
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      activeGeminiKey: 'proxy',
+      studyFocus: {
+        word: target,
+        type: 'plain-past',
+      },
+    });
+
+    render(<StudyView />);
+
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    expect(screen.queryByText(englishForForm(target, 'plain-past'))).toBeNull();
+    expect(screen.queryByText('English hint hidden until review.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show hint', exact: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'AI clue', exact: true })).toBeNull();
+  });
+
+  it('shows English meaning after review even when default hidden', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    expect(screen.getByText(englishForForm(target, type))).toBeTruthy();
   });
 
   it('ignores a persisted card when its form is no longer enabled', async () => {
@@ -337,6 +376,7 @@ describe('StudyView daily startup guards', () => {
     mockedApp.value = makeApp({
       state: goalHitState(),
       allWords: [baseWord, exactWord],
+      practicePrefs: { ...DEFAULT_PREFS, englishHints: 'show' },
     });
 
     render(<StudyView />);

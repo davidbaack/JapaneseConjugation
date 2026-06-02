@@ -10,7 +10,7 @@ export const DEFAULT_PREFS = {
   listeningPrompt: false,
   autoAdvanceCorrect: false,
   autoAiExplainErrors: true,
-  englishHints: 'show',
+  englishHints: 'hidden',
   minimalPairSetId: '',
   minimalPairReturn: null,
   skipDuplicateForms: true,

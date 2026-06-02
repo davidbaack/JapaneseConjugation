@@ -425,11 +425,11 @@ export default function SettingsView() {
             </button>
           </div>
           <div>
-            <label className="text-xs text-stone-500 block mb-1">English hints</label>
+            <label className="text-xs text-stone-500 block mb-1">English meaning</label>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { id: 'show', label: 'Show' },
-                { id: 'hidden', label: 'Hide' },
+                { id: 'hidden', label: 'Off' },
+                { id: 'show', label: 'On' },
               ].map((o) => (
                 <button
                   key={o.id}
@@ -444,9 +444,6 @@ export default function SettingsView() {
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Hidden mode can still ask Gemini for a non-answer clue.
-            </p>
           </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Word category label</label>

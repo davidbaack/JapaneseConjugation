@@ -58,6 +58,12 @@ describe('SettingsView controls', () => {
     expect(screen.queryByText('Genki lessons')).toBeNull();
     expect(screen.queryByText('Word groups')).toBeNull();
 
+    expect(screen.getByText('English meaning')).toBeTruthy();
+    const englishMeaning = within(screen.getByText('English meaning').parentElement);
+    expect(englishMeaning.getByRole('button', { name: 'Off', exact: true })).toBeTruthy();
+    expect(englishMeaning.getByRole('button', { name: 'On', exact: true })).toBeTruthy();
+    expect(screen.queryByText(/Hidden mode/i)).toBeNull();
+
     expect(screen.getByText('Word category label')).toBeTruthy();
     const wordCategory = within(screen.getByRole('group', { name: 'Word category label' }));
     expect(wordCategory.getByRole('button', { name: 'Show', exact: true })).toBeTruthy();
@@ -74,6 +80,19 @@ describe('SettingsView controls', () => {
       const raw = localStorage.getItem('jp-verb-srs-v2');
       expect(raw).toBeTruthy();
       expect(JSON.parse(raw).practicePrefs.showWordCategory).toBe(false);
+      expect(JSON.parse(raw).practicePrefs.englishHints).toBe('hidden');
+    });
+
+    fireEvent.click(englishMeaning.getByRole('button', { name: 'On', exact: true }));
+    await waitFor(() => {
+      const raw = localStorage.getItem('jp-verb-srs-v2');
+      expect(JSON.parse(raw).practicePrefs.englishHints).toBe('show');
+    });
+
+    fireEvent.click(englishMeaning.getByRole('button', { name: 'Off', exact: true }));
+    await waitFor(() => {
+      const raw = localStorage.getItem('jp-verb-srs-v2');
+      expect(JSON.parse(raw).practicePrefs.englishHints).toBe('hidden');
     });
 
     fireEvent.click(wordCategory.getByRole('button', { name: 'Show', exact: true }));

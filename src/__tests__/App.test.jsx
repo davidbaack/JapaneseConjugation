@@ -104,7 +104,7 @@ describe('App shell', () => {
     expect(screen.queryByText(/Prompt form:/i)).toBeNull();
   }, 15000);
 
-  it('does not show answer-form endings or target English before answering', async () => {
+  it('does not show answer-form endings or English meaning before answering', async () => {
     const savedState = defaultState();
     const savedType = 'desiderative-past-negative';
     localStorage.setItem(
@@ -143,7 +143,7 @@ describe('App shell', () => {
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(screen.getAllByText(/Tai Past Negative/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/did not want to ~/i)).toBeTruthy();
-    expect(screen.getByText(/to speak/i)).toBeTruthy();
+    expect(screen.queryByText(/to speak/i)).toBeNull();
     expect(screen.queryByText('\u305f\u304f\u306a\u304b\u3063\u305f')).toBeNull();
     expect(screen.queryByText(/did not want to speak/i)).toBeNull();
   }, 15000);

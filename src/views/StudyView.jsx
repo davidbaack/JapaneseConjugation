@@ -24,7 +24,6 @@ import KanaInputPad from '../components/KanaInputPad.jsx';
 import { ContextExamplePanel } from '../components/ContextExamplePanel.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import { ChatPanel } from '../components/ChatPanel.jsx';
-import { callGemini, aiSystemFromPrefs } from '../utils/gemini.js';
 import { toHiragana, toHiraganaProgress } from '../utils/romaji.js';
 import {
   conjugateItem,
@@ -34,11 +33,10 @@ import {
   getWordMeta,
   isAdjective,
   isRedundantPracticeType,
-  promptFormLabel,
   surfaceFormFor,
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
-import { explainItem, stepCoachHint, GROUP_NAMES } from '../utils/conjugatorExplain.js';
+import { explainItem, stepCoachHint } from '../utils/conjugatorExplain.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 import {
   selectNext,
@@ -538,10 +536,6 @@ export default function StudyView() {
   const [wasCorrected, setWasCorrected] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [showPromptText, setShowPromptText] = useState(false);
-  const [showEnglishHint, setShowEnglishHint] = useState(false);
-  const [aiHintText, setAiHintText] = useState('');
-  const [aiHintLoading, setAiHintLoading] = useState(false);
-  const [aiHintErr, setAiHintErr] = useState('');
   const [stepHint, setStepHint] = useState('');
   const [hintMasked, setHintMasked] = useState(false);
   const [hintRevealed, setHintRevealed] = useState(false);
@@ -586,7 +580,6 @@ export default function StudyView() {
   // than the live (possibly self-corrected) input.
   const wrongSnapshotRef = useRef(null);
   const typingHintRef = useRef(null);
-  const aiHintAbortRef = useRef(null);
 
   const enabledTypes = useMemo(() => {
     if (sessionFilterFormGroupId) {
@@ -816,13 +809,6 @@ export default function StudyView() {
   useEffect(() => {
     setShowPromptText(!listeningPrompt);
   }, [current?.id, listeningPrompt]);
-
-  useEffect(() => {
-    setShowEnglishHint(false);
-    setAiHintText('');
-    setAiHintErr('');
-    setAiHintLoading(false);
-  }, [current?.id, practicePrefs.englishHints]);
 
   useEffect(() => {
     if (stepHint && typingHintRef.current) {
@@ -1133,7 +1119,7 @@ export default function StudyView() {
     todayGoalHit && !startedGoalHit.current && seededInitialDailyGoalRef.current && !bonusMode;
   const reviewComplete = dueQueueDone || dailyGoalJustHit;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
-  const hideEnglishHint = englishHintsHidden && phase === 'answering' && !showEnglishHint;
+  const hideEnglishMeaning = englishHintsHidden && phase === 'answering';
   // Guided kana is now an in-box "reveal next" action, not a separate mode.
   const guidedKana = false;
   const liveKana = typedAnswerMode && !reverseDrill;
@@ -1302,49 +1288,6 @@ export default function StudyView() {
     setReviewBase(state.session?.reviewed || 0);
     resetActiveAttempt();
     setTab('study');
-  }
-
-  async function generateAIClue() {
-    if (!current || !geminiKey) return;
-    if (aiHintLoading) {
-      aiHintAbortRef.current?.abort();
-      aiHintAbortRef.current = null;
-      setAiHintLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    aiHintAbortRef.current = controller;
-    setAiHintLoading(true);
-    setAiHintErr('');
-    setAiHintText('');
-    try {
-      const prompt = `Give one concise non-answer clue for this Japanese conjugation drill. Do NOT reveal the exact answer "${expected}" and do not spell out the full transformed form.\n\nBase word: ${
-        current.verb.dict
-      } (${current.verb.reading})\nMeaning: ${current.verb.meaning}\nClass: ${
-        GROUP_NAMES[current.verb.group] || current.verb.group
-      }\nTask: ${
-        reverseDrill
-          ? `identify the dictionary form from ${typeInfo.label} ${sourceForm}`
-          : transformationMode
-            ? `transform ${sourceTypeInfo.label} to ${targetTypeInfo.label} without changing the word`
-            : `transform ${promptFormLabel(current.verb, promptType)} to ${typeInfo.label}`
-      }\n\nInclude one semantic hint and one rule cue. Keep it under 30 words.`;
-      const reply = await callGemini(
-        [{ role: 'user', parts: [{ text: prompt }] }],
-        geminiKey,
-        220,
-        0.25,
-        aiSystemFromPrefs(
-          practicePrefs,
-          'You give safe study hints for Japanese conjugation quizzes. Never reveal the exact answer.',
-        ),
-      );
-      if (!controller.signal.aborted) setAiHintText(reply);
-    } catch (e) {
-      if (!controller.signal.aborted) setAiHintErr(e.message || 'AI clue failed.');
-    }
-    if (!controller.signal.aborted) setAiHintLoading(false);
-    aiHintAbortRef.current = null;
   }
 
   // Deterministic, offline step coach — no API key required. Irregular forms
@@ -2263,51 +2206,8 @@ export default function StudyView() {
             <div className="text-xs text-stone-400">Answer with the dictionary form.</div>
           )}
 
-          {hideEnglishHint ? (
-            <div className="mt-3 max-w-md mx-auto rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2 text-xs text-stone-500">
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <span>English hint hidden until review.</span>
-                <button
-                  onClick={() => setShowEnglishHint(true)}
-                  className="px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-750 dark:text-stone-300"
-                >
-                  Show hint
-                </button>
-                <button
-                  onClick={generateAIClue}
-                  disabled={!geminiKey}
-                  className="px-2 py-1 rounded-lg border border-indigo-200 bg-white hover:bg-indigo-50 disabled:opacity-40 text-indigo-700 dark:bg-stone-900 dark:border-stone-800 dark:text-indigo-400 inline-flex items-center gap-1"
-                >
-                  <IconSpark className="w-3.5 h-3.5" />
-                  {aiHintLoading ? 'Cancel' : 'AI clue'}
-                </button>
-              </div>
-              {aiHintText && (
-                <div className="mt-2 text-stone-705 dark:text-stone-300 leading-relaxed max-h-32 overflow-y-auto">
-                  {aiHintText}
-                </div>
-              )}
-              {aiHintErr && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-rose-600 text-sm">{aiHintErr}</span>
-                  <button
-                    onClick={generateAIClue}
-                    className="text-xs text-indigo-600 hover:text-indigo-800 underline"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
-              {aiHintText && phase === 'answering' && (
-                <div className="mt-2 text-xs text-stone-500 max-w-md mx-auto rounded-lg border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 max-h-32 overflow-y-auto">
-                  {aiHintText}
-                </div>
-              )}
-            </>
+          {!hideEnglishMeaning && (
+            <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
           )}
 
           {phase === 'reviewing' && practicePrefs.showWordCategory && (
@@ -2600,7 +2500,7 @@ export default function StudyView() {
                                   className="text-xl"
                                   subClassName="text-xs text-stone-400 mt-1"
                                 />
-                                {!hideEnglishHint && (
+                                {!hideEnglishMeaning && (
                                   <div className="mt-1 text-xs text-stone-500">{w.meaning}</div>
                                 )}
                               </button>
