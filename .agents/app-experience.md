@@ -46,6 +46,9 @@ confirms the new direction, update this document in the same change.
 - The default scope is verb-first plus common textbook adjectives. Textbook Core
   forms are enabled from the start; rare stacked, short, or edge variants are
   opt-in.
+- Nouns conjugate only through the copula, so they are excluded from the default
+  automatic scope. Learners opt back in by enabling the noun group in Settings,
+  and explicit lists, Library Lookup, and focused practice still reach nouns.
 - A compact command bar is always visible for focused word or form-family
   practice.
 - Explicit focused practice re-enables excluded content and counts through SRS.

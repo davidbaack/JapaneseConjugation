@@ -138,11 +138,20 @@ export function filterWordsForStudyScope(
   const automaticWords = options.builtInWords?.length
     ? sourceWords.filter((word) => builtInKeys.has(wordKey(word)))
     : sourceWords;
-  const ranked = rankedProgressionWords(automaticWords);
+  // Nouns "conjugate" only via the copula, so they are out of the default
+  // automatic scope. Learners opt back in by enabling the noun group in
+  // Settings; explicit lists and focused practice still reach nouns directly.
+  const includeNouns = (
+    Array.isArray(prefs.wordGroups) ? prefs.wordGroups : DEFAULT_PREFS.wordGroups
+  ).includes('noun');
+  const scopedWords = includeNouns
+    ? automaticWords
+    : automaticWords.filter((word) => word.group !== 'noun');
+  const ranked = rankedProgressionWords(scopedWords);
   const introduced = introducedBuiltInWordCount(state, ranked);
   const wordsForUnlockedKeys = (unlocked) => {
     const unlockedKeys = new Set(unlocked.map(wordKey));
-    return automaticWords.filter((word) => unlockedKeys.has(wordKey(word)));
+    return scopedWords.filter((word) => unlockedKeys.has(wordKey(word)));
   };
 
   if (introduced < 12) return wordsForUnlockedKeys(ranked.slice(0, 24));
@@ -168,7 +177,7 @@ export function filterWordsForStudyScope(
       ),
     );
   }
-  return automaticWords;
+  return scopedWords;
 }
 
 export function buildVocabularyProgressionSummary(

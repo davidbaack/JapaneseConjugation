@@ -59,14 +59,33 @@ describe('vocabulary progression', () => {
       jlptLevels: ['N1'],
       genkiLessons: null,
       minnaLessons: null,
-      wordTypes: ['noun'],
-      wordGroups: ['noun'],
+      wordTypes: ['na-adjective'],
+      wordGroups: ['ichidan'],
     };
 
     const result = filterWordsForStudyScope(words, { cards: {} }, prefs, []);
 
     expect(result).toHaveLength(24);
     expect(result.some((item) => item.jlpt === 'N5')).toBe(true);
+  });
+
+  it('keeps nouns out of automatic study by default, but includes them when opted in', () => {
+    const words = [
+      ...Array.from({ length: 10 }, (_, i) => word(i)),
+      word(50, { dict: '本', reading: 'ほん', meaning: 'book', group: 'noun' }),
+      word(51, { dict: '学生', reading: 'がくせい', meaning: 'student', group: 'noun' }),
+    ];
+
+    const defaultResult = filterWordsForStudyScope(words, { cards: {} }, DEFAULT_PREFS, []);
+    expect(defaultResult.some((item) => item.group === 'noun')).toBe(false);
+
+    const optedIn = filterWordsForStudyScope(
+      words,
+      { cards: {} },
+      { ...DEFAULT_PREFS, wordGroups: [...DEFAULT_PREFS.wordGroups, 'noun'] },
+      [],
+    );
+    expect(optedIn.some((item) => item.group === 'noun')).toBe(true);
   });
 
   it('lets enabled library lists bypass progression tiers intentionally', () => {

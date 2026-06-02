@@ -86,20 +86,6 @@ export function mergePracticePrefs(prefs) {
   ) {
     wordGroups = [...wordGroups, 'irregular-adjective'];
   }
-  if (
-    Array.isArray(source.wordGroups) &&
-    oldAllGroups.every((id) => source.wordGroups.includes(id)) &&
-    !wordGroups.includes('noun')
-  ) {
-    wordGroups = [...wordGroups, 'noun'];
-  }
-  const oldAllTypes = ['verb', 'i-adjective', 'na-adjective'];
-  const wordTypes =
-    Array.isArray(source.wordTypes) &&
-    oldAllTypes.every((id) => source.wordTypes.includes(id)) &&
-    !source.wordTypes.includes('noun')
-      ? [...source.wordTypes, 'noun']
-      : source.wordTypes;
   return {
     ...DEFAULT_PREFS,
     ...source,
@@ -115,7 +101,6 @@ export function mergePracticePrefs(prefs) {
         : sourceFormStrategy === 'masu'
           ? 'polite-present'
           : 'dictionary',
-    ...(wordTypes ? { wordTypes } : {}),
     wordGroups,
     reviewLimit,
     reviewLimitSource,
