@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildConjugationSpeedRows,
+  buildReadinessFamilyRows,
   buildReadinessMap,
   defaultReadinessState,
   launchPrefsForReadinessDimension,
   recordReadinessAttempt,
+  weakestReadinessSkill,
 } from '../utils/readiness.js';
 
 const ICHIDAN_WORD = {
@@ -142,5 +144,74 @@ describe('readiness tracking', () => {
       answerMode: 'input',
       reviewStyle: 'forms',
     });
+  });
+});
+
+describe('readiness family rollup', () => {
+  it('rolls word-form readiness up to form families and ignores untested dimensions', () => {
+    let readiness = defaultReadinessState();
+    // Production records on typed answers (the default). Keys are word-form
+    // card ids, exactly as production stores them.
+    readiness = recordReadinessAttempt(readiness, 'verb:ichidan:食べる:たべる|plain-past', {
+      correct: true,
+      responseMs: 4000,
+      answerMode: 'input',
+      now: 1000,
+    });
+    readiness = recordReadinessAttempt(readiness, 'verb:godan:書く:かく|plain-past', {
+      correct: false,
+      responseMs: 12000,
+      answerMode: 'input',
+      now: 2000,
+    });
+
+    const rows = buildReadinessFamilyRows({ readiness });
+    const basics = rows.find((row) => row.id === 'basic-tenses');
+
+    expect(basics.measured).toEqual(expect.arrayContaining(['production', 'speed']));
+    // Typed answers never populate recognition, so it stays untested/hidden.
+    expect(basics.measured).not.toContain('recognition');
+    expect(basics.cells.recognition.status).toBe('untested');
+    expect(basics.cells.production.attempted).toBe(2);
+    expect(basics.types.find((type) => type.typeId === 'plain-past')).toBeTruthy();
+
+    // A family with no reps reports nothing measured.
+    const untouched = rows.find((row) => row.practiced === 0);
+    expect(untouched.measured).toEqual([]);
+    expect(untouched.types).toEqual([]);
+  });
+
+  it('records recognition only for choice-mode answers', () => {
+    let readiness = defaultReadinessState();
+    readiness = recordReadinessAttempt(readiness, 'verb:ichidan:見る:みる|te-form', {
+      correct: true,
+      responseMs: 3000,
+      answerMode: 'choice',
+      now: 1000,
+    });
+    const rows = buildReadinessFamilyRows({ readiness });
+    const teFamily = rows.find((row) => (row.typeIds || []).includes('te-form'));
+    expect(teFamily.measured).toContain('recognition');
+  });
+
+  it('surfaces the weakest measured skill, never an untested recognition cell', () => {
+    let readiness = defaultReadinessState();
+    for (let i = 0; i < 4; i += 1) {
+      readiness = recordReadinessAttempt(readiness, 'verb:godan:書く:かく|plain-past', {
+        correct: false,
+        responseMs: 5000,
+        answerMode: 'input',
+        now: 1000 + i,
+      });
+    }
+
+    const weak = weakestReadinessSkill({ readiness });
+    expect(weak.familyId).toBe('basic-tenses');
+    expect(['production', 'speed']).toContain(weak.dimension);
+    expect(weak.dimension).not.toBe('recognition');
+  });
+
+  it('returns no nudge when nothing has been practiced', () => {
+    expect(weakestReadinessSkill({ readiness: defaultReadinessState() })).toBeNull();
   });
 });

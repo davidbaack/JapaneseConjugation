@@ -37,6 +37,11 @@ confirms the new direction, update this document in the same change.
   (kept out of the way of Skip) and is reversible from Library.
 - The main review stream mixes due cards, weak cards, and a small auto-trickle
   of new word-form cards.
+- Form-family strength expands into a recognition/production/speed readiness
+  breakdown (showing only dimensions with reps, so default typed practice never
+  renders an empty recognition cell). Each family offers a one-tap drill that
+  scopes Reviews to that family in the weak dimension's answer mode, and the
+  single weakest skill surfaces as a dashboard nudge.
 - If no cards are due, Reviews should still offer a useful core warmup.
 - Required due Reviews complete the progress bar. Bonus Reviews can continue
   after completion and still update SRS.

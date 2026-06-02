@@ -47,7 +47,12 @@ import {
   localDateKey,
   typeIdFromCardId,
 } from '../utils/storage.js';
-import { recordReadinessAttempt } from '../utils/readiness.js';
+import {
+  buildReadinessFamilyRows,
+  launchPrefsForReadinessDimension,
+  recordReadinessAttempt,
+  weakestReadinessSkill,
+} from '../utils/readiness.js';
 import {
   formDisplay,
   promptDisplay,
@@ -563,6 +568,38 @@ function formFamilyStrengthRows(state = {}) {
   }).sort((a, b) => a.sortScore - b.sortScore || a.label.localeCompare(b.label));
 }
 
+const READINESS_TONE = {
+  strong: 'bg-emerald-500',
+  developing: 'bg-amber-500',
+  weak: 'bg-rose-500',
+  untested: 'bg-stone-300 dark:bg-stone-700',
+};
+const READINESS_SHORT = { recognition: 'Rec', production: 'Prod', speed: 'Spd' };
+
+// Compact recognition/production/speed pills — measured dimensions only, so a
+// default input-mode learner (no recognition reps) never sees a blank cell.
+function ReadinessBadges({ row }) {
+  const dims = row?.measured || [];
+  if (!dims.length) return null;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {dims.map((id) => {
+        const cell = row.cells[id];
+        return (
+          <span
+            key={id}
+            title={`${READINESS_SHORT[id]}: ${cell.label}${cell.detail ? ` (${cell.detail})` : ''}`}
+            className="inline-flex items-center gap-1 rounded-full border border-stone-200 px-1.5 py-0.5 text-[10px] font-medium text-stone-600 dark:border-stone-700 dark:text-stone-300"
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${READINESS_TONE[cell.status]}`} />
+            {READINESS_SHORT[id]}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 function ReviewsDashboard({
   daily,
   practicePrefs,
@@ -574,6 +611,9 @@ function ReviewsDashboard({
   onStartRecommendation,
   onRetestMisses,
   retestCount = 0,
+  readinessFamilies = [],
+  weakestSkill = null,
+  onDrillReadiness,
 }) {
   const dailyGoal = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
@@ -588,6 +628,7 @@ function ReviewsDashboard({
   const strengthRows = formFamilyStrengthRows(state);
   const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
   const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
+  const readinessById = new Map(readinessFamilies.map((row) => [row.id, row]));
   const weakCount = strengthRows.filter((row) => row.status === 'weak').length;
   const streak = daily.goalStreak || 0;
   // Progressive disclosure: the forecast, form-family strength, and stat tiles
@@ -755,10 +796,33 @@ function ReviewsDashboard({
             </div>
           </div>
           <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
-              Form families
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                Form families
+              </span>
+              <span className="text-[10px] text-stone-400 dark:text-stone-500">
+                Rec / Prod / Spd
+              </span>
             </div>
-            <div className="space-y-2">
+            {weakestSkill && onDrillReadiness && (
+              <button
+                type="button"
+                onClick={() =>
+                  onDrillReadiness({
+                    familyId: weakestSkill.familyId,
+                    dimension: weakestSkill.dimension,
+                  })
+                }
+                className="mb-3 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs text-amber-900 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/40"
+              >
+                <span>
+                  Sharpen <span className="font-semibold">{weakestSkill.label}</span> —{' '}
+                  {weakestSkill.dimensionLabel.toLowerCase()} is {weakestSkill.status}
+                </span>
+                <span className="shrink-0 font-semibold">Drill →</span>
+              </button>
+            )}
+            <div className="space-y-1">
               {rowsToShow.map((row) => {
                 const tone =
                   row.status === 'strong'
@@ -768,14 +832,20 @@ function ReviewsDashboard({
                       : row.status === 'developing'
                         ? 'bg-amber-500'
                         : 'bg-stone-300';
-                return (
-                  <div key={row.id}>
+                const readiness = readinessById.get(row.id);
+                const detailTypes = readiness?.types || [];
+                const weakest = readiness?.weakest;
+                const header = (
+                  <>
                     <div className="flex items-center justify-between gap-3 text-xs">
                       <span className="font-medium text-stone-700 dark:text-stone-200">
                         {row.label}
                       </span>
-                      <span className="tabular-nums text-stone-500">
-                        {row.attempted ? `${row.accuracy}%` : 'new'}
+                      <span className="flex items-center gap-2">
+                        {readiness && <ReadinessBadges row={readiness} />}
+                        <span className="tabular-nums text-stone-500">
+                          {row.attempted ? `${row.accuracy}%` : 'new'}
+                        </span>
                       </span>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
@@ -784,7 +854,43 @@ function ReviewsDashboard({
                         style={{ width: `${row.attempted ? row.accuracy : 8}%` }}
                       />
                     </div>
-                  </div>
+                  </>
+                );
+                if (!detailTypes.length) {
+                  return (
+                    <div key={row.id} className="px-1 py-1">
+                      {header}
+                    </div>
+                  );
+                }
+                return (
+                  <details key={row.id} className="rounded-md px-1 py-1">
+                    <summary className="cursor-pointer list-none rounded-md transition hover:bg-stone-50 dark:hover:bg-stone-950/60">
+                      {header}
+                    </summary>
+                    <div className="mt-2 space-y-1.5 border-t border-stone-100 pt-2 dark:border-stone-800">
+                      {detailTypes.map((type) => (
+                        <div
+                          key={type.typeId}
+                          className="flex items-center justify-between gap-3 text-[11px] text-stone-500 dark:text-stone-400"
+                        >
+                          <span className="truncate">{type.label}</span>
+                          <ReadinessBadges row={type} />
+                        </div>
+                      ))}
+                      {weakest && onDrillReadiness && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onDrillReadiness({ familyId: row.id, dimension: weakest.id })
+                          }
+                          className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-stone-800"
+                        >
+                          Drill {weakest.label.toLowerCase()} in {row.label}
+                        </button>
+                      )}
+                    </div>
+                  </details>
                 );
               })}
             </div>
@@ -976,6 +1082,13 @@ export default function StudyView() {
     const open = (state.mistakes || []).filter((mistake) => !mistake.resolved);
     return aggregateDiagnosedMistakes(open).length ? open.length : 0;
   }, [state.mistakes]);
+  // Recognition/production/speed readiness rolled up to form families, plus the
+  // single weakest skill, for the dashboard's strength section and nudge. Scoped
+  // to state.readiness so it only recomputes when readiness data changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const readinessFamilies = useMemo(() => buildReadinessFamilyRows(state), [state.readiness]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const weakestReadiness = useMemo(() => weakestReadinessSkill(state), [state.readiness]);
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const todayGoalHit = isDailyGoalHitToday(daily);
@@ -1284,6 +1397,9 @@ export default function StudyView() {
           onStartRecommendation={startReviewRecommendation}
           onRetestMisses={launchMistakeRetest}
           retestCount={retestableMisses}
+          readinessFamilies={readinessFamilies}
+          weakestSkill={weakestReadiness}
+          onDrillReadiness={drillReadinessGap}
         />
       </div>
     );
@@ -1634,6 +1750,16 @@ export default function StudyView() {
     setSessionFilterFormGroupId(groupId);
     setDashboardOpen(false);
     setCurrent(null);
+  }
+
+  // Drill the weakest readiness dimension of a form family: apply that
+  // dimension's answer mode (recognition -> choice, speed -> timed input,
+  // production -> input) and scope Reviews to the family.
+  function drillReadinessGap({ familyId, dimension }) {
+    if (dimension) {
+      setPracticePrefs((prev) => ({ ...prev, ...launchPrefsForReadinessDimension(dimension) }));
+    }
+    chooseFocusFormGroup(familyId);
   }
 
   // Build a focused repair drill from the learner's open misses and drop
