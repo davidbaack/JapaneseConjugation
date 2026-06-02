@@ -152,6 +152,29 @@ describe('SRSQueueBar', () => {
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
+  it('shows a cleared message instead of future review forecast once the queue is done', () => {
+    mockedApp.value = appState({
+      todayDrillActive: true,
+      todayPlan: {
+        available: true,
+        forecastLabel: '4 tomorrow \u00b7 3 this week',
+        sourceCounts: { due: 0 },
+        summary: 'Core warmup',
+      },
+      srsQueue: {
+        dueRuleIds: ['plain-past', 'te-form'],
+        completedDueRuleIds: ['plain-past', 'te-form'],
+        startedAt: Date.now(),
+      },
+    });
+
+    render(<SRSQueueBar />);
+
+    expect(screen.getByText('Queue cleared')).toBeTruthy();
+    expect(screen.getByText('All due cards cleared for today')).toBeTruthy();
+    expect(screen.queryByText(/up next:/i)).toBeNull();
+  });
+
   it('starts the Practical Core Path from Study', () => {
     const app = appState({ tab: 'study' });
     mockedApp.value = app;

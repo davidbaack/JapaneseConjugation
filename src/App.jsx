@@ -47,6 +47,11 @@ export function SRSQueueBar() {
   const hasDueQueue = dueTotal > 0;
   const queueDone = hasDueQueue && dueCleared >= dueTotal;
   const upcoming = todayPlan.forecastLabel;
+  const queueDetail = queueDone
+    ? 'All due cards cleared for today'
+    : upcoming
+      ? `up next: ${upcoming}`
+      : todayPlan.summary;
   const dueNow = todayPlan.sourceCounts?.due || 0;
   const progressPct = hasDueQueue
     ? Math.min(100, Math.round((dueCleared / dueTotal) * 100))
@@ -105,7 +110,7 @@ export function SRSQueueBar() {
             </div>
           </div>
           <div className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">
-            {upcoming ? `up next: ${upcoming}` : todayPlan.summary}
+            {queueDetail}
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {chips.map((chip) => (
