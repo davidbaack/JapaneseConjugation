@@ -64,4 +64,35 @@ describe('ChatPanel', () => {
 
     expect(window.Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
+
+  it('formats Gemini markdown without exposing raw emphasis markers', async () => {
+    geminiMock.callGemini.mockResolvedValue(
+      [
+        'Remember that **ku [ku]** verbs use a special past-tense pattern.',
+        '',
+        '- Try **kaku [kaku]** next',
+        '- Compare it with `aruku`',
+      ].join('\n'),
+    );
+
+    render(
+      <ChatPanel
+        verb={WORD}
+        type="plain-past"
+        userAnswer="tadeta"
+        expected="tabeta"
+        explanation={EXPLANATION}
+        geminiKey="proxy"
+      />,
+    );
+
+    const emphasizedRule = await screen.findByText('ku [ku]');
+    const emphasizedExample = screen.getByText('kaku [kaku]');
+    const inlineCode = screen.getByText('aruku');
+
+    expect(emphasizedRule.tagName).toBe('STRONG');
+    expect(emphasizedExample.tagName).toBe('STRONG');
+    expect(inlineCode.tagName).toBe('CODE');
+    expect(screen.queryByText(/\*\*/)).toBeNull();
+  });
 });
