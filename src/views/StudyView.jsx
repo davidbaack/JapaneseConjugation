@@ -3212,6 +3212,32 @@ export default function StudyView() {
                         practicePrefs={practicePrefs}
                       />
                     </ReviewDisclosure>
+                    {geminiKey && (
+                      <ReviewDisclosure tone="emerald" summary="Ask Gemini why">
+                        {!chatOpen ? (
+                          <button
+                            onClick={() => setChatOpen(true)}
+                            aria-expanded={chatOpen}
+                            className="w-full py-2 border border-emerald-200 dark:border-emerald-900 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/50 rounded-xl text-sm text-emerald-700 dark:text-emerald-400 flex items-center justify-center gap-1.5 transition"
+                          >
+                            <IconChat className="w-4 h-4" /> Ask Gemini why
+                          </button>
+                        ) : (
+                          <ChatPanel
+                            verb={current.verb}
+                            type={practicedType}
+                            userAnswer={expected}
+                            expected={expected}
+                            explanation={reviewExplanation}
+                            geminiKey={geminiKey}
+                            practicePrefs={practicePrefs}
+                            taskOverride={taskOverride}
+                            wasCorrect
+                            reviewTone="emerald"
+                          />
+                        )}
+                      </ReviewDisclosure>
+                    )}
                   </div>
                 )}
 

@@ -531,6 +531,26 @@ describe('StudyView daily startup guards', () => {
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
   });
 
+  it('shows Gemini review help after a correct answer when configured', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      activeGeminiKey: 'proxy',
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('Ask Gemini why').length).toBeGreaterThan(0);
+  });
+
   it('keeps direct kana pending until a miss, then grades retyped kana immediately', async () => {
     mockedApp.value = makeApp({
       practicePrefs: {

@@ -13,7 +13,7 @@ vi.mock('../utils/gemini.js', () => ({
   callGemini: geminiMock.callGemini,
 }));
 
-import { ChatPanel } from '../components/ChatPanel.jsx';
+import { ChatPanel, buildContext } from '../components/ChatPanel.jsx';
 
 const WORD = {
   dict: 'taberu',
@@ -48,6 +48,26 @@ afterEach(() => {
 });
 
 describe('ChatPanel', () => {
+  it('frames correct review prompts as correct-answer support', () => {
+    const context = buildContext(
+      WORD,
+      'plain-past',
+      'tabeta',
+      'tabeta',
+      EXPLANATION,
+      undefined,
+      '',
+      false,
+      true,
+    );
+
+    expect(context).toContain('just got this right');
+    expect(context).toContain('Correct: tabeta');
+    expect(context).toContain('why this answer is correct');
+    expect(context).not.toContain('just got this wrong');
+    expect(context).not.toContain('what I typed wrong');
+  });
+
   it('keeps automatic Gemini replies from scrolling the whole page', async () => {
     render(
       <ChatPanel
