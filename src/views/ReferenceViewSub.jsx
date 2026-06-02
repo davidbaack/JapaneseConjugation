@@ -5,20 +5,17 @@ import {
   IconCheck,
   IconVolume,
   IconSpark,
-  IconBook,
-  IconPen,
   IconRefresh,
 } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
-import { PitchAccentSection } from '../components/PitchAccent.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
-import { toHiragana, kanaToRomaji } from '../utils/romaji.js';
+import { kanaToRomaji } from '../utils/romaji.js';
 import { playPronunciation } from '../utils/speech.js';
 import { isAdjective } from '../utils/conjugator.js';
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { normalizeReferenceState } from '../utils/storage.js';
 import { formDisplay, promptDisplay } from '../utils/display.js';
-import { callGemini, aiSystemFromPrefs, extractJSON, AI_COACH_SYSTEM } from '../utils/gemini.js';
+import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 import { ruMasuDiagnostic } from '../utils/ruVerbDiagnostics.js';
@@ -29,7 +26,6 @@ import { ruMasuDiagnostic } from '../utils/ruVerbDiagnostics.js';
 export * from '../utils/referenceHelpers.js';
 import {
   FAVORITES_LIST_NAME,
-  transitivePairFor,
   wordKeyLocal,
   searchWords,
   surfaceFormForLocal,
@@ -37,13 +33,6 @@ import {
   adHocReferenceCandidates,
   formRows,
   referenceRows,
-  splitJapaneseMorae,
-  kanjiCharsFor,
-  referenceDictionaryLinks,
-  kanjiDictionaryLinks,
-  writingPracticeUnits,
-  writingDrillSteps,
-  pronunciationPracticeForms,
   findFavoritesList,
   favoriteListHasWord,
   toggleFavoriteInLists,
@@ -72,43 +61,17 @@ export default function ReferenceViewSub({
   setPracticePrefs,
   setTab,
   practiceWord,
-  focused = false,
 }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
   const [expandedRow, setExpandedRow] = useState(null);
   const [scratchIndex, setScratchIndex] = useState(0);
-  const [aiText, setAiText] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiErr, setAiErr] = useState('');
   const [copyTableOk, setCopyTableOk] = useState(false);
   const [lookupAiText, setLookupAiText] = useState('');
   const [lookupAiLoading, setLookupAiLoading] = useState(false);
   const [lookupAiErr, setLookupAiErr] = useState('');
-  const [accentText, setAccentText] = useState('');
-  const [accentLoading, setAccentLoading] = useState(false);
-  const [accentErr, setAccentErr] = useState('');
-  const [kanjiText, setKanjiText] = useState('');
-  const [kanjiLoading, setKanjiLoading] = useState(false);
-  const [kanjiErr, setKanjiErr] = useState('');
-  const [writingText, setWritingText] = useState('');
-  const [writingLoading, setWritingLoading] = useState(false);
-  const [writingErr, setWritingErr] = useState('');
-  const [scratchAiText, setScratchAiText] = useState('');
-  const [scratchAiLoading, setScratchAiLoading] = useState(false);
-  const [scratchAiErr, setScratchAiErr] = useState('');
-  const [pairAiText, setPairAiText] = useState('');
-  const [pairAiLoading, setPairAiLoading] = useState(false);
-  const [pairAiErr, setPairAiErr] = useState('');
   const [favoriteMsg, setFavoriteMsg] = useState('');
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const aiAbortRef = useRef(null);
   const lookupAbortRef = useRef(null);
-  const accentAbortRef = useRef(null);
-  const kanjiAbortRef = useRef(null);
-  const writingAbortRef = useRef(null);
-  const scratchAbortRef = useRef(null);
-  const pairAbortRef = useRef(null);
 
   const words = useMemo(() => [...verbs, ...adjectives], [verbs, adjectives]);
   const reference = normalizeReferenceState(state.reference);
@@ -134,11 +97,6 @@ export default function ReferenceViewSub({
   const showScratch = !!(query.trim() && scratchCandidate && !scratchMatchesKnown);
   const scratchRows = showScratch ? formRows(scratchCandidate) : [];
   const scratchMasuDiagnostic = showScratch ? ruMasuDiagnostic(scratchCandidate) : null;
-  const transitivePair = selected ? transitivePairFor(selected, words) : null;
-  const transitivePartnerView = transitivePair
-    ? promptDisplay(transitivePair.partner, null, practicePrefs)
-    : null;
-
   useEffect(() => {
     if (!selected || !words.some((w) => w.dict === selected.dict)) {
       setSelected(referenceSelectedWord || matches[0] || words[0] || null);
@@ -152,27 +110,17 @@ export default function ReferenceViewSub({
 
   useEffect(() => {
     setScratchIndex(0);
-    setScratchAiText('');
-    setScratchAiErr('');
-    setScratchAiLoading(false);
   }, [query]);
 
   const rows = selected ? referenceRows(selected, state) : [];
   const selectedView = selected ? promptDisplay(selected, null, practicePrefs) : null;
   const selectedMasuDiagnostic = selected ? ruMasuDiagnostic(selected) : null;
-  const selectedMorae = selected ? splitJapaneseMorae(selected.reading) : [];
-  const pronunciationForms = selected ? pronunciationPracticeForms(selected) : [];
-  const selectedKanji = selected ? kanjiCharsFor(selected.dict) : [];
-  const writingUnits = selected ? writingPracticeUnits(selected) : [];
-  const writingDrill = selected ? writingDrillSteps(selected, writingUnits) : [];
-  const dictionaryLinks = selected ? referenceDictionaryLinks(selected) : [];
   const masteredRows = rows.filter((r) => r.progress.status === 'mastered').length;
   const dueRows = rows.filter((r) => r.progress.status === 'due').length;
   const favoritesList = findFavoritesList(wordLists);
   const selectedFavorited = favoriteListHasWord(wordLists, selected);
   const favoriteCount = (favoritesList?.wordKeys || []).length;
   const weakRuleCount = reference.weakRules.length;
-  const showAdvancedReference = !focused || advancedOpen;
 
   useEffect(() => {
     setCopyTableOk(false);
@@ -180,27 +128,6 @@ export default function ReferenceViewSub({
 
   useEffect(() => {
     setExpandedRow(null);
-  }, [selected?.dict, selected?.group]);
-
-  useEffect(() => {
-    setAccentText('');
-    setAccentErr('');
-  }, [selected?.dict, selected?.group]);
-
-  useEffect(() => {
-    setKanjiText('');
-    setKanjiErr('');
-  }, [selected?.dict, selected?.group]);
-
-  useEffect(() => {
-    setWritingText('');
-    setWritingErr('');
-  }, [selected?.dict, selected?.group]);
-
-  useEffect(() => {
-    setPairAiText('');
-    setPairAiErr('');
-    setPairAiLoading(false);
   }, [selected?.dict, selected?.group]);
 
   useEffect(() => {
@@ -451,36 +378,6 @@ export default function ReferenceViewSub({
     } catch {}
   }
 
-  async function generateExamples() {
-    if (!selected || !geminiKey) return;
-    if (aiLoading) {
-      aiAbortRef.current?.abort();
-      aiAbortRef.current = null;
-      setAiLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    aiAbortRef.current = controller;
-    setAiLoading(true);
-    setAiErr('');
-    setAiText('');
-    try {
-      const prompt = `Create three short learner-friendly example sentences for ${selected.dict} (${selected.reading}, ${selected.meaning}, ${GROUP_NAMES[selected.group]}). Include one common mistake to avoid. Focus on conjugation.`;
-      const reply = await callGemini(
-        [{ role: 'user', parts: [{ text: prompt }] }],
-        geminiKey,
-        900,
-        0.4,
-        aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM),
-      );
-      if (!controller.signal.aborted) setAiText(reply);
-    } catch (e) {
-      if (!controller.signal.aborted) setAiErr(e.message);
-    }
-    if (!controller.signal.aborted) setAiLoading(false);
-    aiAbortRef.current = null;
-  }
-
   async function explainLookup() {
     if (!query.trim() || !geminiKey || !lookupMatches.length) return;
     if (lookupAiLoading) {
@@ -516,204 +413,6 @@ export default function ReferenceViewSub({
     }
     if (!controller.signal.aborted) setLookupAiLoading(false);
     lookupAbortRef.current = null;
-  }
-
-  async function generateAccentGuide() {
-    if (!selected || !geminiKey) return;
-    if (accentLoading) {
-      accentAbortRef.current?.abort();
-      accentAbortRef.current = null;
-      setAccentLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    accentAbortRef.current = controller;
-    setAccentLoading(true);
-    setAccentErr('');
-    setAccentText('');
-    try {
-      const keyForms = pronunciationForms.map((f) => `${f} (${kanaToRomaji(f)})`).join(', ');
-      const selectedKind =
-        selected.group === 'noun' ? 'noun' : isAdjective(selected) ? 'adjective' : 'verb';
-      const prompt = `Create a compact pronunciation and Tokyo pitch-accent coaching note for this Japanese ${selectedKind}.\n\nWord: ${selected.dict}\nReading: ${selected.reading}\nMeaning: ${selected.meaning}\nClass: ${GROUP_NAMES[selected.group] || selected.group}\nUseful conjugated forms to mention: ${keyForms}\n\nIf the exact accent is uncertain, say so clearly instead of pretending certainty. Include: likely accent label/number if known, mora-by-mora pitch shape in plain text, how pitch may shift in common conjugated forms, one shadowing drill, and one learner mistake to listen for. Keep it short and practical.`;
-      const reply = await callGemini(
-        [{ role: 'user', parts: [{ text: prompt }] }],
-        geminiKey,
-        900,
-        0.2,
-        aiSystemFromPrefs(
-          practicePrefs,
-          'You are a careful Japanese pronunciation coach. Be honest about uncertainty in pitch-accent data and focus on practical listening and speaking guidance.',
-        ),
-      );
-      if (!controller.signal.aborted) setAccentText(reply);
-    } catch (e) {
-      if (!controller.signal.aborted) setAccentErr(e.message || 'Accent guide failed.');
-    }
-    if (!controller.signal.aborted) setAccentLoading(false);
-    accentAbortRef.current = null;
-  }
-
-  async function generateKanjiInsight() {
-    if (!selected || !geminiKey) return;
-    if (kanjiLoading) {
-      kanjiAbortRef.current?.abort();
-      kanjiAbortRef.current = null;
-      setKanjiLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    kanjiAbortRef.current = controller;
-    setKanjiLoading(true);
-    setKanjiErr('');
-    setKanjiText('');
-    try {
-      const chars = selectedKanji.length ? selectedKanji.join('、') : 'no kanji';
-      const prompt = `Create a compact dictionary and kanji insight for this Japanese conjugation reference entry.\n\nWord: ${selected.dict}\nReading: ${selected.reading}\nMeaning: ${selected.meaning}\nClass: ${GROUP_NAMES[selected.group] || selected.group}\nKanji characters in writing: ${chars}\n\nInclude: what each kanji contributes to the word meaning, any useful on'yomi/kun'yomi contrast for this exact word, how okurigana or kana ending connects to conjugation, one memory hook, and one warning about a dictionary ambiguity or alternate writing if relevant. If the word is usually kana-only, explain that instead. Be honest when a detail is uncertain.`;
-      const reply = await callGemini(
-        [{ role: 'user', parts: [{ text: prompt }] }],
-        geminiKey,
-        950,
-        0.25,
-        aiSystemFromPrefs(
-          practicePrefs,
-          'You are a careful Japanese dictionary and kanji coach. Keep explanations practical for conjugation learners. Do not invent kanji readings, stroke counts, or etymology when uncertain.',
-        ),
-      );
-      if (!controller.signal.aborted) setKanjiText(reply);
-    } catch (e) {
-      if (!controller.signal.aborted) setKanjiErr(e.message || 'Kanji insight failed.');
-    }
-    if (!controller.signal.aborted) setKanjiLoading(false);
-    kanjiAbortRef.current = null;
-  }
-
-  async function generateWritingGuide() {
-    if (!selected || !geminiKey) return;
-    if (writingLoading) {
-      writingAbortRef.current?.abort();
-      writingAbortRef.current = null;
-      setWritingLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    writingAbortRef.current = controller;
-    setWritingLoading(true);
-    setWritingErr('');
-    setWritingText('');
-    try {
-      const chars = writingUnits.map((u) => `${u.ch} (${u.type})`).join(', ') || 'none';
-      const prompt = `Create a compact handwriting practice note for this Japanese conjugation reference entry.\n\nWord: ${selected.dict}\nReading: ${selected.reading}\nMeaning: ${selected.meaning}\nClass: ${GROUP_NAMES[selected.group] || selected.group}\nWriting units shown in the app: ${chars}\n\nInclude: per-character stroke-order attention points, likely radical/component or shape cues when useful, how the kana/okurigana ending connects to conjugation, a 30-second writing drill using one conjugated form, and one caution about verifying exact stroke order in the linked reference. If exact stroke order or component history is uncertain, say so clearly. Keep it practical and short.`;
-      const reply = await callGemini(
-        [{ role: 'user', parts: [{ text: prompt }] }],
-        geminiKey,
-        950,
-        0.2,
-        aiSystemFromPrefs(
-          practicePrefs,
-          'You are a careful Japanese handwriting coach. Be honest about uncertainty, avoid invented etymology, and turn dictionary entries into practical writing drills.',
-        ),
-      );
-      if (!controller.signal.aborted) setWritingText(reply);
-    } catch (e) {
-      if (!controller.signal.aborted) setWritingErr(e.message || 'Writing guide failed.');
-    }
-    if (!controller.signal.aborted) setWritingLoading(false);
-    writingAbortRef.current = null;
-  }
-
-  async function verifyScratchWithAI() {
-    if (!showScratch || !geminiKey) return;
-    if (scratchAiLoading) {
-      scratchAbortRef.current?.abort();
-      scratchAbortRef.current = null;
-      setScratchAiLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    scratchAbortRef.current = controller;
-    setScratchAiLoading(true);
-    setScratchAiErr('');
-    setScratchAiText('');
-    try {
-      const prompt = `Identify this Japanese conjugation reference query and verify its real dictionary entry.\n\nQuery: ${query}\nLocal guess: ${scratchCandidate.dict} (${scratchCandidate.reading}), ${GROUP_NAMES[scratchCandidate.group] || scratchCandidate.group}\n\nReturn ONLY JSON with this exact shape:\n{"words":[{"dict":"dictionary form, noun, or adjective stem","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective|noun","evidence":"why this group is right"}]}\n\nIf the query is an impossible or incomplete Japanese dictionary form, return {"words":[]}.`;
-      const reply = await callGemini(
-        [{ role: 'user', parts: [{ text: prompt }] }],
-        geminiKey,
-        700,
-        0.1,
-        aiSystemFromPrefs(
-          practicePrefs,
-          'You verify Japanese verb and adjective dictionary forms for conjugation practice. Return valid JSON only.',
-        ),
-      );
-
-      // Look up helper parser
-      const parsedData = typeof reply === 'string' ? extractJSON(reply) : reply;
-      const rowsList = Array.isArray(parsedData?.words) ? parsedData.words : [];
-      const result = rowsList.map((row) => {
-        const gp =
-          row.group === 'i-adjective' || row.group === 'na-adjective' ? row.group : row.group;
-        return {
-          dict: String(row.dict || '').trim(),
-          reading: toHiragana(String(row.reading || '').trim()),
-          meaning: String(row.meaning || '').trim(),
-          group: gp,
-        };
-      })[0];
-
-      if (!result) throw new Error('AI could not verify a dictionary-form verb or adjective.');
-      const local = scratchCandidate.group;
-      const verdict =
-        result.group === local
-          ? 'Matches the local guess.'
-          : `Gemini suggests ${GROUP_NAMES[result.group] || result.group}, not ${GROUP_NAMES[local] || local}.`;
-      if (!controller.signal.aborted)
-        setScratchAiText(`${result.dict} (${result.reading}) — ${result.meaning}\n${verdict}`);
-    } catch (e) {
-      if (!controller.signal.aborted) setScratchAiErr(e.message || 'AI verification failed.');
-    }
-    if (!controller.signal.aborted) setScratchAiLoading(false);
-    scratchAbortRef.current = null;
-  }
-
-  async function explainTransitivePair() {
-    if (!transitivePair || !geminiKey) return;
-    if (pairAiLoading) {
-      pairAbortRef.current?.abort();
-      pairAbortRef.current = null;
-      setPairAiLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    pairAbortRef.current = controller;
-    setPairAiLoading(true);
-    setPairAiErr('');
-    setPairAiText('');
-    try {
-      const selectedRole =
-        transitivePair.role === 'transitive' ? '他動詞 / transitive' : '自動詞 / intransitive';
-      const partnerRole =
-        transitivePair.partnerRole === 'transitive'
-          ? '他動詞 / transitive'
-          : '自動詞 / intransitive';
-      const prompt = `Contrast this Japanese transitive/intransitive verb pair for a conjugation learner.\n\nSelected: ${selected.dict} (${selected.reading}) — ${selected.meaning} [${selectedRole}]\nPair: ${transitivePair.partner.dict} (${transitivePair.partner.reading}) — ${transitivePair.partner.meaning} [${partnerRole}]\nScene: ${transitivePair.pair.scene}\n\nExplain the difference with を vs が/は frames, give one natural sentence for each verb, and warn about any form that looks like passive/causative but is actually a separate lexical pair. Keep it concise and practical.`;
-      const reply = await callGemini(
-        [{ role: 'user', parts: [{ text: prompt }] }],
-        geminiKey,
-        1000,
-        0.25,
-        aiSystemFromPrefs(
-          practicePrefs,
-          'You are a careful Japanese grammar coach. Explain transitive and intransitive verb pairs with particles, context, and learner traps. Do not overgeneralize suffix patterns.',
-        ),
-      );
-      if (!controller.signal.aborted) setPairAiText(reply);
-    } catch (e) {
-      if (!controller.signal.aborted) setPairAiErr(e.message || 'AI pair contrast failed.');
-    }
-    if (!controller.signal.aborted) setPairAiLoading(false);
-    pairAbortRef.current = null;
   }
 
   function speakJapaneseLocal(text) {
@@ -989,26 +688,7 @@ export default function ReferenceViewSub({
                     {groupDisplayLabel(scratchCandidate.group)} · {scratchCandidate.sourceNote}
                   </div>
                 </div>
-                <button
-                  onClick={verifyScratchWithAI}
-                  disabled={!geminiKey}
-                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
-                >
-                  <IconSpark className="w-4 h-4" />
-                  {scratchAiLoading ? 'Cancel' : 'AI verify'}
-                </button>
               </div>
-              {!geminiKey && (
-                <div className="mt-2 text-xs text-stone-500">
-                  Gemini is not configured to verify the dictionary form, reading, and group.
-                </div>
-              )}
-              {scratchAiErr && <div className="mt-2 text-sm text-rose-600">{scratchAiErr}</div>}
-              {scratchAiText && (
-                <div className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans max-h-72 overflow-y-auto">
-                  {scratchAiText}
-                </div>
-              )}
             </div>
             <div className="max-h-80 overflow-y-auto">
               <table className="w-full text-sm">
@@ -1174,351 +854,6 @@ export default function ReferenceViewSub({
           </div>
         )}
 
-        {focused && (
-          <div className="rounded-xl border border-stone-200 bg-white p-4 text-left dark:border-stone-850 dark:bg-stone-900">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-stone-950 dark:text-stone-50">
-                  Advanced reference tools
-                </div>
-                <div className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
-                  Kanji links, writing practice, pronunciation, AI examples, and verb-pair notes.
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAdvancedOpen((open) => !open)}
-                className="inline-flex items-center justify-center rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850"
-              >
-                {advancedOpen ? 'Hide tools' : 'Show tools'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {showAdvancedReference && transitivePair && (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5 text-left">
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-stone-105 dark:border-stone-800">
-              <div>
-                <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold">
-                  Transitive pair
-                </div>
-                <h3 className="font-semibold text-lg mt-1 text-stone-950 dark:text-stone-50">
-                  自動詞 / 他動詞 contrast
-                </h3>
-                <p className="text-xs text-stone-500 mt-1">
-                  Same scene, different argument pattern: を for acting on something, が/は for what
-                  happens automatically.
-                </p>
-              </div>
-              <button
-                onClick={explainTransitivePair}
-                disabled={!geminiKey}
-                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
-              >
-                <IconSpark className="w-4 h-4" />
-                {pairAiLoading ? 'Cancel' : 'AI contrast'}
-              </button>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-3 mt-4">
-              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-955 p-3">
-                <div className="text-[11px] uppercase tracking-wider text-stone-500 font-semibold">
-                  Current · {transitivePair.role === 'transitive' ? '他動詞' : '自動詞'}
-                </div>
-                <ScriptDisplay
-                  view={selectedView}
-                  className="text-2xl font-semibold mt-1 text-stone-900 dark:text-stone-100"
-                  subClassName="text-xs text-stone-500"
-                />
-                <div className="text-xs text-stone-600 mt-2">{selected.meaning}</div>
-                <div className="text-[11px] text-stone-450 mt-1">
-                  {transitivePair.role === 'transitive'
-                    ? 'Usually frames an object with を.'
-                    : 'Usually frames the thing/event with が or は.'}
-                </div>
-              </div>
-              <div className="rounded-xl border border-indigo-150 bg-indigo-50/60 dark:bg-indigo-950/20 p-3">
-                <div className="text-[11px] uppercase tracking-wider text-indigo-700 dark:text-indigo-400 font-semibold">
-                  Pair · {transitivePair.partnerRole === 'transitive' ? '他動詞' : '自動詞'}
-                </div>
-                <ScriptDisplay
-                  view={transitivePartnerView}
-                  className="text-2xl font-semibold mt-1 text-stone-900 dark:text-stone-100"
-                  subClassName="text-xs text-stone-500"
-                />
-                <div className="text-xs text-stone-600 mt-2">{transitivePair.partner.meaning}</div>
-                <div className="text-[11px] text-stone-450 mt-1">
-                  Scene: {transitivePair.pair.scene}
-                </div>
-              </div>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {transitivePair.partnerInDeck && (
-                <button
-                  onClick={() => chooseReferenceWord(transitivePair.partner)}
-                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-sm text-stone-700 dark:text-stone-300 transition"
-                >
-                  Open pair
-                </button>
-              )}
-              {!geminiKey && (
-                <span className="text-xs text-stone-400">
-                  Gemini is not configured for contextual pair coaching.
-                </span>
-              )}
-            </div>
-            {pairAiErr && <div className="mt-2 text-sm text-rose-600">{pairAiErr}</div>}
-            {pairAiText && (
-              <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-sm text-stone-750 dark:text-stone-305 leading-relaxed whitespace-pre-wrap font-sans max-h-80 overflow-y-auto">
-                {pairAiText}
-              </div>
-            )}
-          </div>
-        )}
-
-        {showAdvancedReference && (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
-            <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
-                <IconBook className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                Dictionary & kanji
-              </div>
-              <button
-                onClick={generateKanjiInsight}
-                disabled={!geminiKey}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
-              >
-                <IconSpark className="w-4 h-4" />
-                {kanjiLoading ? 'Cancel' : 'AI kanji'}
-              </button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {dictionaryLinks.map((link) => (
-                <a
-                  key={link.id}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 text-sm text-stone-600 dark:text-stone-300 transition animate-fade-in"
-                >
-                  {link.label}
-                </a>
-              ))}
-            </div>
-            <div className="mt-3">
-              {selectedKanji.length ? (
-                <div className="flex flex-wrap gap-2">
-                  {selectedKanji.map((ch) => (
-                    <div
-                      key={ch}
-                      className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-955 px-3 py-2"
-                    >
-                      <div
-                        className="text-2xl font-bold text-stone-800 dark:text-stone-200"
-                        lang="ja"
-                      >
-                        {ch}
-                      </div>
-                      <div className="mt-1 flex gap-1.5">
-                        {kanjiDictionaryLinks(ch).map((link) => (
-                          <a
-                            key={link.id}
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] text-indigo-605 hover:text-indigo-805 dark:text-indigo-400"
-                          >
-                            {link.label}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-xs text-stone-400">
-                  No kanji in this dictionary form. Use the dictionary links for kana-only usage
-                  notes.
-                </div>
-              )}
-            </div>
-            {!geminiKey && (
-              <div className="mt-2 text-xs text-stone-400">
-                Gemini is not configured for kanji meaning and readings details.
-              </div>
-            )}
-            {kanjiErr && <div className="mt-2 text-sm text-rose-600">{kanjiErr}</div>}
-            {kanjiText && (
-              <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans border-t border-stone-100 dark:border-stone-800 pt-3 max-h-80 overflow-y-auto">
-                {kanjiText}
-              </div>
-            )}
-          </div>
-        )}
-
-        {showAdvancedReference && (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
-            <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
-                <IconPen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                Handwriting & Stroke
-              </div>
-              <button
-                onClick={generateWritingGuide}
-                disabled={!geminiKey}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
-              >
-                <IconSpark className="w-4 h-4" />
-                {writingLoading ? 'Cancel' : 'AI writing'}
-              </button>
-            </div>
-            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {writingUnits.map((unit, i) => (
-                <div
-                  key={unit.ch + '-' + i}
-                  className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-955 p-2"
-                >
-                  <div className="relative aspect-square rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 overflow-hidden flex items-center justify-center">
-                    <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-stone-200 dark:border-stone-800" />
-                    <div className="absolute inset-y-0 left-1/2 border-l border-dashed border-stone-200 dark:border-stone-800" />
-                    <div
-                      className="relative text-5xl sm:text-4xl font-semibold text-stone-805 dark:text-stone-205 leading-none"
-                      lang="ja"
-                    >
-                      {unit.ch}
-                    </div>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wider text-stone-400 font-semibold">
-                      {unit.type}
-                    </span>
-                    <div className="flex flex-wrap justify-end gap-1">
-                      {unit.links.map((link) => (
-                        <a
-                          key={link.id}
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[11px] text-indigo-605 hover:text-indigo-805 dark:text-indigo-400"
-                        >
-                          {link.label}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 grid sm:grid-cols-3 gap-2">
-              {writingDrill.map((step, i) => (
-                <div
-                  key={step}
-                  className="rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-955 px-3 py-2 text-xs leading-relaxed text-stone-605 dark:text-stone-300"
-                >
-                  <span className="font-semibold text-stone-800 dark:text-stone-200">{i + 1}.</span>{' '}
-                  {step}
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 text-xs text-stone-400">
-              KanjiVG opens animated stroke data when available; Jisho is included as a second
-              reference. For kana-only, use the grid as trace-and-cover.
-            </div>
-            {!geminiKey && (
-              <div className="mt-2 text-xs text-stone-400">Gemini is not configured.</div>
-            )}
-            {writingErr && <div className="mt-2 text-sm text-rose-600">{writingErr}</div>}
-            {writingText && (
-              <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 border-t border-stone-100 dark:border-stone-800 pt-3 font-sans max-h-80 overflow-y-auto">
-                {writingText}
-              </div>
-            )}
-          </div>
-        )}
-
-        {showAdvancedReference && (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
-            <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
-                <IconVolume className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                Pronunciation lab
-              </div>
-              <button
-                onClick={generateAccentGuide}
-                disabled={!geminiKey}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center gap-1.5 transition"
-              >
-                <IconSpark className="w-4 h-4" />
-                {accentLoading ? 'Cancel' : 'AI accent'}
-              </button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {selectedMorae.map((m, i) => (
-                <span
-                  key={m + '-' + i}
-                  className="min-w-8 px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-955 text-center text-lg text-stone-850 dark:text-stone-150"
-                  lang="ja"
-                >
-                  {m}
-                </span>
-              ))}
-            </div>
-            <div className="mt-3 grid sm:grid-cols-3 gap-2">
-              <button
-                onClick={() => speakJapaneseLocal(selected.reading)}
-                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm inline-flex items-center justify-center gap-1.5 text-stone-700 dark:text-stone-300 font-medium transition"
-              >
-                <IconVolume className="w-4 h-4" />
-                Word
-              </button>
-              <button
-                onClick={() => {
-                  if (typeof window === 'undefined' || !window.speechSynthesis) return;
-                  window.speechSynthesis.cancel();
-                  const u = new SpeechSynthesisUtterance(selected.reading);
-                  u.lang = 'ja-JP';
-                  u.rate = 0.62;
-                  window.speechSynthesis.speak(u);
-                }}
-                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm inline-flex items-center justify-center gap-1.5 text-stone-700 dark:text-stone-300 font-medium transition"
-              >
-                <IconVolume className="w-4 h-4" />
-                Slow
-              </button>
-              <button
-                onClick={() => speakJapaneseLocal(pronunciationForms.join('、'))}
-                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm inline-flex items-center justify-center gap-1.5 text-stone-700 dark:text-stone-300 font-medium transition"
-              >
-                <IconVolume className="w-4 h-4" />
-                Forms
-              </button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {pronunciationForms.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => speakJapaneseLocal(f)}
-                  className="px-2.5 py-1.5 rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-850 text-sm text-stone-800 dark:text-stone-200 transition"
-                  lang="ja"
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-            {!geminiKey && (
-              <div className="mt-2 text-xs text-stone-400">
-                Gemini is not configured for Tokyo accent coaching.
-              </div>
-            )}
-            {accentErr && <div className="mt-2 text-sm text-rose-600">{accentErr}</div>}
-            {accentText && (
-              <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 border-t border-stone-100 dark:border-stone-800 pt-3 font-sans max-h-80 overflow-y-auto">
-                {accentText}
-              </div>
-            )}
-          </div>
-        )}
-
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-stone-50 dark:bg-stone-950 text-stone-500 dark:text-stone-400 text-xs uppercase tracking-wider">
@@ -1597,12 +932,6 @@ export default function ReferenceViewSub({
                           className="px-5 py-4 border-t border-stone-100 dark:border-stone-800 space-y-2.5"
                         >
                           <div className="sm:hidden">{renderReferenceRowActions(r, true)}</div>
-                          <PitchAccentSection
-                            word={selected}
-                            kanaText={r.answer}
-                            geminiKey={geminiKey}
-                            practicePrefs={practicePrefs}
-                          />
                           <ConjugationBreakdown
                             word={selected}
                             type={r.type.id}
@@ -1618,33 +947,6 @@ export default function ReferenceViewSub({
             </tbody>
           </table>
         </div>
-
-        {showAdvancedReference && (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-4 text-left">
-            <div className="flex items-center justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-stone-950 dark:text-stone-50">
-                <IconSpark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                AI examples
-              </div>
-              <button
-                onClick={generateExamples}
-                disabled={!geminiKey}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm transition"
-              >
-                {aiLoading ? 'Cancel' : 'Generate'}
-              </button>
-            </div>
-            {!geminiKey && (
-              <div className="mt-2 text-xs text-stone-400">Gemini is not configured.</div>
-            )}
-            {aiErr && <div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
-            {aiText && (
-              <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-stone-705 dark:text-stone-300 font-sans border-t border-stone-105 dark:border-stone-800 pt-3">
-                {aiText}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

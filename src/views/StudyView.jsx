@@ -21,7 +21,6 @@ import {
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import KanaInputPad from '../components/KanaInputPad.jsx';
-import { PitchAccentSection } from '../components/PitchAccent.jsx';
 import { ContextExamplePanel } from '../components/ContextExamplePanel.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import { ChatPanel } from '../components/ChatPanel.jsx';
@@ -3145,12 +3144,6 @@ export default function StudyView() {
                         </div>
                       </>
                     )}
-                    <PitchAccentSection
-                      word={current.verb}
-                      kanaText={expected}
-                      geminiKey={geminiKey}
-                      practicePrefs={practicePrefs}
-                    />
                     {wasCorrect && practicePrefs.autoAdvanceCorrect && (
                       <div className="text-xs text-emerald-700 mt-2">Next card coming up...</div>
                     )}

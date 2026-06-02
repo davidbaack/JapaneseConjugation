@@ -83,7 +83,7 @@ describe('estimateStorageBytes', () => {
     const store = makeQuotaStore();
     globalThis.localStorage = store;
     store.setItem('jp-verb-srs-v2', 'abcd');
-    store.setItem('katachiya_ai_pitch_cache', 'ef');
+    store.setItem('katachiya_ai_explanations_cache', 'ef');
     store.setItem('unrelated', 'should-not-count');
     // (4+12)*2 + (24+2)*2 ... we only assert it counts app keys and ignores others.
     const bytes = estimateStorageBytes();
@@ -100,12 +100,10 @@ describe('clearAICache', () => {
     const store = makeQuotaStore();
     globalThis.localStorage = store;
     store.setItem('katachiya_ai_explanations_cache', '1');
-    store.setItem('katachiya_ai_pitch_cache', '2');
     store.setItem('katachiya_ai_sentence_cache', '3');
     store.setItem('jp-verb-srs-v2', 'keep');
     clearAICache();
     expect(store._map.has('katachiya_ai_explanations_cache')).toBe(false);
-    expect(store._map.has('katachiya_ai_pitch_cache')).toBe(false);
     expect(store._map.has('katachiya_ai_sentence_cache')).toBe(false);
     expect(store._map.get('jp-verb-srs-v2')).toBe('keep');
   });

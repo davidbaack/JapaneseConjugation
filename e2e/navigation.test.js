@@ -68,18 +68,18 @@ test.describe('Tab navigation', () => {
     await expect(page.getByText('127/127')).toBeVisible();
   });
 
-  test('library lookup keeps advanced reference tools collapsed by default', async ({ page }) => {
+  test('library lookup omits advanced reference tools', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
     await page.locator('nav').getByRole('tab', { name: 'library', exact: true }).click();
 
     await expect(page.getByRole('tab', { name: /Lookup/ })).toBeVisible();
-    await expect(page.getByText('Advanced reference tools')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Show tools' })).toHaveCount(0);
+    await expect(page.getByText('Advanced reference tools')).toHaveCount(0);
     await expect(page.getByText('Dictionary & kanji')).toHaveCount(0);
-
-    await page.getByRole('button', { name: 'Show tools' }).click();
-    await expect(page.getByText('Dictionary & kanji')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Hide tools' })).toBeVisible();
+    await expect(page.getByText('Handwriting & Stroke')).toHaveCount(0);
+    await expect(page.getByText('Pronunciation lab')).toHaveCount(0);
+    await expect(page.getByText('AI examples')).toHaveCount(0);
   });
 });
