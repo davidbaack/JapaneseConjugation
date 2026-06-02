@@ -263,6 +263,7 @@ export function practicePrefsForTodayDrill(prefs = DEFAULT_PREFS, plan) {
     minimalPairReturn: null,
     reviewLimit: 0,
     reviewLimitSource: '',
+    practicePath: '',
     wordListIds: plan?.wordKeys?.length ? [TODAY_DRILL_LIST_ID] : [],
   };
 }

@@ -97,6 +97,7 @@ describe('today drill planner', () => {
       minimalPairSetId: '',
       reviewLimit: 0,
       reviewLimitSource: '',
+      practicePath: '',
       wordListIds: [TODAY_DRILL_LIST_ID],
     });
     expect(prefs.drillMode).toBeUndefined();

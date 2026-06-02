@@ -29,6 +29,7 @@ export const DEFAULT_PREFS = {
   newCardsPerDay: 0,
   reviewLimit: 0,
   reviewLimitSource: '',
+  practicePath: '',
   jlptLevels: ['N5', 'N4', 'N3', 'N2', 'N1'],
   genkiLessons: [],
   minnaLessons: [],

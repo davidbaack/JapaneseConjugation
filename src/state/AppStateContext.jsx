@@ -27,6 +27,10 @@ import {
   TODAY_DRILL_LIST_ID,
   upsertTodayDrillList,
 } from '../utils/todayDrill.js';
+import {
+  buildPracticalCorePath,
+  practicePrefsForPracticalCorePath,
+} from '../utils/practicalCorePath.js';
 
 // Centralized global app state (improvement #6). All the SRS/customs/prefs
 // state, the hydration + cloud-sync effects, theme/voice wiring, and the
@@ -339,9 +343,15 @@ function useAppController() {
     () => buildTodayDrillPlan(state, allWords, practicePrefs, wordLists, { builtInWords }),
     [state, allWords, practicePrefs, wordLists, builtInWords],
   );
+  const practicalCorePath = useMemo(
+    () => buildPracticalCorePath(state, allWords, practicePrefs, wordLists, { builtInWords }),
+    [state, allWords, practicePrefs, wordLists, builtInWords],
+  );
   const todayKey = localDateKey();
   const todayGoalHit = daily.date === todayKey && !!daily.goalHit;
   const todayDrillActive = isTodayDrillPractice(practicePrefs);
+  const practicalCorePathActive =
+    todayDrillActive && practicePrefs.practicePath === 'practical-core';
   const activeSrsQueue = useMemo(() => {
     if (srsQueue.date !== todayKey) {
       return { date: todayKey, dueRuleIds: [], completedDueRuleIds: [], startedAt: null };
@@ -388,6 +398,31 @@ function useAppController() {
       session: { ...(prev.session || {}), mistakePatterns: {} },
     }));
     setPracticePrefs((prev) => practicePrefsForTodayDrill(prev, drillPlan));
+    setSrsQueue({
+      date: localDateKey(),
+      dueRuleIds: [...(drillPlan.dueRuleIds || [])],
+      completedDueRuleIds: [],
+      startedAt: Date.now(),
+    });
+    setStudyFocus(null);
+    setTab('study');
+    return true;
+  }
+
+  function startPracticalCorePath(path = practicalCorePath) {
+    const corePath = path || practicalCorePath;
+    const drillPlan = corePath?.plan;
+    if (!drillPlan?.available) return false;
+    try {
+      sessionStorage.removeItem('jp-study-current');
+    } catch {}
+    setWordLists((prev) => upsertTodayDrillList(prev, drillPlan));
+    setState((prev) => ({
+      ...prev,
+      enabledTypes: drillPlan.typeIds,
+      session: { ...(prev.session || {}), mistakePatterns: {} },
+    }));
+    setPracticePrefs((prev) => practicePrefsForPracticalCorePath(prev, drillPlan));
     setSrsQueue({
       date: localDateKey(),
       dueRuleIds: [...(drillPlan.dueRuleIds || [])],
@@ -450,10 +485,13 @@ function useAppController() {
     daily,
     dailyPct,
     todayPlan,
+    practicalCorePath,
     todayGoalHit,
     todayDrillActive,
+    practicalCorePathActive,
     srsQueue: activeSrsQueue,
     startTodayDrill,
+    startPracticalCorePath,
     markSrsQueueCompleted,
   };
 }

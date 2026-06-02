@@ -9,7 +9,7 @@ vi.mock('../state/AppStateContext.jsx', () => ({
   useApp: () => mockedApp.value,
 }));
 
-import { SRSQueueBar } from '../App.jsx';
+import { PracticalCorePathPanel, SRSQueueBar } from '../App.jsx';
 
 function appState(overrides = {}) {
   return {
@@ -31,8 +31,39 @@ function appState(overrides = {}) {
     },
     todayGoalHit: false,
     todayDrillActive: false,
+    practicalCorePathActive: false,
     srsQueue: { dueRuleIds: [], completedDueRuleIds: [], startedAt: null },
     startTodayDrill: vi.fn(),
+    practicalCorePath: {
+      available: true,
+      activeStageId: 'foundations',
+      activeStage: {
+        id: 'foundations',
+        label: 'Foundations',
+        focus: 'Past, negative, polite, and te-form',
+      },
+      completeStages: 0,
+      totalProgressPct: 0,
+      stages: [
+        {
+          id: 'foundations',
+          label: 'Foundations',
+          stats: { complete: false, progressPct: 0 },
+        },
+        {
+          id: 'everyday',
+          label: 'Everyday production',
+          stats: { complete: false, progressPct: 0 },
+        },
+        {
+          id: 'fluency',
+          label: 'Mixed fluency',
+          stats: { complete: false, progressPct: 0 },
+        },
+      ],
+      plan: { available: true, typeIds: ['plain-past'], wordKeys: ['godan:\u8d70\u308b'] },
+    },
+    startPracticalCorePath: vi.fn(),
     ...overrides,
   };
 }
@@ -106,5 +137,37 @@ describe('SRSQueueBar', () => {
 
     expect(app.setTab).toHaveBeenCalledWith('study');
     expect(app.startTodayDrill).not.toHaveBeenCalled();
+  });
+
+  it('starts the Practical Core Path from Study', () => {
+    const app = appState({ tab: 'study' });
+    mockedApp.value = app;
+
+    render(<PracticalCorePathPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start Core Path' }));
+
+    expect(app.startPracticalCorePath).toHaveBeenCalledWith(app.practicalCorePath);
+  });
+
+  it('returns to Study when the Practical Core Path is already active', () => {
+    const app = appState({ tab: 'study', practicalCorePathActive: true });
+    mockedApp.value = app;
+
+    render(<PracticalCorePathPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue path' }));
+
+    expect(app.setTab).toHaveBeenCalledWith('study');
+    expect(app.startPracticalCorePath).not.toHaveBeenCalled();
+  });
+
+  it('hides the Practical Core Path panel outside Study', () => {
+    const app = appState({ tab: 'library' });
+    mockedApp.value = app;
+
+    render(<PracticalCorePathPanel />);
+
+    expect(screen.queryByText('Practical Core Path')).toBeNull();
   });
 });
