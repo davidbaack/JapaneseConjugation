@@ -198,6 +198,58 @@ describe('App shell', () => {
     expect(screen.queryByText('Gemini is not configured for AI chat.')).toBeNull();
   }, 15000);
 
+  it('shows correct-answer rationale expanded without a More toggle', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          enabledTypes: ['plain-past'],
+          daily: {
+            date: localDateKey(),
+            count: DEFAULT_PREFS.dailyGoal,
+            goalHit: true,
+            goalStreak: 1,
+            bestGoalStreak: 1,
+            currentAnswerStreak: 0,
+            bestAnswerStreak: 0,
+          },
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: '\u8a71\u3059',
+        group: 'godan',
+        type: 'plain-past',
+        word: {
+          dict: '\u8a71\u3059',
+          reading: '\u306f\u306a\u3059',
+          meaning: 'to speak',
+          group: 'godan',
+        },
+      }),
+    );
+
+    render(<App />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'hanashita' } });
+    const checkButton = screen.queryByRole('button', { name: 'Check (Enter)' });
+    if (checkButton) fireEvent.click(checkButton);
+
+    await screen.findAllByText('Correct!', {}, { timeout: 5000 });
+    const rationale = screen.getByText('Why this is right');
+    expect(rationale.closest('details')).toBeNull();
+    expect(screen.getByText(/Dictionary Form -> Plain Past transformation/)).toBeTruthy();
+    expect(screen.queryByText('More')).toBeNull();
+  }, 15000);
+
   it('mounts every tab without hitting the error boundary', async () => {
     render(<App />);
     // Each nav button's accessible name is its catalog label.
