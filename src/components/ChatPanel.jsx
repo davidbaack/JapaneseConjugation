@@ -7,6 +7,10 @@ import { isAdjective } from '../utils/conjugator.js';
 import { GROUP_NAMES, explainItem } from '../utils/conjugatorExplain.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 
+const INLINE_MARKDOWN_RE = /(`[^`]+`|\*\*[\s\S]+?\*\*|__[\s\S]+?__)/g;
+const LIST_ITEM_RE = /^\s*(?:[-*+]|\d+[.)])\s+(.+)$/;
+const ORDERED_LIST_ITEM_RE = /^\s*\d+[.)]\s+/;
+
 function feedbackNoteFor(prefs) {
   return (prefs.aiFeedbackLevel || DEFAULT_PREFS.aiFeedbackLevel) === 'expert'
     ? 'Use the configured Expert JP feedback style; romaji only for the most important forms.'
@@ -53,6 +57,81 @@ export function buildCoachContext(
   const exp = explainItem(verb, type);
   const task = taskOverride || `${ti.label} (${ti.hint})`;
   return `I'm practicing Japanese conjugation and want step-by-step hints. IMPORTANT: do NOT tell me the final answer — coach me toward it.\n\n${label}: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: transform to ${task}\nWhat I've typed so far: ${toHiragana(userAnswer) || userAnswer || '(nothing yet)'}\nHow this form is built: ${exp.rule || 'apply the standard rule for this form'}${exp.note ? ' ' + exp.note : ''}\n\nTell me what to do for the next step only, then wait for me. Never reveal the whole answer. ${feedbackNote}`;
+}
+
+function renderInlineMarkdown(text, keyPrefix) {
+  const parts = String(text).split(INLINE_MARKDOWN_RE).filter(Boolean);
+  return parts.map((part, index) => {
+    const key = `${keyPrefix}-${index}`;
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return (
+        <code
+          key={key}
+          className="rounded bg-stone-100 px-1 py-0.5 font-mono text-[0.92em] text-stone-800 dark:bg-stone-950 dark:text-stone-100"
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
+    const strong =
+      (part.startsWith('**') && part.endsWith('**')) ||
+      (part.startsWith('__') && part.endsWith('__'));
+    if (strong) {
+      return (
+        <strong key={key} className="font-semibold text-stone-950 dark:text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    return part;
+  });
+}
+
+function renderAssistantBlock(block, blockIndex) {
+  const lines = block
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const listItems = lines.map((line) => line.match(LIST_ITEM_RE));
+  const isList = lines.length > 0 && listItems.every(Boolean);
+
+  if (isList) {
+    const ordered = lines.every((line) => ORDERED_LIST_ITEM_RE.test(line));
+    const ListTag = ordered ? 'ol' : 'ul';
+    return (
+      <ListTag
+        key={blockIndex}
+        className={`${ordered ? 'list-decimal' : 'list-disc'} space-y-1 pl-5`}
+      >
+        {listItems.map((match, lineIndex) => (
+          <li key={lineIndex}>{renderInlineMarkdown(match[1], `${blockIndex}-${lineIndex}`)}</li>
+        ))}
+      </ListTag>
+    );
+  }
+
+  return (
+    <p key={blockIndex}>
+      {lines.map((line, lineIndex) => (
+        <React.Fragment key={lineIndex}>
+          {lineIndex > 0 && <br />}
+          {renderInlineMarkdown(line, `${blockIndex}-${lineIndex}`)}
+        </React.Fragment>
+      ))}
+    </p>
+  );
+}
+
+function AssistantMessage({ content }) {
+  const blocks = String(content)
+    .replace(/\r\n?/g, '\n')
+    .trim()
+    .split(/\n{2,}/)
+    .filter((block) => block.trim());
+
+  return <div className="space-y-3">{blocks.map(renderAssistantBlock)}</div>;
 }
 
 export function ChatPanel({
@@ -203,10 +282,9 @@ export function ChatPanel({
         {display.map((m, i) => (
           <div
             key={i}
-            style={{ whiteSpace: 'pre-wrap' }}
-            className={`text-sm px-3 py-2 rounded-lg leading-relaxed ${m.role === 'assistant' ? 'bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-100' : 'bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/50 text-indigo-900 dark:text-indigo-200 ml-6 text-right'}`}
+            className={`text-sm px-3 py-2 rounded-lg leading-relaxed break-words ${m.role === 'assistant' ? 'bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-100' : 'whitespace-pre-wrap bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/50 text-indigo-900 dark:text-indigo-200 ml-6 text-right'}`}
           >
-            {m.content}
+            {m.role === 'assistant' ? <AssistantMessage content={m.content} /> : m.content}
           </div>
         ))}
         {loading && display.length > 0 && (
