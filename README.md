@@ -1,26 +1,22 @@
 # Katachiya - Japanese Conjugation SRS
 
-Katachiya is a React/Vite app for practicing Japanese verb and adjective conjugation. It combines SRS review, transformation drills, lookup/reference tools, timed practice, learner stats, optional Gemini coaching through Supabase, and installable PWA behavior.
+Katachiya is a React/Vite app for focused Japanese verb and adjective conjugation practice. It centers the daily SRS loop, quick conjugation checking, lightweight lookup, custom practice words, optional speech support, and installable PWA behavior.
 
 ## Current App Surface
 
-The app is organized around these top-level tabs:
+The app is organized around a deliberately small top-level surface:
 
-- **Study** - SRS flashcards for word, sentence, and Transform practice. Supports forward, reverse, and mixed directions; free input, guided kana, multiple choice, and self-check answer modes; romaji-to-kana conversion; an on-screen kana pad; live kana feedback; deterministic step hints; speech playback; and optional AI clue/chat support.
-- **Conjugation Check** - identifies typed conjugated verbs or adjectives from romaji, kana, or kanji input, then shows the dictionary word, matching form, near misses, pronunciation, and handoffs into Reference or targeted Study practice.
-- **Which Group?** - drills group recognition before conjugation, covering verb classes and adjective classes with per-group accuracy and optional AI explanations.
-- **Endings** - the Ending Lab for rapid te-form/plain-past sound-change practice and plain/polite register switching, with pattern stats, hints, pronunciation, and optional AI memory hooks.
-- **Games** - currently opens Kotoba Rush, a timed typing drill with rapid prompts, combo scoring, and the same configured vocabulary/form filters as the rest of practice.
-- **Insights** - combines overview stats, skill radar, readiness/form accuracy, SRS level breakdowns, mistake history, retests, transformation accuracy, and minimal-pair progress.
-- **Library** - includes reverse lookup, reference tables, lessons, favorites, weak-form drills, word lists, custom verbs/adjectives, vocab pack imports, AI list generation, Anki TSV export, vocab CSV export, and CSV/TSV bulk import.
-- **Settings** - controls answer modes, prompt forms, daily goals, theme, display scripts, furigana, kana feedback, English hints, speech voice, JLPT/Genki/Minna filters, word groups, word lists, form packs, cloud sync, backup/restore, and progress reset.
+- **Practice** - the daily conjugation loop with SRS cards, input/choice/self-check/speech answer modes, romaji-to-kana conversion, an on-screen kana pad, live kana feedback, deterministic hints, lightweight progress, and mistake retest entry.
+- **Check** - identifies typed conjugated verbs or adjectives from romaji, kana, or kanji input, then shows the dictionary word, matching form, near misses, pronunciation, and handoffs into targeted Practice.
+- **Library** - keeps lookup and custom practice words close to the drill loop. Lookup offers search, reverse form matching, form tables, basic pronunciation, and `Drill word`; Words lets learners add custom verbs/adjectives without import/export or reference-lab tooling in the main UI.
+- **Settings** - keeps only core practice defaults visible: answer mode, daily goal, display script/furigana, sound, voice, and one form-scope selector.
 
 ## Practice Scope
 
 - Built-in starter vocabulary: 30 verbs and 25 adjectives.
 - Word classes: ichidan, godan, suru, kuru, irregular adjective, i-adjective, and na-adjective.
 - Lesson/filter lanes: JLPT N5-N1, 23 Genki lessons, and 50 Minna no Nihongo lessons.
-- Conjugation coverage: 127 selectable form types grouped into packs such as Core, Basics, Everyday Expansion, Advanced Patterns, Compound Challenge, and All forms.
+- Conjugation coverage: 127 internal form types, surfaced to learners through focused packs such as Basics, Core, Advanced Patterns, and Weak mix.
 - Form groups include basic tenses, te-form/stem, volitional/desire, potential, conditionals, progressive, commands/requests, passive, causative, causative-passive, keigo, special forms, and adjectives.
 - Minimal-pair/review support covers contrasts such as ichidan vs godan ru-verbs, i-adjective vs na-adjective, passive vs potential, godan sound-change clusters, and causative vs passive.
 

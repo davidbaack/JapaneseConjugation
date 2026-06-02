@@ -17,22 +17,16 @@ afterEach(() => {
 });
 
 describe('App shell', () => {
-  it('renders the header, subtitle, and full nav', async () => {
+  it('renders the header, subtitle, and simplified nav', async () => {
     render(<App />);
     expect(screen.getByRole('heading', { name: /Katachiya/ })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: /Japanese Conjugation SRS/ })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Conjugation Practice/ })).toBeTruthy();
     // Nav labels (accessible name is the catalog string; CSS only capitalizes).
-    for (const label of [
-      'study',
-      'Conjugation Check',
-      'Which Group?',
-      'Endings',
-      'games',
-      'insights',
-      'library',
-      'settings',
-    ]) {
+    for (const label of ['Practice', 'Check', 'Library', 'Settings']) {
       expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
+    }
+    for (const removed of ['Which Group?', 'Endings', 'games', 'insights']) {
+      expect(screen.queryByRole('tab', { name: removed, exact: true })).toBeNull();
     }
   });
 
@@ -253,21 +247,30 @@ describe('App shell', () => {
   it('mounts every tab without hitting the error boundary', async () => {
     render(<App />);
     // Each nav button's accessible name is its catalog label.
-    const labels = [
-      'study',
-      'Conjugation Check',
-      'Which Group?',
-      'Endings',
-      'games',
-      'insights',
-      'library',
-      'settings',
-    ];
+    const labels = ['Practice', 'Check', 'Library', 'Settings'];
     for (const label of labels) {
       fireEvent.click(screen.getByRole('tab', { name: label, exact: true }));
       // Each view lazy-loads; wait until its chunk resolves (nav stays mounted).
       await waitFor(() => expect(screen.queryByText('Something went wrong')).toBeNull());
       expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
     }
+  });
+
+  it('keeps Library focused on Lookup and Words with a direct drill handoff', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Library', exact: true }));
+
+    await screen.findByText('Lookup and words for practice.', {}, { timeout: 5000 });
+    expect(screen.getByRole('tab', { name: /^Lookup/i })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /^Words/i })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: 'Lessons', exact: true })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Lists', exact: true })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Custom words', exact: true })).toBeNull();
+    expect(screen.queryByText('AI disambiguate')).toBeNull();
+    expect(screen.queryByText('Scratch conjugator')).toBeNull();
+    expect(screen.queryByText('Copy table')).toBeNull();
+
+    const drillWord = await screen.findByRole('button', { name: 'Drill word' });
+    expect(drillWord).toBeTruthy();
   });
 });

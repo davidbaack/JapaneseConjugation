@@ -23,6 +23,7 @@ export default function CustomDictionaryViewSub({
   customAdjectives,
   setCustomAdjectives,
   geminiKey,
+  aiToolsEnabled = true,
   state,
 }) {
   const [dictTab, setDictTab] = useState('verbs');
@@ -48,6 +49,7 @@ export default function CustomDictionaryViewSub({
   const lookupCancelledRef = useRef(false);
 
   const isAdj = dictTab === 'adjectives';
+  const geminiAvailable = aiToolsEnabled && !!geminiKey;
   const starterWords = isAdj ? STARTER_ADJECTIVES : STARTER_VERBS;
   const customWords = isAdj ? customAdjectives : customVerbs;
   const setCustomWords = isAdj ? setCustomAdjectives : setCustomVerbs;
@@ -65,7 +67,7 @@ export default function CustomDictionaryViewSub({
   const visibleWords = virtualize ? allWords.slice(start, end) : allWords;
 
   async function fetchSugg(wordsList) {
-    if (!geminiKey) return;
+    if (!geminiAvailable) return;
     const gen = ++suggGen.current;
     const wlist = wordsList || allWords;
     setSuggLoading(true);
@@ -93,7 +95,7 @@ export default function CustomDictionaryViewSub({
     if (geminiKey) fetchSugg();
     // fetchSugg is defined inline without useCallback — adding it would cause infinite re-runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geminiKey, dictTab]);
+  }, [geminiAvailable, dictTab]);
 
   function resetAdd() {
     setShowAdd(false);
@@ -145,7 +147,7 @@ export default function CustomDictionaryViewSub({
     const newCustom = [...customWords, word];
     setCustomWords(newCustom);
     resetAdd();
-    if (geminiKey) fetchSugg([...starterWords, ...newCustom]);
+    if (geminiAvailable) fetchSugg([...starterWords, ...newCustom]);
   }
 
   function addManual() {
@@ -219,7 +221,7 @@ export default function CustomDictionaryViewSub({
           </button>
         </div>
 
-        {geminiKey && (
+        {geminiAvailable && (
           <div className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium">
@@ -280,7 +282,7 @@ export default function CustomDictionaryViewSub({
             <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">
               Add {isAdj ? 'an adjective' : 'a verb'}
             </h3>
-            {geminiKey ? (
+            {geminiAvailable ? (
               addPhase !== 'confirming' ? (
                 <div className="space-y-2">
                   <div className="flex gap-2">
@@ -367,9 +369,6 @@ export default function CustomDictionaryViewSub({
               )
             ) : (
               <div className="space-y-3">
-                <p className="text-xs text-amber-705 bg-amber-50 dark:bg-amber-955/20 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2">
-                  Gemini is not configured for AI lookup and suggestions.
-                </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-stone-500 block mb-1">Dictionary form</label>

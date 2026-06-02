@@ -7,16 +7,12 @@
 // carry their exact casing.
 export default {
   'app.title': 'Katachiya',
-  'app.subtitle': 'Japanese Conjugation SRS',
+  'app.subtitle': 'Conjugation Practice',
 
-  'nav.study': 'study',
-  'nav.check': 'Conjugation Check',
-  'nav.classify': 'Which Group?',
-  'nav.endings': 'Endings',
-  'nav.games': 'games',
-  'nav.insights': 'insights',
-  'nav.library': 'library',
-  'nav.settings': 'settings',
+  'nav.study': 'Practice',
+  'nav.check': 'Check',
+  'nav.library': 'Library',
+  'nav.settings': 'Settings',
 
   'header.session': '{correct}/{reviewed} this session',
   'header.today': '{count}/{goal} today',

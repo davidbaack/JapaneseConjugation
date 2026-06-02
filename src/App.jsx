@@ -1,25 +1,29 @@
 import React, { Suspense } from 'react';
-import { IconCloud } from './components/Icons.jsx';
+import { IconCloud, IconSettings } from './components/Icons.jsx';
 import AuthModal from './components/AuthModal.jsx';
 import ViewSkeleton from './components/Skeleton.jsx';
 import UpdatePrompt from './components/UpdatePrompt.jsx';
 import { t } from './i18n/index.js';
 import { AppStateProvider, useApp } from './state/AppStateContext.jsx';
 import { useTablist } from './components/useTablist.js';
+import { typeIdFromCardId } from './utils/storage.js';
+import {
+  aggregateDiagnosedMistakes,
+  buildRepairDrillPlan,
+  repairPrefsForPlan,
+  upsertRepairWordList,
+} from './utils/mistakeDiagnosis.js';
 
 // Views — lazy-loaded so each gets its own chunk. Each view sources what it
 // needs from the central app state via useApp(), so the shell renders them
 // without prop-drilling.
 const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
 const CheckView = React.lazy(() => import('./views/CheckView.jsx'));
-const GamesView = React.lazy(() => import('./views/GamesView.jsx'));
-const EndingsView = React.lazy(() => import('./views/EndingsView.jsx'));
-const ClassificationView = React.lazy(() => import('./views/ClassificationView.jsx'));
-const InsightsView = React.lazy(() => import('./views/InsightsView.jsx'));
 const LibraryView = React.lazy(() => import('./views/LibraryView.jsx'));
 const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 
-const TABS = ['study', 'check', 'classify', 'endings', 'games', 'insights', 'library', 'settings'];
+const PRIMARY_TABS = ['study', 'check', 'library'];
+const TABS = [...PRIMARY_TABS, 'settings'];
 
 export function SRSQueueBar() {
   const {
@@ -323,6 +327,92 @@ export function PracticalCorePathPanel() {
   );
 }
 
+export function PracticeProgressPanel() {
+  const {
+    tab,
+    state,
+    setState,
+    setTab,
+    allWords,
+    wordLists,
+    setWordLists,
+    practicePrefs,
+    setPracticePrefs,
+    daily,
+  } = useApp();
+
+  if (tab !== 'study') return null;
+
+  const openMistakes = (state.mistakes || []).filter((m) => !m.resolved);
+  const mistakePatterns = aggregateDiagnosedMistakes(openMistakes);
+  const weakTypeIds = new Set(openMistakes.map((m) => m.type).filter(Boolean));
+  for (const [cardId, card] of Object.entries(state.cards || {})) {
+    if ((card?.incorrect || 0) > 0) weakTypeIds.add(typeIdFromCardId(cardId));
+  }
+  weakTypeIds.delete('dictionary');
+  const canRetest = openMistakes.length > 0 && mistakePatterns.length > 0;
+
+  function launchMistakeRetest() {
+    if (!canRetest) {
+      setTab('study');
+      return;
+    }
+    const plan = buildRepairDrillPlan(mistakePatterns[0], allWords || []);
+    if (plan.wordKeys.length) {
+      setWordLists(upsertRepairWordList(wordLists, plan));
+    }
+    if (plan.typeIds.length) {
+      setState((prev) => ({ ...prev, enabledTypes: plan.typeIds }));
+    }
+    setPracticePrefs({
+      ...repairPrefsForPlan(practicePrefs, plan),
+      minimalPairSetId: '',
+      minimalPairReturn: null,
+    });
+    setTab('study');
+  }
+
+  const tiles = [
+    ['Today', `${daily.count || 0}/${practicePrefs.dailyGoal || 30}`],
+    ['Streak', daily.goalStreak ? `${daily.goalStreak} day` : '0 days'],
+    ['Weak forms', weakTypeIds.size],
+    ['Misses', openMistakes.length],
+  ];
+
+  return (
+    <section
+      aria-label="Practice progress"
+      className="mb-4 rounded-lg border border-stone-200 bg-white px-3 py-3 shadow-sm dark:border-stone-800 dark:bg-stone-900"
+    >
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {tiles.map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-950"
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-450 dark:text-stone-500">
+                {label}
+              </div>
+              <div className="mt-1 text-lg font-semibold tabular-nums text-stone-900 dark:text-stone-100">
+                {value}
+              </div>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={launchMistakeRetest}
+          disabled={!canRetest}
+          className="min-h-10 rounded-lg border border-stone-250 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-stone-850"
+        >
+          Retest misses
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function AppShell() {
   const { tab, setTab, showAuthModal, setShowAuthModal, supabase } = useApp();
 
@@ -349,7 +439,7 @@ function AppShell() {
           aria-label="App sections"
           className="mb-3 flex flex-wrap gap-1 rounded-xl border border-stone-200 bg-white p-1 dark:border-stone-800 dark:bg-stone-900"
         >
-          {TABS.map((id) => (
+          {PRIMARY_TABS.map((id) => (
             <button
               key={id}
               {...tabProps(id)}
@@ -363,17 +453,28 @@ function AppShell() {
               {t(`nav.${id}`)}
             </button>
           ))}
+          <button
+            type="button"
+            {...tabProps('settings')}
+            onClick={() => setTab('settings')}
+            aria-label={t('nav.settings')}
+            title={t('nav.settings')}
+            className={`inline-flex min-h-10 w-11 shrink-0 items-center justify-center rounded-lg transition ${
+              tab === 'settings'
+                ? 'bg-stone-800 text-white dark:bg-indigo-700'
+                : 'text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800'
+            }`}
+          >
+            <IconSettings className="h-4 w-4" />
+          </button>
         </nav>
         <PracticalCorePathPanel />
         <SRSQueueBar />
+        <PracticeProgressPanel />
         <Suspense fallback={<ViewSkeleton />}>
           <div {...panelProps(tab)}>
             {tab === 'study' && <StudyView />}
             {tab === 'check' && <CheckView />}
-            {tab === 'games' && <GamesView />}
-            {tab === 'endings' && <EndingsView />}
-            {tab === 'classify' && <ClassificationView />}
-            {tab === 'insights' && <InsightsView />}
             {tab === 'library' && <LibraryView />}
             {tab === 'settings' && <SettingsView />}
           </div>
