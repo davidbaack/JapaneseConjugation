@@ -29,6 +29,7 @@ import {
 } from '../utils/todayDrill.js';
 import {
   buildPracticalCorePath,
+  practicalCoreBaselineForPath,
   practicePrefsForPracticalCorePath,
 } from '../utils/practicalCorePath.js';
 
@@ -337,17 +338,22 @@ function useAppController() {
     () => [...allVerbs, ...allAdjectives, ...builtInNouns],
     [allVerbs, allAdjectives, builtInNouns],
   );
+  const todayKey = localDateKey();
   const daily = state.daily || defaultState().daily;
   const dailyPct = Math.min(100, Math.round((daily.count / (practicePrefs.dailyGoal || 30)) * 100));
   const todayPlan = useMemo(
     () => buildTodayDrillPlan(state, allWords, practicePrefs, wordLists, { builtInWords }),
     [state, allWords, practicePrefs, wordLists, builtInWords],
   );
+  const practicalCoreBaseline = srsQueue.date === todayKey ? srsQueue.practicalCoreBaseline : null;
   const practicalCorePath = useMemo(
-    () => buildPracticalCorePath(state, allWords, practicePrefs, wordLists, { builtInWords }),
-    [state, allWords, practicePrefs, wordLists, builtInWords],
+    () =>
+      buildPracticalCorePath(state, allWords, practicePrefs, wordLists, {
+        builtInWords,
+        practicalCoreBaseline,
+      }),
+    [state, allWords, practicePrefs, wordLists, builtInWords, practicalCoreBaseline],
   );
-  const todayKey = localDateKey();
   const todayGoalHit = daily.date === todayKey && !!daily.goalHit;
   const todayDrillActive = isTodayDrillPractice(practicePrefs);
   const practicalCorePathActive =
@@ -428,6 +434,7 @@ function useAppController() {
       dueRuleIds: [...(drillPlan.dueRuleIds || [])],
       completedDueRuleIds: [],
       startedAt: Date.now(),
+      practicalCoreBaseline: practicalCoreBaselineForPath(corePath),
     });
     setStudyFocus(null);
     setTab('study');

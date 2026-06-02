@@ -187,7 +187,7 @@ export function PracticalCorePathPanel() {
       className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-3 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/20"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <div className="text-xs font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
               Practical Core Path
@@ -202,23 +202,84 @@ export function PracticalCorePathPanel() {
           <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-300">
             {activeStage.focus}
           </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="mt-3 grid gap-2">
             {stages.map((stage, index) => {
               const active = stage.id === activeStage.id;
               const done = stage.stats.complete;
+              const session = stage.session || {};
+              const startProgressPct = Math.max(
+                0,
+                Math.min(100, session.startProgressPct ?? stage.stats.progressPct),
+              );
+              const progressDeltaPct = Math.max(
+                0,
+                Math.min(100 - startProgressPct, session.progressDeltaPct || 0),
+              );
+              const correctDelta = Math.max(0, session.correctDelta || 0);
               return (
-                <span
+                <div
                   key={stage.id}
-                  className={`rounded-md border px-2 py-1 text-[11px] font-medium ${
+                  aria-current={active ? 'step' : undefined}
+                  className={`rounded-md border px-2.5 py-2 ${
                     active
-                      ? 'border-emerald-300 bg-white text-emerald-800 dark:border-emerald-700 dark:bg-stone-950 dark:text-emerald-300'
+                      ? 'border-emerald-300 bg-white/95 dark:border-emerald-700 dark:bg-stone-950'
                       : done
-                        ? 'border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300'
-                        : 'border-stone-200 bg-white/70 text-stone-600 dark:border-stone-800 dark:bg-stone-950/50 dark:text-stone-300'
+                        ? 'border-emerald-200 bg-emerald-100/70 dark:border-emerald-900 dark:bg-emerald-950/30'
+                        : 'border-stone-200 bg-white/70 dark:border-stone-800 dark:bg-stone-950/50'
                   }`}
                 >
-                  {index + 1}. {stage.label} - {stage.stats.progressPct}%
-                </span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div
+                        className={`text-xs font-semibold ${
+                          active || done
+                            ? 'text-emerald-800 dark:text-emerald-300'
+                            : 'text-stone-700 dark:text-stone-200'
+                        }`}
+                      >
+                        {index + 1}. {stage.label}
+                      </div>
+                      <div className="mt-0.5 text-[11px] leading-snug text-stone-600 dark:text-stone-300">
+                        {stage.description || stage.focus}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right text-[11px] font-semibold tabular-nums text-stone-700 dark:text-stone-200">
+                      {stage.stats.progressPct}%
+                    </div>
+                  </div>
+                  <div
+                    role="progressbar"
+                    aria-label={`${stage.label} stage progress`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={stage.stats.progressPct}
+                    aria-valuetext={`${stage.stats.progressPct}% total, ${correctDelta} correct this session`}
+                    className="relative mt-2 h-2 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0 rounded-full bg-emerald-700/35 dark:bg-emerald-500/20"
+                      style={{ width: `${startProgressPct}%` }}
+                    />
+                    {progressDeltaPct > 0 && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-y-0 rounded-full bg-emerald-500 shadow-[0_0_0_1px_rgba(16,185,129,0.45)] dark:bg-emerald-300"
+                        style={{ left: `${startProgressPct}%`, width: `${progressDeltaPct}%` }}
+                      />
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-stone-500 dark:text-stone-400">
+                    <span>
+                      {correctDelta
+                        ? `+${correctDelta} correct this session`
+                        : 'No session gain yet'}
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {stage.stats.correct}/{stage.targetCorrect} correct
+                    </span>
+                  </div>
+                </div>
               );
             })}
           </div>

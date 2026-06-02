@@ -8,6 +8,7 @@ export const PRACTICAL_CORE_PATH_STAGES = [
     id: 'foundations',
     label: 'Foundations',
     focus: 'Past, negative, polite, and te-form',
+    description: 'Basic past, negative, polite, and te-form practice',
     targetCorrect: 12,
     typeIds: BASICS_TYPE_IDS,
   },
@@ -15,6 +16,7 @@ export const PRACTICAL_CORE_PATH_STAGES = [
     id: 'everyday',
     label: 'Everyday production',
     focus: 'Can, want to, if/when, ongoing',
+    description: "Can/cannot, want to, let's, if/when, and ongoing action",
     targetCorrect: 30,
     typeIds: LEARNER_DEFAULT_TYPE_IDS,
   },
@@ -22,10 +24,44 @@ export const PRACTICAL_CORE_PATH_STAGES = [
     id: 'fluency',
     label: 'Mixed fluency',
     focus: 'Due cards, weak forms, and Core review',
+    description: 'Due cards, weak forms, and mixed Core review',
     targetCorrect: 60,
     typeIds: LEARNER_DEFAULT_TYPE_IDS,
   },
 ];
+
+function clampPercent(value) {
+  const percent = Number(value);
+  if (!Number.isFinite(percent)) return 0;
+  return Math.max(0, Math.min(100, Math.round(percent)));
+}
+
+function cleanCount(value, fallback = 0) {
+  const count = Number(value);
+  if (!Number.isFinite(count)) return fallback;
+  return Math.max(0, Math.round(count));
+}
+
+function sessionStats(stats, baselineStage) {
+  const currentCorrect = cleanCount(stats.correct);
+  const currentProgressPct = clampPercent(stats.progressPct);
+  const baselineCorrect =
+    baselineStage && baselineStage.correct !== undefined
+      ? cleanCount(baselineStage.correct, currentCorrect)
+      : currentCorrect;
+  const baselineProgressPct =
+    baselineStage && baselineStage.progressPct !== undefined
+      ? clampPercent(baselineStage.progressPct)
+      : currentProgressPct;
+  const startCorrect = Math.min(currentCorrect, baselineCorrect);
+  const startProgressPct = Math.min(currentProgressPct, baselineProgressPct);
+
+  return {
+    startProgressPct,
+    progressDeltaPct: Math.max(0, currentProgressPct - startProgressPct),
+    correctDelta: Math.max(0, currentCorrect - startCorrect),
+  };
+}
 
 function stageStats(state = {}, stage) {
   const stageTypes = new Set(stage.typeIds);
@@ -81,6 +117,18 @@ export function practicePrefsForPracticalCorePath(prefs = DEFAULT_PREFS, plan) {
   };
 }
 
+export function practicalCoreBaselineForPath(path) {
+  if (!path?.stages?.length) return null;
+  return {
+    activeStageId: path.activeStageId || path.activeStage?.id || '',
+    stages: path.stages.map((stage) => ({
+      id: stage.id,
+      correct: cleanCount(stage.stats?.correct),
+      progressPct: clampPercent(stage.stats?.progressPct),
+    })),
+  };
+}
+
 export function buildPracticalCorePath(
   state,
   words,
@@ -88,10 +136,17 @@ export function buildPracticalCorePath(
   wordLists = [],
   options = {},
 ) {
-  const stages = PRACTICAL_CORE_PATH_STAGES.map((stage) => ({
-    ...stage,
-    stats: stageStats(state, stage),
-  }));
+  const baselineStages = new Map(
+    (options.practicalCoreBaseline?.stages || []).map((stage) => [stage.id, stage]),
+  );
+  const stages = PRACTICAL_CORE_PATH_STAGES.map((stage) => {
+    const stats = stageStats(state, stage);
+    return {
+      ...stage,
+      stats,
+      session: sessionStats(stats, baselineStages.get(stage.id)),
+    };
+  });
   const activeStage = stages.find((stage) => !stage.stats.complete) || stages[stages.length - 1];
   const planState = { ...(state || {}), enabledTypes: activeStage.typeIds };
   const planPrefs = practicalCorePrefs(prefs);

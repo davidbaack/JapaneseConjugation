@@ -3,6 +3,7 @@ import { BASICS_TYPE_IDS } from '../data/conjugationTypes.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import {
   buildPracticalCorePath,
+  practicalCoreBaselineForPath,
   practicePrefsForPracticalCorePath,
 } from '../utils/practicalCorePath.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
@@ -54,6 +55,11 @@ describe('practical core path', () => {
     expect(path.available).toBe(true);
     expect(path.plan.title).toBe('Practical Core Path');
     expect(path.plan.typeIds.every((typeId) => BASICS_TYPE_IDS.includes(typeId))).toBe(true);
+    expect(path.stages[0].session).toMatchObject({
+      startProgressPct: 0,
+      progressDeltaPct: 0,
+      correctDelta: 0,
+    });
   });
 
   it('advances to everyday production after enough foundation wins', () => {
@@ -71,6 +77,55 @@ describe('practical core path', () => {
     expect(path.activeStageId).toBe('everyday');
     expect(path.stages[0].stats.complete).toBe(true);
     expect(path.activeStage.typeIds).toContain('potential');
+  });
+
+  it('derives current-session stage gain from a Practical Core baseline', () => {
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardIdFor(TABERU, 'plain-past')]: reviewedCard(8),
+      },
+    };
+
+    const path = buildPracticalCorePath(state, [TABERU, HASHIRU, TAKAI], DEFAULT_PREFS, [], {
+      now: 10,
+      practicalCoreBaseline: {
+        activeStageId: 'foundations',
+        stages: [
+          { id: 'foundations', correct: 3, progressPct: 25 },
+          { id: 'everyday', correct: 0, progressPct: 0 },
+          { id: 'fluency', correct: 0, progressPct: 0 },
+        ],
+      },
+    });
+
+    expect(path.stages[0].stats.progressPct).toBe(67);
+    expect(path.stages[0].session).toMatchObject({
+      startProgressPct: 25,
+      progressDeltaPct: 42,
+      correctDelta: 5,
+    });
+  });
+
+  it('builds a session baseline from the current path progress', () => {
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardIdFor(TABERU, 'plain-past')]: reviewedCard(6),
+      },
+    };
+    const path = buildPracticalCorePath(state, [TABERU, HASHIRU, TAKAI], DEFAULT_PREFS, [], {
+      now: 10,
+    });
+
+    expect(practicalCoreBaselineForPath(path)).toMatchObject({
+      activeStageId: 'foundations',
+      stages: [
+        { id: 'foundations', correct: 6, progressPct: 50 },
+        { id: 'everyday', correct: 6, progressPct: 20 },
+        { id: 'fluency', correct: 6, progressPct: 10 },
+      ],
+    });
   });
 
   it('builds launcher prefs without preserving side drills', () => {

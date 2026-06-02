@@ -41,6 +41,7 @@ function appState(overrides = {}) {
         id: 'foundations',
         label: 'Foundations',
         focus: 'Past, negative, polite, and te-form',
+        description: 'Basic past, negative, polite, and te-form practice',
       },
       completeStages: 0,
       totalProgressPct: 0,
@@ -48,17 +49,29 @@ function appState(overrides = {}) {
         {
           id: 'foundations',
           label: 'Foundations',
-          stats: { complete: false, progressPct: 0 },
+          focus: 'Past, negative, polite, and te-form',
+          description: 'Basic past, negative, polite, and te-form practice',
+          targetCorrect: 12,
+          stats: { complete: false, correct: 0, progressPct: 0 },
+          session: { startProgressPct: 0, progressDeltaPct: 0, correctDelta: 0 },
         },
         {
           id: 'everyday',
           label: 'Everyday production',
-          stats: { complete: false, progressPct: 0 },
+          focus: 'Can, want to, if/when, ongoing',
+          description: "Can/cannot, want to, let's, if/when, and ongoing action",
+          targetCorrect: 30,
+          stats: { complete: false, correct: 0, progressPct: 0 },
+          session: { startProgressPct: 0, progressDeltaPct: 0, correctDelta: 0 },
         },
         {
           id: 'fluency',
           label: 'Mixed fluency',
-          stats: { complete: false, progressPct: 0 },
+          focus: 'Due cards, weak forms, and Core review',
+          description: 'Due cards, weak forms, and mixed Core review',
+          targetCorrect: 60,
+          stats: { complete: false, correct: 0, progressPct: 0 },
+          session: { startProgressPct: 0, progressDeltaPct: 0, correctDelta: 0 },
         },
       ],
       plan: { available: true, typeIds: ['plain-past'], wordKeys: ['godan:\u8d70\u308b'] },
@@ -148,6 +161,58 @@ describe('SRSQueueBar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start Core Path' }));
 
     expect(app.startPracticalCorePath).toHaveBeenCalledWith(app.practicalCorePath);
+  });
+
+  it('shows Practical Core Path stage bars with session gain', () => {
+    const app = appState({
+      tab: 'study',
+      practicalCorePath: {
+        ...appState().practicalCorePath,
+        totalProgressPct: 34,
+        stages: [
+          {
+            id: 'foundations',
+            label: 'Foundations',
+            focus: 'Past, negative, polite, and te-form',
+            description: 'Basic past, negative, polite, and te-form practice',
+            targetCorrect: 12,
+            stats: { complete: false, correct: 5, progressPct: 42 },
+            session: { startProgressPct: 25, progressDeltaPct: 17, correctDelta: 2 },
+          },
+          {
+            id: 'everyday',
+            label: 'Everyday production',
+            focus: 'Can, want to, if/when, ongoing',
+            description: "Can/cannot, want to, let's, if/when, and ongoing action",
+            targetCorrect: 30,
+            stats: { complete: false, correct: 5, progressPct: 17 },
+            session: { startProgressPct: 17, progressDeltaPct: 0, correctDelta: 0 },
+          },
+          {
+            id: 'fluency',
+            label: 'Mixed fluency',
+            focus: 'Due cards, weak forms, and Core review',
+            description: 'Due cards, weak forms, and mixed Core review',
+            targetCorrect: 60,
+            stats: { complete: false, correct: 5, progressPct: 8 },
+            session: { startProgressPct: 8, progressDeltaPct: 0, correctDelta: 0 },
+          },
+        ],
+      },
+    });
+    mockedApp.value = app;
+
+    render(<PracticalCorePathPanel />);
+
+    const foundationsBar = screen.getByRole('progressbar', {
+      name: 'Foundations stage progress',
+    });
+    expect(foundationsBar.getAttribute('aria-valuenow')).toBe('42');
+    expect(foundationsBar.getAttribute('aria-valuetext')).toBe('42% total, 2 correct this session');
+    expect(screen.getByText('Basic past, negative, polite, and te-form practice')).toBeTruthy();
+    expect(screen.getByText('+2 correct this session')).toBeTruthy();
+    expect(screen.getByText('5/12 correct')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Foundations/ })).toBeNull();
   });
 
   it('returns to Study when the Practical Core Path is already active', () => {
