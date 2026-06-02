@@ -22,19 +22,26 @@ export function buildContext(
   prefs = DEFAULT_PREFS,
   taskOverride = '',
   wasCorrected = false,
+  wasCorrect = false,
 ) {
   const ti = getTypeInfo(type);
   const label = isAdjective(verb) ? 'Adjective' : 'Verb';
   const feedbackNote = feedbackNoteFor(prefs);
   const task = taskOverride || `${ti.label} (${ti.hint})`;
-  const opener = wasCorrected
-    ? `I'm studying Japanese. I made a mistake mid-typing but self-corrected to the right answer — it still counts as wrong.`
-    : `I'm studying Japanese and just got this wrong.`;
+  const gotItRight = wasCorrect && !wasCorrected;
+  const opener = gotItRight
+    ? `I'm studying Japanese and just got this right.`
+    : wasCorrected
+      ? `I'm studying Japanese. I made a mistake mid-typing but self-corrected to the right answer — it still counts as wrong.`
+      : `I'm studying Japanese and just got this wrong.`;
   const answerLabel = wasCorrected ? 'My answer when I went wrong' : 'My answer';
   const correctedNote = wasCorrected
     ? `\nSelf-correction: I later typed the right answer before submitting, but the initial mistake counted.`
     : '';
-  return `${opener}\n\n${label}: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: ${task}\n${answerLabel}: ${toHiragana(userAnswer) || userAnswer || '(blank)'}\nCorrect: ${expected}${correctedNote}\n\nAuto-explanation: ${explanation.intro} ${explanation.rule}${explanation.derivation && explanation.derivation !== expected ? '\nStep: ' + explanation.derivation : ''}${explanation.note ? '\nNote: ' + explanation.note : ''}\n\nHelp me understand what I typed wrong and how to remember the right form. ${feedbackNote}`;
+  const reviewRequest = gotItRight
+    ? 'Help me understand why this answer is correct and how to remember this form.'
+    : 'Help me understand what I typed wrong and how to remember the right form.';
+  return `${opener}\n\n${label}: ${verb.dict} (${verb.reading}) — ${verb.meaning}\nType: ${GROUP_NAMES[verb.group]}\nTask: ${task}\n${answerLabel}: ${toHiragana(userAnswer) || userAnswer || '(blank)'}\nCorrect: ${expected}${correctedNote}\n\nAuto-explanation: ${explanation.intro} ${explanation.rule}${explanation.derivation && explanation.derivation !== expected ? '\nStep: ' + explanation.derivation : ''}${explanation.note ? '\nNote: ' + explanation.note : ''}\n\n${reviewRequest} ${feedbackNote}`;
 }
 
 // Context for the "Discuss further" chat opened while the student is still
@@ -66,6 +73,8 @@ export function ChatPanel({
   taskOverride = '',
   mode = 'review',
   wasCorrected = false,
+  wasCorrect = false,
+  reviewTone = 'rose',
 }) {
   const [apiHistory, setApiHistory] = useState([]);
   const [display, setDisplay] = useState([]);
@@ -87,6 +96,7 @@ export function ChatPanel({
             practicePrefs,
             taskOverride,
             wasCorrected,
+            wasCorrect,
           ),
     [
       verb,
@@ -98,6 +108,7 @@ export function ChatPanel({
       taskOverride,
       mode,
       wasCorrected,
+      wasCorrect,
     ],
   );
   /* eslint-enable react-hooks/exhaustive-deps */
@@ -105,6 +116,10 @@ export function ChatPanel({
     mode === 'coach'
       ? `${AI_SYSTEM} You are coaching a student who is still mid-answer: never reveal the full correct answer, and guide only the next single step.`
       : AI_SYSTEM;
+  const reviewBorderClass =
+    reviewTone === 'emerald'
+      ? 'border-emerald-200 dark:border-emerald-900/60'
+      : 'border-rose-200 dark:border-rose-900/60';
   /* eslint-disable react-hooks/exhaustive-deps */
   const systemText = useMemo(
     () => aiSystemFromPrefs(practicePrefs, baseSystem),
@@ -182,7 +197,7 @@ export function ChatPanel({
 
   return (
     <div
-      className={`mt-3 pt-3 border-t ${mode === 'coach' ? 'border-indigo-200 dark:border-indigo-800/40' : 'border-rose-200'}`}
+      className={`mt-3 pt-3 border-t ${mode === 'coach' ? 'border-indigo-200 dark:border-indigo-800/40' : reviewBorderClass}`}
     >
       <div className="text-xs font-medium text-stone-500 mb-2 flex items-center gap-1.5">
         <IconChat className="w-3.5 h-3.5" />
