@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Decision-Making Preference
+
+- Ask the user about any non-obvious decision rather than making the call yourself. When a choice is ambiguous, has trade-offs, or isn't clearly implied by the request, pause and ask before proceeding. This applies to all agents (Codex, Claude, and Gemini).
+
 ## Repo Workflow
 
 - For learner-facing product, UX, navigation, SRS, Library, Lessons, Practice Lab, Settings, or progress-language changes, read `.agents/app-experience.md` first. If a change goes against that design, ask the user before implementing it; when the user confirms a new direction, update `.agents/app-experience.md`.
