@@ -52,7 +52,7 @@ test.describe('App page-load smoke tests', () => {
     await page.waitForLoadState('networkidle');
 
     const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href');
-    expect(manifestHref).toBeTruthy();
+    if (!manifestHref) throw new Error('Missing web manifest link href');
 
     const manifestUrl = new URL(manifestHref, page.url()).toString();
     const manifestResponse = await page.request.get(manifestUrl);
@@ -85,6 +85,7 @@ test.describe('App page-load smoke tests', () => {
     expect(swResponse.headers()['content-type']).toContain('javascript');
 
     const appleTouchIcon = await page.locator('link[rel="apple-touch-icon"]').getAttribute('href');
+    if (!appleTouchIcon) throw new Error('Missing apple touch icon link href');
     expect(new URL(appleTouchIcon, page.url()).pathname).toBe(
       '/JapaneseConjugation/apple-touch-icon.png',
     );

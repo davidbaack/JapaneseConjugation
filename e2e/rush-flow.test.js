@@ -80,6 +80,8 @@ test.describe('Rush mode', () => {
     await page.getByPlaceholder('Type answer').fill('tabeta');
 
     await expect(page.getByText('OK').first()).toBeVisible();
-    await expect(page.getByText('\u305f\u3079\u305f \u00b7 combo 1', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('\u98df\u3079\u308b \u2192 \u305f\u3079\u305f', { exact: true }),
+    ).toBeVisible();
   });
 });
