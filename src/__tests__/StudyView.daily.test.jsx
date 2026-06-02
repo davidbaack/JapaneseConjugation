@@ -277,8 +277,6 @@ describe('StudyView daily startup guards', () => {
     expect(screen.queryByText('English hint hidden until review.')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Show hint', exact: true })).toBeNull();
     expect(screen.queryByRole('button', { name: 'AI clue', exact: true })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Hint', exact: true })).toBeTruthy();
   });
 
   it('shows English meaning after review even when default hidden', async () => {
@@ -416,7 +414,7 @@ describe('StudyView daily startup guards', () => {
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
   });
 
-  it('toggles typed live kana help from the Study answer box', async () => {
+  it('controls live kana help from the Study answer box', async () => {
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
     mockedApp.value = makeApp({
@@ -434,12 +432,16 @@ describe('StudyView daily startup guards', () => {
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     const helper = await screen.findByRole('group', { name: 'Live kana help' }, { timeout: 5000 });
-    const firstKana = Array.from(conjugateItem(target, type))[0];
+    const expectedKana = Array.from(conjugateItem(target, type));
+    const firstKana = expectedKana[0];
 
-    expect(within(helper).queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
-    fireEvent.change(input, { target: { value: 'ta' } });
+    fireEvent.click(within(helper).getByRole('button', { name: 'Reveal next kana' }));
     expect(within(helper).getByText(firstKana)).toBeTruthy();
-    expect(input.value).toBe('ta');
+    await waitFor(() => expect(input.value).toBe(firstKana));
+
+    fireEvent.change(input, { target: { value: 'ta' } });
+    fireEvent.click(within(helper).getByRole('button', { name: 'Reveal next kana' }));
+    await waitFor(() => expect(input.value).toBe(expectedKana.slice(0, 2).join('')));
 
     fireEvent.click(within(helper).getByRole('button', { name: 'Hide live kana help' }));
     expect(within(helper).getByRole('button', { name: 'Show live kana help' })).toBeTruthy();

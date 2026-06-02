@@ -1,11 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { IconCheck, IconVolume, IconRefresh } from '../components/Icons.jsx';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  IconList,
+  IconStar,
+  IconCheck,
+  IconVolume,
+  IconSpark,
+  IconRefresh,
+} from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
+import { kanaToRomaji } from '../utils/romaji.js';
 import { playPronunciation } from '../utils/speech.js';
 import { isAdjective } from '../utils/conjugator.js';
+import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { normalizeReferenceState } from '../utils/storage.js';
 import { formDisplay, promptDisplay } from '../utils/display.js';
+import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 import { ruMasuDiagnostic } from '../utils/ruVerbDiagnostics.js';
@@ -15,16 +25,28 @@ import { ruMasuDiagnostic } from '../utils/ruVerbDiagnostics.js';
 // this component uses directly.
 export * from '../utils/referenceHelpers.js';
 import {
+  FAVORITES_LIST_NAME,
   wordKeyLocal,
   searchWords,
   surfaceFormForLocal,
   formLookupCandidates,
+  adHocReferenceCandidates,
+  formRows,
   referenceRows,
+  findFavoritesList,
+  favoriteListHasWord,
+  toggleFavoriteInLists,
   focusWordInLists,
   focusPracticePrefsForWord,
   referenceWithSearch,
   referenceWithHistory,
   referenceWithSelected,
+  referenceRuleTarget,
+  compareReferenceRuleTarget,
+  referencePracticePrefsForTarget,
+  referenceWithWeakRule,
+  referenceHasWeakRule,
+  weakReferencePracticeTarget,
 } from '../utils/referenceHelpers.js';
 
 export default function ReferenceViewSub({
@@ -38,11 +60,18 @@ export default function ReferenceViewSub({
   practicePrefs = DEFAULT_PREFS,
   setPracticePrefs,
   setTab,
+  practiceWord,
 }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
   const [expandedRow, setExpandedRow] = useState(null);
+  const [scratchIndex, setScratchIndex] = useState(0);
+  const [copyTableOk, setCopyTableOk] = useState(false);
+  const [lookupAiText, setLookupAiText] = useState('');
+  const [lookupAiLoading, setLookupAiLoading] = useState(false);
+  const [lookupAiErr, setLookupAiErr] = useState('');
   const [favoriteMsg, setFavoriteMsg] = useState('');
+  const lookupAbortRef = useRef(null);
 
   const words = useMemo(() => [...verbs, ...adjectives], [verbs, adjectives]);
   const reference = normalizeReferenceState(state.reference);
@@ -54,20 +83,48 @@ export default function ReferenceViewSub({
     : null;
   const matches = useMemo(() => searchWords(query, words), [query, words]);
   const lookupMatches = useMemo(() => formLookupCandidates(query, words), [query, words]);
-  const showScratch = false;
-  const scratchCandidate = null;
-  const scratchRows = [];
+  const scratchCandidates = useMemo(() => adHocReferenceCandidates(query), [query]);
+  const scratchCandidate =
+    scratchCandidates[Math.min(scratchIndex, Math.max(0, scratchCandidates.length - 1))] || null;
+  const scratchMatchesKnown = !!(
+    scratchCandidate &&
+    words.some(
+      (w) =>
+        w.group === scratchCandidate.group &&
+        (w.dict === scratchCandidate.dict || w.reading === scratchCandidate.reading),
+    )
+  );
+  const showScratch = !!(query.trim() && scratchCandidate && !scratchMatchesKnown);
+  const scratchRows = showScratch ? formRows(scratchCandidate) : [];
+  const scratchMasuDiagnostic = showScratch ? ruMasuDiagnostic(scratchCandidate) : null;
   useEffect(() => {
     if (!selected || !words.some((w) => w.dict === selected.dict)) {
       setSelected(referenceSelectedWord || matches[0] || words[0] || null);
     }
   }, [matches, words, selected, referenceSelectedWord]);
 
+  useEffect(() => {
+    setLookupAiText('');
+    setLookupAiErr('');
+  }, [query]);
+
+  useEffect(() => {
+    setScratchIndex(0);
+  }, [query]);
+
   const rows = selected ? referenceRows(selected, state) : [];
   const selectedView = selected ? promptDisplay(selected, null, practicePrefs) : null;
   const selectedMasuDiagnostic = selected ? ruMasuDiagnostic(selected) : null;
   const masteredRows = rows.filter((r) => r.progress.status === 'mastered').length;
   const dueRows = rows.filter((r) => r.progress.status === 'due').length;
+  const favoritesList = findFavoritesList(wordLists);
+  const selectedFavorited = favoriteListHasWord(wordLists, selected);
+  const favoriteCount = (favoritesList?.wordKeys || []).length;
+  const weakRuleCount = reference.weakRules.length;
+
+  useEffect(() => {
+    setCopyTableOk(false);
+  }, [selected?.dict, selected?.group]);
 
   useEffect(() => {
     setExpandedRow(null);
@@ -99,6 +156,36 @@ export default function ReferenceViewSub({
     return !!(selected && word && selected.dict === word.dict && selected.group === word.group);
   }
 
+  function toggleFavorite() {
+    if (!selected || !setWordLists) return;
+    const result = toggleFavoriteInLists(wordLists, selected);
+    setWordLists(result.wordLists);
+    setFavoriteMsg(
+      result.favorited
+        ? `Added to ${FAVORITES_LIST_NAME}.`
+        : `Removed from ${FAVORITES_LIST_NAME}.`,
+    );
+  }
+
+  function useFavoritesForDrill() {
+    if (!setPracticePrefs) return;
+    let list = findFavoritesList(wordLists);
+    let nextLists = wordLists;
+    if (!list && selected && setWordLists) {
+      const result = toggleFavoriteInLists(wordLists, selected);
+      nextLists = result.wordLists;
+      list = findFavoritesList(nextLists);
+      setWordLists(nextLists);
+    }
+    if (!list) return;
+    const selectedIds = practicePrefs.wordListIds || [];
+    setPracticePrefs({
+      ...practicePrefs,
+      wordListIds: selectedIds.includes(list.id) ? selectedIds : [...selectedIds, list.id],
+    });
+    setFavoriteMsg(`${list.name || FAVORITES_LIST_NAME} will be used in drills.`);
+  }
+
   function drillSelectedWord() {
     if (!selected || !setWordLists || !setPracticePrefs) return;
     const result = focusWordInLists(wordLists, selected);
@@ -106,6 +193,226 @@ export default function ReferenceViewSub({
     setPracticePrefs(focusPracticePrefsForWord(practicePrefs, selected));
     setFavoriteMsg(`Drilling only ${selected.dict}.`);
     if (setTab) setTab('study');
+  }
+
+  function applyReferencePracticeTarget(target, sourceWord = selected) {
+    if (!target || !setPracticePrefs) return;
+    const typeIds = target.typeIds?.length ? target.typeIds : [target.typeId].filter(Boolean);
+    setPracticePrefs(referencePracticePrefsForTarget(practicePrefs, target));
+    setState((prev) => {
+      const remembered = sourceWord
+        ? referenceWithSelected(referenceWithHistory(prev.reference, sourceWord), sourceWord)
+        : normalizeReferenceState(prev.reference);
+      return {
+        ...prev,
+        enabledTypes: typeIds.length ? typeIds : prev.enabledTypes,
+        reference: remembered,
+      };
+    });
+  }
+
+  function drillReferenceRow(row) {
+    if (!selected || !row) return;
+    const target = referenceRuleTarget(selected, row.type);
+    applyReferencePracticeTarget(target);
+    setFavoriteMsg(`Drilling ${target?.label || row.type.label}.`);
+    if (practiceWord) {
+      practiceWord(selected, row.type.id, {
+        source: 'reference',
+        launchMode: 'drill',
+        returnTo: 'reference',
+        referenceLabel: target?.label || row.type.label,
+      });
+    } else if (setTab) {
+      setTab('study');
+    }
+  }
+
+  function compareReferenceRow(row) {
+    if (!selected || !row) return;
+    const target = compareReferenceRuleTarget(selected, row.type);
+    applyReferencePracticeTarget(target);
+    setFavoriteMsg(`Comparing ${target?.typeIds?.length || 1} nearby forms.`);
+    if (practiceWord) {
+      practiceWord(selected, row.type.id, {
+        source: 'reference',
+        launchMode: 'compare',
+        returnTo: 'reference',
+        referenceLabel: target?.label || row.type.label,
+      });
+    } else if (setTab) {
+      setTab('study');
+    }
+  }
+
+  function addReferenceWeakRule(row) {
+    if (!selected || !row) return;
+    const target = referenceRuleTarget(selected, row.type);
+    setState((prev) => ({
+      ...prev,
+      reference: referenceWithWeakRule(
+        referenceWithSelected(referenceWithHistory(prev.reference, selected), selected),
+        target,
+      ),
+    }));
+    setFavoriteMsg(`${target?.label || row.type.label} added to weak forms.`);
+  }
+
+  function drillWeakReferenceRules() {
+    const target = weakReferencePracticeTarget(reference);
+    if (!target) return;
+    applyReferencePracticeTarget(target);
+    setFavoriteMsg(`Drilling ${target.label}.`);
+    const seedType = selected
+      ? target.typeIds.find((id) =>
+          isAdjective(selected) ? id.startsWith('adj-') : !id.startsWith('adj-'),
+        )
+      : null;
+    if (practiceWord && selected && target.groups.includes(selected.group) && seedType) {
+      practiceWord(selected, seedType, {
+        source: 'reference',
+        launchMode: 'weak',
+        returnTo: 'reference',
+        referenceLabel: target.label,
+      });
+    } else if (setTab) {
+      setTab('study');
+    }
+  }
+
+  function renderReferenceRowActions(row, mobile = false) {
+    const target = selected ? referenceRuleTarget(selected, row.type) : null;
+    const added = referenceHasWeakRule(reference, target);
+    const buttonBase = mobile
+      ? 'flex-1 min-w-[7rem] px-3 py-2 rounded-lg border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition'
+      : 'h-8 w-8 rounded-lg border inline-flex items-center justify-center transition';
+    const quiet =
+      'border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800';
+    return (
+      <div className={`flex ${mobile ? 'flex-wrap' : 'flex-nowrap'} gap-1.5`}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            drillReferenceRow(row);
+          }}
+          className={`${buttonBase} bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 border-stone-850 dark:border-stone-200`}
+          title={`Drill ${row.type.label}`}
+          aria-label={`Drill ${row.type.label}`}
+        >
+          <IconRefresh className="w-3.5 h-3.5" />
+          <span className={mobile ? '' : 'sr-only'}>Drill</span>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            compareReferenceRow(row);
+          }}
+          className={`${buttonBase} ${quiet}`}
+          title={`Compare ${row.type.label}`}
+          aria-label={`Compare ${row.type.label}`}
+        >
+          <IconList className="w-3.5 h-3.5" />
+          <span className={mobile ? '' : 'sr-only'}>Compare</span>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            addReferenceWeakRule(row);
+          }}
+          className={`${buttonBase} ${
+            added
+              ? 'bg-amber-50 border-amber-250 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-300'
+              : quiet
+          }`}
+          title={`Add ${row.type.label} to weak forms`}
+          aria-label={`Add ${row.type.label} to weak forms`}
+        >
+          <IconStar className="w-3.5 h-3.5" />
+          <span className={mobile ? '' : 'sr-only'}>{added ? 'Added' : 'Weak'}</span>
+        </button>
+      </div>
+    );
+  }
+
+  async function copyTable() {
+    if (!selected || !rows.length) return;
+    const header = ['Word', 'Reading', 'Meaning', 'Group', 'Form', 'Answer', 'Romaji', 'Rule'].join(
+      '\t',
+    );
+    const body = rows.map((r) =>
+      [
+        selected.dict,
+        selected.reading,
+        selected.meaning,
+        GROUP_NAMES[selected.group] || selected.group,
+        r.type.label,
+        r.answer,
+        kanaToRomaji(r.answer),
+        r.explanation.rule,
+      ].join('\t'),
+    );
+    const text = [header, ...body].join('\n');
+    try {
+      let copied = false;
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      } else {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.left = '-9999px';
+        document.body.appendChild(area);
+        area.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(area);
+      }
+      if (copied) {
+        setCopyTableOk(true);
+        setTimeout(() => setCopyTableOk(false), 1800);
+      }
+    } catch {}
+  }
+
+  async function explainLookup() {
+    if (!query.trim() || !geminiKey || !lookupMatches.length) return;
+    if (lookupAiLoading) {
+      lookupAbortRef.current?.abort();
+      lookupAbortRef.current = null;
+      setLookupAiLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    lookupAbortRef.current = controller;
+    setLookupAiLoading(true);
+    setLookupAiErr('');
+    setLookupAiText('');
+    try {
+      const candidates = lookupMatches
+        .slice(0, 6)
+        .map(
+          (m, i) =>
+            `${i + 1}. ${m.surface} / ${m.answer} = ${m.word.dict} (${m.word.reading}), ${m.type.label}, ${GROUP_NAMES[m.word.group]}, ${m.word.meaning}, ${m.matchKind}`,
+        )
+        .join('\n');
+      const prompt = `A Japanese learner searched this conjugated form or sentence fragment: "${query}".\n\nLocal reverse-conjugation candidates:\n${candidates}\n\nRank the likely intended candidate, explain the conjugation rule briefly, mention any ambiguity, and give one tiny practice prompt.`;
+      const reply = await callGemini(
+        [{ role: 'user', parts: [{ text: prompt }] }],
+        geminiKey,
+        900,
+        0.25,
+        aiSystemFromPrefs(practicePrefs, AI_COACH_SYSTEM),
+      );
+      if (!controller.signal.aborted) setLookupAiText(reply);
+    } catch (e) {
+      if (!controller.signal.aborted) setLookupAiErr(e.message || 'AI lookup failed.');
+    }
+    if (!controller.signal.aborted) setLookupAiLoading(false);
+    lookupAbortRef.current = null;
   }
 
   function speakJapaneseLocal(text) {
@@ -118,6 +425,7 @@ export default function ReferenceViewSub({
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 overflow-hidden flex flex-col">
         <div className="p-3 border-b border-stone-105 dark:border-stone-800">
           <div className="relative">
+            <IconList className="w-4 h-4 absolute left-3 top-2.5 text-stone-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -126,7 +434,7 @@ export default function ReferenceViewSub({
               }}
               placeholder="Search word or form"
               aria-label="Search for a word or conjugation form"
-              className="w-full px-3 py-2 text-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-lg focus:border-indigo-500 focus:outline-none transition"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-lg focus:border-indigo-500 focus:outline-none transition"
               autoCorrect="off"
               spellCheck="false"
             />
@@ -256,7 +564,76 @@ export default function ReferenceViewSub({
                 </div>
               ) : (
                 <div className="mt-2 text-xs text-stone-400">
-                  No local form match yet. Try a dictionary form, kana, or romaji.
+                  No local form match yet. Try a dictionary form, romaji, or paste the sentence into
+                  Scanner.
+                </div>
+              )}
+              <button
+                onClick={explainLookup}
+                disabled={!geminiKey || !lookupMatches.length}
+                className="mt-2 w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm inline-flex items-center justify-center gap-1.5 transition"
+              >
+                <IconSpark className="w-4 h-4" />
+                {lookupAiLoading ? 'Cancel' : 'AI disambiguate'}
+              </button>
+              {!geminiKey && (
+                <div className="mt-1 text-[11px] text-stone-400 text-center">
+                  Gemini is not configured for contextual ranking.
+                </div>
+              )}
+              {lookupAiErr && <div className="mt-2 text-xs text-rose-600">{lookupAiErr}</div>}
+              {lookupAiText && (
+                <div className="mt-2 text-xs leading-relaxed whitespace-pre-wrap text-stone-700 dark:text-stone-300 max-h-72 overflow-y-auto">
+                  {lookupAiText}
+                </div>
+              )}
+              {showScratch && (
+                <div className="mt-3 rounded-xl border border-indigo-150 bg-indigo-50/60 dark:bg-indigo-950/20 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs uppercase tracking-wider text-indigo-750 font-medium">
+                      Scratch conjugator
+                    </div>
+                    <span className="text-xs rounded-full bg-white dark:bg-stone-800 px-2 py-0.5 text-indigo-700 dark:text-indigo-300">
+                      {groupDisplayLabel(scratchCandidate.group)}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
+                    Local table for{' '}
+                    <span className="font-semibold text-stone-800 dark:text-stone-200" lang="ja">
+                      {scratchCandidate.dict}
+                    </span>
+                    . {scratchCandidate.sourceNote}
+                  </div>
+                  {scratchMasuDiagnostic && (
+                    <div className="mt-2 border-l-2 border-indigo-300 dark:border-indigo-700 pl-3 text-xs text-stone-600 dark:text-stone-350">
+                      <span className="font-semibold text-indigo-750 dark:text-indigo-300">
+                        Masu check:{' '}
+                      </span>
+                      <span lang="ja" className="font-semibold text-stone-800 dark:text-stone-100">
+                        {scratchMasuDiagnostic.dict}
+                        {' -> '}
+                        {scratchMasuDiagnostic.politeSurface}
+                      </span>
+                      <span className="ml-1">{scratchMasuDiagnostic.contrast}</span>
+                    </div>
+                  )}
+                  {scratchCandidates.length > 1 && (
+                    <div className="mt-2 flex gap-1.5">
+                      {scratchCandidates.map((c, i) => (
+                        <button
+                          key={c.group}
+                          onClick={() => setScratchIndex(i)}
+                          className={`px-2 py-1 rounded-lg border text-[11px] transition ${
+                            scratchCandidate.group === c.group
+                              ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:text-white dark:border-indigo-600'
+                              : 'bg-white border-indigo-100 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:text-stone-400'
+                          }`}
+                        >
+                          {groupDisplayLabel(c.group)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -280,6 +657,9 @@ export default function ReferenceViewSub({
                     <ScriptDisplay view={wv} className="" subClassName="text-xs text-stone-500" />
                   </div>
                   <span className="text-[11px] text-stone-400 inline-flex items-center gap-1 font-semibold">
+                    {favoriteListHasWord(wordLists, w) && (
+                      <IconStar className="w-3 h-3 text-amber-500" />
+                    )}
                     {isAdjective(w) ? 'adj' : 'verb'}
                   </span>
                 </div>
@@ -403,6 +783,40 @@ export default function ReferenceViewSub({
                   Drill word
                 </button>
                 <button
+                  onClick={toggleFavorite}
+                  className={`px-3 py-2 border rounded-lg text-sm inline-flex items-center gap-1.5 transition ${
+                    selectedFavorited
+                      ? 'bg-amber-50 border-amber-250 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900'
+                      : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 text-stone-600 dark:text-stone-300'
+                  }`}
+                >
+                  <IconStar className="w-4 h-4" />
+                  {selectedFavorited ? 'Favorited' : 'Favorite'}
+                </button>
+                <button
+                  onClick={useFavoritesForDrill}
+                  disabled={!favoriteCount && !selected}
+                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 disabled:opacity-40 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
+                >
+                  <IconList className="w-4 h-4" />
+                  Drill favorites
+                </button>
+                <button
+                  onClick={drillWeakReferenceRules}
+                  disabled={!weakRuleCount || !setPracticePrefs}
+                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 disabled:opacity-40 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
+                >
+                  <IconStar className="w-4 h-4" />
+                  Drill weak forms
+                </button>
+                <button
+                  onClick={copyTable}
+                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
+                >
+                  <IconList className="w-4 h-4" />
+                  {copyTableOk ? 'Copied' : 'Copy table'}
+                </button>
+                <button
                   onClick={() => speakJapaneseLocal(selected.reading)}
                   className="p-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-stone-500"
                   title="Speak"
@@ -412,10 +826,22 @@ export default function ReferenceViewSub({
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-stone-550">
+              <span
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 ${selectedFavorited ? 'bg-amber-50 text-amber-700' : 'bg-stone-50 text-stone-500'}`}
+              >
+                <IconStar className="w-3.5 h-3.5" />
+                {favoriteCount} favorite{favoriteCount === 1 ? '' : 's'}
+              </span>
               <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-emerald-50 text-emerald-700">
                 <IconCheck className="w-3.5 h-3.5" />
                 {masteredRows}/{rows.length} forms mastered
               </span>
+              {!!weakRuleCount && (
+                <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-amber-50 text-amber-750">
+                  <IconStar className="w-3.5 h-3.5" />
+                  {weakRuleCount} weak form{weakRuleCount === 1 ? '' : 's'}
+                </span>
+              )}
               {!!dueRows && (
                 <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-amber-50 text-amber-750">
                   {dueRows} due
@@ -436,6 +862,7 @@ export default function ReferenceViewSub({
                 <th className="px-4 py-2 text-left font-medium">Answer</th>
                 <th className="px-4 py-2 text-left font-medium">Progress</th>
                 <th className="px-4 py-2 text-left font-medium hidden md:table-cell">Rule</th>
+                <th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
@@ -494,13 +921,17 @@ export default function ReferenceViewSub({
                       <td className="px-4 py-2 text-xs text-stone-550 hidden md:table-cell text-left">
                         {r.explanation.rule}
                       </td>
+                      <td className="px-4 py-2 hidden sm:table-cell">
+                        {renderReferenceRowActions(r)}
+                      </td>
                     </tr>
                     {expanded && (
                       <tr className="bg-stone-50/50 dark:bg-stone-950/20">
                         <td
-                          colSpan="4"
+                          colSpan="5"
                           className="px-5 py-4 border-t border-stone-100 dark:border-stone-800 space-y-2.5"
                         >
+                          <div className="sm:hidden">{renderReferenceRowActions(r, true)}</div>
                           <ConjugationBreakdown
                             word={selected}
                             type={r.type.id}

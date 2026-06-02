@@ -1,21 +1,38 @@
 import React, { useState } from 'react';
 import ReferenceViewSub from './ReferenceViewSub.jsx';
+import LessonsView from './LessonsView.jsx';
+import ListsViewSub from './ListsViewSub.jsx';
 import CustomDictionaryViewSub from './CustomDictionaryViewSub.jsx';
 import { useTablist } from '../components/useTablist.js';
-import { IconBook, IconPen } from '../components/Icons.jsx';
+import { IconBook, IconSpark, IconList, IconPen } from '../components/Icons.jsx';
 import { useApp } from '../state/AppStateContext.jsx';
 
-const LIBRARY_SECTIONS = [
+const PRIMARY_SECTIONS = [
   {
     id: 'reference',
     label: 'Lookup',
-    desc: 'Search a word or form, then launch practice.',
+    desc: 'Search forms and launch targeted practice.',
     Icon: IconBook,
   },
   {
-    id: 'words',
-    label: 'Words',
-    desc: 'Add custom practice words.',
+    id: 'lessons',
+    label: 'Lessons',
+    desc: 'Rules, traps, and examples.',
+    Icon: IconSpark,
+  },
+];
+
+const MANAGEMENT_SECTIONS = [
+  {
+    id: 'lists',
+    label: 'Lists',
+    desc: 'Decks and exports.',
+    Icon: IconList,
+  },
+  {
+    id: 'dictionary',
+    label: 'Custom words',
+    desc: 'Your verbs and adjectives.',
     Icon: IconPen,
   },
 ];
@@ -39,8 +56,9 @@ export default function LibraryView() {
     practiceWord,
   } = useApp();
   const [subTab, setSubTab] = useState('reference');
+  const sections = [...PRIMARY_SECTIONS, ...MANAGEMENT_SECTIONS];
   const { tabProps, panelProps } = useTablist(
-    LIBRARY_SECTIONS.map((t) => t.id),
+    sections.map((t) => t.id),
     subTab,
     setSubTab,
   );
@@ -54,15 +72,15 @@ export default function LibraryView() {
               Library
             </div>
             <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
-              Lookup and words for practice.
+              Rules and forms for the next drill.
             </h2>
           </div>
-          <div className="text-sm text-stone-550 dark:text-stone-400">Find, add, drill.</div>
+          <div className="text-sm text-stone-550 dark:text-stone-400">Lookup, learn, drill.</div>
         </div>
 
         <div role="tablist" aria-label="Library sections" className="mt-4 space-y-3">
           <div className="grid sm:grid-cols-2 gap-2">
-            {LIBRARY_SECTIONS.map((section) => {
+            {PRIMARY_SECTIONS.map((section) => {
               const active = subTab === section.id;
               const SectionIcon = section.Icon;
               return (
@@ -97,6 +115,32 @@ export default function LibraryView() {
               );
             })}
           </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3 dark:border-stone-800">
+            <span className="text-xs uppercase tracking-wider text-stone-450 dark:text-stone-500">
+              Manage
+            </span>
+            {MANAGEMENT_SECTIONS.map((section) => {
+              const active = subTab === section.id;
+              const SectionIcon = section.Icon;
+              return (
+                <button
+                  key={section.id}
+                  {...tabProps(section.id)}
+                  onClick={() => setSubTab(section.id)}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                    active
+                      ? 'border-indigo-300 bg-indigo-50 text-indigo-750 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300'
+                      : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-350 dark:hover:bg-stone-850'
+                  }`}
+                  title={section.desc}
+                >
+                  <SectionIcon className="w-4 h-4" />
+                  {section.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -117,14 +161,28 @@ export default function LibraryView() {
             focused
           />
         )}
-        {subTab === 'words' && (
+        {subTab === 'lessons' && <LessonsView />}
+        {subTab === 'lists' && (
+          <ListsViewSub
+            words={[...verbs, ...adjectives]}
+            customVerbs={customVerbs}
+            setCustomVerbs={setCustomVerbs}
+            customAdjectives={customAdjectives}
+            setCustomAdjectives={setCustomAdjectives}
+            wordLists={wordLists}
+            setWordLists={setWordLists}
+            practicePrefs={practicePrefs}
+            setPracticePrefs={setPracticePrefs}
+            geminiKey={geminiKey}
+          />
+        )}
+        {subTab === 'dictionary' && (
           <CustomDictionaryViewSub
             customVerbs={customVerbs}
             setCustomVerbs={setCustomVerbs}
             customAdjectives={customAdjectives}
             setCustomAdjectives={setCustomAdjectives}
             geminiKey={geminiKey}
-            aiToolsEnabled={false}
             state={state}
           />
         )}

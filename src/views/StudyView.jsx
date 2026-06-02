@@ -541,6 +541,7 @@ export default function StudyView() {
   const [hintRevealed, setHintRevealed] = useState(false);
   const [coachChatOpen, setCoachChatOpen] = useState(false);
   const [coachSeedAnswer, setCoachSeedAnswer] = useState('');
+  const [coachRevealed, setCoachRevealed] = useState(0);
   const [greenRevealed, setGreenRevealed] = useState(0);
   const [revealedMiss, setRevealedMiss] = useState(false);
   const [reviewChoiceLabel, setReviewChoiceLabel] = useState('');
@@ -852,6 +853,7 @@ export default function StudyView() {
   }, [current, phase, practicePrefs.autoSpeak, practicePrefs.voiceURI]);
 
   useEffect(() => {
+    setCoachRevealed(0);
     setGreenRevealed(0);
   }, [current?.id, answerMode]);
 
@@ -1131,7 +1133,7 @@ export default function StudyView() {
   const preview = coachPreview;
   const holdKanaFeedback = phase === 'answering' && !hadKanaMistakeRef.current;
   const coachCells = guidedKana
-    ? kanaCoachCells(expected, answer, 0, holdKanaFeedback, greenRevealed)
+    ? kanaCoachCells(expected, answer, coachRevealed, holdKanaFeedback, greenRevealed)
     : [];
   const coachWrongIndex = coachCells.findIndex((c) => c.state === 'wrong');
   const coachTypedCount = Array.from(coachProgress).length;
@@ -1145,7 +1147,7 @@ export default function StudyView() {
           ? 'Extra kana after the answer.'
           : '';
   const liveCells = liveKana
-    ? kanaCoachCells(expected, answer, 0, holdKanaFeedback, greenRevealed)
+    ? kanaCoachCells(expected, answer, coachRevealed, holdKanaFeedback, greenRevealed)
     : [];
   const liveWrongIndex = liveCells.findIndex((c) => c.state === 'wrong' || c.state === 'extra');
   const liveStatus =
@@ -1158,7 +1160,9 @@ export default function StudyView() {
         : '';
   const reviewAnswerSource = phase === 'reviewing' && submittedAnswer ? submittedAnswer : answer;
   const reviewKanaCells =
-    typedAnswerMode && !reverseDrill ? kanaCoachCells(expected, reviewAnswerSource, 0) : [];
+    typedAnswerMode && !reverseDrill
+      ? kanaCoachCells(expected, reviewAnswerSource, coachRevealed)
+      : [];
 
   function nextMinimalPairProgress(correct) {
     return recordMinimalPairResult(
@@ -1254,6 +1258,7 @@ export default function StudyView() {
     setAnswer('');
     setPhase('answering');
     setChatOpen(false);
+    setCoachRevealed(0);
     setGreenRevealed(0);
     setRevealedMiss(false);
     setReviewChoiceLabel('');
@@ -1303,6 +1308,19 @@ export default function StudyView() {
     if (reveal) setHintRevealed(true);
   }
 
+  function revealNextKana() {
+    if (!current || reverseDrill || phase !== 'answering') return;
+    const expectedChars = Array.from(expected);
+    if (!expectedChars.length) return;
+    const typedCount = Array.from(toHiraganaProgress(answer)).length;
+    const nextCount = Math.min(expectedChars.length, Math.max(coachRevealed, typedCount) + 1);
+    setLiveKanaVisible(true);
+    setCoachRevealed(nextCount);
+    setGreenRevealed((prev) => Math.max(prev, nextCount));
+    setAnswer(expectedChars.slice(0, nextCount).join(''));
+    focusAnswerInput();
+  }
+
   // Opens a continuous AI chat for deeper help, seeded with the current
   // attempt. Snapshot the typed answer so the chat doesn't re-init on keypress.
   function openCoachChat() {
@@ -1333,6 +1351,7 @@ export default function StudyView() {
     setReviewBase(state.session?.reviewed || 0);
     setChatOpen(false);
     setAnswer('');
+    setCoachRevealed(0);
     setGreenRevealed(0);
     setRevealedMiss(false);
     setReviewChoiceLabel('');
@@ -1361,6 +1380,7 @@ export default function StudyView() {
     if (phase === 'reviewing') {
       setChatOpen(false);
       setAnswer('');
+      setCoachRevealed(0);
       setRevealedMiss(false);
       setReviewChoiceLabel('');
       setSelfCheckOpen(false);
@@ -1490,6 +1510,7 @@ export default function StudyView() {
         autoAdvanceRef.current = null;
         setChatOpen(false);
         setAnswer('');
+        setCoachRevealed(0);
         setRevealedMiss(false);
         setReviewChoiceLabel('');
         setSelfCheckOpen(false);
@@ -1532,6 +1553,7 @@ export default function StudyView() {
     setState(nextState);
     setChatOpen(false);
     setAnswer('');
+    setCoachRevealed(0);
     setRevealedMiss(false);
     setReviewChoiceLabel('');
     setSelfCheckOpen(false);
@@ -1639,6 +1661,7 @@ export default function StudyView() {
         autoAdvanceRef.current = null;
         setChatOpen(false);
         setAnswer('');
+        setCoachRevealed(0);
         setRevealedMiss(false);
         setReviewChoiceLabel('');
         setSelfCheckOpen(false);
@@ -1751,7 +1774,7 @@ export default function StudyView() {
 
   function rememberKanaMistake(nextAnswer, enabled) {
     if (!enabled) return;
-    const cells = kanaCoachCells(expected, nextAnswer, 0, true);
+    const cells = kanaCoachCells(expected, nextAnswer, coachRevealed, true);
     if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
       if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = nextAnswer;
       hadKanaMistakeRef.current = true;
@@ -2637,7 +2660,21 @@ export default function StudyView() {
                         Check (Enter)
                       </button>
                     </StickyAction>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      <button
+                        onClick={() =>
+                          setCoachRevealed(
+                            Math.min(
+                              expectedKanaCount,
+                              Math.max(coachRevealed, coachTypedCount) + 1,
+                            ),
+                          )
+                        }
+                        disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
+                        className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
+                      >
+                        Hint
+                      </button>
                       <button
                         onClick={revealAnswer}
                         className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm text-amber-800"
@@ -2704,6 +2741,16 @@ export default function StudyView() {
                               ) : (
                                 <IconEye className="w-4 h-4" />
                               )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={revealNextKana}
+                              disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
+                              aria-label="Reveal next kana"
+                              title="Reveal next kana"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                            >
+                              <IconSpark className="w-4 h-4" />
                             </button>
                           </div>
                         </div>

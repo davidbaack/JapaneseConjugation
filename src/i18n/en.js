@@ -11,6 +11,10 @@ export default {
 
   'nav.study': 'Practice',
   'nav.check': 'Check',
+  'nav.classify': 'Which Group?',
+  'nav.endings': 'Endings',
+  'nav.games': 'Games',
+  'nav.insights': 'Insights',
   'nav.library': 'Library',
   'nav.settings': 'Settings',
 

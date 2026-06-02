@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { IconCloud, IconSettings } from './components/Icons.jsx';
+import { IconCloud } from './components/Icons.jsx';
 import AuthModal from './components/AuthModal.jsx';
 import ViewSkeleton from './components/Skeleton.jsx';
 import UpdatePrompt from './components/UpdatePrompt.jsx';
@@ -19,11 +19,14 @@ import {
 // without prop-drilling.
 const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
 const CheckView = React.lazy(() => import('./views/CheckView.jsx'));
+const GamesView = React.lazy(() => import('./views/GamesView.jsx'));
+const EndingsView = React.lazy(() => import('./views/EndingsView.jsx'));
+const ClassificationView = React.lazy(() => import('./views/ClassificationView.jsx'));
+const InsightsView = React.lazy(() => import('./views/InsightsView.jsx'));
 const LibraryView = React.lazy(() => import('./views/LibraryView.jsx'));
 const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 
-const PRIMARY_TABS = ['study', 'check', 'library'];
-const TABS = [...PRIMARY_TABS, 'settings'];
+const TABS = ['study', 'check', 'classify', 'endings', 'games', 'insights', 'library', 'settings'];
 
 export function SRSQueueBar() {
   const {
@@ -439,12 +442,12 @@ function AppShell() {
           aria-label="App sections"
           className="mb-3 flex flex-wrap gap-1 rounded-xl border border-stone-200 bg-white p-1 dark:border-stone-800 dark:bg-stone-900"
         >
-          {PRIMARY_TABS.map((id) => (
+          {TABS.map((id) => (
             <button
               key={id}
               {...tabProps(id)}
               onClick={() => setTab(id)}
-              className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition capitalize ${
+              className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition ${
                 tab === id
                   ? 'bg-stone-800 dark:bg-indigo-700 text-white font-semibold'
                   : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
@@ -453,20 +456,6 @@ function AppShell() {
               {t(`nav.${id}`)}
             </button>
           ))}
-          <button
-            type="button"
-            {...tabProps('settings')}
-            onClick={() => setTab('settings')}
-            aria-label={t('nav.settings')}
-            title={t('nav.settings')}
-            className={`inline-flex min-h-10 w-11 shrink-0 items-center justify-center rounded-lg transition ${
-              tab === 'settings'
-                ? 'bg-stone-800 text-white dark:bg-indigo-700'
-                : 'text-stone-600 hover:bg-stone-100 dark:text-stone-400 dark:hover:bg-stone-800'
-            }`}
-          >
-            <IconSettings className="h-4 w-4" />
-          </button>
         </nav>
         <PracticalCorePathPanel />
         <SRSQueueBar />
@@ -475,6 +464,10 @@ function AppShell() {
           <div {...panelProps(tab)}>
             {tab === 'study' && <StudyView />}
             {tab === 'check' && <CheckView />}
+            {tab === 'games' && <GamesView />}
+            {tab === 'endings' && <EndingsView />}
+            {tab === 'classify' && <ClassificationView />}
+            {tab === 'insights' && <InsightsView />}
             {tab === 'library' && <LibraryView />}
             {tab === 'settings' && <SettingsView />}
           </div>
