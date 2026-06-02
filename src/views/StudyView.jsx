@@ -2479,6 +2479,32 @@ export default function StudyView() {
     setTab('library');
   }
 
+  // Universal escape hatch back to the Reviews dashboard. Exits whatever
+  // focused session is active (minimal-pair contrast, repair drill, or a
+  // focus-word lock) so specialLaunchActive clears and the dashboard renders.
+  function returnToOverview() {
+    if (activeMinimalPairSet) {
+      const restoreTypes = minimalPairReturnEnabledTypes(practicePrefs) || [];
+      setPracticePrefs((prev) => {
+        const cleared = clearMinimalPairPrefs(prev);
+        return cleared.reviewLimitSource === 'repair'
+          ? { ...cleared, reviewLimitSource: '', reviewLimit: 0 }
+          : cleared;
+      });
+      if (restoreTypes.length) setState((prev) => ({ ...prev, enabledTypes: restoreTypes }));
+    } else if (practicePrefs.reviewLimitSource === 'repair') {
+      setPracticePrefs((prev) => ({ ...prev, reviewLimitSource: '', reviewLimit: 0 }));
+    }
+    setLaunchContext(null);
+    setFocusWordLock(null);
+    setSessionFilterWord(null);
+    setSessionFilterFormGroupId(null);
+    onFocusConsumed?.();
+    resetActiveAttempt();
+    setCurrent(null);
+    setDashboardOpen(true);
+  }
+
   return (
     <div className="space-y-4">
       {referenceLaunch && (
@@ -2529,10 +2555,10 @@ export default function StudyView() {
       />
       <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3">
         <div className="flex items-center gap-2.5">
-          {!specialLaunchActive && (
+          {!referenceLaunch && (
             <button
               type="button"
-              onClick={() => setDashboardOpen(true)}
+              onClick={returnToOverview}
               aria-label="Back to Reviews overview"
               className="shrink-0 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 hover:text-stone-700 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"
             >

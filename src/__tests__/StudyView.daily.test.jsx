@@ -208,6 +208,24 @@ describe('StudyView daily startup guards', () => {
     expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
   });
 
+  it('offers an Overview return path from a focused (special) session', async () => {
+    const app = makeApp({ studyFocus: { word: STARTER_VERBS[0], type: 'plain-past' } });
+    // Consuming the focus clears it in the real provider; mirror that so the
+    // dashboard can re-render once the focus lock is released.
+    app.clearStudyFocus = vi.fn(() => {
+      app.studyFocus = null;
+    });
+    mockedApp.value = app;
+
+    render(<StudyView />);
+
+    // A focus launch is a "special" session — it previously hid Overview.
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Reviews overview' }));
+
+    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+  });
+
   it('does not auto-start today over a focused word launch', async () => {
     const clearStudyFocus = vi.fn();
     const app = makeApp({
