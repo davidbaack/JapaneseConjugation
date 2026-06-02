@@ -28,11 +28,6 @@ import {
   upsertTodayDrillList,
 } from '../utils/todayDrill.js';
 import {
-  buildPracticalCorePath,
-  practicalCoreBaselineForPath,
-  practicePrefsForPracticalCorePath,
-} from '../utils/practicalCorePath.js';
-import {
   includeTypeFamilyInReviewState,
   includeWordInReviewState,
   includeWordKeyInReviewState,
@@ -352,19 +347,8 @@ function useAppController() {
     () => buildTodayDrillPlan(state, allWords, practicePrefs, wordLists, { builtInWords }),
     [state, allWords, practicePrefs, wordLists, builtInWords],
   );
-  const practicalCoreBaseline = srsQueue.date === todayKey ? srsQueue.practicalCoreBaseline : null;
-  const practicalCorePath = useMemo(
-    () =>
-      buildPracticalCorePath(state, allWords, practicePrefs, wordLists, {
-        builtInWords,
-        practicalCoreBaseline,
-      }),
-    [state, allWords, practicePrefs, wordLists, builtInWords, practicalCoreBaseline],
-  );
   const todayGoalHit = daily.date === todayKey && !!daily.goalHit;
   const todayDrillActive = isTodayDrillPractice(practicePrefs);
-  const practicalCorePathActive =
-    todayDrillActive && practicePrefs.practicePath === 'practical-core';
   const activeSrsQueue = useMemo(() => {
     if (srsQueue.date !== todayKey) {
       return { date: todayKey, dueRuleIds: [], completedDueRuleIds: [], startedAt: null };
@@ -475,32 +459,6 @@ function useAppController() {
     return true;
   }
 
-  function startPracticalCorePath(path = practicalCorePath) {
-    const corePath = path || practicalCorePath;
-    const drillPlan = corePath?.plan;
-    if (!drillPlan?.available) return false;
-    try {
-      sessionStorage.removeItem('jp-study-current');
-    } catch {}
-    setWordLists((prev) => upsertTodayDrillList(prev, drillPlan));
-    setState((prev) => ({
-      ...prev,
-      enabledTypes: drillPlan.typeIds,
-      session: { ...(prev.session || {}), mistakePatterns: {} },
-    }));
-    setPracticePrefs((prev) => practicePrefsForPracticalCorePath(prev, drillPlan));
-    setSrsQueue({
-      date: localDateKey(),
-      dueRuleIds: [...(drillPlan.dueRuleIds || [])],
-      completedDueRuleIds: [],
-      startedAt: Date.now(),
-      practicalCoreBaseline: practicalCoreBaselineForPath(corePath),
-    });
-    setStudyFocus(null);
-    setTab('study');
-    return true;
-  }
-
   function markSrsQueueCompleted(ruleId) {
     if (!ruleId) return;
     setSrsQueue((prev) => {
@@ -554,13 +512,10 @@ function useAppController() {
     daily,
     dailyPct,
     todayPlan,
-    practicalCorePath,
     todayGoalHit,
     todayDrillActive,
-    practicalCorePathActive,
     srsQueue: activeSrsQueue,
     startTodayDrill,
-    startPracticalCorePath,
     markSrsQueueCompleted,
   };
 }
