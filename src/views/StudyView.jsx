@@ -1364,8 +1364,14 @@ export default function StudyView() {
 
   function revealNextKana() {
     if (!current || reverseDrill || phase !== 'answering') return;
+    const expectedChars = Array.from(expected);
+    if (!expectedChars.length) return;
+    const typedCount = Array.from(toHiraganaProgress(answer)).length;
+    const nextCount = Math.min(expectedChars.length, Math.max(coachRevealed, typedCount) + 1);
     setLiveKanaVisible(true);
-    setCoachRevealed(Math.min(expectedKanaCount, Math.max(coachRevealed, coachTypedCount) + 1));
+    setCoachRevealed(nextCount);
+    setGreenRevealed((prev) => Math.max(prev, nextCount));
+    setAnswer(expectedChars.slice(0, nextCount).join(''));
     focusAnswerInput();
   }
 
