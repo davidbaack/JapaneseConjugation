@@ -22,12 +22,20 @@ import {
   DAY,
 } from '../utils/storage.js';
 import { conjugateItem } from '../utils/conjugator.js';
+import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import {
   ALL_CARD_TYPES,
   INTRODUCED_DEFAULT_TYPE_IDS,
-  LEARNER_DEFAULT_TYPE_IDS,
   LEGACY_BROAD_DEFAULT_TYPE_IDS,
+  TEXTBOOK_CORE_TYPE_IDS,
 } from '../data/conjugationTypes.js';
+import {
+  excludeFormFamilyFromReviewState,
+  excludeWordFromReviewState,
+  includeFormFamilyInReviewState,
+  includeWordInReviewState,
+  reviewTypeIdsForState,
+} from '../utils/reviewScope.js';
 
 // Mock localStorage for storage tests (mergeState etc. are pure but defaultState references CONJ_TYPES)
 // No localStorage calls in the functions we're testing — they're all pure.
@@ -388,30 +396,31 @@ describe('mergeState', () => {
     expect(state.enabledTypes.length).toBeGreaterThan(0);
   });
 
-  it('starts new learners on the core conjugation scope', () => {
+  it('starts new learners on the textbook core conjugation scope', () => {
     const state = defaultState();
-    expect(state.enabledTypes).toEqual(LEARNER_DEFAULT_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(TEXTBOOK_CORE_TYPE_IDS);
     expect(state.enabledTypes).not.toContain('request-kudasai');
     expect(state.enabledTypes).not.toContain('permission');
     expect(state.enabledTypes).not.toContain('obligation');
-    expect(state.enabledTypes).not.toContain('potential-polite');
-    expect(state.enabledTypes).not.toContain('desiderative-polite');
-    expect(state.enabledTypes).not.toContain('progressive-polite');
+    expect(state.enabledTypes).toContain('passive');
+    expect(state.enabledTypes).toContain('causative');
+    expect(state.enabledTypes).toContain('command-nasai');
     expect(state.enabledTypes).not.toContain('passive-polite-past-negative');
+    expect(state.enabledTypes).not.toContain('short-causative');
     expect(state.enabledTypes).not.toContain('short-causative-passive-polite-past-negative');
   });
 
-  it('migrates the old broad default scope to the learner default', () => {
+  it('migrates the old broad default scope to textbook core', () => {
     const state = mergeState({ enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS }, null);
-    expect(state.enabledTypes).toEqual(LEARNER_DEFAULT_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(TEXTBOOK_CORE_TYPE_IDS);
   });
 
-  it('migrates pre-introduced broad default scopes to the learner default', () => {
+  it('migrates pre-introduced broad default scopes to textbook core', () => {
     const preIntroducedIds = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
       (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
     );
     const state = mergeState({ enabledTypes: preIntroducedIds }, null);
-    expect(state.enabledTypes).toEqual(LEARNER_DEFAULT_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(TEXTBOOK_CORE_TYPE_IDS);
   });
 
   it('preserves an explicit all-forms scope', () => {
@@ -482,10 +491,10 @@ describe('mergeState', () => {
 describe('mergeCloudState', () => {
   it('does not revive the legacy broad default during cloud merges', () => {
     const merged = mergeCloudState(
-      { cards: {}, verbStats: {}, mistakes: [], enabledTypes: LEARNER_DEFAULT_TYPE_IDS },
+      { cards: {}, verbStats: {}, mistakes: [], enabledTypes: TEXTBOOK_CORE_TYPE_IDS },
       { cards: {}, verbStats: {}, mistakes: [], enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS },
     );
-    expect(merged.enabledTypes).toEqual(LEARNER_DEFAULT_TYPE_IDS);
+    expect(merged.enabledTypes).toEqual(TEXTBOOK_CORE_TYPE_IDS);
   });
 
   it('preserves explicit all-forms cloud scopes', () => {
@@ -496,7 +505,7 @@ describe('mergeCloudState', () => {
         cards: {},
         verbStats: {},
         mistakes: [],
-        enabledTypes: LEARNER_DEFAULT_TYPE_IDS,
+        enabledTypes: TEXTBOOK_CORE_TYPE_IDS,
       },
       {
         schemaVersion: SRS_SCHEMA_VERSION,
@@ -616,6 +625,57 @@ describe('word-form SRS selection', () => {
     group: 'godan',
   };
 
+  it('keeps exclusion state separate from word-form SRS history', () => {
+    const dueCardId = cardIdFor(TABERU, 'plain-past');
+    const dueCard = {
+      reps: 3,
+      interval: 8,
+      ease: 2.5,
+      nextReview: 1,
+      correct: 3,
+      incorrect: 1,
+      lastSeen: 1,
+    };
+    const state = { ...defaultState(), cards: { [dueCardId]: dueCard } };
+    const excluded = excludeWordFromReviewState(state, TABERU);
+
+    expect(excluded.cards[dueCardId]).toEqual(dueCard);
+    expect(filterWordsForStudyScope([TABERU], excluded, DEFAULT_PREFS, [])).toEqual([]);
+
+    const restored = includeWordInReviewState(excluded, TABERU);
+    expect(restored.cards[dueCardId]).toEqual(dueCard);
+    expect(filterWordsForStudyScope([TABERU], restored, DEFAULT_PREFS, [])).toEqual([TABERU]);
+  });
+
+  it('suspends and restores form families without deleting card history', () => {
+    const dueCardId = cardIdFor(TABERU, 'plain-past');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [dueCardId]: {
+          reps: 2,
+          interval: 3,
+          ease: 2.5,
+          nextReview: 1,
+          correct: 2,
+          incorrect: 0,
+          lastSeen: 1,
+        },
+      },
+    };
+
+    const excluded = excludeFormFamilyFromReviewState(state, 'basic-tenses');
+    expect(reviewTypeIdsForState(excluded, ['plain-past', 'te-form'])).toEqual(['te-form']);
+    expect(excluded.cards[dueCardId]).toEqual(state.cards[dueCardId]);
+
+    const restored = includeFormFamilyInReviewState(excluded, 'basic-tenses');
+    expect(reviewTypeIdsForState(restored, ['plain-past', 'te-form'])).toEqual([
+      'plain-past',
+      'te-form',
+    ]);
+    expect(restored.cards[dueCardId]).toEqual(state.cards[dueCardId]);
+  });
+
   it('schedules due cards by exact word-form card id', () => {
     const dueCardId = cardIdFor(TABERU, 'plain-past');
     const state = {
@@ -643,10 +703,34 @@ describe('word-form SRS selection', () => {
       ...DEFAULT_PREFS,
       reviewStyle: 'reading',
     });
-    expect(LEARNER_DEFAULT_TYPE_IDS).not.toContain('dictionary');
+    expect(TEXTBOOK_CORE_TYPE_IDS).not.toContain('dictionary');
     expect(card.id).toBe(cardIdFor(TABERU, 'dictionary'));
     expect(card.type).toBe('dictionary');
     expect(card.sourceType).toBe('plain-past');
+  });
+
+  it('introduces new review cards by textbook word order before form order', () => {
+    const earlyWord = {
+      ...KAKU,
+      lesson: 3,
+      lessons: [3],
+      minnaLesson: 5,
+    };
+    const laterWord = {
+      ...TABERU,
+      lesson: 12,
+      lessons: [12],
+      minnaLesson: 13,
+    };
+    const card = selectNext(
+      defaultState(),
+      [laterWord, earlyWord],
+      ['te-form', 'plain-past'],
+      null,
+      DEFAULT_PREFS,
+    );
+
+    expect(card.verb).toBe(earlyWord);
   });
 
   it('caps new cards by daily goal and uses a smaller bonus-study batch', () => {

@@ -2,6 +2,7 @@
 
 ## Repo Workflow
 
+- For learner-facing product, UX, navigation, SRS, Library, Lessons, Practice Lab, Settings, or progress-language changes, read `.agents/app-experience.md` first. If a change goes against that design, ask the user before implementing it; when the user confirms a new direction, update `.agents/app-experience.md`.
 - Check `git status --short` before editing. This worktree is often dirty; do not overwrite unrelated user changes.
 - Treat this project as still in active development: optimize for the desired current product shape, and do not preserve or migrate old functionality unless the user explicitly asks for it.
 - Keep learner-facing parity work narrow and grounded in the current checkout before claiming completion.

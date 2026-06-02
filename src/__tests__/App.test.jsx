@@ -16,34 +16,33 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
+async function startReviewsFromDashboard() {
+  const starts = await screen.findAllByRole(
+    'button',
+    { name: /Start Reviews|Continue Reviews|Start Core Warmup/ },
+    { timeout: 5000 },
+  );
+  fireEvent.click(starts[starts.length - 1]);
+}
+
 describe('App shell', () => {
   it('renders the header, subtitle, and restored nav', async () => {
     render(<App />);
     expect(screen.getByRole('heading', { name: /Katachiya/ })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Conjugation Practice/ })).toBeTruthy();
     // Nav labels (accessible name is the catalog string; CSS only capitalizes).
-    for (const label of [
-      'Practice',
-      'Check',
-      'Which Group?',
-      'Endings',
-      'Games',
-      'Insights',
-      'Library',
-      'Settings',
-    ]) {
+    for (const label of ['Reviews', 'Lessons', 'Library', 'Practice Lab', 'Settings']) {
       expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
     }
   });
 
   it('lazy-loads the default Study view without crashing', async () => {
     render(<App />);
-    // The Suspense skeleton resolves to the Study view; its answer input appears.
-    await waitFor(() => expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy(), {
-      timeout: 5000,
-    });
-    expect(screen.getByText('Review')).toBeTruthy();
-    expect(screen.getByText('Form practice')).toBeTruthy();
+    // The Suspense skeleton resolves to the Reviews dashboard.
+    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+    expect(screen.getByText('Start with what is ready now.')).toBeTruthy();
+    expect(screen.getByText('Upcoming reviews')).toBeTruthy();
+    expect(screen.getByText('Form families')).toBeTruthy();
     expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
   });
@@ -51,7 +50,7 @@ describe('App shell', () => {
   it('shows local SRS counters while signed out', async () => {
     render(<App />);
 
-    await screen.findByText('SRS Queue', {}, { timeout: 5000 });
+    await screen.findByText('Reviews Queue', {}, { timeout: 5000 });
     expect(screen.getByText('local')).toBeTruthy();
     expect(screen.getByText('0/0 session')).toBeTruthy();
     expect(screen.getByText('0/30 today')).toBeTruthy();
@@ -83,19 +82,22 @@ describe('App shell', () => {
 
     render(<App />);
 
-    await screen.findByText('SRS Queue', {}, { timeout: 5000 });
+    await screen.findByText('Reviews Queue', {}, { timeout: 5000 });
     await waitFor(() => {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
       expect(raw.practicePrefs.wordListIds || []).not.toContain(TODAY_DRILL_LIST_ID);
     });
-    expect(screen.queryByRole('button', { name: 'Start review' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start Reviews' })).toBeNull();
   });
 
   it('shows the single Review flow instead of legacy Study mode controls', async () => {
     render(<App />);
+    await startReviewsFromDashboard();
     await screen.findByText('Review', {}, { timeout: 5000 });
     expect(screen.getByText('Form practice')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Word', exact: true })).toBeNull();
+    expect(screen.getByText('Focus reviews')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Word', exact: true })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Form', exact: true })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Sentence', exact: true })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Transform', exact: true })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Study mode' })).toBeNull();
@@ -140,6 +142,7 @@ describe('App shell', () => {
 
     render(<App />);
 
+    await startReviewsFromDashboard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(screen.getAllByText(/Tai Past Negative/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/did not want to ~/i)).toBeTruthy();
@@ -188,6 +191,7 @@ describe('App shell', () => {
 
     render(<App />);
 
+    await startReviewsFromDashboard();
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: 'zzz' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
@@ -238,6 +242,7 @@ describe('App shell', () => {
 
     render(<App />);
 
+    await startReviewsFromDashboard();
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: 'hanashita' } });
     const checkButton = screen.queryByRole('button', { name: 'Check (Enter)' });
@@ -253,16 +258,7 @@ describe('App shell', () => {
   it('mounts every tab without hitting the error boundary', async () => {
     render(<App />);
     // Each nav button's accessible name is its catalog label.
-    const labels = [
-      'Practice',
-      'Check',
-      'Which Group?',
-      'Endings',
-      'Games',
-      'Insights',
-      'Library',
-      'Settings',
-    ];
+    const labels = ['Reviews', 'Lessons', 'Library', 'Practice Lab', 'Settings'];
     for (const label of labels) {
       fireEvent.click(screen.getByRole('tab', { name: label, exact: true }));
       // Each view lazy-loads; wait until its chunk resolves (nav stays mounted).
@@ -275,11 +271,13 @@ describe('App shell', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Library', exact: true }));
 
-    await screen.findByText('Rules and forms for the next drill.', {}, { timeout: 5000 });
+    await screen.findByText('What Reviews is allowed to show.', {}, { timeout: 5000 });
+    expect(screen.getByRole('tab', { name: /^Inventory/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Lookup/i })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: /^Lessons/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Lists/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Custom words/i })).toBeTruthy();
+    expect(await screen.findAllByRole('button', { name: 'Review now' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /^Lookup/i }));
     const drillWord = await screen.findByRole('button', { name: 'Drill word' });
     expect(drillWord).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {

@@ -9,7 +9,8 @@ test.describe('Rush mode', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await page.locator('nav').getByRole('tab', { name: 'Games', exact: true }).click();
+    await page.locator('nav').getByRole('tab', { name: 'Practice Lab', exact: true }).click();
+    await page.getByRole('tab', { name: 'Rush', exact: true }).click();
 
     await expect(page.getByText('Kotoba Rush').first()).toBeVisible();
 
@@ -74,7 +75,8 @@ test.describe('Rush mode', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await page.locator('nav').getByRole('tab', { name: 'Games', exact: true }).click();
+    await page.locator('nav').getByRole('tab', { name: 'Practice Lab', exact: true }).click();
+    await page.getByRole('tab', { name: 'Rush', exact: true }).click();
     await page.getByRole('button', { name: 'Start', exact: true }).click();
 
     await page.getByPlaceholder('Type answer').fill('tabeta');

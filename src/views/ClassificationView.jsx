@@ -13,7 +13,7 @@ import {
   surfaceFormFor,
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
-import { defaultState, bumpDaily } from '../utils/storage.js';
+import { defaultState } from '../utils/storage.js';
 import { promptDisplay } from '../utils/display.js';
 import { TYPE_LABEL } from '../data/conjugationTypes.js';
 import { callGemini, aiSystemFromPrefs } from '../utils/gemini.js';
@@ -194,7 +194,6 @@ export default function ClassificationView() {
           [correctGroup]: { attempted: prev.attempted + 1, correct: prev.correct + (ok ? 1 : 0) },
         },
       },
-      daily: bumpDaily(state.daily, ok, practicePrefs.dailyGoal || 30),
     });
     setResult({ ok, chosen: group });
   }

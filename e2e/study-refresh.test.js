@@ -15,6 +15,13 @@ async function waitForStableStoredCurrent(page) {
   return last;
 }
 
+async function startReviewsFromDashboard(page) {
+  await page
+    .getByRole('region', { name: 'Reviews dashboard' })
+    .getByRole('button', { name: /Start Reviews|Start Core Warmup|Continue Reviews/ })
+    .click();
+}
+
 // Reloading the Study tab should resume the same card rather than drawing a
 // fresh verb. The active card is persisted to sessionStorage and restored on
 // mount, so both the stored descriptor and the visible prompt must be stable
@@ -24,7 +31,9 @@ test.describe('Study refresh persistence', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // A card is on screen in the default input drill.
+    await startReviewsFromDashboard(page);
+
+    // A card is on screen after the learner starts Reviews.
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
 
     // The active card is persisted to sessionStorage.
@@ -37,6 +46,7 @@ test.describe('Study refresh persistence', () => {
 
     await page.reload();
     await page.waitForLoadState('networkidle');
+    await startReviewsFromDashboard(page);
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
 
     // Same descriptor and same visible prompt after the reload.

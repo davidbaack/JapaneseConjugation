@@ -7,9 +7,9 @@ beforeEach(() => {
 
 describe('t', () => {
   it('returns the English string for a known key', () => {
-    expect(t('nav.study')).toBe('Practice');
-    expect(t('nav.classify')).toBe('Which Group?');
-    expect(t('nav.games')).toBe('Games');
+    expect(t('nav.study')).toBe('Reviews');
+    expect(t('nav.lessons')).toBe('Lessons');
+    expect(t('nav.lab')).toBe('Practice Lab');
     expect(t('app.title')).toBe('Katachiya');
   });
 

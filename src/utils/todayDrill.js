@@ -5,6 +5,7 @@ import { minimalPairSetMatchesWord, recommendMinimalPairSets } from './minimalPa
 import { cardIdFor, cardWeakScore, localDateKey, weakTypeIdsForState } from './storage.js';
 import { buildRuleCandidates, ruleCandidateTypeSet } from './ruleCandidates.js';
 import { filterWordsForStudyScope } from './vocabularyProgression.js';
+import { reviewTypeIdsForState } from './reviewScope.js';
 
 export const TODAY_DRILL_LIST_ID = 'list-today-drill';
 export const TODAY_DRILL_LIST_NAME = "Today's Drill";
@@ -109,7 +110,7 @@ export function buildTodayDrillPlan(
 ) {
   const now = options.now || Date.now();
   const availableWords = selectableWords(state, words, prefs, wordLists, options);
-  const activeTypes = enabledTypeIdsFor(state?.enabledTypes);
+  const activeTypes = reviewTypeIdsForState(state, enabledTypeIdsFor(state?.enabledTypes));
   const rulesWithCandidates = buildRuleCandidates(availableWords, activeTypes, prefs, {
     activeTypes,
   });

@@ -1,6 +1,7 @@
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { getWordMeta, wordKey, wordKind } from './conjugator.js';
+import { isWordExcludedFromReview } from './reviewScope.js';
 
 const JLPT_RANK = { N5: 0, N4: 1, N3: 2, N2: 3, N1: 4 };
 const STARTER_WORD_KEYS = new Set([...STARTER_VERBS, ...STARTER_ADJECTIVES].map(wordKey));
@@ -121,10 +122,16 @@ export function filterWordsForStudyScope(
 ) {
   const listKeys = selectedListWordKeys(prefs, wordLists);
   if (listKeys) {
-    return cleanWords(words).filter((word) => listKeys.has(wordKey(word)));
+    return cleanWords(words).filter(
+      (word) =>
+        listKeys.has(wordKey(word)) &&
+        (options.ignoreReviewScope || !isWordExcludedFromReview(state, word)),
+    );
   }
 
-  const sourceWords = cleanWords(words);
+  const sourceWords = cleanWords(words).filter(
+    (word) => options.ignoreReviewScope || !isWordExcludedFromReview(state, word),
+  );
   const builtInKeys = options.builtInWords?.length
     ? new Set(cleanWords(options.builtInWords).map(wordKey))
     : null;

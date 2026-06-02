@@ -12,7 +12,7 @@ import {
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
-import { cardIdFor, defaultState, gradeCard, recordMistake, bumpDaily } from '../utils/storage.js';
+import { cardIdFor, defaultState, gradeCard, recordMistake } from '../utils/storage.js';
 import { bumpSessionMistakePattern } from '../utils/mistakeDiagnosis.js';
 import { kanaMatchDisplayForPrefs, promptDisplay, shuffled } from '../utils/display.js';
 import {
@@ -190,7 +190,6 @@ export default function RushView() {
           },
           mistakeDiagnosis,
         ),
-        daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 30) : s.daily,
         game: {
           ...prevGame,
           bestScore: Math.max(prevGame.bestScore || 0, nextScore),

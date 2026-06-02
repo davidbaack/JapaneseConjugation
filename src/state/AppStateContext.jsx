@@ -32,6 +32,13 @@ import {
   practicalCoreBaselineForPath,
   practicePrefsForPracticalCorePath,
 } from '../utils/practicalCorePath.js';
+import {
+  includeTypeFamilyInReviewState,
+  includeWordInReviewState,
+  includeWordKeyInReviewState,
+  removeReviewRecommendationState,
+  upsertReviewRecommendationState,
+} from '../utils/reviewScope.js';
 
 // Centralized global app state (improvement #6). All the SRS/customs/prefs
 // state, the hydration + cloud-sync effects, theme/voice wiring, and the
@@ -385,11 +392,64 @@ function useAppController() {
 
   // Cross-view actions, so views don't need ad-hoc callback props.
   function practiceWord(word, type, options = {}) {
+    if (word || type) {
+      setState((prev) =>
+        includeTypeFamilyInReviewState(includeWordInReviewState(prev, word), type),
+      );
+    }
     setStudyFocus({ word, type, ...options });
     setTab('study');
   }
   const clearStudyFocus = () => setStudyFocus(null);
   const showAuth = () => setShowAuthModal(true);
+  const addReviewRecommendation = (recommendation) =>
+    setState((prev) => upsertReviewRecommendationState(prev, recommendation));
+
+  function startReviewRecommendation(recommendation) {
+    if (!recommendation) return false;
+    const wordKeys = Array.isArray(recommendation.wordKeys) ? recommendation.wordKeys : [];
+    const typeIds = Array.isArray(recommendation.typeIds) ? recommendation.typeIds : [];
+    const listId = `list-review-rec-${recommendation.id}`;
+    setState((prev) => {
+      let next = { ...prev };
+      for (const key of wordKeys) next = includeWordKeyInReviewState(next, key);
+      for (const typeId of typeIds) next = includeTypeFamilyInReviewState(next, typeId);
+      next = removeReviewRecommendationState(next, recommendation.id);
+      return {
+        ...next,
+        ...(typeIds.length ? { enabledTypes: typeIds } : {}),
+        session: { ...(next.session || {}), mistakePatterns: {} },
+      };
+    });
+    if (wordKeys.length) {
+      setWordLists((prev) => {
+        const list = {
+          id: listId,
+          name: recommendation.label || 'Recommended reviews',
+          wordKeys,
+        };
+        return (prev || []).some((item) => item.id === listId)
+          ? prev.map((item) => (item.id === listId ? list : item))
+          : [...(prev || []), list];
+      });
+    }
+    setPracticePrefs((prev) => ({
+      ...prev,
+      reviewStyle: 'auto',
+      minimalPairSetId: '',
+      minimalPairReturn: null,
+      reviewLimit: Math.max(0, Number(recommendation.suggestedCount || 0)),
+      reviewLimitSource: recommendation.suggestedCount ? 'lab' : '',
+      practicePath: '',
+      wordListIds: wordKeys.length ? [listId] : [],
+    }));
+    try {
+      sessionStorage.removeItem('jp-study-current');
+    } catch {}
+    setStudyFocus(null);
+    setTab('study');
+    return true;
+  }
 
   function startTodayDrill(plan = todayPlan) {
     const drillPlan = plan || todayPlan;
@@ -473,6 +533,8 @@ function useAppController() {
     studyFocus,
     practiceWord,
     clearStudyFocus,
+    addReviewRecommendation,
+    startReviewRecommendation,
     showAuthModal,
     setShowAuthModal,
     showAuth,

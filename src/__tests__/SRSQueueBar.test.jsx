@@ -14,7 +14,7 @@ import { PracticalCorePathPanel, SRSQueueBar } from '../App.jsx';
 function appState(overrides = {}) {
   return {
     state: { session: { reviewed: 4, correct: 3 } },
-    tab: 'library',
+    tab: 'study',
     setTab: vi.fn(),
     practicePrefs: { dailyGoal: 30 },
     session: { user: { id: 'learner' } },
@@ -96,9 +96,9 @@ describe('SRSQueueBar', () => {
 
     render(<SRSQueueBar />);
 
-    expect(screen.getByText('SRS Queue')).toBeTruthy();
+    expect(screen.getByText('Reviews Queue')).toBeTruthy();
     expect(screen.getByText('local')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Start review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start Reviews' }));
 
     expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
   });
@@ -121,14 +121,15 @@ describe('SRSQueueBar', () => {
 
     render(<SRSQueueBar />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start Reviews' }));
 
     expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
     expect(app.setTab).not.toHaveBeenCalled();
   });
 
-  it('jumps back to Study when an active queue is still ready', () => {
+  it('hides the Reviews queue bar outside Reviews', () => {
     const app = appState({
+      tab: 'library',
       todayDrillActive: true,
       todayPlan: {
         available: true,
@@ -146,9 +147,9 @@ describe('SRSQueueBar', () => {
 
     render(<SRSQueueBar />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go study' }));
-
-    expect(app.setTab).toHaveBeenCalledWith('study');
+    expect(screen.queryByText('Reviews Queue')).toBeNull();
+    expect(screen.queryByText('Queue cleared')).toBeNull();
+    expect(app.setTab).not.toHaveBeenCalled();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 

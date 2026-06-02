@@ -1,22 +1,18 @@
 import { test, expect } from '@playwright/test';
 
 const TABS = [
-  { id: 'study', label: 'Practice' },
-  { id: 'check', label: 'Check' },
-  { id: 'classify', label: 'Which Group?' },
-  { id: 'endings', label: 'Endings' },
-  { id: 'games', label: 'Games' },
-  { id: 'insights', label: 'Insights' },
+  { id: 'study', label: 'Reviews' },
+  { id: 'lessons', label: 'Lessons' },
   { id: 'library', label: 'Library' },
+  { id: 'lab', label: 'Practice Lab' },
   { id: 'settings', label: 'Settings' },
 ];
 
 const VIEW_ANCHORS = {
-  classify: () => /Classification drill/,
-  endings: () => /Ending Lab/,
-  games: () => /Kotoba Rush/,
-  insights: () => /Overview/,
-  library: () => /Rules and forms for the next drill/,
+  study: () => /Start with what is ready now/,
+  lessons: () => /Conjugation formation guide/,
+  library: () => /What Reviews is allowed to show/,
+  lab: () => /Check a conjugation/,
   settings: () => /Practice session/,
 };
 
@@ -38,29 +34,32 @@ test.describe('Tab navigation', () => {
     }
   });
 
-  test('practice is the default tab on first load', async ({ page }) => {
+  test('reviews is the default tab on first load', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const practiceTab = page.locator('nav').getByRole('tab', { name: 'Practice', exact: true });
-    await expect(practiceTab).toHaveClass(/font-semibold/);
-    await expect(page.getByText('Practice progress')).toHaveCount(0);
+    const reviewsTab = page.locator('nav').getByRole('tab', { name: 'Reviews', exact: true });
+    await expect(reviewsTab).toHaveClass(/font-semibold/);
+    await expect(page.getByRole('region', { name: 'Review progress' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Retest misses' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Reviews dashboard' })).toBeVisible();
   });
 
-  test('library exposes lookup, lessons, lists, and custom words', async ({ page }) => {
+  test('library exposes inventory, lookup, lists, and custom words', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
     await page.locator('nav').getByRole('tab', { name: 'Library', exact: true }).click();
 
+    await expect(page.getByRole('tab', { name: /^Inventory/ })).toBeVisible();
     await expect(page.getByRole('tab', { name: /^Lookup/ })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /^Lessons/ })).toBeVisible();
     await expect(page.getByRole('tab', { name: /^Lists/ })).toBeVisible();
     await expect(page.getByRole('tab', { name: /^Custom words/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Review now' }).first()).toBeVisible();
+
+    await page.getByRole('tab', { name: /^Lookup/ }).click();
     await expect(page.getByText('Copy table')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Drill word' })).toBeVisible();
-
     await page.getByLabel('Search for a word or conjugation form').fill('tabeta');
     await expect(page.getByText('AI disambiguate')).toBeVisible();
 

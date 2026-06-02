@@ -45,6 +45,7 @@ import {
   gradeCard,
   bumpDaily,
   localDateKey,
+  typeIdFromCardId,
 } from '../utils/storage.js';
 import { recordReadinessAttempt } from '../utils/readiness.js';
 import {
@@ -76,6 +77,14 @@ import {
 } from '../utils/minimalPairs.js';
 import { buildRuleCandidates } from '../utils/ruleCandidates.js';
 import { TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
+import {
+  excludeFormFamilyFromReviewState,
+  excludeWordFromReviewState,
+  formFamilyForType,
+  includeFormFamilyInReviewState,
+  includeWordInReviewState,
+  reviewTypeIdsForState,
+} from '../utils/reviewScope.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
@@ -87,7 +96,7 @@ export { kanaCoachCells, explainReversePrompt };
 const STUDY_CURRENT_KEY = 'jp-study-current';
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
-const REVIEW_LIMIT_SOURCES = new Set(['repair']);
+const REVIEW_LIMIT_SOURCES = new Set(['repair', 'lab']);
 
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
@@ -355,22 +364,12 @@ function StudyFocusBar({
     ? FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId)
     : null;
 
-  if (!hasFilter && mode === null) {
-    return (
-      <div className="flex justify-end">
-        <button
-          onClick={() => setMode('word')}
-          className="text-xs text-stone-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition flex items-center gap-1 py-1"
-        >
-          <IconPlus className="w-3 h-3" /> Focus
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+          Focus reviews
+        </span>
         {sessionFilterWord && (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-700 dark:text-indigo-300">
             <span lang="ja">{sessionFilterWord.dict}</span>
@@ -403,25 +402,27 @@ function StudyFocusBar({
         {!sessionFilterWord && (
           <button
             onClick={() => setMode(mode === 'word' ? null : 'word')}
-            className={`text-xs px-2.5 py-1 rounded-full border transition ${
+            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition ${
               mode === 'word'
                 ? 'border-indigo-300 bg-indigo-50 text-indigo-600 dark:border-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300'
                 : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-700 dark:hover:text-indigo-300'
             }`}
           >
-            + Word
+            <IconPlus className="h-3 w-3" />
+            Word
           </button>
         )}
         {!sessionFilterFormGroupId && (
           <button
             onClick={() => setMode(mode === 'form' ? null : 'form')}
-            className={`text-xs px-2.5 py-1 rounded-full border transition ${
+            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition ${
               mode === 'form'
                 ? 'border-violet-300 bg-violet-50 text-violet-600 dark:border-violet-700 dark:bg-violet-950/30 dark:text-violet-300'
                 : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-violet-300 hover:text-violet-600 dark:hover:border-violet-700 dark:hover:text-violet-300'
             }`}
           >
-            + Form
+            <IconPlus className="h-3 w-3" />
+            Form
           </button>
         )}
         {hasFilter && (
@@ -508,6 +509,259 @@ function StudyFocusBar({
   );
 }
 
+function reviewForecastRows(forecast) {
+  return [
+    ['1h', forecast?.in1h || 0],
+    ['4h', forecast?.in4h || 0],
+    ['Today', forecast?.today || 0],
+    ['Tomorrow', forecast?.tomorrow || 0],
+    ['Week', forecast?.week || 0],
+  ];
+}
+
+function formFamilyStrengthRows(state = {}) {
+  return FORM_GROUPS.map((family) => {
+    const typeIds = new Set(family.typeIds || []);
+    let correct = 0;
+    let incorrect = 0;
+    for (const [cardId, card] of Object.entries(state.cards || {})) {
+      if (!typeIds.has(typeIdFromCardId(cardId))) continue;
+      correct += card?.correct || 0;
+      incorrect += card?.incorrect || 0;
+    }
+    const mistakeCount = (state.mistakes || []).filter(
+      (mistake) => !mistake.resolved && typeIds.has(mistake.type),
+    ).length;
+    const attempted = correct + incorrect;
+    const accuracy = attempted ? Math.round((correct / attempted) * 100) : 0;
+    const status =
+      attempted >= 3 && accuracy >= 85
+        ? 'strong'
+        : attempted > 0 && (accuracy < 60 || mistakeCount > 0)
+          ? 'weak'
+          : attempted > 0
+            ? 'developing'
+            : 'new';
+    return {
+      ...family,
+      attempted,
+      correct,
+      incorrect,
+      accuracy,
+      mistakeCount,
+      status,
+      sortScore:
+        status === 'weak'
+          ? -1000 - mistakeCount * 50 + accuracy
+          : status === 'new'
+            ? 500
+            : status === 'developing'
+              ? 100 + accuracy
+              : 1000 + accuracy,
+    };
+  }).sort((a, b) => a.sortScore - b.sortScore || a.label.localeCompare(b.label));
+}
+
+function ReviewsDashboard({
+  daily,
+  practicePrefs,
+  srsQueue,
+  state,
+  todayPlan,
+  todayDrillActive,
+  onStart,
+  onStartRecommendation,
+}) {
+  const dailyGoal = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
+  const dueTotal = srsQueue?.dueRuleIds?.length || 0;
+  const dueDone = srsQueue?.completedDueRuleIds?.length || 0;
+  const dashboardDue = todayPlan?.sourceCounts?.due || dueTotal;
+  const progressPct = dueTotal
+    ? Math.min(100, Math.round((dueDone / dueTotal) * 100))
+    : Math.min(100, Math.round(((daily.count || 0) / dailyGoal) * 100));
+  const progressNow = dueTotal ? dueDone : Math.min(daily.count || 0, dailyGoal);
+  const progressMax = dueTotal || dailyGoal;
+  const recommendations = state.reviewScope?.recommendations || [];
+  const strengthRows = formFamilyStrengthRows(state);
+  const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
+  const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
+
+  return (
+    <section className="space-y-4" aria-label="Reviews dashboard">
+      <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm dark:border-stone-800 dark:bg-stone-900 sm:p-5">
+        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+              Reviews
+            </div>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
+              Start with what is ready now.
+            </h2>
+            <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
+              Due cards come first. If the queue is light, Reviews adds weak forms and textbook core
+              warmup cards.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                ['Due now', dashboardDue],
+                ['Today', `${daily.count || 0}/${dailyGoal}`],
+                ['Weak forms', strengthRows.filter((row) => row.status === 'weak').length],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-950"
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+                    {label}
+                  </div>
+                  <div className="mt-0.5 text-lg font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+                    {value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/20">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                  Session progress
+                </div>
+                <div className="mt-1 text-sm text-stone-600 dark:text-stone-300">
+                  {dueTotal ? `${dueDone}/${dueTotal} required reviews` : 'Core warmup ready'}
+                </div>
+              </div>
+              <div className="text-xl font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
+                {progressPct}%
+              </div>
+            </div>
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={progressMax}
+              aria-valuenow={progressNow}
+              className="mt-3 h-2 overflow-hidden rounded-full bg-white dark:bg-stone-800"
+            >
+              <span className="block h-full bg-indigo-600" style={{ width: `${progressPct}%` }} />
+            </div>
+            <button
+              type="button"
+              onClick={onStart}
+              disabled={!todayPlan.available && !todayDrillActive}
+              className="mt-4 w-full rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400"
+            >
+              {todayDrillActive
+                ? 'Continue Reviews'
+                : dashboardDue
+                  ? 'Start Reviews'
+                  : 'Start Core Warmup'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {recommendations.length > 0 && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                Recommended reviews
+              </div>
+              <div className="text-sm text-stone-600 dark:text-stone-300">
+                Practice Lab found focused work to bring back into SRS.
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-2">
+            {recommendations.map((rec) => (
+              <button
+                key={rec.id}
+                type="button"
+                onClick={() => onStartRecommendation(rec)}
+                className="rounded-xl border border-emerald-200 bg-white px-3 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-stone-950 dark:hover:bg-emerald-950/30"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                      {rec.label}
+                    </div>
+                    {rec.detail && (
+                      <div className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
+                        {rec.detail}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    Start
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
+            Upcoming reviews
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {reviewForecastRows(todayPlan.upcomingForecast).map(([label, value]) => (
+              <div
+                key={label}
+                className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-center dark:border-stone-800 dark:bg-stone-950"
+              >
+                <div className="text-base font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+                  {value}
+                </div>
+                <div className="mt-0.5 text-[10px] uppercase tracking-wider text-stone-500">
+                  {label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
+            Form families
+          </div>
+          <div className="space-y-2">
+            {rowsToShow.map((row) => {
+              const tone =
+                row.status === 'strong'
+                  ? 'bg-emerald-500'
+                  : row.status === 'weak'
+                    ? 'bg-rose-500'
+                    : row.status === 'developing'
+                      ? 'bg-amber-500'
+                      : 'bg-stone-300';
+              return (
+                <div key={row.id}>
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <span className="font-medium text-stone-700 dark:text-stone-200">
+                      {row.label}
+                    </span>
+                    <span className="tabular-nums text-stone-500">
+                      {row.attempted ? `${row.accuracy}%` : 'new'}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
+                    <span
+                      className={`block h-full ${tone}`}
+                      style={{ width: `${row.attempted ? row.accuracy : 8}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function StudyView() {
   const {
     state,
@@ -527,6 +781,7 @@ export default function StudyView() {
     todayDrillActive: contextTodayDrillActive,
     srsQueue,
     startTodayDrill,
+    startReviewRecommendation,
     markSrsQueueCompleted,
   } = useApp();
   const [current, setCurrent] = useState(null);
@@ -558,6 +813,8 @@ export default function StudyView() {
   const seededInitialDailyGoalRef = useRef(false);
   const autoStartedTodayRef = useRef(false);
   const [bonusMode, setBonusMode] = useState(false);
+  const [dashboardOpen, setDashboardOpen] = useState(() => !focus?.word);
+  const [undoReviewScopeAction, setUndoReviewScopeAction] = useState(null);
   const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
   const [sessionFilterWord, setSessionFilterWord] = useState(null);
   const [sessionFilterFormGroupId, setSessionFilterFormGroupId] = useState(null);
@@ -586,12 +843,19 @@ export default function StudyView() {
       const group = FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId);
       if (group?.typeIds?.length) return group.typeIds;
     }
-    return state.enabledTypes?.length ? state.enabledTypes : ['plain-past'];
-  }, [state.enabledTypes, sessionFilterFormGroupId]);
+    const baseTypes = state.enabledTypes?.length ? state.enabledTypes : ['plain-past'];
+    return reviewTypeIdsForState(state, baseTypes);
+  }, [state, sessionFilterFormGroupId]);
   const practiceWords = useMemo(() => {
-    const base = filterWordsForStudyScope(verbs, { cards: state.cards }, practicePrefs, wordLists, {
-      builtInWords,
-    });
+    const base = filterWordsForStudyScope(
+      verbs,
+      { cards: state.cards, reviewScope: state.reviewScope },
+      practicePrefs,
+      wordLists,
+      {
+        builtInWords,
+      },
+    );
     // Apply session word filter if set
     let words = base;
     if (sessionFilterWord) {
@@ -615,6 +879,7 @@ export default function StudyView() {
   }, [
     verbs,
     state.cards,
+    state.reviewScope,
     practicePrefs,
     wordLists,
     builtInWords,
@@ -702,10 +967,12 @@ export default function StudyView() {
 
   useLayoutEffect(() => {
     if (!hydrated) return;
+    if (dashboardOpen && !focus?.word) return;
     // When arriving from Check's "Practice this verb", seed that exact word/form
     // once. If no rule covers it, fall through to normal selection.
     if (focus?.word && !focusSeededRef.current) {
       focusSeededRef.current = true;
+      setDashboardOpen(false);
       setFocusWordLock(focus.word);
       if (focus.returnTo === 'reference') setLaunchContext(focus);
       const card = buildFocusCard(state, focus.word, focus.type);
@@ -747,6 +1014,7 @@ export default function StudyView() {
     practicePrefs,
     practiceRuleCandidates,
     focus,
+    dashboardOpen,
   ]);
 
   useEffect(() => {
@@ -932,29 +1200,6 @@ export default function StudyView() {
   }, [practicePrefs.reviewLimit, practicePrefs.reviewLimitSource]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    if (autoStartedTodayRef.current) return;
-    if (todayGoalHit) return;
-    if (specialLaunchActive) return;
-    if (todayDrillActive) return;
-    if (canResumePersistedCurrent) return;
-    if (canResumeTodayDrill) return;
-    if (!todayPlan.available) return;
-    launchTodayDrill();
-    // launchTodayDrill intentionally omitted so the auto-start decision keys off
-    // the entry conditions, not a freshly allocated function each render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    hydrated,
-    todayGoalHit,
-    specialLaunchActive,
-    todayDrillActive,
-    canResumePersistedCurrent,
-    canResumeTodayDrill,
-    todayPlan,
-  ]);
-
-  useEffect(() => {
     return () => {
       if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
       if (speechRecognitionRef.current) {
@@ -974,7 +1219,31 @@ export default function StudyView() {
   if (!hydrated) {
     return (
       <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-8 text-center text-sm text-stone-500 dark:text-stone-400">
-        Loading daily drill...
+        Loading Reviews...
+      </div>
+    );
+  }
+
+  if (dashboardOpen && !specialLaunchActive) {
+    return (
+      <div className="space-y-4">
+        <StudyFocusBar
+          allWords={verbs}
+          sessionFilterWord={sessionFilterWord}
+          onWordChange={chooseFocusWord}
+          sessionFilterFormGroupId={sessionFilterFormGroupId}
+          onFormGroupChange={chooseFocusFormGroup}
+        />
+        <ReviewsDashboard
+          daily={daily}
+          practicePrefs={practicePrefs}
+          srsQueue={srsQueue}
+          state={state}
+          todayPlan={todayPlan}
+          todayDrillActive={todayDrillActive}
+          onStart={beginReviews}
+          onStartRecommendation={startReviewRecommendation}
+        />
       </div>
     );
   }
@@ -987,9 +1256,9 @@ export default function StudyView() {
           <StudyFocusBar
             allWords={verbs}
             sessionFilterWord={sessionFilterWord}
-            onWordChange={setSessionFilterWord}
+            onWordChange={chooseFocusWord}
             sessionFilterFormGroupId={sessionFilterFormGroupId}
-            onFormGroupChange={setSessionFilterFormGroupId}
+            onFormGroupChange={chooseFocusFormGroup}
           />
         )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
@@ -1135,6 +1404,7 @@ export default function StudyView() {
   const coachCells = guidedKana
     ? kanaCoachCells(expected, answer, coachRevealed, holdKanaFeedback, greenRevealed)
     : [];
+  const visibleCoachCells = coachCells.filter((cell) => cell.state !== 'empty' || cell.shown);
   const coachWrongIndex = coachCells.findIndex((c) => c.state === 'wrong');
   const coachTypedCount = Array.from(coachProgress).length;
   const expectedKanaCount = Array.from(expected).length;
@@ -1149,6 +1419,7 @@ export default function StudyView() {
   const liveCells = liveKana
     ? kanaCoachCells(expected, answer, coachRevealed, holdKanaFeedback, greenRevealed)
     : [];
+  const visibleLiveCells = liveCells.filter((cell) => cell.state !== 'empty' || cell.shown);
   const liveWrongIndex = liveCells.findIndex((c) => c.state === 'wrong' || c.state === 'extra');
   const liveStatus =
     liveWrongIndex >= 0
@@ -1278,6 +1549,7 @@ export default function StudyView() {
   function launchTodayDrill() {
     if (!todayPlan.available) return;
     autoStartedTodayRef.current = true;
+    setDashboardOpen(false);
     clearPersistedCurrent();
     const launched = startTodayDrill?.(todayPlan);
     if (launched === false) return;
@@ -1288,6 +1560,39 @@ export default function StudyView() {
     setReviewBase(state.session?.reviewed || 0);
     resetActiveAttempt();
     setTab('study');
+  }
+
+  function beginReviews() {
+    if (todayDrillActive || canResumePersistedCurrent || canResumeTodayDrill) {
+      setDashboardOpen(false);
+      setCurrent(null);
+      return;
+    }
+    launchTodayDrill();
+  }
+
+  function chooseFocusWord(word) {
+    if (word) {
+      setState((prev) => includeWordInReviewState(prev, word));
+    }
+    setSessionFilterWord(word);
+    setDashboardOpen(false);
+    setCurrent(null);
+  }
+
+  function chooseFocusFormGroup(groupId) {
+    const group = FORM_GROUPS.find((item) => item.id === groupId);
+    setState((prev) => {
+      const restored = groupId ? includeFormFamilyInReviewState(prev, groupId) : prev;
+      if (!group?.typeIds?.length) return restored;
+      return {
+        ...restored,
+        enabledTypes: [...new Set([...(restored.enabledTypes || []), ...group.typeIds])],
+      };
+    });
+    setSessionFilterFormGroupId(groupId);
+    setDashboardOpen(false);
+    setCurrent(null);
   }
 
   // Deterministic, offline step coach — no API key required. Irregular forms
@@ -1579,6 +1884,37 @@ export default function StudyView() {
         { bonusMode, wordLists },
       ),
     );
+  }
+
+  function removeCurrentWordFromReviews() {
+    if (!current) return;
+    const removedWord = current.verb;
+    setState((prev) => excludeWordFromReviewState(prev, removedWord));
+    setUndoReviewScopeAction({
+      kind: 'word',
+      label: removedWord.dict,
+      restore: () => setState((prev) => includeWordInReviewState(prev, removedWord)),
+    });
+    resetActiveAttempt();
+  }
+
+  function removeCurrentFormFamilyFromReviews() {
+    if (!current) return;
+    const family = formFamilyForType(current.type);
+    if (!family) return;
+    setState((prev) => excludeFormFamilyFromReviewState(prev, family.id));
+    setUndoReviewScopeAction({
+      kind: 'form',
+      label: family.label,
+      restore: () => setState((prev) => includeFormFamilyInReviewState(prev, family.id)),
+    });
+    resetActiveAttempt();
+  }
+
+  function restoreLastReviewScopeAction() {
+    undoReviewScopeAction?.restore?.();
+    setUndoReviewScopeAction(null);
+    setCurrent(null);
   }
 
   function gradeSelfCheck(ok, label) {
@@ -2067,6 +2403,7 @@ export default function StudyView() {
       </div>
     ) : null;
   const referenceLaunch = launchContext;
+  const currentFormFamily = formFamilyForType(current.type);
 
   function returnToReference() {
     setLaunchContext(null);
@@ -2096,12 +2433,32 @@ export default function StudyView() {
           </button>
         </div>
       )}
+      {undoReviewScopeAction && (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Removed {undoReviewScopeAction.kind === 'word' ? 'word' : 'form family'}:{' '}
+              <strong>{undoReviewScopeAction.label}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={restoreLastReviewScopeAction}
+              className="self-start rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-stone-950 dark:text-amber-200 dark:hover:bg-amber-950/40 sm:self-auto"
+            >
+              Undo
+            </button>
+          </div>
+        </div>
+      )}
       <StudyFocusBar
         allWords={verbs}
         sessionFilterWord={sessionFilterWord}
-        onWordChange={setSessionFilterWord}
+        onWordChange={chooseFocusWord}
         sessionFilterFormGroupId={sessionFilterFormGroupId}
-        onFormGroupChange={setSessionFilterFormGroupId}
+        onFormGroupChange={chooseFocusFormGroup}
       />
       <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3">
         <div className="text-left">
@@ -2112,12 +2469,30 @@ export default function StudyView() {
             {reverseDrill ? 'Reading practice' : 'Form practice'}
           </div>
         </div>
-        <div className="text-xs text-stone-400 text-right">
-          {(practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'forms'
-            ? 'Forms only'
-            : (practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'reading'
-              ? 'Reading'
-              : 'Auto'}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={removeCurrentWordFromReviews}
+            className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-stone-800 dark:text-stone-300 dark:hover:border-rose-900 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
+          >
+            Remove word
+          </button>
+          {currentFormFamily && (
+            <button
+              type="button"
+              onClick={removeCurrentFormFamilyFromReviews}
+              className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-stone-800 dark:text-stone-300 dark:hover:border-rose-900 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
+            >
+              Remove {currentFormFamily.label}
+            </button>
+          )}
+          <div className="text-xs text-stone-400 text-right">
+            {(practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'forms'
+              ? 'Forms only'
+              : (practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'reading'
+                ? 'Reading'
+                : 'Auto'}
+          </div>
         </div>
       </div>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
@@ -2542,7 +2917,7 @@ export default function StudyView() {
                   <>
                     <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3 mb-3">
                       <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                        {coachCells.map((cell, i) => {
+                        {visibleCoachCells.map((cell, i) => {
                           const cls =
                             kanaMatchDisplay === 'none'
                               ? cell.state === 'empty'
@@ -2714,7 +3089,7 @@ export default function StudyView() {
                         </div>
                       </div>
                     )}
-                    {!!liveCells.length && liveKana && (
+                    {(!!visibleLiveCells.length || liveKanaVisible) && liveKana && (
                       <div
                         role="group"
                         aria-label="Live kana help"
@@ -2757,7 +3132,7 @@ export default function StudyView() {
                         {liveKanaVisible && (
                           <>
                             <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                              {liveCells.map((cell, i) => {
+                              {visibleLiveCells.map((cell, i) => {
                                 const cls =
                                   cell.state === 'correct'
                                     ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'

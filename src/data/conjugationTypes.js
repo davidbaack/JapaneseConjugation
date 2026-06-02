@@ -575,6 +575,11 @@ export const ADVANCED_PATTERN_TYPE_IDS = [
   'adj-sugiru',
 ];
 
+export const TEXTBOOK_CORE_TYPE_IDS = uniqueTypeIds([
+  ...EVERYDAY_TYPE_IDS,
+  ...ADVANCED_PATTERN_TYPE_IDS,
+]);
+
 export const COMPOUND_CHALLENGE_TYPE_IDS = [
   'passive-polite-negative',
   'passive-polite-past',
@@ -619,9 +624,9 @@ export const COMPOUND_CHALLENGE_TYPE_IDS = [
 export const TYPE_PACKS = [
   {
     id: 'core',
-    label: 'Core',
-    hint: 'A learner-friendly default: foundations plus common everyday production forms.',
-    typeIds: LEARNER_DEFAULT_TYPE_IDS,
+    label: 'Textbook Core',
+    hint: 'Default Genki/Minna-style scope: common forms without rare stacked or short variants.',
+    typeIds: TEXTBOOK_CORE_TYPE_IDS,
   },
   {
     id: 'basics',

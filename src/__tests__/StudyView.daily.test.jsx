@@ -107,6 +107,15 @@ function persistStudyCard(word, type) {
     }),
   );
 }
+
+async function startReviewsFromDashboard() {
+  const start = await screen.findByRole(
+    'button',
+    { name: /Start Reviews|Continue Reviews|Start Core Warmup/ },
+    { timeout: 5000 },
+  );
+  fireEvent.click(start);
+}
 class FakeSpeechRecognition {
   static instance = null;
 
@@ -157,16 +166,20 @@ afterEach(() => {
 });
 
 describe('StudyView daily startup guards', () => {
-  it('auto-starts today for signed-in learners', async () => {
+  it('opens to the Reviews dashboard for signed-in learners, then starts on command', async () => {
     const app = makeApp();
     mockedApp.value = app;
 
     render(<StudyView />);
 
-    await waitFor(() => expect(app.startTodayDrill).toHaveBeenCalled());
+    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+    expect(app.startTodayDrill).not.toHaveBeenCalled();
+
+    await startReviewsFromDashboard();
+    expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
   });
 
-  it('auto-starts today while signed out', async () => {
+  it('opens to the Reviews dashboard while signed out, then starts on command', async () => {
     const app = makeApp({
       session: null,
     });
@@ -174,7 +187,11 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await waitFor(() => expect(app.startTodayDrill).toHaveBeenCalled());
+    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+    expect(app.startTodayDrill).not.toHaveBeenCalled();
+
+    await startReviewsFromDashboard();
+    expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
   });
 
   it('does not auto-start today over a focused word launch', async () => {
@@ -206,7 +223,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    expect(await screen.findByText('No cards available')).toBeTruthy();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
@@ -228,6 +245,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
+    await startReviewsFromDashboard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
@@ -254,6 +272,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
+    await startReviewsFromDashboard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     const raw = sessionStorage.getItem('jp-study-current');
     expect(raw).toBeTruthy();
@@ -304,18 +323,19 @@ describe('StudyView daily startup guards', () => {
       JSON.stringify({
         dict: STARTER_VERBS[0].dict,
         group: STARTER_VERBS[0].group,
-        type: 'passive',
+        type: 'short-causative-passive-polite-past-negative',
       }),
     );
     mockedApp.value = makeApp({ state: goalHitState() });
 
     render(<StudyView />);
 
+    await startReviewsFromDashboard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     await waitFor(() => {
       const raw = sessionStorage.getItem('jp-study-current');
       expect(raw).toBeTruthy();
-      expect(JSON.parse(raw).type).not.toBe('passive');
+      expect(JSON.parse(raw).type).not.toBe('short-causative-passive-polite-past-negative');
     });
     expect(screen.queryByText('No cards available')).toBeNull();
   });
@@ -345,6 +365,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
+    await startReviewsFromDashboard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     await waitFor(() => {
       const raw = sessionStorage.getItem('jp-study-current');
@@ -381,6 +402,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
+    await startReviewsFromDashboard();
     await screen.findByText('to open (v.t.)', {}, { timeout: 5000 });
     expect(screen.queryByText('No cards available')).toBeNull();
   });
@@ -498,6 +520,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
+    await startReviewsFromDashboard();
     expect(await screen.findByText('0/1 due')).toBeTruthy();
     expect(screen.getByText('Review')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
@@ -526,6 +549,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
+    await startReviewsFromDashboard();
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 

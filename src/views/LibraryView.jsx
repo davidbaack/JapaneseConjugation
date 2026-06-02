@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import ReferenceViewSub from './ReferenceViewSub.jsx';
-import LessonsView from './LessonsView.jsx';
 import ListsViewSub from './ListsViewSub.jsx';
 import CustomDictionaryViewSub from './CustomDictionaryViewSub.jsx';
+import ReviewInventoryView from './ReviewInventoryView.jsx';
 import { useTablist } from '../components/useTablist.js';
-import { IconBook, IconSpark, IconList, IconPen } from '../components/Icons.jsx';
+import { IconBook, IconCheck, IconList, IconPen } from '../components/Icons.jsx';
 import { useApp } from '../state/AppStateContext.jsx';
 
 const PRIMARY_SECTIONS = [
   {
-    id: 'reference',
-    label: 'Lookup',
-    desc: 'Search forms and launch targeted practice.',
-    Icon: IconBook,
+    id: 'inventory',
+    label: 'Inventory',
+    desc: 'Turn review words and form families on or off.',
+    Icon: IconCheck,
   },
   {
-    id: 'lessons',
-    label: 'Lessons',
-    desc: 'Rules, traps, and examples.',
-    Icon: IconSpark,
+    id: 'reference',
+    label: 'Lookup / Check',
+    desc: 'Search real forms and launch targeted practice.',
+    Icon: IconBook,
   },
 ];
 
@@ -55,7 +55,7 @@ export default function LibraryView() {
     setTab,
     practiceWord,
   } = useApp();
-  const [subTab, setSubTab] = useState('reference');
+  const [subTab, setSubTab] = useState('inventory');
   const sections = [...PRIMARY_SECTIONS, ...MANAGEMENT_SECTIONS];
   const { tabProps, panelProps } = useTablist(
     sections.map((t) => t.id),
@@ -72,10 +72,12 @@ export default function LibraryView() {
               Library
             </div>
             <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
-              Rules and forms for the next drill.
+              What Reviews is allowed to show.
             </h2>
           </div>
-          <div className="text-sm text-stone-550 dark:text-stone-400">Lookup, learn, drill.</div>
+          <div className="text-sm text-stone-550 dark:text-stone-400">
+            Inventory, lookup, lists.
+          </div>
         </div>
 
         <div role="tablist" aria-label="Library sections" className="mt-4 space-y-3">
@@ -145,6 +147,7 @@ export default function LibraryView() {
       </section>
 
       <div {...panelProps(subTab)}>
+        {subTab === 'inventory' && <ReviewInventoryView />}
         {subTab === 'reference' && (
           <ReferenceViewSub
             state={state}
@@ -161,7 +164,6 @@ export default function LibraryView() {
             focused
           />
         )}
-        {subTab === 'lessons' && <LessonsView />}
         {subTab === 'lists' && (
           <ListsViewSub
             words={[...verbs, ...adjectives]}

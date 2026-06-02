@@ -10,6 +10,7 @@ import {
   getLessonCoverage,
 } from '../data/lessonContent.js';
 import { useApp } from '../state/AppStateContext.jsx';
+import { includeTypeFamilyInReviewState } from '../utils/reviewScope.js';
 
 function LessonStat({ label, value }) {
   return (
@@ -65,7 +66,11 @@ export default function LessonsView() {
   }, [query]);
 
   function drillTypeIds(typeIds) {
-    setState((prev) => ({ ...prev, enabledTypes: [...new Set(typeIds)] }));
+    setState((prev) => {
+      let next = prev;
+      for (const typeId of typeIds) next = includeTypeFamilyInReviewState(next, typeId);
+      return { ...next, enabledTypes: [...new Set(typeIds)] };
+    });
     setTab('study');
   }
 

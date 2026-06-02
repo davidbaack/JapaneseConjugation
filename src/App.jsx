@@ -18,18 +18,15 @@ import {
 // needs from the central app state via useApp(), so the shell renders them
 // without prop-drilling.
 const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
-const CheckView = React.lazy(() => import('./views/CheckView.jsx'));
-const GamesView = React.lazy(() => import('./views/GamesView.jsx'));
-const EndingsView = React.lazy(() => import('./views/EndingsView.jsx'));
-const ClassificationView = React.lazy(() => import('./views/ClassificationView.jsx'));
-const InsightsView = React.lazy(() => import('./views/InsightsView.jsx'));
+const LessonsView = React.lazy(() => import('./views/LessonsView.jsx'));
 const LibraryView = React.lazy(() => import('./views/LibraryView.jsx'));
+const PracticeLabView = React.lazy(() => import('./views/PracticeLabView.jsx'));
 const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 const DevHistoryPanel = import.meta.env.DEV
   ? React.lazy(() => import('./components/DevHistoryPanel.jsx'))
   : null;
 
-const TABS = ['study', 'check', 'classify', 'endings', 'games', 'insights', 'library', 'settings'];
+const TABS = ['study', 'lessons', 'library', 'lab', 'settings'];
 
 export function SRSQueueBar() {
   const {
@@ -51,6 +48,8 @@ export function SRSQueueBar() {
   } = useApp();
   const signedIn = !!session?.user;
   const cloudSyncAvailable = !!supabase;
+
+  if (tab !== 'study') return null;
 
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
   const dueCleared = srsQueue?.completedDueRuleIds?.length || 0;
@@ -112,7 +111,7 @@ export function SRSQueueBar() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-              {queueDone ? 'Queue cleared' : 'SRS Queue'}
+              {queueDone ? 'Queue cleared' : 'Reviews Queue'}
             </div>
             <div className={`flex items-center gap-1 text-[11px] ${syncTone}`}>
               <IconCloud className="h-3 w-3" />
@@ -158,7 +157,7 @@ export function SRSQueueBar() {
               }}
               className="min-h-9 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
             >
-              {canStart ? 'Start review' : 'Go study'}
+              {canStart ? 'Start Reviews' : 'Go to Reviews'}
             </button>
           )}
           {!signedIn && cloudSyncAvailable && (
@@ -387,7 +386,7 @@ export function PracticeProgressPanel() {
 
   return (
     <section
-      aria-label="Practice progress"
+      aria-label="Review progress"
       className="mb-4 rounded-lg border border-stone-200 bg-white px-3 py-3 shadow-sm dark:border-stone-800 dark:bg-stone-900"
     >
       <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -466,12 +465,9 @@ function AppShell() {
         <Suspense fallback={<ViewSkeleton />}>
           <div {...panelProps(tab)}>
             {tab === 'study' && <StudyView />}
-            {tab === 'check' && <CheckView />}
-            {tab === 'games' && <GamesView />}
-            {tab === 'endings' && <EndingsView />}
-            {tab === 'classify' && <ClassificationView />}
-            {tab === 'insights' && <InsightsView />}
+            {tab === 'lessons' && <LessonsView />}
             {tab === 'library' && <LibraryView />}
+            {tab === 'lab' && <PracticeLabView />}
             {tab === 'settings' && <SettingsView />}
           </div>
         </Suspense>

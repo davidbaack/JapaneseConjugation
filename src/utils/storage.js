@@ -3,7 +3,7 @@ import {
   CONJ_TYPES,
   ALL_CARD_TYPES,
   TYPE_PACKS,
-  LEARNER_DEFAULT_TYPE_IDS,
+  TEXTBOOK_CORE_TYPE_IDS,
   LEGACY_BROAD_DEFAULT_TYPE_IDS,
   INTRODUCED_DEFAULT_TYPE_IDS,
 } from '../data/conjugationTypes.js';
@@ -19,6 +19,7 @@ import {
 import { getMinimalPairSet, mergeMinimalPairProgress } from './minimalPairs.js';
 import { mergePracticePrefs } from './display.js';
 import { buildRuleCandidates } from './ruleCandidates.js';
+import { defaultReviewScope, normalizeReviewScope, reviewTypeIdsForState } from './reviewScope.js';
 
 export const DAY = 86400000;
 export const SRS_SCHEMA_VERSION = 3;
@@ -53,7 +54,7 @@ function isLegacyBroadDefaultTypeScope(ids) {
 }
 
 function normalizeDefaultTypeScope(ids) {
-  return isLegacyBroadDefaultTypeScope(ids) ? [...LEARNER_DEFAULT_TYPE_IDS] : ids;
+  return isLegacyBroadDefaultTypeScope(ids) ? [...TEXTBOOK_CORE_TYPE_IDS] : ids;
 }
 
 export function wordSrsKey(word) {
@@ -364,6 +365,9 @@ function hasLocalStateData(state) {
     hasItems(state.reference?.history) ||
     !!state.reference?.selected ||
     hasItems(state.reference?.weakRules) ||
+    hasItems(state.reviewScope?.excludedWordKeys) ||
+    hasItems(state.reviewScope?.excludedFormFamilyIds) ||
+    hasItems(state.reviewScope?.recommendations) ||
     (state.daily &&
       ((state.daily.count || 0) > 0 ||
         !!state.daily.goalHit ||
@@ -649,7 +653,7 @@ export function mergeCloudState(local, cloud) {
           retryQueue: [],
           readiness: defaultReadinessState(),
           transformation: emptyTransformationStats(),
-          enabledTypes: [...LEARNER_DEFAULT_TYPE_IDS],
+          enabledTypes: [...TEXTBOOK_CORE_TYPE_IDS],
         };
   const normalizedCloud =
     cloud.schemaVersion === SRS_SCHEMA_VERSION
@@ -662,7 +666,7 @@ export function mergeCloudState(local, cloud) {
           retryQueue: [],
           readiness: defaultReadinessState(),
           transformation: emptyTransformationStats(),
-          enabledTypes: [...LEARNER_DEFAULT_TYPE_IDS],
+          enabledTypes: [...TEXTBOOK_CORE_TYPE_IDS],
         };
   local = normalizedLocal;
   cloud = normalizedCloud;
@@ -741,6 +745,20 @@ export function mergeCloudState(local, cloud) {
     },
     transformation: mergeTransformationStats(local.transformation, cloud.transformation),
     minimalPairs: mergeMinimalPairProgress(local.minimalPairs, cloud.minimalPairs),
+    reviewScope: normalizeReviewScope({
+      excludedWordKeys: [
+        ...(cloud.reviewScope?.excludedWordKeys || []),
+        ...(local.reviewScope?.excludedWordKeys || []),
+      ],
+      excludedFormFamilyIds: [
+        ...(cloud.reviewScope?.excludedFormFamilyIds || []),
+        ...(local.reviewScope?.excludedFormFamilyIds || []),
+      ],
+      recommendations: [
+        ...(local.reviewScope?.recommendations || []),
+        ...(cloud.reviewScope?.recommendations || []),
+      ],
+    }),
   };
 }
 
@@ -829,7 +847,8 @@ export function defaultState() {
     transformation: emptyTransformationStats(),
     minimalPairs: { bySet: {} },
     reference: normalizeReferenceState(),
-    enabledTypes: [...LEARNER_DEFAULT_TYPE_IDS],
+    reviewScope: defaultReviewScope(),
+    enabledTypes: [...TEXTBOOK_CORE_TYPE_IDS],
     session: { reviewed: 0, correct: 0, skipped: 0, mistakePatterns: {} },
     daily: {
       date: localDateKey(),
@@ -880,19 +899,20 @@ export function mergeState(saved, sessionOverride) {
       : mergeTransformationStats(base.transformation, saved && saved.transformation),
     minimalPairs: mergeMinimalPairProgress(base.minimalPairs, saved && saved.minimalPairs),
     reference: normalizeReferenceState(saved && saved.reference ? saved.reference : null),
+    reviewScope: normalizeReviewScope(saved && saved.reviewScope ? saved.reviewScope : null),
     daily: (saved && saved.daily) || base.daily,
     classify: (saved && saved.classify) || base.classify,
     session: sessionOverride || base.session,
   };
 
   if (oldSrsSchema) {
-    merged.enabledTypes = [...LEARNER_DEFAULT_TYPE_IDS];
+    merged.enabledTypes = [...TEXTBOOK_CORE_TYPE_IDS];
   } else if (
     saved &&
     Array.isArray(saved.enabledTypes) &&
     isLegacyBroadDefaultTypeScope(saved.enabledTypes)
   ) {
-    merged.enabledTypes = [...LEARNER_DEFAULT_TYPE_IDS];
+    merged.enabledTypes = [...TEXTBOOK_CORE_TYPE_IDS];
   } else if (
     saved &&
     Array.isArray(saved.enabledTypes) &&
@@ -1135,12 +1155,12 @@ function buildWordFormCandidates(
 }
 
 function formPriority(typeId) {
-  const index = LEARNER_DEFAULT_TYPE_IDS.indexOf(typeId);
-  return index >= 0 ? index : LEARNER_DEFAULT_TYPE_IDS.length + 100;
+  const index = TEXTBOOK_CORE_TYPE_IDS.indexOf(typeId);
+  return index >= 0 ? index : TEXTBOOK_CORE_TYPE_IDS.length + 100;
 }
 
 function candidateSortScore(entry, wordLists = []) {
-  return formPriority(entry.type) * 100000 + wordPriority(entry.verb, wordLists);
+  return wordPriority(entry.verb, wordLists) * 100000 + formPriority(entry.type);
 }
 
 function lastSeenForCandidate(state, entry) {
@@ -1317,7 +1337,7 @@ export function buildPracticePoolSummary(
   options = {},
 ) {
   const filtered = filterWordsForStudyScope(words, state, prefs, wordLists, options);
-  const enabled = enabledTypeIdsFor(state.enabledTypes);
+  const enabled = reviewTypeIdsForState(state, enabledTypeIdsFor(state.enabledTypes));
   const now = Date.now();
   const activeTypes = new Set();
   const activeRules = buildRuleCandidates(filtered, enabled, prefs, { activeTypes: enabled });

@@ -12,7 +12,7 @@ import {
   ONBIN_PATTERN_META,
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
-import { defaultState, bumpDaily } from '../utils/storage.js';
+import { defaultState } from '../utils/storage.js';
 import { promptDisplay, formDisplay, shuffled } from '../utils/display.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { playPronunciation } from '../utils/speech.js';
@@ -238,7 +238,6 @@ export default function EndingsView() {
               },
             },
           },
-          daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 30) : s.daily,
         };
       });
     } else {
@@ -264,7 +263,6 @@ export default function EndingsView() {
               },
             },
           },
-          daily: ok ? bumpDaily(s.daily, true, practicePrefs.dailyGoal || 30) : s.daily,
         };
       });
     }
