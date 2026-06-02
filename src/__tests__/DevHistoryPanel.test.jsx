@@ -74,7 +74,7 @@ describe('DevHistoryPanel', () => {
 
     render(<DevHistoryPanel />);
     fireEvent.click(screen.getByRole('button', { name: 'History' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Preview commit abcdef1/ }));
 
     expect(await screen.findByRole('dialog', { name: 'Revision preview' })).toBeTruthy();
     const frame = screen.getByTitle('Revision preview abcdef1');

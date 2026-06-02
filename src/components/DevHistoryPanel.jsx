@@ -172,13 +172,19 @@ export default function DevHistoryPanel({ apiBase = API_BASE }) {
                 {revisions.map((revision) => {
                   const building = buildingSha === revision.sha;
                   return (
-                    <article
+                    <button
                       key={revision.sha}
-                      className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm dark:border-stone-800 dark:bg-stone-900"
+                      type="button"
+                      onClick={() => restorePreview(revision)}
+                      disabled={!!buildingSha}
+                      aria-label={`Preview commit ${revision.shortSha}: ${
+                        revision.subject || 'no subject'
+                      }`}
+                      className="w-full rounded-lg border border-stone-200 bg-white p-3 text-left shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50/40 focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:cursor-wait disabled:opacity-65 dark:border-stone-800 dark:bg-stone-900 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                      <span className="flex items-start justify-between gap-3">
+                        <span className="min-w-0">
+                          <span className="flex flex-wrap items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
                             <code className="font-semibold text-stone-800 dark:text-stone-100">
                               {revision.shortSha}
                             </code>
@@ -193,27 +199,25 @@ export default function DevHistoryPanel({ apiBase = API_BASE }) {
                                 dirty
                               </span>
                             )}
-                          </div>
-                          <h3 className="mt-1 text-sm font-semibold leading-5 text-stone-950 dark:text-stone-50">
+                          </span>
+                          <span className="mt-1 block text-sm font-semibold leading-5 text-stone-950 dark:text-stone-50">
                             {revision.subject || '(no subject)'}
-                          </h3>
+                          </span>
                           {revision.refs && (
-                            <div className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">
+                            <span className="mt-1 block truncate text-xs text-stone-500 dark:text-stone-400">
                               {revision.refs}
-                            </div>
+                            </span>
                           )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => restorePreview(revision)}
-                          disabled={!!buildingSha}
-                          className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg bg-stone-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-stone-700 disabled:cursor-wait disabled:opacity-60 dark:bg-emerald-700 dark:hover:bg-emerald-600"
+                        </span>
+                        <span
+                          aria-hidden="true"
+                          className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg bg-stone-900 px-3 py-2 text-xs font-semibold text-white dark:bg-emerald-700"
                         >
                           <IconEye className="h-3.5 w-3.5" />
                           {building ? 'Building' : 'Restore'}
-                        </button>
-                      </div>
-                    </article>
+                        </span>
+                      </span>
+                    </button>
                   );
                 })}
               </div>
