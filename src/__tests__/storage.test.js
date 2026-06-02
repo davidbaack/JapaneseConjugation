@@ -609,6 +609,12 @@ describe('selectNext never serves an unconjugatable (blank) card', () => {
 describe('word-form SRS selection', () => {
   const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
   const KAKU = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan' };
+  const YOMU = {
+    dict: '\u8aad\u3080',
+    reading: '\u3088\u3080',
+    meaning: 'to read',
+    group: 'godan',
+  };
 
   it('schedules due cards by exact word-form card id', () => {
     const dueCardId = cardIdFor(TABERU, 'plain-past');
@@ -666,5 +672,63 @@ describe('word-form SRS selection', () => {
       { ...DEFAULT_PREFS, dailyGoal: 10 },
     );
     expect(card).toBeNull();
+  });
+
+  it('moves to fresh material instead of looping recently reviewed weak cards', () => {
+    const now = Date.now();
+    const weakFutureCard = (lastSeen) => ({
+      reps: 1,
+      interval: 1,
+      ease: 2.3,
+      nextReview: now + DAY,
+      correct: 1,
+      incorrect: 3,
+      lastSeen,
+    });
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardIdFor(TABERU, 'plain-past')]: weakFutureCard(now - 1000),
+        [cardIdFor(KAKU, 'plain-past')]: weakFutureCard(now - 2000),
+      },
+    };
+
+    const card = selectNext(state, [TABERU, KAKU, YOMU], ['plain-past'], null, DEFAULT_PREFS);
+
+    expect(card.id).toBe(cardIdFor(YOMU, 'plain-past'));
+  });
+
+  it('rotates future review away from recently seen weak cards when no fresh cards remain', () => {
+    const now = Date.now();
+    const recentWeakCard = (lastSeen) => ({
+      reps: 1,
+      interval: 1,
+      ease: 2.3,
+      nextReview: now + DAY,
+      correct: 1,
+      incorrect: 3,
+      lastSeen,
+    });
+    const olderReviewedCard = {
+      reps: 3,
+      interval: 8,
+      ease: 2.5,
+      nextReview: now + 2 * DAY,
+      correct: 3,
+      incorrect: 0,
+      lastSeen: now - DAY,
+    };
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardIdFor(TABERU, 'plain-past')]: recentWeakCard(now - 1000),
+        [cardIdFor(KAKU, 'plain-past')]: recentWeakCard(now - 2000),
+        [cardIdFor(YOMU, 'plain-past')]: olderReviewedCard,
+      },
+    };
+
+    const card = selectNext(state, [TABERU, KAKU, YOMU], ['plain-past'], null, DEFAULT_PREFS);
+
+    expect(card.id).toBe(cardIdFor(YOMU, 'plain-past'));
   });
 });

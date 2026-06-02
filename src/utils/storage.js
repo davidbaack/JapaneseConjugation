@@ -23,6 +23,8 @@ import { buildRuleCandidates } from './ruleCandidates.js';
 export const DAY = 86400000;
 export const SRS_SCHEMA_VERSION = 3;
 export const DICTIONARY_TYPE_ID = 'dictionary';
+const REVIEW_ROTATION_SIZE = 8;
+const RECENT_REVIEW_COOLDOWN_MS = 5 * 60 * 1000;
 
 const LEGACY_VERB_DEFAULT_TYPE_IDS = CONJ_TYPES.filter((t) => t.id !== 'plain-present').map(
   (t) => t.id,
@@ -1141,6 +1143,57 @@ function candidateSortScore(entry, wordLists = []) {
   return formPriority(entry.type) * 100000 + wordPriority(entry.verb, wordLists);
 }
 
+function lastSeenForCandidate(state, entry) {
+  return Number(state.cards?.[entry.id]?.lastSeen || 0);
+}
+
+function candidateWasSeenRecently(state, entry, now) {
+  const lastSeen = lastSeenForCandidate(state, entry);
+  return lastSeen > 0 && now - lastSeen < RECENT_REVIEW_COOLDOWN_MS;
+}
+
+function rotateReviewCandidates(candidates, state, options = {}) {
+  if (!candidates.length) return null;
+  const ranked = [...candidates]
+    .sort(options.rank)
+    .slice(0, Math.min(REVIEW_ROTATION_SIZE, candidates.length));
+  ranked.sort(
+    (a, b) =>
+      lastSeenForCandidate(state, a) - lastSeenForCandidate(state, b) ||
+      options.tie(a, b) ||
+      candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists),
+  );
+  return ranked[0] || null;
+}
+
+function pickWeakReview(pool, state, options = {}) {
+  return rotateReviewCandidates(pool, state, {
+    ...options,
+    rank:
+      options.rank ||
+      ((a, b) =>
+        b.weakScore - a.weakScore ||
+        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
+    tie: options.tie || ((a, b) => b.weakScore - a.weakScore),
+  });
+}
+
+function pickFutureReview(pool, state, options = {}) {
+  return rotateReviewCandidates(pool, state, {
+    ...options,
+    rank:
+      options.rank ||
+      ((a, b) =>
+        state.cards[a.id].nextReview - state.cards[b.id].nextReview ||
+        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
+    tie:
+      options.tie ||
+      ((a, b) =>
+        state.cards[a.id].nextReview - state.cards[b.id].nextReview ||
+        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
+  });
+}
+
 export function selectNext(
   state,
   verbs,
@@ -1186,6 +1239,10 @@ export function selectNext(
       weakScore: cardWeakScore(state, p.id, p.verb, p.type),
     }))
     .filter((p) => p.weakScore > 0);
+  const hasReviewFallback = fresh.length || nearDue.length || future.length;
+  const readyWeak = hasReviewFallback
+    ? weak.filter((p) => !candidateWasSeenRecently(state, p, now))
+    : weak;
   let chosen = pickWeakWeighted(due, state);
   if (!chosen) {
     if (due.length) {
@@ -1194,9 +1251,8 @@ export function selectNext(
       chosen = sl[Math.floor(Math.random() * sl.length)];
     } else if (retry.length) {
       chosen = pickWeakWeighted(retry, state) || retry[Math.floor(Math.random() * retry.length)];
-    } else if (weak.length) {
-      weak.sort((a, b) => b.weakScore - a.weakScore);
-      chosen = weak[0];
+    } else if (readyWeak.length) {
+      chosen = pickWeakReview(readyWeak, state, options);
     } else if (fresh.length) {
       fresh.sort(
         (a, b) =>
@@ -1204,11 +1260,9 @@ export function selectNext(
       );
       chosen = fresh[0];
     } else if (nearDue.length) {
-      nearDue.sort((a, b) => state.cards[a.id].nextReview - state.cards[b.id].nextReview);
-      chosen = nearDue[0];
+      chosen = pickFutureReview(nearDue, state, options);
     } else {
-      future.sort((a, b) => state.cards[a.id].nextReview - state.cards[b.id].nextReview);
-      chosen = future[0];
+      chosen = pickFutureReview(future, state, options);
     }
   }
   if (!chosen) return null;
