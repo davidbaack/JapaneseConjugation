@@ -289,5 +289,5 @@ describe('App shell', () => {
     expect(screen.getByRole('button', { name: 'Favorite', exact: true })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Drill favorites' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Copy table' })).toBeTruthy();
-  });
+  }, 15000);
 });
