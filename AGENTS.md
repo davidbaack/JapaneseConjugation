@@ -13,11 +13,13 @@
 ## Project Skills
 
 - `smoke-test`: Use `.agents/skills/smoke-test/SKILL.md` when asked to run smoke tests, quick tests, deploy tests, branch validation, or test-failure repair. It runs `npm run ci:fast`, then `npm run ci`, and fixes failures until the gates pass or a real external blocker is identified.
+- `dev-page`: Use `.agents/skills/dev-page/SKILL.md` when asked to run, open, inspect, or verify the local Vite dev page or the dev-only History panel. It starts `npm run dev:page` and uses `http://127.0.0.1:5173/JapaneseConjugation/`.
 
 ## Common Commands
 
 - Install dependencies: `npm install`
 - Start Vite dev server: `npm run dev`
+- Start deterministic dev page: `npm run dev:page`
 - Fast local gate: `npm run ci:fast`
 - Unit tests only: `npm test`
 - E2E tests: `npm run test:e2e`

@@ -25,6 +25,9 @@ const ClassificationView = React.lazy(() => import('./views/ClassificationView.j
 const InsightsView = React.lazy(() => import('./views/InsightsView.jsx'));
 const LibraryView = React.lazy(() => import('./views/LibraryView.jsx'));
 const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
+const DevHistoryPanel = import.meta.env.DEV
+  ? React.lazy(() => import('./components/DevHistoryPanel.jsx'))
+  : null;
 
 const TABS = ['study', 'check', 'classify', 'endings', 'games', 'insights', 'library', 'settings'];
 
@@ -479,6 +482,11 @@ function AppShell() {
         supabase={supabase}
       />
       <UpdatePrompt />
+      {DevHistoryPanel && (
+        <Suspense fallback={null}>
+          <DevHistoryPanel />
+        </Suspense>
+      )}
     </div>
   );
 }

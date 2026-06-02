@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dev Page"
+  short_description: "Run and inspect the local Vite page."
+  default_prompt: "Use $dev-page to start JapaneseConjugation's local dev page, open the app URL, and verify the dev-only History panel when relevant."
