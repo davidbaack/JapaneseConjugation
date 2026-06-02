@@ -863,14 +863,7 @@ export default function StudyView() {
 
   useEffect(() => {
     if (!current) return;
-    if (phase !== 'answering') return;
-    if (reverseDrill) return;
-    if (!typedAnswerMode) return;
-    const exp = reverseDrill ? current.verb.reading : sourceForm;
-    const preview = toHiragana(answer);
-    if (exp && preview === exp) {
-      submit();
-    }
+    submitIfCompleteTypedAnswer(answer);
   }, [answer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Remember how many leading kana have turned green so they stay green through
@@ -1460,7 +1453,8 @@ export default function StudyView() {
     const raw = choiceValue !== undefined ? choiceValue : answer;
     if (!raw.trim()) return;
     const spoken = !!options.spoken;
-    const normalized = choiceValue !== undefined && !spoken ? raw : toHiragana(raw);
+    const fromTypedInput = !!options.fromTypedInput || (choiceValue === undefined && !spoken);
+    const normalized = !spoken && fromTypedInput ? toHiragana(raw) : raw;
     const finalOk = reverseDrill
       ? spoken
         ? spokenAnswerResult(spokenAnswerTargets, raw).ok
@@ -1807,17 +1801,39 @@ export default function StudyView() {
     setTimeout(() => inputRef.current?.focus(), 0);
   }
 
-  function insertAnswerText(text) {
-    setTypoGuard(null);
-    if (typedAnswerMode && liveKanaVisible && !reverseDrill) {
-      const newVal = answer + text;
-      const cells = kanaCoachCells(expected, newVal, coachRevealed, true);
-      if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
-        hadKanaMistakeRef.current = true;
-      }
+  function submitIfCompleteTypedAnswer(nextAnswer) {
+    if (!current) return false;
+    if (phase !== 'answering') return false;
+    if (reverseDrill) return false;
+    if (!typedAnswerMode) return false;
+    if (expected && toHiragana(nextAnswer) === expected) {
+      submit(nextAnswer, { fromTypedInput: true });
+      return true;
     }
-    setAnswer((prev) => `${prev}${text}`);
-    focusAnswerInput();
+    return false;
+  }
+
+  function rememberKanaMistake(nextAnswer, enabled) {
+    if (!enabled) return;
+    const cells = kanaCoachCells(expected, nextAnswer, coachRevealed, true);
+    if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
+      if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = nextAnswer;
+      hadKanaMistakeRef.current = true;
+    }
+  }
+
+  function updateTypedAnswer(nextAnswer, options = {}) {
+    setTypoGuard(null);
+    rememberKanaMistake(nextAnswer, options.trackKanaMistake !== false);
+    setAnswer(nextAnswer);
+    return submitIfCompleteTypedAnswer(nextAnswer);
+  }
+
+  function insertAnswerText(text) {
+    const submitted = updateTypedAnswer(`${answer}${text}`, {
+      trackKanaMistake: typedAnswerMode && liveKanaVisible && !reverseDrill,
+    });
+    if (!submitted) focusAnswerInput();
   }
 
   function backspaceAnswerText() {
@@ -2667,16 +2683,9 @@ export default function StudyView() {
                         type="text"
                         value={answer}
                         onChange={(e) => {
-                          setTypoGuard(null);
-                          const newVal = e.target.value;
-                          if (kanaMatchDisplay !== 'none') {
-                            const cells = kanaCoachCells(expected, newVal, coachRevealed, true);
-                            if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
-                              if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = newVal;
-                              hadKanaMistakeRef.current = true;
-                            }
-                          }
-                          setAnswer(newVal);
+                          updateTypedAnswer(e.target.value, {
+                            trackKanaMistake: kanaMatchDisplay !== 'none',
+                          });
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -2876,16 +2885,9 @@ export default function StudyView() {
                         type="text"
                         value={answer}
                         onChange={(e) => {
-                          setTypoGuard(null);
-                          const newVal = e.target.value;
-                          if (liveKanaVisible && !reverseDrill) {
-                            const cells = kanaCoachCells(expected, newVal, coachRevealed, true);
-                            if (cells.some((c) => c.state === 'wrong' || c.state === 'extra')) {
-                              if (!hadKanaMistakeRef.current) wrongSnapshotRef.current = newVal;
-                              hadKanaMistakeRef.current = true;
-                            }
-                          }
-                          setAnswer(newVal);
+                          updateTypedAnswer(e.target.value, {
+                            trackKanaMistake: liveKanaVisible && !reverseDrill,
+                          });
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {

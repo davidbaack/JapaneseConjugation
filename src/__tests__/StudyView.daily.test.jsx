@@ -495,6 +495,36 @@ describe('StudyView daily startup guards', () => {
     expect(markSrsQueueCompleted).toHaveBeenCalledWith(dueCardId);
   });
 
+  it('checks an exact romaji answer as soon as typing completes it', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'tabet' } });
+    expect(setState).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: 'tabeta' } });
+    expect(setState).toHaveBeenCalled();
+
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
+    expect(nextState.cards[cardId].correct).toBe(1);
+    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+  });
+
   it('keeps direct kana pending until a miss, then grades retyped kana immediately', async () => {
     mockedApp.value = makeApp({
       practicePrefs: {
