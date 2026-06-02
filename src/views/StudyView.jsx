@@ -177,13 +177,23 @@ function cardMatchesPractice(card, words, enabledTypes, prefs = DEFAULT_PREFS) {
   return !isRedundantPracticeType(card.verb, card.type, activeTypes, prefs);
 }
 
-function ReviewDisclosure({ tone = 'stone', summary, children }) {
+function ReviewDisclosure({ tone = 'stone', summary, children, alwaysOpen = false }) {
   const toneClass =
     tone === 'rose'
       ? 'border-rose-200 dark:border-rose-900/60 bg-white/70 dark:bg-stone-950/50'
       : tone === 'emerald'
         ? 'border-emerald-200 dark:border-emerald-900/60 bg-white/70 dark:bg-stone-950/50'
         : 'border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-950/50';
+
+  if (alwaysOpen) {
+    return (
+      <section className={`rounded-xl border ${toneClass} px-3 py-2`}>
+        <div className="text-sm font-semibold text-stone-800 dark:text-stone-100">{summary}</div>
+        <div className="mt-3 space-y-2.5">{children}</div>
+      </section>
+    );
+  }
+
   return (
     <details className={`rounded-xl border ${toneClass} px-3 py-2`}>
       <summary className="cursor-pointer list-none text-sm font-semibold text-stone-800 dark:text-stone-100">
@@ -3161,7 +3171,7 @@ export default function StudyView() {
 
                 {wasCorrect && reviewExplanation && (
                   <div className="mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-900/50 text-left">
-                    <ReviewDisclosure tone="emerald" summary="Why this is right">
+                    <ReviewDisclosure tone="emerald" summary="Why this is right" alwaysOpen>
                       <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
                         {reviewExplanation.intro}
                       </div>
