@@ -10,6 +10,10 @@
 - After feature work is complete, commit the relevant files and push the branch, or merge to `main` when that is the agreed flow.
 - Do not edit `dist/`, `test-results/`, or generated service-worker output. Current PWA behavior is configured through `VitePWA` in `vite.config.js`; treat `public/sw.js` as obsolete unless it reappears as tracked source.
 
+## Project Skills
+
+- `smoke-test`: Use `.agents/skills/smoke-test/SKILL.md` when asked to run smoke tests, quick tests, deploy tests, branch validation, or test-failure repair. It runs `npm run ci:fast`, then `npm run ci`, and fixes failures until the gates pass or a real external blocker is identified.
+
 ## Common Commands
 
 - Install dependencies: `npm install`

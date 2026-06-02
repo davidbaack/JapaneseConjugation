@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # Claude Agent Instructions
 
 ## After Completing Changes

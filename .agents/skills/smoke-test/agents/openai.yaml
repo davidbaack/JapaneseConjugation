@@ -1,0 +1,4 @@
+interface:
+  display_name: "Smoke Test"
+  short_description: "Run quick and deploy validation."
+  default_prompt: "Use $smoke-test to run JapaneseConjugation's quick and deploy smoke tests, fix any failures, rerun until passing, and report the final validation status."
