@@ -3,7 +3,6 @@ import { IconSpark } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import StickyAction from '../components/StickyAction.jsx';
 import {
-  filterWordsForPrefs,
   isAdjective,
   classifyGroupId,
   isIrregularAdjective,
@@ -13,6 +12,7 @@ import {
   getWordMeta,
   surfaceFormFor,
 } from '../utils/conjugator.js';
+import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { defaultState, bumpDaily } from '../utils/storage.js';
 import { promptDisplay } from '../utils/display.js';
 import { TYPE_LABEL } from '../data/conjugationTypes.js';
@@ -111,13 +111,17 @@ export default function ClassificationView() {
     setState,
     setTab,
     allWords: words,
+    builtInWords,
     practicePrefs,
     wordLists,
     activeGeminiKey: geminiKey,
   } = useApp();
   const filtered = useMemo(
-    () => filterWordsForPrefs(words, practicePrefs, wordLists),
-    [words, practicePrefs, wordLists],
+    () =>
+      filterWordsForStudyScope(words, { cards: state.cards }, practicePrefs, wordLists, {
+        builtInWords,
+      }),
+    [words, state.cards, practicePrefs, wordLists, builtInWords],
   );
   const [current, setCurrent] = useState(null);
   const [result, setResult] = useState(null);

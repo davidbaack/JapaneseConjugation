@@ -7,14 +7,8 @@ import {
   LEGACY_BROAD_DEFAULT_TYPE_IDS,
   INTRODUCED_DEFAULT_TYPE_IDS,
 } from '../data/conjugationTypes.js';
-import {
-  RULES,
-  wordKey,
-  wordKind,
-  getWordMeta,
-  enabledTypeIdsFor,
-  filterWordsForPrefs,
-} from './conjugator.js';
+import { RULES, wordKey, wordKind, getWordMeta, enabledTypeIdsFor } from './conjugator.js';
+import { filterWordsForStudyScope } from './vocabularyProgression.js';
 import { diagnoseMistake } from './mistakeDiagnosis.js';
 import { retryWithBackoff } from './retry.js';
 import {
@@ -1265,8 +1259,14 @@ export function buildFocusCard(state, word, type) {
   };
 }
 
-export function buildPracticePoolSummary(state, words, prefs = DEFAULT_PREFS, wordLists = []) {
-  const filtered = filterWordsForPrefs(words, prefs, wordLists);
+export function buildPracticePoolSummary(
+  state,
+  words,
+  prefs = DEFAULT_PREFS,
+  wordLists = [],
+  options = {},
+) {
+  const filtered = filterWordsForStudyScope(words, state, prefs, wordLists, options);
   const enabled = enabledTypeIdsFor(state.enabledTypes);
   const now = Date.now();
   const activeTypes = new Set();

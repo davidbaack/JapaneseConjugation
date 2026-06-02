@@ -53,6 +53,10 @@ describe('SettingsView controls', () => {
 
     expect(screen.queryByText('Kana help while typing')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Kana help while typing' })).toBeNull();
+    expect(screen.queryByText('Vocabulary filters')).toBeNull();
+    expect(screen.queryByText('JLPT levels')).toBeNull();
+    expect(screen.queryByText('Genki lessons')).toBeNull();
+    expect(screen.queryByText('Word groups')).toBeNull();
 
     expect(screen.getByText('Word category label')).toBeTruthy();
     const wordCategory = within(screen.getByRole('group', { name: 'Word category label' }));
@@ -62,8 +66,8 @@ describe('SettingsView controls', () => {
     expect(screen.getByText('Conjugation types in scope')).toBeTruthy();
     expect(screen.getByText(/Current mix:/)).toBeTruthy();
     expect(screen.getByText(/drop-る, row-shift, irregular/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /ichidan: drop る/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /godan: row-shift/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /ichidan: drop る/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /godan: row-shift/ })).toBeNull();
     expect(screen.queryByText(/Hides う-verb \/ る-verb/)).toBeNull();
 
     await waitFor(() => {

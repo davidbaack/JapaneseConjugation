@@ -325,6 +325,10 @@ function useAppController() {
     () => [...builtInAdjectives, ...customAdjectives],
     [builtInAdjectives, customAdjectives],
   );
+  const builtInWords = useMemo(
+    () => [...builtInVerbs, ...builtInAdjectives, ...builtInNouns],
+    [builtInVerbs, builtInAdjectives, builtInNouns],
+  );
   const allWords = useMemo(
     () => [...allVerbs, ...allAdjectives, ...builtInNouns],
     [allVerbs, allAdjectives, builtInNouns],
@@ -332,8 +336,8 @@ function useAppController() {
   const daily = state.daily || defaultState().daily;
   const dailyPct = Math.min(100, Math.round((daily.count / (practicePrefs.dailyGoal || 30)) * 100));
   const todayPlan = useMemo(
-    () => buildTodayDrillPlan(state, allWords, practicePrefs, wordLists),
-    [state, allWords, practicePrefs, wordLists],
+    () => buildTodayDrillPlan(state, allWords, practicePrefs, wordLists, { builtInWords }),
+    [state, allWords, practicePrefs, wordLists, builtInWords],
   );
   const todayKey = localDateKey();
   const todayGoalHit = daily.date === todayKey && !!daily.goalHit;
@@ -440,6 +444,7 @@ function useAppController() {
     supabase,
     allVerbs,
     allAdjectives,
+    builtInWords,
     builtInNouns,
     allWords,
     daily,

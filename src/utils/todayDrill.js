@@ -1,9 +1,10 @@
 import { ALL_CARD_TYPES, TYPE_PACKS } from '../data/conjugationTypes.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import { enabledTypeIdsFor, filterWordsForPrefs, wordKey } from './conjugator.js';
+import { enabledTypeIdsFor, wordKey } from './conjugator.js';
 import { minimalPairSetMatchesWord, recommendMinimalPairSets } from './minimalPairs.js';
 import { cardIdFor, cardWeakScore, localDateKey, weakTypeIdsForState } from './storage.js';
 import { buildRuleCandidates, ruleCandidateTypeSet } from './ruleCandidates.js';
+import { filterWordsForStudyScope } from './vocabularyProgression.js';
 
 export const TODAY_DRILL_LIST_ID = 'list-today-drill';
 export const TODAY_DRILL_LIST_NAME = "Today's Drill";
@@ -28,9 +29,15 @@ function dailyGoalReviewLimit(state = {}, prefs = DEFAULT_PREFS) {
   return Math.max(1, goal - (Number(daily.count) || 0));
 }
 
-function selectableWords(words, prefs, wordLists) {
+function selectableWords(state, words, prefs, wordLists, options = {}) {
   const scopedPrefs = { ...DEFAULT_PREFS, ...prefs, wordListIds: [] };
-  const filtered = filterWordsForPrefs(words || [], scopedPrefs, wordLists || []);
+  const filtered = filterWordsForStudyScope(
+    words || [],
+    state || {},
+    scopedPrefs,
+    wordLists || [],
+    options,
+  );
   return filtered.length ? filtered : words || [];
 }
 
@@ -101,7 +108,7 @@ export function buildTodayDrillPlan(
   options = {},
 ) {
   const now = options.now || Date.now();
-  const availableWords = selectableWords(words, prefs, wordLists);
+  const availableWords = selectableWords(state, words, prefs, wordLists, options);
   const activeTypes = enabledTypeIdsFor(state?.enabledTypes);
   const rulesWithCandidates = buildRuleCandidates(availableWords, activeTypes, prefs, {
     activeTypes,
