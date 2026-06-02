@@ -3,7 +3,6 @@ import { IconSpark } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import StickyAction from '../components/StickyAction.jsx';
 import {
-  filterWordsForPrefs,
   isAdjective,
   conjugate,
   onbinTailFor,
@@ -12,6 +11,7 @@ import {
   ONBIN_TA_CHOICES,
   ONBIN_PATTERN_META,
 } from '../utils/conjugator.js';
+import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { defaultState, bumpDaily } from '../utils/storage.js';
 import { promptDisplay, formDisplay, shuffled } from '../utils/display.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
@@ -40,13 +40,17 @@ export default function EndingsView() {
     setState,
     setTab,
     allVerbs: verbs,
+    builtInWords,
     practicePrefs,
     wordLists,
     activeGeminiKey: geminiKey,
   } = useApp();
   const drillVerbs = useMemo(
-    () => filterWordsForPrefs(verbs, practicePrefs, wordLists).filter((v) => !isAdjective(v)),
-    [verbs, practicePrefs, wordLists],
+    () =>
+      filterWordsForStudyScope(verbs, { cards: state.cards }, practicePrefs, wordLists, {
+        builtInWords,
+      }).filter((v) => !isAdjective(v)),
+    [verbs, state.cards, practicePrefs, wordLists, builtInWords],
   );
 
   const stats = state.onbin || defaultState().onbin;

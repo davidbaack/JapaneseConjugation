@@ -3,13 +3,8 @@ import { IconVolume } from './Icons.jsx';
 import ScriptDisplay from './ScriptDisplay.jsx';
 import { playPronunciation } from '../utils/speech.js';
 import { promptDisplay, formDisplay, shuffled } from '../utils/display.js';
-import {
-  RULES,
-  filterWordsForPrefs,
-  conjugateItem,
-  isRedundantPracticeType,
-  wordKey,
-} from '../utils/conjugator.js';
+import { RULES, conjugateItem, isRedundantPracticeType, wordKey } from '../utils/conjugator.js';
+import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { contextSentenceFor } from '../utils/conjugatorExplain.js';
 import { ruleWeakScore, defaultState } from '../utils/storage.js';
 import { TYPE_LABEL, ALL_CARD_TYPES } from '../data/conjugationTypes.js';
@@ -22,8 +17,9 @@ export function buildAmbientDeck(
   wordLists = [],
   mode = 'smart',
   count = 18,
+  options = {},
 ) {
-  const filtered = filterWordsForPrefs(words, practicePrefs, wordLists);
+  const filtered = filterWordsForStudyScope(words, state, practicePrefs, wordLists, options);
   const enabled =
     state.enabledTypes && state.enabledTypes.length
       ? state.enabledTypes
@@ -70,6 +66,7 @@ export default function AmbientReviewPanel({
   state,
   setState,
   words,
+  builtInWords = [],
   practicePrefs = DEFAULT_PREFS,
   wordLists = [],
 }) {
@@ -85,9 +82,10 @@ export default function AmbientReviewPanel({
   // Recompute only when the relevant state slices change, not on every state
   // mutation (e.g. session counters), so the ambient deck stays stable.
   const deck = useMemo(
-    () => buildAmbientDeck(words, state, practicePrefs, wordLists, mode, 18),
+    () => buildAmbientDeck(words, state, practicePrefs, wordLists, mode, 18, { builtInWords }),
     [
       words,
+      builtInWords,
       state.cards,
       state.mistakes,
       state.enabledTypes,
@@ -104,15 +102,7 @@ export default function AmbientReviewPanel({
   useEffect(() => {
     setIndex(0);
     setPlaying(false);
-  }, [
-    mode,
-    practicePrefs.wordListIds,
-    practicePrefs.jlptLevels,
-    practicePrefs.wordTypes,
-    practicePrefs.wordGroups,
-    practicePrefs.genkiLessons,
-    practicePrefs.skipDuplicateForms,
-  ]);
+  }, [mode, practicePrefs.wordListIds, practicePrefs.skipDuplicateForms]);
 
   useEffect(() => {
     return () => {

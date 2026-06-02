@@ -5,12 +5,12 @@ import KanaProgressMeter from '../components/KanaProgressMeter.jsx';
 import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells } from '../utils/kanaCoach.js';
 import {
-  filterWordsForPrefs,
   practiceTypesForItem,
   pickPromptType,
   conjugateItem,
   getTypeInfo,
 } from '../utils/conjugator.js';
+import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { cardIdFor, defaultState, gradeCard, recordMistake, bumpDaily } from '../utils/storage.js';
 import { bumpSessionMistakePattern } from '../utils/mistakeDiagnosis.js';
@@ -24,10 +24,21 @@ import {
 import { useApp } from '../state/AppStateContext.jsx';
 
 export default function RushView() {
-  const { state, setState, setTab, allWords: verbs, practicePrefs, wordLists } = useApp();
+  const {
+    state,
+    setState,
+    setTab,
+    allWords: verbs,
+    builtInWords,
+    practicePrefs,
+    wordLists,
+  } = useApp();
   const gameWords = useMemo(
-    () => filterWordsForPrefs(verbs, practicePrefs, wordLists),
-    [verbs, practicePrefs, wordLists],
+    () =>
+      filterWordsForStudyScope(verbs, { cards: state.cards }, practicePrefs, wordLists, {
+        builtInWords,
+      }),
+    [verbs, state.cards, practicePrefs, wordLists, builtInWords],
   );
   const eligible = useMemo(
     () =>

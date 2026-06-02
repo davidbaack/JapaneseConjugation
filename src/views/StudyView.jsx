@@ -28,7 +28,6 @@ import { toHiragana, toHiraganaProgress } from '../utils/romaji.js';
 import {
   conjugateItem,
   enabledTypeIdsFor,
-  filterWordsForPrefs,
   pickPromptType,
   getTypeInfo,
   getWordMeta,
@@ -37,6 +36,7 @@ import {
   promptFormLabel,
   surfaceFormFor,
 } from '../utils/conjugator.js';
+import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { explainItem, stepCoachHint, GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 import {
@@ -319,6 +319,7 @@ export default function StudyView() {
     setState,
     setTab,
     allWords: verbs,
+    builtInWords,
     activeGeminiKey: geminiKey,
     practicePrefs,
     setPracticePrefs,
@@ -394,7 +395,9 @@ export default function StudyView() {
     [state.enabledTypes],
   );
   const practiceWords = useMemo(() => {
-    const base = filterWordsForPrefs(verbs, practicePrefs, wordLists);
+    const base = filterWordsForStudyScope(verbs, { cards: state.cards }, practicePrefs, wordLists, {
+      builtInWords,
+    });
     // Keep a "Practice this verb" target from Check eligible even if it sits
     // outside the current Study filters, so the reset guard below doesn't
     // discard the focus card the moment it's seeded.
@@ -406,7 +409,7 @@ export default function StudyView() {
       return [...base, lockedWord];
     }
     return base;
-  }, [verbs, practicePrefs, wordLists, focus, focusWordLock]);
+  }, [verbs, state.cards, practicePrefs, wordLists, builtInWords, focus, focusWordLock]);
 
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
   const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
