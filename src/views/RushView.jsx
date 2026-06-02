@@ -9,11 +9,11 @@ import {
   pickPromptType,
   conjugateItem,
   getTypeInfo,
+  wordKey,
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
-import { cardIdFor, defaultState, gradeCard, recordMistake } from '../utils/storage.js';
-import { bumpSessionMistakePattern } from '../utils/mistakeDiagnosis.js';
+import { defaultState } from '../utils/storage.js';
 import { kanaMatchDisplayForPrefs, promptDisplay, shuffled } from '../utils/display.js';
 import {
   isRushAnswerCorrect,
@@ -153,47 +153,38 @@ export default function RushView() {
     setAnswer('');
   }
 
-  function recordRushAttempt(current, ok, raw, nextScore, nextCombo) {
+  function recordRushAttempt(current, ok, nextScore, nextCombo) {
     setState((s) => {
-      const rid =
-        cardIdFor(current.item, current.type.id) || `${current.item.group}-${current.type.id}`;
-      const dict = current.item.dict;
-      const prevVS = s.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
       const prevGame = s.game || defaultState().game;
-      const nextMistakes = ok
-        ? s.mistakes
-        : recordMistake(
-            s.mistakes,
-            current.item,
-            current.type.id,
-            current.promptType,
-            normalizeRushAnswer(raw),
-            current.expected,
-          );
-      const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
+      const now = Date.now();
+      const bump = (bucket = {}) => ({
+        attempted: (bucket.attempted || 0) + 1,
+        correct: (bucket.correct || 0) + (ok ? 1 : 0),
+        incorrect: (bucket.incorrect || 0) + (ok ? 0 : 1),
+        lastAt: now,
+      });
+      const key = wordKey(current.item);
+      const wordStats = bump(prevGame.byWord?.[key]);
       return {
         ...s,
-        cards: { ...s.cards, [rid]: gradeCard(s.cards[rid], ok) },
-        verbStats: {
-          ...(s.verbStats || {}),
-          [dict]: {
-            ...(s.verbStats?.[dict] || {}),
-            [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
-          },
-        },
-        mistakes: nextMistakes,
-        session: bumpSessionMistakePattern(
-          {
-            ...(s.session || {}),
-            reviewed: (s.session?.reviewed || 0) + 1,
-            correct: (s.session?.correct || 0) + (ok ? 1 : 0),
-          },
-          mistakeDiagnosis,
-        ),
         game: {
           ...prevGame,
           bestScore: Math.max(prevGame.bestScore || 0, nextScore),
           bestCombo: Math.max(prevGame.bestCombo || 0, nextCombo),
+          byType: {
+            ...(prevGame.byType || {}),
+            [current.type.id]: bump(prevGame.byType?.[current.type.id]),
+          },
+          byWord: {
+            ...(prevGame.byWord || {}),
+            [key]: {
+              ...wordStats,
+              dict: current.item.dict,
+              reading: current.item.reading,
+              meaning: current.item.meaning,
+              group: current.item.group,
+            },
+          },
         },
       };
     });
@@ -232,7 +223,7 @@ export default function RushView() {
           ...r,
         ].slice(0, 5),
       );
-      recordRushAttempt(current, true, raw, nextScore, nextCombo);
+      recordRushAttempt(current, true, nextScore, nextCombo);
       advanceRef.current = setTimeout(() => active && launchRound(nextCleared), 520);
     } else {
       setCombo(0);
@@ -253,7 +244,7 @@ export default function RushView() {
           ...r,
         ].slice(0, 5),
       );
-      recordRushAttempt(current, false, raw, score, 0);
+      recordRushAttempt(current, false, score, 0);
       advanceRef.current = setTimeout(() => active && launchRound(cleared), 900);
     }
   }

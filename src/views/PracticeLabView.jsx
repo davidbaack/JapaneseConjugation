@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { IconCheck, IconList, IconRefresh, IconSpark } from '../components/Icons.jsx';
 import { useTablist } from '../components/useTablist.js';
 import { useApp } from '../state/AppStateContext.jsx';
+import { buildLabReviewRecommendations } from '../utils/reviewRecommendations.js';
 import CheckView from './CheckView.jsx';
 import ClassificationView from './ClassificationView.jsx';
 import EndingsView from './EndingsView.jsx';
@@ -14,59 +15,38 @@ const LAB_TABS = [
   { id: 'games', label: 'Rush', icon: IconRefresh },
 ];
 
-const REVIEW_RECOMMENDATIONS = {
-  endings: {
-    id: 'lab-te-ta-review',
-    source: 'lab',
-    label: 'Te and ta form Reviews',
-    detail: 'Full recall for the forms practiced in Ending Lab.',
-    typeIds: ['te-form', 'plain-past'],
-    suggestedCount: 12,
-  },
-  classify: {
-    id: 'lab-foundation-review',
-    source: 'lab',
-    label: 'Group-aware foundation Reviews',
-    detail: 'Plain, polite, negative, past, and te-form recall.',
-    typeIds: [
-      'plain-present',
-      'plain-past',
-      'plain-negative',
-      'plain-past-negative',
-      'polite-present',
-      'polite-past',
-      'polite-negative',
-      'te-form',
-    ],
-    suggestedCount: 14,
-  },
-  games: {
-    id: 'lab-rush-review',
-    source: 'lab',
-    label: 'Rush follow-up Reviews',
-    detail: 'A short full-recall set for forms that appear in Rush.',
-    typeIds: ['plain-past', 'plain-negative', 'polite-present', 'te-form', 'potential'],
-    suggestedCount: 10,
-  },
-};
-
 export default function PracticeLabView() {
-  const { addReviewRecommendation, setTab } = useApp();
+  const {
+    addReviewRecommendation,
+    allWords,
+    builtInWords,
+    practicePrefs,
+    setTab,
+    state,
+    wordLists,
+  } = useApp();
   const [active, setActive] = useState('check');
   const { tabProps, panelProps } = useTablist(
     LAB_TABS.map((tab) => tab.id),
     active,
     setActive,
   );
+  const recommendations = useMemo(
+    () =>
+      buildLabReviewRecommendations(state, allWords, practicePrefs, wordLists, {
+        activeTool: active,
+        builtInWords,
+      }),
+    [active, allWords, builtInWords, practicePrefs, state, wordLists],
+  );
 
-  function sendRecommendation() {
-    const recommendation = REVIEW_RECOMMENDATIONS[active];
+  function sendRecommendation(recommendation = recommendations[0]) {
     if (!recommendation) return;
     addReviewRecommendation(recommendation);
     setTab('study');
   }
 
-  const canRecommend = !!REVIEW_RECOMMENDATIONS[active];
+  const canRecommend = recommendations.length > 0;
 
   return (
     <div className="space-y-4">
@@ -99,7 +79,7 @@ export default function PracticeLabView() {
           </div>
           <button
             type="button"
-            onClick={sendRecommendation}
+            onClick={() => sendRecommendation()}
             disabled={!canRecommend}
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
           >
@@ -107,6 +87,27 @@ export default function PracticeLabView() {
             Send to Reviews
           </button>
         </div>
+        {recommendations.length > 0 && (
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {recommendations.map((recommendation) => (
+              <button
+                key={recommendation.id}
+                type="button"
+                onClick={() => sendRecommendation(recommendation)}
+                className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-left transition hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35"
+              >
+                <div className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                  {recommendation.label}
+                </div>
+                {recommendation.detail && (
+                  <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-350">
+                    {recommendation.detail}
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       <section {...panelProps(active)}>

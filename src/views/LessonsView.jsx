@@ -10,7 +10,7 @@ import {
   getLessonCoverage,
 } from '../data/lessonContent.js';
 import { useApp } from '../state/AppStateContext.jsx';
-import { includeTypeFamilyInReviewState } from '../utils/reviewScope.js';
+import { buildLessonReviewRecommendation } from '../utils/reviewRecommendations.js';
 
 function LessonStat({ label, value }) {
   return (
@@ -56,7 +56,7 @@ function lessonMatches(lesson, query) {
 }
 
 export default function LessonsView() {
-  const { setState, setTab } = useApp();
+  const { addReviewRecommendation, allWords, setTab } = useApp();
   const [query, setQuery] = useState('');
   const coverage = useMemo(() => getLessonCoverage(), []);
   const allTypeIds = useMemo(() => ALL_CARD_TYPES.map((type) => type.id), []);
@@ -65,12 +65,10 @@ export default function LessonsView() {
     return LESSON_SECTIONS.filter((lesson) => lessonMatches(lesson, q));
   }, [query]);
 
-  function drillTypeIds(typeIds) {
-    setState((prev) => {
-      let next = prev;
-      for (const typeId of typeIds) next = includeTypeFamilyInReviewState(next, typeId);
-      return { ...next, enabledTypes: [...new Set(typeIds)] };
-    });
+  function sendLessonRecommendation(lesson, options = {}) {
+    const recommendation = buildLessonReviewRecommendation(lesson, allWords, options);
+    if (!recommendation) return;
+    addReviewRecommendation(recommendation);
     setTab('study');
   }
 
@@ -92,11 +90,16 @@ export default function LessonsView() {
             </p>
           </div>
           <button
-            onClick={() => drillTypeIds(allTypeIds)}
+            onClick={() =>
+              sendLessonRecommendation(
+                { groupId: 'all-forms', title: 'All forms', typeIds: allTypeIds },
+                { suggestedCount: 20, wordLimit: 16 },
+              )
+            }
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-850 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-950 dark:hover:bg-stone-100"
           >
             <IconRefresh className="w-4 h-4" />
-            Drill every form
+            Send all to Reviews
           </button>
         </div>
 
@@ -338,11 +341,11 @@ export default function LessonsView() {
                   </p>
                 </div>
                 <button
-                  onClick={() => drillTypeIds(lesson.typeIds)}
+                  onClick={() => sendLessonRecommendation(lesson)}
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-750 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-indigo-950/25"
                 >
                   <IconRefresh className="w-4 h-4" />
-                  Drill lesson
+                  Send to Reviews
                 </button>
               </div>
 

@@ -586,6 +586,30 @@ function mergeProgressMap(local = {}, cloud = {}) {
   return merged;
 }
 
+function mergeGameProgressBucket(local = {}, cloud = {}) {
+  const newer = Number(local?.lastAt || 0) >= Number(cloud?.lastAt || 0) ? local : cloud;
+  return {
+    ...cloud,
+    ...local,
+    dict: local?.dict || cloud?.dict || newer?.dict,
+    reading: local?.reading || cloud?.reading || newer?.reading,
+    meaning: local?.meaning || cloud?.meaning || newer?.meaning,
+    group: local?.group || cloud?.group || newer?.group,
+    attempted: maxNum(local?.attempted, cloud?.attempted),
+    correct: maxNum(local?.correct, cloud?.correct),
+    incorrect: maxNum(local?.incorrect, cloud?.incorrect),
+    lastAt: maxNum(local?.lastAt, cloud?.lastAt) || null,
+  };
+}
+
+function mergeGameProgressMap(local = {}, cloud = {}) {
+  const merged = {};
+  for (const key of new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})])) {
+    merged[key] = mergeGameProgressBucket(local?.[key], cloud?.[key]);
+  }
+  return merged;
+}
+
 export function mergeTransformationStats(local = {}, cloud = {}) {
   const bySource = mergeProgressMap(local?.bySource, cloud?.bySource);
   const byTarget = mergeProgressMap(local?.byTarget, cloud?.byTarget);
@@ -711,6 +735,8 @@ export function mergeCloudState(local, cloud) {
       played: maxNum(local.game?.played, cloud.game?.played),
       bestScore: maxNum(local.game?.bestScore, cloud.game?.bestScore),
       bestCombo: maxNum(local.game?.bestCombo, cloud.game?.bestCombo),
+      byType: mergeGameProgressMap(local.game?.byType, cloud.game?.byType),
+      byWord: mergeGameProgressMap(local.game?.byWord, cloud.game?.byWord),
     },
     onbin: {
       attempted: maxNum(local.onbin?.attempted, cloud.onbin?.attempted),
@@ -828,7 +854,7 @@ export function defaultState() {
     mistakes: [],
     shadow: { attempted: 0, totalRating: 0, byScenario: {} },
     ambient: { sessions: 0, played: 0, lastAt: null },
-    game: { played: 0, bestScore: 0, bestCombo: 0 },
+    game: { played: 0, bestScore: 0, bestCombo: 0, byType: {}, byWord: {} },
     onbin: { attempted: 0, correct: 0, hints: 0, streak: 0, bestStreak: 0, byPattern: {} },
     register: { attempted: 0, correct: 0, streak: 0, bestStreak: 0, byPattern: {}, byVerb: {} },
     readiness: defaultReadinessState(),
@@ -880,7 +906,12 @@ export function mergeState(saved, sessionOverride) {
     mistakes: Array.isArray(saved && saved.mistakes) ? saved.mistakes : [],
     shadow: (saved && saved.shadow) || base.shadow,
     ambient: (saved && saved.ambient) || base.ambient,
-    game: (saved && saved.game) || base.game,
+    game: {
+      ...base.game,
+      ...((saved && saved.game) || {}),
+      byType: (saved && saved.game && saved.game.byType) || {},
+      byWord: (saved && saved.game && saved.game.byWord) || {},
+    },
     onbin: (saved && saved.onbin) || base.onbin,
     register: (saved && saved.register) || base.register,
     readiness: oldSrsSchema

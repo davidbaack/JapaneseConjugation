@@ -457,7 +457,7 @@ describe('filterWordsForPrefs', () => {
 });
 
 describe('mergePracticePrefs', () => {
-  it('keeps review limits only for repair drills', () => {
+  it('keeps review limits only for bounded review sessions', () => {
     expect(mergePracticePrefs({ reviewLimit: 10, reviewLimitSource: 'today' })).toMatchObject({
       reviewLimit: 0,
       reviewLimitSource: '',
@@ -465,6 +465,12 @@ describe('mergePracticePrefs', () => {
     expect(mergePracticePrefs({ reviewLimit: 10, reviewLimitSource: 'repair' })).toMatchObject({
       reviewLimit: 10,
       reviewLimitSource: 'repair',
+    });
+    expect(
+      mergePracticePrefs({ reviewLimit: 8, reviewLimitSource: 'recommendation' }),
+    ).toMatchObject({
+      reviewLimit: 8,
+      reviewLimitSource: 'recommendation',
     });
   });
 

@@ -85,5 +85,18 @@ test.describe('Rush mode', () => {
     await expect(
       page.getByText('\u98df\u3079\u308b \u2192 \u305f\u3079\u305f', { exact: true }),
     ).toBeVisible();
+    await expect
+      .poll(async () =>
+        page.evaluate((key) => {
+          const payload = JSON.parse(localStorage.getItem(key) || '{}');
+          const state = payload.state || {};
+          return {
+            cards: Object.keys(state.cards || {}).length,
+            verbStats: Object.keys(state.verbStats || {}).length,
+            rushAttempts: state.game?.byType?.['plain-past']?.attempted || 0,
+          };
+        }, STORAGE_KEY),
+      )
+      .toEqual({ cards: 0, verbStats: 0, rushAttempts: 1 });
   });
 });

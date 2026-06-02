@@ -96,7 +96,7 @@ export { kanaCoachCells, explainReversePrompt };
 const STUDY_CURRENT_KEY = 'jp-study-current';
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
-const REVIEW_LIMIT_SOURCES = new Set(['repair', 'lab']);
+const REVIEW_LIMIT_SOURCES = new Set(['repair', 'lab', 'recommendation']);
 
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
@@ -668,7 +668,7 @@ function ReviewsDashboard({
                 Recommended reviews
               </div>
               <div className="text-sm text-stone-600 dark:text-stone-300">
-                Practice Lab found focused work to bring back into SRS.
+                Lessons and Practice Lab can send focused work back into SRS.
               </div>
             </div>
           </div>
@@ -682,6 +682,9 @@ function ReviewsDashboard({
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                      {rec.source === 'lesson' ? 'Lesson' : 'Practice Lab'}
+                    </div>
                     <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
                       {rec.label}
                     </div>
@@ -2277,7 +2280,9 @@ export default function StudyView() {
           {reviewSetComplete
             ? reviewLimitSource === 'repair'
               ? 'Repair drill complete'
-              : 'Drill complete'
+              : reviewLimitSource === 'recommendation'
+                ? 'Recommended reviews complete'
+                : 'Drill complete'
             : 'Drill complete'}
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
@@ -2509,7 +2514,11 @@ export default function StudyView() {
                 {reviewLimit > 0 && (
                   <div className="text-indigo-600 dark:text-indigo-400 font-medium">
                     {Math.min(reviewsDone, reviewLimit)}/{reviewLimit}{' '}
-                    {reviewLimitSource === 'repair' ? 'repair' : 'drill'}
+                    {reviewLimitSource === 'repair'
+                      ? 'repair'
+                      : reviewLimitSource === 'recommendation'
+                        ? 'recommended'
+                        : 'drill'}
                   </div>
                 )}
                 {initialDue > 0 && !bonusMode && (

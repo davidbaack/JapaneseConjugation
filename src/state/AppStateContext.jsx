@@ -439,7 +439,7 @@ function useAppController() {
       minimalPairSetId: '',
       minimalPairReturn: null,
       reviewLimit: Math.max(0, Number(recommendation.suggestedCount || 0)),
-      reviewLimitSource: recommendation.suggestedCount ? 'lab' : '',
+      reviewLimitSource: recommendation.suggestedCount ? 'recommendation' : '',
       practicePath: '',
       wordListIds: wordKeys.length ? [listId] : [],
     }));

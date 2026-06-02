@@ -66,7 +66,7 @@ export function mergePracticePrefs(prefs) {
   delete source.aiGuideTone;
   delete source.drillMode;
   delete source.drillDirection;
-  const reviewLimitSource = ['repair', 'lab'].includes(source.reviewLimitSource)
+  const reviewLimitSource = ['repair', 'lab', 'recommendation'].includes(source.reviewLimitSource)
     ? source.reviewLimitSource
     : '';
   const rawReviewLimit = Number(source.reviewLimit || 0);

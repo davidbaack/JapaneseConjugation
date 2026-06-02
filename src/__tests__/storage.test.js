@@ -554,6 +554,75 @@ describe('mergeCloudState', () => {
     expect(merged.readiness.byRule['ichidan|plain-past'].production.attempted).toBe(1);
     expect(merged.readiness.byRule['ichidan|plain-past'].recognition.attempted).toBe(2);
   });
+
+  it('merges Lab-only Rush stats without creating SRS history', () => {
+    const merged = mergeCloudState(
+      {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        cards: {},
+        verbStats: {},
+        mistakes: [],
+        enabledTypes: ['plain-past'],
+        game: {
+          played: 1,
+          bestScore: 400,
+          bestCombo: 4,
+          byType: {
+            'plain-past': { attempted: 3, correct: 2, incorrect: 1, lastAt: 200 },
+          },
+          byWord: {
+            'ichidan:\u98df\u3079\u308b': {
+              dict: '\u98df\u3079\u308b',
+              reading: '\u305f\u3079\u308b',
+              meaning: 'to eat',
+              group: 'ichidan',
+              attempted: 3,
+              correct: 2,
+              incorrect: 1,
+              lastAt: 200,
+            },
+          },
+        },
+      },
+      {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        cards: {},
+        verbStats: {},
+        mistakes: [],
+        enabledTypes: ['plain-past'],
+        game: {
+          played: 2,
+          bestScore: 300,
+          bestCombo: 5,
+          byType: {
+            'te-form': { attempted: 2, correct: 0, incorrect: 2, lastAt: 300 },
+          },
+          byWord: {
+            'godan:\u66f8\u304f': {
+              dict: '\u66f8\u304f',
+              reading: '\u304b\u304f',
+              meaning: 'to write',
+              group: 'godan',
+              attempted: 2,
+              correct: 0,
+              incorrect: 2,
+              lastAt: 300,
+            },
+          },
+        },
+      },
+    );
+
+    expect(merged.cards).toEqual({});
+    expect(merged.verbStats).toEqual({});
+    expect(merged.game.played).toBe(2);
+    expect(merged.game.bestScore).toBe(400);
+    expect(merged.game.bestCombo).toBe(5);
+    expect(merged.game.byType['plain-past']).toMatchObject({ attempted: 3, incorrect: 1 });
+    expect(merged.game.byType['te-form']).toMatchObject({ attempted: 2, incorrect: 2 });
+    expect(merged.game.byWord['ichidan:\u98df\u3079\u308b'].dict).toBe('\u98df\u3079\u308b');
+    expect(merged.game.byWord['godan:\u66f8\u304f'].dict).toBe('\u66f8\u304f');
+  });
 });
 
 describe('buildFocusCard', () => {
