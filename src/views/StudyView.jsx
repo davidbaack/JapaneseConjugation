@@ -599,6 +599,9 @@ function ReviewsDashboard({
   onDrillReadiness,
   onbinWeakness = false,
   onDrillEndingLab,
+  groupConfusion = false,
+  onDrillClassify,
+  onDrillRush,
 }) {
   const dailyGoal = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
@@ -619,6 +622,44 @@ function ReviewsDashboard({
     weakestSkill.familyId === TE_FORM_STEM_FAMILY_ID &&
     onbinWeakness &&
     !!onDrillEndingLab;
+  const weakestToRush = !!weakestSkill && weakestSkill.dimension === 'speed' && !!onDrillRush;
+  // One prioritized "do this next" nudge that routes a detected weakness to the
+  // matching Practice Lab tool: group confusion (foundational) > onbin sound
+  // changes > slow recall > a generic scoped review of the weakest skill.
+  const primaryNudge =
+    groupConfusion && onDrillClassify
+      ? {
+          onClick: onDrillClassify,
+          lead: 'You keep mixing up ',
+          emphasis: 'verb groups',
+          tail: ' — drill them in Groups',
+        }
+      : weakestSkill && weakestToEndingLab
+        ? {
+            onClick: onDrillEndingLab,
+            lead: 'You keep missing ',
+            emphasis: 'sound changes',
+            tail: ' — drill them in Ending Lab',
+          }
+        : weakestSkill && weakestToRush
+          ? {
+              onClick: onDrillRush,
+              lead: 'Your ',
+              emphasis: 'recall is slow',
+              tail: ' — build speed in Rush',
+            }
+          : weakestSkill && onDrillReadiness
+            ? {
+                onClick: () =>
+                  onDrillReadiness({
+                    familyId: weakestSkill.familyId,
+                    dimension: weakestSkill.dimension,
+                  }),
+                lead: 'Sharpen ',
+                emphasis: weakestSkill.label,
+                tail: ` — ${weakestSkill.dimensionLabel.toLowerCase()} is ${weakestSkill.status}`,
+              }
+            : null;
   const weakCount = strengthRows.filter((row) => row.status === 'weak').length;
   const streak = daily.goalStreak || 0;
   // Progressive disclosure: the forecast, form-family strength, and stat tiles
@@ -789,32 +830,16 @@ function ReviewsDashboard({
             <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
               Form families
             </div>
-            {weakestSkill && (weakestToEndingLab || onDrillReadiness) && (
+            {primaryNudge && (
               <button
                 type="button"
-                onClick={
-                  weakestToEndingLab
-                    ? onDrillEndingLab
-                    : () =>
-                        onDrillReadiness({
-                          familyId: weakestSkill.familyId,
-                          dimension: weakestSkill.dimension,
-                        })
-                }
+                onClick={primaryNudge.onClick}
                 className="mb-3 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs text-amber-900 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/40"
               >
                 <span>
-                  {weakestToEndingLab ? (
-                    <>
-                      You keep missing <span className="font-semibold">sound changes</span> — drill
-                      them in Ending Lab
-                    </>
-                  ) : (
-                    <>
-                      Sharpen <span className="font-semibold">{weakestSkill.label}</span> —{' '}
-                      {weakestSkill.dimensionLabel.toLowerCase()} is {weakestSkill.status}
-                    </>
-                  )}
+                  {primaryNudge.lead}
+                  <span className="font-semibold">{primaryNudge.emphasis}</span>
+                  {primaryNudge.tail}
                 </span>
                 <span className="shrink-0 font-semibold">Drill →</span>
               </button>
@@ -833,6 +858,7 @@ function ReviewsDashboard({
                 const weakest = readiness?.weakest;
                 const rowToEndingLab =
                   row.id === TE_FORM_STEM_FAMILY_ID && onbinWeakness && !!onDrillEndingLab;
+                const rowToRush = !rowToEndingLab && weakest?.id === 'speed' && !!onDrillRush;
                 const accuracyLabel = row.attempted ? `${row.accuracy}%` : 'new';
                 const bar = (
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
@@ -917,7 +943,16 @@ function ReviewsDashboard({
                           Drill sound changes in Ending Lab →
                         </button>
                       )}
-                      {weakest && !rowToEndingLab && onDrillReadiness && (
+                      {weakest && rowToRush && (
+                        <button
+                          type="button"
+                          onClick={onDrillRush}
+                          className="mt-1 w-full rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1.5 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-950/60"
+                        >
+                          Drill speed in Rush →
+                        </button>
+                      )}
+                      {weakest && !rowToEndingLab && !rowToRush && onDrillReadiness && (
                         <button
                           type="button"
                           onClick={() =>
@@ -1130,6 +1165,14 @@ export default function StudyView() {
     const open = (state.mistakes || []).filter((mistake) => !mistake.resolved);
     return aggregateDiagnosedMistakes(open).some(
       (pattern) => pattern.category === 'godan-sound-change',
+    );
+  }, [state.mistakes]);
+  // Verb-group confusion is the foundational miss (you cannot conjugate without
+  // the group); when it clusters, the dashboard routes to the Groups drill.
+  const groupConfusion = useMemo(() => {
+    const open = (state.mistakes || []).filter((mistake) => !mistake.resolved);
+    return aggregateDiagnosedMistakes(open).some(
+      (pattern) => pattern.category === 'verb-group-confusion',
     );
   }, [state.mistakes]);
   // Recognition/production/speed readiness rolled up to form families, plus the
@@ -1467,6 +1510,9 @@ export default function StudyView() {
           onDrillReadiness={drillReadinessGap}
           onbinWeakness={onbinWeakness}
           onDrillEndingLab={() => openLabTool('endings')}
+          groupConfusion={groupConfusion}
+          onDrillClassify={() => openLabTool('classify')}
+          onDrillRush={() => openLabTool('games')}
         />
       </div>
     );

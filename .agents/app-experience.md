@@ -94,10 +94,12 @@ confirms the new direction, update this document in the same change.
 - Lab tools can create visible recommended Review sets. The learner starts the
   set explicitly; once practiced in Reviews, it updates normal SRS.
 - The routing also runs the other way: when Reviews diagnoses a weakness that a
-  Lab tool trains (e.g. godan sound-change misses -> Ending Lab), the dashboard's
-  drill for that skill opens the matching Lab tool directly, so specialized
-  practice is summoned at the moment of need rather than only found by browsing
-  the Lab.
+  Lab tool trains, the dashboard's drill for that skill opens the matching Lab
+  tool directly, so specialized practice is summoned at the moment of need
+  rather than only found by browsing the Lab. Current routes: godan sound-change
+  misses -> Ending Lab, verb-group confusion -> Groups, and a weak speed
+  dimension -> Rush. A single prioritized nudge picks the most foundational gap
+  (groups first), and each form family's drill routes by its own weakest skill.
 - Lab attempts do not silently change word-form SRS scheduling unless they are
   completed as full Reviews.
 
