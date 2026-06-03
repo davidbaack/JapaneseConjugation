@@ -583,7 +583,9 @@ const READINESS_TONE = {
   weak: 'bg-rose-500',
   untested: 'bg-stone-300 dark:bg-stone-700',
 };
-function ReviewsDashboard({
+// Exported for unit tests of the Reviews→Lab routing nudge ladder; the app
+// renders it through StudyView's default export.
+export function ReviewsDashboard({
   daily,
   practicePrefs,
   srsQueue,

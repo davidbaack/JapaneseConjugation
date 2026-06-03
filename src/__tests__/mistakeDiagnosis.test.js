@@ -7,6 +7,7 @@ import {
   rankSessionMistakePatterns,
 } from '../utils/mistakeDiagnosis.js';
 import { recordMistake } from '../utils/storage.js';
+import { conjugateItem } from '../utils/conjugator.js';
 
 const kaku = {
   dict: '\u66f8\u304f',
@@ -99,6 +100,22 @@ describe('mistake pattern aggregation and repair drills', () => {
     expect(rows[0]).toMatchObject({
       patternId: 'godan-onbin-ku-gu',
       count: 1,
+      unresolved: 1,
+    });
+  });
+
+  it('aggregates a verb-group-confusion category the dashboard routes to Groups', () => {
+    // Conjugating an ichidan verb with godan rules is the group-confusion miss
+    // the Reviews→Groups routing keys on (pattern.category === 'verb-group-confusion').
+    const expected = conjugateItem(taberu, 'plain-past');
+    const asGodan = conjugateItem({ ...taberu, group: 'godan' }, 'plain-past');
+    const mistakes = recordMistake([], taberu, 'plain-past', null, asGodan, expected);
+
+    const rows = aggregateDiagnosedMistakes(mistakes);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      category: 'verb-group-confusion',
+      patternId: 'verb-group:ichidan:plain-past',
       unresolved: 1,
     });
   });
