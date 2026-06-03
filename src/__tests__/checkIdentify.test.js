@@ -43,6 +43,13 @@ describe('identifyConjugation', () => {
     expect(hit.kanji).toBe('食べた');
   });
 
+  it('finds an exact kanji polite-past match (食べました)', () => {
+    const res = identifyConjugation('食べました', ALL);
+    const hit = res.exact.find((e) => e.word.reading === 'たべる' && e.type === 'polite-past');
+    expect(hit).toBeTruthy();
+    expect(hit.kanji).toBe('食べました');
+  });
+
   it('finds an exact romaji-typed match (tabeta)', () => {
     const res = identifyConjugation('tabeta', ALL);
     expect(res.normalized).toBe('たべた');
@@ -64,6 +71,37 @@ describe('identifyConjugation', () => {
     expect(closeWrong).toBeTruthy();
     expect(closeWrong.kana).toBe('かえります');
     expect(closeWrong.diff.summary).toBeTruthy();
+  });
+
+  it('caps low-value wrong candidates after an exact tabemashita match', () => {
+    const noisyWords = [
+      taberu,
+      { dict: '立つ', reading: 'たつ', meaning: 'to stand', group: 'godan' },
+      { dict: 'たす', reading: 'たす', meaning: 'Plus (math operator)', group: 'godan' },
+      { dict: '足す', reading: 'たす', meaning: 'to add (numbers)', group: 'godan' },
+      { dict: '炊く', reading: 'たく', meaning: 'to cook rice', group: 'godan' },
+      { dict: '経つ', reading: 'たつ', meaning: 'time passes', group: 'godan' },
+    ];
+    const res = identifyConjugation('tabemashita', noisyWords, { includeNearWhenExact: true });
+    expect(res.exact).toContainEqual(
+      expect.objectContaining({ word: taberu, type: 'polite-past', kana: 'たべました' }),
+    );
+    expect(res.near.length).toBeLessThanOrEqual(3);
+    expect(res.near.some((match) => /\bmath operator\b/i.test(match.word.meaning))).toBe(false);
+    expect(res.near.every((match) => match.word.reading.startsWith('たべ'))).toBe(true);
+  });
+
+  it('does not add kana coincidence near-misses after exact 食べました', () => {
+    const noisyWords = [
+      taberu,
+      { dict: '立つ', reading: 'たつ', meaning: 'to stand', group: 'godan' },
+      { dict: '足す', reading: 'たす', meaning: 'to add (numbers)', group: 'godan' },
+    ];
+    const res = identifyConjugation('食べました', noisyWords, { includeNearWhenExact: true });
+    expect(res.exact).toContainEqual(
+      expect.objectContaining({ word: taberu, type: 'polite-past', kanji: '食べました' }),
+    );
+    expect(res.near).toHaveLength(0);
   });
 
   it('finds an exact match for a godan verb (のんだ = past of 飲む)', () => {

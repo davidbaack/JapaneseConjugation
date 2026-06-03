@@ -4,9 +4,17 @@ const BASE_URL = import.meta.env?.BASE_URL || '/';
 
 export const VERB_LEXICON_URL = `${BASE_URL}data/verb-lexicon.json`;
 
+const GENERATED_ARTIFACT_MEANING = /\bmath operator\b/i;
+
+export function isGeneratedPracticeArtifactRow(row = []) {
+  const [, , meaning, group] = row || [];
+  return Boolean(group) && GENERATED_ARTIFACT_MEANING.test(String(meaning || ''));
+}
+
 export function inflateVerbRow(row) {
   const [dict, reading, meaning, group, jlpt, genkiLessons, minnaLessons, common] = row || [];
   if (!dict || !reading || !group) return null;
+  if (isGeneratedPracticeArtifactRow(row)) return null;
   const cleanGenki = Array.isArray(genkiLessons) ? genkiLessons : [];
   const cleanMinna = Array.isArray(minnaLessons) ? minnaLessons : [];
   return {

@@ -19,6 +19,7 @@ const PRACTICE_GROUPS = new Set([
   'i-adjective',
   'na-adjective',
 ]);
+const GENERATED_ARTIFACT_MEANING = /\bmath operator\b/i;
 const VERB_ENDINGS = new Set(['う', 'く', 'ぐ', 'す', 'つ', 'ぬ', 'ぶ', 'む', 'る']);
 const ICHIDAN_HINTS = new Set([
   'え',
@@ -443,6 +444,10 @@ function isLowUsePracticeWord(word) {
   return PRACTICE_GROUPS.has(word.group) && word.jlpt && !hasLessonCoverage(word) && !word.common;
 }
 
+function isGeneratedPracticeArtifact(word) {
+  return Boolean(word.group) && GENERATED_ARTIFACT_MEANING.test(normalizeMeaning(word.meaning));
+}
+
 function countByJlpt(words) {
   const counts = {};
   for (const word of words) {
@@ -545,8 +550,10 @@ async function main() {
   const candidateWords = [...words.values()].filter(
     (word) => word.jlpt || word.genkiLessons.length || word.minnaLessons.length,
   );
-  const trimmedLowUseWords = candidateWords.filter(isLowUsePracticeWord);
-  const rows = candidateWords
+  const trimmedGeneratedArtifactWords = candidateWords.filter(isGeneratedPracticeArtifact);
+  const publishableWords = candidateWords.filter((word) => !isGeneratedPracticeArtifact(word));
+  const trimmedLowUseWords = publishableWords.filter(isLowUsePracticeWord);
+  const rows = publishableWords
     .filter((word) => !isLowUsePracticeWord(word))
     .sort((a, b) => {
       const levelDiff = (LEVEL_RANK[a.jlpt] ?? 9) - (LEVEL_RANK[b.jlpt] ?? 9);
@@ -567,6 +574,17 @@ async function main() {
       ['i-adjective', 'na-adjective'].includes(word.group),
     ).length,
     byJlpt: countByJlpt(trimmedLowUseWords),
+  };
+  const trimmedGeneratedArtifacts = {
+    total: trimmedGeneratedArtifactWords.length,
+    verbs: trimmedGeneratedArtifactWords.filter((word) =>
+      ['ichidan', 'godan', 'suru', 'kuru'].includes(word.group),
+    ).length,
+    adjectives: trimmedGeneratedArtifactWords.filter((word) =>
+      ['i-adjective', 'na-adjective'].includes(word.group),
+    ).length,
+    nouns: trimmedGeneratedArtifactWords.filter((word) => word.group === 'noun').length,
+    byJlpt: countByJlpt(trimmedGeneratedArtifactWords),
   };
 
   const payload = {
@@ -593,12 +611,13 @@ async function main() {
       },
     ],
     trimPolicy: {
-      appliesTo: 'JLPT-tagged verbs and adjectives',
+      appliesTo: 'JLPT-tagged verbs/adjectives and generated operator-label rows',
       keepIf: ['Genki lesson tag', 'Minna no Nihongo lesson tag', 'JMdict common priority marker'],
-      removeIf: 'JLPT-only and not marked common by JMdict',
+      removeIf: 'JLPT-only and not marked common by JMdict, or generated operator-label artifact',
     },
     stats: {
       trimmedLowUse,
+      trimmedGeneratedArtifacts,
     },
     columns: [
       'dict',
@@ -625,6 +644,7 @@ async function main() {
     nouns: nouns.length,
     common: rows.filter((row) => row[7]).length,
     trimmedLowUse,
+    trimmedGeneratedArtifacts,
     jlpt: {},
     genkiLessons: new Set(),
     minnaLessons: new Set(),
@@ -643,6 +663,7 @@ async function main() {
         nouns: counts.nouns,
         common: counts.common,
         trimmedLowUse: counts.trimmedLowUse,
+        trimmedGeneratedArtifacts: counts.trimmedGeneratedArtifacts,
         jlpt: counts.jlpt,
         genkiLessonCount: counts.genkiLessons.size,
         minnaLessonCount: counts.minnaLessons.size,

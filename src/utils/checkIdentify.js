@@ -85,6 +85,8 @@ const MAX_NEAR_DISTANCE = 2;
 // the entire suffix may have been formed wrongly.
 const ANCHORED_MAX_DISTANCE = 3;
 const MAX_NEAR_RESULTS = 5;
+const MAX_NEAR_WHEN_EXACT = 3;
+const MIN_EXACT_NEAR_PREFIX = 2;
 
 // Which form does a て/た ending suggest the learner was aiming for? Used only
 // to break ties between equally-close candidates of the intended verb.
@@ -237,11 +239,22 @@ export function identifyConjugation(input, words = [], options = {}) {
     return a.kana.length - b.kana.length;
   });
 
-  // When there is already a correct answer, show every equally-close wrong
-  // interpretation so the UI does not flood the learner with weaker guesses.
+  // When there is already a correct answer, keep only a small set of the best
+  // wrong interpretations with a real shared head. The correct hit is the
+  // point; near matches are just a backup comparison if the learner wants to
+  // inspect them, not a list of every one-kana-stem coincidence.
+  const exactNearPool =
+    exact.length > 0 && includeNearWhenExact
+      ? pool.filter((cand) => commonPrefixLength(normalized, cand.kana) >= MIN_EXACT_NEAR_PREFIX)
+      : pool;
+  const bestExactNearDistance = exactNearPool[0]?.distance;
   const matchedPool =
-    exact.length > 0 && includeNearWhenExact && pool.length > 0
-      ? pool.filter((cand) => cand.distance === pool[0].distance)
+    exact.length > 0 && includeNearWhenExact
+      ? exactNearPool.length > 0
+        ? exactNearPool
+            .filter((cand) => cand.distance === bestExactNearDistance)
+            .slice(0, MAX_NEAR_WHEN_EXACT)
+        : []
       : pool.slice(0, MAX_NEAR_RESULTS);
 
   for (const cand of matchedPool) {
