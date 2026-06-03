@@ -50,6 +50,7 @@ import {
 import {
   buildReadinessFamilyRows,
   launchPrefsForReadinessDimension,
+  READINESS_DIMENSIONS,
   recordReadinessAttempt,
   weakestReadinessSkill,
 } from '../utils/readiness.js';
@@ -574,32 +575,6 @@ const READINESS_TONE = {
   weak: 'bg-rose-500',
   untested: 'bg-stone-300 dark:bg-stone-700',
 };
-const READINESS_SHORT = { recognition: 'Rec', production: 'Prod', speed: 'Spd' };
-
-// Compact recognition/production/speed pills — measured dimensions only, so a
-// default input-mode learner (no recognition reps) never sees a blank cell.
-function ReadinessBadges({ row }) {
-  const dims = row?.measured || [];
-  if (!dims.length) return null;
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      {dims.map((id) => {
-        const cell = row.cells[id];
-        return (
-          <span
-            key={id}
-            title={`${READINESS_SHORT[id]}: ${cell.label}${cell.detail ? ` (${cell.detail})` : ''}`}
-            className="inline-flex items-center gap-1 rounded-full border border-stone-200 px-1.5 py-0.5 text-[10px] font-medium text-stone-600 dark:border-stone-700 dark:text-stone-300"
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${READINESS_TONE[cell.status]}`} />
-            {READINESS_SHORT[id]}
-          </span>
-        );
-      })}
-    </span>
-  );
-}
-
 function ReviewsDashboard({
   daily,
   practicePrefs,
@@ -796,13 +771,8 @@ function ReviewsDashboard({
             </div>
           </div>
           <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
-                Form families
-              </span>
-              <span className="text-[10px] text-stone-400 dark:text-stone-500">
-                Rec / Prod / Spd
-              </span>
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
+              Form families
             </div>
             {weakestSkill && onDrillReadiness && (
               <button
@@ -833,51 +803,82 @@ function ReviewsDashboard({
                         ? 'bg-amber-500'
                         : 'bg-stone-300';
                 const readiness = readinessById.get(row.id);
-                const detailTypes = readiness?.types || [];
                 const weakest = readiness?.weakest;
-                const header = (
-                  <>
-                    <div className="flex items-center justify-between gap-3 text-xs">
-                      <span className="font-medium text-stone-700 dark:text-stone-200">
-                        {row.label}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        {readiness && <ReadinessBadges row={readiness} />}
-                        <span className="tabular-nums text-stone-500">
-                          {row.attempted ? `${row.accuracy}%` : 'new'}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
-                      <span
-                        className={`block h-full ${tone}`}
-                        style={{ width: `${row.attempted ? row.accuracy : 8}%` }}
-                      />
-                    </div>
-                  </>
+                const accuracyLabel = row.attempted ? `${row.accuracy}%` : 'new';
+                const bar = (
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
+                    <span
+                      className={`block h-full ${tone}`}
+                      style={{ width: `${row.attempted ? row.accuracy : 8}%` }}
+                    />
+                  </div>
                 );
-                if (!detailTypes.length) {
+
+                // No readiness reps yet — show the plain accuracy row, nothing to expand.
+                if (!readiness || readiness.practiced === 0) {
                   return (
                     <div key={row.id} className="px-1 py-1">
-                      {header}
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <span className="font-medium text-stone-700 dark:text-stone-200">
+                          {row.label}
+                        </span>
+                        <span className="tabular-nums text-stone-500">{accuracyLabel}</span>
+                      </div>
+                      {bar}
                     </div>
                   );
                 }
+
                 return (
-                  <details key={row.id} className="rounded-md px-1 py-1">
+                  <details key={row.id} className="group rounded-md px-1 py-1">
                     <summary className="cursor-pointer list-none rounded-md transition hover:bg-stone-50 dark:hover:bg-stone-950/60">
-                      {header}
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <span className="flex items-center gap-1.5 font-medium text-stone-700 dark:text-stone-200">
+                          <span className="text-[10px] text-stone-400 transition group-open:rotate-90">
+                            ▸
+                          </span>
+                          {row.label}
+                        </span>
+                        <span className="tabular-nums text-stone-500">{accuracyLabel}</span>
+                      </div>
+                      {bar}
                     </summary>
-                    <div className="mt-2 space-y-1.5 border-t border-stone-100 pt-2 dark:border-stone-800">
-                      {detailTypes.map((type) => (
-                        <div
-                          key={type.typeId}
-                          className="flex items-center justify-between gap-3 text-[11px] text-stone-500 dark:text-stone-400"
-                        >
-                          <span className="truncate">{type.label}</span>
-                          <ReadinessBadges row={type} />
+                    <div className="mt-2 space-y-1.5 border-t border-stone-100 pl-4 pt-2 dark:border-stone-800">
+                      {READINESS_DIMENSIONS.map((dimension) => {
+                        const cell = readiness.cells[dimension.id];
+                        const tested = cell.status !== 'untested';
+                        return (
+                          <div
+                            key={dimension.id}
+                            className="flex items-center justify-between gap-3 text-[11px]"
+                          >
+                            <span className="flex items-center gap-1.5 text-stone-600 dark:text-stone-300">
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${READINESS_TONE[cell.status]}`}
+                              />
+                              {dimension.label}
+                            </span>
+                            <span
+                              className={
+                                tested
+                                  ? 'font-medium text-stone-600 dark:text-stone-300'
+                                  : 'text-stone-400 dark:text-stone-500'
+                              }
+                            >
+                              {tested
+                                ? `${cell.label}${cell.detail ? ` · ${cell.detail}` : ''}`
+                                : dimension.id === 'recognition'
+                                  ? 'Not tested — try a choice round'
+                                  : 'Not yet tested'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {readiness.types.length > 0 && (
+                        <div className="truncate text-[11px] text-stone-400 dark:text-stone-500">
+                          {readiness.types.map((type) => type.label).join(' · ')}
                         </div>
-                      ))}
+                      )}
                       {weakest && onDrillReadiness && (
                         <button
                           type="button"
