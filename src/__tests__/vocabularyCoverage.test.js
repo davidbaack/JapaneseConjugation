@@ -4,6 +4,7 @@ import {
   inflateAdjectiveRows,
   inflateNounRows,
   inflateVerbRows,
+  isGeneratedPracticeArtifactRow,
   mergeBuiltInVerbs,
   mergeBuiltInWords,
 } from '../data/verbLexicon.js';
@@ -51,6 +52,30 @@ describe('expanded vocabulary lexicon', () => {
       if (!meta.jlpt || hasLessonCoverage) continue;
       expect(meta.common).toBe(true);
     }
+  });
+
+  it('filters generated math-operator artifacts from practice words', () => {
+    expect(
+      isGeneratedPracticeArtifactRow([
+        'は',
+        'は',
+        'Equal (math operator)',
+        'noun',
+        '',
+        [],
+        [40],
+        true,
+      ]),
+    ).toBe(true);
+    expect(
+      inflateVerbRows([
+        ['たす', 'たす', 'Plus (math operator)', 'godan', 'N4', [], [40], true],
+        ['足す', 'たす', 'to add (numbers)', 'godan', 'N4', [], [40], true],
+      ]),
+    ).toEqual([
+      expect.objectContaining({ dict: '足す', reading: 'たす', meaning: 'to add (numbers)' }),
+    ]);
+    expect(words.some((word) => /\bmath operator\b/i.test(word.meaning))).toBe(false);
   });
 
   it('covers every configured Genki and Minna lesson with at least one practice word', () => {

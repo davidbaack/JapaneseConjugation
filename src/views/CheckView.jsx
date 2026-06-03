@@ -112,17 +112,30 @@ function matchKey(match) {
   return `${match.matchStatus}-${match.word.reading}-${match.word.dict}-${match.type}-${match.kana}`;
 }
 
+function sameMatch(left, right) {
+  return (
+    left &&
+    right &&
+    left.word.reading === right.word.reading &&
+    left.word.dict === right.word.dict &&
+    left.type === right.type &&
+    left.kana === right.kana
+  );
+}
+
 function CandidateMatchList({ matches, practicePrefs, onSpeak }) {
   if (matches.length === 0) return null;
 
   return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-950/70">
+    <details className="mt-4 overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 border-b border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-950/70 [&::-webkit-details-marker]:hidden">
         <div className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-          Potential matches
+          Other close matches
         </div>
-        <div className="text-xs text-stone-400">Correct matches first</div>
-      </div>
+        <div className="text-xs text-stone-400">
+          {matches.length} {matches.length === 1 ? 'match' : 'matches'}
+        </div>
+      </summary>
       <ul className="divide-y divide-stone-200 dark:divide-stone-800">
         {matches.map((match) => {
           const correct = match.matchStatus === 'correct';
@@ -193,7 +206,7 @@ function CandidateMatchList({ matches, practicePrefs, onSpeak }) {
           );
         })}
       </ul>
-    </div>
+    </details>
   );
 }
 
@@ -316,13 +329,17 @@ export default function CheckView() {
   // or the intended form when it's a near-miss.
   const headForm =
     result?.status === 'exact' ? exactForms[0] : result?.status === 'near' ? result.near[0] : null;
-  const matchRows = result
+  const secondaryMatchRows = result
     ? [
-        ...exactForms.map((match) => ({ ...match, matchStatus: 'correct' })),
-        ...(result.near ?? []).map((match) => ({ ...match, matchStatus: 'wrong' })),
+        ...exactForms
+          .filter((match) => !sameMatch(match, headForm))
+          .map((match) => ({ ...match, matchStatus: 'correct' })),
+        ...(result.near ?? [])
+          .filter((match) => !sameMatch(match, headForm))
+          .map((match) => ({ ...match, matchStatus: 'wrong' })),
       ]
     : [];
-  const showMatchRows = matchRows.length > 1;
+  const showMatchRows = secondaryMatchRows.length > 0;
 
   return (
     <div className="space-y-4">
@@ -513,7 +530,7 @@ export default function CheckView() {
 
               {showMatchRows && (
                 <CandidateMatchList
-                  matches={matchRows}
+                  matches={secondaryMatchRows}
                   practicePrefs={practicePrefs}
                   onSpeak={speak}
                 />
@@ -604,7 +621,7 @@ export default function CheckView() {
 
               {showMatchRows && (
                 <CandidateMatchList
-                  matches={matchRows}
+                  matches={secondaryMatchRows}
                   practicePrefs={practicePrefs}
                   onSpeak={speak}
                 />
