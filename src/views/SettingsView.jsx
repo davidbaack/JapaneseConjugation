@@ -1045,19 +1045,9 @@ export default function SettingsView() {
                       <div className="space-y-3">
                         <div className="text-xs text-rose-700 dark:text-rose-300">
                           This wipes Katachiya learner data and settings in this browser
-                          {session ? ' and in cloud' : ''}. Export is available first.
+                          {session ? ' and in cloud' : ''}.
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExportOpen(true);
-                              setImportOpen(false);
-                            }}
-                            className="px-3 py-1.5 border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:bg-stone-950 dark:text-rose-300 dark:hover:bg-rose-950/20 rounded-lg text-sm font-medium"
-                          >
-                            Open export
-                          </button>
                           <input
                             value={factoryConfirm}
                             onChange={(e) => setFactoryConfirm(e.target.value)}

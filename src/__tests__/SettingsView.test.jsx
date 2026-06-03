@@ -124,6 +124,8 @@ describe('SettingsView controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel', exact: true }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Factory reset', exact: true }));
+    expect(screen.queryByRole('button', { name: 'Open export', exact: true })).toBeNull();
+    expect(screen.queryByText('Export is available first.')).toBeNull();
     const factoryInput = screen.getByLabelText('Type RESET to confirm factory reset');
     const factoryButton = screen.getByRole('button', { name: 'Factory reset', exact: true });
     expect(factoryButton.disabled).toBe(true);
