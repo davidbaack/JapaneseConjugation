@@ -1193,9 +1193,19 @@ export default function StudyView() {
   const specialLaunchActive =
     !!focus?.word ||
     !!focusWordLock ||
+    !!sessionFilterWord ||
+    !!sessionFilterFormGroupId ||
     !!launchContext ||
     repairDrillActive ||
     !!activeMinimalPairSet;
+  const reviewSelectionOptions = useMemo(
+    () => ({
+      bonusMode,
+      wordLists,
+      beginnerLadder: todayDrillActive && !specialLaunchActive,
+    }),
+    [bonusMode, wordLists, todayDrillActive, specialLaunchActive],
+  );
   const todayMinimalPairSet = useMemo(() => {
     if (activeMinimalPairSet || !current) return null;
     return (
@@ -1255,7 +1265,7 @@ export default function StudyView() {
       null,
       practicePrefs,
       practiceRuleCandidates,
-      { bonusMode, wordLists },
+      reviewSelectionOptions,
     );
     if (nextCard) {
       setCurrent((existing) => existing || nextCard);
@@ -1269,6 +1279,7 @@ export default function StudyView() {
     enabledTypes,
     practicePrefs,
     practiceRuleCandidates,
+    reviewSelectionOptions,
     focus,
     dashboardOpen,
   ]);
@@ -2016,7 +2027,7 @@ export default function StudyView() {
             current.id,
             practicePrefs,
             practiceRuleCandidates,
-            { bonusMode, wordLists },
+            reviewSelectionOptions,
           ),
         );
       }
@@ -2145,7 +2156,7 @@ export default function StudyView() {
             current.id,
             practicePrefs,
             practiceRuleCandidates,
-            { bonusMode, wordLists },
+            reviewSelectionOptions,
           ),
         );
       }, 850);
@@ -2189,7 +2200,7 @@ export default function StudyView() {
         current.id,
         practicePrefs,
         practiceRuleCandidates,
-        { bonusMode, wordLists },
+        reviewSelectionOptions,
       ),
     );
   }
@@ -2327,7 +2338,7 @@ export default function StudyView() {
             current.id,
             practicePrefs,
             practiceRuleCandidates,
-            { bonusMode, wordLists },
+            reviewSelectionOptions,
           ),
         );
       }, 850);
@@ -2649,7 +2660,7 @@ export default function StudyView() {
                 current.id,
                 practicePrefs,
                 practiceRuleCandidates,
-                { bonusMode, wordLists },
+                reviewSelectionOptions,
               ),
             );
             setAnswer('');

@@ -693,6 +693,24 @@ describe('word-form SRS selection', () => {
     meaning: 'to read',
     group: 'godan',
   };
+  const SURU = {
+    dict: '\u3059\u308b',
+    reading: '\u3059\u308b',
+    meaning: 'to do',
+    group: 'suru',
+  };
+  const IKU = {
+    dict: '\u884c\u304f',
+    reading: '\u3044\u304f',
+    meaning: 'to go',
+    group: 'godan',
+  };
+  const KAU = {
+    dict: '\u8cb7\u3046',
+    reading: '\u304b\u3046',
+    meaning: 'to buy',
+    group: 'godan',
+  };
 
   it('keeps exclusion state separate from word-form SRS history', () => {
     const dueCardId = cardIdFor(TABERU, 'plain-past');
@@ -800,6 +818,49 @@ describe('word-form SRS selection', () => {
     );
 
     expect(card.verb).toBe(earlyWord);
+  });
+
+  it('ladders fresh Core Warmup through regular ichidan and godan before irregulars', () => {
+    const words = [SURU, IKU, KAU, TABERU, KAKU];
+    const enabled = ['plain-past', 'plain-negative', 'polite-present'];
+    let state = defaultState();
+    let lastCardId = null;
+    const seen = [];
+
+    for (let i = 0; i < 5; i += 1) {
+      const card = selectNext(state, words, enabled, lastCardId, DEFAULT_PREFS, null, {
+        beginnerLadder: true,
+      });
+      expect(card).toBeTruthy();
+      seen.push(card);
+      lastCardId = card.id;
+      state = {
+        ...state,
+        cards: {
+          ...state.cards,
+          [card.id]: {
+            reps: 1,
+            interval: 1,
+            ease: 2.5,
+            nextReview: Date.now() + DAY,
+            correct: 1,
+            incorrect: 0,
+            lastSeen: i + 1,
+            introducedDate: localDateKey(),
+          },
+        },
+      };
+    }
+
+    expect(seen[0].verb.group).toBe('ichidan');
+    expect(seen[0].type).toBe('plain-past');
+    expect(seen[1].verb.group).toBe('ichidan');
+    expect(seen[1].type).toBe('plain-negative');
+    expect(seen.some((card) => card.verb.group === 'godan' && card.verb.dict !== IKU.dict)).toBe(
+      true,
+    );
+    expect(seen.map((card) => card.verb.group)).not.toContain('suru');
+    expect(seen.map((card) => card.verb.dict)).not.toContain(IKU.dict);
   });
 
   it('caps new cards by daily goal and uses a smaller bonus-study batch', () => {
