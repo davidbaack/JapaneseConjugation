@@ -37,7 +37,6 @@ const II = {
   irregular: true,
 };
 const SHIZUKA = { dict: '静か', reading: 'しずか', meaning: 'quiet', group: 'na-adjective' };
-const GAKUSEI = { dict: '学生', reading: 'がくせい', meaning: 'student', group: 'noun' };
 
 // ─── Ichidan verb (食べる) ────────────────────────────────────────────────────
 describe('ichidan verb: 食べる', () => {
@@ -333,21 +332,6 @@ describe('na-adjective: 静か', () => {
     expect(conjugateAdjective(SHIZUKA, 'adj-attributive')).toBe('しずかな');
     expect(conjugateAdjective(SHIZUKA, 'adj-sou')).toBe('しずかそう');
     expect(conjugateAdjective(SHIZUKA, 'adj-naru')).toBe('しずかになる');
-  });
-});
-
-describe('noun: 学生', () => {
-  it('uses noun-copula predicate forms', () => {
-    expect(conjugateItem(GAKUSEI, 'adj-plain-present')).toBe('がくせいだ');
-    expect(conjugateItem(GAKUSEI, 'adj-plain-past')).toBe('がくせいだった');
-    expect(conjugateItem(GAKUSEI, 'adj-plain-negative')).toBe('がくせいではない');
-    expect(conjugateItem(GAKUSEI, 'adj-polite-present')).toBe('がくせいです');
-  });
-
-  it('uses の for noun modification and omits adjective-only forms', () => {
-    expect(conjugateItem(GAKUSEI, 'adj-attributive')).toBe('がくせいの');
-    expect(conjugateItem(GAKUSEI, 'adj-adverb')).toBe('');
-    expect(conjugateItem(GAKUSEI, 'adj-sugiru')).toBe('');
   });
 });
 

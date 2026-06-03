@@ -26,7 +26,9 @@ export function inflateVerbRows(rows = []) {
 }
 
 export const inflateAdjectiveRows = inflateVerbRows;
-export const inflateNounRows = inflateVerbRows;
+export function inflateNounRows() {
+  return [];
+}
 
 function lessonList(...values) {
   return [
@@ -94,6 +96,6 @@ export async function loadVerbLexicon(url = VERB_LEXICON_URL) {
     ...data,
     verbs: mergeBuiltInVerbs(inflateVerbRows(data.verbs), STARTER_VERBS),
     adjectives: mergeBuiltInWords(inflateAdjectiveRows(data.adjectives), STARTER_ADJECTIVES),
-    nouns: inflateNounRows(data.nouns),
+    nouns: [],
   };
 }

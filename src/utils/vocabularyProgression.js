@@ -98,7 +98,7 @@ export function wordProgressionScore(word) {
   const lessonPenalty = Number.isFinite(lesson) ? lesson * 10 : 700;
   const commonPenalty = meta.common || isTextbookBacked(meta) ? 0 : 80;
   const readingLength = String(word?.reading || word?.dict || '').length;
-  const groupPenalty = word?.group === 'noun' ? 35 : word?.group?.includes('adjective') ? 15 : 0;
+  const groupPenalty = word?.group?.includes('adjective') ? 15 : 0;
   return starterBoost + rank * 220 + lessonPenalty + commonPenalty + groupPenalty + readingLength;
 }
 
@@ -138,15 +138,7 @@ export function filterWordsForStudyScope(
   const automaticWords = options.builtInWords?.length
     ? sourceWords.filter((word) => builtInKeys.has(wordKey(word)))
     : sourceWords;
-  // Nouns "conjugate" only via the copula, so they are out of the default
-  // automatic scope. Learners opt back in by enabling the noun group in
-  // Settings; explicit lists and focused practice still reach nouns directly.
-  const includeNouns = (
-    Array.isArray(prefs.wordGroups) ? prefs.wordGroups : DEFAULT_PREFS.wordGroups
-  ).includes('noun');
-  const scopedWords = includeNouns
-    ? automaticWords
-    : automaticWords.filter((word) => word.group !== 'noun');
+  const scopedWords = automaticWords;
   const ranked = rankedProgressionWords(scopedWords);
   const introduced = introducedBuiltInWordCount(state, ranked);
   const wordsForUnlockedKeys = (unlocked) => {

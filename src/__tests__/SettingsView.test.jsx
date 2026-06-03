@@ -5,7 +5,6 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 vi.mock('../utils/supabase.js', () => ({ supabase: null }));
 
 import App from '../App.jsx';
-import { DEFAULT_PREFS } from '../data/defaults.js';
 
 afterEach(() => {
   cleanup();
@@ -55,9 +54,6 @@ describe('SettingsView controls', () => {
     expect(screen.queryByText('Kana help while typing')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Kana help while typing' })).toBeNull();
 
-    expect(screen.getByText('Vocabulary scope')).toBeTruthy();
-    const nounToggle = screen.getByRole('button', { name: 'Include nouns', exact: true });
-    expect(nounToggle.getAttribute('aria-pressed')).toBe('false');
     expect(screen.queryByText('Vocabulary filters')).toBeNull();
     expect(screen.queryByText('JLPT levels')).toBeNull();
     expect(screen.queryByText('Genki lessons')).toBeNull();
@@ -89,16 +85,6 @@ describe('SettingsView controls', () => {
     await waitFor(() => {
       const raw = localStorage.getItem('jp-verb-srs-v2');
       expect(JSON.parse(raw).practicePrefs.showWordCategory).toBe(true);
-    });
-
-    fireEvent.click(nounToggle);
-    await waitFor(() => {
-      const raw = localStorage.getItem('jp-verb-srs-v2');
-      expect(JSON.parse(raw).practicePrefs.wordGroups).toEqual([
-        ...DEFAULT_PREFS.wordGroups,
-        'noun',
-      ]);
-      expect(nounToggle.getAttribute('aria-pressed')).toBe('true');
     });
 
     fireEvent.click(sourceForms.getByRole('button', { name: 'Masu', exact: true }));

@@ -458,12 +458,6 @@ describe('parseWordRows', () => {
     expect(rows[0].group).toBe('godan');
   });
 
-  it('parses noun rows for copula practice', () => {
-    const rows = parseWordRows('学生,がくせい,student,noun');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].group).toBe('noun');
-  });
-
   it('skips rows with fewer than 4 columns', () => {
     expect(parseWordRows('食べる\tたべる\tto eat')).toHaveLength(0);
   });

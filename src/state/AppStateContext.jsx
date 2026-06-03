@@ -60,7 +60,6 @@ function useAppController() {
   const [wordLists, setWordLists] = useState([]);
   const [builtInVerbs, setBuiltInVerbs] = useState(STARTER_VERBS);
   const [builtInAdjectives, setBuiltInAdjectives] = useState(STARTER_ADJECTIVES);
-  const [builtInNouns, setBuiltInNouns] = useState([]);
   const [vocabStatus, setVocabStatus] = useState({
     kind: 'starter',
     count: STARTER_VERBS.length + STARTER_ADJECTIVES.length,
@@ -176,10 +175,9 @@ function useAppController() {
           if (cancelled) return;
           setBuiltInVerbs(data.verbs);
           setBuiltInAdjectives(data.adjectives);
-          setBuiltInNouns(data.nouns);
           setVocabStatus({
             kind: 'ready',
-            count: data.verbs.length + data.adjectives.length + data.nouns.length,
+            count: data.verbs.length + data.adjectives.length,
             message: '',
           });
         })
@@ -398,13 +396,10 @@ function useAppController() {
     [builtInAdjectives, customAdjectives],
   );
   const builtInWords = useMemo(
-    () => [...builtInVerbs, ...builtInAdjectives, ...builtInNouns],
-    [builtInVerbs, builtInAdjectives, builtInNouns],
+    () => [...builtInVerbs, ...builtInAdjectives],
+    [builtInVerbs, builtInAdjectives],
   );
-  const allWords = useMemo(
-    () => [...allVerbs, ...allAdjectives, ...builtInNouns],
-    [allVerbs, allAdjectives, builtInNouns],
-  );
+  const allWords = useMemo(() => [...allVerbs, ...allAdjectives], [allVerbs, allAdjectives]);
   const todayKey = localDateKey();
   const daily = state.daily || defaultState().daily;
   const dailyPct = Math.min(100, Math.round((daily.count / (practicePrefs.dailyGoal || 30)) * 100));
@@ -583,7 +578,6 @@ function useAppController() {
     allVerbs,
     allAdjectives,
     builtInWords,
-    builtInNouns,
     allWords,
     daily,
     dailyPct,

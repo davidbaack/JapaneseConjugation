@@ -77,7 +77,6 @@ export const WORD_TYPE_OPTIONS = [
   { id: 'verb', label: 'Verbs' },
   { id: 'i-adjective', label: 'い-adjectives' },
   { id: 'na-adjective', label: 'な-adjectives' },
-  { id: 'noun', label: 'Nouns' },
 ];
 
 export const WORD_GROUP_OPTIONS = WORD_GROUP_DISPLAY_OPTIONS;

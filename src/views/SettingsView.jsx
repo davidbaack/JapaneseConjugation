@@ -212,13 +212,6 @@ export default function SettingsView() {
     }
   }
 
-  function setNounScope(enabled) {
-    setPracticePrefs({
-      ...practicePrefs,
-      wordGroups: enabled ? [...DEFAULT_PREFS.wordGroups, 'noun'] : [...DEFAULT_PREFS.wordGroups],
-    });
-  }
-
   const statusColor =
     syncStatus.kind === 'error'
       ? 'text-rose-700 bg-rose-50 border-rose-250 dark:bg-rose-955/20 dark:border-rose-900'
@@ -232,9 +225,7 @@ export default function SettingsView() {
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
   const reviewStyle = practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle;
   const sourceFormStrategy = practicePrefs.sourceFormStrategy || DEFAULT_PREFS.sourceFormStrategy;
-  const nounsIncluded = Array.isArray(practicePrefs.wordGroups)
-    ? practicePrefs.wordGroups.includes('noun')
-    : DEFAULT_PREFS.wordGroups.includes('noun');
+
   const selectedVoiceAvailable =
     !practicePrefs.voiceURI || speechVoices.some((v) => v.voiceURI === practicePrefs.voiceURI);
   const weakPackIds = weakTypeIdsForState(state, state.enabledTypes);
@@ -620,37 +611,6 @@ export default function SettingsView() {
               </p>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-        <h3 className="font-medium mb-1 text-stone-800 dark:text-stone-200">Vocabulary scope</h3>
-        <p className="text-xs text-stone-500 mb-4">
-          Reviews follow the automatic word ladder. Library lists and focused practice still set
-          their own scope.
-        </p>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-y border-stone-100 dark:border-stone-850 py-3">
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-stone-800 dark:text-stone-200">
-              Include nouns
-            </div>
-            <div className="text-xs text-stone-500 dark:text-stone-400">
-              Adds noun-copula cards to automatic Reviews.
-            </div>
-          </div>
-          <button
-            type="button"
-            aria-label="Include nouns"
-            aria-pressed={nounsIncluded}
-            onClick={() => setNounScope(!nounsIncluded)}
-            className={`w-full sm:w-auto min-w-24 rounded-lg border px-4 py-2 text-sm font-medium transition ${
-              nounsIncluded
-                ? 'border-indigo-600 bg-indigo-600 text-white dark:border-indigo-500 dark:bg-indigo-600'
-                : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:border-stone-700'
-            }`}
-          >
-            {nounsIncluded ? 'On' : 'Off'}
-          </button>
         </div>
       </div>
 

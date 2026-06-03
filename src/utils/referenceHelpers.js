@@ -47,8 +47,6 @@ export function classifyHint(word) {
   }
   if (word.group === 'i-adjective')
     return `${word.reading} conjugates as an い-adjective: ${conjugateAdjective(word, 'adj-plain-past')}, ${conjugateAdjective(word, 'adj-plain-negative')}.`;
-  if (word.group === 'noun')
-    return `${word.reading} uses noun-copula forms: ${conjugateItem(word, 'adj-polite-present')}, ${conjugateItem(word, 'adj-plain-past')}.`;
   return `${word.reading} is a な-adjective: ${conjugateAdjective(word, 'adj-attributive')} + noun, or ${conjugateAdjective(word, 'adj-polite-present')}.`;
 }
 
@@ -165,7 +163,6 @@ function surfaceStemPair(item) {
   }
   if (item.group === 'na-adjective')
     return { readingStem: item.reading.replace(/な$/, ''), dictStem: item.dict.replace(/な$/, '') };
-  if (item.group === 'noun') return { readingStem: item.reading, dictStem: item.dict };
   return { readingStem: item.reading.slice(0, -1), dictStem: item.dict.slice(0, -1) };
 }
 

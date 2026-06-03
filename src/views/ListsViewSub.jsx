@@ -57,9 +57,7 @@ export function parseWordRows(text) {
               groupText.includes('na-adj') ||
               cols[3].includes('な')
             ? 'na-adjective'
-            : groupText.includes('noun') || groupText.includes('名詞')
-              ? 'noun'
-              : null);
+            : null);
       if (!group) return null;
       const reading = toHiragana(cols[1]);
       if (!isAllKana(reading)) return null;
@@ -144,7 +142,7 @@ export function buildVocabularyCsv(list, words) {
       word.reading,
       word.meaning,
       word.group,
-      word.group === 'noun' ? 'noun' : isAdjective(word) ? 'adjective' : 'verb',
+      isAdjective(word) ? 'adjective' : 'verb',
       meta.jlpt || '',
       meta.lessons?.length ? meta.lessons.join(';') : meta.lesson || '',
       meta.minnaLessons?.length ? meta.minnaLessons.join(';') : meta.minnaLesson || '',
@@ -466,7 +464,7 @@ export default function ListsViewSub({
     setAiRows([]);
     setMsg('');
     try {
-      const prompt = `Build a targeted Japanese conjugation drill list.\n\nTarget level/course: ${aiTarget}\nTopic or situation: ${aiTopic || 'general daily life'}\nDesired size: ${count} words\nAvoid words already in the active list when possible: ${avoid || 'none'}\n\nReturn ONLY JSON with this exact shape:\n{"words":[{"dict":"Japanese dictionary form, noun, or adjective stem","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective|noun","jlpt":"N5|N4|N3|N2|N1","reason":"why this is useful for conjugation practice"}]}\n\nUse real, common learner-appropriate words. Mix verbs, adjectives, and noun/counter copula practice when useful. Prefer words that exercise different conjugation patterns. JLPT labels are community estimates, so be practical instead of pretending official certainty.`;
+      const prompt = `Build a targeted Japanese conjugation drill list.\n\nTarget level/course: ${aiTarget}\nTopic or situation: ${aiTopic || 'general daily life'}\nDesired size: ${count} words\nAvoid words already in the active list when possible: ${avoid || 'none'}\n\nReturn ONLY JSON with this exact shape:\n{"words":[{"dict":"Japanese dictionary form or adjective stem","reading":"hiragana only","meaning":"short English meaning","group":"ichidan|godan|suru|kuru|i-adjective|na-adjective","jlpt":"N5|N4|N3|N2|N1","reason":"why this is useful for conjugation practice"}]}\n\nUse real, common learner-appropriate words. Mix verbs and adjectives. Prefer words that exercise different conjugation patterns. JLPT labels are community estimates, so be practical instead of pretending official certainty.`;
       const reply = await callGemini(
         [{ role: 'user', parts: [{ text: prompt }] }],
         geminiKey,
@@ -928,7 +926,7 @@ export default function ListsViewSub({
                     {w.dict}
                   </span>
                   <span className="text-[11px] text-stone-400">
-                    {w.group === 'noun' ? 'noun' : isAdjective(w) ? 'adj' : 'verb'}
+                    {isAdjective(w) ? 'adj' : 'verb'}
                   </span>
                 </div>
                 <div className="text-xs text-stone-500" lang="ja">
@@ -981,9 +979,7 @@ export default function ListsViewSub({
               setImportText(e.target.value);
               setMsg('');
             }}
-            placeholder={
-              '始める,はじめる,to begin,ichidan\n有名,ゆうめい,famous,na-adjective\n学生,がくせい,student,noun'
-            }
+            placeholder={'始める,はじめる,to begin,ichidan\n有名,ゆうめい,famous,na-adjective'}
             aria-label="Paste CSV or TSV rows to bulk import"
             className="w-full h-28 px-3 py-2 text-sm font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
             autoCorrect="off"
