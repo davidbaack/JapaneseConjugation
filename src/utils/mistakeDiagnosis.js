@@ -123,6 +123,41 @@ function diagnosis({
   };
 }
 
+export function labRouteForMistakePattern(pattern) {
+  if (!pattern?.patternId) return null;
+  if (pattern.category === 'verb-group-confusion') {
+    return {
+      tool: 'classify',
+      toolLabel: 'Groups',
+      triggerLabel: 'Wrong verb group',
+      actionLabel: 'Drill verb groups in Groups',
+      detail: 'Sort the group first; the ending rule depends on it.',
+    };
+  }
+
+  const patternId = String(pattern.patternId || '');
+  const repairTypes = new Set(
+    [pattern.targetType, ...(pattern.repairTypeIds || [])].filter(Boolean),
+  );
+  const teTaSoundChange =
+    (pattern.category === 'godan-sound-change' ||
+      patternId.startsWith('godan-onbin') ||
+      patternId === 'iku-exception') &&
+    (repairTypes.has('te-form') || repairTypes.has('plain-past'));
+
+  if (teTaSoundChange) {
+    return {
+      tool: 'endings',
+      toolLabel: 'Ending Lab',
+      triggerLabel: 'Te/ta ending miss',
+      actionLabel: 'Practice te/ta endings in Ending Lab',
+      detail: 'Rebuild the sound-change ending before another review set.',
+    };
+  }
+
+  return null;
+}
+
 function sourceFormDiagnosis(item, type, promptType, got) {
   const source = promptType ? safeConjugate(item, promptType) : item?.reading || '';
   if (!source || got !== source || promptType === type) return null;

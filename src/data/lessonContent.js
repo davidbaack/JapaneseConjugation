@@ -331,6 +331,39 @@ export const LESSON_SECTIONS = [
   }),
 ];
 
+export const LESSON_TRACKS = [
+  {
+    id: 'beginner',
+    level: 'Beginner',
+    title: 'Build the everyday core',
+    summary:
+      'Start with the forms learners need constantly: tense, politeness, te-form links, adjectives, and wanting or inviting.',
+    lessonGroupIds: ['basic-tenses', 'te-form-stem', 'adjectives', 'volitional-desire'],
+    suggestedCount: 12,
+    wordLimit: 18,
+  },
+  {
+    id: 'intermediate',
+    level: 'Intermediate',
+    title: 'Connect ideas and ability',
+    summary:
+      'Add can-do language, if/when choices, ongoing states, and the practical request patterns that turn forms into sentences.',
+    lessonGroupIds: ['potential', 'conditional', 'progressive', 'commands-requests'],
+    suggestedCount: 16,
+    wordLimit: 12,
+  },
+  {
+    id: 'advanced',
+    level: 'Advanced',
+    title: 'Handle perspective and edge forms',
+    summary:
+      'Practice viewpoint shifts, make/let combinations, keigo, and special negative connectors after the core forms feel stable.',
+    lessonGroupIds: ['passive', 'causative', 'causative-passive', 'keigo', 'special-forms'],
+    suggestedCount: 20,
+    wordLimit: 14,
+  },
+];
+
 export function getLessonCoverage() {
   const covered = new Set(LESSON_SECTIONS.flatMap((lesson) => lesson.typeIds));
   const missing = ALL_CARD_TYPES.filter((type) => !covered.has(type.id));

@@ -70,6 +70,7 @@ import {
   aggregateDiagnosedMistakes,
   buildRepairDrillPlan,
   bumpSessionMistakePattern,
+  labRouteForMistakePattern,
   rankSessionMistakePatterns,
   repairPrefsForPlan,
   upsertRepairWordList,
@@ -592,6 +593,7 @@ export function ReviewsDashboard({
   onStartRecommendation,
   onRetestMisses,
   retestCount = 0,
+  mistakeRoute = null,
   readinessFamilies = [],
   weakestSkill = null,
   onDrillReadiness,
@@ -631,6 +633,7 @@ export function ReviewsDashboard({
           lead: 'You keep mixing up ',
           emphasis: 'verb groups',
           tail: ' — drill them in Groups',
+          action: 'Groups',
         }
       : weakestSkill && weakestToEndingLab
         ? {
@@ -638,6 +641,7 @@ export function ReviewsDashboard({
             lead: 'You keep missing ',
             emphasis: 'sound changes',
             tail: ' — drill them in Ending Lab',
+            action: 'Ending Lab',
           }
         : weakestSkill && weakestToRush
           ? {
@@ -645,6 +649,7 @@ export function ReviewsDashboard({
               lead: 'Your ',
               emphasis: 'recall is slow',
               tail: ' — build speed in Rush',
+              action: 'Rush',
             }
           : weakestSkill && onDrillReadiness
             ? {
@@ -656,6 +661,7 @@ export function ReviewsDashboard({
                 lead: 'Sharpen ',
                 emphasis: weakestSkill.label,
                 tail: ` — ${weakestSkill.dimensionLabel.toLowerCase()} is ${weakestSkill.status}`,
+                action: 'Drill',
               }
             : null;
   const weakCount = strengthRows.filter((row) => row.status === 'weak').length;
@@ -751,7 +757,9 @@ export function ReviewsDashboard({
                 onClick={onRetestMisses}
                 className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-stone-800"
               >
-                Retest {retestCount} miss{retestCount === 1 ? '' : 'es'}
+                {mistakeRoute
+                  ? `${mistakeRoute.triggerLabel} -> ${mistakeRoute.toolLabel}`
+                  : `Retest ${retestCount} miss${retestCount === 1 ? '' : 'es'}`}
               </button>
             )}
           </div>
@@ -839,7 +847,7 @@ export function ReviewsDashboard({
                   <span className="font-semibold">{primaryNudge.emphasis}</span>
                   {primaryNudge.tail}
                 </span>
-                <span className="shrink-0 font-semibold">Drill →</span>
+                <span className="shrink-0 font-semibold">{primaryNudge.action} →</span>
               </button>
             )}
             <div className="space-y-1">
@@ -970,6 +978,18 @@ export function ReviewsDashboard({
         </div>
       )}
     </section>
+  );
+}
+
+function MistakeRouteHint({ route }) {
+  if (!route) return null;
+  return (
+    <div className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs dark:border-indigo-900/60 dark:bg-indigo-950/20">
+      <div className="font-semibold text-indigo-800 dark:text-indigo-200">
+        {route.triggerLabel} -&gt; {route.toolLabel}
+      </div>
+      <div className="mt-0.5 text-stone-600 dark:text-stone-350">{route.detail}</div>
+    </div>
   );
 }
 
@@ -1148,29 +1168,28 @@ export default function StudyView() {
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
     [state.session?.mistakePatterns],
   );
+  const openMistakeSummary = useMemo(() => {
+    const open = (state.mistakes || []).filter((mistake) => !mistake.resolved);
+    return {
+      count: open.length,
+      patterns: aggregateDiagnosedMistakes(open),
+    };
+  }, [state.mistakes]);
   // Retestable misses power the dashboard's "Retest misses" affordance. Only
   // count them when they actually aggregate into a repair pattern we can drill.
-  const retestableMisses = useMemo(() => {
-    const open = (state.mistakes || []).filter((mistake) => !mistake.resolved);
-    return aggregateDiagnosedMistakes(open).length ? open.length : 0;
-  }, [state.mistakes]);
+  const retestableMisses = openMistakeSummary.patterns.length ? openMistakeSummary.count : 0;
+  const topMistakeRoute = labRouteForMistakePattern(openMistakeSummary.patterns[0]);
   // When open misses cluster as godan sound-change errors, the te-form/stem
   // readiness drill routes to Ending Lab's scaffolded onbin practice instead of
   // a generic scoped review.
-  const onbinWeakness = useMemo(() => {
-    const open = (state.mistakes || []).filter((mistake) => !mistake.resolved);
-    return aggregateDiagnosedMistakes(open).some(
-      (pattern) => pattern.category === 'godan-sound-change',
-    );
-  }, [state.mistakes]);
+  const onbinWeakness = openMistakeSummary.patterns.some(
+    (pattern) => pattern.category === 'godan-sound-change',
+  );
   // Verb-group confusion is the foundational miss (you cannot conjugate without
   // the group); when it clusters, the dashboard routes to the Groups drill.
-  const groupConfusion = useMemo(() => {
-    const open = (state.mistakes || []).filter((mistake) => !mistake.resolved);
-    return aggregateDiagnosedMistakes(open).some(
-      (pattern) => pattern.category === 'verb-group-confusion',
-    );
-  }, [state.mistakes]);
+  const groupConfusion = openMistakeSummary.patterns.some(
+    (pattern) => pattern.category === 'verb-group-confusion',
+  );
   // Recognition/production/speed readiness rolled up to form families, plus the
   // single weakest skill, for the dashboard's strength section and nudge. Scoped
   // to state.readiness so it only recomputes when readiness data changes.
@@ -1506,6 +1525,7 @@ export default function StudyView() {
           onStartRecommendation={startReviewRecommendation}
           onRetestMisses={launchMistakeRetest}
           retestCount={retestableMisses}
+          mistakeRoute={topMistakeRoute}
           readinessFamilies={readinessFamilies}
           weakestSkill={weakestReadiness}
           onDrillReadiness={drillReadinessGap}
@@ -1895,8 +1915,15 @@ export default function StudyView() {
   // straight into it, leaving the dashboard for the active card.
   function launchMistakeRetest() {
     const openMistakes = (state.mistakes || []).filter((mistake) => !mistake.resolved);
-    const patterns = aggregateDiagnosedMistakes(openMistakes);
+    const patterns = openMistakeSummary.patterns.length
+      ? openMistakeSummary.patterns
+      : aggregateDiagnosedMistakes(openMistakes);
     if (!openMistakes.length || !patterns.length) return;
+    const route = labRouteForMistakePattern(patterns[0]);
+    if (route) {
+      openLabTool(route.tool);
+      return;
+    }
     const plan = buildRepairDrillPlan(patterns[0], verbs || []);
     if (plan.wordKeys.length) {
       setWordLists(upsertRepairWordList(wordLists, plan));
@@ -1993,6 +2020,19 @@ export default function StudyView() {
     setPhase('answering');
     setCurrent(null);
     setTab('study');
+  }
+
+  function launchMistakePatternNextStep(pattern) {
+    const route = labRouteForMistakePattern(pattern);
+    if (route) {
+      openLabTool(route.tool);
+      return;
+    }
+    launchRepairDrill(pattern);
+  }
+
+  function mistakePatternActionLabel(pattern) {
+    return labRouteForMistakePattern(pattern)?.actionLabel || 'Start 10-card repair drill';
   }
 
   function submit(choiceValue, options = {}) {
@@ -2525,6 +2565,7 @@ export default function StudyView() {
                 <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
                   {sessionMistakePatterns[0].feedback}
                 </div>
+                <MistakeRouteHint route={labRouteForMistakePattern(sessionMistakePatterns[0])} />
               </div>
               <div className="text-xs font-semibold tabular-nums text-rose-700 dark:text-rose-300">
                 {sessionMistakePatterns[0].count}x
@@ -2543,10 +2584,10 @@ export default function StudyView() {
               </div>
             )}
             <button
-              onClick={() => launchRepairDrill(sessionMistakePatterns[0])}
+              onClick={() => launchMistakePatternNextStep(sessionMistakePatterns[0])}
               className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
             >
-              Start 10-card repair drill
+              {mistakePatternActionLabel(sessionMistakePatterns[0])}
             </button>
           </div>
         ) : (
@@ -2622,6 +2663,7 @@ export default function StudyView() {
                 <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
                   {sessionMistakePatterns[0].feedback}
                 </div>
+                <MistakeRouteHint route={labRouteForMistakePattern(sessionMistakePatterns[0])} />
               </div>
               <div className="text-xs font-semibold tabular-nums text-rose-700 dark:text-rose-300">
                 {sessionMistakePatterns[0].count}x
@@ -2640,10 +2682,10 @@ export default function StudyView() {
               </div>
             )}
             <button
-              onClick={() => launchRepairDrill(sessionMistakePatterns[0])}
+              onClick={() => launchMistakePatternNextStep(sessionMistakePatterns[0])}
               className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
             >
-              Start 10-card repair drill
+              {mistakePatternActionLabel(sessionMistakePatterns[0])}
             </button>
           </div>
         ) : (
