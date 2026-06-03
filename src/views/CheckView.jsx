@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { IconCheck, IconX, IconPen, IconVolume } from '../components/Icons.jsx';
+import { IconCheck, IconX, IconVolume } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
-import KanaInputPad from '../components/KanaInputPad.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import StickyAction from '../components/StickyAction.jsx';
 import { playPronunciation } from '../utils/speech.js';
@@ -10,7 +9,7 @@ import { getTypeInfo, getWordMeta } from '../utils/conjugator.js';
 import { explainItem, GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { formRows } from './ReferenceViewSub.jsx';
 import { formDisplay, englishForForm } from '../utils/display.js';
-import { toHiragana } from '../utils/romaji.js';
+import { toKanaInputValue } from '../utils/romaji.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
 const MAX_HISTORY = 6;
@@ -208,7 +207,6 @@ export default function CheckView() {
   } = useApp();
   const [input, setInput] = useState('');
   const [result, setResult] = useState(null);
-  const [kanaPadOpen, setKanaPadOpen] = useState(false);
   const [history, setHistory] = useState(loadHistory);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [showForms, setShowForms] = useState(false);
@@ -267,7 +265,7 @@ export default function CheckView() {
 
   const handleExample = useCallback(
     (ex) => {
-      setInput(ex);
+      setInput(toKanaInputValue(ex));
       runCheck(ex);
     },
     [runCheck],
@@ -283,10 +281,6 @@ export default function CheckView() {
     (text) => playPronunciation(text, 0.9, practicePrefs.voiceURI),
     [practicePrefs.voiceURI],
   );
-
-  const insertText = useCallback((t) => setInput((a) => a + t), []);
-  const backspaceText = useCallback(() => setInput((a) => Array.from(a).slice(0, -1).join('')), []);
-  const clearText = useCallback(() => setInput(''), []);
 
   if (!allWords.length) {
     return (
@@ -313,7 +307,6 @@ export default function CheckView() {
     );
   }
 
-  const previewKana = toHiragana(input);
   // When several distinct forms share the same surface, that's a teaching
   // moment (e.g. potential = passive for ichidan verbs), not a footnote.
   const exactForms = result?.exact ?? [];
@@ -351,7 +344,13 @@ export default function CheckView() {
               value={input}
               onChange={(e) => {
                 setResult(null);
-                setInput(e.target.value);
+                setInput(
+                  e.nativeEvent?.isComposing ? e.target.value : toKanaInputValue(e.target.value),
+                );
+              }}
+              onCompositionEnd={(e) => {
+                setResult(null);
+                setInput(toKanaInputValue(e.currentTarget.value));
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -369,37 +368,7 @@ export default function CheckView() {
               enterKeyHint="done"
               spellCheck="false"
             />
-            <button
-              type="button"
-              onClick={() => setKanaPadOpen((v) => !v)}
-              className={`shrink-0 p-2 rounded-lg border inline-flex items-center justify-center aspect-square transition ${
-                kanaPadOpen
-                  ? 'bg-stone-800 border-stone-800 text-white dark:bg-indigo-600 dark:border-indigo-600 dark:text-white'
-                  : 'bg-white border-stone-200 hover:bg-stone-50 text-stone-600 dark:bg-stone-900 dark:border-stone-800 dark:hover:bg-stone-800 dark:text-stone-300'
-              }`}
-              title="Kana pad"
-            >
-              <IconPen className="w-4 h-4" />
-            </button>
           </div>
-
-          {/* Romaji→kana preview, matching Study's auto-convert affordance */}
-          {!result && previewKana && previewKana !== input && (
-            <div className="mt-2 text-center text-sm text-stone-400" lang="ja">
-              → {previewKana}
-            </div>
-          )}
-
-          <KanaInputPad
-            open={kanaPadOpen}
-            onToggle={() => setKanaPadOpen((v) => !v)}
-            onInsert={insertText}
-            onBackspace={backspaceText}
-            onClear={clearText}
-            onSubmit={handleCheck}
-            canSubmit={!!input.trim()}
-            noToggle
-          />
 
           {!result && (
             <>

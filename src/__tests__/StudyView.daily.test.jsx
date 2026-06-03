@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
@@ -468,7 +468,7 @@ describe('StudyView daily startup guards', () => {
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
   });
 
-  it('controls live kana help from the Study answer box', async () => {
+  it('reveals kana directly into the Study answer box', async () => {
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
     mockedApp.value = makeApp({
@@ -485,27 +485,27 @@ describe('StudyView daily startup guards', () => {
     render(<StudyView />);
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    const helper = await screen.findByRole('group', { name: 'Live kana help' }, { timeout: 5000 });
     const expectedKana = Array.from(conjugateItem(target, type));
     const firstKana = expectedKana[0];
+    const revealNext = await screen.findByRole(
+      'button',
+      { name: 'Reveal next kana' },
+      { timeout: 5000 },
+    );
 
-    fireEvent.click(within(helper).getByRole('button', { name: 'Reveal next kana' }));
-    expect(within(helper).getByText(firstKana)).toBeTruthy();
+    fireEvent.click(revealNext);
     await waitFor(() => expect(input.value).toBe(firstKana));
 
     fireEvent.change(input, { target: { value: 'ta' } });
-    fireEvent.click(within(helper).getByRole('button', { name: 'Reveal next kana' }));
+    await waitFor(() => expect(input.value).toBe(firstKana));
+    fireEvent.click(revealNext);
     await waitFor(() => expect(input.value).toBe(expectedKana.slice(0, 2).join('')));
 
-    fireEvent.click(within(helper).getByRole('button', { name: 'Hide live kana help' }));
-    expect(within(helper).getByRole('button', { name: 'Show live kana help' })).toBeTruthy();
-    expect(within(helper).queryByText(firstKana)).toBeNull();
-
-    fireEvent.click(within(helper).getByRole('button', { name: 'Show live kana help' }));
-    expect(within(helper).getByText(firstKana)).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Live kana help' })).toBeNull();
+    expect(screen.queryByRole('status', { name: 'Kana preview' })).toBeNull();
   });
 
-  it('shows a non-spoiler kana preview while typing reading-practice answers', async () => {
+  it('auto-converts reading-practice answers in the text input', async () => {
     const target = STARTER_VERBS[0];
     mockedApp.value = makeApp({
       practicePrefs: {
@@ -527,9 +527,8 @@ describe('StudyView daily startup guards', () => {
     );
     fireEvent.change(input, { target: { value: 'oki' } });
 
-    const preview = screen.getByRole('status', { name: 'Kana preview' });
-    expect(within(preview).getByText('お')).toBeTruthy();
-    expect(within(preview).getByText('き')).toBeTruthy();
+    expect(input.value).toBe('\u304a\u304d');
+    expect(screen.queryByRole('status', { name: 'Kana preview' })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Live kana help' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
   });
@@ -615,6 +614,7 @@ describe('StudyView daily startup guards', () => {
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: 'tabet' } });
+    expect(input.value).toBe('\u305f\u3079t');
     expect(setState).not.toHaveBeenCalled();
 
     fireEvent.change(input, { target: { value: 'tabeta' } });
@@ -647,7 +647,7 @@ describe('StudyView daily startup guards', () => {
     expect(screen.getAllByText('Ask Gemini why').length).toBeGreaterThan(0);
   });
 
-  it('keeps direct kana pending until a miss, then grades retyped kana immediately', async () => {
+  it('keeps direct kana in the input and flags mismatches inline', async () => {
     mockedApp.value = makeApp({
       practicePrefs: {
         ...DEFAULT_PREFS,
@@ -659,22 +659,20 @@ describe('StudyView daily startup guards', () => {
       },
     });
 
-    const { container } = render(<StudyView />);
+    render(<StudyView />);
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: 'たべ' } });
-
-    await waitFor(() => {
-      expect(container.querySelectorAll('.border-emerald-300').length).toBe(1);
-    });
+    await waitFor(() => expect(input.value).toBe('たべ'));
+    expect(screen.queryByText('Kana 2 does not match yet.')).toBeNull();
 
     fireEvent.change(input, { target: { value: 'たなこ' } });
     await waitFor(() => expect(screen.getByText('Kana 2 does not match yet.')).toBeTruthy());
+    expect(input.className).toContain('border-rose-400');
 
     fireEvent.change(input, { target: { value: 'たべ' } });
-    await waitFor(() => {
-      expect(container.querySelectorAll('.border-emerald-300').length).toBe(2);
-    });
+    await waitFor(() => expect(screen.queryByText('Kana 2 does not match yet.')).toBeNull());
+    expect(input.className).not.toContain('border-rose-400');
   });
 
   it('focuses the review advance button without asking the browser to scroll', async () => {

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { toHiragana, toHiraganaProgress, kanaToRomaji, isAllKana } from '../utils/romaji.js';
+import {
+  toHiragana,
+  toHiraganaProgress,
+  toKanaInputValue,
+  kanaToRomaji,
+  isAllKana,
+} from '../utils/romaji.js';
 
 describe('toHiragana', () => {
   it('converts basic romaji syllables', () => {
@@ -119,6 +125,29 @@ describe('toHiraganaProgress', () => {
 
   it('converts n followed by consonant to ん mid-word', () => {
     expect(toHiraganaProgress('kenko')).toBe('けんこ');
+  });
+});
+
+describe('toKanaInputValue', () => {
+  it('converts completed romaji syllables while leaving an incomplete suffix editable', () => {
+    expect(toKanaInputValue('ta')).toBe('\u305f');
+    expect(toKanaInputValue('tabet')).toBe('\u305f\u3079t');
+    expect(toKanaInputValue('tabeta')).toBe('\u305f\u3079\u305f');
+  });
+
+  it('keeps doubled consonants usable for the next keystroke', () => {
+    expect(toKanaInputValue('matt')).toBe('\u307e\u3063t');
+    expect(toKanaInputValue('matte')).toBe('\u307e\u3063\u3066');
+  });
+
+  it('handles n before consonants without blocking na-row syllables', () => {
+    expect(toKanaInputValue('yonde')).toBe('\u3088\u3093\u3067');
+    expect(toKanaInputValue('na')).toBe('\u306a');
+    expect(toKanaInputValue('n')).toBe('n');
+  });
+
+  it('passes through existing Japanese text and converts appended romaji', () => {
+    expect(toKanaInputValue('\u98df\u3079ta')).toBe('\u98df\u3079\u305f');
   });
 });
 

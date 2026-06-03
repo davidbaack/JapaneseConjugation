@@ -248,6 +248,95 @@ export function toHiraganaProgress(s) {
   return out;
 }
 
+export function toKanaInputValue(s) {
+  if (!s) return '';
+  s = normalizeRomajiInput(s);
+  let out = '',
+    i = 0;
+  while (i < s.length) {
+    const rawCh = s[i];
+    const ch = rawCh.toLowerCase();
+    if (ch === "'" || ch === '’' || ch === 'ʼ') {
+      i++;
+      continue;
+    }
+    if (rawCh.charCodeAt(0) > 127) {
+      out += rawCh;
+      i++;
+      continue;
+    }
+    if (/\s/.test(rawCh)) {
+      out += rawCh;
+      i++;
+      continue;
+    }
+    if (!/[a-z]/i.test(rawCh)) {
+      out += rawCh;
+      i++;
+      continue;
+    }
+    if (ch === 'n') {
+      const rawNext = s[i + 1];
+      const nx = rawNext?.toLowerCase();
+      if (nx === undefined) {
+        out += ch;
+        i++;
+        continue;
+      }
+      if (nx === "'" || rawNext === '’' || rawNext === 'ʼ') {
+        out += '\u3093';
+        i += 2;
+        continue;
+      }
+      if (nx === 'n') {
+        if (s[i + 2] === undefined) {
+          out += '\u3093';
+          i += 2;
+          continue;
+        }
+        out += '\u3093';
+        i++;
+        continue;
+      }
+      if (!/[aiueoy]/.test(nx)) {
+        out += '\u3093';
+        i++;
+        continue;
+      }
+    }
+    if (i < s.length - 1 && /[bcdfghjkmpqrstvwxyz]/.test(ch) && ch === s[i + 1].toLowerCase()) {
+      out += '\u3063';
+      if (s[i + 2] === undefined) {
+        out += ch;
+        i += 2;
+      } else {
+        i++;
+      }
+      continue;
+    }
+    let matched = false;
+    for (let len = 3; len >= 1; len--) {
+      const sub = s.slice(i, i + len).toLowerCase();
+      if (ROMAJI_MAP[sub]) {
+        out += ROMAJI_MAP[sub];
+        i += len;
+        matched = true;
+        break;
+      }
+    }
+    if (matched) continue;
+    const letters = s.slice(i).match(/^[a-z]+/i)?.[0] || '';
+    if (letters && ROMAJI_PREFIXES.has(letters.toLowerCase())) {
+      out += letters.toLowerCase();
+      i += letters.length;
+      continue;
+    }
+    out += rawCh;
+    i++;
+  }
+  return out;
+}
+
 export const HIRAGANA_TO_ROMAJI = {};
 for (const [rom, kana] of Object.entries(ROMAJI_MAP)) {
   if (!HIRAGANA_TO_ROMAJI[kana]) HIRAGANA_TO_ROMAJI[kana] = rom;
@@ -295,21 +384,3 @@ export function isAllKana(s) {
   }
   return true;
 }
-
-export const KANA_PAD_ROWS = [
-  ['あ', 'い', 'う', 'え', 'お'],
-  ['か', 'き', 'く', 'け', 'こ'],
-  ['さ', 'し', 'す', 'せ', 'そ'],
-  ['た', 'ち', 'つ', 'て', 'と'],
-  ['な', 'に', 'ぬ', 'ね', 'の'],
-  ['は', 'ひ', 'ふ', 'へ', 'ほ'],
-  ['ま', 'み', 'む', 'め', 'も'],
-  ['や', 'ゆ', 'よ', 'わ', 'を'],
-  ['ら', 'り', 'る', 'れ', 'ろ', 'ん'],
-  ['が', 'ぎ', 'ぐ', 'げ', 'ご'],
-  ['ざ', 'じ', 'ず', 'ぜ', 'ぞ'],
-  ['だ', 'ぢ', 'づ', 'で', 'ど'],
-  ['ば', 'び', 'ぶ', 'べ', 'ぼ'],
-  ['ぱ', 'ぴ', 'ぷ', 'ぺ', 'ぽ'],
-  ['ゃ', 'ゅ', 'ょ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ', 'っ', 'ー'],
-];
