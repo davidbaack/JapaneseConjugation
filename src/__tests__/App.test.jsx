@@ -313,4 +313,44 @@ describe('App shell', () => {
     expect(screen.getByRole('button', { name: 'Drill favorites' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Copy table' })).toBeTruthy();
   }, 15000);
+
+  it('keeps Library reverse lookup details aligned with the confirmed hit', async () => {
+    const savedState = defaultState();
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...savedState,
+          reference: {
+            ...savedState.reference,
+            selected: {
+              dict: '書く',
+              reading: 'かく',
+              meaning: 'to write',
+              group: 'godan',
+            },
+          },
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+
+    render(<App />);
+    await screen.findByRole('region', { name: 'Reviews dashboard' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('tab', { name: 'Library', exact: true }));
+
+    fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));
+    expect((await screen.findAllByText('to write')).length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
+      target: { value: '食べました' },
+    });
+
+    expect(await screen.findByText('1 hit')).toBeTruthy();
+    await waitFor(() => expect(screen.queryAllByText('to write').length).toBe(0));
+    expect(screen.getAllByText('to eat').length).toBeGreaterThan(0);
+  }, 15000);
 });

@@ -72,6 +72,7 @@ export default function ReferenceViewSub({
   const [lookupAiErr, setLookupAiErr] = useState('');
   const [favoriteMsg, setFavoriteMsg] = useState('');
   const lookupAbortRef = useRef(null);
+  const lookupAutoSelectKeyRef = useRef('');
 
   const words = useMemo(() => [...verbs, ...adjectives], [verbs, adjectives]);
   const reference = normalizeReferenceState(state.reference);
@@ -102,6 +103,22 @@ export default function ReferenceViewSub({
       setSelected(referenceSelectedWord || matches[0] || words[0] || null);
     }
   }, [matches, words, selected, referenceSelectedWord]);
+
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery || !lookupMatches.length) {
+      lookupAutoSelectKeyRef.current = '';
+      return;
+    }
+    const topWord = lookupMatches[0]?.word || null;
+    if (!topWord) return;
+    const autoSelectKey = `${trimmedQuery}:${wordKeyLocal(topWord)}`;
+    if (lookupAutoSelectKeyRef.current === autoSelectKey) return;
+    lookupAutoSelectKeyRef.current = autoSelectKey;
+    setSelected((current) =>
+      current && wordKeyLocal(current) === wordKeyLocal(topWord) ? current : topWord,
+    );
+  }, [lookupMatches, query]);
 
   useEffect(() => {
     setLookupAiText('');
