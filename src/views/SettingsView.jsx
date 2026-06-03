@@ -4,7 +4,6 @@ import { ALL_CARD_TYPES, TYPE_PACKS, FORM_GROUPS } from '../data/conjugationType
 import {
   buildPracticePoolSummary,
   weakTypeIdsForState,
-  defaultState,
   mergeState,
   dailyNewCardLimit,
   bonusNewCardLimit,
@@ -49,6 +48,46 @@ const ANSWER_MODE_OPTIONS = [
   { id: 'speak', label: 'Speak answer' },
 ];
 
+const RESET_ACTIONS = [
+  {
+    id: 'progress',
+    title: 'Reset review progress',
+    description: 'Clears SRS cards, mistakes, streaks, and lab stats.',
+    clears: 'Review history and practice stats',
+    keeps: 'Settings, form scope, Library exclusions, custom words, and lists',
+    confirm: 'Reset progress',
+    done: 'Review progress reset.',
+  },
+  {
+    id: 'settings',
+    title: 'Restore default settings',
+    description: 'Restores answer, display, goal, filter, and form-scope defaults.',
+    clears: 'Non-default Settings choices',
+    keeps: 'Progress, custom words, and lists',
+    confirm: 'Restore settings',
+    done: 'Default settings restored.',
+  },
+  {
+    id: 'custom-content',
+    title: 'Clear custom learner content',
+    description: 'Removes custom verbs, custom adjectives, and saved word lists.',
+    clears: 'Custom words, lists, and active list selections',
+    keeps: 'Built-in progress and other settings',
+    confirm: 'Clear custom content',
+    done: 'Custom learner content cleared.',
+  },
+  {
+    id: 'factory',
+    title: 'Factory reset account',
+    description: 'Wipes learner data and settings for a clean Katachiya start.',
+    clears: 'Progress, settings, custom words, lists, and Library exclusions',
+    keeps: 'Your login account',
+    confirm: 'Factory reset',
+    done: 'Factory reset complete.',
+    danger: true,
+  },
+];
+
 export default function SettingsView() {
   const {
     state,
@@ -62,6 +101,7 @@ export default function SettingsView() {
     session,
     syncStatus,
     syncNow,
+    resetLearnerData,
     practicePrefs,
     setPracticePrefs,
     speechVoices,
@@ -70,7 +110,10 @@ export default function SettingsView() {
     allWords,
     showAuth: onShowAuth,
   } = useApp();
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [pendingReset, setPendingReset] = useState(null);
+  const [factoryConfirm, setFactoryConfirm] = useState('');
+  const [resetBusy, setResetBusy] = useState('');
+  const [resetErr, setResetErr] = useState('');
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -124,11 +167,6 @@ export default function SettingsView() {
     if (next.length) setState({ ...state, enabledTypes: next });
   }
 
-  function reset() {
-    setState({ ...defaultState(), enabledTypes: state.enabledTypes });
-    setConfirmReset(false);
-  }
-
   async function copyExport() {
     try {
       if (navigator.clipboard?.writeText) {
@@ -155,6 +193,23 @@ export default function SettingsView() {
     setImportOpen(false);
     setMsg('Restored!');
     setTimeout(() => setMsg(''), 3000);
+  }
+
+  async function runReset(action) {
+    if (!action || resetBusy) return;
+    setResetErr('');
+    setResetBusy(action.id);
+    try {
+      const result = await resetLearnerData(action.id);
+      setPendingReset(null);
+      setFactoryConfirm('');
+      setMsg(`${action.done}${result.cloud ? ' Saved to cloud.' : ''}`);
+      setTimeout(() => setMsg(''), 3000);
+    } catch (e) {
+      setResetErr(e.message || 'Reset failed.');
+    } finally {
+      setResetBusy('');
+    }
   }
 
   function setNounScope(enabled) {
@@ -913,34 +968,152 @@ export default function SettingsView() {
       </div>
 
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-        <h3 className="font-medium mb-1 text-stone-850 dark:text-stone-200">Reset progress</h3>
-        <p className="text-xs text-stone-500 mb-3">
-          Clear all SRS state. Custom verbs and settings stay.
+        <h3 className="font-medium mb-1 text-stone-850 dark:text-stone-200">Reset & cleanup</h3>
+        <p className="text-xs text-stone-500 mb-4">
+          Signed-in resets update this browser and your cloud account. Signed-out resets are local.
         </p>
-        {!confirmReset ? (
-          <button
-            onClick={() => setConfirmReset(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm text-stone-700 dark:text-stone-300"
-          >
-            <IconRefresh className="w-4 h-4" />
-            Reset all progress
-          </button>
-        ) : (
-          <div className="flex gap-2">
-            <button
-              onClick={reset}
-              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm"
-            >
-              Yes, reset
-            </button>
-            <button
-              onClick={() => setConfirmReset(false)}
-              className="px-3 py-1.5 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
+        <div role="status" aria-live="polite">
+          {resetErr && (
+            <div className="mb-3 text-sm text-rose-700 bg-rose-50 border border-rose-250 rounded-lg px-3 py-2">
+              {resetErr}
+            </div>
+          )}
+        </div>
+        <div className="divide-y divide-stone-100 dark:divide-stone-850 border-y border-stone-100 dark:border-stone-850">
+          {RESET_ACTIONS.map((action) => {
+            const active = pendingReset === action.id;
+            const busy = resetBusy === action.id;
+            const canFactoryReset = factoryConfirm.trim().toUpperCase() === 'RESET';
+            return (
+              <div key={action.id} className="py-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <IconRefresh
+                        className={`w-4 h-4 ${action.danger ? 'text-rose-600' : 'text-indigo-600 dark:text-indigo-400'}`}
+                      />
+                      <div className="text-sm font-medium text-stone-850 dark:text-stone-200">
+                        {action.title}
+                      </div>
+                    </div>
+                    <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                      {action.description}
+                    </p>
+                    <div className="mt-2 grid gap-1 text-[11px] text-stone-500 dark:text-stone-400">
+                      <div>
+                        <span className="font-semibold text-stone-600 dark:text-stone-300">
+                          Clears:
+                        </span>{' '}
+                        {action.clears}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-stone-600 dark:text-stone-300">
+                          Keeps:
+                        </span>{' '}
+                        {action.keeps}
+                      </div>
+                    </div>
+                  </div>
+                  {!active && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetErr('');
+                        setPendingReset(action.id);
+                        setFactoryConfirm('');
+                      }}
+                      disabled={!!resetBusy}
+                      className={`w-full sm:w-auto px-3 py-1.5 rounded-lg text-sm font-medium border transition disabled:opacity-50 ${
+                        action.danger
+                          ? 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/20'
+                          : 'border-stone-200 text-stone-700 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850'
+                      }`}
+                    >
+                      {action.confirm}
+                    </button>
+                  )}
+                </div>
+                {active && (
+                  <div
+                    className={`mt-3 rounded-xl border px-3 py-3 ${
+                      action.danger
+                        ? 'border-rose-200 bg-rose-50/70 dark:border-rose-900 dark:bg-rose-950/20'
+                        : 'border-stone-200 bg-stone-50 dark:border-stone-800 dark:bg-stone-950'
+                    }`}
+                  >
+                    {action.danger ? (
+                      <div className="space-y-3">
+                        <div className="text-xs text-rose-700 dark:text-rose-300">
+                          This wipes Katachiya learner data and settings in this browser
+                          {session ? ' and in cloud' : ''}. Export is available first.
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExportOpen(true);
+                              setImportOpen(false);
+                            }}
+                            className="px-3 py-1.5 border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:bg-stone-950 dark:text-rose-300 dark:hover:bg-rose-950/20 rounded-lg text-sm font-medium"
+                          >
+                            Open export
+                          </button>
+                          <input
+                            value={factoryConfirm}
+                            onChange={(e) => setFactoryConfirm(e.target.value)}
+                            aria-label="Type RESET to confirm factory reset"
+                            placeholder="Type RESET"
+                            className="flex-1 px-3 py-1.5 border border-rose-200 dark:border-rose-900 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg text-sm focus:border-rose-500 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            type="button"
+                            onClick={() => runReset(action)}
+                            disabled={!canFactoryReset || !!resetBusy}
+                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
+                          >
+                            {busy ? 'Resetting...' : 'Factory reset'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPendingReset(null);
+                              setFactoryConfirm('');
+                            }}
+                            disabled={!!resetBusy}
+                            className="px-3 py-1.5 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 hover:bg-white dark:hover:bg-stone-900 rounded-lg text-sm font-medium disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => runReset(action)}
+                          disabled={!!resetBusy}
+                          className="px-3 py-1.5 bg-stone-850 hover:bg-stone-950 dark:bg-indigo-600 dark:hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
+                        >
+                          {busy ? 'Resetting...' : `Yes, ${action.confirm.toLowerCase()}`}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingReset(null)}
+                          disabled={!!resetBusy}
+                          className="px-3 py-1.5 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-white dark:hover:bg-stone-900 rounded-lg text-sm font-medium disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
       <div className="text-xs text-stone-400 text-center pt-2">
         Progress saves automatically to your browser.

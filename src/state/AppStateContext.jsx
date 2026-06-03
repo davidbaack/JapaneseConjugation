@@ -11,6 +11,7 @@ import {
   mergeState,
   buildSyncPayload,
   mergeSyncPayload,
+  saveAll,
   pruneAICache,
   localDateKey,
 } from '../utils/storage.js';
@@ -21,6 +22,7 @@ import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
 import { loadVerbLexicon } from '../data/verbLexicon.js';
 import { supabase } from '../utils/supabase.js';
 import { useCloudAutoSync } from '../hooks/useCloudAutoSync.js';
+import { buildLearnerResetPayload, commitLearnerResetPayload } from '../utils/learnerReset.js';
 import {
   buildTodayDrillPlan,
   practicePrefsForTodayDrill,
@@ -94,6 +96,40 @@ function useAppController() {
     if (Array.isArray(payload.customAdjectives)) setCustomAdjectives(payload.customAdjectives);
     if (Array.isArray(payload.wordLists)) setWordLists(payload.wordLists);
     if (payload.practicePrefs) setPracticePrefs(mergePracticePrefs(payload.practicePrefs));
+  }
+
+  function applyLearnerResetPayload(payload, syncedAt = null) {
+    if (!payload) return;
+    if (typeof syncedAt === 'number') lastSyncedAtRef.current = syncedAt;
+    setState(payload.state || defaultState());
+    setCustomVerbs(Array.isArray(payload.customVerbs) ? payload.customVerbs : []);
+    setCustomAdjectives(Array.isArray(payload.customAdjectives) ? payload.customAdjectives : []);
+    setWordLists(Array.isArray(payload.wordLists) ? payload.wordLists : []);
+    setPracticePrefs(mergePracticePrefs(payload.practicePrefs));
+    setStudyFocus(null);
+    setLabFocus(null);
+    setSrsQueue({
+      date: localDateKey(),
+      dueRuleIds: [],
+      completedDueRuleIds: [],
+      startedAt: null,
+    });
+    try {
+      sessionStorage.removeItem('jp-study-current');
+    } catch {}
+  }
+
+  function saveResetPayload(payload, syncedAt = null) {
+    const nextSyncedAt = typeof syncedAt === 'number' ? syncedAt : lastSyncedAtRef.current;
+    saveAll(
+      payload.state,
+      payload.customVerbs,
+      payload.customAdjectives,
+      payload.wordLists,
+      { enabled: !!session },
+      nextSyncedAt,
+      payload.practicePrefs,
+    );
   }
 
   // Local storage hydration on mount + Supabase auth listener
@@ -328,6 +364,34 @@ function useAppController() {
     }
   }
 
+  async function resetLearnerData(kind) {
+    const payload = buildLearnerResetPayload(
+      { state, customVerbs, customAdjectives, wordLists, practicePrefs },
+      kind,
+    );
+    const writesCloud = !!(session?.user && supabase);
+    if (writesCloud) {
+      setSyncStatus({ kind: 'syncing', message: 'Saving reset to cloud...', at: null });
+    }
+
+    try {
+      const result = await commitLearnerResetPayload({
+        payload,
+        session: writesCloud ? session : null,
+        writeCloud: writesCloud ? cloudUpsert : null,
+        saveLocal: saveResetPayload,
+        applyLocal: applyLearnerResetPayload,
+      });
+      if (writesCloud) {
+        setSyncStatus({ kind: 'ok', message: 'Reset saved to cloud', at: result.at });
+      }
+      return result;
+    } catch (e) {
+      setSyncStatus({ kind: 'error', message: e.message || 'Reset failed', at: null });
+      throw e;
+    }
+  }
+
   const allVerbs = useMemo(() => [...builtInVerbs, ...customVerbs], [builtInVerbs, customVerbs]);
   const allAdjectives = useMemo(
     () => [...builtInAdjectives, ...customAdjectives],
@@ -510,6 +574,7 @@ function useAppController() {
     syncStatus,
     vocabStatus,
     syncNow,
+    resetLearnerData,
     activeGeminiKey,
     speechVoices,
     resolvedTheme,

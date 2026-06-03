@@ -110,6 +110,26 @@ describe('SettingsView controls', () => {
       expect(JSON.parse(raw).practicePrefs.promptForm).toBe('polite-present');
     });
 
+    expect(screen.getByText('Reset & cleanup')).toBeTruthy();
+    expect(screen.getByText('Reset review progress')).toBeTruthy();
+    expect(screen.getByText('Restore default settings')).toBeTruthy();
+    expect(screen.getByText('Clear custom learner content')).toBeTruthy();
+    expect(screen.getByText('Factory reset account')).toBeTruthy();
+    expect(
+      screen.getByText('Settings, form scope, Library exclusions, custom words, and lists'),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore settings', exact: true }));
+    expect(screen.getByRole('button', { name: 'Yes, restore settings', exact: true })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel', exact: true }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Factory reset', exact: true }));
+    const factoryInput = screen.getByLabelText('Type RESET to confirm factory reset');
+    const factoryButton = screen.getByRole('button', { name: 'Factory reset', exact: true });
+    expect(factoryButton.disabled).toBe(true);
+    fireEvent.change(factoryInput, { target: { value: 'RESET' } });
+    expect(factoryButton.disabled).toBe(false);
+
     expect(screen.queryByRole('button', { name: 'Guided', exact: true })).toBeNull();
   });
 });
