@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 vi.mock('../utils/supabase.js', () => ({ supabase: null }));
 
 import App from '../App.jsx';
+import { DEFAULT_PREFS } from '../data/defaults.js';
 
 afterEach(() => {
   cleanup();
@@ -54,6 +55,17 @@ describe('SettingsView controls', () => {
     expect(screen.queryByText('Kana help while typing')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Kana help while typing' })).toBeNull();
 
+    expect(screen.getByText('Vocabulary scope')).toBeTruthy();
+    const nounToggle = screen.getByRole('button', { name: 'Include nouns', exact: true });
+    expect(nounToggle.getAttribute('aria-pressed')).toBe('false');
+    expect(screen.queryByText('Vocabulary filters')).toBeNull();
+    expect(screen.queryByText('JLPT levels')).toBeNull();
+    expect(screen.queryByText('Genki lessons')).toBeNull();
+    expect(screen.queryByText('Word types')).toBeNull();
+    expect(screen.queryByText('Word groups')).toBeNull();
+    expect(screen.queryByText(/Refines every drill/)).toBeNull();
+    expect(screen.queryByText(/Textbook selection applies/)).toBeNull();
+
     expect(screen.getByText('Word category label')).toBeTruthy();
     const wordCategory = within(screen.getByRole('group', { name: 'Word category label' }));
     expect(wordCategory.getByRole('button', { name: 'Show', exact: true })).toBeTruthy();
@@ -61,9 +73,10 @@ describe('SettingsView controls', () => {
 
     expect(screen.getByText('Conjugation types in scope')).toBeTruthy();
     expect(screen.getByText(/Current mix:/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Custom/ }));
     expect(screen.getByText(/drop-る, row-shift, irregular/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /ichidan: drop る/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /godan: row-shift/ })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /Plain Past/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /Te-form/ }).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Hides う-verb \/ る-verb/)).toBeNull();
 
     await waitFor(() => {
@@ -76,6 +89,16 @@ describe('SettingsView controls', () => {
     await waitFor(() => {
       const raw = localStorage.getItem('jp-verb-srs-v2');
       expect(JSON.parse(raw).practicePrefs.showWordCategory).toBe(true);
+    });
+
+    fireEvent.click(nounToggle);
+    await waitFor(() => {
+      const raw = localStorage.getItem('jp-verb-srs-v2');
+      expect(JSON.parse(raw).practicePrefs.wordGroups).toEqual([
+        ...DEFAULT_PREFS.wordGroups,
+        'noun',
+      ]);
+      expect(nounToggle.getAttribute('aria-pressed')).toBe('true');
     });
 
     fireEvent.click(sourceForms.getByRole('button', { name: 'Masu', exact: true }));

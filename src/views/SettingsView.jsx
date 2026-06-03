@@ -1,12 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { IconVolume, IconRefresh, IconCloud } from '../components/Icons.jsx';
-import {
-  JLPT_LEVELS,
-  GENKI_LESSONS,
-  MINNA_LESSONS,
-  WORD_TYPE_OPTIONS,
-  WORD_GROUP_OPTIONS,
-} from '../data/starterWords.js';
 import { ALL_CARD_TYPES, TYPE_PACKS, FORM_GROUPS } from '../data/conjugationTypes.js';
 import {
   buildPracticePoolSummary,
@@ -85,61 +78,12 @@ export default function SettingsView() {
   const [importErr, setImportErr] = useState('');
   const [msg, setMsg] = useState('');
   const [copyOk, setCopyOk] = useState(false);
-  const [openLessons, setOpenLessons] = useState({ genki: false, minna: false });
   const [showCustom, setShowCustom] = useState(false);
 
   const exportData = useMemo(
     () => serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
     [state, customVerbs, customAdjectives, wordLists, practicePrefs],
   );
-
-  function togglePref(key, id, allIds) {
-    const cur = practicePrefs[key] || allIds;
-    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-    setPracticePrefs({ ...practicePrefs, [key]: next.length ? next : allIds });
-  }
-
-  function setGenkiLessons(ids) {
-    const clean = [...new Set(ids.map(Number))]
-      .filter((n) => GENKI_LESSONS.includes(n))
-      .sort((a, b) => a - b);
-    setPracticePrefs({
-      ...practicePrefs,
-      genkiLessons: clean.length === GENKI_LESSONS.length ? [] : clean,
-    });
-  }
-
-  function toggleGenkiLesson(n) {
-    const selected =
-      practicePrefs.genkiLessons === null
-        ? []
-        : Array.isArray(practicePrefs.genkiLessons) && practicePrefs.genkiLessons.length
-          ? practicePrefs.genkiLessons
-          : GENKI_LESSONS;
-    const next = selected.includes(n) ? selected.filter((x) => x !== n) : [...selected, n];
-    setGenkiLessons(next.length ? next : GENKI_LESSONS);
-  }
-
-  function setMinnaLessons(ids) {
-    const clean = [...new Set(ids.map(Number))]
-      .filter((n) => MINNA_LESSONS.includes(n))
-      .sort((a, b) => a - b);
-    setPracticePrefs({
-      ...practicePrefs,
-      minnaLessons: clean.length === MINNA_LESSONS.length ? [] : clean,
-    });
-  }
-
-  function toggleMinnaLesson(n) {
-    const selected =
-      practicePrefs.minnaLessons === null
-        ? []
-        : Array.isArray(practicePrefs.minnaLessons) && practicePrefs.minnaLessons.length
-          ? practicePrefs.minnaLessons
-          : MINNA_LESSONS;
-    const next = selected.includes(n) ? selected.filter((x) => x !== n) : [...selected, n];
-    setMinnaLessons(next.length ? next : MINNA_LESSONS);
-  }
 
   function toggleDisplayScript(id) {
     const current = resolveDisplayScripts(practicePrefs);
@@ -213,6 +157,13 @@ export default function SettingsView() {
     setTimeout(() => setMsg(''), 3000);
   }
 
+  function setNounScope(enabled) {
+    setPracticePrefs({
+      ...practicePrefs,
+      wordGroups: enabled ? [...DEFAULT_PREFS.wordGroups, 'noun'] : [...DEFAULT_PREFS.wordGroups],
+    });
+  }
+
   const statusColor =
     syncStatus.kind === 'error'
       ? 'text-rose-700 bg-rose-50 border-rose-250 dark:bg-rose-955/20 dark:border-rose-900'
@@ -226,22 +177,9 @@ export default function SettingsView() {
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
   const reviewStyle = practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle;
   const sourceFormStrategy = practicePrefs.sourceFormStrategy || DEFAULT_PREFS.sourceFormStrategy;
-  const selectedGenkiLessons =
-    practicePrefs.genkiLessons === null
-      ? []
-      : Array.isArray(practicePrefs.genkiLessons) && practicePrefs.genkiLessons.length
-        ? practicePrefs.genkiLessons
-        : GENKI_LESSONS;
-  const selectedMinnaLessons =
-    practicePrefs.minnaLessons === null
-      ? []
-      : Array.isArray(practicePrefs.minnaLessons) && practicePrefs.minnaLessons.length
-        ? practicePrefs.minnaLessons
-        : MINNA_LESSONS;
-  const selectedWordGroups =
-    practicePrefs.wordGroups && practicePrefs.wordGroups.length
-      ? practicePrefs.wordGroups
-      : WORD_GROUP_OPTIONS.map((x) => x.id);
+  const nounsIncluded = Array.isArray(practicePrefs.wordGroups)
+    ? practicePrefs.wordGroups.includes('noun')
+    : DEFAULT_PREFS.wordGroups.includes('noun');
   const selectedVoiceAvailable =
     !practicePrefs.voiceURI || speechVoices.some((v) => v.voiceURI === practicePrefs.voiceURI);
   const weakPackIds = weakTypeIdsForState(state, state.enabledTypes);
@@ -631,243 +569,33 @@ export default function SettingsView() {
       </div>
 
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-        <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Vocabulary filters</h3>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">JLPT levels</label>
-            <div className="flex gap-1">
-              {JLPT_LEVELS.map((l) => (
-                <button
-                  key={l}
-                  onClick={() => togglePref('jlptLevels', l, JLPT_LEVELS)}
-                  className={`flex-1 px-2 py-2 rounded-lg text-xs border transition ${
-                    (practicePrefs.jlptLevels || JLPT_LEVELS).includes(l)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {l}
-                </button>
-              ))}
+        <h3 className="font-medium mb-1 text-stone-800 dark:text-stone-200">Vocabulary scope</h3>
+        <p className="text-xs text-stone-500 mb-4">
+          Reviews follow the automatic word ladder. Library lists and focused practice still set
+          their own scope.
+        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-y border-stone-100 dark:border-stone-850 py-3">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-stone-800 dark:text-stone-200">
+              Include nouns
+            </div>
+            <div className="text-xs text-stone-500 dark:text-stone-400">
+              Adds noun-copula cards to automatic Reviews.
             </div>
           </div>
-          <div className="hidden sm:block"></div>
-          <div className="sm:col-span-2 rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden">
-            <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-stone-50 dark:bg-stone-950">
-              <button
-                onClick={() => setOpenLessons((prev) => ({ ...prev, genki: !prev.genki }))}
-                className="flex items-center gap-2 flex-1 text-left"
-              >
-                <svg
-                  className={`w-3.5 h-3.5 text-stone-400 flex-shrink-0 transition-transform ${openLessons.genki ? 'rotate-90' : ''}`}
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M7.293 4.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <span className="text-sm font-medium text-stone-800 dark:text-stone-200">
-                  Genki lessons
-                </span>
-              </button>
-              <div className="text-xs text-stone-500 font-medium">
-                {selectedGenkiLessons.length === 0
-                  ? 'None'
-                  : selectedGenkiLessons.length === GENKI_LESSONS.length
-                    ? 'All'
-                    : `${selectedGenkiLessons.length} selected`}
-              </div>
-            </div>
-            {openLessons.genki && (
-              <div className="p-3 bg-white dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800">
-                <div className="flex gap-1 mb-2">
-                  <button
-                    onClick={() => setPracticePrefs({ ...practicePrefs, genkiLessons: null })}
-                    className={`px-2 py-1 rounded-md text-[11px] border transition ${practicePrefs.genkiLessons === null ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850'}`}
-                  >
-                    None
-                  </button>
-                  <button
-                    onClick={() => setGenkiLessons(GENKI_LESSONS)}
-                    className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setGenkiLessons(GENKI_LESSONS.filter((n) => n <= 12))}
-                    className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                  >
-                    I
-                  </button>
-                  <button
-                    onClick={() => setGenkiLessons(GENKI_LESSONS.filter((n) => n >= 13))}
-                    className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                  >
-                    II
-                  </button>
-                </div>
-                <div className="grid grid-cols-6 sm:grid-cols-[repeat(12,minmax(0,1fr))] gap-1">
-                  {GENKI_LESSONS.map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => toggleGenkiLesson(n)}
-                      className={`px-2 py-2 rounded-lg text-xs border transition ${selectedGenkiLessons.includes(n) ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'}`}
-                    >
-                      L{n}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="sm:col-span-2 flex items-center gap-3">
-            <div className="flex-1 border-t border-stone-200 dark:border-stone-800" />
-            <span className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 tracking-wide">
-              OR
-            </span>
-            <div className="flex-1 border-t border-stone-200 dark:border-stone-800" />
-          </div>
-          <div className="sm:col-span-2 rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden">
-            <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-stone-50 dark:bg-stone-950">
-              <button
-                onClick={() => setOpenLessons((prev) => ({ ...prev, minna: !prev.minna }))}
-                className="flex items-center gap-2 flex-1 text-left"
-              >
-                <svg
-                  className={`w-3.5 h-3.5 text-stone-400 flex-shrink-0 transition-transform ${openLessons.minna ? 'rotate-90' : ''}`}
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M7.293 4.293a1 1 0 011.414 0l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L11.586 10 7.293 5.707a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <span className="text-sm font-medium text-stone-800 dark:text-stone-200">
-                  みんなの日本語 lessons
-                </span>
-              </button>
-              <div className="text-xs text-stone-500 font-medium">
-                {selectedMinnaLessons.length === 0
-                  ? 'None'
-                  : selectedMinnaLessons.length === MINNA_LESSONS.length
-                    ? 'All'
-                    : `${selectedMinnaLessons.length} selected`}
-              </div>
-            </div>
-            {openLessons.minna && (
-              <div className="p-3 bg-white dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800">
-                <div className="flex gap-1 mb-2">
-                  <button
-                    onClick={() => setPracticePrefs({ ...practicePrefs, minnaLessons: null })}
-                    className={`px-2 py-1 rounded-md text-[11px] border transition ${practicePrefs.minnaLessons === null ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850'}`}
-                  >
-                    None
-                  </button>
-                  <button
-                    onClick={() => setMinnaLessons(MINNA_LESSONS)}
-                    className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setMinnaLessons(MINNA_LESSONS.filter((n) => n <= 25))}
-                    className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                  >
-                    I
-                  </button>
-                  <button
-                    onClick={() => setMinnaLessons(MINNA_LESSONS.filter((n) => n >= 26))}
-                    className="px-2 py-1 rounded-md text-[11px] border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850"
-                  >
-                    II
-                  </button>
-                </div>
-                <div className="grid grid-cols-6 sm:grid-cols-[repeat(13,minmax(0,1fr))] gap-1">
-                  {MINNA_LESSONS.map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => toggleMinnaLesson(n)}
-                      className={`px-2 py-2 rounded-lg text-xs border transition ${selectedMinnaLessons.includes(n) ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600' : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'}`}
-                    >
-                      L{n}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-[11px] text-stone-400 mt-2">
-                  Words from Genki <span className="font-semibold">OR</span> Minna lessons are
-                  included. Textbook selection applies <span className="font-semibold">AND</span>{' '}
-                  JLPT, word type, and study-list filters.
-                </p>
-              </div>
-            )}
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-xs text-stone-500 block mb-1">Word types</label>
-            <div className="grid grid-cols-3 gap-2">
-              {WORD_TYPE_OPTIONS.map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() =>
-                    togglePref(
-                      'wordTypes',
-                      o.id,
-                      WORD_TYPE_OPTIONS.map((x) => x.id),
-                    )
-                  }
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.wordTypes || WORD_TYPE_OPTIONS.map((x) => x.id)).includes(o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="sm:col-span-2">
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <label className="text-xs text-stone-500 block">Word groups</label>
-              <span className="text-[11px] text-stone-400">
-                {selectedWordGroups.length}/{WORD_GROUP_OPTIONS.length}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-              {WORD_GROUP_OPTIONS.map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() =>
-                    togglePref(
-                      'wordGroups',
-                      o.id,
-                      WORD_GROUP_OPTIONS.map((x) => x.id),
-                    )
-                  }
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    selectedWordGroups.includes(o.id)
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  <span className="block leading-tight">{o.label}</span>
-                  {o.aliasText && (
-                    <span className="mt-0.5 block text-[10px] leading-tight opacity-70">
-                      {o.aliasText}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400 mt-1">
-              Refines every drill and review deck after JLPT, lesson, and word-list filters. Older
-              textbook names are shown only as “also called” aliases.
-            </p>
-          </div>
+          <button
+            type="button"
+            aria-label="Include nouns"
+            aria-pressed={nounsIncluded}
+            onClick={() => setNounScope(!nounsIncluded)}
+            className={`w-full sm:w-auto min-w-24 rounded-lg border px-4 py-2 text-sm font-medium transition ${
+              nounsIncluded
+                ? 'border-indigo-600 bg-indigo-600 text-white dark:border-indigo-500 dark:bg-indigo-600'
+                : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:border-stone-700'
+            }`}
+          >
+            {nounsIncluded ? 'On' : 'Off'}
+          </button>
         </div>
       </div>
 
