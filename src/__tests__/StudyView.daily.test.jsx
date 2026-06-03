@@ -6,7 +6,7 @@ import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
 import { conjugateItem, wordKey } from '../utils/conjugator.js';
 import { englishForForm } from '../utils/display.js';
-import { cardIdFor, defaultState } from '../utils/storage.js';
+import { cardIdFor, defaultState, recordMistake } from '../utils/storage.js';
 import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
@@ -30,6 +30,7 @@ function makeApp(overrides = {}) {
     setWordLists: vi.fn(),
     studyFocus: null,
     clearStudyFocus: vi.fn(),
+    openLabTool: vi.fn(),
     session: { user: { id: 'test-user' } },
     showAuth: vi.fn(),
     hydrated: true,
@@ -206,6 +207,33 @@ describe('StudyView daily startup guards', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to Reviews overview' }));
     expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+  });
+
+  it('routes open verb-group mistakes from the dashboard into Groups', async () => {
+    const target = STARTER_VERBS.find((word) => word.reading === '\u305f\u3079\u308b');
+    expect(target).toBeTruthy();
+    const state = {
+      ...defaultState(),
+      mistakes: recordMistake(
+        [],
+        target,
+        'plain-past',
+        null,
+        '\u305f\u3079\u3063\u305f',
+        conjugateItem(target, 'plain-past'),
+      ),
+    };
+    const openLabTool = vi.fn();
+    mockedApp.value = makeApp({ state, openLabTool });
+
+    render(<StudyView />);
+
+    const routeButton = await screen.findByRole('button', {
+      name: 'Wrong verb group -> Groups',
+    });
+    fireEvent.click(routeButton);
+
+    expect(openLabTool).toHaveBeenCalledWith('classify');
   });
 
   it('offers an Overview return path from a focused (special) session', async () => {

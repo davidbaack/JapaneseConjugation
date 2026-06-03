@@ -4,6 +4,7 @@ import {
   buildRepairDrillPlan,
   bumpSessionMistakePattern,
   diagnoseMistake,
+  labRouteForMistakePattern,
   rankSessionMistakePatterns,
 } from '../utils/mistakeDiagnosis.js';
 import { recordMistake } from '../utils/storage.js';
@@ -54,6 +55,40 @@ describe('diagnoseMistake', () => {
     expect(result.feedback).toContain('u/tsu/ru');
   });
 
+  it('routes te/ta ending misses to Ending Lab', () => {
+    const result = diagnoseMistake({
+      item: kaku,
+      type: 'te-form',
+      userAnswer: '\u304b\u3063\u3066',
+      expected: '\u304b\u3044\u3066',
+    });
+
+    expect(labRouteForMistakePattern(result)).toMatchObject({
+      tool: 'endings',
+      toolLabel: 'Ending Lab',
+      triggerLabel: 'Te/ta ending miss',
+    });
+  });
+
+  it('routes verb group mistakes to Groups', () => {
+    const result = diagnoseMistake({
+      item: taberu,
+      type: 'plain-past',
+      userAnswer: '\u305f\u3079\u3063\u305f',
+      expected: '\u305f\u3079\u305f',
+    });
+
+    expect(result).toMatchObject({
+      category: 'verb-group-confusion',
+      patternId: 'verb-group:ichidan:plain-past',
+    });
+    expect(labRouteForMistakePattern(result)).toMatchObject({
+      tool: 'classify',
+      toolLabel: 'Groups',
+      triggerLabel: 'Wrong verb group',
+    });
+  });
+
   it('classifies a plain answer when polite negative was requested', () => {
     const result = diagnoseMistake({
       item: taberu,
@@ -67,6 +102,7 @@ describe('diagnoseMistake', () => {
       patternId: 'politeness-mismatch:polite-negative',
       guessedType: 'plain-negative',
     });
+    expect(labRouteForMistakePattern(result)).toBeNull();
   });
 
   it('does not invent a category for unrelated wrong text', () => {
