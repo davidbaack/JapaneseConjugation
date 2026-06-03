@@ -93,10 +93,9 @@ starts and completes the recommended work in Reviews.
 Settings holds global preferences and account/data controls. Current controls
 include answer mode, review style, source forms, new cards per day, daily goal,
 theme, display scripts, furigana, English hints, word-category labels, speech
-playback, auto-next, listening prompts, Japanese voice selection, JLPT filters,
-Genki and Minna no Nihongo lesson filters, word types, word groups,
-conjugation-type packs or custom form selection, cloud sync sign-in/sync, manual
-backup/restore, and progress reset.
+playback, auto-next, listening prompts, Japanese voice selection, vocabulary
+scope with noun inclusion, conjugation-type packs or custom form selection,
+cloud sync sign-in/sync, manual backup/restore, and progress reset.
 
 Workflow-specific controls stay on the active screen. For example, practice
 direction, sentence mode, and live kana controls live on the Reviews card rather
