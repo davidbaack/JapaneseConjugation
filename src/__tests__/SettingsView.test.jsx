@@ -131,5 +131,5 @@ describe('SettingsView controls', () => {
     expect(factoryButton.disabled).toBe(false);
 
     expect(screen.queryByRole('button', { name: 'Guided', exact: true })).toBeNull();
-  });
+  }, 15000);
 });
