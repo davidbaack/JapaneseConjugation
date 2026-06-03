@@ -232,6 +232,11 @@ export default function SettingsView() {
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
   const reviewStyle = practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle;
   const sourceFormStrategy = practicePrefs.sourceFormStrategy || DEFAULT_PREFS.sourceFormStrategy;
+  const theme = practicePrefs.theme || DEFAULT_PREFS.theme;
+  const englishHints = practicePrefs.englishHints || DEFAULT_PREFS.englishHints;
+  const showWordCategory = !!practicePrefs.showWordCategory;
+  const furiganaEnabled =
+    practicePrefs.furigana !== false && displayScripts.kanji && displayScripts.kana;
   const nounsIncluded = Array.isArray(practicePrefs.wordGroups)
     ? practicePrefs.wordGroups.includes('noun')
     : DEFAULT_PREFS.wordGroups.includes('noun');
@@ -319,6 +324,7 @@ export default function SettingsView() {
               {ANSWER_MODE_OPTIONS.map((o) => (
                 <button
                   key={o.id}
+                  aria-pressed={answerMode === o.id}
                   onClick={() => setPracticePrefs({ ...practicePrefs, answerMode: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     answerMode === o.id
@@ -337,6 +343,7 @@ export default function SettingsView() {
               {REVIEW_STYLE_OPTIONS.map((o) => (
                 <button
                   key={o.id}
+                  aria-pressed={reviewStyle === o.id}
                   onClick={() =>
                     setPracticePrefs({
                       ...practicePrefs,
@@ -366,6 +373,7 @@ export default function SettingsView() {
               {SOURCE_FORM_OPTIONS.map((o) => (
                 <button
                   key={o.id}
+                  aria-pressed={sourceFormStrategy === o.id}
                   onClick={() =>
                     setPracticePrefs({
                       ...practicePrefs,
@@ -432,7 +440,7 @@ export default function SettingsView() {
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-stone-500 block mb-1">Theme</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div role="group" aria-label="Theme" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { id: 'light', label: 'Light' },
                 { id: 'dark', label: 'Dark' },
@@ -440,9 +448,10 @@ export default function SettingsView() {
               ].map((o) => (
                 <button
                   key={o.id}
+                  aria-pressed={theme === o.id}
                   onClick={() => setPracticePrefs({ ...practicePrefs, theme: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.theme || 'system') === o.id
+                    theme === o.id
                       ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
@@ -454,7 +463,7 @@ export default function SettingsView() {
           </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">Display scripts</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div role="group" aria-label="Display scripts" className="grid grid-cols-3 gap-2">
               {[
                 { id: 'kanji', label: 'Kanji' },
                 { id: 'kana', label: 'Kana' },
@@ -462,6 +471,7 @@ export default function SettingsView() {
               ].map((o) => (
                 <button
                   key={o.id}
+                  aria-pressed={displayScripts[o.id]}
                   onClick={() => toggleDisplayScript(o.id)}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     displayScripts[o.id]
@@ -478,8 +488,9 @@ export default function SettingsView() {
                 setPracticePrefs({ ...practicePrefs, furigana: practicePrefs.furigana === false })
               }
               disabled={!(displayScripts.kanji && displayScripts.kana)}
+              aria-pressed={furiganaEnabled}
               className={`mt-2 w-full px-3 py-2 rounded-lg text-sm border transition disabled:opacity-40 ${
-                practicePrefs.furigana !== false && displayScripts.kanji && displayScripts.kana
+                furiganaEnabled
                   ? 'bg-indigo-600 text-white border-indigo-600'
                   : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
               }`}
@@ -489,16 +500,17 @@ export default function SettingsView() {
           </div>
           <div>
             <label className="text-xs text-stone-500 block mb-1">English hints</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div role="group" aria-label="English hints" className="grid grid-cols-2 gap-2">
               {[
                 { id: 'show', label: 'Show' },
                 { id: 'hidden', label: 'Hide' },
               ].map((o) => (
                 <button
                   key={o.id}
+                  aria-pressed={englishHints === o.id}
                   onClick={() => setPracticePrefs({ ...practicePrefs, englishHints: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === o.id
+                    englishHints === o.id
                       ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
@@ -520,9 +532,10 @@ export default function SettingsView() {
               ].map((o) => (
                 <button
                   key={String(o.id)}
+                  aria-pressed={showWordCategory === o.id}
                   onClick={() => setPracticePrefs({ ...practicePrefs, showWordCategory: o.id })}
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    !!practicePrefs.showWordCategory === o.id
+                    showWordCategory === o.id
                       ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
                       : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                   }`}
@@ -541,6 +554,7 @@ export default function SettingsView() {
               onClick={() =>
                 setPracticePrefs({ ...practicePrefs, autoSpeak: !practicePrefs.autoSpeak })
               }
+              aria-pressed={!!practicePrefs.autoSpeak}
               className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
                 practicePrefs.autoSpeak
                   ? 'bg-indigo-600 text-white border-indigo-600'
@@ -559,6 +573,7 @@ export default function SettingsView() {
                   autoAdvanceCorrect: !practicePrefs.autoAdvanceCorrect,
                 })
               }
+              aria-pressed={!!practicePrefs.autoAdvanceCorrect}
               className={`w-full px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center gap-1.5 ${
                 practicePrefs.autoAdvanceCorrect
                   ? 'bg-indigo-600 text-white border-indigo-600'
@@ -577,6 +592,7 @@ export default function SettingsView() {
                   listeningPrompt: !practicePrefs.listeningPrompt,
                 })
               }
+              aria-pressed={!!practicePrefs.listeningPrompt}
               className={`w-full px-3 py-2 rounded-lg text-sm border transition ${
                 practicePrefs.listeningPrompt
                   ? 'bg-indigo-600 text-white border-indigo-600'
@@ -661,7 +677,11 @@ export default function SettingsView() {
         <p className="text-xs text-stone-500 mb-4">
           Choose a focused pack instead of managing dozens of individual forms.
         </p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+        <div
+          role="group"
+          aria-label="Conjugation type packs"
+          className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4"
+        >
           {typePacks.map((pack) => {
             const packKey = [...pack.typeIds].sort().join('|');
             const active = packKey === enabledKey;
@@ -669,6 +689,7 @@ export default function SettingsView() {
             return (
               <button
                 key={pack.id}
+                aria-pressed={active}
                 onClick={() => applyTypePack(pack.typeIds)}
                 className={`text-left rounded-xl border px-3 py-3 transition ${
                   active
@@ -694,6 +715,9 @@ export default function SettingsView() {
           })}
           <button
             onClick={() => setShowCustom((v) => !v)}
+            aria-pressed={isCustomMode}
+            aria-expanded={showCustom}
+            aria-controls="settings-custom-forms"
             className={`text-left rounded-xl border px-3 py-3 transition ${
               isCustomMode
                 ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900 text-stone-900 dark:text-stone-100'
@@ -712,7 +736,10 @@ export default function SettingsView() {
           </button>
         </div>
         {showCustom && (
-          <div className="mt-3 mb-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/30 dark:bg-indigo-950/10 overflow-y-auto max-h-[60vh]">
+          <div
+            id="settings-custom-forms"
+            className="mt-3 mb-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/30 dark:bg-indigo-950/10 overflow-y-auto max-h-[60vh]"
+          >
             {FORM_GROUPS.map((group) => {
               const enabledInGroup = group.typeIds.filter((id) => state.enabledTypes.includes(id));
               const allEnabled = enabledInGroup.length === group.typeIds.length;
@@ -740,6 +767,7 @@ export default function SettingsView() {
                       return (
                         <button
                           key={typeId}
+                          aria-pressed={checked}
                           onClick={() => toggleForm(typeId)}
                           className="w-full text-left flex items-center gap-3 px-3 py-2 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/20 transition"
                         >
@@ -748,6 +776,7 @@ export default function SettingsView() {
                           >
                             {checked && (
                               <svg
+                                aria-hidden="true"
                                 className="w-full h-full text-white p-0.5"
                                 viewBox="0 0 10 10"
                                 fill="none"

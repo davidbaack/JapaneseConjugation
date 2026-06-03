@@ -13,6 +13,10 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
+function expectPressed(button, pressed) {
+  expect(button.getAttribute('aria-pressed')).toBe(String(pressed));
+}
+
 describe('SettingsView controls', () => {
   it('shows review settings without legacy study-mode controls', async () => {
     render(<App />);
@@ -25,8 +29,12 @@ describe('SettingsView controls', () => {
     expect(screen.queryByText('Study direction')).toBeNull();
     expect(screen.queryByText('Timed drill')).toBeNull();
     const answerMode = within(screen.getByRole('group', { name: 'Answer mode' }));
-    expect(answerMode.getByRole('button', { name: 'Type answer', exact: true })).toBeTruthy();
-    expect(answerMode.getByRole('button', { name: 'Choices', exact: true })).toBeTruthy();
+    const typeAnswer = answerMode.getByRole('button', { name: 'Type answer', exact: true });
+    const choicesAnswer = answerMode.getByRole('button', { name: 'Choices', exact: true });
+    expect(typeAnswer).toBeTruthy();
+    expectPressed(typeAnswer, true);
+    expect(choicesAnswer).toBeTruthy();
+    expectPressed(choicesAnswer, false);
     expect(answerMode.getByRole('button', { name: 'Self-check', exact: true })).toBeTruthy();
     expect(answerMode.getByRole('button', { name: 'Speak answer', exact: true })).toBeTruthy();
     expect(answerMode.queryByRole('button', { name: 'Free input', exact: true })).toBeNull();
@@ -34,12 +42,18 @@ describe('SettingsView controls', () => {
     expect(screen.queryByText('Prompt form')).toBeNull();
     expect(screen.getByText('Review style')).toBeTruthy();
     const reviewStyle = within(screen.getByRole('group', { name: 'Review style' }));
-    expect(reviewStyle.getByRole('button', { name: 'Auto', exact: true })).toBeTruthy();
-    expect(reviewStyle.getByRole('button', { name: 'Forms only', exact: true })).toBeTruthy();
+    const autoReviewStyle = reviewStyle.getByRole('button', { name: 'Auto', exact: true });
+    const formsReviewStyle = reviewStyle.getByRole('button', { name: 'Forms only', exact: true });
+    expect(autoReviewStyle).toBeTruthy();
+    expectPressed(autoReviewStyle, true);
+    expect(formsReviewStyle).toBeTruthy();
+    expectPressed(formsReviewStyle, false);
     expect(reviewStyle.getByRole('button', { name: 'Reading practice', exact: true })).toBeTruthy();
     expect(screen.getByText('Source forms')).toBeTruthy();
     const sourceForms = within(screen.getByRole('group', { name: 'Source forms' }));
-    expect(sourceForms.getByRole('button', { name: 'Auto', exact: true })).toBeTruthy();
+    const autoSourceForms = sourceForms.getByRole('button', { name: 'Auto', exact: true });
+    expect(autoSourceForms).toBeTruthy();
+    expectPressed(autoSourceForms, true);
     expect(sourceForms.getByRole('button', { name: 'Dictionary', exact: true })).toBeTruthy();
     expect(sourceForms.getByRole('button', { name: 'Masu', exact: true })).toBeTruthy();
     expect(sourceForms.getByRole('button', { name: 'Mixed', exact: true })).toBeTruthy();
@@ -55,9 +69,15 @@ describe('SettingsView controls', () => {
     expect(screen.queryByText('Kana help while typing')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Kana help while typing' })).toBeNull();
 
+    const displayScripts = within(screen.getByRole('group', { name: 'Display scripts' }));
+    expectPressed(displayScripts.getByRole('button', { name: 'Kanji', exact: true }), true);
+    expectPressed(displayScripts.getByRole('button', { name: 'Romaji', exact: true }), false);
+    const englishHints = within(screen.getByRole('group', { name: 'English hints' }));
+    expectPressed(englishHints.getByRole('button', { name: 'Hide', exact: true }), true);
+
     expect(screen.getByText('Vocabulary scope')).toBeTruthy();
     const nounToggle = screen.getByRole('button', { name: 'Include nouns', exact: true });
-    expect(nounToggle.getAttribute('aria-pressed')).toBe('false');
+    expectPressed(nounToggle, false);
     expect(screen.queryByText('Vocabulary filters')).toBeNull();
     expect(screen.queryByText('JLPT levels')).toBeNull();
     expect(screen.queryByText('Genki lessons')).toBeNull();
@@ -68,12 +88,22 @@ describe('SettingsView controls', () => {
 
     expect(screen.getByText('Word category label')).toBeTruthy();
     const wordCategory = within(screen.getByRole('group', { name: 'Word category label' }));
-    expect(wordCategory.getByRole('button', { name: 'Show', exact: true })).toBeTruthy();
-    expect(wordCategory.getByRole('button', { name: 'Hide', exact: true })).toBeTruthy();
+    const showWordCategory = wordCategory.getByRole('button', { name: 'Show', exact: true });
+    const hideWordCategory = wordCategory.getByRole('button', { name: 'Hide', exact: true });
+    expect(showWordCategory).toBeTruthy();
+    expectPressed(showWordCategory, false);
+    expect(hideWordCategory).toBeTruthy();
+    expectPressed(hideWordCategory, true);
 
     expect(screen.getByText('Conjugation types in scope')).toBeTruthy();
+    const typePacks = within(screen.getByRole('group', { name: 'Conjugation type packs' }));
+    expectPressed(typePacks.getByRole('button', { name: /Textbook Core/ }), true);
+    const customPack = typePacks.getByRole('button', { name: /Custom/ });
+    expectPressed(customPack, false);
+    expect(customPack.getAttribute('aria-expanded')).toBe('false');
     expect(screen.getByText(/Current mix:/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Custom/ }));
+    fireEvent.click(customPack);
+    expect(customPack.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByText(/drop-る, row-shift, irregular/)).toBeTruthy();
     expect(screen.getAllByRole('button', { name: /Plain Past/ }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: /Te-form/ }).length).toBeGreaterThan(0);
@@ -85,7 +115,9 @@ describe('SettingsView controls', () => {
       expect(JSON.parse(raw).practicePrefs.showWordCategory).toBe(false);
     });
 
-    fireEvent.click(wordCategory.getByRole('button', { name: 'Show', exact: true }));
+    fireEvent.click(showWordCategory);
+    expectPressed(showWordCategory, true);
+    expectPressed(hideWordCategory, false);
     await waitFor(() => {
       const raw = localStorage.getItem('jp-verb-srs-v2');
       expect(JSON.parse(raw).practicePrefs.showWordCategory).toBe(true);
@@ -98,10 +130,13 @@ describe('SettingsView controls', () => {
         ...DEFAULT_PREFS.wordGroups,
         'noun',
       ]);
-      expect(nounToggle.getAttribute('aria-pressed')).toBe('true');
+      expectPressed(nounToggle, true);
     });
 
-    fireEvent.click(sourceForms.getByRole('button', { name: 'Masu', exact: true }));
+    const masuSourceForms = sourceForms.getByRole('button', { name: 'Masu', exact: true });
+    fireEvent.click(masuSourceForms);
+    expectPressed(autoSourceForms, false);
+    expectPressed(masuSourceForms, true);
 
     await waitFor(() => {
       const raw = localStorage.getItem('jp-verb-srs-v2');
