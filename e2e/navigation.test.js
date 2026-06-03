@@ -80,7 +80,7 @@ test.describe('Tab navigation', () => {
 
     await expect(page.getByText('Practice session')).toBeVisible();
     await expect(page.getByText('Conjugation types in scope')).toBeVisible();
-    await expect(page.getByText('Vocabulary filters')).toBeVisible();
+    await expect(page.getByText('Vocabulary scope')).toBeVisible();
     await expect(page.getByText('Display scripts')).toBeVisible();
     await expect(page.getByText('Review style')).toBeVisible();
     await expect(page.getByText('Source forms')).toBeVisible();
