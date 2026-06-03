@@ -8,6 +8,7 @@ export const DEFAULT_PREFS = {
   answerMode: 'input',
   autoSpeak: false,
   listeningPrompt: false,
+  sentenceMode: false,
   autoAdvanceCorrect: false,
   autoAiExplainErrors: true,
   englishHints: 'hidden',

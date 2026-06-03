@@ -121,7 +121,9 @@ describe('App shell', () => {
     expect(screen.getByText('Focus reviews')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Word', exact: true })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Form', exact: true })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Sentence', exact: true })).toBeNull();
+    // "Sentence" is now the cued-cloze presentation toggle — a valid review
+    // control, not a legacy study-mode button.
+    expect(screen.getByRole('button', { name: 'Sentence', exact: true })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Transform', exact: true })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Study mode' })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();

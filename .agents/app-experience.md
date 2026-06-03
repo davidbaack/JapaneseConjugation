@@ -56,6 +56,12 @@ confirms the new direction, update this document in the same change.
   and explicit lists, Library Lookup, and focused practice still reach nouns.
 - A compact command bar is always visible for focused word or form-family
   practice.
+- Sentence mode is an opt-in, off-by-default presentation toggle in the active
+  card (sticky until turned off). It wraps a normal forward production card in a
+  cued example sentence with a blank and a grammar cue; the word and target form
+  stay visible, so it is contextualized production with a fixed frame, not
+  inferential comprehension. It falls back to the normal prompt for reverse,
+  listening, and minimal-pair cards.
 - Explicit focused practice re-enables excluded content and counts through SRS.
 
 ## Inclusion And Exclusion

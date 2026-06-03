@@ -36,7 +36,11 @@ import {
   surfaceFormFor,
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
-import { explainItem, stepCoachHint } from '../utils/conjugatorExplain.js';
+import {
+  explainItem,
+  getOfflineTemplateSentence,
+  stepCoachHint,
+} from '../utils/conjugatorExplain.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 import {
   selectNext,
@@ -1033,6 +1037,7 @@ export default function StudyView() {
   const typedAnswerMode = answerMode === 'input';
   const transformationMode = false;
   const listeningPrompt = !!practicePrefs.listeningPrompt;
+  const sentenceMode = !!practicePrefs.sentenceMode;
   const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
   const practiceRuleCandidates = useMemo(
     () =>
@@ -1117,6 +1122,21 @@ export default function StudyView() {
     );
   }, [activeMinimalPairSet, current, todayMinimalPairSetIds]);
   const minimalPairSetForCurrent = activeMinimalPairSet || todayMinimalPairSet;
+  // Cued cloze: when Sentence mode is on, wrap a normal forward production card
+  // in an example sentence with a blank. Only the Japanese frame + grammar cue
+  // are shown (never the "Fill in: word (reading)" prefix, which would leak the
+  // reading regardless of script settings). Null for reverse/listening/minimal
+  // -pair cards, which keep their normal prompt.
+  const clozePrompt = useMemo(() => {
+    if (!current || !sentenceMode) return null;
+    if (reverseDrill || listeningPrompt || minimalPairSetForCurrent) return null;
+    try {
+      const built = getOfflineTemplateSentence(current.verb, current.type);
+      return built?.sentence ? { sentence: built.sentence, cue: built.cue } : null;
+    } catch {
+      return null;
+    }
+  }, [current, sentenceMode, reverseDrill, listeningPrompt, minimalPairSetForCurrent]);
 
   useLayoutEffect(() => {
     if (!hydrated) return;
@@ -2709,6 +2729,21 @@ export default function StudyView() {
                 ? 'Reading'
                 : 'Auto'}
           </div>
+          <button
+            type="button"
+            onClick={() =>
+              setPracticePrefs((prev) => ({ ...prev, sentenceMode: !prev.sentenceMode }))
+            }
+            aria-pressed={sentenceMode}
+            title="Show each prompt inside an example sentence (stays on until you turn it off)"
+            className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+              sentenceMode
+                ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+            }`}
+          >
+            Sentence{sentenceMode ? ' · on' : ''}
+          </button>
           <details className="relative">
             <summary className="flex cursor-pointer list-none items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800">
               Adjust scope
@@ -2795,6 +2830,24 @@ export default function StudyView() {
               ]
                 .filter(Boolean)
                 .join(' · ')}
+            </div>
+          )}
+          {clozePrompt && (
+            <div className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+                Sentence
+              </div>
+              <div
+                className="mt-1 text-lg leading-relaxed text-stone-900 dark:text-stone-100"
+                lang="ja"
+              >
+                {clozePrompt.sentence}
+              </div>
+              {clozePrompt.cue && (
+                <div className="mt-1.5 text-[11px] leading-snug text-indigo-700/80 dark:text-indigo-300/80">
+                  {clozePrompt.cue}
+                </div>
+              )}
             </div>
           )}
           {hidePromptText ? (
