@@ -26,6 +26,15 @@ export const SRS_SCHEMA_VERSION = 3;
 export const DICTIONARY_TYPE_ID = 'dictionary';
 const REVIEW_ROTATION_SIZE = 8;
 const RECENT_REVIEW_COOLDOWN_MS = 5 * 60 * 1000;
+const BEGINNER_LADDER_CARD_COUNT = 5;
+const BEGINNER_LADDER_STAGES = [
+  { group: 'ichidan', type: 'plain-past' },
+  { group: 'ichidan', type: 'plain-negative' },
+  { group: 'godan', type: 'plain-negative' },
+  { group: 'godan', type: 'polite-present' },
+  { group: 'godan', type: 'plain-past' },
+];
+const SIMPLE_GODAN_ENDINGS = /[うくぐすつぬぶむ]$/;
 
 const LEGACY_VERB_DEFAULT_TYPE_IDS = CONJ_TYPES.filter((t) => t.id !== 'plain-present').map(
   (t) => t.id,
@@ -1194,6 +1203,45 @@ function candidateSortScore(entry, wordLists = []) {
   return wordPriority(entry.verb, wordLists) * 100000 + formPriority(entry.type);
 }
 
+function reviewedCardCount(state = {}) {
+  return Object.values(state.cards || {}).filter(
+    (card) =>
+      card &&
+      ((Number(card.correct) || 0) + (Number(card.incorrect) || 0) + (Number(card.reps) || 0) > 0 ||
+        Number(card.lastSeen) > 0),
+  ).length;
+}
+
+function isSimpleBeginnerGodan(word) {
+  const reading = String(word?.reading || word?.dict || '');
+  if (!SIMPLE_GODAN_ENDINGS.test(reading)) return false;
+  return word?.dict !== '行く' && reading !== 'いく';
+}
+
+function beginnerLadderStageIndex(entry) {
+  return BEGINNER_LADDER_STAGES.findIndex((stage) => {
+    if (entry.type !== stage.type || entry.verb?.group !== stage.group) return false;
+    return stage.group !== 'godan' || isSimpleBeginnerGodan(entry.verb);
+  });
+}
+
+function openBeginnerLadderStage(pool, state) {
+  for (let index = 0; index < BEGINNER_LADDER_STAGES.length; index += 1) {
+    const stageCandidates = pool.filter((entry) => beginnerLadderStageIndex(entry) === index);
+    if (!stageCandidates.length) continue;
+    if (!stageCandidates.some((entry) => state.cards?.[entry.id])) return index;
+  }
+  return -1;
+}
+
+function beginnerLadderSortScore(entry, openStage) {
+  const stageIndex = beginnerLadderStageIndex(entry);
+  if (stageIndex < 0) return BEGINNER_LADDER_STAGES.length + 1;
+  if (openStage < 0) return stageIndex;
+  if (stageIndex === openStage) return 0;
+  return 1 + Math.abs(stageIndex - openStage);
+}
+
 function lastSeenForCandidate(state, entry) {
   return Number(state.cards?.[entry.id]?.lastSeen || 0);
 }
@@ -1294,6 +1342,10 @@ export function selectNext(
   const readyWeak = hasReviewFallback
     ? weak.filter((p) => !candidateWasSeenRecently(state, p, now))
     : weak;
+  const openBeginnerStage =
+    options.beginnerLadder && reviewedCardCount(state) < BEGINNER_LADDER_CARD_COUNT
+      ? openBeginnerLadderStage(pool, state)
+      : -1;
   let chosen = pickWeakWeighted(due, state);
   if (!chosen) {
     if (due.length) {
@@ -1307,6 +1359,10 @@ export function selectNext(
     } else if (fresh.length) {
       fresh.sort(
         (a, b) =>
+          (openBeginnerStage >= 0
+            ? beginnerLadderSortScore(a, openBeginnerStage) -
+              beginnerLadderSortScore(b, openBeginnerStage)
+            : 0) ||
           candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists),
       );
       chosen = fresh[0];

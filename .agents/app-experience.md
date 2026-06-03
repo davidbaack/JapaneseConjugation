@@ -48,6 +48,9 @@ confirms the new direction, update this document in the same change.
 - New content follows a word-first ladder: words are introduced by the earliest
   Genki or Minna lesson metadata, then enabled forms are introduced as
   word-form SRS cards.
+- A brand-new Core Warmup starts with a short regular-first ladder: the opening
+  fresh cards use regular ichidan and simple godan examples before irregulars,
+  godan る traps, or special exceptions.
 - The default scope is verb-first plus common textbook adjectives. Textbook Core
   forms are enabled from the start; rare stacked, short, or edge variants are
   opt-in.
