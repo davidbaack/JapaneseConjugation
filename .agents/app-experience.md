@@ -93,6 +93,11 @@ confirms the new direction, update this document in the same change.
   review-relevant conjugation skills.
 - Lab tools can create visible recommended Review sets. The learner starts the
   set explicitly; once practiced in Reviews, it updates normal SRS.
+- The routing also runs the other way: when Reviews diagnoses a weakness that a
+  Lab tool trains (e.g. godan sound-change misses -> Ending Lab), the dashboard's
+  drill for that skill opens the matching Lab tool directly, so specialized
+  practice is summoned at the moment of need rather than only found by browsing
+  the Lab.
 - Lab attempts do not silently change word-form SRS scheduling unless they are
   completed as full Reviews.
 

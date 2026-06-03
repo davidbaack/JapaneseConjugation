@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { IconCheck, IconList, IconRefresh, IconSpark } from '../components/Icons.jsx';
 import { useTablist } from '../components/useTablist.js';
 import { useApp } from '../state/AppStateContext.jsx';
@@ -20,12 +20,24 @@ export default function PracticeLabView() {
     addReviewRecommendation,
     allWords,
     builtInWords,
+    clearLabFocus,
+    labFocus,
     practicePrefs,
     setTab,
     state,
     wordLists,
   } = useApp();
   const [active, setActive] = useState('check');
+  // Open the tool another view asked for (e.g. dashboard → Ending Lab), then
+  // consume the request so a later manual visit lands on the default tool.
+  useEffect(() => {
+    const tool = labFocus?.tool;
+    if (tool && LAB_TABS.some((tab) => tab.id === tool)) {
+      setActive(tool);
+      clearLabFocus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labFocus]);
   const { tabProps, panelProps } = useTablist(
     LAB_TABS.map((tab) => tab.id),
     active,

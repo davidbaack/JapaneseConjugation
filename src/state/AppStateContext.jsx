@@ -68,6 +68,7 @@ function useAppController() {
   const [session, setSession] = useState(null);
   // A { word, type } the user asked to practise from Check; consumed by Study.
   const [studyFocus, setStudyFocus] = useState(null);
+  const [labFocus, setLabFocus] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
   const [srsQueue, setSrsQueue] = useState(() => ({
@@ -385,6 +386,13 @@ function useAppController() {
     setTab('study');
   }
   const clearStudyFocus = () => setStudyFocus(null);
+  // Open a specific Practice Lab tool from another view (e.g. the dashboard
+  // routing a detected weakness into the matching Lab drill).
+  function openLabTool(tool) {
+    setLabFocus(tool ? { tool } : null);
+    setTab('lab');
+  }
+  const clearLabFocus = () => setLabFocus(null);
   const showAuth = () => setShowAuthModal(true);
   const addReviewRecommendation = (recommendation) =>
     setState((prev) => upsertReviewRecommendationState(prev, recommendation));
@@ -491,6 +499,9 @@ function useAppController() {
     studyFocus,
     practiceWord,
     clearStudyFocus,
+    labFocus,
+    openLabTool,
+    clearLabFocus,
     addReviewRecommendation,
     startReviewRecommendation,
     showAuthModal,
