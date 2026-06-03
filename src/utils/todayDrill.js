@@ -39,7 +39,7 @@ function selectableWords(state, words, prefs, wordLists, options = {}) {
     wordLists || [],
     options,
   );
-  return filtered.length ? filtered : words || [];
+  return filtered;
 }
 
 function wordWeakScore(state, word) {

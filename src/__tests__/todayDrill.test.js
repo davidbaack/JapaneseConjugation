@@ -7,6 +7,7 @@ import {
   upsertTodayDrillList,
 } from '../utils/todayDrill.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
+import { excludeWordFromReviewState } from '../utils/reviewScope.js';
 
 const TABERU = {
   dict: '\u98df\u3079\u308b',
@@ -68,6 +69,20 @@ describe('today drill planner', () => {
     expect(plan.sourceCounts.weak).toBeGreaterThan(0);
     expect(plan.sourceCounts.minimalPairs).toBeGreaterThan(0);
     expect(plan.minimalPairSetIds).toContain('ichidan-godan-ru');
+  });
+
+  it('does not fall back to all words when Library exclusions empty the scope', () => {
+    const words = [TABERU, HASHIRU, KAKU, TAKAI];
+    const state = words.reduce(
+      (nextState, word) => excludeWordFromReviewState(nextState, word),
+      defaultState(),
+    );
+
+    const plan = buildTodayDrillPlan(state, words, DEFAULT_PREFS, [], { now: 10 });
+
+    expect(plan.available).toBe(false);
+    expect(plan.wordKeys).toEqual([]);
+    expect(plan.typeIds).toEqual([]);
   });
 
   it('builds launcher prefs and a reusable Today word list', () => {
