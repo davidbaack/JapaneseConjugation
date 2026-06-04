@@ -171,11 +171,12 @@ export function mergeWeaknessState(local, cloud) {
 export function weaknessLaneScore(weakness, typeId, subcategoryId, options = {}) {
   const lane = normalizeWeaknessState(weakness).byLane[weaknessLaneKey(typeId, subcategoryId)];
   if (!lane?.attempted) return 0;
+  if (!lane.incorrect) return 0;
   const now = options.now || Date.now();
   const recentScore = lane.recent.reduce((sum, attempt) => {
     const age = Math.max(0, now - attempt.at);
     const decay = Math.max(0.2, 1 - age / RECENT_DECAY_MS);
-    return sum + (attempt.correct ? 0.25 : 3.5) * decay;
+    return sum + (attempt.correct ? 0 : 3.5) * decay;
   }, 0);
   const missRate = lane.attempted ? lane.incorrect / lane.attempted : 0;
   const avgMs = lane.attempted ? lane.totalResponseMs / lane.attempted : 0;

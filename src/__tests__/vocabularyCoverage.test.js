@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   inflateAdjectiveRows,
-  inflateNounRows,
   inflateVerbRows,
   isGeneratedPracticeArtifactRow,
   mergeBuiltInVerbs,
@@ -21,8 +20,7 @@ const lexicon = JSON.parse(
 );
 const verbs = mergeBuiltInVerbs(inflateVerbRows(lexicon.verbs), STARTER_VERBS);
 const adjectives = mergeBuiltInWords(inflateAdjectiveRows(lexicon.adjectives), STARTER_ADJECTIVES);
-const nouns = inflateNounRows(lexicon.nouns);
-const words = [...verbs, ...adjectives, ...nouns];
+const words = [...verbs, ...adjectives];
 
 function missingLessons(items, key, max) {
   const seen = new Set();
@@ -38,7 +36,8 @@ describe('expanded vocabulary lexicon', () => {
     expect(words.length).toBeGreaterThan(1700);
     expect(verbs.length).toBeGreaterThan(1000);
     expect(adjectives.length).toBeGreaterThan(700);
-    expect(nouns.length).toBe(0);
+    expect(lexicon.nouns).toBeUndefined();
+    expect(words.some((word) => word.group === 'noun')).toBe(false);
     for (const level of JLPT_LEVELS) {
       const count = words.filter((word) => getWordMeta(word).jlpt === level).length;
       expect(count).toBeGreaterThan(50);
