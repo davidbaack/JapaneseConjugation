@@ -8,6 +8,7 @@ import {
 } from '../utils/todayDrill.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
 import { excludeWordFromReviewState } from '../utils/reviewScope.js';
+import { recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
 
 const TABERU = {
   dict: '\u98df\u3079\u308b',
@@ -83,6 +84,25 @@ describe('today drill planner', () => {
     expect(plan.available).toBe(false);
     expect(plan.wordKeys).toEqual([]);
     expect(plan.typeIds).toEqual([]);
+  });
+
+  it('does not label correct-only practice history as weak Today drill work', () => {
+    const state = {
+      ...defaultState(),
+      weakness: recordWeaknessAttempt(defaultState().weakness, {
+        word: TABERU,
+        typeId: 'plain-past',
+        correct: true,
+        responseMs: 12000,
+        now: Date.now(),
+      }),
+    };
+
+    const plan = buildTodayDrillPlan(state, [TABERU, TAKAI], DEFAULT_PREFS, [], { now: 10 });
+
+    expect(plan.available).toBe(true);
+    expect(plan.sourceCounts.weak).toBe(0);
+    expect(plan.sourceLabels.some((label) => label.includes('weak'))).toBe(false);
   });
 
   it('builds launcher prefs and a reusable Today word list', () => {

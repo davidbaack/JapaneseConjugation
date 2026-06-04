@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { cardIdFor, DAY, defaultState, localDateKey, selectNext } from '../utils/storage.js';
 import {
+  buildWeaknessFamilyRows,
   defaultWeaknessState,
   deriveWeaknessSubcategory,
   rankedWeaknessLanes,
@@ -86,6 +87,22 @@ describe('subcategory weakness model', () => {
     expect(lanes[0].attempted).toBe(2);
     expect(lanes[0].incorrect).toBe(2);
     expect(lanes[0].score).toBeGreaterThan(weaknessScoreForCard(weakness, TABERU, 'plain-past'));
+  });
+
+  it('keeps correct-only history out of weak lanes', () => {
+    const weakness = recordWeaknessAttempt(defaultWeaknessState(), {
+      word: TABERU,
+      typeId: 'plain-past',
+      correct: true,
+      responseMs: 12000,
+      now: Date.now(),
+    });
+
+    expect(weaknessScoreForCard(weakness, TABERU, 'plain-past')).toBe(0);
+    expect(rankedWeaknessLanes(weakness)).toEqual([]);
+    expect(buildWeaknessFamilyRows({ weakness }).every((family) => family.rows.length === 0)).toBe(
+      true,
+    );
   });
 
   it('selects fresh related cards in a weak subcategory before unrelated cards', () => {
