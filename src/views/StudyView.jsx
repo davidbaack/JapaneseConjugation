@@ -105,6 +105,7 @@ const STUDY_CURRENT_KEY = 'jp-study-current';
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
 const REVIEW_LIMIT_SOURCES = new Set(['repair', 'lab', 'recommendation']);
+const REVIEW_SESSION_HISTORY_SIZE = 4;
 
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
@@ -1062,6 +1063,7 @@ export default function StudyView() {
   const speechSubmittedRef = useRef(false);
   const speechAutoStartKeyRef = useRef('');
   const minimalPairSetIdRef = useRef(practicePrefs.minimalPairSetId || '');
+  const recentCardIdsRef = useRef([]);
   // Snapshots the typed answer the moment a kana mistake first occurs, so the
   // review panel can show what was actually entered when it went wrong rather
   // than the live (possibly self-corrected) input.
@@ -1832,12 +1834,38 @@ export default function StudyView() {
     }
   }
 
+  function rememberSessionCard(cardId) {
+    if (!cardId) return;
+    recentCardIdsRef.current = [
+      cardId,
+      ...recentCardIdsRef.current.filter((id) => id !== cardId),
+    ].slice(0, REVIEW_SESSION_HISTORY_SIZE);
+  }
+
+  function selectNextReviewCard(nextState, lastCardId, optionOverrides = {}) {
+    rememberSessionCard(lastCardId);
+    return selectNext(
+      nextState,
+      practiceWords,
+      enabledTypes,
+      lastCardId,
+      practicePrefs,
+      practiceRuleCandidates,
+      {
+        ...reviewSelectionOptions,
+        ...optionOverrides,
+        recentCardIds: recentCardIdsRef.current,
+      },
+    );
+  }
+
   function resetActiveAttempt() {
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
     stopSpeechRecognition();
+    recentCardIdsRef.current = [];
     setAnswer('');
     setPhase('answering');
     setChatOpen(false);
@@ -2065,17 +2093,7 @@ export default function StudyView() {
       setWasCorrected(false);
       setPhase('answering');
       if (!reviewSetComplete && !reviewComplete) {
-        setCurrent(
-          selectNext(
-            state,
-            practiceWords,
-            enabledTypes,
-            current.id,
-            practicePrefs,
-            practiceRuleCandidates,
-            reviewSelectionOptions,
-          ),
-        );
+        setCurrent(selectNextReviewCard(state, current.id));
       }
       return;
     }
@@ -2194,17 +2212,7 @@ export default function StudyView() {
         wrongSnapshotRef.current = null;
         setWasCorrected(false);
         setPhase('answering');
-        setCurrent(
-          selectNext(
-            nextState,
-            practiceWords,
-            enabledTypes,
-            current.id,
-            practicePrefs,
-            practiceRuleCandidates,
-            reviewSelectionOptions,
-          ),
-        );
+        setCurrent(selectNextReviewCard(nextState, current.id));
       }, 850);
     }
   }
@@ -2238,17 +2246,7 @@ export default function StudyView() {
     setWasCorrected(false);
     setPhase('answering');
     setWasCorrect(false);
-    setCurrent(
-      selectNext(
-        nextState,
-        practiceWords,
-        enabledTypes,
-        current.id,
-        practicePrefs,
-        practiceRuleCandidates,
-        reviewSelectionOptions,
-      ),
-    );
+    setCurrent(selectNextReviewCard(nextState, current.id));
   }
 
   function removeCurrentWordFromReviews() {
@@ -2376,17 +2374,7 @@ export default function StudyView() {
         wrongSnapshotRef.current = null;
         setWasCorrected(false);
         setPhase('answering');
-        setCurrent(
-          selectNext(
-            nextState,
-            practiceWords,
-            enabledTypes,
-            current.id,
-            practicePrefs,
-            practiceRuleCandidates,
-            reviewSelectionOptions,
-          ),
-        );
+        setCurrent(selectNextReviewCard(nextState, current.id));
       }, 850);
     }
   }
@@ -2607,17 +2595,7 @@ export default function StudyView() {
         <button
           onClick={() => {
             setBonusMode(true);
-            setCurrent(
-              selectNext(
-                state,
-                practiceWords,
-                enabledTypes,
-                current?.id,
-                practicePrefs,
-                practiceRuleCandidates,
-                { bonusMode: true, wordLists },
-              ),
-            );
+            setCurrent(selectNextReviewCard(state, current?.id, { bonusMode: true, wordLists }));
             setPhase('answering');
           }}
           className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium"
@@ -2700,17 +2678,7 @@ export default function StudyView() {
         <button
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
-            setCurrent(
-              selectNext(
-                state,
-                practiceWords,
-                enabledTypes,
-                current.id,
-                practicePrefs,
-                practiceRuleCandidates,
-                reviewSelectionOptions,
-              ),
-            );
+            setCurrent(selectNextReviewCard(state, current.id));
             setAnswer('');
             setPhase('answering');
           }}

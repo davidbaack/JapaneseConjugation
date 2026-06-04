@@ -945,4 +945,76 @@ describe('word-form SRS selection', () => {
 
     expect(card.id).toBe(cardIdFor(YOMU, 'plain-past'));
   });
+
+  it('moves to available material instead of ping-ponging session-recent due cards', () => {
+    const dueCard = {
+      reps: 1,
+      interval: 1,
+      ease: 2.5,
+      nextReview: 1,
+      correct: 0,
+      incorrect: 0,
+      lastSeen: 0,
+    };
+    const taberuPast = cardIdFor(TABERU, 'plain-past');
+    const kakuPast = cardIdFor(KAKU, 'plain-past');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [taberuPast]: dueCard,
+        [kakuPast]: dueCard,
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU, YOMU],
+      ['plain-past'],
+      null,
+      DEFAULT_PREFS,
+      null,
+      {
+        recentCardIds: [taberuPast, kakuPast],
+      },
+    );
+
+    expect(card.id).toBe(cardIdFor(YOMU, 'plain-past'));
+  });
+
+  it('moves to available material instead of ping-ponging session-recent retry cards', () => {
+    const now = Date.now();
+    const retryCard = {
+      reps: 0,
+      interval: 0,
+      ease: 2.3,
+      nextReview: now + 60000,
+      correct: 0,
+      incorrect: 1,
+      lastSeen: now,
+    };
+    const taberuPast = cardIdFor(TABERU, 'plain-past');
+    const kakuPast = cardIdFor(KAKU, 'plain-past');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [taberuPast]: retryCard,
+        [kakuPast]: retryCard,
+      },
+      retryQueue: [taberuPast, kakuPast],
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU, YOMU],
+      ['plain-past'],
+      null,
+      DEFAULT_PREFS,
+      null,
+      {
+        recentCardIds: [taberuPast, kakuPast],
+      },
+    );
+
+    expect(card.id).toBe(cardIdFor(YOMU, 'plain-past'));
+  });
 });
