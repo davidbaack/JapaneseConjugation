@@ -1573,7 +1573,8 @@ export default function StudyView() {
             <>
               <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
               <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
-                Enable conjugation types in Settings.
+                No words or forms are in your review scope right now. Widen your scope in Settings,
+                or include words and forms from Library.
               </p>
               <button
                 onClick={() => setTab('settings')}

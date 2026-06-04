@@ -135,15 +135,25 @@ export function filterWordsForStudyScope(
   const builtInKeys = options.builtInWords?.length
     ? new Set(cleanWords(options.builtInWords).map(wordKey))
     : null;
-  const automaticWords = options.builtInWords?.length
+  const automaticWords = builtInKeys
     ? sourceWords.filter((word) => builtInKeys.has(wordKey(word)))
     : sourceWords;
+  // Custom (non-built-in) words are user-chosen, so they are always in scope:
+  // they bypass the built-in progression ladder the same way enabled lists do.
+  // Without this, custom words would be counted by Settings' pool summary but
+  // never surface in automatic Reviews, leaving "No cards available."
+  const customWords = builtInKeys
+    ? sourceWords.filter((word) => !builtInKeys.has(wordKey(word)))
+    : [];
   const scopedWords = automaticWords;
   const ranked = rankedProgressionWords(scopedWords);
   const introduced = introducedBuiltInWordCount(state, ranked);
+  // customWords and scopedWords are disjoint (built-in vs not), so a plain
+  // concat adds no duplicates and leaves behavior unchanged when there are none.
+  const withCustom = (unlocked) => (customWords.length ? [...unlocked, ...customWords] : unlocked);
   const wordsForUnlockedKeys = (unlocked) => {
     const unlockedKeys = new Set(unlocked.map(wordKey));
-    return scopedWords.filter((word) => unlockedKeys.has(wordKey(word)));
+    return withCustom(scopedWords.filter((word) => unlockedKeys.has(wordKey(word))));
   };
 
   if (introduced < 12) return wordsForUnlockedKeys(ranked.slice(0, 24));
@@ -169,7 +179,7 @@ export function filterWordsForStudyScope(
       ),
     );
   }
-  return scopedWords;
+  return withCustom(scopedWords);
 }
 
 export function buildVocabularyProgressionSummary(
