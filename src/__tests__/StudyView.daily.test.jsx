@@ -283,7 +283,10 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    expect(await screen.findByText('No cards available')).toBeTruthy();
+    // A repair drill bypasses the dashboard and drills immediately; it must
+    // not dead-end on the empty state, nor hand off to the today drill.
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    expect(screen.queryByText('No cards available')).toBeNull();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
@@ -465,6 +468,35 @@ describe('StudyView daily startup guards', () => {
     await startReviewsFromDashboard();
     await screen.findByText('to open (v.t.)', {}, { timeout: 5000 });
     expect(screen.queryByText('No cards available')).toBeNull();
+  });
+
+  it('auto-selects a card for a persisted special launch instead of dead-ending', async () => {
+    // A repair drill (reviewLimitSource === 'repair') bypasses the dashboard.
+    // On a fresh load dashboardOpen is true and there is no studyFocus, so the
+    // selection effect must still run for the special launch — otherwise the
+    // dashboard is hidden, no card is chosen, and Reviews shows "No cards
+    // available." Regression guard for that deadlock.
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      state: defaultState(),
+      allWords: [target],
+      wordLists: [{ id: 'repair-drill', name: 'Repair', wordKeys: [wordKey(target)] }],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        englishHints: 'show',
+        reviewLimitSource: 'repair',
+        reviewLimit: 10,
+        wordListIds: ['repair-drill'],
+      },
+    });
+
+    render(<StudyView />);
+
+    // A real card renders directly (its meaning is shown), without an
+    // intervening dashboard or empty state.
+    await screen.findByText(target.meaning, {}, { timeout: 5000 });
+    expect(screen.queryByText('No cards available')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Reviews dashboard' })).toBeNull();
   });
 
   it('automatically checks a final spoken answer in speak answer mode', async () => {

@@ -1252,7 +1252,11 @@ export default function StudyView() {
 
   useLayoutEffect(() => {
     if (!hydrated) return;
-    if (dashboardOpen && !focus?.word) return;
+    // Bail only when the dashboard will actually render. Special launches
+    // (repair/recommendation/minimal-pair/focus) bypass the dashboard, so we
+    // must still select a card for them — otherwise the dashboard is hidden,
+    // no card is chosen, and Reviews dead-ends on "No cards available."
+    if (dashboardOpen && !specialLaunchActive) return;
     // When arriving from Check's "Practice this verb", seed that exact word/form
     // once. If no rule covers it, fall through to normal selection.
     if (focus?.word && !focusSeededRef.current) {
@@ -1301,6 +1305,7 @@ export default function StudyView() {
     reviewSelectionOptions,
     focus,
     dashboardOpen,
+    specialLaunchActive,
   ]);
 
   useEffect(() => {
