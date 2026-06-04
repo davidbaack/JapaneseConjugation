@@ -401,5 +401,13 @@ describe('App shell', () => {
     expect(await screen.findByText('1 hit')).toBeTruthy();
     await waitFor(() => expect(screen.queryAllByText('to write').length).toBe(0));
     expect(screen.getAllByText('to eat').length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
+      target: { value: 'plus' },
+    });
+
+    expect(await screen.findByText('no exact hit')).toBeTruthy();
+    await waitFor(() => expect(screen.queryAllByText('to eat').length).toBe(0));
+    expect(screen.queryByText('Plus (math operator)')).toBeNull();
   }, 15000);
 });

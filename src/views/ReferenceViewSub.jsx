@@ -129,13 +129,20 @@ export default function ReferenceViewSub({
     setScratchIndex(0);
   }, [query]);
 
-  const rows = selected ? referenceRows(selected, state) : [];
-  const selectedView = selected ? promptDisplay(selected, null, practicePrefs) : null;
-  const selectedMasuDiagnostic = selected ? ruMasuDiagnostic(selected) : null;
+  const queryActive = !!query.trim();
+  const selectedKey = selected ? wordKeyLocal(selected) : '';
+  const selectedMatchesQuery =
+    !queryActive ||
+    matches.some((word) => wordKeyLocal(word) === selectedKey) ||
+    lookupMatches.some((match) => wordKeyLocal(match.word) === selectedKey);
+  const detailWord = selectedMatchesQuery ? selected : null;
+  const rows = detailWord ? referenceRows(detailWord, state) : [];
+  const selectedView = detailWord ? promptDisplay(detailWord, null, practicePrefs) : null;
+  const selectedMasuDiagnostic = detailWord ? ruMasuDiagnostic(detailWord) : null;
   const masteredRows = rows.filter((r) => r.progress.status === 'mastered').length;
   const dueRows = rows.filter((r) => r.progress.status === 'due').length;
   const favoritesList = findFavoritesList(wordLists);
-  const selectedFavorited = favoriteListHasWord(wordLists, selected);
+  const selectedFavorited = favoriteListHasWord(wordLists, detailWord);
   const favoriteCount = (favoritesList?.wordKeys || []).length;
   const weakRuleCount = reference.weakRules.length;
 
@@ -753,7 +760,7 @@ export default function ReferenceViewSub({
           </div>
         )}
 
-        {selected && (
+        {detailWord && (
           <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5 text-left">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-4">
               <div className="min-w-0">
@@ -762,13 +769,13 @@ export default function ReferenceViewSub({
                   className="text-4xl font-semibold text-stone-950 dark:text-stone-50"
                   subClassName="text-stone-500 mt-1"
                 />
-                <div className="text-sm text-stone-605 italic mt-2">{selected.meaning}</div>
+                <div className="text-sm text-stone-605 italic mt-2">{detailWord.meaning}</div>
                 <div className="text-xs text-stone-500 dark:text-stone-400 mt-1">
-                  {groupDisplayLabel(selected.group)}
+                  {groupDisplayLabel(detailWord.group)}
                 </div>
-                {groupAliasText(selected.group) && (
+                {groupAliasText(detailWord.group) && (
                   <div className="text-[11px] text-stone-400 mt-0.5">
-                    {groupAliasText(selected.group)}
+                    {groupAliasText(detailWord.group)}
                   </div>
                 )}
                 {selectedMasuDiagnostic && (
@@ -793,7 +800,7 @@ export default function ReferenceViewSub({
               <div className="flex flex-wrap gap-2 sm:justify-end">
                 <button
                   onClick={drillSelectedWord}
-                  disabled={!selected || !setWordLists || !setPracticePrefs}
+                  disabled={!detailWord || !setWordLists || !setPracticePrefs}
                   className="px-3 py-2 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 disabled:opacity-40 text-white dark:text-stone-900 rounded-lg text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconRefresh className="w-4 h-4" />
@@ -812,7 +819,7 @@ export default function ReferenceViewSub({
                 </button>
                 <button
                   onClick={useFavoritesForDrill}
-                  disabled={!favoriteCount && !selected}
+                  disabled={!favoriteCount && !detailWord}
                   className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 disabled:opacity-40 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconList className="w-4 h-4" />
@@ -834,7 +841,7 @@ export default function ReferenceViewSub({
                   {copyTableOk ? 'Copied' : 'Copy table'}
                 </button>
                 <button
-                  onClick={() => speakJapaneseLocal(selected.reading)}
+                  onClick={() => speakJapaneseLocal(detailWord.reading)}
                   className="p-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-stone-500"
                   title="Speak"
                 >
@@ -871,99 +878,103 @@ export default function ReferenceViewSub({
           </div>
         )}
 
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-stone-50 dark:bg-stone-950 text-stone-500 dark:text-stone-400 text-xs uppercase tracking-wider">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">Form</th>
-                <th className="px-4 py-2 text-left font-medium">Answer</th>
-                <th className="px-4 py-2 text-left font-medium">Progress</th>
-                <th className="px-4 py-2 text-left font-medium hidden md:table-cell">Rule</th>
-                <th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
-              {rows.map((r) => {
-                const rv = formDisplay(r.answer, practicePrefs, selected, r.type.id);
-                const expanded = expandedRow === r.type.id;
-                return (
-                  <React.Fragment key={r.type.id}>
-                    <tr
-                      onClick={() => setExpandedRow(expanded ? null : r.type.id)}
-                      className={`border-t border-stone-100 dark:border-stone-850 cursor-pointer transition ${expanded ? 'bg-indigo-50/20 dark:bg-indigo-950/10' : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'}`}
-                    >
-                      <td className="px-4 py-2 text-left">
-                        <div className="font-semibold text-stone-850 dark:text-stone-200">
-                          {r.type.label}
-                        </div>
-                        <div className="text-xs text-stone-400">{r.type.hint}</div>
-                      </td>
-                      <td className="px-4 py-2 text-left">
-                        <div className="flex items-center gap-2">
-                          <ScriptDisplay
-                            view={rv}
-                            word={selected}
-                            type={r.type.id}
-                            colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                            className="text-lg text-stone-900 dark:text-stone-100"
-                            subClassName="text-xs text-stone-450"
-                          />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              speakJapaneseLocal(r.answer);
-                            }}
-                            className="p-1.5 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-500 flex-shrink-0"
-                            title={`Speak ${r.type.label}`}
+        {detailWord && (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-stone-50 dark:bg-stone-950 text-stone-500 dark:text-stone-400 text-xs uppercase tracking-wider">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium">Form</th>
+                  <th className="px-4 py-2 text-left font-medium">Answer</th>
+                  <th className="px-4 py-2 text-left font-medium">Progress</th>
+                  <th className="px-4 py-2 text-left font-medium hidden md:table-cell">Rule</th>
+                  <th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
+                {rows.map((r) => {
+                  const rv = formDisplay(r.answer, practicePrefs, detailWord, r.type.id);
+                  const expanded = expandedRow === r.type.id;
+                  return (
+                    <React.Fragment key={r.type.id}>
+                      <tr
+                        onClick={() => setExpandedRow(expanded ? null : r.type.id)}
+                        className={`border-t border-stone-100 dark:border-stone-850 cursor-pointer transition ${expanded ? 'bg-indigo-50/20 dark:bg-indigo-950/10' : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'}`}
+                      >
+                        <td className="px-4 py-2 text-left">
+                          <div className="font-semibold text-stone-850 dark:text-stone-200">
+                            {r.type.label}
+                          </div>
+                          <div className="text-xs text-stone-400">{r.type.hint}</div>
+                        </td>
+                        <td className="px-4 py-2 text-left">
+                          <div className="flex items-center gap-2">
+                            <ScriptDisplay
+                              view={rv}
+                              word={detailWord}
+                              type={r.type.id}
+                              colorHighlight={practicePrefs.colorCodeConjugations !== false}
+                              className="text-lg text-stone-900 dark:text-stone-100"
+                              subClassName="text-xs text-stone-450"
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                speakJapaneseLocal(r.answer);
+                              }}
+                              className="p-1.5 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-500 flex-shrink-0"
+                              title={`Speak ${r.type.label}`}
+                            >
+                              <IconVolume className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-left">
+                          <div
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-semibold ${r.progress.tone}`}
                           >
-                            <IconVolume className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-left">
-                        <div
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-semibold ${r.progress.tone}`}
-                        >
-                          {r.progress.status === 'mastered' ? (
-                            <IconCheck className="w-3.5 h-3.5" />
-                          ) : (
-                            <span className={`w-2 h-2 rounded-full ${r.progress.levelInfo.dot}`} />
-                          )}
-                          <span>{r.progress.label}</span>
-                        </div>
-                        <div className="mt-1 text-[11px] text-stone-400 hidden sm:block">
-                          {r.progress.detail}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-xs text-stone-550 hidden md:table-cell text-left">
-                        {r.explanation.rule}
-                      </td>
-                      <td className="px-4 py-2 hidden sm:table-cell">
-                        {renderReferenceRowActions(r)}
-                      </td>
-                    </tr>
-                    {expanded && (
-                      <tr className="bg-stone-50/50 dark:bg-stone-950/20">
-                        <td
-                          colSpan="5"
-                          className="px-5 py-4 border-t border-stone-100 dark:border-stone-800 space-y-2.5"
-                        >
-                          <div className="sm:hidden">{renderReferenceRowActions(r, true)}</div>
-                          <ConjugationBreakdown
-                            word={selected}
-                            type={r.type.id}
-                            geminiKey={geminiKey}
-                            practicePrefs={practicePrefs}
-                          />
+                            {r.progress.status === 'mastered' ? (
+                              <IconCheck className="w-3.5 h-3.5" />
+                            ) : (
+                              <span
+                                className={`w-2 h-2 rounded-full ${r.progress.levelInfo.dot}`}
+                              />
+                            )}
+                            <span>{r.progress.label}</span>
+                          </div>
+                          <div className="mt-1 text-[11px] text-stone-400 hidden sm:block">
+                            {r.progress.detail}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-xs text-stone-550 hidden md:table-cell text-left">
+                          {r.explanation.rule}
+                        </td>
+                        <td className="px-4 py-2 hidden sm:table-cell">
+                          {renderReferenceRowActions(r)}
                         </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      {expanded && (
+                        <tr className="bg-stone-50/50 dark:bg-stone-950/20">
+                          <td
+                            colSpan="5"
+                            className="px-5 py-4 border-t border-stone-100 dark:border-stone-800 space-y-2.5"
+                          >
+                            <div className="sm:hidden">{renderReferenceRowActions(r, true)}</div>
+                            <ConjugationBreakdown
+                              word={detailWord}
+                              type={r.type.id}
+                              geminiKey={geminiKey}
+                              practicePrefs={practicePrefs}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

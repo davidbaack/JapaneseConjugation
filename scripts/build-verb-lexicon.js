@@ -2,6 +2,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
+import { isLexiconArtifactWord, normalizeLexiconWord } from '../src/utils/lexiconArtifacts.js';
 
 const JLPT_GENKI_URL = 'https://raw.githubusercontent.com/elzup/jlpt-word-list/master/out/all.csv';
 const MINNA_URL = 'https://www.astr.tohoku.ac.jp/~akhlaghi/blog/JapaneseVocab/MNNvocab.csv';
@@ -19,7 +20,7 @@ const PRACTICE_GROUPS = new Set([
   'i-adjective',
   'na-adjective',
 ]);
-const GENERATED_ARTIFACT_MEANING = /\bmath operator\b/i;
+const cleanedArtifacts = { removed: 0, repaired: 0 };
 const VERB_ENDINGS = new Set(['う', 'く', 'ぐ', 'す', 'つ', 'ぬ', 'ぶ', 'む', 'る']);
 const ICHIDAN_HINTS = new Set([
   'え',
@@ -338,8 +339,14 @@ function normalizeSupportedWord(row, jmdictIndex) {
   };
 }
 
-function mergeWord(map, word) {
-  if (!word?.dict || !word?.reading || !word?.group) return;
+function mergeWord(map, rawWord) {
+  const word = normalizeLexiconWord(rawWord);
+  if (!word) {
+    cleanedArtifacts.removed += 1;
+    return;
+  }
+  if (word !== rawWord) cleanedArtifacts.repaired += 1;
+  if (!word.dict || !word.reading || !word.group) return;
   const key = `${word.group}:${word.dict}`;
   const existing = map.get(key);
   if (!existing) {
@@ -445,7 +452,7 @@ function isLowUsePracticeWord(word) {
 }
 
 function isGeneratedPracticeArtifact(word) {
-  return Boolean(word.group) && GENERATED_ARTIFACT_MEANING.test(normalizeMeaning(word.meaning));
+  return isLexiconArtifactWord(word);
 }
 
 function countByJlpt(words) {
@@ -611,13 +618,15 @@ async function main() {
       },
     ],
     trimPolicy: {
-      appliesTo: 'JLPT-tagged verbs/adjectives and generated operator-label rows',
+      appliesTo: 'JLPT-tagged verbs/adjectives and known generated artifact rows',
       keepIf: ['Genki lesson tag', 'Minna no Nihongo lesson tag', 'JMdict common priority marker'],
-      removeIf: 'JLPT-only and not marked common by JMdict, or generated operator-label artifact',
+      removeIf:
+        'JLPT-only and not marked common by JMdict, generated operator-label artifact, or known non-conjugation scrape artifact',
     },
     stats: {
       trimmedLowUse,
       trimmedGeneratedArtifacts,
+      cleanedArtifacts,
     },
     columns: [
       'dict',
@@ -645,6 +654,7 @@ async function main() {
     common: rows.filter((row) => row[7]).length,
     trimmedLowUse,
     trimmedGeneratedArtifacts,
+    cleanedArtifacts,
     jlpt: {},
     genkiLessons: new Set(),
     minnaLessons: new Set(),
@@ -664,6 +674,7 @@ async function main() {
         common: counts.common,
         trimmedLowUse: counts.trimmedLowUse,
         trimmedGeneratedArtifacts: counts.trimmedGeneratedArtifacts,
+        cleanedArtifacts: counts.cleanedArtifacts,
         jlpt: counts.jlpt,
         genkiLessonCount: counts.genkiLessons.size,
         minnaLessonCount: counts.minnaLessons.size,

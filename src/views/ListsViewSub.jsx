@@ -247,6 +247,10 @@ export default function ListsViewSub({
   const activeKeys = new Set(active?.wordKeys || []);
   const matches = useMemo(() => searchWords(query, words).slice(0, 120), [query, words]);
   const activeWords = useMemo(() => wordsForList(active, words), [active, words]);
+  const resolvedListCounts = useMemo(
+    () => new Map(wordLists.map((list) => [list.id, wordsForList(list, words).length])),
+    [wordLists, words],
+  );
   const selectedIds = practicePrefs.wordListIds || [];
 
   const packGroups = useMemo(() => {
@@ -590,7 +594,9 @@ export default function ListsViewSub({
               >
                 <button onClick={() => setActiveId(l.id)} className="w-full text-left">
                   <div className="font-medium text-stone-805 dark:text-stone-200">{l.name}</div>
-                  <div className="text-xs text-stone-500">{(l.wordKeys || []).length} words</div>
+                  <div className="text-xs text-stone-500">
+                    {resolvedListCounts.get(l.id) || 0} words
+                  </div>
                 </button>
                 <div className="flex gap-2 mt-2">
                   <button

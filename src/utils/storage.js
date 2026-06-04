@@ -18,6 +18,7 @@ import {
 } from './readiness.js';
 import { getMinimalPairSet, mergeMinimalPairProgress } from './minimalPairs.js';
 import { mergePracticePrefs } from './display.js';
+import { normalizeWordListKeys } from './lexiconArtifacts.js';
 import { buildRuleCandidates } from './ruleCandidates.js';
 import { defaultReviewScope, normalizeReviewScope, reviewTypeIdsForState } from './reviewScope.js';
 import {
@@ -127,7 +128,9 @@ function wordPriority(word, wordLists = []) {
 
 export function normalizeWordLists(wordLists = []) {
   return Array.isArray(wordLists)
-    ? wordLists.filter((list) => list && list.id !== RETIRED_REPAIR_DRILL_LIST_ID)
+    ? wordLists
+        .filter((list) => list && list.id !== RETIRED_REPAIR_DRILL_LIST_ID)
+        .map((list) => ({ ...list, wordKeys: normalizeWordListKeys(list.wordKeys) }))
     : [];
 }
 

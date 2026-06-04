@@ -78,6 +78,39 @@ describe('expanded vocabulary lexicon', () => {
     expect(words.some((word) => /\bmath operator\b/i.test(word.meaning))).toBe(false);
   });
 
+  it('repairs known lesson-source scrape artifacts before learners see them', () => {
+    expect(
+      inflateVerbRows([
+        ['ある', 'ある', 'A certain ~, One ~', 'godan', 'N5', [], [41], true],
+        ['掃除する', 'そじする', 'Clean (a room)', 'suru', 'N5', [], [19], false],
+        ['注意する', 'ちゅいする', 'Be careful', 'suru', 'N4', [], [33], false],
+        ['研究する', 'けんきょうする', 'do Research', 'suru', 'N4', [], [15], false],
+        ['用意する', 'よいする', 'Prepare', 'suru', 'N4', [], [45], false],
+        ['遅刻する', 'ちこくする', 'Be late, Come late', 'suru', 'N2', [], [39], false],
+        ['回する', 'まわする', 'Turn', 'suru', 'N5', [], [23], false],
+        ['はんかする', 'はんかする', 'Quarrel, fight', 'suru', '', [], [38], false],
+      ]),
+    ).toEqual([
+      expect.objectContaining({ dict: '掃除する', reading: 'そうじする' }),
+      expect.objectContaining({ dict: '注意する', reading: 'ちゅういする' }),
+      expect.objectContaining({ dict: '研究する', reading: 'けんきゅうする' }),
+      expect.objectContaining({ dict: '用意する', reading: 'よういする' }),
+      expect.objectContaining({ dict: '遅刻する', reading: 'ちこくする' }),
+      expect.objectContaining({ dict: '回す', reading: 'まわす', group: 'godan' }),
+      expect.objectContaining({ dict: 'けんかする', reading: 'けんかする' }),
+    ]);
+    expect(words.some((word) => word.dict === 'ある' && word.meaning.includes('A certain'))).toBe(
+      false,
+    );
+    expect(words).toContainEqual(
+      expect.objectContaining({ dict: '掃除する', reading: 'そうじする' }),
+    );
+    expect(words).toContainEqual(expect.objectContaining({ dict: '回す', reading: 'まわす' }));
+    expect(words).toContainEqual(
+      expect.objectContaining({ dict: '注意する', reading: 'ちゅういする' }),
+    );
+  });
+
   it('covers every configured Genki and Minna lesson with at least one practice word', () => {
     expect(missingLessons(words, 'lessons', 23)).toEqual([]);
     expect(missingLessons(words, 'minnaLessons', 50)).toEqual([3]);

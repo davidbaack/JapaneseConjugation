@@ -350,9 +350,19 @@ describe('normalizeWordLists', () => {
       normalizeWordLists([
         null,
         { id: 'repair-drill', name: 'Repair', wordKeys: ['ichidan:\u98df\u3079\u308b'] },
-        { id: 'learner-list', name: 'Learner List', wordKeys: ['godan:\u66f8\u304f'] },
+        {
+          id: 'learner-list',
+          name: 'Learner List',
+          wordKeys: ['godan:\u66f8\u304f', 'godan:たす', 'suru:回する', 'suru:はんかする'],
+        },
       ]),
-    ).toEqual([{ id: 'learner-list', name: 'Learner List', wordKeys: ['godan:\u66f8\u304f'] }]);
+    ).toEqual([
+      {
+        id: 'learner-list',
+        name: 'Learner List',
+        wordKeys: ['godan:\u66f8\u304f', 'godan:回す', 'suru:けんかする'],
+      },
+    ]);
   });
 });
 
