@@ -11,14 +11,13 @@ import { useTablist } from './components/useTablist.js';
 // without prop-drilling.
 const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
 const LessonsView = React.lazy(() => import('./views/LessonsView.jsx'));
-const LibraryView = React.lazy(() => import('./views/LibraryView.jsx'));
-const PracticeLabView = React.lazy(() => import('./views/PracticeLabView.jsx'));
+const ToolsView = React.lazy(() => import('./views/ToolsView.jsx'));
 const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 const DevHistoryPanel = import.meta.env.DEV
   ? React.lazy(() => import('./components/DevHistoryPanel.jsx'))
   : null;
 
-const TABS = ['study', 'lessons', 'library', 'lab', 'settings'];
+const TABS = ['practice', 'learn', 'tools', 'settings'];
 
 function AppShell() {
   const { tab, setTab, showAuthModal, setShowAuthModal, supabase } = useApp();
@@ -63,10 +62,9 @@ function AppShell() {
         </nav>
         <Suspense fallback={<ViewSkeleton />}>
           <div {...panelProps(tab)}>
-            {tab === 'study' && <StudyView />}
-            {tab === 'lessons' && <LessonsView />}
-            {tab === 'library' && <LibraryView />}
-            {tab === 'lab' && <PracticeLabView />}
+            {tab === 'practice' && <StudyView />}
+            {tab === 'learn' && <LessonsView />}
+            {tab === 'tools' && <ToolsView />}
             {tab === 'settings' && <SettingsView />}
           </div>
         </Suspense>

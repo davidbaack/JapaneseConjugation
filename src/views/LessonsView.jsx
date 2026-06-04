@@ -64,7 +64,7 @@ function uniqueTypeIds(lessons = []) {
   return [...new Set(lessons.flatMap((lesson) => lesson.typeIds || []))];
 }
 
-function TrackCard({ track, lessons, onLearnLesson, onReviewLesson, onReviewTrack }) {
+function TrackCard({ track, lessons, onLearnLesson, onPracticeLesson, onPracticeTrack }) {
   const styles = TRACK_STYLES[track.id] || TRACK_STYLES.beginner;
   const formCount = uniqueTypeIds(lessons).length;
 
@@ -85,11 +85,11 @@ function TrackCard({ track, lessons, onLearnLesson, onReviewLesson, onReviewTrac
       </div>
       <button
         type="button"
-        onClick={() => onReviewTrack(track, lessons)}
+        onClick={() => onPracticeTrack(track, lessons)}
         className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${styles.button}`}
       >
         <IconRefresh className="w-4 h-4" />
-        Review track
+        Practice track
       </button>
 
       <ol className="mt-4 space-y-2">
@@ -109,7 +109,7 @@ function TrackCard({ track, lessons, onLearnLesson, onReviewLesson, onReviewTrac
                   {lesson.title}
                 </div>
                 <p className="mt-1 text-xs leading-relaxed text-stone-550 dark:text-stone-400">
-                  Learn the rule, then review the forms while they are fresh.
+                  Learn the rule, then practice the forms while they are fresh.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <a
@@ -121,10 +121,10 @@ function TrackCard({ track, lessons, onLearnLesson, onReviewLesson, onReviewTrac
                   </a>
                   <button
                     type="button"
-                    onClick={() => onReviewLesson(lesson)}
+                    onClick={() => onPracticeLesson(lesson)}
                     className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${styles.button}`}
                   >
-                    Review this
+                    Practice this
                   </button>
                 </div>
               </div>
@@ -185,7 +185,7 @@ export default function LessonsView() {
     const recommendation = buildLessonReviewRecommendation(lesson, allWords, options);
     if (!recommendation) return;
     addReviewRecommendation(recommendation);
-    setTab('study');
+    setTab('practice');
   }
 
   function sendTrackRecommendation(track, lessons) {
@@ -233,7 +233,7 @@ export default function LessonsView() {
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 dark:text-stone-300">
               Follow a track when you want a learning path, or use the reference sections when you
-              need a specific rule. Each lesson can hand a focused set back to Reviews.
+              need a specific rule. Each lesson can hand a focused set back to Practice.
             </p>
           </div>
           <button
@@ -246,7 +246,7 @@ export default function LessonsView() {
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-850 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-950 dark:hover:bg-stone-100"
           >
             <IconRefresh className="w-4 h-4" />
-            Send all to Reviews
+            Send all to Practice
           </button>
         </div>
 
@@ -274,7 +274,7 @@ export default function LessonsView() {
               Guided lesson tracks
             </h3>
             <p className="text-sm text-stone-600 dark:text-stone-300">
-              Pick a level, learn one section, then send the matching forms to Reviews.
+              Pick a level, learn one section, then send the matching forms to Practice.
             </p>
           </div>
         </div>
@@ -285,8 +285,8 @@ export default function LessonsView() {
               track={track}
               lessons={lessons}
               onLearnLesson={openLesson}
-              onReviewLesson={sendLessonRecommendation}
-              onReviewTrack={sendTrackRecommendation}
+              onPracticeLesson={sendLessonRecommendation}
+              onPracticeTrack={sendTrackRecommendation}
             />
           ))}
         </div>
@@ -591,10 +591,11 @@ export default function LessonsView() {
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <div className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
-                            Learn this, then review this
+                            Learn this, then practice this
                           </div>
                           <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
-                            Read the rule below, then send these forms to Reviews for active recall.
+                            Read the rule below, then send these forms to Practice for active
+                            recall.
                           </p>
                         </div>
                         <button
@@ -603,7 +604,7 @@ export default function LessonsView() {
                           className="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
                         >
                           <IconRefresh className="w-4 h-4" />
-                          Review this
+                          Practice this
                         </button>
                       </div>
                     </div>

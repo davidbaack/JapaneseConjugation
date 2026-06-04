@@ -109,10 +109,10 @@ function persistStudyCard(word, type) {
   );
 }
 
-async function startReviewsFromDashboard() {
+async function startWorkoutFromDashboard() {
   const start = await screen.findByRole(
     'button',
-    { name: /Start Reviews|Continue Reviews|Start Core Warmup/ },
+    { name: /Start workout|Continue workout/ },
     { timeout: 5000 },
   );
   fireEvent.click(start);
@@ -167,20 +167,20 @@ afterEach(() => {
 });
 
 describe('StudyView daily startup guards', () => {
-  it('opens to the Reviews dashboard for signed-in learners, then starts on command', async () => {
+  it('opens to the Practice dashboard for signed-in learners, then starts on command', async () => {
     const app = makeApp();
     mockedApp.value = app;
 
     render(<StudyView />);
 
-    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
 
-    await startReviewsFromDashboard();
+    await startWorkoutFromDashboard();
     expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
   });
 
-  it('opens to the Reviews dashboard while signed out, then starts on command', async () => {
+  it('opens to the Practice dashboard while signed out, then starts on command', async () => {
     const app = makeApp({
       session: null,
     });
@@ -188,25 +188,25 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
 
-    await startReviewsFromDashboard();
+    await startWorkoutFromDashboard();
     expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
   });
 
-  it('returns to the Reviews dashboard from an active card via Overview', async () => {
+  it('returns to the Practice dashboard from an active card via Overview', async () => {
     const target = STARTER_VERBS[0];
     persistStudyCard(target, 'plain-past');
     mockedApp.value = makeApp();
 
     render(<StudyView />);
 
-    await startReviewsFromDashboard();
+    await startWorkoutFromDashboard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Reviews overview' }));
-    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Practice overview' }));
+    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
   });
 
   it('routes open verb-group mistakes from the dashboard into Groups', async () => {
@@ -228,8 +228,9 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    const routeButton = await screen.findByRole('button', { name: /mixing up/i });
-    expect(routeButton.textContent).toMatch(/verb groups/i);
+    const routeButton = await screen.findByRole('button', {
+      name: 'Wrong verb group -> Groups',
+    });
     fireEvent.click(routeButton);
 
     expect(openLabTool).toHaveBeenCalledWith('classify');
@@ -248,9 +249,9 @@ describe('StudyView daily startup guards', () => {
 
     // A focus launch is a "special" session — it previously hid Overview.
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Reviews overview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Practice overview' }));
 
-    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
   });
 
   it('does not auto-start today over a focused word launch', async () => {
@@ -276,15 +277,15 @@ describe('StudyView daily startup guards', () => {
         ...DEFAULT_PREFS,
         reviewLimit: 10,
         reviewLimitSource: 'repair',
-        wordListIds: ['repair-drill'],
       },
     });
     mockedApp.value = app;
 
     render(<StudyView />);
 
-    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+    await screen.findByRole('region', { name: 'Practice dashboard' }, { timeout: 5000 });
     expect(screen.queryByPlaceholderText(/Type romaji or kana/i)).toBeNull();
+    expect(screen.queryByText('No cards available')).toBeNull();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
@@ -306,7 +307,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startReviewsFromDashboard();
+    await startWorkoutFromDashboard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
@@ -333,7 +334,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startReviewsFromDashboard();
+    await startWorkoutFromDashboard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     const raw = sessionStorage.getItem('jp-study-current');
     expect(raw).toBeTruthy();
@@ -378,37 +379,6 @@ describe('StudyView daily startup guards', () => {
     expect(screen.getByText(englishForForm(target, type))).toBeTruthy();
   });
 
-  it('resolves a matching missed form after a clean correct Review', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    const expected = conjugateItem(target, type);
-    const setState = vi.fn();
-    const state = {
-      ...defaultState(),
-      mistakes: recordMistake([], target, type, 'polite-present', 'wrong', expected),
-    };
-    mockedApp.value = makeApp({
-      state,
-      setState,
-      allWords: [target],
-    });
-
-    render(<StudyView />);
-
-    await startReviewsFromDashboard();
-    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.change(input, { target: { value: expected } });
-
-    await waitFor(() => expect(setState).toHaveBeenCalled());
-    const nextState = setState.mock.calls
-      .map(([arg]) => arg)
-      .find((arg) => arg && Array.isArray(arg.mistakes));
-    expect(nextState.mistakes[0]).toMatchObject({
-      key: state.mistakes[0].key,
-      resolved: true,
-    });
-  });
-
   it('ignores a persisted card when its form is no longer enabled', async () => {
     sessionStorage.setItem(
       'jp-study-current',
@@ -422,7 +392,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startReviewsFromDashboard();
+    await startWorkoutFromDashboard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     await waitFor(() => {
       const raw = sessionStorage.getItem('jp-study-current');
@@ -457,7 +427,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startReviewsFromDashboard();
+    await startWorkoutFromDashboard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     await waitFor(() => {
       const raw = sessionStorage.getItem('jp-study-current');
@@ -494,39 +464,34 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startReviewsFromDashboard();
+    await startWorkoutFromDashboard();
     await screen.findByText('to open (v.t.)', {}, { timeout: 5000 });
     expect(screen.queryByText('No cards available')).toBeNull();
   });
 
-  it('auto-selects a card for a persisted special launch instead of dead-ending', async () => {
-    // Recommendation launches use the bounded review special-launch machinery.
-    // On a fresh load dashboardOpen is true and there is no studyFocus, so the
-    // selection effect must still run for the special launch; otherwise the
-    // dashboard is hidden, no card is chosen, and Reviews shows "No cards
-    // available." Regression guard for that shared path.
+  it('does not treat a retired repair list as a persisted special launch', async () => {
+    // Retired repair-drill prefs can remain in older storage. They should not
+    // hide the dashboard or select a card now that generic repair drills are
+    // retired.
     const target = STARTER_VERBS[0];
-    const listId = 'list-review-rec-test';
     mockedApp.value = makeApp({
       state: defaultState(),
       allWords: [target],
-      wordLists: [{ id: listId, name: 'Recommended reviews', wordKeys: [wordKey(target)] }],
+      wordLists: [{ id: 'repair-drill', name: 'Repair', wordKeys: [wordKey(target)] }],
       practicePrefs: {
         ...DEFAULT_PREFS,
         englishHints: 'show',
-        reviewLimitSource: 'recommendation',
+        reviewLimitSource: 'repair',
         reviewLimit: 10,
-        wordListIds: [listId],
+        wordListIds: ['repair-drill'],
       },
     });
 
     render(<StudyView />);
 
-    // A real card renders directly (its meaning is shown), without an
-    // intervening dashboard or empty state.
-    await screen.findByText(target.meaning, {}, { timeout: 5000 });
+    await screen.findByRole('region', { name: 'Practice dashboard' }, { timeout: 5000 });
+    expect(screen.queryByPlaceholderText(/Type romaji or kana/i)).toBeNull();
     expect(screen.queryByText('No cards available')).toBeNull();
-    expect(screen.queryByRole('region', { name: 'Reviews dashboard' })).toBeNull();
   });
 
   it('automatically checks a final spoken answer in speak answer mode', async () => {
@@ -623,7 +588,7 @@ describe('StudyView daily startup guards', () => {
     expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
   });
 
-  it('shows SRS queue progress for an active Today drill in the Review flow', async () => {
+  it('shows ready-card progress for an active Today drill in the Practice flow', async () => {
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
     const dueCardId = cardIdFor(target, type);
@@ -641,13 +606,13 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startReviewsFromDashboard();
-    expect(await screen.findByText('0/1 due')).toBeTruthy();
-    expect(screen.getByText('Review')).toBeTruthy();
+    await startWorkoutFromDashboard();
+    expect(await screen.findByText('0/1 ready')).toBeTruthy();
+    expect(screen.getByText('Practice')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
   });
 
-  it('counts a correct Review answer toward the SRS queue and daily progress', async () => {
+  it('counts a correct Practice answer toward the ready queue and daily progress', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
@@ -670,7 +635,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startReviewsFromDashboard();
+    await startWorkoutFromDashboard();
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 

@@ -15,6 +15,15 @@ function uniqueStrings(values = []) {
   return [...new Set((values || []).map((value) => String(value || '').trim()).filter(Boolean))];
 }
 
+function normalizePracticeCopy(value = '') {
+  return String(value || '')
+    .replace(/\bReviews\b/g, 'Practice')
+    .replace(/\breviews\b/g, 'practice')
+    .replace(/\bReview\b/g, 'Practice')
+    .replace(/\breview\b/g, 'practice')
+    .replace(/\bSRS\b/g, 'Practice history');
+}
+
 export function normalizeReviewScope(scope = null) {
   const familyIds = new Set(FORM_GROUPS.map((group) => group.id));
   return {
@@ -27,8 +36,8 @@ export function normalizeReviewScope(scope = null) {
       .map((rec) => ({
         id: String(rec.id),
         source: String(rec.source || 'lab'),
-        label: String(rec.label),
-        detail: String(rec.detail || ''),
+        label: normalizePracticeCopy(rec.label),
+        detail: normalizePracticeCopy(rec.detail),
         wordKeys: uniqueStrings(rec.wordKeys),
         typeIds: uniqueStrings(rec.typeIds).filter((id) =>
           ALL_CARD_TYPES.some((type) => type.id === id),

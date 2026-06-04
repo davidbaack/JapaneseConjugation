@@ -55,7 +55,7 @@ export default function PracticeLabView() {
   function sendRecommendation(recommendation = recommendations[0]) {
     if (!recommendation) return;
     addReviewRecommendation(recommendation);
-    setTab('study');
+    setTab('practice');
   }
 
   const canRecommend = recommendations.length > 0;
@@ -66,7 +66,7 @@ export default function PracticeLabView() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div
             role="tablist"
-            aria-label="Practice Lab tools"
+            aria-label="Tools"
             className="flex flex-wrap gap-1 rounded-xl border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
           >
             {LAB_TABS.map((tab) => {
@@ -96,7 +96,7 @@ export default function PracticeLabView() {
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
           >
             <IconRefresh className="h-4 w-4" />
-            Send to Reviews
+            Send to Practice
           </button>
         </div>
         {recommendations.length > 0 && (

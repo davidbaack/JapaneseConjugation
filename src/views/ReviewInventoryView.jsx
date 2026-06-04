@@ -1,13 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { FORM_GROUPS } from '../data/conjugationTypes.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import { compatibleTypes, getWordMeta, wordKey } from '../utils/conjugator.js';
 import {
-  excludeFormFamilyFromReviewState,
   excludeWordFromReviewState,
-  includeFormFamilyInReviewState,
   includeWordInReviewState,
-  isFormFamilyExcludedFromReview,
   isWordExcludedFromReview,
 } from '../utils/reviewScope.js';
 
@@ -57,30 +53,14 @@ export default function ReviewInventoryView() {
     );
   }
 
-  function toggleFamily(family) {
-    setState((prev) => {
-      const restored = isFormFamilyExcludedFromReview(prev, family.id)
-        ? includeFormFamilyInReviewState(prev, family.id)
-        : excludeFormFamilyFromReviewState(prev, family.id);
-      if (isFormFamilyExcludedFromReview(prev, family.id)) {
-        return {
-          ...restored,
-          enabledTypes: [...new Set([...(restored.enabledTypes || []), ...family.typeIds])],
-        };
-      }
-      return restored;
-    });
-  }
-
-  function reviewWord(word) {
+  function practiceInventoryWord(word) {
     const type = compatibleTypes(word).find(
       (item) => !['plain-present', 'adj-plain-present'].includes(item.id),
     )?.id;
-    practiceWord(word, type, { source: 'library', launchMode: 'inventory' });
+    practiceWord(word, type, { source: 'tools', launchMode: 'inventory' });
   }
 
   const excludedWords = state.reviewScope?.excludedWordKeys?.length || 0;
-  const excludedFamilies = state.reviewScope?.excludedFormFamilyIds?.length || 0;
 
   return (
     <div className="space-y-4">
@@ -88,70 +68,17 @@ export default function ReviewInventoryView() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-              Review inventory
+              Practice words
             </div>
             <h3 className="mt-1 text-lg font-semibold text-stone-950 dark:text-stone-50">
-              Words and form families in automatic Reviews.
+              Words in automatic Practice.
             </h3>
           </div>
           <div className="flex gap-2 text-xs">
             <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
               {excludedWords} words off
             </span>
-            <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
-              {excludedFamilies} families off
-            </span>
           </div>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-              Form families
-            </h3>
-            <p className="text-xs text-stone-500 dark:text-stone-400">
-              These controls are the same durable switches Reviews uses.
-            </p>
-          </div>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {FORM_GROUPS.map((family) => {
-            const excluded = isFormFamilyExcludedFromReview(state, family.id);
-            return (
-              <div
-                key={family.id}
-                className={`rounded-xl border px-3 py-3 ${
-                  excluded
-                    ? 'border-rose-200 bg-rose-50/70 dark:border-rose-900/60 dark:bg-rose-950/20'
-                    : 'border-stone-200 bg-stone-50 dark:border-stone-800 dark:bg-stone-950'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-                      {family.label}
-                    </div>
-                    <div className="mt-0.5 text-xs text-stone-500">
-                      {family.typeIds.length} card types
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => toggleFamily(family)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                      excluded
-                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                        : 'border border-stone-200 bg-white text-stone-700 hover:bg-stone-100 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800'
-                    }`}
-                  >
-                    {excluded ? 'Restore' : 'Remove'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
         </div>
       </section>
 
@@ -200,10 +127,10 @@ export default function ReviewInventoryView() {
                 <div className="flex shrink-0 gap-2">
                   <button
                     type="button"
-                    onClick={() => reviewWord(word)}
+                    onClick={() => practiceInventoryWord(word)}
                     className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300"
                   >
-                    Review now
+                    Practice now
                   </button>
                   <button
                     type="button"

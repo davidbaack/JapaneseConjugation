@@ -1,17 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { IconVolume, IconRefresh, IconCloud } from '../components/Icons.jsx';
-import { ALL_CARD_TYPES, TYPE_PACKS, FORM_GROUPS } from '../data/conjugationTypes.js';
-import {
-  buildPracticePoolSummary,
-  weakTypeIdsForState,
-  mergeState,
-  dailyNewCardLimit,
-  bonusNewCardLimit,
-  normalizeWordLists,
-} from '../utils/storage.js';
+import { mergeState, normalizeWordLists } from '../utils/storage.js';
 import {
   mergePracticePrefs,
-  normalizeAnswerMode,
   resolveDisplayScripts,
   scriptModeFromDisplay,
 } from '../utils/display.js';
@@ -20,49 +11,20 @@ import { serializeBackup, parseBackup } from '../utils/backup.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
-function jaccardSim(a, b) {
-  const sa = new Set(a),
-    sb = new Set(b);
-  let inter = 0;
-  for (const x of sa) if (sb.has(x)) inter++;
-  const union = sa.size + sb.size - inter;
-  return union === 0 ? 0 : inter / union;
-}
-
-const REVIEW_STYLE_OPTIONS = [
-  { id: 'auto', label: 'Auto' },
-  { id: 'forms', label: 'Forms only' },
-  { id: 'reading', label: 'Reading practice' },
-];
-
-const SOURCE_FORM_OPTIONS = [
-  { id: 'auto', label: 'Auto' },
-  { id: 'dictionary', label: 'Dictionary' },
-  { id: 'masu', label: 'Masu' },
-  { id: 'mixed', label: 'Mixed' },
-];
-
-const ANSWER_MODE_OPTIONS = [
-  { id: 'input', label: 'Type answer' },
-  { id: 'choice', label: 'Choices' },
-  { id: 'self-check', label: 'Self-check' },
-  { id: 'speak', label: 'Speak answer' },
-];
-
 const RESET_ACTIONS = [
   {
     id: 'progress',
-    title: 'Reset review progress',
-    description: 'Clears SRS cards, mistakes, streaks, and lab stats.',
-    clears: 'Review history and practice stats',
-    keeps: 'Settings, form scope, Library exclusions, custom words, and lists',
+    title: 'Reset practice progress',
+    description: 'Clears card history, mistakes, streaks, weakness map, and tool stats.',
+    clears: 'Practice history and weakness signals',
+    keeps: 'Settings, Practice map scope, Tools word exclusions, custom words, and lists',
     confirm: 'Reset progress',
-    done: 'Review progress reset.',
+    done: 'Practice progress reset.',
   },
   {
     id: 'settings',
     title: 'Restore default settings',
-    description: 'Restores answer, display, goal, filter, and form-scope defaults.',
+    description: 'Restores display, audio, and Practice defaults.',
     clears: 'Non-default Settings choices',
     keeps: 'Progress, custom words, and lists',
     confirm: 'Restore settings',
@@ -81,7 +43,7 @@ const RESET_ACTIONS = [
     id: 'factory',
     title: 'Factory reset account',
     description: 'Wipes learner data and settings for a clean Katachiya start.',
-    clears: 'Progress, settings, custom words, lists, and Library exclusions',
+    clears: 'Progress, settings, custom words, lists, and Tools exclusions',
     keeps: 'Your login account',
     confirm: 'Factory reset',
     done: 'Factory reset complete.',
@@ -108,8 +70,6 @@ export default function SettingsView() {
     speechVoices,
     resolvedTheme,
     supabase,
-    allWords,
-    builtInWords,
     showAuth: onShowAuth,
   } = useApp();
   const [pendingReset, setPendingReset] = useState(null);
@@ -123,7 +83,6 @@ export default function SettingsView() {
   const [importErr, setImportErr] = useState('');
   const [msg, setMsg] = useState('');
   const [copyOk, setCopyOk] = useState(false);
-  const [showCustom, setShowCustom] = useState(false);
 
   const exportData = useMemo(
     () => serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
@@ -139,34 +98,6 @@ export default function SettingsView() {
       displayScripts: next,
       scriptMode: scriptModeFromDisplay(next),
     });
-  }
-
-  function applyTypePack(ids) {
-    const valid = new Set(ALL_CARD_TYPES.map((t) => t.id));
-    const clean = [...new Set((ids || []).filter((id) => valid.has(id)))];
-    if (clean.length) {
-      setState({ ...state, enabledTypes: clean });
-      setShowCustom(false);
-    }
-  }
-
-  function toggleForm(typeId) {
-    const next = state.enabledTypes.includes(typeId)
-      ? state.enabledTypes.filter((id) => id !== typeId)
-      : [...state.enabledTypes, typeId];
-    if (next.length) setState({ ...state, enabledTypes: next });
-  }
-
-  function toggleGroup(groupTypeIds, allEnabled) {
-    let next;
-    if (allEnabled) {
-      next = state.enabledTypes.filter((id) => !groupTypeIds.includes(id));
-    } else {
-      const cur = new Set(state.enabledTypes);
-      for (const id of groupTypeIds) cur.add(id);
-      next = [...cur];
-    }
-    if (next.length) setState({ ...state, enabledTypes: next });
   }
 
   async function copyExport() {
@@ -224,9 +155,6 @@ export default function SettingsView() {
           : 'text-stone-600 bg-stone-50 border-stone-250 dark:bg-stone-950 dark:border-stone-850';
 
   const displayScripts = resolveDisplayScripts(practicePrefs);
-  const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
-  const reviewStyle = practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle;
-  const sourceFormStrategy = practicePrefs.sourceFormStrategy || DEFAULT_PREFS.sourceFormStrategy;
   const theme = practicePrefs.theme || DEFAULT_PREFS.theme;
   const englishHints = practicePrefs.englishHints || DEFAULT_PREFS.englishHints;
   const showWordCategory = !!practicePrefs.showWordCategory;
@@ -234,200 +162,9 @@ export default function SettingsView() {
     practicePrefs.furigana !== false && displayScripts.kanji && displayScripts.kana;
   const selectedVoiceAvailable =
     !practicePrefs.voiceURI || speechVoices.some((v) => v.voiceURI === practicePrefs.voiceURI);
-  const weakPackIds = weakTypeIdsForState(state, state.enabledTypes);
-  const typePacks = [
-    ...TYPE_PACKS.filter((pack) => ['basics', 'core', 'advanced'].includes(pack.id)),
-    {
-      id: 'weak',
-      label: 'Weak mix',
-      hint: 'Uses your misses and SRS history to pick forms worth isolating.',
-      typeIds: weakPackIds,
-    },
-  ];
-  const enabledKey = [...state.enabledTypes].sort().join('|');
-  const settingsWords = useMemo(() => allWords || [], [allWords]);
-  const poolSummary = useMemo(
-    () =>
-      buildPracticePoolSummary(state, settingsWords, practicePrefs, wordLists, { builtInWords }),
-    [state, settingsWords, practicePrefs, wordLists, builtInWords],
-  );
-  const automaticNewCards = dailyNewCardLimit(practicePrefs);
-  const automaticBonusNewCards = bonusNewCardLimit(practicePrefs);
-  const activeTypeCount = state.enabledTypes.length;
-
-  const isCustomMode = !typePacks.some((p) => [...p.typeIds].sort().join('|') === enabledKey);
-
-  const closestPackId = useMemo(() => {
-    if (!isCustomMode) return null;
-    let best = null,
-      bestSim = 0;
-    for (const pack of TYPE_PACKS) {
-      const sim = jaccardSim(state.enabledTypes, pack.typeIds);
-      if (sim > bestSim) {
-        bestSim = sim;
-        best = pack.id;
-      }
-    }
-    return bestSim > 0.1 ? best : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabledKey, isCustomMode]);
 
   return (
     <div className="space-y-4 text-left">
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-        <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Practice session</h3>
-        <div
-          className={`mb-4 border-y py-3 ${poolSummary.prompts ? 'border-stone-100 dark:border-stone-850' : 'border-amber-200 bg-amber-50/60 dark:bg-amber-955/20 -mx-2 px-2 rounded-xl'}`}
-        >
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <div className="text-xs uppercase tracking-wider text-stone-500 font-medium">
-              Question pool
-            </div>
-            {!poolSummary.prompts && (
-              <div className="text-xs text-amber-700 dark:text-amber-400">No available prompts</div>
-            )}
-          </div>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
-            {[
-              ['Prompts', poolSummary.prompts],
-              ['Words', poolSummary.words],
-              ['Forms', poolSummary.forms],
-              ['Due', poolSummary.due],
-              ['New', poolSummary.fresh],
-              ['Weak', poolSummary.weak],
-            ].map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <div className="text-lg font-semibold tabular-nums text-stone-800 dark:text-stone-200">
-                  {value}
-                </div>
-                <div className="text-[11px] text-stone-400">{label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div className="sm:col-span-2">
-            <label className="text-xs text-stone-500 block mb-1">Answer mode</label>
-            <div
-              role="group"
-              aria-label="Answer mode"
-              className="grid grid-cols-2 sm:grid-cols-4 gap-2"
-            >
-              {ANSWER_MODE_OPTIONS.map((o) => (
-                <button
-                  key={o.id}
-                  aria-pressed={answerMode === o.id}
-                  onClick={() => setPracticePrefs({ ...practicePrefs, answerMode: o.id })}
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    answerMode === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-xs text-stone-500 block mb-1">Review style</label>
-            <div role="group" aria-label="Review style" className="grid grid-cols-3 gap-2">
-              {REVIEW_STYLE_OPTIONS.map((o) => (
-                <button
-                  key={o.id}
-                  aria-pressed={reviewStyle === o.id}
-                  onClick={() =>
-                    setPracticePrefs({
-                      ...practicePrefs,
-                      reviewStyle: o.id,
-                    })
-                  }
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    reviewStyle === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            <div className="mt-2">
-              <p className="text-[11px] text-stone-400">
-                Auto keeps daily review seamless. Forms only sticks to production prompts. Reading
-                practice asks you to recover the dictionary form.
-              </p>
-            </div>
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-xs text-stone-500 block mb-1">Source forms</label>
-            <div role="group" aria-label="Source forms" className="grid grid-cols-2 gap-2">
-              {SOURCE_FORM_OPTIONS.map((o) => (
-                <button
-                  key={o.id}
-                  aria-pressed={sourceFormStrategy === o.id}
-                  onClick={() =>
-                    setPracticePrefs({
-                      ...practicePrefs,
-                      sourceFormStrategy: o.id,
-                      promptForm:
-                        o.id === 'mixed'
-                          ? 'random'
-                          : o.id === 'masu'
-                            ? 'polite-present'
-                            : 'dictionary',
-                    })
-                  }
-                  className={`px-3 py-2 rounded-lg text-sm border transition ${
-                    sourceFormStrategy === o.id
-                      ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">New cards/day</label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={practicePrefs.newCardsPerDay || 0}
-              onChange={(e) =>
-                setPracticePrefs({
-                  ...practicePrefs,
-                  newCardsPerDay: Math.max(0, Number(e.target.value) || 0),
-                })
-              }
-              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
-            />
-            <p className="text-[11px] text-stone-400 mt-1">
-              0 = Auto: {automaticNewCards}/day, then {automaticBonusNewCards} per bonus batch.
-            </p>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Daily goal</label>
-            <input
-              type="number"
-              min="1"
-              max="200"
-              value={practicePrefs.dailyGoal}
-              onChange={(e) =>
-                setPracticePrefs({
-                  ...practicePrefs,
-                  dailyGoal: Math.max(1, Number(e.target.value) || 30),
-                })
-              }
-              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
-            />
-          </div>
-        </div>
-      </div>
-
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
         <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Display & audio</h3>
         <div className="grid sm:grid-cols-2 gap-3">
@@ -538,7 +275,7 @@ export default function SettingsView() {
               ))}
             </div>
             <p className="text-[11px] text-stone-400 mt-1">
-              Hides group labels during review so identifying drop-る, row-shift, irregular, or
+              Hides group labels during practice so identifying drop-ru, row-shift, irregular, or
               adjective category stays part of the training.
             </p>
           </div>
@@ -629,155 +366,6 @@ export default function SettingsView() {
               </p>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-        <h3 className="font-medium mb-1 text-stone-850 dark:text-stone-200">
-          Conjugation types in scope
-        </h3>
-        <p className="text-xs text-stone-500 mb-4">
-          Choose a focused pack instead of managing dozens of individual forms.
-        </p>
-        <div
-          role="group"
-          aria-label="Conjugation type packs"
-          className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4"
-        >
-          {typePacks.map((pack) => {
-            const packKey = [...pack.typeIds].sort().join('|');
-            const active = packKey === enabledKey;
-            const isGhost = !active && isCustomMode && pack.id === closestPackId;
-            return (
-              <button
-                key={pack.id}
-                aria-pressed={active}
-                onClick={() => applyTypePack(pack.typeIds)}
-                className={`text-left rounded-xl border px-3 py-3 transition ${
-                  active
-                    ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900 text-stone-900 dark:text-stone-100'
-                    : isGhost
-                      ? 'bg-indigo-50/40 dark:bg-indigo-950/10 border-indigo-200/50 dark:border-indigo-900/30 text-stone-800 dark:text-stone-300 hover:bg-white dark:hover:bg-stone-900'
-                      : 'bg-stone-50 dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-800 dark:text-stone-300 hover:bg-white dark:hover:bg-stone-900 hover:border-indigo-200'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-medium text-stone-800 dark:text-stone-200">
-                    {pack.label}
-                  </div>
-                  <div
-                    className={`text-[11px] px-1.5 py-0.5 rounded-full ${active ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700'}`}
-                  >
-                    {pack.typeIds.length}
-                  </div>
-                </div>
-                <div className="text-xs text-stone-500 mt-1">{pack.hint}</div>
-              </button>
-            );
-          })}
-          <button
-            onClick={() => setShowCustom((v) => !v)}
-            aria-pressed={isCustomMode}
-            aria-expanded={showCustom}
-            aria-controls="settings-custom-forms"
-            className={`text-left rounded-xl border px-3 py-3 transition ${
-              isCustomMode
-                ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900 text-stone-900 dark:text-stone-100'
-                : 'bg-stone-50 dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-800 dark:text-stone-300 hover:bg-white dark:hover:bg-stone-900 hover:border-indigo-200'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-medium text-stone-800 dark:text-stone-200">Custom</div>
-              <div
-                className={`text-[11px] px-1.5 py-0.5 rounded-full ${isCustomMode ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-stone-800 text-stone-500 dark:text-stone-400 border border-stone-200 dark:border-stone-700'}`}
-              >
-                {state.enabledTypes.length}
-              </div>
-            </div>
-            <div className="text-xs text-stone-500 mt-1">Pick exactly which forms to drill.</div>
-          </button>
-        </div>
-        {showCustom && (
-          <div
-            id="settings-custom-forms"
-            className="mt-3 mb-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/30 dark:bg-indigo-950/10 overflow-y-auto max-h-[60vh]"
-          >
-            {FORM_GROUPS.map((group) => {
-              const enabledInGroup = group.typeIds.filter((id) => state.enabledTypes.includes(id));
-              const allEnabled = enabledInGroup.length === group.typeIds.length;
-              return (
-                <div
-                  key={group.id}
-                  className="border-b border-indigo-100 dark:border-indigo-900/50 last:border-b-0"
-                >
-                  <div className="flex items-center justify-between px-3 py-2 bg-indigo-50/60 dark:bg-indigo-950/20">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
-                      {group.label}
-                    </span>
-                    <button
-                      onClick={() => toggleGroup(group.typeIds, allEnabled)}
-                      className="text-[11px] px-2 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition"
-                    >
-                      {allEnabled ? 'None' : 'All'}
-                    </button>
-                  </div>
-                  <div className="divide-y divide-stone-100 dark:divide-stone-800/50">
-                    {group.typeIds.map((typeId) => {
-                      const form = ALL_CARD_TYPES.find((t) => t.id === typeId);
-                      if (!form) return null;
-                      const checked = state.enabledTypes.includes(typeId);
-                      return (
-                        <button
-                          key={typeId}
-                          aria-pressed={checked}
-                          onClick={() => toggleForm(typeId)}
-                          className="w-full text-left flex items-center gap-3 px-3 py-2 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/20 transition"
-                        >
-                          <div
-                            className={`w-4 h-4 rounded flex-shrink-0 border transition ${checked ? 'bg-indigo-600 border-indigo-600' : 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-600'}`}
-                          >
-                            {checked && (
-                              <svg
-                                aria-hidden="true"
-                                className="w-full h-full text-white p-0.5"
-                                viewBox="0 0 10 10"
-                                fill="none"
-                              >
-                                <path
-                                  d="M1.5 5l2.5 2.5 4.5-5"
-                                  stroke="currentColor"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-sm text-stone-800 dark:text-stone-200">
-                              {form.label}
-                            </div>
-                            {form.sub && (
-                              <div className="text-xs text-stone-500 dark:text-stone-400">
-                                {form.sub}
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2 text-xs text-stone-500 dark:text-stone-400">
-          Current mix:{' '}
-          <span className="font-semibold text-stone-700 dark:text-stone-200">
-            {activeTypeCount}
-          </span>{' '}
-          forms selected.
         </div>
       </div>
 

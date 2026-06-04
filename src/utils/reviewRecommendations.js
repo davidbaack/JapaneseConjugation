@@ -170,12 +170,12 @@ function onbinRecommendation(state, words, activeTool) {
   return makeRecommendation({
     id: 'lab-onbin-review',
     source: 'lab',
-    label: weak.length ? 'Review weak te/ta sound changes' : 'Review te/ta sound changes',
+    label: weak.length ? 'Practice weak te/ta sound changes' : 'Practice te/ta sound changes',
     detail: weak.length
       ? `${weak
           .slice(0, 2)
           .map((row) => row.key)
-          .join(', ')} need full recall in Reviews.`
+          .join(', ')} need full recall in Practice.`
       : 'Full recall for the sound-change patterns from Ending Lab.',
     wordKeys: selected.map(wordKey),
     typeIds,
@@ -205,13 +205,13 @@ function registerRecommendation(state, words, activeTool) {
   return makeRecommendation({
     id: 'lab-register-review',
     source: 'lab',
-    label: weak.length ? 'Review weak plain/polite switches' : 'Review plain/polite switches',
+    label: weak.length ? 'Practice weak plain/polite switches' : 'Practice plain/polite switches',
     detail: weak.length
       ? `${weak
           .slice(0, 2)
           .map((row) => row.key)
           .join(', ')} switches need full recall.`
-      : 'Move register-switch practice into full word-form Reviews.',
+      : 'Move register-switch practice into full word-form Practice.',
     wordKeys: selected.map(wordKey),
     typeIds,
     suggestedCount: suggestedCount(selected, typeIds, 10),
@@ -244,7 +244,7 @@ function classifyRecommendation(state, words, activeTool) {
   return makeRecommendation({
     id: 'lab-classify-review',
     source: 'lab',
-    label: weak.length ? 'Review weak conjugation groups' : 'Review group-aware foundations',
+    label: weak.length ? 'Practice weak conjugation groups' : 'Practice group-aware foundations',
     detail: weak.length
       ? `${weak
           .slice(0, 3)
@@ -273,11 +273,12 @@ function rushRecommendation(state, words, activeTool) {
   return makeRecommendation({
     id: 'lab-rush-review',
     source: 'lab',
-    label: weakTypes.length || weakWordKeys.size ? 'Review Rush misses' : 'Rush follow-up Reviews',
+    label:
+      weakTypes.length || weakWordKeys.size ? 'Practice Rush misses' : 'Rush follow-up Practice',
     detail:
       weakTypes.length || weakWordKeys.size
         ? 'Turn fast-drill misses into full recall scheduling.'
-        : 'A short Review set for forms that appear in Rush.',
+        : 'A short Practice set for forms that appear in Rush.',
     wordKeys: filled.map(wordKey),
     typeIds,
     suggestedCount: suggestedCount(filled, typeIds, 10),
@@ -321,7 +322,7 @@ export function buildLessonReviewRecommendation(lesson, words = [], options = {}
   return makeRecommendation({
     id: `lesson-${safeId(lesson?.groupId || lesson?.title || 'forms')}`,
     source: 'lesson',
-    label: `${lesson?.title || 'Lesson'} Reviews`,
+    label: `${lesson?.title || 'Lesson'} Practice`,
     detail: labels.length
       ? `Full recall for ${labels.join(', ')}${suffix}.`
       : 'Full recall for the forms in this lesson.',

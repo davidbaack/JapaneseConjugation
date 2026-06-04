@@ -1,0 +1,148 @@
+import { describe, expect, it } from 'vitest';
+import { DEFAULT_PREFS } from '../data/defaults.js';
+import { cardIdFor, DAY, defaultState, localDateKey, selectNext } from '../utils/storage.js';
+import {
+  defaultWeaknessState,
+  deriveWeaknessSubcategory,
+  rankedWeaknessLanes,
+  recordWeaknessAttempt,
+  weaknessScoreForCard,
+} from '../utils/subcategoryWeakness.js';
+
+const TABERU = {
+  dict: '\u98df\u3079\u308b',
+  reading: '\u305f\u3079\u308b',
+  meaning: 'to eat',
+  group: 'ichidan',
+};
+const KAKU = {
+  dict: '\u66f8\u304f',
+  reading: '\u304b\u304f',
+  meaning: 'to write',
+  group: 'godan',
+};
+const KIKU = {
+  dict: '\u805e\u304f',
+  reading: '\u304d\u304f',
+  meaning: 'to listen',
+  group: 'godan',
+};
+const YOMU = {
+  dict: '\u8aad\u3080',
+  reading: '\u3088\u3080',
+  meaning: 'to read',
+  group: 'godan',
+};
+const IKU = {
+  dict: '\u884c\u304f',
+  reading: '\u3044\u304f',
+  meaning: 'to go',
+  group: 'godan',
+};
+const SURU = {
+  dict: '\u3059\u308b',
+  reading: '\u3059\u308b',
+  meaning: 'to do',
+  group: 'suru',
+};
+
+function withMisses(weakness, word, typeId, count = 3) {
+  let next = weakness;
+  for (let i = 0; i < count; i += 1) {
+    next = recordWeaknessAttempt(next, {
+      word,
+      typeId,
+      correct: false,
+      responseMs: 9000,
+      now: Date.now() - i * 1000,
+    });
+  }
+  return next;
+}
+
+describe('subcategory weakness model', () => {
+  it('derives broad groups, irregulars, and te/ta godan sound-change buckets', () => {
+    expect(deriveWeaknessSubcategory(TABERU, 'plain-past').id).toBe('ichidan');
+    expect(deriveWeaknessSubcategory(SURU, 'te-form').id).toBe('suru');
+    expect(deriveWeaknessSubcategory(KAKU, 'te-form').id).toBe('godan-onbin-ku');
+    expect(deriveWeaknessSubcategory(YOMU, 'plain-past').id).toBe('godan-onbin-mnb');
+    expect(deriveWeaknessSubcategory(IKU, 'te-form').id).toBe('iku-exception');
+    expect(deriveWeaknessSubcategory(KAKU, 'plain-negative').id).toBe('godan');
+  });
+
+  it('records attempts and ranks weak type plus subcategory lanes', () => {
+    let weakness = defaultWeaknessState();
+    weakness = withMisses(weakness, KAKU, 'te-form', 2);
+    weakness = recordWeaknessAttempt(weakness, {
+      word: TABERU,
+      typeId: 'plain-past',
+      correct: true,
+      responseMs: 1200,
+      now: Date.now(),
+    });
+
+    const lanes = rankedWeaknessLanes(weakness);
+    expect(lanes[0].key).toBe('te-form|godan-onbin-ku');
+    expect(lanes[0].attempted).toBe(2);
+    expect(lanes[0].incorrect).toBe(2);
+    expect(lanes[0].score).toBeGreaterThan(weaknessScoreForCard(weakness, TABERU, 'plain-past'));
+  });
+
+  it('selects fresh related cards in a weak subcategory before unrelated cards', () => {
+    const weakness = withMisses(defaultWeaknessState(), KAKU, 'te-form', 3);
+    const state = { ...defaultState(), weakness };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU, KIKU, YOMU],
+      ['te-form'],
+      null,
+      DEFAULT_PREFS,
+      null,
+      { recentCardIds: [cardIdFor(KAKU, 'te-form')] },
+    );
+
+    expect(card.type).toBe('te-form');
+    expect(card.verb).toBe(KIKU);
+  });
+
+  it('rotates verbs within a weak lane instead of repeating the same verb', () => {
+    const weakness = withMisses(defaultWeaknessState(), KAKU, 'te-form', 3);
+    const state = { ...defaultState(), weakness };
+    const words = [KAKU, KIKU, YOMU];
+
+    const first = selectNext(state, words, ['te-form'], null, DEFAULT_PREFS);
+    const second = selectNext(state, words, ['te-form'], first.id, DEFAULT_PREFS, null, {
+      recentCardIds: [first.id],
+    });
+
+    expect(first.type).toBe('te-form');
+    expect(second.type).toBe('te-form');
+    expect(deriveWeaknessSubcategory(second.verb, second.type).id).toBe('godan-onbin-ku');
+    expect(second.verb.dict).not.toBe(first.verb.dict);
+  });
+
+  it('still prefers an actually ready card before filling with weak fresh lanes', () => {
+    const weakness = withMisses(defaultWeaknessState(), KAKU, 'te-form', 3);
+    const dueId = cardIdFor(TABERU, 'plain-past');
+    const state = {
+      ...defaultState(),
+      weakness,
+      cards: {
+        [dueId]: {
+          reps: 1,
+          interval: 1,
+          ease: 2.5,
+          nextReview: Date.now() - DAY,
+          correct: 1,
+          incorrect: 0,
+          introducedDate: localDateKey(-1),
+        },
+      },
+    };
+
+    const card = selectNext(state, [TABERU, KAKU, KIKU], ['plain-past', 'te-form']);
+
+    expect(card.id).toBe(dueId);
+  });
+});
