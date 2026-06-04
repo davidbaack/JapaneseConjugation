@@ -1,6 +1,6 @@
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { toHiragana, kanaToRomaji } from './romaji.js';
-import { conjugateItem, surfaceFormFor, isAdjective, wordKey } from './conjugator.js';
+import { conjugateItem, surfaceFormFor, isAdjective, wordKey, onbinStem } from './conjugator.js';
 import { CONJ_TYPES, ADJ_TYPES } from '../data/conjugationTypes.js';
 
 const RETIRED_REPAIR_DRILL_LIST_ID = 'repair-drill';
@@ -713,25 +713,183 @@ function choiceSeed(current, mode) {
   return `${mode}|${current.id}|${current.type}|${wordKey(current.verb)}`;
 }
 
-export function makeChoices(current, verbs) {
-  const expected = conjugateItem(current.verb, current.type);
+const CHOICE_COUNT = 4;
+const TE_CHOICE_TAILS = ['て', 'で', 'って', 'んで', 'いて', 'いで', 'して', 'きて'];
+const TA_CHOICE_TAILS = ['た', 'だ', 'った', 'んだ', 'いた', 'いだ', 'した', 'きた'];
+const CHOICE_SUFFIX_GROUPS = [
+  ['て', 'で', 'た', 'だ'],
+  ['って', 'った', 'んで', 'んだ', 'いて', 'いた', 'いで', 'いだ', 'して', 'した', 'きて', 'きた'],
+  ['ます', 'ました', 'ません', 'ませんでした', 'ましょう'],
+  ['ない', 'なかった', 'なければ', 'なくて', 'ないで', 'ずに'],
+  ['かった', 'くて', 'くない', 'くなかった', 'い'],
+  ['です', 'でした', 'ではありません', 'ではありませんでした', 'だった', 'ではなかった', 'で'],
+  ['たい', 'たくない', 'たかった', 'たくなかった', 'たいです', 'たくないです'],
+  ['る', 'ない', 'た', 'て'],
+];
+const FINAL_CHOICE_TAILS = [
+  'る',
+  'た',
+  'だ',
+  'て',
+  'で',
+  'ない',
+  'ます',
+  'ました',
+  'ません',
+  'かった',
+  'くて',
+];
+
+function kanaLength(value) {
+  return Array.from(value || '').length;
+}
+
+function commonHeadLength(a, b) {
+  const left = Array.from(a || '');
+  const right = Array.from(b || '');
+  const length = Math.min(left.length, right.length);
+  for (let i = 0; i < length; i++) {
+    if (left[i] !== right[i]) return i;
+  }
+  return length;
+}
+
+function nearChoiceLimit(expected, candidate) {
+  const maxLen = Math.max(kanaLength(expected), kanaLength(candidate));
+  return Math.max(2, Math.min(4, Math.ceil(maxLen * 0.35)));
+}
+
+function teTaChoiceStem(word, expected) {
+  const stem = onbinStem(word);
+  if (stem) return stem;
+  const masuStem = conjugateItem(word, 'masu-stem');
+  if (masuStem) return masuStem;
+  const chars = Array.from(expected || '');
+  return chars.slice(0, Math.max(0, chars.length - 1)).join('');
+}
+
+function addChoiceCandidate(candidates, seen, value, source, expected, seed, priority = 0) {
+  const candidate = String(value || '').normalize('NFKC');
+  if (!candidate || candidate === expected || seen.has(candidate)) return;
+  seen.add(candidate);
+  const distance = editDistance(candidate, expected);
+  const sourceRank =
+    {
+      sound: 0,
+      form: 1,
+      suffix: 2,
+      fallback: 3,
+    }[source] ?? 4;
+  candidates.push({
+    value: candidate,
+    rank:
+      sourceRank * 10000 +
+      distance * 100 +
+      priority * 10 +
+      Math.abs(kanaLength(candidate) - kanaLength(expected)) * 10 +
+      (hashString(`${seed}|${candidate}`) % 10),
+  });
+}
+
+function addTeTaChoiceCandidates(candidates, seen, word, expected, seed) {
+  const te = conjugateItem(word, 'te-form');
+  const past = conjugateItem(word, 'plain-past');
+  const bases = [
+    { form: te, tails: TE_CHOICE_TAILS },
+    { form: past, tails: TA_CHOICE_TAILS },
+  ];
+  const stem = teTaChoiceStem(word, expected);
+  const masuStem = conjugateItem(word, 'masu-stem');
+  for (const { form, tails } of bases) {
+    if (!form || !expected.startsWith(form)) continue;
+    const afterBase = expected.slice(form.length);
+    tails.forEach((tail, tailIndex) => {
+      addChoiceCandidate(
+        candidates,
+        seen,
+        stem + tail + afterBase,
+        'sound',
+        expected,
+        seed,
+        tailIndex,
+      );
+    });
+    [masuStem, word?.reading].forEach((head, headIndex) => {
+      if (!head) return;
+      tails.slice(0, 2).forEach((tail, tailIndex) => {
+        addChoiceCandidate(
+          candidates,
+          seen,
+          head + tail + afterBase,
+          'sound',
+          expected,
+          seed,
+          20 + headIndex * 2 + tailIndex,
+        );
+      });
+    });
+  }
+}
+
+function addSameWordFormCandidates(candidates, seen, current, expected, seed) {
   const types = isAdjective(current.verb) ? ADJ_TYPES : CONJ_TYPES;
+  for (const type of types) {
+    const candidate = conjugateItem(current.verb, type.id);
+    if (!candidate || candidate === expected) continue;
+    const distance = editDistance(candidate, expected);
+    const sharedHead = commonHeadLength(candidate, expected);
+    const sharesEnoughHead = sharedHead >= Math.min(2, kanaLength(expected));
+    if (sharesEnoughHead && distance <= nearChoiceLimit(expected, candidate)) {
+      addChoiceCandidate(candidates, seen, candidate, 'form', expected, seed);
+    }
+  }
+}
+
+function addSuffixChoiceCandidates(candidates, seen, expected, seed) {
+  for (const group of CHOICE_SUFFIX_GROUPS) {
+    const suffix = [...group]
+      .sort((a, b) => kanaLength(b) - kanaLength(a))
+      .find((item) => expected.endsWith(item));
+    if (!suffix) continue;
+    const head = expected.slice(0, expected.length - suffix.length);
+    if (!head) continue;
+    for (const alternate of group) {
+      addChoiceCandidate(candidates, seen, head + alternate, 'suffix', expected, seed);
+    }
+  }
+}
+
+function addFallbackChoiceCandidates(candidates, seen, expected, seed) {
+  const chars = Array.from(expected || '');
+  if (!chars.length) return;
+  const head = chars.slice(0, -1).join('');
+  for (const tail of FINAL_CHOICE_TAILS) {
+    addChoiceCandidate(candidates, seen, head + tail, 'fallback', expected, seed);
+  }
+  if (chars.length > 2) {
+    const shorterHead = chars.slice(0, -2).join('');
+    for (const tail of FINAL_CHOICE_TAILS.slice(0, 6)) {
+      addChoiceCandidate(candidates, seen, shorterHead + tail, 'fallback', expected, seed);
+    }
+  }
+}
+
+export function makeChoices(current, _verbs) {
+  const expected = conjugateItem(current.verb, current.type);
+  if (!expected) return [];
   const seed = choiceSeed(current, 'forward');
   const set = new Set([expected]);
-  for (const t of stableShuffled(types, `${seed}|types`)) {
-    const v = conjugateItem(current.verb, t.id);
-    if (v && v !== expected) set.add(v);
-    if (set.size >= 4) break;
+  const seen = new Set(set);
+  const candidates = [];
+  addTeTaChoiceCandidates(candidates, seen, current.verb, expected, seed);
+  addSameWordFormCandidates(candidates, seen, current, expected, seed);
+  addSuffixChoiceCandidates(candidates, seen, expected, seed);
+  addFallbackChoiceCandidates(candidates, seen, expected, seed);
+  for (const candidate of candidates.sort((a, b) => a.rank - b.rank)) {
+    set.add(candidate.value);
+    if (set.size >= CHOICE_COUNT) break;
   }
-  for (const v of stableShuffled(
-    verbs.filter((v) => v.group === current.verb.group),
-    `${seed}|words`,
-  )) {
-    const x = conjugateItem(v, current.type);
-    if (x && x !== expected) set.add(x);
-    if (set.size >= 4) break;
-  }
-  return stableShuffled([...set].slice(0, 4), `${seed}|answers`);
+  return stableShuffled([...set].slice(0, CHOICE_COUNT), `${seed}|answers`);
 }
 
 export function dictionaryAnswerMatches(raw, item) {

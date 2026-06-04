@@ -16,8 +16,14 @@ import {
   normalizeSentenceBlankForTarget,
   spokenAnswerResult,
 } from '../utils/display.js';
-import { filterWordsForPrefs } from '../utils/conjugator.js';
-import { STARTER_VERBS } from '../data/starterWords.js';
+import {
+  compatibleTypes,
+  conjugateItem,
+  filterWordsForPrefs,
+  onbinStem,
+  surfaceStemPair,
+} from '../utils/conjugator.js';
+import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
 
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
 const TAKAI = { dict: '高い', reading: 'たかい', meaning: 'expensive', group: 'i-adjective' };
@@ -229,6 +235,125 @@ describe('answerPhaseTaskDetails', () => {
 });
 
 describe('answer mode choices', () => {
+  const byReading = (items, reading) => items.find((item) => item.reading === reading);
+  const cardFor = (word, type) => ({ id: `${word.group}|${type}`, verb: word, type });
+  const teTaTails = [
+    '\u3066',
+    '\u3067',
+    '\u3063\u3066',
+    '\u3093\u3067',
+    '\u3044\u3066',
+    '\u3044\u3067',
+    '\u3057\u3066',
+    '\u304d\u3066',
+    '\u305f',
+    '\u3060',
+    '\u3063\u305f',
+    '\u3093\u3060',
+    '\u3044\u305f',
+    '\u3044\u3060',
+    '\u3057\u305f',
+    '\u304d\u305f',
+  ];
+  const suffixFamilies = [
+    ['\u3066', '\u3067', '\u305f', '\u3060'],
+    [
+      '\u3063\u3066',
+      '\u3063\u305f',
+      '\u3093\u3067',
+      '\u3093\u3060',
+      '\u3044\u3066',
+      '\u3044\u305f',
+      '\u3044\u3067',
+      '\u3044\u3060',
+      '\u3057\u3066',
+      '\u3057\u305f',
+      '\u304d\u3066',
+      '\u304d\u305f',
+    ],
+    [
+      '\u307e\u3059',
+      '\u307e\u3057\u305f',
+      '\u307e\u305b\u3093',
+      '\u307e\u305b\u3093\u3067\u3057\u305f',
+      '\u307e\u3057\u3087\u3046',
+    ],
+    [
+      '\u306a\u3044',
+      '\u306a\u304b\u3063\u305f',
+      '\u306a\u3051\u308c\u3070',
+      '\u306a\u304f\u3066',
+      '\u306a\u3044\u3067',
+      '\u305a\u306b',
+    ],
+    [
+      '\u304b\u3063\u305f',
+      '\u304f\u3066',
+      '\u304f\u306a\u3044',
+      '\u304f\u306a\u304b\u3063\u305f',
+      '\u3044',
+    ],
+    [
+      '\u3067\u3059',
+      '\u3067\u3057\u305f',
+      '\u3067\u306f\u3042\u308a\u307e\u305b\u3093',
+      '\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3067\u3057\u305f',
+      '\u3060\u3063\u305f',
+      '\u3067\u306f\u306a\u304b\u3063\u305f',
+      '\u3067',
+    ],
+  ];
+
+  function isCloseChoice(expected, choice) {
+    const maxLen = Math.max(Array.from(expected).length, Array.from(choice).length);
+    const limit = Math.max(2, Math.min(4, Math.ceil(maxLen * 0.35)));
+    return editDistance(choice, expected) <= limit;
+  }
+
+  function isStemPreservingChoice(word, expected, choice) {
+    const { readingStem } = surfaceStemPair(word);
+    const stems = [
+      readingStem,
+      conjugateItem(word, 'masu-stem'),
+      word.reading?.slice(0, -1),
+      onbinStem(word),
+    ].filter((stem) => stem && Array.from(stem).length > 0);
+    return stems.some((stem) => expected.startsWith(stem) && choice.startsWith(stem));
+  }
+
+  function isApprovedTeTaChoice(word, expected, choice) {
+    const te = conjugateItem(word, 'te-form');
+    const past = conjugateItem(word, 'plain-past');
+    if (!((te && expected.startsWith(te)) || (past && expected.startsWith(past)))) return false;
+    return (
+      isStemPreservingChoice(word, expected, choice) &&
+      teTaTails.some((tail) => choice.includes(tail))
+    );
+  }
+
+  function isNearbySameWordForm(word, expected, choice) {
+    return (
+      editDistance(choice, expected) <= 3 &&
+      compatibleTypes(word).some((type) => conjugateItem(word, type.id) === choice)
+    );
+  }
+
+  function isSuffixFamilyChoice(expected, choice) {
+    for (const family of suffixFamilies) {
+      const expectedSuffix = [...family]
+        .sort((a, b) => Array.from(b).length - Array.from(a).length)
+        .find((suffix) => expected.endsWith(suffix));
+      const choiceSuffix = [...family]
+        .sort((a, b) => Array.from(b).length - Array.from(a).length)
+        .find((suffix) => choice.endsWith(suffix));
+      if (!expectedSuffix || !choiceSuffix) continue;
+      const expectedHead = expected.slice(0, expected.length - expectedSuffix.length);
+      const choiceHead = choice.slice(0, choice.length - choiceSuffix.length);
+      if (expectedHead && expectedHead === choiceHead) return true;
+    }
+    return false;
+  }
+
   const current = {
     id: 'ichidan|plain-past',
     verb: STARTER_VERBS[0],
@@ -240,6 +365,73 @@ describe('answer mode choices', () => {
     expect(first).toHaveLength(4);
     for (let i = 0; i < 20; i++) {
       expect(makeChoices(current, STARTER_VERBS)).toEqual(first);
+    }
+  });
+
+  it('keeps godan te-form choices close to the intended answer', () => {
+    const nomu = byReading(STARTER_VERBS, '\u306e\u3080');
+    const choices = makeChoices(cardFor(nomu, 'te-form'), STARTER_VERBS);
+    expect(choices).toHaveLength(4);
+    expect(choices).toContain('\u306e\u3093\u3067');
+    expect(choices).toContain('\u306e\u3066');
+    expect(choices).not.toContain('\u306e\u307e\u306a\u3051\u308c\u3070');
+    expect(choices).not.toContain('\u306e\u307e\u305b\u306a\u3051\u308c\u3070');
+    expect(choices).not.toContain('\u306e\u307f\u307e\u3057\u305f');
+  });
+
+  it('uses plausible same-word variants for common te/ta sound-change cards', () => {
+    const cases = [
+      [byReading(STARTER_VERBS, '\u306e\u3080'), 'plain-past'],
+      [byReading(STARTER_VERBS, '\u304b\u304f'), 'te-form'],
+      [byReading(STARTER_VERBS, '\u307e\u3064'), 'te-form'],
+      [byReading(STARTER_VERBS, '\u3044\u304f'), 'te-form'],
+    ];
+    for (const [word, type] of cases) {
+      const expected = conjugateItem(word, type);
+      const choices = makeChoices(cardFor(word, type), STARTER_VERBS);
+      expect(choices).toHaveLength(4);
+      expect(choices).toContain(expected);
+      for (const choice of choices.filter((item) => item !== expected)) {
+        expect(
+          isCloseChoice(expected, choice) ||
+            isStemPreservingChoice(word, expected, choice) ||
+            isNearbySameWordForm(word, expected, choice) ||
+            isSuffixFamilyChoice(expected, choice) ||
+            isApprovedTeTaChoice(word, expected, choice),
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('covers representative verbs and adjectives with deterministic plausible choices', () => {
+    const representativeWords = [
+      byReading(STARTER_VERBS, '\u305f\u3079\u308b'),
+      byReading(STARTER_VERBS, '\u306e\u3080'),
+      byReading(STARTER_VERBS, '\u3059\u308b'),
+      byReading(STARTER_VERBS, '\u304f\u308b'),
+      byReading(STARTER_ADJECTIVES, '\u305f\u304b\u3044'),
+      byReading(STARTER_ADJECTIVES, '\u3057\u305a\u304b'),
+    ];
+
+    for (const word of representativeWords) {
+      for (const type of compatibleTypes(word)) {
+        const expected = conjugateItem(word, type.id);
+        if (!expected) continue;
+        const currentCard = cardFor(word, type.id);
+        const choices = makeChoices(currentCard, STARTER_VERBS);
+        expect(choices).toHaveLength(4);
+        expect(choices).toContain(expected);
+        expect(makeChoices(currentCard, STARTER_VERBS)).toEqual(choices);
+        for (const choice of choices.filter((item) => item !== expected)) {
+          expect(
+            isCloseChoice(expected, choice) ||
+              isStemPreservingChoice(word, expected, choice) ||
+              isNearbySameWordForm(word, expected, choice) ||
+              isSuffixFamilyChoice(expected, choice) ||
+              isApprovedTeTaChoice(word, expected, choice),
+          ).toBe(true);
+        }
+      }
     }
   });
 
