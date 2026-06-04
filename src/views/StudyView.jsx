@@ -1868,7 +1868,7 @@ export default function StudyView() {
     liveWrongIndex >= 0
       ? liveCells[liveWrongIndex].state === 'extra'
         ? 'Extra kana after the answer.'
-        : `Kana ${liveWrongIndex + 1} does not match yet.`
+        : `Expected ${liveCells[liveWrongIndex].expected} at kana ${liveWrongIndex + 1}.`
       : preview === expected
         ? 'Complete match. Press Enter.'
         : '';
@@ -3708,11 +3708,15 @@ export default function StudyView() {
                       )}
                     </div>
                     <div className="flex-1">
-                      <div
-                        className={`text-sm font-medium ${wasCorrect ? 'text-emerald-800 dark:text-emerald-300' : wasCorrected ? 'text-amber-800 dark:text-amber-300' : 'text-rose-800'}`}
+                      <h3
+                        className={`text-sm font-semibold ${wasCorrect ? 'text-emerald-800 dark:text-emerald-300' : wasCorrected ? 'text-amber-800 dark:text-amber-300' : 'text-rose-800 dark:text-rose-300'}`}
                       >
-                        {wasCorrect ? 'Correct!' : wasCorrected ? 'Self-corrected.' : 'Not quite.'}
-                      </div>
+                        {wasCorrect
+                          ? 'Correct!'
+                          : wasCorrected
+                            ? 'Self-corrected.'
+                            : 'Review this form.'}
+                      </h3>
                       {wasCorrected && (
                         <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                           You fixed it mid-type, but the mistake still counts.
@@ -4079,15 +4083,27 @@ export default function StudyView() {
                     </div>
                   )}
 
-                  <StickyAction className="mt-3">
-                    <button
-                      ref={nextButtonRef}
-                      onClick={() => submit()}
-                      className="w-full py-2.5 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl font-medium shadow-lg transition"
-                    >
-                      Next (Enter)
-                    </button>
-                  </StickyAction>
+                  {wasCorrect ? (
+                    <StickyAction className="mt-3">
+                      <button
+                        ref={nextButtonRef}
+                        onClick={() => submit()}
+                        className="w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-lg transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150"
+                      >
+                        Next (Enter)
+                      </button>
+                    </StickyAction>
+                  ) : (
+                    <div className="mt-4">
+                      <button
+                        ref={nextButtonRef}
+                        onClick={() => submit()}
+                        className="w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-sm transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150"
+                      >
+                        Next (Enter)
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

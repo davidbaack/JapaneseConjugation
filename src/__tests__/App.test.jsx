@@ -266,7 +266,10 @@ describe('App shell', () => {
     fireEvent.change(input, { target: { value: 'zzz' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
 
-    await screen.findAllByText('Not quite.', {}, { timeout: 5000 });
+    const verdictStatus = await screen.findAllByText('Not quite.', {}, { timeout: 5000 });
+    expect(verdictStatus).toHaveLength(1);
+    expect(screen.getByText('Review this form.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Next (Enter)' }).closest('.sticky')).toBeNull();
     expect(screen.getByText(/Rule:/)).toBeTruthy();
     expect(screen.getByText('Full rule path').closest('details')?.hasAttribute('open')).toBe(false);
     expect(screen.queryByText('Gemini is not configured for AI chat.')).toBeNull();

@@ -719,14 +719,14 @@ describe('StudyView daily startup guards', () => {
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: 'たべ' } });
     await waitFor(() => expect(input.value).toBe('たべ'));
-    expect(screen.queryByText('Kana 2 does not match yet.')).toBeNull();
+    expect(screen.queryByText('Expected \u3079 at kana 2.')).toBeNull();
 
     fireEvent.change(input, { target: { value: 'たなこ' } });
-    await waitFor(() => expect(screen.getByText('Kana 2 does not match yet.')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Expected \u3079 at kana 2.')).toBeTruthy());
     expect(input.className).toContain('border-rose-400');
 
     fireEvent.change(input, { target: { value: 'たべ' } });
-    await waitFor(() => expect(screen.queryByText('Kana 2 does not match yet.')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('Expected \u3079 at kana 2.')).toBeNull());
     expect(input.className).not.toContain('border-rose-400');
   });
 
@@ -752,7 +752,7 @@ describe('StudyView daily startup guards', () => {
       fireEvent.change(input, { target: { value: 'zzzz' } });
       fireEvent.keyDown(input, { key: 'Enter' });
 
-      await waitFor(() => expect(screen.getAllByText('Not quite.').length).toBeGreaterThan(0));
+      await waitFor(() => expect(screen.getByText('Review this form.')).toBeTruthy());
       await waitFor(() => expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true }));
     } finally {
       window.HTMLButtonElement.prototype.focus = originalFocus;
