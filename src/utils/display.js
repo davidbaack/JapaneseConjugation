@@ -3,6 +3,8 @@ import { toHiragana, kanaToRomaji } from './romaji.js';
 import { conjugateItem, surfaceFormFor, isAdjective, wordKey } from './conjugator.js';
 import { CONJ_TYPES, ADJ_TYPES } from '../data/conjugationTypes.js';
 
+const RETIRED_REPAIR_DRILL_LIST_ID = 'repair-drill';
+
 export function resolveDisplayScripts(prefs = DEFAULT_PREFS) {
   const ds = prefs.displayScripts;
   if (ds && (ds.kanji || ds.kana || ds.romaji)) {
@@ -66,12 +68,31 @@ export function mergePracticePrefs(prefs) {
   delete source.aiGuideTone;
   delete source.drillMode;
   delete source.drillDirection;
-  const reviewLimitSource = ['repair', 'lab', 'recommendation'].includes(source.reviewLimitSource)
+  const reviewLimitSource = ['lab', 'recommendation'].includes(source.reviewLimitSource)
     ? source.reviewLimitSource
     : '';
   const rawReviewLimit = Number(source.reviewLimit || 0);
   const reviewLimit =
     reviewLimitSource && Number.isFinite(rawReviewLimit) && rawReviewLimit > 0 ? rawReviewLimit : 0;
+  const wordListIds = Array.isArray(source.wordListIds)
+    ? source.wordListIds.filter((id) => id && id !== RETIRED_REPAIR_DRILL_LIST_ID)
+    : DEFAULT_PREFS.wordListIds;
+  const minimalPairReturn =
+    source.minimalPairReturn && typeof source.minimalPairReturn === 'object'
+      ? (() => {
+          const saved = { ...source.minimalPairReturn };
+          if (saved.reviewLimitSource === 'repair') {
+            saved.reviewLimitSource = '';
+            saved.reviewLimit = 0;
+          }
+          if (Array.isArray(saved.wordListIds)) {
+            saved.wordListIds = saved.wordListIds.filter(
+              (id) => id && id !== RETIRED_REPAIR_DRILL_LIST_ID,
+            );
+          }
+          return saved;
+        })()
+      : DEFAULT_PREFS.minimalPairReturn;
   const displayScripts = source.displayScripts
     ? { ...DEFAULT_PREFS.displayScripts, ...source.displayScripts }
     : resolveDisplayScripts(source);
@@ -102,6 +123,8 @@ export function mergePracticePrefs(prefs) {
           ? 'polite-present'
           : 'dictionary',
     wordGroups,
+    wordListIds,
+    minimalPairReturn,
     reviewLimit,
     reviewLimitSource,
   };

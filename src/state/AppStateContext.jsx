@@ -14,6 +14,7 @@ import {
   saveAll,
   pruneAICache,
   localDateKey,
+  normalizeWordLists,
 } from '../utils/storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { getJapaneseVoices } from '../utils/speech.js';
@@ -93,7 +94,7 @@ function useAppController() {
     if (payload.state) setState(mergeState(payload.state, { reviewed: 0, correct: 0 }));
     if (Array.isArray(payload.customVerbs)) setCustomVerbs(payload.customVerbs);
     if (Array.isArray(payload.customAdjectives)) setCustomAdjectives(payload.customAdjectives);
-    if (Array.isArray(payload.wordLists)) setWordLists(payload.wordLists);
+    if (Array.isArray(payload.wordLists)) setWordLists(normalizeWordLists(payload.wordLists));
     if (payload.practicePrefs) setPracticePrefs(mergePracticePrefs(payload.practicePrefs));
   }
 
@@ -103,7 +104,7 @@ function useAppController() {
     setState(payload.state || defaultState());
     setCustomVerbs(Array.isArray(payload.customVerbs) ? payload.customVerbs : []);
     setCustomAdjectives(Array.isArray(payload.customAdjectives) ? payload.customAdjectives : []);
-    setWordLists(Array.isArray(payload.wordLists) ? payload.wordLists : []);
+    setWordLists(normalizeWordLists(payload.wordLists));
     setPracticePrefs(mergePracticePrefs(payload.practicePrefs));
     setStudyFocus(null);
     setLabFocus(null);
@@ -139,7 +140,7 @@ function useAppController() {
       if (local.state) setState(mergeState(local.state, { reviewed: 0, correct: 0 }));
       if (Array.isArray(local.customVerbs)) setCustomVerbs(local.customVerbs);
       if (Array.isArray(local.customAdjectives)) setCustomAdjectives(local.customAdjectives);
-      if (Array.isArray(local.wordLists)) setWordLists(local.wordLists);
+      if (Array.isArray(local.wordLists)) setWordLists(normalizeWordLists(local.wordLists));
       if (local.practicePrefs) setPracticePrefs(mergePracticePrefs(local.practicePrefs));
       if (typeof local.lastSyncedAt === 'number') lastSyncedAtRef.current = local.lastSyncedAt;
     }

@@ -5,6 +5,7 @@ import {
   bumpDaily,
   recordMistake,
   markMistakeResolved,
+  normalizeWordLists,
   localDateKey,
   mergeState,
   mergeCloudState,
@@ -339,6 +340,18 @@ describe('markMistakeResolved', () => {
     mistakes = markMistakeResolved(mistakes, keyToResolve);
     expect(mistakes[0].resolved).toBe(true);
     expect(mistakes[1].resolved).toBe(false);
+  });
+});
+
+describe('normalizeWordLists', () => {
+  it('drops retired repair drill lists without touching learner lists', () => {
+    expect(
+      normalizeWordLists([
+        null,
+        { id: 'repair-drill', name: 'Repair', wordKeys: ['ichidan:\u98df\u3079\u308b'] },
+        { id: 'learner-list', name: 'Learner List', wordKeys: ['godan:\u66f8\u304f'] },
+      ]),
+    ).toEqual([{ id: 'learner-list', name: 'Learner List', wordKeys: ['godan:\u66f8\u304f'] }]);
   });
 });
 
@@ -782,6 +795,30 @@ describe('word-form SRS selection', () => {
     const card = selectNext(state, [TABERU, KAKU], ['plain-past'], null, DEFAULT_PREFS);
     expect(card.id).toBe(dueCardId);
     expect(card.type).toBe('plain-past');
+    expect(card.verb).toBe(TABERU);
+  });
+
+  it('surfaces retryQueue cards before fresh fallback until they are cleared', () => {
+    const retryCardId = cardIdFor(TABERU, 'plain-past');
+    const state = {
+      ...defaultState(),
+      retryQueue: [retryCardId],
+      cards: {
+        [retryCardId]: {
+          reps: 0,
+          interval: 0,
+          ease: 2.3,
+          nextReview: Date.now() + DAY,
+          correct: 0,
+          incorrect: 1,
+          lastSeen: 1,
+        },
+      },
+    };
+
+    const card = selectNext(state, [TABERU, KAKU], ['plain-past'], null, DEFAULT_PREFS);
+
+    expect(card.id).toBe(retryCardId);
     expect(card.verb).toBe(TABERU);
   });
 

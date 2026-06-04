@@ -16,27 +16,25 @@ afterEach(() => {
   cleanup();
 });
 
-// Minimal props to render the dashboard's Form-families card. retestCount forces
-// `hasHistory`, so the prioritized nudge renders; the routing handlers are spies
-// so each test can assert exactly which Lab tool (or generic drill) was summoned.
+// Minimal props to render the dashboard's Form-families card. A prior daily rep
+// forces `hasHistory`, so the prioritized nudge renders; the routing handlers
+// are spies so each test can assert exactly which Lab tool was summoned.
 function renderDashboard(overrides = {}) {
   const handlers = {
     onStart: vi.fn(),
     onStartRecommendation: vi.fn(),
-    onRetestMisses: vi.fn(),
     onDrillReadiness: vi.fn(),
     onDrillEndingLab: vi.fn(),
     onDrillClassify: vi.fn(),
     onDrillRush: vi.fn(),
   };
   const props = {
-    daily: { count: 0, goalStreak: 0 },
+    daily: { count: 1, goalStreak: 0 },
     practicePrefs: DEFAULT_PREFS,
     srsQueue: { dueRuleIds: [], completedDueRuleIds: [] },
     state: defaultState(),
     todayPlan: { available: true },
     todayDrillActive: false,
-    retestCount: 1,
     readinessFamilies: [],
     weakestSkill: null,
     onbinWeakness: false,

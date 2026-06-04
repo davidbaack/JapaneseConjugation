@@ -228,9 +228,8 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    const routeButton = await screen.findByRole('button', {
-      name: 'Wrong verb group -> Groups',
-    });
+    const routeButton = await screen.findByRole('button', { name: /mixing up/i });
+    expect(routeButton.textContent).toMatch(/verb groups/i);
     fireEvent.click(routeButton);
 
     expect(openLabTool).toHaveBeenCalledWith('classify');
@@ -271,22 +270,21 @@ describe('StudyView daily startup guards', () => {
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
-  it('does not auto-start today over a repair drill', async () => {
+  it('treats stale repair launch prefs as normal dashboard state', async () => {
     const app = makeApp({
       practicePrefs: {
         ...DEFAULT_PREFS,
         reviewLimit: 10,
         reviewLimitSource: 'repair',
+        wordListIds: ['repair-drill'],
       },
     });
     mockedApp.value = app;
 
     render(<StudyView />);
 
-    // A repair drill bypasses the dashboard and drills immediately; it must
-    // not dead-end on the empty state, nor hand off to the today drill.
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    expect(screen.queryByText('No cards available')).toBeNull();
+    expect(await screen.findByRole('region', { name: 'Reviews dashboard' })).toBeTruthy();
+    expect(screen.queryByPlaceholderText(/Type romaji or kana/i)).toBeNull();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
@@ -380,6 +378,37 @@ describe('StudyView daily startup guards', () => {
     expect(screen.getByText(englishForForm(target, type))).toBeTruthy();
   });
 
+  it('resolves a matching missed form after a clean correct Review', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const expected = conjugateItem(target, type);
+    const setState = vi.fn();
+    const state = {
+      ...defaultState(),
+      mistakes: recordMistake([], target, type, 'polite-present', 'wrong', expected),
+    };
+    mockedApp.value = makeApp({
+      state,
+      setState,
+      allWords: [target],
+    });
+
+    render(<StudyView />);
+
+    await startReviewsFromDashboard();
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: expected } });
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    const nextState = setState.mock.calls
+      .map(([arg]) => arg)
+      .find((arg) => arg && Array.isArray(arg.mistakes));
+    expect(nextState.mistakes[0]).toMatchObject({
+      key: state.mistakes[0].key,
+      resolved: true,
+    });
+  });
+
   it('ignores a persisted card when its form is no longer enabled', async () => {
     sessionStorage.setItem(
       'jp-study-current',
@@ -471,22 +500,23 @@ describe('StudyView daily startup guards', () => {
   });
 
   it('auto-selects a card for a persisted special launch instead of dead-ending', async () => {
-    // A repair drill (reviewLimitSource === 'repair') bypasses the dashboard.
+    // Recommendation launches use the bounded review special-launch machinery.
     // On a fresh load dashboardOpen is true and there is no studyFocus, so the
-    // selection effect must still run for the special launch — otherwise the
+    // selection effect must still run for the special launch; otherwise the
     // dashboard is hidden, no card is chosen, and Reviews shows "No cards
-    // available." Regression guard for that deadlock.
+    // available." Regression guard for that shared path.
     const target = STARTER_VERBS[0];
+    const listId = 'list-review-rec-test';
     mockedApp.value = makeApp({
       state: defaultState(),
       allWords: [target],
-      wordLists: [{ id: 'repair-drill', name: 'Repair', wordKeys: [wordKey(target)] }],
+      wordLists: [{ id: listId, name: 'Recommended reviews', wordKeys: [wordKey(target)] }],
       practicePrefs: {
         ...DEFAULT_PREFS,
         englishHints: 'show',
-        reviewLimitSource: 'repair',
+        reviewLimitSource: 'recommendation',
         reviewLimit: 10,
-        wordListIds: ['repair-drill'],
+        wordListIds: [listId],
       },
     });
 

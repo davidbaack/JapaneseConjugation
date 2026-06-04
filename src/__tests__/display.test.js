@@ -447,15 +447,42 @@ describe('mergePracticePrefs', () => {
       reviewLimit: 0,
       reviewLimitSource: '',
     });
-    expect(mergePracticePrefs({ reviewLimit: 10, reviewLimitSource: 'repair' })).toMatchObject({
-      reviewLimit: 10,
-      reviewLimitSource: 'repair',
+    expect(
+      mergePracticePrefs({
+        reviewLimit: 10,
+        reviewLimitSource: 'repair',
+        wordListIds: ['repair-drill', 'learner-list'],
+      }),
+    ).toMatchObject({
+      reviewLimit: 0,
+      reviewLimitSource: '',
+      wordListIds: ['learner-list'],
+    });
+    expect(mergePracticePrefs({ reviewLimit: 6, reviewLimitSource: 'lab' })).toMatchObject({
+      reviewLimit: 6,
+      reviewLimitSource: 'lab',
     });
     expect(
       mergePracticePrefs({ reviewLimit: 8, reviewLimitSource: 'recommendation' }),
     ).toMatchObject({
       reviewLimit: 8,
       reviewLimitSource: 'recommendation',
+    });
+  });
+
+  it('strips retired repair state from minimal-pair return prefs', () => {
+    expect(
+      mergePracticePrefs({
+        minimalPairReturn: {
+          reviewLimitSource: 'repair',
+          reviewLimit: 10,
+          wordListIds: ['repair-drill', 'list-review-rec-1'],
+        },
+      }).minimalPairReturn,
+    ).toMatchObject({
+      reviewLimitSource: '',
+      reviewLimit: 0,
+      wordListIds: ['list-review-rec-1'],
     });
   });
 
