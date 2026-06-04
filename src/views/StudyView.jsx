@@ -66,6 +66,7 @@ import {
   typoGuardForAnswer,
   spokenAnswerResult,
 } from '../utils/display.js';
+import { sentenceDisplay } from '../utils/sentenceDisplay.js';
 import {
   aggregateDiagnosedMistakes,
   buildRepairDrillPlan,
@@ -1249,6 +1250,10 @@ export default function StudyView() {
       return null;
     }
   }, [current, sentenceMode, reverseDrill, listeningPrompt, minimalPairSetForCurrent]);
+  const clozePromptView = useMemo(
+    () => (clozePrompt ? sentenceDisplay(clozePrompt.sentence, practicePrefs) : null),
+    [clozePrompt, practicePrefs],
+  );
 
   useLayoutEffect(() => {
     if (!hydrated) return;
@@ -2984,12 +2989,12 @@ export default function StudyView() {
               <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
                 Sentence
               </div>
-              <div
+              <ScriptDisplay
+                view={clozePromptView}
                 className="mt-1 text-lg leading-relaxed text-stone-900 dark:text-stone-100"
-                lang="ja"
-              >
-                {clozePrompt.sentence}
-              </div>
+                subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
+                colorHighlight={false}
+              />
               {clozePrompt.cue && (
                 <div className="mt-1.5 text-[11px] leading-snug text-indigo-700/80 dark:text-indigo-300/80">
                   {clozePrompt.cue}

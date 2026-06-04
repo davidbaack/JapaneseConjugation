@@ -12,6 +12,28 @@ export default function ScriptDisplay({
   if (!view) return null;
   const isJpn = view.lang !== 'en';
 
+  if (Array.isArray(view.parts) && view.parts.length) {
+    return (
+      <>
+        <div className={className} lang={view.lang}>
+          {view.parts.map((part, index) =>
+            part.ruby ? (
+              <ruby key={`${part.text}:${index}`}>
+                {part.text}
+                <rt className="text-[10px] font-medium text-stone-500 dark:text-stone-300">
+                  {part.ruby}
+                </rt>
+              </ruby>
+            ) : (
+              <React.Fragment key={`${part.text}:${index}`}>{part.text}</React.Fragment>
+            ),
+          )}
+        </div>
+        {view.sub && <div className={subClassName}>{view.sub}</div>}
+      </>
+    );
+  }
+
   if (colorHighlight && isJpn && word && type) {
     const mainParts = getConjugationParts(word, type, view.main);
     const rubyParts = view.ruby ? getConjugationParts(word, type, view.ruby) : null;
