@@ -45,6 +45,8 @@ describe('App shell', () => {
     // returning-user signals until there is history to show.
     expect(screen.getByText('Begin with practical forms.')).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
+    expect(screen.getByText('Enabled form scope')).toBeTruthy();
+    expect(screen.queryByText('Forms in this workout')).toBeNull();
     expect(screen.queryByText('Next workout')).toBeNull();
     expect(screen.queryByText('Form families')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();
@@ -120,6 +122,8 @@ describe('App shell', () => {
     expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
     fireEvent.click(screen.getByText('Te-form & Stem'));
 
+    expect(screen.getByText('2/2 enabled')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Disable all Te-form & Stem forms' })).toBeTruthy();
     expect(screen.getByText('Recent weak spots')).toBeTruthy();
     expect(screen.getByText('Te-form - Godan ku sound changes')).toBeTruthy();
     expect(screen.getByText('0/2')).toBeTruthy();
