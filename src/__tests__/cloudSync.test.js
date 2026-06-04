@@ -315,6 +315,47 @@ describe('mergeSyncPayload', () => {
     expect(offLocal.practicePrefs.kanaAssist).toBe('off');
     expect(offLocal.practicePrefs).not.toHaveProperty('kanaMatchDisplay');
   });
+
+  it('strips retired repair drill sync state without dropping recommendation launches', () => {
+    const merged = mergeSyncPayload(
+      {
+        wordLists: [
+          { id: 'repair-drill', name: 'Repair', wordKeys: ['ichidan:\u98df\u3079\u308b'] },
+          { id: 'learner-list', name: 'Learner List', wordKeys: ['godan:\u66f8\u304f'] },
+        ],
+        practicePrefs: {
+          ...DEFAULT_PREFS,
+          reviewLimitSource: 'repair',
+          reviewLimit: 10,
+          wordListIds: ['repair-drill'],
+        },
+      },
+      {
+        wordLists: [
+          { id: 'repair-drill', name: 'Repair', wordKeys: ['godan:\u66f8\u304f'] },
+          {
+            id: 'list-review-rec-cloud',
+            name: 'Recommended reviews',
+            wordKeys: ['godan:\u66f8\u304f'],
+          },
+        ],
+        practicePrefs: {
+          ...DEFAULT_PREFS,
+          reviewLimitSource: 'recommendation',
+          reviewLimit: 8,
+          wordListIds: ['list-review-rec-cloud'],
+        },
+      },
+    );
+
+    expect(merged.wordLists.map((list) => list.id)).toEqual([
+      'list-review-rec-cloud',
+      'learner-list',
+    ]);
+    expect(merged.practicePrefs.reviewLimitSource).toBe('recommendation');
+    expect(merged.practicePrefs.reviewLimit).toBe(8);
+    expect(merged.practicePrefs.wordListIds).toEqual(['list-review-rec-cloud']);
+  });
 });
 
 describe('when Supabase is not configured', () => {

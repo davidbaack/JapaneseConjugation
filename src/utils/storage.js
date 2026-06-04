@@ -45,6 +45,7 @@ const LEGACY_PREINTRO_DEFAULT_TYPE_IDS = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
 const LEGACY_VERB_PREINTRO_DEFAULT_TYPE_IDS = LEGACY_VERB_DEFAULT_TYPE_IDS.filter(
   (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
 );
+const RETIRED_REPAIR_DRILL_LIST_ID = 'repair-drill';
 
 function sameIdSet(ids, targetIds) {
   const uniqueIds = [...new Set(ids || [])];
@@ -116,11 +117,23 @@ function wordPriority(word, wordLists = []) {
   return listBoost + Math.min(genki, minna) * 100 + jlptRank * 10 + wordKey(word).length;
 }
 
+export function normalizeWordLists(wordLists = []) {
+  return Array.isArray(wordLists)
+    ? wordLists.filter((list) => list && list.id !== RETIRED_REPAIR_DRILL_LIST_ID)
+    : [];
+}
+
 export function loadAll() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return parsed;
+    return {
+      ...parsed,
+      wordLists: normalizeWordLists(parsed.wordLists),
+      ...(parsed.practicePrefs ? { practicePrefs: mergePracticePrefs(parsed.practicePrefs) } : {}),
+    };
   } catch {
     return null;
   }
@@ -147,7 +160,7 @@ export function saveAll(
     state,
     customVerbs,
     customAdjectives,
-    wordLists,
+    wordLists: normalizeWordLists(wordLists),
     syncConfig,
     lastSyncedAt,
     practicePrefs: mergePracticePrefs(practicePrefs),
@@ -442,7 +455,7 @@ export function buildSyncPayload({
     state: state || defaultState(),
     customVerbs: Array.isArray(customVerbs) ? customVerbs : [],
     customAdjectives: Array.isArray(customAdjectives) ? customAdjectives : [],
-    wordLists: Array.isArray(wordLists) ? wordLists : [],
+    wordLists: normalizeWordLists(wordLists),
     practicePrefs: mergePracticePrefs(practicePrefs),
   };
 }
@@ -465,10 +478,10 @@ function mergeListKeys(field, localList, cloudList) {
 
 function mergeWordLists(local = [], cloud = []) {
   const byId = new Map();
-  for (const list of cloud || []) {
+  for (const list of normalizeWordLists(cloud)) {
     if (list?.id) byId.set(list.id, { ...list });
   }
-  for (const list of local || []) {
+  for (const list of normalizeWordLists(local)) {
     if (!list?.id) continue;
     const existing = byId.get(list.id);
     if (!existing) {
@@ -482,7 +495,7 @@ function mergeWordLists(local = [], cloud = []) {
     if (words) merged.words = words;
     byId.set(list.id, merged);
   }
-  return [...byId.values()];
+  return normalizeWordLists([...byId.values()]);
 }
 
 function mergeSyncPracticePrefs(localPrefs, cloudPrefs) {

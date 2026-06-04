@@ -42,6 +42,7 @@ import {
   selectNext,
   buildFocusCard,
   recordMistake,
+  markMistakeResolved,
   gradeCard,
   bumpDaily,
   localDateKey,
@@ -69,12 +70,9 @@ import {
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
 import {
   aggregateDiagnosedMistakes,
-  buildRepairDrillPlan,
   bumpSessionMistakePattern,
   labRouteForMistakePattern,
   rankSessionMistakePatterns,
-  repairPrefsForPlan,
-  upsertRepairWordList,
 } from '../utils/mistakeDiagnosis.js';
 import {
   clearMinimalPairPrefs,
@@ -105,7 +103,7 @@ export { kanaCoachCells, explainReversePrompt };
 const STUDY_CURRENT_KEY = 'jp-study-current';
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
-const REVIEW_LIMIT_SOURCES = new Set(['repair', 'lab', 'recommendation']);
+const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation']);
 const REVIEW_SESSION_HISTORY_SIZE = 4;
 
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
@@ -593,9 +591,6 @@ export function ReviewsDashboard({
   todayDrillActive,
   onStart,
   onStartRecommendation,
-  onRetestMisses,
-  retestCount = 0,
-  mistakeRoute = null,
   readinessFamilies = [],
   weakestSkill = null,
   onDrillReadiness,
@@ -615,6 +610,7 @@ export function ReviewsDashboard({
   const progressNow = dueTotal ? dueDone : Math.min(daily.count || 0, dailyGoal);
   const progressMax = dueTotal || dailyGoal;
   const recommendations = state.reviewScope?.recommendations || [];
+  const mistakeHistoryCount = (state.mistakes || []).length;
   const strengthRows = formFamilyStrengthRows(state);
   const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
   const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
@@ -677,7 +673,7 @@ export function ReviewsDashboard({
     streak > 0 ||
     dueTotal > 0 ||
     recommendations.length > 0 ||
-    retestCount > 0;
+    mistakeHistoryCount > 0;
 
   return (
     <section className="space-y-4" aria-label="Reviews dashboard">
@@ -753,17 +749,6 @@ export function ReviewsDashboard({
                   ? 'Start Reviews'
                   : 'Start Core Warmup'}
             </button>
-            {retestCount > 0 && (
-              <button
-                type="button"
-                onClick={onRetestMisses}
-                className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-stone-800"
-              >
-                {mistakeRoute
-                  ? `${mistakeRoute.triggerLabel} -> ${mistakeRoute.toolLabel}`
-                  : `Retest ${retestCount} miss${retestCount === 1 ? '' : 'es'}`}
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -1006,7 +991,6 @@ export default function StudyView() {
     practicePrefs,
     setPracticePrefs,
     wordLists,
-    setWordLists,
     studyFocus: focus,
     clearStudyFocus: onFocusConsumed,
     openLabTool,
@@ -1178,10 +1162,6 @@ export default function StudyView() {
       patterns: aggregateDiagnosedMistakes(open),
     };
   }, [state.mistakes]);
-  // Retestable misses power the dashboard's "Retest misses" affordance. Only
-  // count them when they actually aggregate into a repair pattern we can drill.
-  const retestableMisses = openMistakeSummary.patterns.length ? openMistakeSummary.count : 0;
-  const topMistakeRoute = labRouteForMistakePattern(openMistakeSummary.patterns[0]);
   // When open misses cluster as godan sound-change errors, the te-form/stem
   // readiness drill routes to Ending Lab's scaffolded onbin practice instead of
   // a generic scoped review.
@@ -1203,7 +1183,7 @@ export default function StudyView() {
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const todayGoalHit = isDailyGoalHitToday(daily);
-  const repairDrillActive = practicePrefs.reviewLimitSource === 'repair';
+  const boundedReviewLaunchActive = activeReviewLimitFromPrefs(practicePrefs) > 0;
   const todayDrillActive =
     contextTodayDrillActive ??
     (!practicePrefs.minimalPairSetId &&
@@ -1218,7 +1198,7 @@ export default function StudyView() {
     !!sessionFilterWord ||
     !!sessionFilterFormGroupId ||
     !!launchContext ||
-    repairDrillActive ||
+    boundedReviewLaunchActive ||
     !!activeMinimalPairSet;
   const reviewSelectionOptions = useMemo(
     () => ({
@@ -1259,8 +1239,8 @@ export default function StudyView() {
 
   useLayoutEffect(() => {
     if (!hydrated) return;
-    // Bail only when the dashboard will actually render. Special launches
-    // (repair/recommendation/minimal-pair/focus) bypass the dashboard, so we
+    // Bail only when the dashboard will actually render. Bounded review,
+    // recommendation, minimal-pair, and focus launches bypass the dashboard, so
     // must still select a card for them — otherwise the dashboard is hidden,
     // no card is chosen, and Reviews dead-ends on "No cards available."
     if (dashboardOpen && !specialLaunchActive) return;
@@ -1535,9 +1515,6 @@ export default function StudyView() {
           todayDrillActive={todayDrillActive}
           onStart={beginReviews}
           onStartRecommendation={startReviewRecommendation}
-          onRetestMisses={launchMistakeRetest}
-          retestCount={retestableMisses}
-          mistakeRoute={topMistakeRoute}
           readinessFamilies={readinessFamilies}
           weakestSkill={weakestReadiness}
           onDrillReadiness={drillReadinessGap}
@@ -1770,6 +1747,18 @@ export default function StudyView() {
     };
   }
 
+  function resolveMistakesForCurrentCard(mistakes = []) {
+    const matches = (mistakes || []).filter(
+      (mistake) =>
+        !mistake.resolved &&
+        mistake.dict === current?.verb?.dict &&
+        mistake.group === current?.verb?.group &&
+        mistake.type === current?.type,
+    );
+    if (!matches.length) return mistakes;
+    return matches.reduce((next, mistake) => markMistakeResolved(next, mistake.key), mistakes);
+  }
+
   function stopSpeechRecognition() {
     const recognition = speechRecognitionRef.current;
     if (!recognition) {
@@ -1950,37 +1939,6 @@ export default function StudyView() {
     chooseFocusFormGroup(familyId);
   }
 
-  // Build a focused repair drill from the learner's open misses and drop
-  // straight into it, leaving the dashboard for the active card.
-  function launchMistakeRetest() {
-    const openMistakes = (state.mistakes || []).filter((mistake) => !mistake.resolved);
-    const patterns = openMistakeSummary.patterns.length
-      ? openMistakeSummary.patterns
-      : aggregateDiagnosedMistakes(openMistakes);
-    if (!openMistakes.length || !patterns.length) return;
-    const route = labRouteForMistakePattern(patterns[0]);
-    if (route) {
-      openLabTool(route.tool);
-      return;
-    }
-    const plan = buildRepairDrillPlan(patterns[0], verbs || []);
-    if (plan.wordKeys.length) {
-      setWordLists(upsertRepairWordList(wordLists, plan));
-    }
-    if (plan.typeIds.length) {
-      setState((prev) => ({ ...prev, enabledTypes: plan.typeIds }));
-    }
-    setPracticePrefs({
-      ...repairPrefsForPlan(practicePrefs, plan),
-      minimalPairSetId: '',
-      minimalPairReturn: null,
-    });
-    setSessionFilterWord(null);
-    setSessionFilterFormGroupId(null);
-    setDashboardOpen(false);
-    setCurrent(null);
-  }
-
   // Deterministic, offline step coach — no API key required. Irregular forms
   // are masked on the first click; a second click reveals the spelled-out steps.
   function showStepHint() {
@@ -2019,59 +1977,15 @@ export default function StudyView() {
     setCoachChatOpen(true);
   }
 
-  function launchRepairDrill(pattern) {
-    const plan = buildRepairDrillPlan(pattern, verbs);
-    if (setWordLists && plan.wordKeys.length) {
-      setWordLists(upsertRepairWordList(wordLists, plan));
-    }
-    if (setState) {
-      setState((prev) => ({
-        ...prev,
-        ...(plan.typeIds.length ? { enabledTypes: plan.typeIds } : {}),
-        session: { ...(prev.session || {}), mistakePatterns: {} },
-      }));
-    }
-    if (setPracticePrefs) {
-      setPracticePrefs({
-        ...repairPrefsForPlan(practicePrefs, plan),
-        minimalPairSetId: '',
-        minimalPairReturn: null,
-      });
-    }
-    setReviewBase(state.session?.reviewed || 0);
-    setChatOpen(false);
-    setAnswer('');
-    setCoachRevealed(0);
-    setGreenRevealed(0);
-    setRevealedMiss(false);
-    setReviewChoiceLabel('');
-    setSelfCheckOpen(false);
-    setTypoGuard(null);
-    setStepHint('');
-    setHintMasked(false);
-    setHintRevealed(false);
-    setCoachChatOpen(false);
-    setLastDiagnosis(null);
-    hadKanaMistakeRef.current = false;
-    wrongSnapshotRef.current = null;
-    setWasCorrected(false);
-    setWasCorrect(false);
-    setPhase('answering');
-    setCurrent(null);
-    setTab('study');
-  }
-
   function launchMistakePatternNextStep(pattern) {
     const route = labRouteForMistakePattern(pattern);
     if (route) {
       openLabTool(route.tool);
-      return;
     }
-    launchRepairDrill(pattern);
   }
 
   function mistakePatternActionLabel(pattern) {
-    return labRouteForMistakePattern(pattern)?.actionLabel || 'Start 10-card repair drill';
+    return labRouteForMistakePattern(pattern)?.actionLabel || '';
   }
 
   function submit(choiceValue, options = {}) {
@@ -2136,7 +2050,7 @@ export default function StudyView() {
       },
     };
     const nextMistakes = ok
-      ? state.mistakes
+      ? resolveMistakesForCurrentCard(state.mistakes)
       : recordMistake(
           state.mistakes,
           current.verb,
@@ -2303,7 +2217,7 @@ export default function StudyView() {
       },
     };
     const nextMistakes = ok
-      ? state.mistakes
+      ? resolveMistakesForCurrentCard(state.mistakes)
       : recordMistake(
           state.mistakes,
           current.verb,
@@ -2582,12 +2496,14 @@ export default function StudyView() {
                 ))}
               </div>
             )}
-            <button
-              onClick={() => launchMistakePatternNextStep(sessionMistakePatterns[0])}
-              className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
-            >
-              {mistakePatternActionLabel(sessionMistakePatterns[0])}
-            </button>
+            {labRouteForMistakePattern(sessionMistakePatterns[0]) && (
+              <button
+                onClick={() => launchMistakePatternNextStep(sessionMistakePatterns[0])}
+                className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
+              >
+                {mistakePatternActionLabel(sessionMistakePatterns[0])}
+              </button>
+            )}
           </div>
         ) : (
           sessionWrong === 0 &&
@@ -2615,12 +2531,8 @@ export default function StudyView() {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
-          {reviewSetComplete
-            ? reviewLimitSource === 'repair'
-              ? 'Repair drill complete'
-              : reviewLimitSource === 'recommendation'
-                ? 'Recommended reviews complete'
-                : 'Drill complete'
+          {reviewLimitSource === 'recommendation'
+            ? 'Recommended reviews complete'
             : 'Drill complete'}
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
@@ -2670,12 +2582,14 @@ export default function StudyView() {
                 ))}
               </div>
             )}
-            <button
-              onClick={() => launchMistakePatternNextStep(sessionMistakePatterns[0])}
-              className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
-            >
-              {mistakePatternActionLabel(sessionMistakePatterns[0])}
-            </button>
+            {labRouteForMistakePattern(sessionMistakePatterns[0]) && (
+              <button
+                onClick={() => launchMistakePatternNextStep(sessionMistakePatterns[0])}
+                className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
+              >
+                {mistakePatternActionLabel(sessionMistakePatterns[0])}
+              </button>
+            )}
           </div>
         ) : (
           <div className="mb-5" />
@@ -2746,21 +2660,29 @@ export default function StudyView() {
     setTab('library');
   }
 
+  function clearBoundedReviewPrefs(prefs = {}) {
+    const next = { ...prefs, reviewLimitSource: '', reviewLimit: 0 };
+    if (Array.isArray(next.wordListIds)) {
+      next.wordListIds = next.wordListIds.filter(
+        (id) => id !== 'repair-drill' && !String(id || '').startsWith('list-review-rec-'),
+      );
+    }
+    return next;
+  }
+
   // Universal escape hatch back to the Reviews dashboard. Exits whatever
-  // focused session is active (minimal-pair contrast, repair drill, or a
+  // focused session is active (minimal-pair contrast, bounded review, or a
   // focus-word lock) so specialLaunchActive clears and the dashboard renders.
   function returnToOverview() {
     if (activeMinimalPairSet) {
       const restoreTypes = minimalPairReturnEnabledTypes(practicePrefs) || [];
       setPracticePrefs((prev) => {
         const cleared = clearMinimalPairPrefs(prev);
-        return cleared.reviewLimitSource === 'repair'
-          ? { ...cleared, reviewLimitSource: '', reviewLimit: 0 }
-          : cleared;
+        return clearBoundedReviewPrefs(cleared);
       });
       if (restoreTypes.length) setState((prev) => ({ ...prev, enabledTypes: restoreTypes }));
-    } else if (practicePrefs.reviewLimitSource === 'repair') {
-      setPracticePrefs((prev) => ({ ...prev, reviewLimitSource: '', reviewLimit: 0 }));
+    } else if (practicePrefs.reviewLimitSource || practicePrefs.reviewLimit > 0) {
+      setPracticePrefs((prev) => clearBoundedReviewPrefs(prev));
     }
     setLaunchContext(null);
     setFocusWordLock(null);
@@ -2913,11 +2835,7 @@ export default function StudyView() {
                 {reviewLimit > 0 && (
                   <div className="text-indigo-600 dark:text-indigo-400 font-medium">
                     {Math.min(reviewsDone, reviewLimit)}/{reviewLimit}{' '}
-                    {reviewLimitSource === 'repair'
-                      ? 'repair'
-                      : reviewLimitSource === 'recommendation'
-                        ? 'recommended'
-                        : 'drill'}
+                    {reviewLimitSource === 'recommendation' ? 'recommended' : 'drill'}
                   </div>
                 )}
                 {initialDue > 0 && !bonusMode && (

@@ -7,6 +7,7 @@ import {
   mergeState,
   dailyNewCardLimit,
   bonusNewCardLimit,
+  normalizeWordLists,
 } from '../utils/storage.js';
 import {
   mergePracticePrefs,
@@ -188,7 +189,7 @@ export default function SettingsView() {
     setState(mergeState(data.state, { reviewed: 0, correct: 0 }));
     if (Array.isArray(data.customVerbs)) setCustomVerbs(data.customVerbs);
     if (Array.isArray(data.customAdjectives)) setCustomAdjectives(data.customAdjectives);
-    if (Array.isArray(data.wordLists)) setWordLists(data.wordLists);
+    if (Array.isArray(data.wordLists)) setWordLists(normalizeWordLists(data.wordLists));
     if (data.practicePrefs) setPracticePrefs(mergePracticePrefs(data.practicePrefs));
     setImportText('');
     setImportOpen(false);

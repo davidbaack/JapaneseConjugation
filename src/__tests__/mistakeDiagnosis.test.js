@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   aggregateDiagnosedMistakes,
-  buildRepairDrillPlan,
   bumpSessionMistakePattern,
   diagnoseMistake,
   labRouteForMistakePattern,
@@ -14,20 +13,6 @@ const kaku = {
   dict: '\u66f8\u304f',
   reading: '\u304b\u304f',
   meaning: 'to write',
-  group: 'godan',
-};
-
-const oyogu = {
-  dict: '\u6cf3\u3050',
-  reading: '\u304a\u3088\u3050',
-  meaning: 'to swim',
-  group: 'godan',
-};
-
-const matsu = {
-  dict: '\u5f85\u3064',
-  reading: '\u307e\u3064',
-  meaning: 'to wait',
   group: 'godan',
 };
 
@@ -118,7 +103,7 @@ describe('diagnoseMistake', () => {
   });
 });
 
-describe('mistake pattern aggregation and repair drills', () => {
+describe('mistake pattern aggregation and Lab routing', () => {
   it('stores diagnosis on missed cards and aggregates pattern counts', () => {
     const mistakes = recordMistake(
       [],
@@ -171,24 +156,5 @@ describe('mistake pattern aggregation and repair drills', () => {
       patternId: 'politeness-mismatch:polite-negative',
       count: 1,
     });
-  });
-
-  it('builds a scoped repair drill from the highest-value pattern', () => {
-    const mistakes = recordMistake(
-      [],
-      kaku,
-      'te-form',
-      null,
-      '\u304b\u3063\u3066',
-      '\u304b\u3044\u3066',
-    );
-    const [pattern] = aggregateDiagnosedMistakes(mistakes);
-    const plan = buildRepairDrillPlan(pattern, [kaku, oyogu, matsu, taberu]);
-
-    expect(plan.typeIds).toEqual(['te-form', 'plain-past']);
-    expect(plan.wordKeys).toContain('godan:\u66f8\u304f');
-    expect(plan.wordKeys).toContain('godan:\u6cf3\u3050');
-    expect(plan.wordKeys).not.toContain('godan:\u5f85\u3064');
-    expect(plan.reviewLimit).toBe(10);
   });
 });

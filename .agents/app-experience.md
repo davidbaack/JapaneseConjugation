@@ -29,7 +29,7 @@ confirms the new direction, update this document in the same change.
   upcoming review timing, and strong/weak form-family signals.
 - The dashboard is the single Reviews surface. A brand-new learner sees only a
   short intro plus one Start action; returning-user signals (stat tiles, streak,
-  upcoming-review forecast, form-family strength, Retest misses) are
+  upcoming-review forecast, form-family strength, and mistake-informed Lab nudges) are
   progressively disclosed once there is real history. Do not stack separate
   queue, progress, or staged "core path" panels above it, and once a card is
   active the card takes focus rather than sitting below status panels.
