@@ -9,7 +9,7 @@ import {
   IconMic,
   IconPlus,
 } from '../components/Icons.jsx';
-import { FORM_GROUPS } from '../data/conjugationTypes.js';
+import { ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
 import {
   getSpeechRecognitionConstructor,
   playPronunciation,
@@ -86,10 +86,9 @@ import {
 } from '../utils/minimalPairs.js';
 import { buildRuleCandidates } from '../utils/ruleCandidates.js';
 import { TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
+import { buildWeaknessFamilyRows, recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
 import {
-  excludeFormFamilyFromReviewState,
   excludeWordFromReviewState,
-  formFamilyForType,
   includeFormFamilyInReviewState,
   includeWordInReviewState,
   reviewTypeIdsForState,
@@ -378,7 +377,7 @@ function StudyFocusBar({
     <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-1 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-          Focus reviews
+          Focus practice
         </span>
         {sessionFilterWord && (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-700 dark:text-indigo-300">
@@ -519,6 +518,144 @@ function StudyFocusBar({
   );
 }
 
+const WEAKNESS_ROW_TONE = {
+  strong: 'bg-emerald-500',
+  developing: 'bg-amber-500',
+  weak: 'bg-rose-500',
+};
+
+function PracticeScopeSidebar({ state, weaknessFamilies = [], onToggleFamily, onToggleType }) {
+  const enabled = new Set(state.enabledTypes || []);
+  const weaknessByFamily = new Map(weaknessFamilies.map((family) => [family.id, family]));
+  const activeCount = (state.enabledTypes || []).length;
+
+  return (
+    <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start" aria-label="Practice map">
+      <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+              Practice map
+            </div>
+            <h2 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
+              Forms in this workout
+            </h2>
+          </div>
+          <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
+            {activeCount}
+          </span>
+        </div>
+        <div className="mt-3 space-y-2">
+          {FORM_GROUPS.map((family) => {
+            const enabledInFamily = family.typeIds.filter((typeId) => enabled.has(typeId));
+            const allEnabled = enabledInFamily.length === family.typeIds.length;
+            const weaknessRows = weaknessByFamily.get(family.id)?.rows || [];
+            return (
+              <details
+                key={family.id}
+                className="rounded-xl border border-stone-200 bg-stone-50/80 dark:border-stone-800 dark:bg-stone-950/70"
+              >
+                <summary className="cursor-pointer list-none px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                        {family.label}
+                      </div>
+                      <div className="mt-0.5 text-xs text-stone-500">
+                        {enabledInFamily.length}/{family.typeIds.length} forms on
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onToggleFamily(family);
+                      }}
+                      className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                        allEnabled
+                          ? 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300'
+                          : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400'
+                      }`}
+                    >
+                      {allEnabled ? 'Off' : 'On'}
+                    </button>
+                  </div>
+                </summary>
+                <div className="border-t border-stone-200 px-3 py-3 dark:border-stone-800">
+                  {weaknessRows.length > 0 && (
+                    <div className="mb-3 space-y-1.5">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+                        Recent weak spots
+                      </div>
+                      {weaknessRows.slice(0, 4).map((row) => (
+                        <div
+                          key={row.key}
+                          className="rounded-lg border border-stone-200 bg-white px-2.5 py-2 dark:border-stone-800 dark:bg-stone-900"
+                        >
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="truncate font-medium text-stone-700 dark:text-stone-200">
+                              {row.typeLabel} - {row.subcategoryLabel}
+                            </span>
+                            <span className="tabular-nums text-stone-500">
+                              {row.correct}/{row.attempted}
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
+                            <span
+                              className={`block h-full ${WEAKNESS_ROW_TONE[row.status] || 'bg-stone-300'}`}
+                              style={{ width: `${Math.max(8, row.accuracy)}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="grid gap-1.5">
+                    {family.typeIds.map((typeId) => {
+                      const type = ALL_CARD_TYPES.find((item) => item.id === typeId);
+                      if (!type) return null;
+                      const checked = enabled.has(typeId);
+                      return (
+                        <button
+                          key={typeId}
+                          type="button"
+                          aria-pressed={checked}
+                          onClick={() => onToggleType(typeId)}
+                          className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
+                            checked
+                              ? 'border-indigo-200 bg-indigo-50 text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100'
+                              : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800'
+                          }`}
+                        >
+                          <span
+                            className={`mt-0.5 h-3.5 w-3.5 rounded border ${
+                              checked
+                                ? 'border-indigo-600 bg-indigo-600 dark:border-indigo-400 dark:bg-indigo-400'
+                                : 'border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-950'
+                            }`}
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-xs font-semibold">{type.label}</span>
+                            {type.sub && (
+                              <span className="block truncate text-[11px] opacity-70">
+                                {type.sub}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      </section>
+    </aside>
+  );
+}
+
 function reviewForecastRows(forecast) {
   return [
     ['1h', forecast?.in1h || 0],
@@ -582,7 +719,7 @@ const READINESS_TONE = {
   weak: 'bg-rose-500',
   untested: 'bg-stone-300 dark:bg-stone-700',
 };
-// Exported for unit tests of the Reviews→Lab routing nudge ladder; the app
+// Exported for unit tests of the Practice-to-Tools routing nudge ladder; the app
 // renders it through StudyView's default export.
 export function ReviewsDashboard({
   daily,
@@ -626,8 +763,8 @@ export function ReviewsDashboard({
     !!onDrillEndingLab;
   const weakestToRush = !!weakestSkill && weakestSkill.dimension === 'speed' && !!onDrillRush;
   // One prioritized "do this next" nudge that routes a detected weakness to the
-  // matching Practice Lab tool: group confusion (foundational) > onbin sound
-  // changes > slow recall > a generic scoped review of the weakest skill.
+  // matching Tools drill: group confusion (foundational) > onbin sound
+  // changes > slow recall > generic scoped practice of the weakest skill.
   const primaryNudge =
     groupConfusion && onDrillClassify
       ? {
@@ -680,27 +817,27 @@ export function ReviewsDashboard({
     retestCount > 0;
 
   return (
-    <section className="space-y-4" aria-label="Reviews dashboard">
+    <section className="space-y-4" aria-label="Practice dashboard">
       <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm dark:border-stone-800 dark:bg-stone-900 sm:p-5">
         <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-              Reviews
+              Practice
             </div>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
-              {hasHistory ? 'Start with what is ready now.' : 'Begin with the core forms.'}
+              {hasHistory ? 'Start a focused workout.' : 'Begin with practical forms.'}
             </h2>
             <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
               {hasHistory
-                ? 'Due cards come first. If the queue is light, Reviews adds weak forms and textbook core warmup cards.'
-                : 'Reviews builds from the most common textbook verbs and adjectives, then grows as you answer. Press Start to begin.'}
+                ? 'Ready cards come first, then the workout fills with recent misses and varied words in the same weak patterns.'
+                : 'Start with a 12-card workout built from Core and Everyday forms. The map will learn what to repeat as you answer.'}
             </p>
             {hasHistory && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {[
-                  ['Due now', dashboardDue],
+                  ['Ready now', dashboardDue],
                   ['Today', `${daily.count || 0}/${dailyGoal}`],
-                  ['Weak forms', weakCount],
+                  ['Recent misses', weakCount],
                   ...(streak > 0 ? [['Streak', `${streak} day${streak === 1 ? '' : 's'}`]] : []),
                 ].map(([label, value]) => (
                   <div
@@ -722,10 +859,12 @@ export function ReviewsDashboard({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                  Session progress
+                  Workout progress
                 </div>
                 <div className="mt-1 text-sm text-stone-600 dark:text-stone-300">
-                  {dueTotal ? `${dueDone}/${dueTotal} required reviews` : 'Core warmup ready'}
+                  {dueTotal
+                    ? `${dueDone}/${dueTotal} ready cards practiced`
+                    : '12-card workout ready'}
                 </div>
               </div>
               <div className="text-xl font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
@@ -747,11 +886,7 @@ export function ReviewsDashboard({
               disabled={!todayPlan.available && !todayDrillActive}
               className="mt-4 w-full rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400"
             >
-              {todayDrillActive
-                ? 'Continue Reviews'
-                : dashboardDue
-                  ? 'Start Reviews'
-                  : 'Start Core Warmup'}
+              {todayDrillActive ? 'Continue workout' : 'Start workout'}
             </button>
             {retestCount > 0 && (
               <button
@@ -761,7 +896,7 @@ export function ReviewsDashboard({
               >
                 {mistakeRoute
                   ? `${mistakeRoute.triggerLabel} -> ${mistakeRoute.toolLabel}`
-                  : `Retest ${retestCount} miss${retestCount === 1 ? '' : 'es'}`}
+                  : `Practice ${retestCount} miss${retestCount === 1 ? '' : 'es'}`}
               </button>
             )}
           </div>
@@ -773,10 +908,10 @@ export function ReviewsDashboard({
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                Recommended reviews
+                Recommended practice
               </div>
               <div className="text-sm text-stone-600 dark:text-stone-300">
-                Lessons and Practice Lab can send focused work back into SRS.
+                Learn and Tools can send focused work back into Practice.
               </div>
             </div>
           </div>
@@ -791,7 +926,7 @@ export function ReviewsDashboard({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                      {rec.source === 'lesson' ? 'Lesson' : 'Practice Lab'}
+                      {rec.source === 'lesson' ? 'Learn' : 'Tools'}
                     </div>
                     <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
                       {rec.label}
@@ -816,7 +951,7 @@ export function ReviewsDashboard({
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
             <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
-              Upcoming reviews
+              Next workout
             </div>
             <div className="grid grid-cols-5 gap-2">
               {reviewForecastRows(todayPlan.upcomingForecast).map(([label, value]) => (
@@ -1199,6 +1334,8 @@ export default function StudyView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const readinessFamilies = useMemo(() => buildReadinessFamilyRows(state), [state.readiness]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  const weaknessFamilies = useMemo(() => buildWeaknessFamilyRows(state), [state.weakness]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const weakestReadiness = useMemo(() => weakestReadinessSkill(state), [state.readiness]);
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
@@ -1262,7 +1399,7 @@ export default function StudyView() {
     // Bail only when the dashboard will actually render. Special launches
     // (repair/recommendation/minimal-pair/focus) bypass the dashboard, so we
     // must still select a card for them — otherwise the dashboard is hidden,
-    // no card is chosen, and Reviews dead-ends on "No cards available."
+    // no card is chosen, and Practice dead-ends on "No cards available."
     if (dashboardOpen && !specialLaunchActive) return;
     // When arriving from Check's "Practice this verb", seed that exact word/form
     // once. If no rule covers it, fall through to normal selection.
@@ -1511,42 +1648,43 @@ export default function StudyView() {
   if (!hydrated) {
     return (
       <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-8 text-center text-sm text-stone-500 dark:text-stone-400">
-        Loading Reviews...
+        Loading Practice...
       </div>
     );
   }
 
   if (dashboardOpen && !specialLaunchActive) {
     return (
-      <div className="space-y-4">
-        <StudyFocusBar
-          allWords={verbs}
-          sessionFilterWord={sessionFilterWord}
-          onWordChange={chooseFocusWord}
-          sessionFilterFormGroupId={sessionFilterFormGroupId}
-          onFormGroupChange={chooseFocusFormGroup}
-        />
-        <ReviewsDashboard
-          daily={daily}
-          practicePrefs={practicePrefs}
-          srsQueue={srsQueue}
+      <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <PracticeScopeSidebar
           state={state}
-          todayPlan={todayPlan}
-          todayDrillActive={todayDrillActive}
-          onStart={beginReviews}
-          onStartRecommendation={startReviewRecommendation}
-          onRetestMisses={launchMistakeRetest}
-          retestCount={retestableMisses}
-          mistakeRoute={topMistakeRoute}
-          readinessFamilies={readinessFamilies}
-          weakestSkill={weakestReadiness}
-          onDrillReadiness={drillReadinessGap}
-          onbinWeakness={onbinWeakness}
-          onDrillEndingLab={() => openLabTool('endings')}
-          groupConfusion={groupConfusion}
-          onDrillClassify={() => openLabTool('classify')}
-          onDrillRush={() => openLabTool('games')}
+          weaknessFamilies={weaknessFamilies}
+          onToggleFamily={togglePracticeFamily}
+          onToggleType={togglePracticeType}
         />
+        <div className="min-w-0 space-y-4">
+          <ReviewsDashboard
+            daily={daily}
+            practicePrefs={practicePrefs}
+            srsQueue={srsQueue}
+            state={state}
+            todayPlan={todayPlan}
+            todayDrillActive={todayDrillActive}
+            onStart={beginReviews}
+            onStartRecommendation={startReviewRecommendation}
+            onRetestMisses={launchMistakeRetest}
+            retestCount={retestableMisses}
+            mistakeRoute={topMistakeRoute}
+            readinessFamilies={readinessFamilies}
+            weakestSkill={weakestReadiness}
+            onDrillReadiness={drillReadinessGap}
+            onbinWeakness={onbinWeakness}
+            onDrillEndingLab={() => openLabTool('endings')}
+            groupConfusion={groupConfusion}
+            onDrillClassify={() => openLabTool('classify')}
+            onDrillRush={() => openLabTool('games')}
+          />
+        </div>
       </div>
     );
   }
@@ -1585,14 +1723,14 @@ export default function StudyView() {
             <>
               <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
               <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
-                No words or forms are in your review scope right now. Widen your scope in Settings,
-                or include words and forms from Library.
+                No words or forms are active in the Practice map right now. Turn on forms in the
+                map, or restore words from Tools.
               </p>
               <button
-                onClick={() => setTab('settings')}
+                onClick={() => setTab('tools')}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
               >
-                Go to Settings
+                Open Tools
               </button>
             </>
           )}
@@ -1683,7 +1821,7 @@ export default function StudyView() {
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const sessionSkipped = state.session?.skipped || 0;
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
-  // Daily SRS queue completion flags
+  // Ready-card completion flags
   const queuedDueRuleIds = srsQueue?.dueRuleIds || [];
   const completedDueCount = srsQueue?.completedDueRuleIds?.length || 0;
   const initialDue = queuedDueRuleIds.length;
@@ -1904,7 +2042,7 @@ export default function StudyView() {
     setLaunchContext(null);
     setReviewBase(state.session?.reviewed || 0);
     resetActiveAttempt();
-    setTab('study');
+    setTab('practice');
   }
 
   function beginReviews() {
@@ -1940,9 +2078,40 @@ export default function StudyView() {
     setCurrent(null);
   }
 
+  function togglePracticeType(typeId) {
+    if (!typeId) return;
+    setState((prev) => {
+      const currentTypes = new Set(prev.enabledTypes || []);
+      if (currentTypes.has(typeId)) {
+        if (currentTypes.size <= 1) return prev;
+        currentTypes.delete(typeId);
+      } else {
+        currentTypes.add(typeId);
+      }
+      return { ...prev, enabledTypes: [...currentTypes] };
+    });
+    setCurrent(null);
+  }
+
+  function togglePracticeFamily(family) {
+    if (!family?.typeIds?.length) return;
+    setState((prev) => {
+      const currentTypes = new Set(prev.enabledTypes || []);
+      const allEnabled = family.typeIds.every((typeId) => currentTypes.has(typeId));
+      if (allEnabled) {
+        for (const typeId of family.typeIds) currentTypes.delete(typeId);
+        if (!currentTypes.size) return prev;
+      } else {
+        for (const typeId of family.typeIds) currentTypes.add(typeId);
+      }
+      return { ...prev, enabledTypes: [...currentTypes] };
+    });
+    setCurrent(null);
+  }
+
   // Drill the weakest readiness dimension of a form family: apply that
   // dimension's answer mode (recognition -> choice, speed -> timed input,
-  // production -> input) and scope Reviews to the family.
+  // production -> input) and scope Practice to the family.
   function drillReadinessGap({ familyId, dimension }) {
     if (dimension) {
       setPracticePrefs((prev) => ({ ...prev, ...launchPrefsForReadinessDimension(dimension) }));
@@ -2017,61 +2186,6 @@ export default function StudyView() {
     if (!current || !geminiKey) return;
     setCoachSeedAnswer(answer);
     setCoachChatOpen(true);
-  }
-
-  function launchRepairDrill(pattern) {
-    const plan = buildRepairDrillPlan(pattern, verbs);
-    if (setWordLists && plan.wordKeys.length) {
-      setWordLists(upsertRepairWordList(wordLists, plan));
-    }
-    if (setState) {
-      setState((prev) => ({
-        ...prev,
-        ...(plan.typeIds.length ? { enabledTypes: plan.typeIds } : {}),
-        session: { ...(prev.session || {}), mistakePatterns: {} },
-      }));
-    }
-    if (setPracticePrefs) {
-      setPracticePrefs({
-        ...repairPrefsForPlan(practicePrefs, plan),
-        minimalPairSetId: '',
-        minimalPairReturn: null,
-      });
-    }
-    setReviewBase(state.session?.reviewed || 0);
-    setChatOpen(false);
-    setAnswer('');
-    setCoachRevealed(0);
-    setGreenRevealed(0);
-    setRevealedMiss(false);
-    setReviewChoiceLabel('');
-    setSelfCheckOpen(false);
-    setTypoGuard(null);
-    setStepHint('');
-    setHintMasked(false);
-    setHintRevealed(false);
-    setCoachChatOpen(false);
-    setLastDiagnosis(null);
-    hadKanaMistakeRef.current = false;
-    wrongSnapshotRef.current = null;
-    setWasCorrected(false);
-    setWasCorrect(false);
-    setPhase('answering');
-    setCurrent(null);
-    setTab('study');
-  }
-
-  function launchMistakePatternNextStep(pattern) {
-    const route = labRouteForMistakePattern(pattern);
-    if (route) {
-      openLabTool(route.tool);
-      return;
-    }
-    launchRepairDrill(pattern);
-  }
-
-  function mistakePatternActionLabel(pattern) {
-    return labRouteForMistakePattern(pattern)?.actionLabel || 'Start 10-card repair drill';
   }
 
   function submit(choiceValue, options = {}) {
@@ -2162,6 +2276,12 @@ export default function StudyView() {
         answerMode,
         kanaAssist: 'live',
         reverseDrill,
+      }),
+      weakness: recordWeaknessAttempt(state.weakness, {
+        word: current.verb,
+        typeId: current.type,
+        correct: ok,
+        responseMs,
       }),
       minimalPairs: nextMinimalPairProgress(ok),
       session: {
@@ -2266,19 +2386,6 @@ export default function StudyView() {
     resetActiveAttempt();
   }
 
-  function removeCurrentFormFamilyFromReviews() {
-    if (!current) return;
-    const family = formFamilyForType(current.type);
-    if (!family) return;
-    setState((prev) => excludeFormFamilyFromReviewState(prev, family.id));
-    setUndoReviewScopeAction({
-      kind: 'form',
-      label: family.label,
-      restore: () => setState((prev) => includeFormFamilyInReviewState(prev, family.id)),
-    });
-    resetActiveAttempt();
-  }
-
   function restoreLastReviewScopeAction() {
     undoReviewScopeAction?.restore?.();
     setUndoReviewScopeAction(null);
@@ -2329,6 +2436,12 @@ export default function StudyView() {
         answerMode,
         kanaAssist: 'live',
         reverseDrill,
+      }),
+      weakness: recordWeaknessAttempt(state.weakness, {
+        word: current.verb,
+        typeId: current.type,
+        correct: ok,
+        responseMs,
       }),
       minimalPairs: nextMinimalPairProgress(ok),
       session: {
@@ -2425,6 +2538,12 @@ export default function StudyView() {
         kanaAssist: 'live',
         reverseDrill,
       }),
+      weakness: recordWeaknessAttempt(state.weakness, {
+        word: current.verb,
+        typeId: current.type,
+        correct: false,
+        responseMs,
+      }),
       minimalPairs: nextMinimalPairProgress(false),
       session: {
         ...bumpSessionMistakePattern(
@@ -2493,7 +2612,7 @@ export default function StudyView() {
     updateTypedAnswer(toKanaInputValue(event.currentTarget.value), options);
   }
 
-  // SRS queue completion screen — shown once when the due queue is cleared
+  // Workout completion screen — shown once when the ready queue is cleared
   // or the session limit is reached. Bonus mode lets the user keep practicing.
   if (reviewComplete && phase === 'answering') {
     const sessionCorrect = state.session.correct || 0;
@@ -2506,13 +2625,13 @@ export default function StudyView() {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
-          {dueQueueDone ? 'Queue cleared!' : 'Session complete'}
+          Map updated
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-1">
           {dueQueueDone ? `${completedDueCount}/${initialDue}` : sessionReviewed}
         </div>
         <div className="text-sm text-stone-400 mb-3">
-          {dueQueueDone ? 'due cards cleared' : 'cards reviewed'}
+          {dueQueueDone ? 'ready cards practiced' : 'cards practiced'}
         </div>
         <div className="flex justify-center gap-2 mb-2">
           <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
@@ -2582,12 +2701,6 @@ export default function StudyView() {
                 ))}
               </div>
             )}
-            <button
-              onClick={() => launchMistakePatternNextStep(sessionMistakePatterns[0])}
-              className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
-            >
-              {mistakePatternActionLabel(sessionMistakePatterns[0])}
-            </button>
           </div>
         ) : (
           sessionWrong === 0 &&
@@ -2605,7 +2718,7 @@ export default function StudyView() {
           }}
           className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium"
         >
-          Keep practicing
+          Start next workout
         </button>
       </div>
     );
@@ -2619,7 +2732,7 @@ export default function StudyView() {
             ? reviewLimitSource === 'repair'
               ? 'Repair drill complete'
               : reviewLimitSource === 'recommendation'
-                ? 'Recommended reviews complete'
+                ? 'Recommended practice complete'
                 : 'Drill complete'
             : 'Drill complete'}
         </div>
@@ -2670,12 +2783,6 @@ export default function StudyView() {
                 ))}
               </div>
             )}
-            <button
-              onClick={() => launchMistakePatternNextStep(sessionMistakePatterns[0])}
-              className="mt-3 w-full px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition"
-            >
-              {mistakePatternActionLabel(sessionMistakePatterns[0])}
-            </button>
           </div>
         ) : (
           <div className="mb-5" />
@@ -2689,7 +2796,7 @@ export default function StudyView() {
           }}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium"
         >
-          Start another drill
+          Start next workout
         </button>
       </div>
     );
@@ -2737,16 +2844,15 @@ export default function StudyView() {
       </div>
     ) : null;
   const referenceLaunch = launchContext;
-  const currentFormFamily = formFamilyForType(current.type);
 
   function returnToReference() {
     setLaunchContext(null);
     setFocusWordLock(null);
     onFocusConsumed?.();
-    setTab('library');
+    setTab('tools');
   }
 
-  // Universal escape hatch back to the Reviews dashboard. Exits whatever
+  // Universal escape hatch back to the Practice dashboard. Exits whatever
   // focused session is active (minimal-pair contrast, repair drill, or a
   // focus-word lock) so specialLaunchActive clears and the dashboard renders.
   function returnToOverview() {
@@ -2773,1241 +2879,1233 @@ export default function StudyView() {
   }
 
   return (
-    <div className="space-y-4">
-      {referenceLaunch && (
-        <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="text-left">
-            <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
-              Reference drill
-            </div>
-            <div className="text-sm text-stone-700 dark:text-stone-250">
-              {referenceLaunch.referenceLabel || 'Focused reference practice'}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={returnToReference}
-            className="px-3 py-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white/70 dark:bg-stone-950/40 text-sm text-indigo-700 dark:text-indigo-250 hover:bg-white dark:hover:bg-stone-900 transition"
-          >
-            Back to reference
-          </button>
-        </div>
-      )}
-      {undoReviewScopeAction && (
-        <div
-          role="status"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200"
-        >
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              Removed {undoReviewScopeAction.kind === 'word' ? 'word' : 'form family'}:{' '}
-              <strong>{undoReviewScopeAction.label}</strong>
-            </span>
-            <button
-              type="button"
-              onClick={restoreLastReviewScopeAction}
-              className="self-start rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-stone-950 dark:text-amber-200 dark:hover:bg-amber-950/40 sm:self-auto"
-            >
-              Undo
-            </button>
-          </div>
-        </div>
-      )}
-      <StudyFocusBar
-        allWords={verbs}
-        sessionFilterWord={sessionFilterWord}
-        onWordChange={chooseFocusWord}
-        sessionFilterFormGroupId={sessionFilterFormGroupId}
-        onFormGroupChange={chooseFocusFormGroup}
+    <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <PracticeScopeSidebar
+        state={state}
+        weaknessFamilies={weaknessFamilies}
+        onToggleFamily={togglePracticeFamily}
+        onToggleType={togglePracticeType}
       />
-      <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          {!referenceLaunch && (
+      <div className="min-w-0 space-y-4">
+        {referenceLaunch && (
+          <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="text-left">
+              <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
+                Reference drill
+              </div>
+              <div className="text-sm text-stone-700 dark:text-stone-250">
+                {referenceLaunch.referenceLabel || 'Focused reference practice'}
+              </div>
+            </div>
             <button
               type="button"
-              onClick={returnToOverview}
-              aria-label="Back to Reviews overview"
-              className="shrink-0 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 hover:text-stone-700 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"
+              onClick={returnToReference}
+              className="px-3 py-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white/70 dark:bg-stone-950/40 text-sm text-indigo-700 dark:text-indigo-250 hover:bg-white dark:hover:bg-stone-900 transition"
             >
-              ← Overview
+              Back to reference
             </button>
-          )}
-          <div className="text-left">
-            <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
-              Review
-            </div>
-            <div className="text-sm text-stone-600 dark:text-stone-300">
-              {reverseDrill ? 'Reading practice' : 'Form practice'}
-            </div>
           </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="text-xs text-stone-400 text-right">
-            {(practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'forms'
-              ? 'Forms only'
-              : (practicePrefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'reading'
-                ? 'Reading'
-                : 'Auto'}
-          </div>
-          <button
-            type="button"
-            onClick={() =>
-              setPracticePrefs((prev) => ({ ...prev, sentenceMode: !prev.sentenceMode }))
-            }
-            aria-pressed={sentenceMode}
-            title="Show each prompt inside an example sentence (stays on until you turn it off)"
-            className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-              sentenceMode
-                ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-            }`}
+        )}
+        {undoReviewScopeAction && (
+          <div
+            role="status"
+            className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200"
           >
-            Sentence{sentenceMode ? ' · on' : ''}
-          </button>
-          <details className="relative">
-            <summary className="flex cursor-pointer list-none items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800">
-              Adjust scope
-            </summary>
-            <div className="absolute right-0 z-10 mt-1 w-64 rounded-lg border border-stone-200 bg-white p-2 text-left shadow-lg dark:border-stone-800 dark:bg-stone-900">
-              <p className="px-1 pb-1.5 text-[11px] leading-snug text-stone-500 dark:text-stone-400">
-                Suspends this from automatic Reviews. SRS history is kept — restore it anytime in
-                Library. To move on without changing scope, use Skip.
-              </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Removed word: <strong>{undoReviewScopeAction.label}</strong>
+              </span>
               <button
                 type="button"
-                onClick={(e) => {
-                  removeCurrentWordFromReviews();
-                  e.currentTarget.closest('details')?.removeAttribute('open');
-                }}
-                className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-stone-700 transition hover:bg-rose-50 hover:text-rose-700 dark:text-stone-200 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
+                onClick={restoreLastReviewScopeAction}
+                className="self-start rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-stone-950 dark:text-amber-200 dark:hover:bg-amber-950/40 sm:self-auto"
               >
-                Remove this word from Reviews
+                Undo
               </button>
-              {currentFormFamily && (
+            </div>
+          </div>
+        )}
+        <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            {!referenceLaunch && (
+              <button
+                type="button"
+                onClick={returnToOverview}
+                aria-label="Back to Practice overview"
+                className="shrink-0 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 hover:text-stone-700 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"
+              >
+                &lt;- Overview
+              </button>
+            )}
+            <div className="text-left">
+              <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
+                Practice
+              </div>
+              <div className="text-sm text-stone-600 dark:text-stone-300">
+                {reverseDrill ? 'Reading practice' : 'Form practice'}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="text-xs text-stone-400 text-right">Workout</div>
+            <button
+              type="button"
+              onClick={() =>
+                setPracticePrefs((prev) => ({ ...prev, sentenceMode: !prev.sentenceMode }))
+              }
+              aria-pressed={sentenceMode}
+              title="Show each prompt inside an example sentence (stays on until you turn it off)"
+              className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                sentenceMode
+                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                  : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+              }`}
+            >
+              Sentence{sentenceMode ? ' on' : ''}
+            </button>
+            <details className="relative">
+              <summary className="flex cursor-pointer list-none items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800">
+                Adjust scope
+              </summary>
+              <div className="absolute right-0 z-10 mt-1 w-64 rounded-lg border border-stone-200 bg-white p-2 text-left shadow-lg dark:border-stone-800 dark:bg-stone-900">
+                <p className="px-1 pb-1.5 text-[11px] leading-snug text-stone-500 dark:text-stone-400">
+                  Removes this word from automatic Practice. Restore words from Tools. To move on
+                  without changing scope, use Skip.
+                </p>
                 <button
                   type="button"
                   onClick={(e) => {
-                    removeCurrentFormFamilyFromReviews();
+                    removeCurrentWordFromReviews();
                     e.currentTarget.closest('details')?.removeAttribute('open');
                   }}
                   className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-stone-700 transition hover:bg-rose-50 hover:text-rose-700 dark:text-stone-200 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
                 >
-                  Remove {currentFormFamily.label} forms from Reviews
+                  Remove this word from Practice
                 </button>
-              )}
-            </div>
-          </details>
-        </div>
-      </div>
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-        <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">
-          <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
-            JLPT {getWordMeta(current.verb).jlpt}
+              </div>
+            </details>
           </div>
-          {reviewLimit > 0 ||
-          !!sessionSkipped ||
-          initialDue > 0 ||
-          (!daily.goalHit && !bonusMode) ? (
-            <div className="flex justify-end mb-3">
-              <div className="text-xs text-stone-400 text-right shrink-0">
-                {reviewLimit > 0 && (
-                  <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-                    {Math.min(reviewsDone, reviewLimit)}/{reviewLimit}{' '}
-                    {reviewLimitSource === 'repair'
-                      ? 'repair'
-                      : reviewLimitSource === 'recommendation'
-                        ? 'recommended'
-                        : 'drill'}
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
+          <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">
+            <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
+              JLPT {getWordMeta(current.verb).jlpt}
+            </div>
+            {reviewLimit > 0 ||
+            !!sessionSkipped ||
+            initialDue > 0 ||
+            (!daily.goalHit && !bonusMode) ? (
+              <div className="flex justify-end mb-3">
+                <div className="text-xs text-stone-400 text-right shrink-0">
+                  {reviewLimit > 0 && (
+                    <div className="text-indigo-600 dark:text-indigo-400 font-medium">
+                      {Math.min(reviewsDone, reviewLimit)}/{reviewLimit}{' '}
+                      {reviewLimitSource === 'repair'
+                        ? 'repair'
+                        : reviewLimitSource === 'recommendation'
+                          ? 'recommended'
+                          : 'drill'}
+                    </div>
+                  )}
+                  {initialDue > 0 && !bonusMode && (
+                    <div className="text-indigo-600 dark:text-indigo-400 font-medium">
+                      {completedDueCount}/{initialDue} ready
+                    </div>
+                  )}
+                  {bonusMode && (
+                    <div className="text-emerald-600 dark:text-emerald-400 font-medium">bonus</div>
+                  )}
+                  {!!sessionSkipped && (
+                    <div className="text-stone-500">{sessionSkipped} skipped</div>
+                  )}
+                  <div className="text-[9px]">
+                    {[
+                      getWordMeta(current.verb).lesson &&
+                        `Genki L${getWordMeta(current.verb).lesson}`,
+                      getWordMeta(current.verb).minnaLesson &&
+                        `Minna L${getWordMeta(current.verb).minnaLesson}`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </div>
-                )}
-                {initialDue > 0 && !bonusMode && (
-                  <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-                    {completedDueCount}/{initialDue} due
-                  </div>
-                )}
-                {bonusMode && (
-                  <div className="text-emerald-600 dark:text-emerald-400 font-medium">✓ bonus</div>
-                )}
-                {!!sessionSkipped && <div className="text-stone-500">{sessionSkipped} skipped</div>}
-                <div className="text-[9px]">
-                  {[
-                    getWordMeta(current.verb).lesson &&
-                      `Genki L${getWordMeta(current.verb).lesson}`,
-                    getWordMeta(current.verb).minnaLesson &&
-                      `Minna L${getWordMeta(current.verb).minnaLesson}`,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="absolute top-4 right-4 sm:top-8 sm:right-6 text-right text-[9px] text-stone-400">
-              {[
-                getWordMeta(current.verb).lesson && `Genki L${getWordMeta(current.verb).lesson}`,
-                getWordMeta(current.verb).minnaLesson &&
-                  `Minna L${getWordMeta(current.verb).minnaLesson}`,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </div>
-          )}
-          {clozePrompt && (
-            <div className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-                Sentence
+            ) : (
+              <div className="absolute top-4 right-4 sm:top-8 sm:right-6 text-right text-[9px] text-stone-400">
+                {[
+                  getWordMeta(current.verb).lesson && `Genki L${getWordMeta(current.verb).lesson}`,
+                  getWordMeta(current.verb).minnaLesson &&
+                    `Minna L${getWordMeta(current.verb).minnaLesson}`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </div>
+            )}
+            {clozePrompt && (
+              <div className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+                  Sentence
+                </div>
+                <ScriptDisplay
+                  view={clozePromptView}
+                  className="mt-1 text-lg leading-relaxed text-stone-900 dark:text-stone-100"
+                  subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
+                  colorHighlight={false}
+                />
+                {clozePrompt.cue && (
+                  <div className="mt-1.5 text-[11px] leading-snug text-indigo-700/80 dark:text-indigo-300/80">
+                    {clozePrompt.cue}
+                  </div>
+                )}
+              </div>
+            )}
+            {hidePromptText ? (
+              <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
+                <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-3">
+                  Listening prompt
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <button
+                    onClick={() => speakJapaneseLocal(promptAudioText, 0.85)}
+                    className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm flex items-center gap-1.5"
+                  >
+                    <IconVolume className="w-4 h-4" />
+                    Replay
+                  </button>
+                  <button
+                    onClick={() => setShowPromptText(true)}
+                    className="px-3 py-2 border border-indigo-250 bg-white/70 hover:bg-white text-indigo-700 rounded-lg text-sm dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300"
+                  >
+                    Show text
+                  </button>
+                </div>
+              </div>
+            ) : (
               <ScriptDisplay
-                view={clozePromptView}
-                className="mt-1 text-lg leading-relaxed text-stone-900 dark:text-stone-100"
-                subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
-                colorHighlight={false}
+                view={promptView}
+                className="text-4xl sm:text-5xl font-medium mb-2 text-stone-900 dark:text-stone-100"
+                subClassName="text-base text-stone-500"
               />
-              {clozePrompt.cue && (
-                <div className="mt-1.5 text-[11px] leading-snug text-indigo-700/80 dark:text-indigo-300/80">
-                  {clozePrompt.cue}
-                </div>
-              )}
-            </div>
-          )}
-          {hidePromptText ? (
-            <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
-              <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-3">
-                Listening prompt
+            )}
+            {noChangePrompt && !hidePromptText && (
+              <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium">
+                Trick: no change needed
               </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                <button
-                  onClick={() => speakJapaneseLocal(promptAudioText, 0.85)}
-                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm flex items-center gap-1.5"
-                >
-                  <IconVolume className="w-4 h-4" />
-                  Replay
-                </button>
-                <button
-                  onClick={() => setShowPromptText(true)}
-                  className="px-3 py-2 border border-indigo-250 bg-white/70 hover:bg-white text-indigo-700 rounded-lg text-sm dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300"
-                >
-                  Show text
-                </button>
+            )}
+            {reverseDrill && !hidePromptText && (
+              <div className="text-xs text-stone-400">Answer with the dictionary form.</div>
+            )}
+
+            {!hideEnglishMeaning && (
+              <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
+            )}
+
+            {phase === 'reviewing' && practicePrefs.showWordCategory && (
+              <div className="text-xs text-stone-400 mt-1">
+                {groupDisplayLabel(current.verb.group)} · {wordType}
+                {groupAliasText(current.verb.group)
+                  ? ` · ${groupAliasText(current.verb.group)}`
+                  : ''}
               </div>
-            </div>
-          ) : (
-            <ScriptDisplay
-              view={promptView}
-              className="text-4xl sm:text-5xl font-medium mb-2 text-stone-900 dark:text-stone-100"
-              subClassName="text-base text-stone-500"
-            />
-          )}
-          {noChangePrompt && !hidePromptText && (
-            <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium">
-              Trick: no change needed
-            </div>
-          )}
-          {reverseDrill && !hidePromptText && (
-            <div className="text-xs text-stone-400">Answer with the dictionary form.</div>
-          )}
-
-          {!hideEnglishMeaning && (
-            <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
-          )}
-
-          {phase === 'reviewing' && practicePrefs.showWordCategory && (
-            <div className="text-xs text-stone-400 mt-1">
-              {groupDisplayLabel(current.verb.group)} · {wordType}
-              {groupAliasText(current.verb.group) ? ` · ${groupAliasText(current.verb.group)}` : ''}
-            </div>
-          )}
-          <div className="mt-4 flex flex-col gap-1">
-            {phase === 'answering' ? (
-              <>
-                <div className="flex justify-center mb-4">
-                  {transformationMode ? (
-                    <div className="max-w-full px-2 text-center">
-                      <div className="text-[10px] font-semibold uppercase text-indigo-500 dark:text-indigo-300">
-                        {transformationActionLabel}
+            )}
+            <div className="mt-4 flex flex-col gap-1">
+              {phase === 'answering' ? (
+                <>
+                  <div className="flex justify-center mb-4">
+                    {transformationMode ? (
+                      <div className="max-w-full px-2 text-center">
+                        <div className="text-[10px] font-semibold uppercase text-indigo-500 dark:text-indigo-300">
+                          {transformationActionLabel}
+                        </div>
+                        <div className="mt-1 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl bg-indigo-600 px-5 py-3 text-white shadow-lg shadow-indigo-950/20 dark:bg-indigo-500/95">
+                          <span className="text-xl sm:text-2xl font-bold leading-tight">
+                            {targetTypeInfo.label}
+                          </span>
+                          {answerTaskDetails.sub && (
+                            <span
+                              className="rounded-lg bg-white/15 px-2 py-1 text-base sm:text-lg font-semibold leading-tight"
+                              lang="ja"
+                            >
+                              {answerTaskDetails.sub}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
+                          <span>From {sourceTypeInfo.label}</span>
+                          <span aria-hidden="true" className="text-indigo-400">
+                            -&gt;
+                          </span>
+                          <span>{transformationSupportText}</span>
+                        </div>
                       </div>
-                      <div className="mt-1 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl bg-indigo-600 px-5 py-3 text-white shadow-lg shadow-indigo-950/20 dark:bg-indigo-500/95">
-                        <span className="text-xl sm:text-2xl font-bold leading-tight">
-                          {targetTypeInfo.label}
+                    ) : (
+                      <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
+                        <span className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                          {taskLabel}
                         </span>
                         {answerTaskDetails.sub && (
                           <span
-                            className="rounded-lg bg-white/15 px-2 py-1 text-base sm:text-lg font-semibold leading-tight"
+                            className="text-sm text-indigo-500 dark:text-indigo-400 font-medium"
                             lang="ja"
                           >
                             {answerTaskDetails.sub}
                           </span>
                         )}
+                        {answerTaskDetails.supportText ? (
+                          <span className="text-xs text-indigo-400 dark:text-indigo-500">
+                            · {answerTaskDetails.supportText}
+                          </span>
+                        ) : null}
+                        {current.ruleLabel && practicePrefs.showWordCategory && (
+                          <span className="text-xs text-indigo-400 dark:text-indigo-500">
+                            · {current.ruleLabel}
+                          </span>
+                        )}
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
-                        <span>From {sourceTypeInfo.label}</span>
-                        <span aria-hidden="true" className="text-indigo-400">
-                          -&gt;
-                        </span>
-                        <span>{transformationSupportText}</span>
-                      </div>
+                    )}
+                    <div className="sr-only">
+                      {transformationMode ? transformationRoute : taskLabel}
                     </div>
-                  ) : (
-                    <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
-                      <span className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                        {taskLabel}
-                      </span>
-                      {answerTaskDetails.sub && (
-                        <span
-                          className="text-sm text-indigo-500 dark:text-indigo-400 font-medium"
-                          lang="ja"
+                  </div>
+                  {minimalPairSetForCurrent && (
+                    <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-250">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold uppercase tracking-wider">
+                          {activeMinimalPairSet ? 'Minimal pair' : 'Today contrast'}
+                        </span>
+                        <span>{minimalPairSetForCurrent.label}</span>
+                        {reviewsDone > 0 && (
+                          <span className="tabular-nums opacity-70">
+                            {reviewsDone} this session
+                          </span>
+                        )}
+                      </div>
+                      {activeMinimalPairSet && (
+                        <button
+                          onClick={() => {
+                            if (setPracticePrefs)
+                              setPracticePrefs(clearMinimalPairPrefs(practicePrefs));
+                            if (setState) {
+                              const enabledTypes = minimalPairReturnEnabledTypes(practicePrefs);
+                              setState((prev) => ({ ...prev, enabledTypes: enabledTypes || [] }));
+                            }
+                          }}
+                          className="ml-1 font-bold leading-none hover:text-emerald-950 dark:hover:text-emerald-100 transition"
+                          aria-label="End minimal pair drill"
+                          title="End drill"
                         >
-                          {answerTaskDetails.sub}
-                        </span>
-                      )}
-                      {answerTaskDetails.supportText ? (
-                        <span className="text-xs text-indigo-400 dark:text-indigo-500">
-                          · {answerTaskDetails.supportText}
-                        </span>
-                      ) : null}
-                      {current.ruleLabel && practicePrefs.showWordCategory && (
-                        <span className="text-xs text-indigo-400 dark:text-indigo-500">
-                          · {current.ruleLabel}
-                        </span>
+                          ×
+                        </button>
                       )}
                     </div>
                   )}
-                  <div className="sr-only">
-                    {transformationMode ? transformationRoute : taskLabel}
-                  </div>
-                </div>
-                {minimalPairSetForCurrent && (
-                  <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-250">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold uppercase tracking-wider">
-                        {activeMinimalPairSet ? 'Minimal pair' : 'Today contrast'}
-                      </span>
-                      <span>{minimalPairSetForCurrent.label}</span>
-                      {reviewsDone > 0 && (
-                        <span className="tabular-nums opacity-70">{reviewsDone} this session</span>
+                  {typoGuard && (
+                    <div className="mb-3 rounded-xl border border-amber-250 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+                      <div className="font-medium">Almost - possible typo.</div>
+                      <div className="text-xs mt-0.5">{typoGuard.detail}</div>
+                    </div>
+                  )}
+
+                  {answerMode === 'self-check' ? (
+                    <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
+                      <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
+                        Self-check deck
+                      </div>
+                      {!selfCheckOpen ? (
+                        <>
+                          <p className="text-sm text-stone-600 dark:text-stone-400 mb-3">
+                            Say or write the answer on your own, then reveal it and grade honestly.
+                          </p>
+                          <div className="grid sm:grid-cols-2 gap-2">
+                            <button
+                              onClick={() => setSelfCheckOpen(true)}
+                              className="py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium transition"
+                            >
+                              Reveal answer
+                            </button>
+                            <button
+                              onClick={skipCurrent}
+                              className="py-2.5 border border-stone-250 bg-white hover:bg-stone-50 text-stone-600 rounded-xl font-medium dark:bg-stone-900 dark:border-stone-800 dark:text-stone-300 transition"
+                            >
+                              Skip without penalty
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="rounded-xl bg-white dark:bg-stone-900 border border-stone-205 dark:border-stone-800 px-3 py-3">
+                            <div className="text-[11px] uppercase tracking-wider text-stone-400 mb-1">
+                              Answer
+                            </div>
+                            <ScriptDisplay
+                              view={expectedView}
+                              word={current.verb}
+                              type={practicedType}
+                              colorHighlight={practicePrefs.colorCodeConjugations !== false}
+                              className="text-2xl font-semibold text-stone-900 dark:text-stone-100"
+                              subClassName="text-xs text-stone-500 mt-1"
+                            />
+                            <div className="text-xs text-stone-500 mt-2">{targetEnglish}</div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 mt-3">
+                            <button
+                              onClick={() => gradeSelfCheck(true, 'Remembered')}
+                              className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition"
+                            >
+                              Remembered
+                            </button>
+                            <button
+                              onClick={() => gradeSelfCheck(false, 'Missed')}
+                              className="py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-xl text-sm font-medium transition"
+                            >
+                              Missed
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
-                    {activeMinimalPairSet && (
-                      <button
-                        onClick={() => {
-                          if (setPracticePrefs)
-                            setPracticePrefs(clearMinimalPairPrefs(practicePrefs));
-                          if (setState) {
-                            const enabledTypes = minimalPairReturnEnabledTypes(practicePrefs);
-                            setState((prev) => ({ ...prev, enabledTypes: enabledTypes || [] }));
-                          }
-                        }}
-                        className="ml-1 font-bold leading-none hover:text-emerald-950 dark:hover:text-emerald-100 transition"
-                        aria-label="End minimal pair drill"
-                        title="End drill"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                )}
-                {typoGuard && (
-                  <div className="mb-3 rounded-xl border border-amber-250 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-                    <div className="font-medium">Almost - possible typo.</div>
-                    <div className="text-xs mt-0.5">{typoGuard.detail}</div>
-                  </div>
-                )}
-
-                {answerMode === 'self-check' ? (
-                  <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
-                    <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
-                      Self-check deck
-                    </div>
-                    {!selfCheckOpen ? (
-                      <>
-                        <p className="text-sm text-stone-600 dark:text-stone-400 mb-3">
-                          Say or write the answer on your own, then reveal it and grade honestly.
-                        </p>
-                        <div className="grid sm:grid-cols-2 gap-2">
-                          <button
-                            onClick={() => setSelfCheckOpen(true)}
-                            className="py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium transition"
-                          >
-                            Reveal answer
-                          </button>
-                          <button
-                            onClick={skipCurrent}
-                            className="py-2.5 border border-stone-250 bg-white hover:bg-stone-50 text-stone-600 rounded-xl font-medium dark:bg-stone-900 dark:border-stone-800 dark:text-stone-300 transition"
-                          >
-                            Skip without penalty
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="rounded-xl bg-white dark:bg-stone-900 border border-stone-205 dark:border-stone-800 px-3 py-3">
-                          <div className="text-[11px] uppercase tracking-wider text-stone-400 mb-1">
-                            Answer
+                  ) : answerMode === 'speak' ? (
+                    <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
+                      <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
+                        Speak answer
+                      </div>
+                      <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <input
+                              ref={inputRef}
+                              id="spoken-answer"
+                              type="text"
+                              value={answer}
+                              onChange={(e) => {
+                                setSpeechError('');
+                                setAnswer(e.target.value);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (answer.trim()) submit(answer, { spoken: true });
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  skipCurrent();
+                                }
+                              }}
+                              placeholder="Heard Japanese answer..."
+                              aria-label="Heard spoken answer"
+                              className="w-full min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
+                              lang="ja"
+                              autoComplete="off"
+                              autoCapitalize="none"
+                              autoCorrect="off"
+                              enterKeyHint="done"
+                              spellCheck="false"
+                            />
                           </div>
+                          <div className="mt-2 min-h-5 text-xs">
+                            {speechListening ? (
+                              <span role="status" className="text-indigo-600 dark:text-indigo-400">
+                                Listening for Japanese...
+                              </span>
+                            ) : speechMatch ? (
+                              <span
+                                className={
+                                  speechMatch.ok
+                                    ? 'text-emerald-700 dark:text-emerald-400'
+                                    : 'text-stone-500 dark:text-stone-400'
+                                }
+                              >
+                                {speechMatch.ok
+                                  ? 'Exact match heard.'
+                                  : speechMatch.score !== null
+                                    ? `Closest match ${speechMatch.score}%.`
+                                    : ''}
+                              </span>
+                            ) : speechRecognitionAvailable ? (
+                              <span className="text-stone-500 dark:text-stone-400">
+                                Microphone ready.
+                              </span>
+                            ) : (
+                              <span className="text-amber-700 dark:text-amber-400">
+                                Speech input is not available in this browser.
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => startSpeechAnswer()}
+                          disabled={!speechRecognitionAvailable}
+                          className={`min-h-12 px-4 py-3 rounded-xl font-medium transition inline-flex items-center justify-center gap-2 ${
+                            speechListening
+                              ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:hover:bg-indigo-600'
+                          }`}
+                        >
+                          <IconMic className="w-4 h-4" />
+                          {speechListening ? 'Stop listening' : 'Speak answer'}
+                        </button>
+                      </div>
+                      {speechError && (
+                        <div
+                          role="alert"
+                          className="mt-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300"
+                        >
+                          {speechError}
+                        </div>
+                      )}
+                      <StickyAction className="mt-3">
+                        <button
+                          onClick={() => submit(answer, { spoken: true })}
+                          disabled={!answer.trim()}
+                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
+                        >
+                          Check spoken answer
+                        </button>
+                      </StickyAction>
+                      <div className="grid sm:grid-cols-2 gap-2 mt-3">
+                        <button
+                          onClick={revealAnswer}
+                          className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
+                        >
+                          Reveal
+                        </button>
+                        <button
+                          onClick={skipCurrent}
+                          className="py-2.5 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    </div>
+                  ) : answerMode === 'choice' ? (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {reverseDrill
+                          ? choices.map((w) => {
+                              const cv = promptDisplay(w, null, practicePrefs);
+                              return (
+                                <button
+                                  key={w.dict + ':' + w.reading}
+                                  onClick={() => submit(w.dict)}
+                                  className="min-h-14 px-3 py-3 border-2 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-xl text-stone-800 dark:text-stone-200 transition"
+                                >
+                                  <ScriptDisplay
+                                    view={cv}
+                                    className="text-xl"
+                                    subClassName="text-xs text-stone-400 mt-1"
+                                  />
+                                  {!hideEnglishMeaning && (
+                                    <div className="mt-1 text-xs text-stone-500">{w.meaning}</div>
+                                  )}
+                                </button>
+                              );
+                            })
+                          : choices.map((c) => {
+                              const cv = formDisplay(c, practicePrefs);
+                              return (
+                                <button
+                                  key={c}
+                                  onClick={() => submit(c)}
+                                  className="min-h-14 px-3 py-3 border-2 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-xl text-stone-800 dark:text-stone-200 transition"
+                                >
+                                  <ScriptDisplay
+                                    view={cv}
+                                    className="text-xl"
+                                    subClassName="text-xs text-stone-400 mt-1"
+                                  />
+                                </button>
+                              );
+                            })}
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-2 mt-3">
+                        <button
+                          onClick={revealAnswer}
+                          className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
+                        >
+                          I don't know
+                        </button>
+                        <button
+                          onClick={skipCurrent}
+                          className="py-2.5 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
+                        >
+                          Skip without penalty
+                        </button>
+                      </div>
+                    </>
+                  ) : guidedKana ? (
+                    <>
+                      <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3 mb-3">
+                        <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
+                          {visibleCoachCells.map((cell, i) => {
+                            const cls =
+                              kanaMatchDisplay === 'none'
+                                ? cell.state === 'empty'
+                                  ? 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300'
+                                  : 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
+                                : cell.state === 'correct'
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
+                                  : cell.state === 'wrong' || cell.state === 'extra'
+                                    ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
+                                    : cell.state === 'pending'
+                                      ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
+                                      : cell.state === 'hint'
+                                        ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-805 dark:text-amber-300'
+                                        : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                            return (
+                              <div
+                                key={i}
+                                className={`w-10 h-11 sm:w-11 sm:h-12 rounded-xl border flex items-center justify-center text-xl font-medium tabular-nums transition ${cls}`}
+                              >
+                                {cell.shown || '·'}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {kanaMatchDisplay === 'color-count' && coachStatus && (
+                          <div
+                            className={`mt-2 text-xs text-center ${
+                              coachWrongIndex >= 0
+                                ? 'text-rose-700'
+                                : coachPreview === expected
+                                  ? 'text-emerald-700'
+                                  : 'text-stone-500'
+                            }`}
+                          >
+                            {coachStatus}
+                          </div>
+                        )}
+                        {!reverseDrill && (
+                          <div className="mt-2 flex flex-col items-center gap-1">
+                            <button
+                              onClick={showStepHint}
+                              className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
+                            >
+                              <IconSpark className="w-3 h-3" />
+                              Hint
+                            </button>
+                            {hintDisclosure}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={inputRef}
+                          type="text"
+                          value={answer}
+                          onChange={(e) =>
+                            updateAnswerFromInput(e, {
+                              trackKanaMistake: kanaMatchDisplay !== 'none',
+                            })
+                          }
+                          onCompositionEnd={(e) =>
+                            commitAnswerComposition(e, {
+                              trackKanaMistake: kanaMatchDisplay !== 'none',
+                            })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (answer.trim()) submit();
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              skipCurrent();
+                            }
+                          }}
+                          placeholder={
+                            reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'
+                          }
+                          aria-label={
+                            reverseDrill
+                              ? 'Type the dictionary form'
+                              : 'Type your answer in romaji or kana'
+                          }
+                          className={answerInputClassName}
+                          lang="ja"
+                          autoComplete="off"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          enterKeyHint="done"
+                          spellCheck="false"
+                        />
+                        {!reverseDrill && (
+                          <button
+                            type="button"
+                            onClick={revealNextKana}
+                            disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
+                            aria-label="Reveal next kana"
+                            title="Reveal next kana"
+                            className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                          >
+                            <IconSpark className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      {liveKana && liveStatus && (
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className={`mt-2 min-h-5 text-center text-xs ${answerFeedbackClassName}`}
+                        >
+                          {liveStatus}
+                        </div>
+                      )}
+                      <StickyAction className="mt-3">
+                        <button
+                          onClick={() => submit()}
+                          disabled={!answer.trim()}
+                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
+                        >
+                          Check (Enter)
+                        </button>
+                      </StickyAction>
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() =>
+                            setCoachRevealed(
+                              Math.min(
+                                expectedKanaCount,
+                                Math.max(coachRevealed, coachTypedCount) + 1,
+                              ),
+                            )
+                          }
+                          disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
+                          className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
+                        >
+                          Hint
+                        </button>
+                        <button
+                          onClick={revealAnswer}
+                          className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm text-amber-800"
+                        >
+                          Reveal
+                        </button>
+                        <button
+                          onClick={skipCurrent}
+                          className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 rounded-xl text-sm"
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={inputRef}
+                          type="text"
+                          value={answer}
+                          onChange={(e) =>
+                            updateAnswerFromInput(e, {
+                              trackKanaMistake: !reverseDrill,
+                            })
+                          }
+                          onCompositionEnd={(e) =>
+                            commitAnswerComposition(e, {
+                              trackKanaMistake: !reverseDrill,
+                            })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (answer.trim()) submit();
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              skipCurrent();
+                            }
+                          }}
+                          placeholder={
+                            reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'
+                          }
+                          aria-label={
+                            reverseDrill
+                              ? 'Type the dictionary form'
+                              : 'Type your answer in romaji or kana'
+                          }
+                          className={answerInputClassName}
+                          lang="ja"
+                          autoComplete="off"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          enterKeyHint="done"
+                          spellCheck="false"
+                        />
+                        {!reverseDrill && (
+                          <button
+                            type="button"
+                            onClick={revealNextKana}
+                            disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
+                            aria-label="Reveal next kana"
+                            title="Reveal next kana"
+                            className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                          >
+                            <IconSpark className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      {liveKana && liveStatus && (
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className={`mt-2 min-h-5 text-center text-xs ${answerFeedbackClassName}`}
+                        >
+                          {liveStatus}
+                        </div>
+                      )}
+                      <StickyAction className="mt-3">
+                        <button
+                          onClick={() => submit()}
+                          disabled={!answer.trim()}
+                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
+                        >
+                          Check (Enter)
+                        </button>
+                      </StickyAction>
+                      <div
+                        className={`mt-2 grid gap-2 ${!reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}
+                      >
+                        {!reverseDrill && (
+                          <button
+                            onClick={showStepHint}
+                            className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
+                          >
+                            Hint
+                          </button>
+                        )}
+                        <button
+                          onClick={revealAnswer}
+                          className="py-2.5 border border-amber-205 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
+                        >
+                          Reveal
+                        </button>
+                        <button
+                          onClick={skipCurrent}
+                          className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-105 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
+                        >
+                          Skip
+                        </button>
+                      </div>
+                      {hintDisclosure}
+                    </>
+                  )}
+                </>
+              ) : (
+                <div
+                  className={`rounded-xl p-4 ${
+                    wasCorrect
+                      ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
+                      : wasCorrected
+                        ? 'bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/50'
+                        : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50'
+                  }`}
+                >
+                  {/* Scoped to the short verdict so screen readers announce the
+                    result without re-reading the breakdown/chat below. */}
+                  <span role="status" aria-live="polite" className="sr-only">
+                    {wasCorrect ? 'Correct!' : wasCorrected ? 'Self-corrected.' : 'Not quite.'}
+                  </span>
+                  <div className="flex items-start gap-3 text-left">
+                    <div
+                      className={`mt-0.5 flex-shrink-0 ${wasCorrect ? 'text-emerald-600' : wasCorrected ? 'text-amber-600' : 'text-rose-600'}`}
+                    >
+                      {wasCorrect ? (
+                        <IconCheck className="w-5 h-5" />
+                      ) : (
+                        <IconX className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div
+                        className={`text-sm font-medium ${wasCorrect ? 'text-emerald-800 dark:text-emerald-300' : wasCorrected ? 'text-amber-800 dark:text-amber-300' : 'text-rose-800'}`}
+                      >
+                        {wasCorrect ? 'Correct!' : wasCorrected ? 'Self-corrected.' : 'Not quite.'}
+                      </div>
+                      {wasCorrected && (
+                        <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                          You fixed it mid-type, but the mistake still counts.
+                        </div>
+                      )}
+                      {wasCorrect ? (
+                        /* Correct answer case */
+                        <>
+                          {reviewKanaCells.length > 0 && (
+                            <div className="mt-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50 p-2">
+                              <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                                {reviewKanaCells.map((cell, i) => {
+                                  const cls =
+                                    cell.state === 'correct'
+                                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
+                                      : cell.state === 'wrong' || cell.state === 'extra'
+                                        ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
+                                        : cell.state === 'hint'
+                                          ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
+                                          : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                                  return (
+                                    <div
+                                      key={i}
+                                      className={`w-8 h-9 sm:w-9 sm:h-10 rounded-lg border flex items-center justify-center text-base font-medium tabular-nums ${cls}`}
+                                    >
+                                      {cell.shown || '·'}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        /* Incorrect answer case */
+                        <>
+                          {reviewKanaCells.length > 0 ? (
+                            <>
+                              {/* Correct Answer nice and clearly at the top */}
+                              <div className="mt-3">
+                                <div className="text-[11px] uppercase tracking-wider text-emerald-600 dark:text-emerald-455 font-semibold mb-1">
+                                  Correct Answer
+                                </div>
+                                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/10 p-2">
+                                  <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
+                                    {Array.from(expected).map((char, i) => (
+                                      <div
+                                        key={i}
+                                        className="w-9 h-10 sm:w-10 sm:h-11 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-850 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300 flex items-center justify-center text-lg font-semibold tabular-nums shadow-sm"
+                                      >
+                                        {char}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                <ScriptDisplay
+                                  view={expectedView}
+                                  word={current.verb}
+                                  type={practicedType}
+                                  colorHighlight={practicePrefs.colorCodeConjugations !== false}
+                                  className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
+                                  subClassName="text-xs text-stone-500 mt-1"
+                                />
+                                <div className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
+                                  {targetEnglish}
+                                </div>
+                              </div>
+
+                              {/* Guessed answer below it */}
+                              <div className="mt-3">
+                                <div
+                                  className={`text-[11px] uppercase tracking-wider ${wasCorrected ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-rose-700/80 dark:text-rose-400/80'} mb-1`}
+                                >
+                                  {reviewChoiceLabel
+                                    ? 'You chose'
+                                    : revealedMiss
+                                      ? "You chose: I don't know"
+                                      : 'Your guess'}
+                                  {!revealedMiss && !reviewChoiceLabel && (
+                                    <span lang="ja" className="ml-1 font-medium">
+                                      (
+                                      {reverseDrill
+                                        ? submittedAnswer.trim() || 'empty'
+                                        : toHiragana(submittedAnswer) || 'empty'}
+                                      )
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="rounded-xl border border-stone-200/60 dark:border-stone-800/60 bg-stone-50/40 dark:bg-stone-900/20 p-2">
+                                  <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                                    {reviewKanaCells.map((cell, i) => {
+                                      const cls =
+                                        cell.state === 'correct'
+                                          ? 'bg-emerald-50/50 border-emerald-350/40 text-emerald-800/80 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-300/80'
+                                          : cell.state === 'wrong' || cell.state === 'extra'
+                                            ? 'bg-rose-50/50 border-rose-350/40 text-rose-800/80 dark:bg-rose-950/20 dark:border-rose-800/30 dark:text-rose-300/80'
+                                            : cell.state === 'hint'
+                                              ? 'bg-amber-50/50 border-amber-350/40 text-amber-800/80 dark:bg-amber-950/20 dark:border-amber-300/30 dark:text-amber-300/80'
+                                              : 'bg-white/50 dark:bg-stone-900/50 border-stone-200/40 dark:border-stone-800/40 text-stone-300/85';
+                                      return (
+                                        <div
+                                          key={i}
+                                          className={`w-7 h-8 sm:w-8 sm:h-9 rounded-lg border flex items-center justify-center text-sm font-medium tabular-nums ${cls}`}
+                                        >
+                                          {cell.shown || '·'}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-xs text-rose-700 mt-1">
+                              {reviewChoiceLabel
+                                ? `You chose: ${reviewChoiceLabel}`
+                                : revealedMiss
+                                  ? "You chose: I don't know"
+                                  : 'You wrote:'}{' '}
+                              {!revealedMiss && !reviewChoiceLabel && (
+                                <span lang="ja" className="font-semibold">
+                                  {reverseDrill
+                                    ? submittedAnswer.trim() || '(empty)'
+                                    : toHiragana(submittedAnswer) || '(empty)'}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {wasCorrect && (
+                        <>
                           <ScriptDisplay
                             view={expectedView}
                             word={current.verb}
                             type={practicedType}
                             colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                            className="text-2xl font-semibold text-stone-900 dark:text-stone-100"
+                            className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
                             subClassName="text-xs text-stone-500 mt-1"
                           />
-                          <div className="text-xs text-stone-500 mt-2">{targetEnglish}</div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mt-3">
-                          <button
-                            onClick={() => gradeSelfCheck(true, 'Remembered')}
-                            className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition"
-                          >
-                            Remembered
-                          </button>
-                          <button
-                            onClick={() => gradeSelfCheck(false, 'Missed')}
-                            className="py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-xl text-sm font-medium transition"
-                          >
-                            Missed
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : answerMode === 'speak' ? (
-                  <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
-                    <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
-                      Speak answer
-                    </div>
-                    <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <input
-                            ref={inputRef}
-                            id="spoken-answer"
-                            type="text"
-                            value={answer}
-                            onChange={(e) => {
-                              setSpeechError('');
-                              setAnswer(e.target.value);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                if (answer.trim()) submit(answer, { spoken: true });
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                skipCurrent();
-                              }
-                            }}
-                            placeholder="Heard Japanese answer..."
-                            aria-label="Heard spoken answer"
-                            className="w-full min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
-                            lang="ja"
-                            autoComplete="off"
-                            autoCapitalize="none"
-                            autoCorrect="off"
-                            enterKeyHint="done"
-                            spellCheck="false"
-                          />
-                        </div>
-                        <div className="mt-2 min-h-5 text-xs">
-                          {speechListening ? (
-                            <span role="status" className="text-indigo-600 dark:text-indigo-400">
-                              Listening for Japanese...
-                            </span>
-                          ) : speechMatch ? (
-                            <span
-                              className={
-                                speechMatch.ok
-                                  ? 'text-emerald-700 dark:text-emerald-400'
-                                  : 'text-stone-500 dark:text-stone-400'
-                              }
-                            >
-                              {speechMatch.ok
-                                ? 'Exact match heard.'
-                                : speechMatch.score !== null
-                                  ? `Closest match ${speechMatch.score}%.`
-                                  : ''}
-                            </span>
-                          ) : speechRecognitionAvailable ? (
-                            <span className="text-stone-500 dark:text-stone-400">
-                              Microphone ready.
-                            </span>
-                          ) : (
-                            <span className="text-amber-700 dark:text-amber-400">
-                              Speech input is not available in this browser.
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => startSpeechAnswer()}
-                        disabled={!speechRecognitionAvailable}
-                        className={`min-h-12 px-4 py-3 rounded-xl font-medium transition inline-flex items-center justify-center gap-2 ${
-                          speechListening
-                            ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                            : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:hover:bg-indigo-600'
-                        }`}
-                      >
-                        <IconMic className="w-4 h-4" />
-                        {speechListening ? 'Stop listening' : 'Speak answer'}
-                      </button>
-                    </div>
-                    {speechError && (
-                      <div
-                        role="alert"
-                        className="mt-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300"
-                      >
-                        {speechError}
-                      </div>
-                    )}
-                    <StickyAction className="mt-3">
-                      <button
-                        onClick={() => submit(answer, { spoken: true })}
-                        disabled={!answer.trim()}
-                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
-                      >
-                        Check spoken answer
-                      </button>
-                    </StickyAction>
-                    <div className="grid sm:grid-cols-2 gap-2 mt-3">
-                      <button
-                        onClick={revealAnswer}
-                        className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
-                      >
-                        Reveal
-                      </button>
-                      <button
-                        onClick={skipCurrent}
-                        className="py-2.5 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-                      >
-                        Skip
-                      </button>
-                    </div>
-                  </div>
-                ) : answerMode === 'choice' ? (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {reverseDrill
-                        ? choices.map((w) => {
-                            const cv = promptDisplay(w, null, practicePrefs);
-                            return (
-                              <button
-                                key={w.dict + ':' + w.reading}
-                                onClick={() => submit(w.dict)}
-                                className="min-h-14 px-3 py-3 border-2 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-xl text-stone-800 dark:text-stone-200 transition"
-                              >
-                                <ScriptDisplay
-                                  view={cv}
-                                  className="text-xl"
-                                  subClassName="text-xs text-stone-400 mt-1"
-                                />
-                                {!hideEnglishMeaning && (
-                                  <div className="mt-1 text-xs text-stone-500">{w.meaning}</div>
-                                )}
-                              </button>
-                            );
-                          })
-                        : choices.map((c) => {
-                            const cv = formDisplay(c, practicePrefs);
-                            return (
-                              <button
-                                key={c}
-                                onClick={() => submit(c)}
-                                className="min-h-14 px-3 py-3 border-2 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-xl text-stone-800 dark:text-stone-200 transition"
-                              >
-                                <ScriptDisplay
-                                  view={cv}
-                                  className="text-xl"
-                                  subClassName="text-xs text-stone-400 mt-1"
-                                />
-                              </button>
-                            );
-                          })}
-                    </div>
-                    <div className="grid sm:grid-cols-2 gap-2 mt-3">
-                      <button
-                        onClick={revealAnswer}
-                        className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
-                      >
-                        I don't know
-                      </button>
-                      <button
-                        onClick={skipCurrent}
-                        className="py-2.5 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-                      >
-                        Skip without penalty
-                      </button>
-                    </div>
-                  </>
-                ) : guidedKana ? (
-                  <>
-                    <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3 mb-3">
-                      <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                        {visibleCoachCells.map((cell, i) => {
-                          const cls =
-                            kanaMatchDisplay === 'none'
-                              ? cell.state === 'empty'
-                                ? 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300'
-                                : 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
-                              : cell.state === 'correct'
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
-                                : cell.state === 'wrong' || cell.state === 'extra'
-                                  ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
-                                  : cell.state === 'pending'
-                                    ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
-                                    : cell.state === 'hint'
-                                      ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-805 dark:text-amber-300'
-                                      : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
-                          return (
-                            <div
-                              key={i}
-                              className={`w-10 h-11 sm:w-11 sm:h-12 rounded-xl border flex items-center justify-center text-xl font-medium tabular-nums transition ${cls}`}
-                            >
-                              {cell.shown || '·'}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {kanaMatchDisplay === 'color-count' && coachStatus && (
-                        <div
-                          className={`mt-2 text-xs text-center ${
-                            coachWrongIndex >= 0
-                              ? 'text-rose-700'
-                              : coachPreview === expected
-                                ? 'text-emerald-700'
-                                : 'text-stone-500'
-                          }`}
-                        >
-                          {coachStatus}
-                        </div>
-                      )}
-                      {!reverseDrill && (
-                        <div className="mt-2 flex flex-col items-center gap-1">
-                          <button
-                            onClick={showStepHint}
-                            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
-                          >
-                            <IconSpark className="w-3 h-3" />
-                            Hint
-                          </button>
-                          {hintDisclosure}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        value={answer}
-                        onChange={(e) =>
-                          updateAnswerFromInput(e, {
-                            trackKanaMistake: kanaMatchDisplay !== 'none',
-                          })
-                        }
-                        onCompositionEnd={(e) =>
-                          commitAnswerComposition(e, {
-                            trackKanaMistake: kanaMatchDisplay !== 'none',
-                          })
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            if (answer.trim()) submit();
-                          } else if (e.key === 'Escape') {
-                            e.preventDefault();
-                            skipCurrent();
-                          }
-                        }}
-                        placeholder={
-                          reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'
-                        }
-                        aria-label={
-                          reverseDrill
-                            ? 'Type the dictionary form'
-                            : 'Type your answer in romaji or kana'
-                        }
-                        className={answerInputClassName}
-                        lang="ja"
-                        autoComplete="off"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        enterKeyHint="done"
-                        spellCheck="false"
-                      />
-                      {!reverseDrill && (
-                        <button
-                          type="button"
-                          onClick={revealNextKana}
-                          disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
-                          aria-label="Reveal next kana"
-                          title="Reveal next kana"
-                          className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-                        >
-                          <IconSpark className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                    {liveKana && liveStatus && (
-                      <div
-                        role="status"
-                        aria-live="polite"
-                        className={`mt-2 min-h-5 text-center text-xs ${answerFeedbackClassName}`}
-                      >
-                        {liveStatus}
-                      </div>
-                    )}
-                    <StickyAction className="mt-3">
-                      <button
-                        onClick={() => submit()}
-                        disabled={!answer.trim()}
-                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
-                      >
-                        Check (Enter)
-                      </button>
-                    </StickyAction>
-                    <div className="mt-2 grid grid-cols-3 gap-2">
-                      <button
-                        onClick={() =>
-                          setCoachRevealed(
-                            Math.min(
-                              expectedKanaCount,
-                              Math.max(coachRevealed, coachTypedCount) + 1,
-                            ),
-                          )
-                        }
-                        disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
-                        className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
-                      >
-                        Hint
-                      </button>
-                      <button
-                        onClick={revealAnswer}
-                        className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm text-amber-800"
-                      >
-                        Reveal
-                      </button>
-                      <button
-                        onClick={skipCurrent}
-                        className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 rounded-xl text-sm"
-                      >
-                        Skip
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        value={answer}
-                        onChange={(e) =>
-                          updateAnswerFromInput(e, {
-                            trackKanaMistake: !reverseDrill,
-                          })
-                        }
-                        onCompositionEnd={(e) =>
-                          commitAnswerComposition(e, {
-                            trackKanaMistake: !reverseDrill,
-                          })
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            if (answer.trim()) submit();
-                          } else if (e.key === 'Escape') {
-                            e.preventDefault();
-                            skipCurrent();
-                          }
-                        }}
-                        placeholder={
-                          reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'
-                        }
-                        aria-label={
-                          reverseDrill
-                            ? 'Type the dictionary form'
-                            : 'Type your answer in romaji or kana'
-                        }
-                        className={answerInputClassName}
-                        lang="ja"
-                        autoComplete="off"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        enterKeyHint="done"
-                        spellCheck="false"
-                      />
-                      {!reverseDrill && (
-                        <button
-                          type="button"
-                          onClick={revealNextKana}
-                          disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
-                          aria-label="Reveal next kana"
-                          title="Reveal next kana"
-                          className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-                        >
-                          <IconSpark className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                    {liveKana && liveStatus && (
-                      <div
-                        role="status"
-                        aria-live="polite"
-                        className={`mt-2 min-h-5 text-center text-xs ${answerFeedbackClassName}`}
-                      >
-                        {liveStatus}
-                      </div>
-                    )}
-                    <StickyAction className="mt-3">
-                      <button
-                        onClick={() => submit()}
-                        disabled={!answer.trim()}
-                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
-                      >
-                        Check (Enter)
-                      </button>
-                    </StickyAction>
-                    <div
-                      className={`mt-2 grid gap-2 ${!reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}
-                    >
-                      {!reverseDrill && (
-                        <button
-                          onClick={showStepHint}
-                          className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-                        >
-                          Hint
-                        </button>
-                      )}
-                      <button
-                        onClick={revealAnswer}
-                        className="py-2.5 border border-amber-205 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
-                      >
-                        Reveal
-                      </button>
-                      <button
-                        onClick={skipCurrent}
-                        className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-105 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-                      >
-                        Skip
-                      </button>
-                    </div>
-                    {hintDisclosure}
-                  </>
-                )}
-              </>
-            ) : (
-              <div
-                className={`rounded-xl p-4 ${
-                  wasCorrect
-                    ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
-                    : wasCorrected
-                      ? 'bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/50'
-                      : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50'
-                }`}
-              >
-                {/* Scoped to the short verdict so screen readers announce the
-                    result without re-reading the breakdown/chat below. */}
-                <span role="status" aria-live="polite" className="sr-only">
-                  {wasCorrect ? 'Correct!' : wasCorrected ? 'Self-corrected.' : 'Not quite.'}
-                </span>
-                <div className="flex items-start gap-3 text-left">
-                  <div
-                    className={`mt-0.5 flex-shrink-0 ${wasCorrect ? 'text-emerald-600' : wasCorrected ? 'text-amber-600' : 'text-rose-600'}`}
-                  >
-                    {wasCorrect ? <IconCheck className="w-5 h-5" /> : <IconX className="w-5 h-5" />}
-                  </div>
-                  <div className="flex-1">
-                    <div
-                      className={`text-sm font-medium ${wasCorrect ? 'text-emerald-800 dark:text-emerald-300' : wasCorrected ? 'text-amber-800 dark:text-amber-300' : 'text-rose-800'}`}
-                    >
-                      {wasCorrect ? 'Correct!' : wasCorrected ? 'Self-corrected.' : 'Not quite.'}
-                    </div>
-                    {wasCorrected && (
-                      <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                        You fixed it mid-type, but the mistake still counts.
-                      </div>
-                    )}
-                    {wasCorrect ? (
-                      /* Correct answer case */
-                      <>
-                        {reviewKanaCells.length > 0 && (
-                          <div className="mt-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50 p-2">
-                            <div className="flex flex-wrap justify-center gap-1" lang="ja">
-                              {reviewKanaCells.map((cell, i) => {
-                                const cls =
-                                  cell.state === 'correct'
-                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
-                                    : cell.state === 'wrong' || cell.state === 'extra'
-                                      ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
-                                      : cell.state === 'hint'
-                                        ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
-                                        : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
-                                return (
-                                  <div
-                                    key={i}
-                                    className={`w-8 h-9 sm:w-9 sm:h-10 rounded-lg border flex items-center justify-center text-base font-medium tabular-nums ${cls}`}
-                                  >
-                                    {cell.shown || '·'}
-                                  </div>
-                                );
-                              })}
-                            </div>
+                          <div className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
+                            {targetEnglish}
                           </div>
-                        )}
-                      </>
-                    ) : (
-                      /* Incorrect answer case */
-                      <>
-                        {reviewKanaCells.length > 0 ? (
-                          <>
-                            {/* Correct Answer nice and clearly at the top */}
-                            <div className="mt-3">
-                              <div className="text-[11px] uppercase tracking-wider text-emerald-600 dark:text-emerald-455 font-semibold mb-1">
-                                Correct Answer
-                              </div>
-                              <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/10 p-2">
-                                <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                                  {Array.from(expected).map((char, i) => (
-                                    <div
-                                      key={i}
-                                      className="w-9 h-10 sm:w-10 sm:h-11 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-850 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300 flex items-center justify-center text-lg font-semibold tabular-nums shadow-sm"
-                                    >
-                                      {char}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              <ScriptDisplay
-                                view={expectedView}
-                                word={current.verb}
-                                type={practicedType}
-                                colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                                className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
-                                subClassName="text-xs text-stone-500 mt-1"
-                              />
-                              <div className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
-                                {targetEnglish}
-                              </div>
-                            </div>
+                        </>
+                      )}
+                      {wasCorrect && practicePrefs.autoAdvanceCorrect && (
+                        <div className="text-xs text-emerald-700 mt-2">Next card coming up...</div>
+                      )}
+                    </div>
+                  </div>
 
-                            {/* Guessed answer below it */}
-                            <div className="mt-3">
-                              <div
-                                className={`text-[11px] uppercase tracking-wider ${wasCorrected ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-rose-700/80 dark:text-rose-400/80'} mb-1`}
-                              >
-                                {reviewChoiceLabel
-                                  ? 'You chose'
-                                  : revealedMiss
-                                    ? "You chose: I don't know"
-                                    : 'Your guess'}
-                                {!revealedMiss && !reviewChoiceLabel && (
-                                  <span lang="ja" className="ml-1 font-medium">
-                                    (
-                                    {reverseDrill
-                                      ? submittedAnswer.trim() || 'empty'
-                                      : toHiragana(submittedAnswer) || 'empty'}
-                                    )
-                                  </span>
-                                )}
-                              </div>
-                              <div className="rounded-xl border border-stone-200/60 dark:border-stone-800/60 bg-stone-50/40 dark:bg-stone-900/20 p-2">
-                                <div className="flex flex-wrap justify-center gap-1" lang="ja">
-                                  {reviewKanaCells.map((cell, i) => {
-                                    const cls =
-                                      cell.state === 'correct'
-                                        ? 'bg-emerald-50/50 border-emerald-350/40 text-emerald-800/80 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-300/80'
-                                        : cell.state === 'wrong' || cell.state === 'extra'
-                                          ? 'bg-rose-50/50 border-rose-350/40 text-rose-800/80 dark:bg-rose-950/20 dark:border-rose-800/30 dark:text-rose-300/80'
-                                          : cell.state === 'hint'
-                                            ? 'bg-amber-50/50 border-amber-350/40 text-amber-800/80 dark:bg-amber-950/20 dark:border-amber-300/30 dark:text-amber-300/80'
-                                            : 'bg-white/50 dark:bg-stone-900/50 border-stone-200/40 dark:border-stone-800/40 text-stone-300/85';
-                                    return (
-                                      <div
-                                        key={i}
-                                        className={`w-7 h-8 sm:w-8 sm:h-9 rounded-lg border flex items-center justify-center text-sm font-medium tabular-nums ${cls}`}
-                                      >
-                                        {cell.shown || '·'}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-xs text-rose-700 mt-1">
-                            {reviewChoiceLabel
-                              ? `You chose: ${reviewChoiceLabel}`
-                              : revealedMiss
-                                ? "You chose: I don't know"
-                                : 'You wrote:'}{' '}
-                            {!revealedMiss && !reviewChoiceLabel && (
-                              <span lang="ja" className="font-semibold">
-                                {reverseDrill
-                                  ? submittedAnswer.trim() || '(empty)'
-                                  : toHiragana(submittedAnswer) || '(empty)'}
-                              </span>
-                            )}
+                  <ContextExamplePanel
+                    item={current.verb}
+                    type={practicedType}
+                    geminiKey={geminiKey}
+                    practicePrefs={practicePrefs}
+                  />
+
+                  {wasCorrect && reviewExplanation && (
+                    <div className="mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-900/50 text-left">
+                      <ReviewDisclosure tone="emerald" summary="Why this is right" alwaysOpen>
+                        <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                          {reviewExplanation.intro}
+                        </div>
+                        {reviewExplanation.reason && (
+                          <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+                            {reviewExplanation.reason}
                           </div>
                         )}
-                      </>
-                    )}
-                    {wasCorrect && (
-                      <>
-                        <ScriptDisplay
-                          view={expectedView}
+                        {reviewExplanation.rule && (
+                          <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                            {reviewExplanation.rule}
+                          </div>
+                        )}
+                        {reviewExplanation.derivation &&
+                          reviewExplanation.derivation !== expected && (
+                            <div
+                              className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
+                              lang="ja"
+                            >
+                              {reviewExplanation.derivation}
+                            </div>
+                          )}
+                        {reviewExplanation.note && (
+                          <div className="text-xs text-stone-605 dark:text-stone-400 italic bg-stone-50/80 dark:bg-stone-950/80 rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-800">
+                            {reviewExplanation.note}
+                          </div>
+                        )}
+                        <ConjugationBreakdown
                           word={current.verb}
                           type={practicedType}
-                          colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                          className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
-                          subClassName="text-xs text-stone-500 mt-1"
+                          geminiKey={geminiKey}
+                          practicePrefs={practicePrefs}
                         />
-                        <div className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
-                          {targetEnglish}
-                        </div>
-                      </>
-                    )}
-                    {wasCorrect && practicePrefs.autoAdvanceCorrect && (
-                      <div className="text-xs text-emerald-700 mt-2">Next card coming up...</div>
-                    )}
-                  </div>
-                </div>
-
-                <ContextExamplePanel
-                  item={current.verb}
-                  type={practicedType}
-                  geminiKey={geminiKey}
-                  practicePrefs={practicePrefs}
-                />
-
-                {wasCorrect && reviewExplanation && (
-                  <div className="mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-900/50 text-left">
-                    <ReviewDisclosure tone="emerald" summary="Why this is right" alwaysOpen>
-                      <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                        {reviewExplanation.intro}
-                      </div>
-                      {reviewExplanation.reason && (
-                        <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
-                          {reviewExplanation.reason}
-                        </div>
-                      )}
-                      {reviewExplanation.rule && (
-                        <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                          {reviewExplanation.rule}
-                        </div>
-                      )}
-                      {reviewExplanation.derivation &&
-                        reviewExplanation.derivation !== expected && (
-                          <div
-                            className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
-                            lang="ja"
-                          >
-                            {reviewExplanation.derivation}
-                          </div>
-                        )}
-                      {reviewExplanation.note && (
-                        <div className="text-xs text-stone-605 dark:text-stone-400 italic bg-stone-50/80 dark:bg-stone-950/80 rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-800">
-                          {reviewExplanation.note}
-                        </div>
-                      )}
-                      <ConjugationBreakdown
-                        word={current.verb}
-                        type={practicedType}
-                        geminiKey={geminiKey}
-                        practicePrefs={practicePrefs}
-                      />
-                    </ReviewDisclosure>
-                    {geminiKey && (
-                      <ReviewDisclosure tone="emerald" summary="Ask Gemini why">
-                        {!chatOpen ? (
-                          <button
-                            onClick={() => setChatOpen(true)}
-                            aria-expanded={chatOpen}
-                            className="w-full py-2 border border-emerald-200 dark:border-emerald-900 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/50 rounded-xl text-sm text-emerald-700 dark:text-emerald-400 flex items-center justify-center gap-1.5 transition"
-                          >
-                            <IconChat className="w-4 h-4" /> Ask Gemini why
-                          </button>
-                        ) : (
-                          <ChatPanel
-                            verb={current.verb}
-                            type={practicedType}
-                            userAnswer={expected}
-                            expected={expected}
-                            explanation={reviewExplanation}
-                            geminiKey={geminiKey}
-                            practicePrefs={practicePrefs}
-                            taskOverride={taskOverride}
-                            wasCorrect
-                            reviewTone="emerald"
-                          />
-                        )}
                       </ReviewDisclosure>
-                    )}
-                  </div>
-                )}
-
-                {!wasCorrect && explanation && (
-                  <div className="mt-4 pt-4 border-t border-rose-200 dark:border-rose-900/50 space-y-2.5 text-left">
-                    <div className="text-xs uppercase tracking-wider text-rose-700 dark:text-rose-400 font-medium">
-                      Why it's{' '}
-                      <span lang="ja" className="normal-case tracking-normal">
-                        {expected}
-                      </span>
+                      {geminiKey && (
+                        <ReviewDisclosure tone="emerald" summary="Ask Gemini why">
+                          {!chatOpen ? (
+                            <button
+                              onClick={() => setChatOpen(true)}
+                              aria-expanded={chatOpen}
+                              className="w-full py-2 border border-emerald-200 dark:border-emerald-900 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/50 rounded-xl text-sm text-emerald-700 dark:text-emerald-400 flex items-center justify-center gap-1.5 transition"
+                            >
+                              <IconChat className="w-4 h-4" /> Ask Gemini why
+                            </button>
+                          ) : (
+                            <ChatPanel
+                              verb={current.verb}
+                              type={practicedType}
+                              userAnswer={expected}
+                              expected={expected}
+                              explanation={reviewExplanation}
+                              geminiKey={geminiKey}
+                              practicePrefs={practicePrefs}
+                              taskOverride={taskOverride}
+                              wasCorrect
+                              reviewTone="emerald"
+                            />
+                          )}
+                        </ReviewDisclosure>
+                      )}
                     </div>
-                    {minimalPairFeedback && (
-                      <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2">
-                        <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                          Contrast check: {minimalPairFeedback.label}
-                        </div>
-                        {minimalPairFeedback.masuDiagnostic && (
-                          <div className="mt-1 border-l-2 border-emerald-300 dark:border-emerald-700 pl-3 text-sm text-stone-700 dark:text-stone-300">
-                            <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                              Masu check
-                            </div>
-                            <div className="mt-0.5">
-                              <span
-                                lang="ja"
-                                className="font-semibold text-stone-900 dark:text-stone-100"
-                              >
-                                {minimalPairFeedback.masuDiagnostic.dict}
-                                {' -> '}
-                                {minimalPairFeedback.masuDiagnostic.politeSurface}
-                              </span>
-                              <span className="ml-2">
-                                {minimalPairFeedback.masuDiagnostic.contrast}
-                              </span>
-                            </div>
+                  )}
+
+                  {!wasCorrect && explanation && (
+                    <div className="mt-4 pt-4 border-t border-rose-200 dark:border-rose-900/50 space-y-2.5 text-left">
+                      <div className="text-xs uppercase tracking-wider text-rose-700 dark:text-rose-400 font-medium">
+                        Why it's{' '}
+                        <span lang="ja" className="normal-case tracking-normal">
+                          {expected}
+                        </span>
+                      </div>
+                      {minimalPairFeedback && (
+                        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2">
+                          <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                            Contrast check: {minimalPairFeedback.label}
                           </div>
-                        )}
-                        {!minimalPairFeedback.masuDiagnostic && (
-                          <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
+                          {minimalPairFeedback.masuDiagnostic && (
+                            <div className="mt-1 border-l-2 border-emerald-300 dark:border-emerald-700 pl-3 text-sm text-stone-700 dark:text-stone-300">
+                              <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                                Masu check
+                              </div>
+                              <div className="mt-0.5">
+                                <span
+                                  lang="ja"
+                                  className="font-semibold text-stone-900 dark:text-stone-100"
+                                >
+                                  {minimalPairFeedback.masuDiagnostic.dict}
+                                  {' -> '}
+                                  {minimalPairFeedback.masuDiagnostic.politeSurface}
+                                </span>
+                                <span className="ml-2">
+                                  {minimalPairFeedback.masuDiagnostic.contrast}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          {!minimalPairFeedback.masuDiagnostic && (
+                            <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
+                              {minimalPairFeedback.intro}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {diagnostic && (
+                        <div className="text-sm text-rose-800 dark:text-rose-300 bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2">
+                          <span className="font-medium text-rose-900 dark:text-rose-200">
+                            Diagnosis:{' '}
+                          </span>
+                          {lastDiagnosis?.label ? `${lastDiagnosis.label}. ` : ''}
+                          {diagnostic}
+                        </div>
+                      )}
+                      {!minimalPairFeedback && (
+                        <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                          {explanation.intro}
+                        </div>
+                      )}
+                      {explanation.rule && (
+                        <div className="rounded-lg bg-white/70 dark:bg-stone-900/70 px-3 py-2 text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                          <span className="font-semibold text-stone-900 dark:text-stone-100">
+                            Rule:{' '}
+                          </span>
+                          {explanation.rule}
+                        </div>
+                      )}
+                      {explanation.derivation && explanation.derivation !== expected && (
+                        <div
+                          className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
+                          lang="ja"
+                        >
+                          {explanation.derivation}
+                        </div>
+                      )}
+                      {minimalPairFeedback && (
+                        <ReviewDisclosure tone="emerald" summary="Full contrast details">
+                          <div className="text-sm text-stone-700 dark:text-stone-300">
                             {minimalPairFeedback.intro}
                           </div>
-                        )}
-                      </div>
-                    )}
-                    {diagnostic && (
-                      <div className="text-sm text-rose-800 dark:text-rose-300 bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2">
-                        <span className="font-medium text-rose-900 dark:text-rose-200">
-                          Diagnosis:{' '}
-                        </span>
-                        {lastDiagnosis?.label ? `${lastDiagnosis.label}. ` : ''}
-                        {diagnostic}
-                      </div>
-                    )}
-                    {!minimalPairFeedback && (
-                      <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                        {explanation.intro}
-                      </div>
-                    )}
-                    {explanation.rule && (
-                      <div className="rounded-lg bg-white/70 dark:bg-stone-900/70 px-3 py-2 text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                        <span className="font-semibold text-stone-900 dark:text-stone-100">
-                          Rule:{' '}
-                        </span>
-                        {explanation.rule}
-                      </div>
-                    )}
-                    {explanation.derivation && explanation.derivation !== expected && (
-                      <div
-                        className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
-                        lang="ja"
-                      >
-                        {explanation.derivation}
-                      </div>
-                    )}
-                    {minimalPairFeedback && (
-                      <ReviewDisclosure tone="emerald" summary="Full contrast details">
-                        <div className="text-sm text-stone-700 dark:text-stone-300">
-                          {minimalPairFeedback.intro}
+                          <div className="grid gap-1.5 sm:grid-cols-2">
+                            {minimalPairFeedback.contrasts.map((contrast) => (
+                              <div
+                                key={contrast.id}
+                                className={`rounded-lg border px-2.5 py-2 text-xs ${
+                                  contrast.id === minimalPairFeedback.active.id
+                                    ? 'border-emerald-300 bg-white/80 text-emerald-900 dark:border-emerald-800 dark:bg-stone-950/50 dark:text-emerald-200'
+                                    : 'border-stone-200 bg-white/60 text-stone-600 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-300'
+                                }`}
+                              >
+                                <div className="font-semibold">{contrast.label}</div>
+                                <div className="mt-0.5">{contrast.cue}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </ReviewDisclosure>
+                      )}
+                      <ReviewDisclosure tone="rose" summary="Full rule path">
+                        <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
+                          {explanation.intro}
                         </div>
-                        <div className="grid gap-1.5 sm:grid-cols-2">
-                          {minimalPairFeedback.contrasts.map((contrast) => (
-                            <div
-                              key={contrast.id}
-                              className={`rounded-lg border px-2.5 py-2 text-xs ${
-                                contrast.id === minimalPairFeedback.active.id
-                                  ? 'border-emerald-300 bg-white/80 text-emerald-900 dark:border-emerald-800 dark:bg-stone-950/50 dark:text-emerald-200'
-                                  : 'border-stone-200 bg-white/60 text-stone-600 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-300'
-                              }`}
+                        {explanation.reason && (
+                          <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
+                            {explanation.reason}
+                          </div>
+                        )}
+                        {explanation.note && (
+                          <div className="text-xs text-stone-600 dark:text-stone-400 italic bg-stone-50/80 dark:bg-stone-950/80 rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-800">
+                            {explanation.note}
+                          </div>
+                        )}
+                        <ConjugationBreakdown
+                          word={current.verb}
+                          type={practicedType}
+                          userAnswer={revealedMiss ? '' : submittedAnswer}
+                          geminiKey={geminiKey}
+                          practicePrefs={practicePrefs}
+                        />
+                      </ReviewDisclosure>
+                      {geminiKey && (
+                        <ReviewDisclosure tone="rose" summary="Ask Gemini why">
+                          {!chatOpen ? (
+                            <button
+                              onClick={() => setChatOpen(true)}
+                              aria-expanded={chatOpen}
+                              className="w-full py-2 border border-rose-200 dark:border-rose-900 hover:bg-rose-100/50 dark:hover:bg-rose-950/50 rounded-xl text-sm text-rose-700 dark:text-rose-450 flex items-center justify-center gap-1.5 transition"
                             >
-                              <div className="font-semibold">{contrast.label}</div>
-                              <div className="mt-0.5">{contrast.cue}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </ReviewDisclosure>
-                    )}
-                    <ReviewDisclosure tone="rose" summary="Full rule path">
-                      <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                        {explanation.intro}
-                      </div>
-                      {explanation.reason && (
-                        <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
-                          {explanation.reason}
-                        </div>
+                              <IconChat className="w-4 h-4" /> Ask Gemini why
+                            </button>
+                          ) : (
+                            <ChatPanel
+                              verb={current.verb}
+                              type={practicedType}
+                              userAnswer={revealedMiss ? '(revealed)' : submittedAnswer}
+                              expected={expected}
+                              explanation={explanation}
+                              geminiKey={geminiKey}
+                              practicePrefs={practicePrefs}
+                              taskOverride={taskOverride}
+                              wasCorrected={wasCorrected}
+                            />
+                          )}
+                        </ReviewDisclosure>
                       )}
-                      {explanation.note && (
-                        <div className="text-xs text-stone-600 dark:text-stone-400 italic bg-stone-50/80 dark:bg-stone-950/80 rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-800">
-                          {explanation.note}
-                        </div>
-                      )}
-                      <ConjugationBreakdown
-                        word={current.verb}
-                        type={practicedType}
-                        userAnswer={revealedMiss ? '' : submittedAnswer}
-                        geminiKey={geminiKey}
-                        practicePrefs={practicePrefs}
-                      />
-                    </ReviewDisclosure>
-                    {geminiKey && (
-                      <ReviewDisclosure tone="rose" summary="Ask Gemini why">
-                        {!chatOpen ? (
-                          <button
-                            onClick={() => setChatOpen(true)}
-                            aria-expanded={chatOpen}
-                            className="w-full py-2 border border-rose-200 dark:border-rose-900 hover:bg-rose-100/50 dark:hover:bg-rose-950/50 rounded-xl text-sm text-rose-700 dark:text-rose-450 flex items-center justify-center gap-1.5 transition"
-                          >
-                            <IconChat className="w-4 h-4" /> Ask Gemini why
-                          </button>
-                        ) : (
-                          <ChatPanel
-                            verb={current.verb}
-                            type={practicedType}
-                            userAnswer={revealedMiss ? '(revealed)' : submittedAnswer}
-                            expected={expected}
-                            explanation={explanation}
-                            geminiKey={geminiKey}
-                            practicePrefs={practicePrefs}
-                            taskOverride={taskOverride}
-                            wasCorrected={wasCorrected}
-                          />
-                        )}
-                      </ReviewDisclosure>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                <StickyAction className="mt-3">
-                  <button
-                    ref={nextButtonRef}
-                    onClick={() => submit()}
-                    className="w-full py-2.5 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl font-medium shadow-lg transition"
-                  >
-                    Next (Enter)
-                  </button>
-                </StickyAction>
-              </div>
-            )}
+                  <StickyAction className="mt-3">
+                    <button
+                      ref={nextButtonRef}
+                      onClick={() => submit()}
+                      className="w-full py-2.5 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl font-medium shadow-lg transition"
+                    >
+                      Next (Enter)
+                    </button>
+                  </StickyAction>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-      <div className="text-center text-xs text-stone-400">
-        Tip: type romaji like <span className="font-mono text-stone-500">tabeta</span>, use kana{' '}
-        <span lang="ja" className="text-stone-550 dark:text-stone-450">
-          たべた
-        </span>
-        , or press Esc to skip without penalty.
+        <div className="text-center text-xs text-stone-400">
+          Tip: type romaji like <span className="font-mono text-stone-500">tabeta</span>, use kana{' '}
+          <span lang="ja" className="text-stone-550 dark:text-stone-450">
+            たべた
+          </span>
+          , or press Esc to skip without penalty.
+        </div>
       </div>
     </div>
   );

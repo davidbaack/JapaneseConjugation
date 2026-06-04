@@ -9,7 +9,7 @@ test.describe('Settings — theme preference', () => {
     await page.waitForLoadState('networkidle');
 
     await page.locator('nav').getByRole('tab', { name: 'Settings', exact: true }).click();
-    await expect(page.getByText('Practice session')).toBeVisible();
+    await expect(page.getByText('Display scripts')).toBeVisible();
 
     await page.getByRole('button', { name: 'Dark', exact: true }).click();
     await expect(page.locator('body')).toHaveClass(/theme-dark/);

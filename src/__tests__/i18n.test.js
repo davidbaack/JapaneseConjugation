@@ -7,9 +7,9 @@ beforeEach(() => {
 
 describe('t', () => {
   it('returns the English string for a known key', () => {
-    expect(t('nav.study')).toBe('Reviews');
-    expect(t('nav.lessons')).toBe('Lessons');
-    expect(t('nav.lab')).toBe('Practice Lab');
+    expect(t('nav.practice')).toBe('Practice');
+    expect(t('nav.learn')).toBe('Learn');
+    expect(t('nav.tools')).toBe('Tools');
     expect(t('app.title')).toBe('Katachiya');
   });
 
@@ -34,9 +34,9 @@ describe('locale management', () => {
   });
 
   it('uses a registered locale and falls back per-key for gaps', () => {
-    registerCatalog('ja', { 'nav.study': '学習' });
+    registerCatalog('ja', { 'nav.practice': '練習' });
     expect(setLocale('ja')).toBe('ja');
-    expect(t('nav.study')).toBe('学習');
+    expect(t('nav.practice')).toBe('練習');
     // Key absent in ja → English fallback, not the raw key.
     expect(t('app.title')).toBe('Katachiya');
   });

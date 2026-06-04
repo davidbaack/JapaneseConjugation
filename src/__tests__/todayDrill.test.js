@@ -71,7 +71,7 @@ describe('today drill planner', () => {
     expect(plan.minimalPairSetIds).toContain('ichidan-godan-ru');
   });
 
-  it('does not fall back to all words when Library exclusions empty the scope', () => {
+  it('does not fall back to all words when Tools exclusions empty the scope', () => {
     const words = [TABERU, HASHIRU, KAKU, TAKAI];
     const state = words.reduce(
       (nextState, word) => excludeWordFromReviewState(nextState, word),

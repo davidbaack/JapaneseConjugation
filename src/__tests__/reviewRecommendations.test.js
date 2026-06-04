@@ -5,6 +5,7 @@ import {
   buildLabReviewRecommendations,
   buildLessonReviewRecommendation,
 } from '../utils/reviewRecommendations.js';
+import { normalizeReviewScope } from '../utils/reviewScope.js';
 import { defaultState } from '../utils/storage.js';
 
 const TABERU = {
@@ -103,7 +104,7 @@ describe('review recommendations', () => {
     expect(rec.typeIds).toEqual(['potential']);
   });
 
-  it('builds lesson handoffs as visible Review recommendations', () => {
+  it('builds lesson handoffs as visible Practice recommendations', () => {
     const rec = buildLessonReviewRecommendation(
       {
         groupId: 'basic-past',
@@ -117,10 +118,30 @@ describe('review recommendations', () => {
     expect(rec).toMatchObject({
       id: 'lesson-basic-past',
       source: 'lesson',
-      label: 'Basic Past Reviews',
+      label: 'Basic Past Practice',
       suggestedCount: 8,
       typeIds: ['plain-past', 'te-form'],
     });
     expect(new Set(rec.wordKeys)).toEqual(new Set([wordKey(TABERU), wordKey(KAKU)]));
+  });
+
+  it('normalizes legacy saved recommendation copy to Practice language', () => {
+    const scope = normalizeReviewScope({
+      recommendations: [
+        {
+          id: 'lesson-basic-past',
+          source: 'lesson',
+          label: 'Basic Past Reviews',
+          detail: 'Move this review set out of SRS.',
+          typeIds: ['plain-past'],
+          wordKeys: [wordKey(TABERU)],
+        },
+      ],
+    });
+
+    expect(scope.recommendations[0]).toMatchObject({
+      label: 'Basic Past Practice',
+      detail: 'Move this practice set out of Practice history.',
+    });
   });
 });

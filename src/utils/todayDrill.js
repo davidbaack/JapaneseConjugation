@@ -1,4 +1,4 @@
-import { ALL_CARD_TYPES, TYPE_PACKS } from '../data/conjugationTypes.js';
+import { ALL_CARD_TYPES } from '../data/conjugationTypes.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { enabledTypeIdsFor, wordKey } from './conjugator.js';
 import { minimalPairSetMatchesWord, recommendMinimalPairSets } from './minimalPairs.js';
@@ -6,6 +6,7 @@ import { cardIdFor, cardWeakScore, localDateKey, weakTypeIdsForState } from './s
 import { buildRuleCandidates, ruleCandidateTypeSet } from './ruleCandidates.js';
 import { filterWordsForStudyScope } from './vocabularyProgression.js';
 import { reviewTypeIdsForState } from './reviewScope.js';
+import { QUICK_PRACTICE_DEFAULT_TYPE_IDS } from './subcategoryWeakness.js';
 
 export const TODAY_DRILL_LIST_ID = 'list-today-drill';
 export const TODAY_DRILL_LIST_NAME = "Today's Drill";
@@ -186,7 +187,7 @@ export function buildTodayDrillPlan(
   pushUnique(typeIds, weakTypeIds, MAX_TYPES);
   pushUnique(typeIds, minimalPairTypeIds, MAX_TYPES);
   pushUnique(typeIds, activeTypes, MAX_TYPES);
-  pushUnique(typeIds, TYPE_PACKS[0].typeIds, MAX_TYPES);
+  pushUnique(typeIds, QUICK_PRACTICE_DEFAULT_TYPE_IDS, MAX_TYPES);
 
   const usableTypeIds = typeIds
     .filter((typeId) => ALL_CARD_TYPES.some((type) => type.id === typeId))

@@ -1,19 +1,17 @@
 import { test, expect } from '@playwright/test';
 
 const TABS = [
-  { id: 'study', label: 'Reviews' },
-  { id: 'lessons', label: 'Lessons' },
-  { id: 'library', label: 'Library' },
-  { id: 'lab', label: 'Practice Lab' },
+  { id: 'practice', label: 'Practice' },
+  { id: 'learn', label: 'Learn' },
+  { id: 'tools', label: 'Tools' },
   { id: 'settings', label: 'Settings' },
 ];
 
 const VIEW_ANCHORS = {
-  study: () => /Begin with the core forms|Start with what is ready now/,
-  lessons: () => /Conjugation formation guide/,
-  library: () => /What Reviews is allowed to show/,
-  lab: () => /Check a conjugation/,
-  settings: () => /Practice session/,
+  practice: () => /Start with a 12-card workout|Practice map/,
+  learn: () => /Conjugation formation guide/,
+  tools: () => /Lookup, repair drills, and word management/,
+  settings: () => /Display scripts/,
 };
 
 test.describe('Tab navigation', () => {
@@ -34,31 +32,35 @@ test.describe('Tab navigation', () => {
     }
   });
 
-  test('reviews is the default tab on first load', async ({ page }) => {
+  test('practice is the default tab on first load', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const reviewsTab = page.locator('nav').getByRole('tab', { name: 'Reviews', exact: true });
-    await expect(reviewsTab).toHaveClass(/font-semibold/);
-    await expect(page.getByRole('region', { name: 'Reviews dashboard' })).toBeVisible();
+    const practiceTab = page.locator('nav').getByRole('tab', { name: 'Practice', exact: true });
+    await expect(practiceTab).toHaveClass(/font-semibold/);
+    await expect(page.getByRole('region', { name: 'Practice dashboard' })).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /Start Reviews|Start Core Warmup|Continue Reviews/ }),
+      page.getByRole('button', { name: /Start workout|Continue workout/ }),
     ).toBeVisible();
   });
 
-  test('library exposes inventory, lookup, lists, and custom words', async ({ page }) => {
+  test('tools exposes words, lookup, lists, and custom words', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await page.locator('nav').getByRole('tab', { name: 'Library', exact: true }).click();
+    await page.locator('nav').getByRole('tab', { name: 'Tools', exact: true }).click();
 
-    await expect(page.getByRole('tab', { name: /^Inventory/ })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /^Lookup/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Words/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Lookup \/ Check/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Groups/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Rush/ })).toBeVisible();
     await expect(page.getByRole('tab', { name: /^Lists/ })).toBeVisible();
     await expect(page.getByRole('tab', { name: /^Custom words/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Review now' }).first()).toBeVisible();
 
-    await page.getByRole('tab', { name: /^Lookup/ }).click();
+    await page.getByRole('tab', { name: /^Words/ }).click();
+    await expect(page.getByRole('button', { name: 'Practice now' }).first()).toBeVisible();
+
+    await page.getByRole('tab', { name: /^Lookup \/ Check/ }).click();
     await expect(page.getByText('Copy table')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Drill word' })).toBeVisible();
     await page.getByLabel('Search for a word or conjugation form').fill('tabeta');
@@ -72,19 +74,19 @@ test.describe('Tab navigation', () => {
     await expect(page.getByText('WaniKani import')).toBeVisible();
   });
 
-  test('settings exposes restored learner controls', async ({ page }) => {
+  test('settings keeps durable preferences and omits old practice controls', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
     await page.locator('nav').getByRole('tab', { name: 'Settings', exact: true }).click();
 
-    await expect(page.getByText('Practice session')).toBeVisible();
-    await expect(page.getByText('Conjugation types in scope')).toBeVisible();
     await expect(page.getByText('Display scripts')).toBeVisible();
-    await expect(page.getByText('Review style')).toBeVisible();
-    await expect(page.getByText('Source forms')).toBeVisible();
-    await expect(page.getByText('New cards/day')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
     await expect(page.getByText('Backup & restore')).toBeVisible();
+    await expect(page.getByText('Practice session')).toHaveCount(0);
+    await expect(page.getByText('Conjugation types in scope')).toHaveCount(0);
+    await expect(page.getByText('Review style')).toHaveCount(0);
+    await expect(page.getByText('Source forms')).toHaveCount(0);
+    await expect(page.getByText('New cards/day')).toHaveCount(0);
   });
 });

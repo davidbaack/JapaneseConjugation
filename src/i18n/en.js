@@ -9,10 +9,9 @@ export default {
   'app.title': 'Katachiya',
   'app.subtitle': 'Conjugation Practice',
 
-  'nav.study': 'Reviews',
-  'nav.lessons': 'Lessons',
-  'nav.library': 'Library',
-  'nav.lab': 'Practice Lab',
+  'nav.practice': 'Practice',
+  'nav.learn': 'Learn',
+  'nav.tools': 'Tools',
   'nav.settings': 'Settings',
 
   'header.session': '{correct}/{reviewed} this session',

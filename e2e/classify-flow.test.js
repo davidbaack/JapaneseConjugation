@@ -7,8 +7,8 @@ test.describe('Classification drill', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await page.locator('nav').getByRole('tab', { name: 'Practice Lab', exact: true }).click();
-    await page.getByRole('tab', { name: 'Groups', exact: true }).click();
+    await page.locator('nav').getByRole('tab', { name: 'Tools', exact: true }).click();
+    await page.getByRole('tab', { name: /^Groups/ }).click();
     await expect(page.getByText('Classification drill')).toBeVisible();
     await expect(page.getByText('Group decoder')).toBeVisible();
 

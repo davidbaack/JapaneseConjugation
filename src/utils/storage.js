@@ -20,6 +20,14 @@ import { getMinimalPairSet, mergeMinimalPairProgress } from './minimalPairs.js';
 import { mergePracticePrefs } from './display.js';
 import { buildRuleCandidates } from './ruleCandidates.js';
 import { defaultReviewScope, normalizeReviewScope, reviewTypeIdsForState } from './reviewScope.js';
+import {
+  QUICK_PRACTICE_DEFAULT_TYPE_IDS,
+  defaultWeaknessState,
+  mergeWeaknessState,
+  normalizeWeaknessState,
+  rankedWeaknessLanes,
+  weaknessScoreForCard,
+} from './subcategoryWeakness.js';
 
 export const DAY = 86400000;
 export const SRS_SCHEMA_VERSION = 3;
@@ -63,7 +71,7 @@ function isLegacyBroadDefaultTypeScope(ids) {
 }
 
 function normalizeDefaultTypeScope(ids) {
-  return isLegacyBroadDefaultTypeScope(ids) ? [...TEXTBOOK_CORE_TYPE_IDS] : ids;
+  return isLegacyBroadDefaultTypeScope(ids) ? [...QUICK_PRACTICE_DEFAULT_TYPE_IDS] : ids;
 }
 
 export function wordSrsKey(word) {
@@ -93,7 +101,7 @@ export function dailyNewCardLimit(prefs = DEFAULT_PREFS) {
   if (Number.isFinite(explicit) && explicit > 0) return Math.round(explicit);
   const dailyGoal = Number(prefs?.dailyGoal || DEFAULT_PREFS.dailyGoal);
   const goal = Number.isFinite(dailyGoal) && dailyGoal > 0 ? dailyGoal : DEFAULT_PREFS.dailyGoal;
-  return Math.min(8, Math.ceil(goal * 0.3));
+  return Math.min(60, Math.round(goal));
 }
 
 export function bonusNewCardLimit(prefs = DEFAULT_PREFS) {
@@ -369,6 +377,7 @@ function hasLocalStateData(state) {
     hasProgressBucketData(state.reader) ||
     hasProgressBucketData(state.production) ||
     hasProgressBucketData(state.transformation) ||
+    hasProgressBucketData(state.weakness) ||
     hasKeys(state.minimalPairs?.bySet) ||
     hasItems(state.reference?.recentSearches) ||
     hasItems(state.reference?.history) ||
@@ -685,8 +694,9 @@ export function mergeCloudState(local, cloud) {
           verbStats: {},
           retryQueue: [],
           readiness: defaultReadinessState(),
+          weakness: defaultWeaknessState(),
           transformation: emptyTransformationStats(),
-          enabledTypes: [...TEXTBOOK_CORE_TYPE_IDS],
+          enabledTypes: [...QUICK_PRACTICE_DEFAULT_TYPE_IDS],
         };
   const normalizedCloud =
     cloud.schemaVersion === SRS_SCHEMA_VERSION
@@ -698,8 +708,9 @@ export function mergeCloudState(local, cloud) {
           verbStats: {},
           retryQueue: [],
           readiness: defaultReadinessState(),
+          weakness: defaultWeaknessState(),
           transformation: emptyTransformationStats(),
-          enabledTypes: [...TEXTBOOK_CORE_TYPE_IDS],
+          enabledTypes: [...QUICK_PRACTICE_DEFAULT_TYPE_IDS],
         };
   local = normalizedLocal;
   cloud = normalizedCloud;
@@ -717,6 +728,7 @@ export function mergeCloudState(local, cloud) {
     ),
     mistakes: mergeMistakes(local.mistakes || [], cloud.mistakes || []),
     readiness: mergeReadinessState(local.readiness, cloud.readiness),
+    weakness: mergeWeaknessState(local.weakness, cloud.weakness),
     enabledTypes,
     daily: (() => {
       const ld = local.daily || {},
@@ -883,7 +895,8 @@ export function defaultState() {
     minimalPairs: { bySet: {} },
     reference: normalizeReferenceState(),
     reviewScope: defaultReviewScope(),
-    enabledTypes: [...TEXTBOOK_CORE_TYPE_IDS],
+    enabledTypes: [...QUICK_PRACTICE_DEFAULT_TYPE_IDS],
+    weakness: defaultWeaknessState(),
     session: { reviewed: 0, correct: 0, skipped: 0, mistakePatterns: {} },
     daily: {
       date: localDateKey(),
@@ -926,6 +939,9 @@ export function mergeState(saved, sessionOverride) {
     readiness: oldSrsSchema
       ? defaultReadinessState()
       : normalizeReadinessState((saved && saved.readiness) || base.readiness),
+    weakness: oldSrsSchema
+      ? defaultWeaknessState()
+      : normalizeWeaknessState((saved && saved.weakness) || base.weakness),
     meaning: (saved && saved.meaning) || base.meaning,
     mock: (saved && saved.mock) || base.mock,
     reader: {
@@ -946,13 +962,13 @@ export function mergeState(saved, sessionOverride) {
   };
 
   if (oldSrsSchema) {
-    merged.enabledTypes = [...TEXTBOOK_CORE_TYPE_IDS];
+    merged.enabledTypes = [...QUICK_PRACTICE_DEFAULT_TYPE_IDS];
   } else if (
     saved &&
     Array.isArray(saved.enabledTypes) &&
     isLegacyBroadDefaultTypeScope(saved.enabledTypes)
   ) {
-    merged.enabledTypes = [...TEXTBOOK_CORE_TYPE_IDS];
+    merged.enabledTypes = [...QUICK_PRACTICE_DEFAULT_TYPE_IDS];
   } else if (
     saved &&
     Array.isArray(saved.enabledTypes) &&
@@ -1103,6 +1119,8 @@ export function cardWeakScore(state, cardId, word = null, typeId = null) {
   const card = (state.cards || {})[cardId] || {};
   const reviews = (card.correct || 0) + (card.incorrect || 0);
   const missRate = reviews ? (card.incorrect || 0) / reviews : 0;
+  const laneScore =
+    word && resolvedType ? weaknessScoreForCard(state.weakness, word, resolvedType) : 0;
   const unresolved = (state.mistakes || [])
     .filter(
       (m) =>
@@ -1111,7 +1129,7 @@ export function cardWeakScore(state, cardId, word = null, typeId = null) {
         (!word || (m.dict === word.dict && m.group === word.group)),
     )
     .reduce((sum, m) => sum + (m.count || 1), 0);
-  return (card.incorrect || 0) * 2 + missRate * 4 + unresolved * 3;
+  return (card.incorrect || 0) * 2 + missRate * 4 + unresolved * 3 + laneScore * 1.4;
 }
 
 export function ruleWeakScore(state, ruleId) {
@@ -1139,6 +1157,9 @@ export function weakTypeIdsForState(state, fallbackIds = []) {
   }
   for (const m of state.mistakes || []) {
     if (!m.resolved && m.type) scores.set(m.type, (scores.get(m.type) || 0) + (m.count || 1) * 4);
+  }
+  for (const lane of rankedWeaknessLanes(state.weakness)) {
+    if (lane.typeId) scores.set(lane.typeId, (scores.get(lane.typeId) || 0) + lane.score);
   }
   const ranked = [...scores.entries()]
     .filter(([id]) => ALL_CARD_TYPES.some((t) => t.id === id))
@@ -1314,7 +1335,8 @@ function pickFreshReview(pool, options, openBeginnerStage) {
       (openBeginnerStage >= 0
         ? beginnerLadderSortScore(a, openBeginnerStage) -
           beginnerLadderSortScore(b, openBeginnerStage)
-        : 0) || candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists),
+        : (b.weakScore || 0) - (a.weakScore || 0)) ||
+      candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists),
   )[0];
 }
 
@@ -1345,7 +1367,14 @@ export function selectNext(
   });
   const freshLimit = options.bonusMode ? bonusNewCardLimit(prefs) : dailyNewCardLimit(prefs);
   const canIntroduceFresh = newCardsIntroducedToday(state) < freshLimit;
-  const fresh = canIntroduceFresh ? avail.filter((p) => !state.cards[p.id]) : [];
+  const fresh = canIntroduceFresh
+    ? avail
+        .filter((p) => !state.cards[p.id])
+        .map((p) => ({
+          ...p,
+          weakScore: cardWeakScore(state, p.id, p.verb, p.type),
+        }))
+    : [];
   const future = avail.filter((p) => {
     const c = state.cards[p.id];
     return c && c.nextReview > now;
@@ -1372,7 +1401,17 @@ export function selectNext(
       ? openBeginnerLadderStage(pool, state)
       : -1;
   const recentIds = new Set((options.recentCardIds || []).filter(Boolean));
+  const recentWordKeys = new Set(
+    [...recentIds, ...(options.recentWordKeys || [])]
+      .map((id) => (String(id).includes('|') ? wordKeyFromCardId(id) : id))
+      .filter(Boolean),
+  );
   const dropRecent = (items) => items.filter((item) => !recentIds.has(item.id));
+  const dropRecentWords = (items) => {
+    const cardFiltered = dropRecent(items);
+    const wordFiltered = cardFiltered.filter((item) => !recentWordKeys.has(wordSrsKey(item.verb)));
+    return wordFiltered.length ? wordFiltered : cardFiltered;
+  };
   const choose = (groups) =>
     pickDueReview(groups.due, state) ||
     pickRetryReview(groups.retry, state) ||
@@ -1381,12 +1420,12 @@ export function selectNext(
     pickFutureReview(groups.nearDue, state, options) ||
     pickFutureReview(groups.future, state, options);
   let chosen = choose({
-    due: dropRecent(due),
-    retry: dropRecent(retry),
-    readyWeak: dropRecent(readyWeak),
-    fresh: dropRecent(fresh),
-    nearDue: dropRecent(nearDue),
-    future: dropRecent(future),
+    due: dropRecentWords(due),
+    retry: dropRecentWords(retry),
+    readyWeak: dropRecentWords(readyWeak),
+    fresh: dropRecentWords(fresh),
+    nearDue: dropRecentWords(nearDue),
+    future: dropRecentWords(future),
   });
   if (!chosen) chosen = choose({ due, retry, readyWeak, fresh, nearDue, future });
   if (!chosen) return null;

@@ -1,20 +1,18 @@
 import { test, expect } from '@playwright/test';
 
-// Exercises the core SRS loop on the default Study tab with the default
+// Exercises the core practice loop on the default Practice tab with the default
 // answer mode ("input"): a card is shown, the learner submits an answer,
-// review feedback appears, and advancing returns to the answering phase.
+// feedback appears, and advancing returns to the answering phase.
 test.describe('Study flow', () => {
   test('answering a card shows feedback and advances', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const dashboard = page.getByRole('region', { name: 'Reviews dashboard' });
+    const dashboard = page.getByRole('region', { name: 'Practice dashboard' });
     await expect(dashboard).toBeVisible();
     await expect(page.getByText('Sign in to save SRS progress')).toHaveCount(0);
 
-    await dashboard
-      .getByRole('button', { name: /Start Reviews|Start Core Warmup|Continue Reviews/ })
-      .click();
+    await dashboard.getByRole('button', { name: /Start workout|Continue workout/ }).click();
 
     // Forward (conjugate) drill renders a free-text answer box.
     const input = page.getByPlaceholder('Type romaji or kana...');
@@ -43,8 +41,8 @@ test.describe('Study flow', () => {
     await page.waitForLoadState('networkidle');
 
     await page
-      .getByRole('region', { name: 'Reviews dashboard' })
-      .getByRole('button', { name: /Start Reviews|Start Core Warmup|Continue Reviews/ })
+      .getByRole('region', { name: 'Practice dashboard' })
+      .getByRole('button', { name: /Start workout|Continue workout/ })
       .click();
 
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();

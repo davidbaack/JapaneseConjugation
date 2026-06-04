@@ -25,6 +25,7 @@ import { conjugateItem } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import {
   ALL_CARD_TYPES,
+  EVERYDAY_TYPE_IDS,
   INTRODUCED_DEFAULT_TYPE_IDS,
   LEGACY_BROAD_DEFAULT_TYPE_IDS,
   TEXTBOOK_CORE_TYPE_IDS,
@@ -396,31 +397,33 @@ describe('mergeState', () => {
     expect(state.enabledTypes.length).toBeGreaterThan(0);
   });
 
-  it('starts new learners on the textbook core conjugation scope', () => {
+  it('starts new learners on the Core plus Everyday conjugation scope', () => {
     const state = defaultState();
-    expect(state.enabledTypes).toEqual(TEXTBOOK_CORE_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
     expect(state.enabledTypes).not.toContain('request-kudasai');
     expect(state.enabledTypes).not.toContain('permission');
     expect(state.enabledTypes).not.toContain('obligation');
-    expect(state.enabledTypes).toContain('passive');
-    expect(state.enabledTypes).toContain('causative');
-    expect(state.enabledTypes).toContain('command-nasai');
+    expect(state.enabledTypes).toContain('progressive-past');
+    expect(state.enabledTypes).toContain('potential-polite-past');
+    expect(state.enabledTypes).not.toContain('passive');
+    expect(state.enabledTypes).not.toContain('causative');
+    expect(state.enabledTypes).not.toContain('command-nasai');
     expect(state.enabledTypes).not.toContain('passive-polite-past-negative');
     expect(state.enabledTypes).not.toContain('short-causative');
     expect(state.enabledTypes).not.toContain('short-causative-passive-polite-past-negative');
   });
 
-  it('migrates the old broad default scope to textbook core', () => {
+  it('migrates the old broad default scope to Core plus Everyday', () => {
     const state = mergeState({ enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS }, null);
-    expect(state.enabledTypes).toEqual(TEXTBOOK_CORE_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
   });
 
-  it('migrates pre-introduced broad default scopes to textbook core', () => {
+  it('migrates pre-introduced broad default scopes to Core plus Everyday', () => {
     const preIntroducedIds = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
       (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
     );
     const state = mergeState({ enabledTypes: preIntroducedIds }, null);
-    expect(state.enabledTypes).toEqual(TEXTBOOK_CORE_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
   });
 
   it('preserves an explicit all-forms scope', () => {
@@ -491,10 +494,10 @@ describe('mergeState', () => {
 describe('mergeCloudState', () => {
   it('does not revive the legacy broad default during cloud merges', () => {
     const merged = mergeCloudState(
-      { cards: {}, verbStats: {}, mistakes: [], enabledTypes: TEXTBOOK_CORE_TYPE_IDS },
+      { cards: {}, verbStats: {}, mistakes: [], enabledTypes: EVERYDAY_TYPE_IDS },
       { cards: {}, verbStats: {}, mistakes: [], enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS },
     );
-    expect(merged.enabledTypes).toEqual(TEXTBOOK_CORE_TYPE_IDS);
+    expect(merged.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
   });
 
   it('preserves explicit all-forms cloud scopes', () => {
@@ -505,7 +508,7 @@ describe('mergeCloudState', () => {
         cards: {},
         verbStats: {},
         mistakes: [],
-        enabledTypes: TEXTBOOK_CORE_TYPE_IDS,
+        enabledTypes: EVERYDAY_TYPE_IDS,
       },
       {
         schemaVersion: SRS_SCHEMA_VERSION,
@@ -863,11 +866,11 @@ describe('word-form SRS selection', () => {
     expect(seen.map((card) => card.verb.dict)).not.toContain(IKU.dict);
   });
 
-  it('caps new cards by daily goal and uses a smaller bonus-study batch', () => {
-    expect(dailyNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(3);
-    expect(bonusNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(2);
+  it('caps fresh workout cards by daily goal and uses a smaller bonus batch', () => {
+    expect(dailyNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(10);
+    expect(bonusNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(5);
     const introduced = {};
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 10; i += 1) {
       introduced[`synthetic-${i}`] = {
         introducedDate: localDateKey(),
         reps: 1,

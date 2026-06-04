@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import { TEXTBOOK_CORE_TYPE_IDS } from '../data/conjugationTypes.js';
+import { EVERYDAY_TYPE_IDS } from '../data/conjugationTypes.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
 import { excludeWordFromReviewState } from '../utils/reviewScope.js';
 import { buildLearnerResetPayload, commitLearnerResetPayload } from '../utils/learnerReset.js';
@@ -48,7 +48,7 @@ function populatedParts() {
 }
 
 describe('buildLearnerResetPayload', () => {
-  it('resets review progress while preserving settings, form scope, review scope, and custom content', () => {
+  it('resets practice progress while preserving settings, map scope, word scope, and custom content', () => {
     const parts = populatedParts();
     const reset = buildLearnerResetPayload(parts, 'progress');
 
@@ -70,7 +70,7 @@ describe('buildLearnerResetPayload', () => {
 
     expect(reset.state.cards).toEqual(parts.state.cards);
     expect(reset.state.reviewScope).toEqual(parts.state.reviewScope);
-    expect(reset.state.enabledTypes).toEqual(TEXTBOOK_CORE_TYPE_IDS);
+    expect(reset.state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
     expect(reset.practicePrefs).toEqual(DEFAULT_PREFS);
     expect(reset.customVerbs).toEqual(parts.customVerbs);
     expect(reset.wordLists).toEqual(parts.wordLists);
@@ -92,7 +92,7 @@ describe('buildLearnerResetPayload', () => {
     const reset = buildLearnerResetPayload(populatedParts(), 'factory');
 
     expect(reset.state.cards).toEqual({});
-    expect(reset.state.enabledTypes).toEqual(TEXTBOOK_CORE_TYPE_IDS);
+    expect(reset.state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
     expect(reset.state.reviewScope.excludedWordKeys).toEqual([]);
     expect(reset.customVerbs).toEqual([]);
     expect(reset.customAdjectives).toEqual([]);

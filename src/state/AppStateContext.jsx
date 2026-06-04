@@ -37,12 +37,19 @@ import {
   upsertReviewRecommendationState,
 } from '../utils/reviewScope.js';
 
-// Centralized global app state (improvement #6). All the SRS/customs/prefs
+// Centralized global app state (improvement #6). All the practice/customs/prefs
 // state, the hydration + cloud-sync effects, theme/voice wiring, and the
 // derived word lists live here instead of being lifted into App.jsx and
 // prop-drilled into every view. Views read what they need via useApp(), and
 // App is just the shell that renders them.
 const AppStateContext = createContext(null);
+
+function normalizeAppTab(tab) {
+  if (tab === 'study') return 'practice';
+  if (tab === 'lessons') return 'learn';
+  if (tab === 'library' || tab === 'lab') return 'tools';
+  return ['practice', 'learn', 'tools', 'settings'].includes(tab) ? tab : 'practice';
+}
 
 function isTodayDrillPractice(prefs = DEFAULT_PREFS) {
   return (
@@ -53,7 +60,11 @@ function isTodayDrillPractice(prefs = DEFAULT_PREFS) {
 }
 
 function useAppController() {
-  const [tab, setTab] = useState('study');
+  const [tab, setRawTab] = useState('practice');
+  const setTab = (nextTab) =>
+    setRawTab((current) =>
+      normalizeAppTab(typeof nextTab === 'function' ? nextTab(current) : nextTab),
+    );
   const [state, setState] = useState(defaultState);
   const [customVerbs, setCustomVerbs] = useState([]);
   const [customAdjectives, setCustomAdjectives] = useState([]);
@@ -442,14 +453,14 @@ function useAppController() {
       );
     }
     setStudyFocus({ word, type, ...options });
-    setTab('study');
+    setTab('practice');
   }
   const clearStudyFocus = () => setStudyFocus(null);
-  // Open a specific Practice Lab tool from another view (e.g. the dashboard
-  // routing a detected weakness into the matching Lab drill).
+  // Open a specific Tools drill from another view (e.g. the dashboard routing
+  // a detected weakness into the matching drill).
   function openLabTool(tool) {
     setLabFocus(tool ? { tool } : null);
-    setTab('lab');
+    setTab('tools');
   }
   const clearLabFocus = () => setLabFocus(null);
   const showAuth = () => setShowAuthModal(true);
@@ -476,7 +487,7 @@ function useAppController() {
       setWordLists((prev) => {
         const list = {
           id: listId,
-          name: recommendation.label || 'Recommended reviews',
+          name: recommendation.label || 'Recommended practice',
           wordKeys,
         };
         return (prev || []).some((item) => item.id === listId)
@@ -498,7 +509,7 @@ function useAppController() {
       sessionStorage.removeItem('jp-study-current');
     } catch {}
     setStudyFocus(null);
-    setTab('study');
+    setTab('practice');
     return true;
   }
 
@@ -522,7 +533,7 @@ function useAppController() {
       startedAt: Date.now(),
     });
     setStudyFocus(null);
-    setTab('study');
+    setTab('practice');
     return true;
   }
 

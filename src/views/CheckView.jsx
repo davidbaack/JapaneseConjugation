@@ -300,14 +300,14 @@ export default function CheckView() {
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
         <p className="text-stone-600 dark:text-stone-300 mb-2">No words available</p>
         <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
-          Add or enable words in the Library.
+          Add or enable words in Tools.
         </p>
         <div className="flex justify-center gap-3">
           <button
-            onClick={() => setTab('library')}
+            onClick={() => setTab('tools')}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
           >
-            Go to Library
+            Go to Tools
           </button>
           <button
             onClick={() => setTab('settings')}
@@ -689,7 +689,7 @@ export default function CheckView() {
                 <li>
                   <span className="font-medium">Word not loaded?</span> Check only knows the{' '}
                   {allWords.length} words in your active set. If this word isn't one of them, add it
-                  in the Library.
+                  in Tools.
                 </li>
               </ul>
             </div>

@@ -20,7 +20,7 @@ export const DEFAULT_PREFS = {
   theme: 'system',
   aiFeedbackLevel: 'beginner',
   aiGuideTone: 'sensei',
-  dailyGoal: 30,
+  dailyGoal: 12,
   scriptMode: 'kanji',
   displayScripts: { kanji: true, kana: true, romaji: false },
   furigana: true,

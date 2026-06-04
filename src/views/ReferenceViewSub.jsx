@@ -209,7 +209,7 @@ export default function ReferenceViewSub({
     setWordLists(result.wordLists);
     setPracticePrefs(focusPracticePrefsForWord(practicePrefs, selected));
     setFavoriteMsg(`Drilling only ${selected.dict}.`);
-    if (setTab) setTab('study');
+    if (setTab) setTab('practice');
   }
 
   function applyReferencePracticeTarget(target, sourceWord = selected) {
@@ -241,7 +241,7 @@ export default function ReferenceViewSub({
         referenceLabel: target?.label || row.type.label,
       });
     } else if (setTab) {
-      setTab('study');
+      setTab('practice');
     }
   }
 
@@ -258,7 +258,7 @@ export default function ReferenceViewSub({
         referenceLabel: target?.label || row.type.label,
       });
     } else if (setTab) {
-      setTab('study');
+      setTab('practice');
     }
   }
 
@@ -293,7 +293,7 @@ export default function ReferenceViewSub({
         referenceLabel: target.label,
       });
     } else if (setTab) {
-      setTab('study');
+      setTab('practice');
     }
   }
 
