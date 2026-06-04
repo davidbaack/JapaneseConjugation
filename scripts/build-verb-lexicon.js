@@ -223,12 +223,6 @@ function posSet(entry) {
   return new Set((entry?.sense || []).flatMap((sense) => sense.partOfSpeech || []));
 }
 
-function hasNounPos(pos) {
-  return [...pos].some(
-    (tag) => tag === 'n' || tag === 'pn' || tag === 'num' || tag.startsWith('n-'),
-  );
-}
-
 function allowsSuru(row = {}) {
   const dict = cleanTerm(row.dict || row.expression);
   const reading = cleanTerm(row.reading);
@@ -248,7 +242,6 @@ function groupFromPos(entry, row = {}) {
   if ([...pos].some((tag) => tag.startsWith('v5'))) return 'godan';
   if (pos.has('adj-i') || pos.has('adj-ix')) return 'i-adjective';
   if (pos.has('adj-na')) return 'na-adjective';
-  if (hasNounPos(pos)) return 'noun';
   return null;
 }
 
@@ -552,8 +545,9 @@ async function main() {
   );
   const trimmedGeneratedArtifactWords = candidateWords.filter(isGeneratedPracticeArtifact);
   const publishableWords = candidateWords.filter((word) => !isGeneratedPracticeArtifact(word));
-  const trimmedLowUseWords = publishableWords.filter(isLowUsePracticeWord);
-  const rows = publishableWords
+  const practiceWords = publishableWords.filter((word) => PRACTICE_GROUPS.has(word.group));
+  const trimmedLowUseWords = practiceWords.filter(isLowUsePracticeWord);
+  const rows = practiceWords
     .filter((word) => !isLowUsePracticeWord(word))
     .sort((a, b) => {
       const levelDiff = (LEVEL_RANK[a.jlpt] ?? 9) - (LEVEL_RANK[b.jlpt] ?? 9);
@@ -564,7 +558,6 @@ async function main() {
     .map(rowFromVerb);
   const verbs = rows.filter((row) => ['ichidan', 'godan', 'suru', 'kuru'].includes(row[3]));
   const adjectives = rows.filter((row) => ['i-adjective', 'na-adjective'].includes(row[3]));
-  const nouns = rows.filter((row) => row[3] === 'noun');
   const trimmedLowUse = {
     total: trimmedLowUseWords.length,
     verbs: trimmedLowUseWords.filter((word) =>
@@ -583,7 +576,6 @@ async function main() {
     adjectives: trimmedGeneratedArtifactWords.filter((word) =>
       ['i-adjective', 'na-adjective'].includes(word.group),
     ).length,
-    nouns: trimmedGeneratedArtifactWords.filter((word) => word.group === 'noun').length,
     byJlpt: countByJlpt(trimmedGeneratedArtifactWords),
   };
 
@@ -631,7 +623,6 @@ async function main() {
     ],
     verbs,
     adjectives,
-    nouns,
   };
 
   mkdirSync(dirname(OUT_PATH), { recursive: true });
@@ -641,7 +632,6 @@ async function main() {
     total: rows.length,
     verbs: verbs.length,
     adjectives: adjectives.length,
-    nouns: nouns.length,
     common: rows.filter((row) => row[7]).length,
     trimmedLowUse,
     trimmedGeneratedArtifacts,
@@ -660,7 +650,6 @@ async function main() {
         total: counts.total,
         verbs: counts.verbs,
         adjectives: counts.adjectives,
-        nouns: counts.nouns,
         common: counts.common,
         trimmedLowUse: counts.trimmedLowUse,
         trimmedGeneratedArtifacts: counts.trimmedGeneratedArtifacts,

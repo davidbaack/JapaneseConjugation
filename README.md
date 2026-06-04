@@ -1,9 +1,9 @@
 # Katachiya - Japanese Conjugation SRS
 
-Katachiya is a React/Vite progressive web app for learning Japanese verb,
-adjective, and noun-copula conjugation through a Reviews-first SRS flow. The app
-is still in active product development, so this README describes the current
-learner-facing surface rather than preserving older navigation names.
+Katachiya is a React/Vite progressive web app for learning Japanese verb and
+adjective conjugation through a Reviews-first SRS flow. The app is still in
+active product development, so this README describes the current learner-facing
+surface rather than preserving older navigation names.
 
 The current app shape is:
 
@@ -93,9 +93,9 @@ starts and completes the recommended work in Reviews.
 Settings holds global preferences and account/data controls. Current controls
 include answer mode, review style, source forms, new cards per day, daily goal,
 theme, display scripts, furigana, English hints, word-category labels, speech
-playback, auto-next, listening prompts, Japanese voice selection, vocabulary
-scope with noun inclusion, conjugation-type packs or custom form selection,
-cloud sync sign-in/sync, manual backup/restore, and progress reset.
+playback, auto-next, listening prompts, Japanese voice selection,
+conjugation-type packs or custom form selection, cloud sync sign-in/sync,
+manual backup/restore, and progress reset.
 
 Workflow-specific controls stay on the active screen. For example, practice
 direction, sentence mode, and live kana controls live on the Reviews card rather
@@ -104,9 +104,8 @@ than in global Settings.
 ## Practice Scope And Data
 
 - Starter data: 30 verbs and 25 adjectives.
-- Generated lexicon: 7,671 practiceable words in `public/data/verb-lexicon.json`
-  as of the current tracked build, including 1,378 verbs, 787 adjectives, and
-  5,506 noun-copula items.
+- Generated lexicon: 2,163 practiceable words in `public/data/verb-lexicon.json`
+  as of the current tracked build, including 1,376 verbs and 787 adjectives.
 - Word filters: JLPT N5-N1, 23 Genki lessons, 50 Minna no Nihongo lessons, word
   types, word groups, and custom study lists.
 - Card coverage: 127 selectable card types across 13 form families.
@@ -117,10 +116,7 @@ than in global Settings.
   clusters, and causative vs passive.
 
 The default automatic review scope is verb-first plus common textbook
-adjectives with Textbook Core forms enabled. Nouns conjugate only through the
-copula, so they are excluded from the default automatic scope unless the learner
-enables nouns in Settings or reaches them through explicit lists, lookup, or
-focused practice.
+adjectives with Textbook Core forms enabled.
 
 ## Stack
 
@@ -241,13 +237,12 @@ inflating the main JavaScript bundle. Regenerate it with:
 npm run vocab:build
 ```
 
-The generated lexicon includes app-practiceable verbs, adjectives, and
-noun-copula items. It combines JLPT level estimates and Genki lesson tags from
-`elzup/jlpt-word-list`, Minna no Nihongo lesson tags from Mohammad Akhlaghi's
-public CSV, and JMdict part-of-speech/commonness data to avoid guessing whether
-a row is a verb, adjective, noun, or useful JLPT-only practice word. JLPT
-vocabulary levels are learner-study estimates; the JLPT organizers do not
-publish a complete official vocabulary list.
+The generated lexicon includes app-practiceable verbs and adjectives. It
+combines JLPT level estimates and Genki lesson tags from `elzup/jlpt-word-list`,
+Minna no Nihongo lesson tags from Mohammad Akhlaghi's public CSV, and JMdict
+part-of-speech/commonness data to avoid guessing whether a row is a supported
+practice word. JLPT vocabulary levels are learner-study estimates; the JLPT
+organizers do not publish a complete official vocabulary list.
 
 ## Project Structure
 

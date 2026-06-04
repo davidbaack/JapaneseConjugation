@@ -34,9 +34,6 @@ export function inflateVerbRows(rows = []) {
 }
 
 export const inflateAdjectiveRows = inflateVerbRows;
-export function inflateNounRows() {
-  return [];
-}
 
 function lessonList(...values) {
   return [
@@ -100,10 +97,11 @@ export async function loadVerbLexicon(url = VERB_LEXICON_URL) {
   const response = await fetch(url, { cache: 'force-cache' });
   if (!response.ok) throw new Error(`Could not load verb lexicon (${response.status})`);
   const data = await response.json();
+  const cleanData = { ...data };
+  delete cleanData.nouns;
   return {
-    ...data,
+    ...cleanData,
     verbs: mergeBuiltInVerbs(inflateVerbRows(data.verbs), STARTER_VERBS),
     adjectives: mergeBuiltInWords(inflateAdjectiveRows(data.adjectives), STARTER_ADJECTIVES),
-    nouns: [],
   };
 }
