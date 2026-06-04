@@ -1,81 +1,66 @@
-# Katachiya - Japanese Conjugation SRS
+# Katachiya - Japanese Conjugation Practice
 
 Katachiya is a React/Vite progressive web app for learning Japanese verb and
-adjective conjugation through a Reviews-first SRS flow. The app is still in
+adjective conjugation through Practice-first workouts. The app is still in
 active product development, so this README describes the current learner-facing
 surface rather than preserving older navigation names.
 
 The current app shape is:
 
-- **Reviews** - the landing page and main daily goal.
-- **Lessons** - a complete formation guide for every app form.
-- **Library** - the durable source of truth for words, form families, lookup,
-  lists, and custom vocabulary.
-- **Practice Lab** - focused tools that train specific skills and can hand work
-  back to Reviews.
-- **Settings** - global preferences, filters, sync, backup, and reset controls.
+- **Practice** - the landing page and main learner loop.
+- **Learn** - formation lessons and guided tracks for every app form.
+- **Tools** - lookup, word management, saved lists, custom words, repair drills,
+  group drills, and speed practice.
+- **Settings** - durable display, audio, sync, backup, and reset preferences.
 
 ## Current App Surface
 
-### Reviews
+### Practice
 
-Reviews opens to a dashboard instead of auto-starting a card. It shows the due
-queue, daily progress, Start/Continue Reviews, Start Core Warmup when nothing is
-due, lesson/lab recommendations, upcoming review timing, and form-family
-strength signals once the learner has history.
+Practice opens to a dashboard instead of auto-starting a card. It shows one
+primary Start workout action, ready-card progress when cards are due, daily
+progress, recent misses, focused recommendations from Learn and Tools, next
+workout timing, and form-family strength once the learner has history.
 
-The review stream combines required due cards, weak cards, and a small trickle
-of new word-form cards. Required due cards complete the progress bar; bonus
-reviews can continue afterward and still update SRS. Reviews can also launch a
-Retest misses session, a focused word drill, a focused form-family drill, or an
-Ending Lab repair drill when sound-change weakness is detected.
+The workout stream prioritizes ready cards, then fills the session with recent
+misses and varied words in the same weak patterns. A normal workout target is 12
+cards, and completion leads with "Map updated" plus a next-workout action.
 
-Active review cards support typed answers, multiple choice, self-check, and
-spoken answers; forward production, reading/reverse practice, and automatic
-mixing; romaji-to-kana conversion; an on-screen kana pad; live kana help with
-hide/show and reveal-next controls; deterministic hints; optional sentence-mode
-cloze prompts; speech playback; and optional Gemini clue/chat support. Removing
-a word or form family from Reviews updates the same durable Library state and
-can be restored from Library.
+Practice has a persistent map for form scope. It shows every form family,
+expanded exact-form toggles, and recent weak spots once there is data. Word
+removal on the active card updates the same durable word-exclusion state managed
+from Tools, and removed words can be restored there.
 
-### Lessons
+Active cards support typed answers, multiple choice, self-check, and spoken
+answers; forward production, reading/reverse practice, and automatic mixing;
+romaji-to-kana conversion; an on-screen kana pad; live kana help with hide/show
+and reveal-next controls; deterministic hints; optional sentence-mode cloze
+prompts; speech playback; and optional Gemini clue/chat support.
 
-Lessons is a searchable conjugation formation guide. It currently has 13 lesson
+### Learn
+
+Learn is a searchable conjugation formation guide. It currently has 13 lesson
 sections covering all 127 app card types, including core verb families, godan
 row shifts, te/ta sound changes, ru-verb traps, potential, conditionals,
 passive, causative, causative-passive, keigo, special forms, and adjective
 forms.
 
-Lessons can send one lesson or all forms to Reviews as an explicit recommended
-review set. Lessons teach and recommend practice, but they do not gate Reviews.
+Learn has guided tracks, a formation-key reference, searchable lesson sections,
+and a Send all to Practice action. Individual lessons and tracks can hand a
+focused recommended set back to Practice, but Learn does not gate workouts.
 
-### Library
+### Tools
 
-Library owns the durable review inventory.
+Tools keeps lookup, durable word management, saved lists, custom vocabulary, and
+specialized drills outside the main workout while still allowing focused work to
+be sent back to Practice.
 
-- **Inventory** turns words and form families on or off for automatic Reviews,
-  shows excluded counts, searches the word inventory, and can launch "Review
-  now" for a selected word.
 - **Lookup / Check** searches dictionary words or real conjugated forms, accepts
   romaji/kana/kanji input, shows exact and near matches, displays form tables,
-  plays pronunciation, and launches targeted Reviews.
-- **Lists** manages study lists, built-in packs, WaniKani imports, Gemini-built
-  list suggestions, favorites, weak-form lists, CSV/TSV bulk import, vocab CSV
-  export, and Anki TSV export.
-- **Custom words** adds and manages custom verbs and adjectives, including
-  optional Gemini lookup/suggestion support when AI is configured.
-
-Library is the source of truth for inclusion and exclusion. Excluded content is
-suspended from automatic Reviews while SRS history and scheduling are preserved.
-
-### Practice Lab
-
-Practice Lab keeps specialized tools outside the main SRS loop while allowing
-them to send focused recommendations back to Reviews.
-
-- **Check** identifies typed conjugations and near misses, explains the matched
-  word/form, shows related forms, plays audio, and can start targeted review for
-  that word.
+  plays pronunciation, and launches targeted Practice.
+- **Words** removes or restores words from automatic Practice, shows excluded
+  counts, searches the word inventory, and can launch "Practice now" for a
+  selected word.
 - **Ending Lab** drills te-form/plain-past sound changes and plain/polite
   register switching with hints, pattern maps, register maps, streaks, and
   optional AI memory hooks.
@@ -84,21 +69,24 @@ them to send focused recommendations back to Reviews.
   explanations.
 - **Rush** opens Kotoba Rush, a timed typing game with filtered cards, score,
   combo, wave, best score, live answer checking, kana progress, and a rush log.
+- **Lists** manages study lists, built-in packs, WaniKani imports, Gemini-built
+  list suggestions, favorites, weak-form lists, CSV/TSV bulk import, vocab CSV
+  export, and Anki TSV export.
+- **Custom words** adds and manages custom verbs and adjectives, including
+  optional Gemini lookup/suggestion support when AI is configured.
 
-Lab attempts do not silently change word-form SRS scheduling unless the learner
-starts and completes the recommended work in Reviews.
+Tool attempts do not silently change word-form scheduling unless the learner
+starts and completes the recommended work in Practice.
 
 ### Settings
 
 Settings holds global preferences and account/data controls. Current controls
-include answer mode, review style, source forms, new cards per day, daily goal,
-theme, display scripts, furigana, English hints, word-category labels, speech
-playback, auto-next, listening prompts, Japanese voice selection,
-conjugation-type packs or custom form selection, cloud sync sign-in/sync,
-manual backup/restore, and progress reset.
+include theme, display scripts, furigana, English hints, word-category labels,
+speech playback, auto-next, listening prompts, Japanese voice selection, cloud
+sync sign-in/sync, manual backup/restore, and reset cleanup.
 
 Workflow-specific controls stay on the active screen. For example, practice
-direction, sentence mode, and live kana controls live on the Reviews card rather
+direction, sentence mode, and live kana controls live on the Practice card rather
 than in global Settings.
 
 ## Practice Scope And Data
@@ -115,7 +103,7 @@ than in global Settings.
   i-adjective vs na-adjective, passive vs potential, godan sound-change
   clusters, and causative vs passive.
 
-The default automatic review scope is verb-first plus common textbook
+The default automatic Practice scope is verb-first plus common textbook
 adjectives with Textbook Core forms enabled.
 
 ## Stack
@@ -191,8 +179,8 @@ To self-host AI coaching:
 Cloud sync is optional. Without Supabase configuration, progress saves locally in
 the browser and manual backup/restore remains available in Settings.
 
-With Supabase configured, signed-in users can sync SRS state, custom
-vocabulary, word lists, and practice preferences across devices. The app expects
+With Supabase configured, signed-in users can sync practice progress, custom
+vocabulary, word lists, and preferences across devices. The app expects
 an `srs_sync` table with:
 
 | Column | Type | Notes |
@@ -215,7 +203,7 @@ To self-host cloud sync:
 3. Enable the auth providers you want learners to use in the Supabase dashboard.
 4. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for the app build. Never
    ship a service-role key to the browser.
-5. Sign in as a test user, complete one review, then confirm `public.srs_sync`
+5. Sign in as a test user, complete one Practice card, then confirm `public.srs_sync`
    contains exactly one row with that user's id, a JSON `data` payload, and a
    fresh `updated_at`.
 
@@ -253,8 +241,8 @@ src/
   hooks/        App hooks for AI sentences, cloud auto-sync, focus traps, virtual rows
   i18n/         String catalog and translation helper
   state/        Global app state provider and cloud/auth wiring
-  utils/        Conjugation, SRS, storage, display, romaji, AI, speech, backup, drill logic
-  views/        Reviews, Lessons, Library, Practice Lab, Settings, and nested tools
+  utils/        Conjugation, scheduling, storage, display, romaji, AI, speech, backup, drill logic
+  views/        Practice, Learn, Tools, Settings, and nested tool surfaces
   __tests__/    Vitest tests
 e2e/            Playwright E2E tests
 public/         PWA icons, Apple touch icon, and generated vocabulary data
