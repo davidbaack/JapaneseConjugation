@@ -522,13 +522,22 @@ const WEAKNESS_ROW_TONE = {
   weak: 'bg-rose-500',
 };
 
-function PracticeScopeSidebar({ state, weaknessFamilies = [], onToggleFamily, onToggleType }) {
+function PracticeScopeSidebar({
+  state,
+  weaknessFamilies = [],
+  onToggleFamily,
+  onToggleType,
+  className = '',
+}) {
   const enabled = new Set(state.enabledTypes || []);
   const weaknessByFamily = new Map(weaknessFamilies.map((family) => [family.id, family]));
   const activeCount = (state.enabledTypes || []).length;
 
   return (
-    <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start" aria-label="Practice map">
+    <aside
+      className={`space-y-3 lg:sticky lg:top-4 lg:self-start ${className}`}
+      aria-label="Practice map"
+    >
       <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -1653,12 +1662,13 @@ export default function StudyView() {
     return (
       <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <PracticeScopeSidebar
+          className="order-2 lg:order-1"
           state={state}
           weaknessFamilies={weaknessFamilies}
           onToggleFamily={togglePracticeFamily}
           onToggleType={togglePracticeType}
         />
-        <div className="min-w-0 space-y-4">
+        <div className="order-1 min-w-0 space-y-4 lg:order-2">
           <ReviewsDashboard
             daily={daily}
             practicePrefs={practicePrefs}
@@ -2867,12 +2877,13 @@ export default function StudyView() {
   return (
     <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <PracticeScopeSidebar
+        className="order-2 lg:order-1"
         state={state}
         weaknessFamilies={weaknessFamilies}
         onToggleFamily={togglePracticeFamily}
         onToggleType={togglePracticeType}
       />
-      <div className="min-w-0 space-y-4">
+      <div className="order-1 min-w-0 space-y-4 lg:order-2">
         {referenceLaunch && (
           <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="text-left">
