@@ -108,6 +108,7 @@ export default function SettingsView() {
     resolvedTheme,
     supabase,
     allWords,
+    builtInWords,
     showAuth: onShowAuth,
   } = useApp();
   const [pendingReset, setPendingReset] = useState(null);
@@ -245,8 +246,8 @@ export default function SettingsView() {
   const enabledKey = [...state.enabledTypes].sort().join('|');
   const settingsWords = useMemo(() => allWords || [], [allWords]);
   const poolSummary = useMemo(
-    () => buildPracticePoolSummary(state, settingsWords, practicePrefs, wordLists),
-    [state, settingsWords, practicePrefs, wordLists],
+    () => buildPracticePoolSummary(state, settingsWords, practicePrefs, wordLists, { builtInWords }),
+    [state, settingsWords, practicePrefs, wordLists, builtInWords],
   );
   const automaticNewCards = dailyNewCardLimit(practicePrefs);
   const automaticBonusNewCards = bonusNewCardLimit(practicePrefs);
