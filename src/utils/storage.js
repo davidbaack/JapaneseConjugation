@@ -1293,6 +1293,31 @@ function pickFutureReview(pool, state, options = {}) {
   });
 }
 
+function pickDueReview(pool, state) {
+  let chosen = pickWeakWeighted(pool, state);
+  if (chosen || !pool.length) return chosen;
+  const dueSoonest = [...pool].sort(
+    (a, b) => state.cards[a.id].nextReview - state.cards[b.id].nextReview,
+  );
+  const slice = dueSoonest.slice(0, Math.min(5, dueSoonest.length));
+  return slice[Math.floor(Math.random() * slice.length)] || null;
+}
+
+function pickRetryReview(pool, state) {
+  return pickWeakWeighted(pool, state) || pool[Math.floor(Math.random() * pool.length)] || null;
+}
+
+function pickFreshReview(pool, options, openBeginnerStage) {
+  if (!pool.length) return null;
+  return [...pool].sort(
+    (a, b) =>
+      (openBeginnerStage >= 0
+        ? beginnerLadderSortScore(a, openBeginnerStage) -
+          beginnerLadderSortScore(b, openBeginnerStage)
+        : 0) || candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists),
+  )[0];
+}
+
 export function selectNext(
   state,
   verbs,
@@ -1346,32 +1371,24 @@ export function selectNext(
     options.beginnerLadder && reviewedCardCount(state) < BEGINNER_LADDER_CARD_COUNT
       ? openBeginnerLadderStage(pool, state)
       : -1;
-  let chosen = pickWeakWeighted(due, state);
-  if (!chosen) {
-    if (due.length) {
-      due.sort((a, b) => state.cards[a.id].nextReview - state.cards[b.id].nextReview);
-      const sl = due.slice(0, Math.min(5, due.length));
-      chosen = sl[Math.floor(Math.random() * sl.length)];
-    } else if (retry.length) {
-      chosen = pickWeakWeighted(retry, state) || retry[Math.floor(Math.random() * retry.length)];
-    } else if (readyWeak.length) {
-      chosen = pickWeakReview(readyWeak, state, options);
-    } else if (fresh.length) {
-      fresh.sort(
-        (a, b) =>
-          (openBeginnerStage >= 0
-            ? beginnerLadderSortScore(a, openBeginnerStage) -
-              beginnerLadderSortScore(b, openBeginnerStage)
-            : 0) ||
-          candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists),
-      );
-      chosen = fresh[0];
-    } else if (nearDue.length) {
-      chosen = pickFutureReview(nearDue, state, options);
-    } else {
-      chosen = pickFutureReview(future, state, options);
-    }
-  }
+  const recentIds = new Set((options.recentCardIds || []).filter(Boolean));
+  const dropRecent = (items) => items.filter((item) => !recentIds.has(item.id));
+  const choose = (groups) =>
+    pickDueReview(groups.due, state) ||
+    pickRetryReview(groups.retry, state) ||
+    pickWeakReview(groups.readyWeak, state, options) ||
+    pickFreshReview(groups.fresh, options, openBeginnerStage) ||
+    pickFutureReview(groups.nearDue, state, options) ||
+    pickFutureReview(groups.future, state, options);
+  let chosen = choose({
+    due: dropRecent(due),
+    retry: dropRecent(retry),
+    readyWeak: dropRecent(readyWeak),
+    fresh: dropRecent(fresh),
+    nearDue: dropRecent(nearDue),
+    future: dropRecent(future),
+  });
+  if (!chosen) chosen = choose({ due, retry, readyWeak, fresh, nearDue, future });
   if (!chosen) return null;
   return {
     id: chosen.id,
