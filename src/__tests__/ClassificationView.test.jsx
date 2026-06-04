@@ -1,10 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { classificationTeachingMoment, classifyHint } from '../views/ClassificationView.jsx';
+import {
+  CLASSIFY_OPTIONS,
+  classificationCategoryId,
+  classificationTeachingMoment,
+  classifyHint,
+} from '../views/ClassificationView.jsx';
 
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
 const KAKU = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan' };
 const KAERU = { dict: '帰る', reading: 'かえる', meaning: 'to return home', group: 'godan' };
 const HASHIRU = { dict: '走る', reading: 'はしる', meaning: 'to run', group: 'godan' };
+const SURU = { dict: 'する', reading: 'する', meaning: 'to do', group: 'suru' };
+const KURU = { dict: '来る', reading: 'くる', meaning: 'to come', group: 'kuru' };
+const II = {
+  dict: 'いい',
+  reading: 'いい',
+  meaning: 'good',
+  group: 'i-adjective',
+  irregular: true,
+};
 
 describe('classification teaching moments', () => {
   it('teaches 食べる as ichidan drop-る', () => {
@@ -37,5 +51,31 @@ describe('classification teaching moments', () => {
       kind: 'ri-shift',
     });
     expect(classifyHint(HASHIRU)).toContain('走る -> 走ります');
+  });
+
+  it('uses one learner-facing irregular category', () => {
+    expect(CLASSIFY_OPTIONS.map((option) => option.id)).toEqual([
+      'ichidan',
+      'godan',
+      'irregular',
+      'i-adjective',
+      'na-adjective',
+    ]);
+    expect(classificationCategoryId(SURU)).toBe('irregular');
+    expect(classificationCategoryId(KURU)).toBe('irregular');
+    expect(classificationCategoryId(II)).toBe('irregular');
+
+    expect(classificationTeachingMoment(SURU)).toMatchObject({
+      label: 'irregular',
+      aliasText: expect.stringContaining('する'),
+    });
+    expect(classificationTeachingMoment(KURU)).toMatchObject({
+      label: 'irregular',
+      aliasText: expect.stringContaining('来る'),
+    });
+    expect(classificationTeachingMoment(II)).toMatchObject({
+      label: 'irregular',
+      aliasText: expect.stringContaining('いい'),
+    });
   });
 });

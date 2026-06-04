@@ -28,17 +28,24 @@ import {
 } from '../utils/groupDisplay.js';
 import { ruMasuDiagnostic } from '../utils/ruVerbDiagnostics.js';
 
-const VERB_CLASSIFY_OPTIONS = VERB_GROUP_IDS.map((id) => {
+const IRREGULAR_CLASSIFY_GROUP_IDS = new Set(['suru', 'kuru', 'irregular-adjective']);
+const REGULAR_VERB_CLASSIFY_IDS = VERB_GROUP_IDS.filter(
+  (id) => !IRREGULAR_CLASSIFY_GROUP_IDS.has(id),
+);
+
+const VERB_CLASSIFY_OPTIONS = REGULAR_VERB_CLASSIFY_IDS.map((id) => {
   const meta = getGroupDisplay(id);
   return { id, label: meta.label, hint: meta.decoder, aliasText: meta.aliasText };
 });
 
+const IRREGULAR_CLASSIFY_OPTION = {
+  id: 'irregular',
+  label: 'irregular',
+  hint: 'Memorize the special する, 来る, and いい patterns.',
+  aliasText: 'includes する, 来る, and いい',
+};
+
 const ADJECTIVE_CLASSIFY_OPTIONS = [
-  {
-    id: 'irregular-adjective',
-    label: 'irregular い-adjective',
-    hint: 'いい keeps its present form but conjugates from よい.',
-  },
   {
     id: 'i-adjective',
     label: 'い-adjective',
@@ -51,7 +58,45 @@ const ADJECTIVE_CLASSIFY_OPTIONS = [
   },
 ];
 
-export const CLASSIFY_OPTIONS = [...VERB_CLASSIFY_OPTIONS, ...ADJECTIVE_CLASSIFY_OPTIONS];
+export const CLASSIFY_OPTIONS = [
+  ...VERB_CLASSIFY_OPTIONS,
+  IRREGULAR_CLASSIFY_OPTION,
+  ...ADJECTIVE_CLASSIFY_OPTIONS,
+];
+
+export function classificationCategoryId(word) {
+  const id = classifyGroupId(word);
+  return IRREGULAR_CLASSIFY_GROUP_IDS.has(id) ? IRREGULAR_CLASSIFY_OPTION.id : id;
+}
+
+function classifyOptionLabel(id) {
+  return CLASSIFY_OPTIONS.find((o) => o.id === id)?.label || id;
+}
+
+function irregularSpecificText(word) {
+  const id = classifyGroupId(word);
+  if (id === 'suru') return 'Specific pattern: する / compound する.';
+  if (id === 'kuru') return 'Specific pattern: 来る / くる.';
+  if (id === 'irregular-adjective') return 'Specific pattern: いい-style adjective.';
+  return '';
+}
+
+function classificationStatsForCategory(stats, category) {
+  const byGroup = stats.byGroup || {};
+  if (category !== IRREGULAR_CLASSIFY_OPTION.id) {
+    return byGroup[category] || { attempted: 0, correct: 0 };
+  }
+  return [IRREGULAR_CLASSIFY_OPTION.id, ...IRREGULAR_CLASSIFY_GROUP_IDS].reduce(
+    (total, id) => {
+      const row = byGroup[id] || { attempted: 0, correct: 0 };
+      return {
+        attempted: total.attempted + (row.attempted || 0),
+        correct: total.correct + (row.correct || 0),
+      };
+    },
+    { attempted: 0, correct: 0 },
+  );
+}
 
 function negativeExample(word) {
   const answer = surfaceFormFor(word, 'plain-negative') || conjugate(word, 'plain-negative');
@@ -83,6 +128,21 @@ export function classifyHint(word) {
 
 export function classificationTeachingMoment(word) {
   const displayGroup = classifyGroupId(word);
+  if (classificationCategoryId(word) === IRREGULAR_CLASSIFY_OPTION.id) {
+    const isVerbIrregular = VERB_GROUP_IDS.includes(displayGroup);
+    const adjectiveExampleType = 'adj-plain-negative';
+    return {
+      label: IRREGULAR_CLASSIFY_OPTION.label,
+      aliasText: irregularSpecificText(word),
+      clue: isVerbIrregular ? groupRecognitionClue(word) : classifyHint(word),
+      example: isVerbIrregular
+        ? negativeExample(word)
+        : `${word.dict} -> ${conjugateAdjective(word, adjectiveExampleType)}`,
+      trap: isVerbIrregular ? groupTrapText(word) : '',
+      masuDiagnostic: isVerbIrregular ? ruMasuDiagnostic(word) : null,
+    };
+  }
+
   if (VERB_GROUP_IDS.includes(displayGroup)) {
     return {
       label: groupDisplayLabel(displayGroup),
@@ -169,21 +229,26 @@ export default function ClassificationView() {
 
   if (!current) return null;
 
-  const correctGroup = classifyGroupId(current);
+  const correctCategory = classificationCategoryId(current);
   const allowed = CLASSIFY_OPTIONS.filter(
-    (o) => filtered.some((w) => classifyGroupId(w) === o.id) || o.id === correctGroup,
+    (o) => filtered.some((w) => classificationCategoryId(w) === o.id) || o.id === correctCategory,
   );
   const stats = state.classify || defaultState().classify;
   const groupRows = CLASSIFY_OPTIONS.map((o) => {
-    const row = stats.byGroup?.[o.id] || { attempted: 0, correct: 0 };
+    const row = classificationStatsForCategory(stats, o.id);
     const accuracy = row.attempted ? Math.round((row.correct / row.attempted) * 100) : 0;
-    return { ...o, ...row, accuracy, inDeck: filtered.some((w) => classifyGroupId(w) === o.id) };
+    return {
+      ...o,
+      ...row,
+      accuracy,
+      inDeck: filtered.some((w) => classificationCategoryId(w) === o.id),
+    };
   }).filter((row) => row.inDeck);
 
   function choose(group) {
     if (result) return;
-    const ok = group === correctGroup;
-    const prev = stats.byGroup?.[correctGroup] || { attempted: 0, correct: 0 };
+    const ok = group === correctCategory;
+    const prev = stats.byGroup?.[correctCategory] || { attempted: 0, correct: 0 };
     setState({
       ...state,
       classify: {
@@ -191,7 +256,10 @@ export default function ClassificationView() {
         correct: (stats.correct || 0) + (ok ? 1 : 0),
         byGroup: {
           ...(stats.byGroup || {}),
-          [correctGroup]: { attempted: prev.attempted + 1, correct: prev.correct + (ok ? 1 : 0) },
+          [correctCategory]: {
+            attempted: prev.attempted + 1,
+            correct: prev.correct + (ok ? 1 : 0),
+          },
         },
       },
     });
@@ -221,10 +289,8 @@ export default function ClassificationView() {
     setAiErr('');
     setAiText('');
     try {
-      const label = CLASSIFY_OPTIONS.find((o) => o.id === correctGroup)?.label || correctGroup;
-      const chosen = result?.chosen
-        ? CLASSIFY_OPTIONS.find((o) => o.id === result.chosen)?.label || result.chosen
-        : 'not answered';
+      const label = classifyOptionLabel(correctCategory);
+      const chosen = result?.chosen ? classifyOptionLabel(result.chosen) : 'not answered';
       const sampleTypes = isAdjective(current)
         ? ['adj-plain-past', 'adj-plain-negative']
         : ['polite-present', 'plain-negative'];
@@ -312,7 +378,7 @@ export default function ClassificationView() {
               onClick={() => choose(o.id)}
               disabled={!!result}
               className={`px-3 py-3 rounded-xl border text-sm font-medium transition ${
-                result && o.id === correctGroup
+                result && o.id === correctCategory
                   ? 'bg-emerald-50 border-emerald-305 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-850 dark:text-emerald-300'
                   : result && o.id === result.chosen && !result.ok
                     ? 'bg-rose-50 border-rose-305 text-rose-800 dark:bg-rose-950/20 dark:border-rose-850 dark:text-rose-300'
@@ -339,15 +405,14 @@ export default function ClassificationView() {
             >
               <span role="status" aria-live="polite" className="sr-only">
                 {result.ok ? 'Correct.' : 'Not quite.'} It is{' '}
-                {teaching?.label || CLASSIFY_OPTIONS.find((o) => o.id === correctGroup)?.label}.
+                {teaching?.label || classifyOptionLabel(correctCategory)}.
               </span>
               <div
                 className={`font-medium text-sm ${result.ok ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}
               >
                 {result.ok ? 'Correct.' : 'Not quite.'}{' '}
                 <span className="font-normal">
-                  It is{' '}
-                  {teaching?.label || CLASSIFY_OPTIONS.find((o) => o.id === correctGroup)?.label}.
+                  It is {teaching?.label || classifyOptionLabel(correctCategory)}.
                 </span>
               </div>
               {teaching?.aliasText && (
