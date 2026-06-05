@@ -523,7 +523,6 @@ function useAppController() {
     setWordLists((prev) => upsertTodayDrillList(prev, drillPlan));
     setState((prev) => ({
       ...prev,
-      enabledTypes: drillPlan.typeIds,
       session: { ...(prev.session || {}), mistakePatterns: {} },
     }));
     setPracticePrefs((prev) => practicePrefsForTodayDrill(prev, drillPlan));

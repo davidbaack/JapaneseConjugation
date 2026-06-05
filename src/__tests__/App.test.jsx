@@ -45,8 +45,9 @@ describe('App shell', () => {
     // returning-user signals until there is history to show.
     expect(screen.getByText('Begin with practical forms.')).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
-    expect(screen.getByText('Enabled form scope')).toBeTruthy();
-    expect(screen.queryByText('Forms in this workout')).toBeNull();
+    expect(screen.getByText('Practice map scope')).toBeTruthy();
+    expect(screen.getByText('Saved forms for future workouts.')).toBeTruthy();
+    expect(screen.getByText('Forms in this workout')).toBeTruthy();
     expect(screen.queryByText('Next workout')).toBeNull();
     expect(screen.queryByText('Form families')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();
@@ -165,8 +166,11 @@ describe('App shell', () => {
   it('shows the single Practice flow instead of legacy Study mode controls', async () => {
     render(<App />);
     await startWorkoutFromDashboard();
-    expect(await screen.findByText('Form practice', {}, { timeout: 5000 })).toBeTruthy();
+    expect(
+      await screen.findByText(/\d+ forms in this workout/i, {}, { timeout: 5000 }),
+    ).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
+    expect(screen.getByText('53 map forms')).toBeTruthy();
     // "Sentence" is now the cued-cloze presentation toggle — a valid review
     // control, not a legacy study-mode button.
     expect(screen.getByRole('button', { name: 'Sentence', exact: true })).toBeTruthy();

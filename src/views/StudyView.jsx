@@ -545,11 +545,14 @@ function PracticeScopeSidebar({
               Practice map
             </div>
             <h2 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
-              Enabled form scope
+              Practice map scope
             </h2>
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+              Saved forms for future workouts.
+            </p>
           </div>
           <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
-            {activeCount} enabled
+            {activeCount} map forms
           </span>
         </div>
         <div className="mt-3 space-y-2">
@@ -754,6 +757,7 @@ export function ReviewsDashboard({
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
   const dueDone = srsQueue?.completedDueRuleIds?.length || 0;
   const dashboardDue = todayPlan?.sourceCounts?.due || dueTotal;
+  const workoutTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
   const progressPct = dueTotal
     ? Math.min(100, Math.round((dueDone / dueTotal) * 100))
     : Math.min(100, Math.round(((daily.count || 0) / dailyGoal) * 100));
@@ -839,7 +843,7 @@ export function ReviewsDashboard({
             <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
               {hasHistory
                 ? 'Ready cards come first, then the workout fills with recent misses and varied words in the same weak patterns.'
-                : 'Start with a 12-card workout built from Core and Everyday forms. The map will learn what to repeat as you answer.'}
+                : 'Start with a 12-card workout drawn from your Practice map. The map will learn what to repeat as you answer.'}
             </p>
             {hasHistory && (
               <div className="mt-4 flex flex-wrap gap-2">
@@ -875,6 +879,16 @@ export function ReviewsDashboard({
                     ? `${dueDone}/${dueTotal} ready cards practiced`
                     : '12-card workout ready'}
                 </div>
+                {!!workoutTypeCount && (
+                  <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 text-xs dark:border-indigo-900/60 dark:bg-stone-950/30">
+                    <span className="font-medium text-stone-600 dark:text-stone-300">
+                      Forms in this workout
+                    </span>
+                    <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
+                      {workoutTypeCount}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="text-xl font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
                 {progressPct}%
@@ -1214,14 +1228,22 @@ export default function StudyView() {
   const wrongSnapshotRef = useRef(null);
   const typingHintRef = useRef(null);
 
+  const todayDrillActive =
+    contextTodayDrillActive ??
+    (!practicePrefs.minimalPairSetId &&
+      !practicePrefs.reviewLimitSource &&
+      (practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID));
   const enabledTypes = useMemo(() => {
     if (sessionFilterFormGroupId) {
       const group = FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId);
       if (group?.typeIds?.length) return group.typeIds;
     }
+    if (todayDrillActive && todayPlan?.typeIds?.length) {
+      return reviewTypeIdsForState(state, todayPlan.typeIds);
+    }
     const baseTypes = state.enabledTypes?.length ? state.enabledTypes : ['plain-past'];
     return reviewTypeIdsForState(state, baseTypes);
-  }, [state, sessionFilterFormGroupId]);
+  }, [state, sessionFilterFormGroupId, todayDrillActive, todayPlan?.typeIds]);
   const practiceWords = useMemo(() => {
     const base = filterWordsForStudyScope(
       verbs,
@@ -1347,11 +1369,6 @@ export default function StudyView() {
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const todayGoalHit = isDailyGoalHitToday(daily);
   const boundedReviewLaunchActive = activeReviewLimitFromPrefs(practicePrefs) > 0;
-  const todayDrillActive =
-    contextTodayDrillActive ??
-    (!practicePrefs.minimalPairSetId &&
-      !practicePrefs.reviewLimitSource &&
-      (practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID));
   const canResumePersistedCurrent = hasPersistedCurrent();
   const canResumeTodayDrill =
     todayDrillActive && daily.date === localDateKey() && canResumePersistedCurrent;
@@ -2940,7 +2957,11 @@ export default function StudyView() {
                 Practice
               </div>
               <div className="text-sm text-stone-600 dark:text-stone-300">
-                {reverseDrill ? 'Reading practice' : 'Form practice'}
+                {todayDrillActive && todayPlan?.typeIds?.length
+                  ? `${todayPlan.typeIds.length} forms in this workout`
+                  : reverseDrill
+                    ? 'Reading practice'
+                    : 'Form practice'}
               </div>
             </div>
           </div>
