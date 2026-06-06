@@ -11,6 +11,7 @@ import { useTablist } from '../components/useTablist.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import { buildLabReviewRecommendations } from '../utils/reviewRecommendations.js';
 import ReferenceViewSub from './ReferenceViewSub.jsx';
+import CheckView from './CheckView.jsx';
 import ReviewInventoryView from './ReviewInventoryView.jsx';
 import ListsViewSub from './ListsViewSub.jsx';
 import CustomDictionaryViewSub from './CustomDictionaryViewSub.jsx';
@@ -20,10 +21,16 @@ import GamesView from './GamesView.jsx';
 
 const TOOL_TABS = [
   {
-    id: 'reference',
-    label: 'Lookup / Check',
+    id: 'lookup',
+    label: 'Lookup',
     desc: 'Search real forms and launch targeted practice.',
     icon: IconBook,
+  },
+  {
+    id: 'check',
+    label: 'Check',
+    desc: 'Identify a conjugated form and diagnose close misses.',
+    icon: IconCheck,
   },
   {
     id: 'words',
@@ -78,7 +85,7 @@ export default function ToolsView() {
     practiceWord,
     wordLists,
   } = useApp();
-  const [active, setActive] = useState('reference');
+  const [active, setActive] = useState('lookup');
 
   useEffect(() => {
     const tool = labFocus?.tool;
@@ -120,7 +127,7 @@ export default function ToolsView() {
               Tools
             </div>
             <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
-              Lookup, repair drills, and word management.
+              Lookup, check, repair drills, and word management.
             </h2>
           </div>
           {recommendations.length > 0 && (
@@ -197,7 +204,7 @@ export default function ToolsView() {
       </section>
 
       <section {...panelProps(active)}>
-        {active === 'reference' && (
+        {active === 'lookup' && (
           <ReferenceViewSub
             state={state}
             setState={setState}
@@ -213,6 +220,7 @@ export default function ToolsView() {
             focused
           />
         )}
+        {active === 'check' && <CheckView />}
         {active === 'words' && <ReviewInventoryView />}
         {active === 'endings' && <EndingsView />}
         {active === 'classify' && <ClassificationView />}
