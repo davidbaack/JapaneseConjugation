@@ -52,13 +52,7 @@ import {
   localDateKey,
   typeIdFromCardId,
 } from '../utils/storage.js';
-import {
-  buildReadinessFamilyRows,
-  launchPrefsForReadinessDimension,
-  READINESS_DIMENSIONS,
-  recordReadinessAttempt,
-  weakestReadinessSkill,
-} from '../utils/readiness.js';
+import { READINESS_DIMENSIONS, recordReadinessAttempt } from '../utils/readiness.js';
 import {
   formDisplay,
   promptDisplay,
@@ -73,7 +67,6 @@ import {
 } from '../utils/display.js';
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
 import {
-  aggregateDiagnosedMistakes,
   bumpSessionMistakePattern,
   labRouteForMistakePattern,
   rankSessionMistakePatterns,
@@ -1170,13 +1163,11 @@ export default function StudyView() {
     wordLists,
     studyFocus: focus,
     clearStudyFocus: onFocusConsumed,
-    openLabTool,
     hydrated,
     todayPlan,
     todayDrillActive: contextTodayDrillActive,
     srsQueue,
     startTodayDrill,
-    startReviewRecommendation,
     markSrsQueueCompleted,
   } = useApp();
   const [current, setCurrent] = useState(null);
@@ -1206,11 +1197,12 @@ export default function StudyView() {
   const seededInitialDailyGoalRef = useRef(false);
   const autoStartedTodayRef = useRef(false);
   const [bonusMode, setBonusMode] = useState(false);
-  const [dashboardOpen, setDashboardOpen] = useState(() => !focus?.word);
   const [undoReviewScopeAction, setUndoReviewScopeAction] = useState(null);
   const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
   const [sessionFilterWord, setSessionFilterWord] = useState(null);
-  const [sessionFilterFormGroupId, setSessionFilterFormGroupId] = useState(null);
+  const [sessionFilterFormGroupId, setSessionFilterFormGroupId] = useState(
+    () => focus?.formGroupId || null,
+  );
   const [launchContext, setLaunchContext] = useState(() =>
     focus?.returnTo === 'reference' ? focus : null,
   );
@@ -1340,50 +1332,31 @@ export default function StudyView() {
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
     [state.session?.mistakePatterns],
   );
-  const openMistakeSummary = useMemo(() => {
-    const open = (state.mistakes || []).filter((mistake) => !mistake.resolved);
-    return {
-      count: open.length,
-      patterns: aggregateDiagnosedMistakes(open),
-    };
-  }, [state.mistakes]);
-  const topMistakeRoute = labRouteForMistakePattern(openMistakeSummary.patterns[0]);
-  const retestableMisses = topMistakeRoute ? openMistakeSummary.count : 0;
-  // When open misses cluster as godan sound-change errors, the te/ta
-  // readiness drill routes to Ending Lab's scaffolded onbin practice instead of
-  // a generic scoped review.
-  const onbinWeakness = openMistakeSummary.patterns.some(
-    (pattern) => pattern.category === 'godan-sound-change',
-  );
-  // Verb-group confusion is the foundational miss (you cannot conjugate without
-  // the group); when it clusters, the dashboard routes to the Groups drill.
-  const groupConfusion = openMistakeSummary.patterns.some(
-    (pattern) => pattern.category === 'verb-group-confusion',
-  );
-  // Recognition/production/speed readiness rolled up to form families, plus the
-  // single weakest skill, for the dashboard's strength section and nudge. Scoped
-  // to state.readiness so it only recomputes when readiness data changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const readinessFamilies = useMemo(() => buildReadinessFamilyRows(state), [state.readiness]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const weaknessFamilies = useMemo(() => buildWeaknessFamilyRows(state), [state.weakness]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const weakestReadiness = useMemo(() => weakestReadinessSkill(state), [state.readiness]);
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const todayGoalHit = isDailyGoalHitToday(daily);
   const boundedReviewLaunchActive = activeReviewLimitFromPrefs(practicePrefs) > 0;
   const canResumePersistedCurrent = hasPersistedCurrent();
-  const canResumeTodayDrill =
-    todayDrillActive && daily.date === localDateKey() && canResumePersistedCurrent;
   const specialLaunchActive =
     !!focus?.word ||
+    !!focus?.formGroupId ||
     !!focusWordLock ||
     !!sessionFilterWord ||
     !!sessionFilterFormGroupId ||
     !!launchContext ||
     boundedReviewLaunchActive ||
     !!activeMinimalPairSet;
+  const retiredReviewLimitSource =
+    !!practicePrefs.reviewLimitSource && !REVIEW_LIMIT_SOURCES.has(practicePrefs.reviewLimitSource);
+  const canAutoStartDefaultWorkout =
+    !todayDrillActive &&
+    !specialLaunchActive &&
+    !canResumePersistedCurrent &&
+    !todayGoalHit &&
+    !retiredReviewLimitSource &&
+    !!todayPlan?.available;
   const reviewSelectionOptions = useMemo(
     () => ({
       bonusMode,
@@ -1423,16 +1396,10 @@ export default function StudyView() {
 
   useLayoutEffect(() => {
     if (!hydrated) return;
-    // Bail only when the dashboard will actually render. Bounded review,
-    // recommendation, minimal-pair, and focus launches bypass the dashboard, so
-    // must still select a card for them — otherwise the dashboard is hidden,
-    // no card is chosen, and Practice dead-ends on "No cards available."
-    if (dashboardOpen && !specialLaunchActive) return;
     // When arriving from Check's "Practice this verb", seed that exact word/form
     // once. If no rule covers it, fall through to normal selection.
     if (focus?.word && !focusSeededRef.current) {
       focusSeededRef.current = true;
-      setDashboardOpen(false);
       setFocusWordLock(focus.word);
       if (focus.returnTo === 'reference') setLaunchContext(focus);
       const card = buildFocusCard(state, focus.word, focus.type);
@@ -1444,10 +1411,20 @@ export default function StudyView() {
         return;
       }
     }
+    if (focus?.formGroupId && !focusSeededRef.current) {
+      focusSeededRef.current = true;
+      setSessionFilterFormGroupId(focus.formGroupId);
+      setFocusWordLock(null);
+      onFocusConsumed?.();
+    }
+    if (!autoStartedTodayRef.current && canAutoStartDefaultWorkout) {
+      launchTodayDrill();
+    }
     if (current !== null) return;
-    const persisted = focus?.word
-      ? null
-      : loadPersistedCurrent(state, practiceWords, enabledTypes, practicePrefs);
+    const persisted =
+      focus?.word || focus?.formGroupId
+        ? null
+        : loadPersistedCurrent(state, practiceWords, enabledTypes, practicePrefs);
     if (persisted) {
       setCurrent(persisted);
       return;
@@ -1475,8 +1452,8 @@ export default function StudyView() {
     practiceRuleCandidates,
     reviewSelectionOptions,
     focus,
-    dashboardOpen,
     specialLaunchActive,
+    canAutoStartDefaultWorkout,
   ]);
 
   useEffect(() => {
@@ -1680,43 +1657,6 @@ export default function StudyView() {
     );
   }
 
-  if (dashboardOpen && !specialLaunchActive) {
-    return (
-      <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <PracticeScopeSidebar
-          className="order-2 lg:order-1"
-          state={state}
-          weaknessFamilies={weaknessFamilies}
-          onToggleFamily={togglePracticeFamily}
-          onToggleType={togglePracticeType}
-        />
-        <div className="order-1 min-w-0 space-y-4 lg:order-2">
-          <ReviewsDashboard
-            daily={daily}
-            practicePrefs={practicePrefs}
-            srsQueue={srsQueue}
-            state={state}
-            todayPlan={todayPlan}
-            todayDrillActive={todayDrillActive}
-            onStart={beginReviews}
-            onStartRecommendation={startReviewRecommendation}
-            onRetestMisses={launchMistakeRetest}
-            retestCount={retestableMisses}
-            mistakeRoute={topMistakeRoute}
-            readinessFamilies={readinessFamilies}
-            weakestSkill={weakestReadiness}
-            onDrillReadiness={drillReadinessGap}
-            onbinWeakness={onbinWeakness}
-            onDrillEndingLab={() => openLabTool('endings')}
-            groupConfusion={groupConfusion}
-            onDrillClassify={() => openLabTool('classify')}
-            onDrillRush={() => openLabTool('games')}
-          />
-        </div>
-      </div>
-    );
-  }
-
   if (!current) {
     const hasSessionFilter = !!(sessionFilterWord || sessionFilterFormGroupId);
     return (
@@ -1857,6 +1797,28 @@ export default function StudyView() {
   const dailyGoalJustHit =
     todayGoalHit && !startedGoalHit.current && seededInitialDailyGoalRef.current && !bonusMode;
   const reviewComplete = dueQueueDone || dailyGoalJustHit;
+  const defaultProgressMax = Math.max(1, Number(todayPlan?.reviewLimit || dailyGoalTarget));
+  const workoutProgress =
+    reviewLimit > 0
+      ? {
+          now: Math.min(reviewsDone, reviewLimit),
+          max: reviewLimit,
+          label: reviewLimitSource === 'recommendation' ? 'Recommended progress' : 'Drill progress',
+        }
+      : initialDue > 0 && !bonusMode
+        ? {
+            now: Math.min(completedDueCount, initialDue),
+            max: initialDue,
+            label: 'Ready-card progress',
+          }
+        : {
+            now: Math.min(reviewsDone, defaultProgressMax),
+            max: defaultProgressMax,
+            label: bonusMode ? 'Bonus progress' : 'Workout progress',
+          };
+  const workoutProgressPct = workoutProgress.max
+    ? Math.min(100, Math.round((workoutProgress.now / workoutProgress.max) * 100))
+    : 0;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishMeaning = englishHintsHidden && phase === 'answering';
   // Guided kana is now an in-box "reveal next" action, not a separate mode.
@@ -2072,7 +2034,6 @@ export default function StudyView() {
   function launchTodayDrill() {
     if (!todayPlan.available) return;
     autoStartedTodayRef.current = true;
-    setDashboardOpen(false);
     clearPersistedCurrent();
     const launched = startTodayDrill?.(todayPlan);
     if (launched === false) return;
@@ -2085,21 +2046,11 @@ export default function StudyView() {
     setTab('practice');
   }
 
-  function beginReviews() {
-    if (todayDrillActive || canResumePersistedCurrent || canResumeTodayDrill) {
-      setDashboardOpen(false);
-      setCurrent(null);
-      return;
-    }
-    launchTodayDrill();
-  }
-
   function chooseFocusWord(word) {
     if (word) {
       setState((prev) => includeWordInReviewState(prev, word));
     }
     setSessionFilterWord(word);
-    setDashboardOpen(false);
     setCurrent(null);
   }
 
@@ -2114,7 +2065,6 @@ export default function StudyView() {
       };
     });
     setSessionFilterFormGroupId(groupId);
-    setDashboardOpen(false);
     setCurrent(null);
   }
 
@@ -2147,21 +2097,6 @@ export default function StudyView() {
       return { ...prev, enabledTypes: [...currentTypes] };
     });
     setCurrent(null);
-  }
-
-  // Drill the weakest readiness dimension of a form family: apply that
-  // dimension's answer mode (recognition -> choice, speed -> timed input,
-  // production -> input) and scope Practice to the family.
-  function drillReadinessGap({ familyId, dimension }) {
-    if (dimension) {
-      setPracticePrefs((prev) => ({ ...prev, ...launchPrefsForReadinessDimension(dimension) }));
-    }
-    chooseFocusFormGroup(familyId);
-  }
-
-  function launchMistakeRetest() {
-    if (!topMistakeRoute) return;
-    openLabTool(topMistakeRoute.tool);
   }
 
   // Deterministic, offline step coach — no API key required. Irregular forms
@@ -2872,9 +2807,8 @@ export default function StudyView() {
     return next;
   }
 
-  // Universal escape hatch back to the Practice dashboard. Exits whatever
-  // focused session is active (minimal-pair contrast, bounded practice, or a
-  // focus-word lock) so specialLaunchActive clears and the dashboard renders.
+  // Universal escape hatch back to Stats. Exits whatever focused session is
+  // active (minimal-pair contrast, bounded practice, or a focus-word lock).
   function returnToOverview() {
     if (activeMinimalPairSet) {
       const restoreTypes = minimalPairReturnEnabledTypes(practicePrefs) || [];
@@ -2893,7 +2827,7 @@ export default function StudyView() {
     onFocusConsumed?.();
     resetActiveAttempt();
     setCurrent(null);
-    setDashboardOpen(true);
+    setTab('stats');
   }
 
   return (
@@ -2950,10 +2884,10 @@ export default function StudyView() {
               <button
                 type="button"
                 onClick={returnToOverview}
-                aria-label="Back to Practice overview"
+                aria-label="Back to Stats"
                 className="shrink-0 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 hover:text-stone-700 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"
               >
-                &lt;- Overview
+                &lt;- Stats
               </button>
             )}
             <div className="text-left">
@@ -3008,6 +2942,34 @@ export default function StudyView() {
               </div>
             </details>
           </div>
+        </div>
+        <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+              {workoutProgress.label}
+            </div>
+            <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
+              {workoutProgress.now}/{workoutProgress.max} cards
+            </div>
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Workout progress"
+            aria-valuemin={0}
+            aria-valuemax={workoutProgress.max}
+            aria-valuenow={workoutProgress.now}
+            className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
+          >
+            <span
+              className="block h-full rounded-full bg-indigo-600 dark:bg-indigo-400"
+              style={{ width: `${workoutProgressPct}%` }}
+            />
+          </div>
+          {!!sessionSkipped && (
+            <div className="mt-1 text-right text-[11px] text-stone-400">
+              {sessionSkipped} skipped
+            </div>
+          )}
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
           <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">

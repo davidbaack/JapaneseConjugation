@@ -17,6 +17,7 @@ import {
   normalizeWordLists,
 } from '../utils/storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { FORM_GROUPS } from '../data/conjugationTypes.js';
 import { getJapaneseVoices } from '../utils/speech.js';
 import { mergePracticePrefs } from '../utils/display.js';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
@@ -31,6 +32,7 @@ import {
   upsertTodayDrillList,
 } from '../utils/todayDrill.js';
 import {
+  includeFormFamilyInReviewState,
   includeTypeFamilyInReviewState,
   includeWordInReviewState,
   includeWordKeyInReviewState,
@@ -49,7 +51,7 @@ function normalizeAppTab(tab) {
   if (tab === 'study') return 'practice';
   if (tab === 'lessons') return 'learn';
   if (tab === 'library' || tab === 'lab') return 'tools';
-  return ['practice', 'learn', 'tools', 'settings'].includes(tab) ? tab : 'practice';
+  return ['practice', 'stats', 'learn', 'tools', 'settings'].includes(tab) ? tab : 'practice';
 }
 
 function isTodayDrillPractice(prefs = DEFAULT_PREFS) {
@@ -456,6 +458,34 @@ function useAppController() {
     setStudyFocus({ word, type, ...options });
     setTab('practice');
   }
+  function practiceFormGroup({ familyId, launchPrefs = {} } = {}) {
+    const family = FORM_GROUPS.find((item) => item.id === familyId);
+    if (!family?.typeIds?.length) return false;
+    setState((prev) => {
+      const restored = includeFormFamilyInReviewState(prev, familyId);
+      return {
+        ...restored,
+        enabledTypes: [...new Set([...(restored.enabledTypes || []), ...family.typeIds])],
+        session: { ...(restored.session || {}), mistakePatterns: {} },
+      };
+    });
+    setPracticePrefs((prev) => ({
+      ...prev,
+      ...launchPrefs,
+      minimalPairSetId: '',
+      minimalPairReturn: null,
+      reviewLimit: 0,
+      reviewLimitSource: '',
+      practicePath: '',
+      wordListIds: [],
+    }));
+    try {
+      sessionStorage.removeItem('jp-study-current');
+    } catch {}
+    setStudyFocus({ formGroupId: familyId, source: 'stats', launchMode: 'form-group' });
+    setTab('practice');
+    return true;
+  }
   const clearStudyFocus = () => setStudyFocus(null);
   // Open a specific Tools drill from another view (e.g. the dashboard routing
   // a detected weakness into the matching drill).
@@ -568,6 +598,7 @@ function useAppController() {
     session,
     studyFocus,
     practiceWord,
+    practiceFormGroup,
     clearStudyFocus,
     labFocus,
     openLabTool,

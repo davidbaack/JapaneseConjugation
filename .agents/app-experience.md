@@ -9,9 +9,11 @@ confirms the new direction, update this document in the same change.
 
 ## Product Shape
 
-- Top-level sections are Practice, Learn, Tools, and Settings.
+- Top-level sections are Practice, Stats, Learn, Tools, and Settings.
 - Practice is the landing page and the main learner loop. It is built around
   short workouts, not a visible long-term SRS queue.
+- Stats contains progress, recommendations, upcoming reviews, and readiness
+  summaries that do not need to block the active workout.
 - Learn teaches forms and verb/adjective groups from start to finish. It can
   recommend focused Practice, but it does not gate Practice.
 - Tools contains lookup, check, word management, saved lists, custom words,
@@ -21,12 +23,13 @@ confirms the new direction, update this document in the same change.
 
 ## Practice
 
-- Practice opens to a dashboard with one primary Start workout action.
+- Practice opens directly into the default workout without requiring a Start
+  action.
 - The default workout target is 12 cards. Ready cards still matter, but the
-  learner-facing framing is ready cards, recent misses, practice history, and
-  next workout rather than SRS intervals.
-- The dashboard stays clean. Detailed form and subgroup weakness data lives in
-  the Practice map.
+  learner-facing framing is session progress, ready cards, recent misses,
+  practice history, and next workout rather than SRS intervals.
+- The active card shows session progress. Detailed form and subgroup weakness
+  data lives in the Practice map and Stats.
 - The persistent Practice map shows all form families, including disabled and
   untried families. Expanded families show exact-form toggles plus subgroup
   weakness rows once there is data.

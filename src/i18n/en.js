@@ -10,6 +10,7 @@ export default {
   'app.subtitle': 'Conjugation Practice',
 
   'nav.practice': 'Practice',
+  'nav.stats': 'Stats',
   'nav.learn': 'Learn',
   'nav.tools': 'Tools',
   'nav.settings': 'Settings',

@@ -19,13 +19,8 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-async function startWorkoutFromDashboard() {
-  const starts = await screen.findAllByRole(
-    'button',
-    { name: /Start workout|Continue workout/ },
-    { timeout: 5000 },
-  );
-  fireEvent.click(starts[starts.length - 1]);
+async function waitForPracticeCard() {
+  return screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
 }
 
 describe('App shell', () => {
@@ -34,29 +29,26 @@ describe('App shell', () => {
     expect(screen.getByRole('heading', { name: /Katachiya/ })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Conjugation Practice/ })).toBeTruthy();
     // Nav labels (accessible name is the catalog string; CSS only capitalizes).
-    for (const label of ['Practice', 'Learn', 'Tools', 'Settings']) {
+    for (const label of ['Practice', 'Stats', 'Learn', 'Tools', 'Settings']) {
       expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
     }
   });
 
-  it('lazy-loads a clean Practice dashboard for a brand-new learner', async () => {
+  it('lazy-loads Practice directly into a workout for a brand-new learner', async () => {
     render(<App />);
-    // The Suspense skeleton resolves to the Practice dashboard.
-    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
-    // New learner (no history): a single clear Start, no wall of zeros, and no
-    // returning-user signals until there is history to show.
-    expect(screen.getByText('Begin with practical forms.')).toBeTruthy();
+    expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
     expect(screen.getByText('Practice map scope')).toBeTruthy();
     expect(screen.getByText('Saved forms for future workouts.')).toBeTruthy();
-    expect(screen.getByText('Forms in this workout')).toBeTruthy();
+    expect(screen.getByRole('progressbar', { name: 'Workout progress' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
     expect(screen.queryByText('Next workout')).toBeNull();
     expect(screen.queryByText('Form families')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
   });
 
-  it('reveals forecast and form-family signals once there is review history', async () => {
+  it('shows forecast and form-family signals in the Stats tab', async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -81,10 +73,13 @@ describe('App shell', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
-    expect(screen.getByText('Start a focused workout.')).toBeTruthy();
+    expect(await waitForPracticeCard()).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'Stats', exact: true }));
+    expect(await screen.findByRole('region', { name: 'Stats dashboard' })).toBeTruthy();
+    expect(screen.getByText('Practice pulse.')).toBeTruthy();
     expect(screen.getByText('Next workout')).toBeTruthy();
     expect(screen.getByText('Form families')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
   });
 
   it('shows subgroup weakness rows in the expanded Practice map', async () => {
@@ -122,7 +117,7 @@ describe('App shell', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
+    expect(await waitForPracticeCard()).toBeTruthy();
     fireEvent.click(screen.getByText('Te/Ta Sound Changes'));
 
     expect(screen.getByText('2/2 enabled')).toBeTruthy();
@@ -159,17 +154,17 @@ describe('App shell', () => {
 
     render(<App />);
 
-    await screen.findByRole('region', { name: 'Practice dashboard' }, { timeout: 5000 });
+    await waitForPracticeCard();
     await waitFor(() => {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
       expect(raw.practicePrefs.wordListIds || []).not.toContain(TODAY_DRILL_LIST_ID);
     });
-    expect(screen.getByRole('button', { name: 'Start workout' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
   });
 
   it('shows the single Practice flow instead of legacy Study mode controls', async () => {
     render(<App />);
-    await startWorkoutFromDashboard();
+    await waitForPracticeCard();
     expect(
       await screen.findByText(/\d+ forms in this workout/i, {}, { timeout: 5000 }),
     ).toBeTruthy();
@@ -221,7 +216,7 @@ describe('App shell', () => {
 
     render(<App />);
 
-    await startWorkoutFromDashboard();
+    await waitForPracticeCard();
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(screen.getAllByText(/Tai Past Negative/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/did not want to ~/i)).toBeTruthy();
@@ -269,7 +264,7 @@ describe('App shell', () => {
 
     render(<App />);
 
-    await startWorkoutFromDashboard();
+    await waitForPracticeCard();
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: 'zzz' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
@@ -323,7 +318,7 @@ describe('App shell', () => {
 
     render(<App />);
 
-    await startWorkoutFromDashboard();
+    await waitForPracticeCard();
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: 'hanashita' } });
     const checkButton = screen.queryByRole('button', { name: 'Check (Enter)' });
@@ -339,7 +334,7 @@ describe('App shell', () => {
   it('mounts every tab without hitting the error boundary', async () => {
     render(<App />);
     // Each nav button's accessible name is its catalog label.
-    const labels = ['Practice', 'Learn', 'Tools', 'Settings'];
+    const labels = ['Practice', 'Stats', 'Learn', 'Tools', 'Settings'];
     for (const label of labels) {
       fireEvent.click(screen.getByRole('tab', { name: label, exact: true }));
       // Each view lazy-loads; wait until its chunk resolves (nav stays mounted).
@@ -406,7 +401,7 @@ describe('App shell', () => {
     );
 
     render(<App />);
-    await screen.findByRole('region', { name: 'Practice dashboard' }, { timeout: 5000 });
+    await waitForPracticeCard();
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
 
     fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));

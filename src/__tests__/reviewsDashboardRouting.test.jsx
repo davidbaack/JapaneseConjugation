@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
-import { ReviewsDashboard } from '../views/StudyView.jsx';
+import { StatsDashboard } from '../views/StatsView.jsx';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { defaultState } from '../utils/storage.js';
 import { buildReadinessFamilyRows, recordReadinessAttempt } from '../utils/readiness.js';
@@ -42,7 +42,7 @@ function renderDashboard(overrides = {}) {
     ...handlers,
     ...overrides,
   };
-  render(<ReviewsDashboard {...props} />);
+  render(<StatsDashboard {...props} />);
   return { ...handlers, ...overrides };
 }
 
@@ -71,7 +71,29 @@ const onbinWeakest = {
   detail: '2/5',
 };
 
-describe('ReviewsDashboard primary nudge priority ladder', () => {
+describe('StatsDashboard primary nudge priority ladder', () => {
+  it('keeps recommendations actionable without a default Start workout gate', () => {
+    const recommendation = {
+      id: 'lesson-basic-tenses',
+      source: 'lesson',
+      label: 'Basic tense refresher',
+      detail: '4 cards',
+    };
+    const state = {
+      ...defaultState(),
+      reviewScope: {
+        ...defaultState().reviewScope,
+        recommendations: [recommendation],
+      },
+    };
+    const spies = renderDashboard({ state });
+
+    expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Basic tense refresher/i }));
+
+    expect(spies.onStartRecommendation).toHaveBeenCalledWith(recommendation);
+  });
+
   it('routes verb-group confusion to Groups, ahead of onbin and speed', () => {
     // Group confusion is foundational: even with onbin + a speed-weak skill also
     // detected, the single nudge picks Groups first.
@@ -137,7 +159,7 @@ describe('ReviewsDashboard primary nudge priority ladder', () => {
   });
 });
 
-describe('ReviewsDashboard per-family speed routing', () => {
+describe('StatsDashboard per-family speed routing', () => {
   // Seed a family whose weakest readiness dimension is speed (slow but correct
   // reps keep production strong) plus a card so the strength row renders.
   function speedWeakState(ruleId) {

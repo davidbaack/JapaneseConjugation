@@ -6,7 +6,7 @@ import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
 import { conjugateItem, wordKey } from '../utils/conjugator.js';
 import { englishForForm } from '../utils/display.js';
-import { cardIdFor, defaultState, recordMistake } from '../utils/storage.js';
+import { cardIdFor, defaultState } from '../utils/storage.js';
 import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
@@ -109,13 +109,8 @@ function persistStudyCard(word, type) {
   );
 }
 
-async function startWorkoutFromDashboard() {
-  const start = await screen.findByRole(
-    'button',
-    { name: /Start workout|Continue workout/ },
-    { timeout: 5000 },
-  );
-  fireEvent.click(start);
+async function waitForPracticeCard() {
+  return screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
 }
 class FakeSpeechRecognition {
   static instance = null;
@@ -167,20 +162,20 @@ afterEach(() => {
 });
 
 describe('StudyView daily startup guards', () => {
-  it('opens to the Practice dashboard for signed-in learners, then starts on command', async () => {
+  it('auto-starts the default Practice workout for signed-in learners', async () => {
     const app = makeApp();
     mockedApp.value = app;
 
     render(<StudyView />);
 
-    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
-
-    await startWorkoutFromDashboard();
+    expect(await waitForPracticeCard()).toBeTruthy();
+    const progress = screen.getByRole('progressbar', { name: 'Workout progress' });
+    expect(progress.getAttribute('aria-valuenow')).toBe('0');
+    expect(progress.getAttribute('aria-valuemax')).toBe(String(app.todayPlan.reviewLimit));
     expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
   });
 
-  it('opens to the Practice dashboard while signed out, then starts on command', async () => {
+  it('auto-starts the default Practice workout while signed out', async () => {
     const app = makeApp({
       session: null,
     });
@@ -188,52 +183,25 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
-
-    await startWorkoutFromDashboard();
+    expect(await waitForPracticeCard()).toBeTruthy();
+    const progress = screen.getByRole('progressbar', { name: 'Workout progress' });
+    expect(progress.getAttribute('aria-valuenow')).toBe('0');
+    expect(progress.getAttribute('aria-valuemax')).toBe(String(app.todayPlan.reviewLimit));
     expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
   });
 
-  it('returns to the Practice dashboard from an active card via Overview', async () => {
+  it('returns to Stats from an active card', async () => {
     const target = STARTER_VERBS[0];
     persistStudyCard(target, 'plain-past');
-    mockedApp.value = makeApp();
+    const app = makeApp();
+    mockedApp.value = app;
 
     render(<StudyView />);
 
-    await startWorkoutFromDashboard();
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitForPracticeCard();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Practice overview' }));
-    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
-  });
-
-  it('routes open verb-group mistakes from the dashboard into Groups', async () => {
-    const target = STARTER_VERBS.find((word) => word.reading === '\u305f\u3079\u308b');
-    expect(target).toBeTruthy();
-    const state = {
-      ...defaultState(),
-      mistakes: recordMistake(
-        [],
-        target,
-        'plain-past',
-        null,
-        '\u305f\u3079\u3063\u305f',
-        conjugateItem(target, 'plain-past'),
-      ),
-    };
-    const openLabTool = vi.fn();
-    mockedApp.value = makeApp({ state, openLabTool });
-
-    render(<StudyView />);
-
-    const routeButton = await screen.findByRole('button', {
-      name: 'Wrong verb group -> Groups',
-    });
-    fireEvent.click(routeButton);
-
-    expect(openLabTool).toHaveBeenCalledWith('classify');
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Stats' }));
+    expect(app.setTab).toHaveBeenCalledWith('stats');
   });
 
   it('offers an Overview return path from a focused (special) session', async () => {
@@ -249,9 +217,9 @@ describe('StudyView daily startup guards', () => {
 
     // A focus launch is a "special" session — it previously hid Overview.
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Practice overview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Stats' }));
 
-    expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
+    expect(app.setTab).toHaveBeenCalledWith('stats');
   });
 
   it('does not auto-start today over a focused word launch', async () => {
@@ -271,7 +239,7 @@ describe('StudyView daily startup guards', () => {
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
-  it('treats stale repair launch prefs as normal dashboard state', async () => {
+  it('does not auto-start today for stale repair launch prefs', async () => {
     const app = makeApp({
       practicePrefs: {
         ...DEFAULT_PREFS,
@@ -283,8 +251,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await screen.findByRole('region', { name: 'Practice dashboard' }, { timeout: 5000 });
-    expect(screen.queryByPlaceholderText(/Type romaji or kana/i)).toBeNull();
+    await waitForPracticeCard();
     expect(screen.queryByText('No cards available')).toBeNull();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
@@ -307,8 +274,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startWorkoutFromDashboard();
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitForPracticeCard();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
@@ -334,8 +300,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startWorkoutFromDashboard();
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitForPracticeCard();
     const raw = sessionStorage.getItem('jp-study-current');
     expect(raw).toBeTruthy();
     expect(JSON.parse(raw).dict).toBe(target.dict);
@@ -392,8 +357,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startWorkoutFromDashboard();
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitForPracticeCard();
     await waitFor(() => {
       const raw = sessionStorage.getItem('jp-study-current');
       expect(raw).toBeTruthy();
@@ -427,8 +391,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startWorkoutFromDashboard();
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitForPracticeCard();
     await waitFor(() => {
       const raw = sessionStorage.getItem('jp-study-current');
       expect(raw).toBeTruthy();
@@ -464,15 +427,14 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startWorkoutFromDashboard();
+    await waitForPracticeCard();
     await screen.findByText('to open (v.t.)', {}, { timeout: 5000 });
     expect(screen.queryByText('No cards available')).toBeNull();
   });
 
   it('does not treat a retired repair list as a persisted special launch', async () => {
     // Retired repair-drill prefs can remain in older storage. They should not
-    // hide the dashboard or select a card now that generic repair drills are
-    // retired.
+    // launch a fresh Today drill now that generic repair drills are retired.
     const target = STARTER_VERBS[0];
     mockedApp.value = makeApp({
       state: defaultState(),
@@ -489,9 +451,9 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await screen.findByRole('region', { name: 'Practice dashboard' }, { timeout: 5000 });
-    expect(screen.queryByPlaceholderText(/Type romaji or kana/i)).toBeNull();
+    await waitForPracticeCard();
     expect(screen.queryByText('No cards available')).toBeNull();
+    expect(mockedApp.value.startTodayDrill).not.toHaveBeenCalled();
   });
 
   it('automatically checks a final spoken answer in speak answer mode', async () => {
@@ -606,7 +568,10 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startWorkoutFromDashboard();
+    await waitForPracticeCard();
+    const progress = screen.getByRole('progressbar', { name: 'Workout progress' });
+    expect(progress.getAttribute('aria-valuenow')).toBe('0');
+    expect(progress.getAttribute('aria-valuemax')).toBe('1');
     expect(await screen.findByText('0/1 ready')).toBeTruthy();
     expect(screen.getByText('Practice')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
@@ -635,7 +600,7 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    await startWorkoutFromDashboard();
+    await waitForPracticeCard();
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 

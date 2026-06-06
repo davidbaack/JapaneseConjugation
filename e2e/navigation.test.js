@@ -2,13 +2,15 @@ import { test, expect } from '@playwright/test';
 
 const TABS = [
   { id: 'practice', label: 'Practice' },
+  { id: 'stats', label: 'Stats' },
   { id: 'learn', label: 'Learn' },
   { id: 'tools', label: 'Tools' },
   { id: 'settings', label: 'Settings' },
 ];
 
 const VIEW_ANCHORS = {
-  practice: () => /Start with a 12-card workout|Practice map/,
+  practice: () => /Practice map/,
+  stats: () => /Practice pulse/,
   learn: () => /Conjugation formation guide/,
   tools: () => /Lookup, check, repair drills, and word management/,
   settings: () => /Display scripts/,
@@ -51,10 +53,11 @@ test.describe('Tab navigation', () => {
 
     const practiceTab = page.locator('nav').getByRole('tab', { name: 'Practice', exact: true });
     await expect(practiceTab).toHaveClass(/font-semibold/);
-    await expect(page.getByRole('region', { name: 'Practice dashboard' })).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: /Start workout|Continue workout/ }),
-    ).toBeVisible();
+    await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
+    await expect(page.getByRole('progressbar', { name: 'Workout progress' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Start workout|Continue workout/ })).toHaveCount(
+      0,
+    );
   });
 
   test('tools exposes lookup, check, words, lists, and custom words', async ({ page }) => {

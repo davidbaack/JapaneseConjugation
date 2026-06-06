@@ -15,11 +15,9 @@ async function waitForStableStoredCurrent(page) {
   return last;
 }
 
-async function startWorkoutFromDashboard(page) {
-  await page
-    .getByRole('region', { name: 'Practice dashboard' })
-    .getByRole('button', { name: /Start workout|Continue workout/ })
-    .click();
+async function waitForPracticeCard(page) {
+  await expect(page.getByRole('progressbar', { name: 'Workout progress' })).toBeVisible();
+  await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
 }
 
 // Reloading the Practice tab should resume the same card rather than drawing a
@@ -31,10 +29,7 @@ test.describe('Study refresh persistence', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await startWorkoutFromDashboard(page);
-
-    // A card is on screen after the learner starts a workout.
-    await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
+    await waitForPracticeCard(page);
 
     // The active card is persisted to sessionStorage.
     const before = await waitForStableStoredCurrent(page);
@@ -46,8 +41,7 @@ test.describe('Study refresh persistence', () => {
 
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await startWorkoutFromDashboard(page);
-    await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
+    await waitForPracticeCard(page);
 
     // Same descriptor and same visible prompt after the reload.
     await expect.poll(() => readStoredCurrent(page)).toBe(before);
