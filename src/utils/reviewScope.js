@@ -1,4 +1,4 @@
-import { ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
+import { ALL_CARD_TYPES, FORM_GROUPS, normalizeFormGroupId } from '../data/conjugationTypes.js';
 import { wordKey } from './conjugator.js';
 
 const MAX_RECOMMENDATIONS = 8;
@@ -28,8 +28,10 @@ export function normalizeReviewScope(scope = null) {
   const familyIds = new Set(FORM_GROUPS.map((group) => group.id));
   return {
     excludedWordKeys: uniqueStrings(scope?.excludedWordKeys),
-    excludedFormFamilyIds: uniqueStrings(scope?.excludedFormFamilyIds).filter((id) =>
-      familyIds.has(id),
+    excludedFormFamilyIds: uniqueStrings(
+      uniqueStrings(scope?.excludedFormFamilyIds)
+        .map(normalizeFormGroupId)
+        .filter((id) => familyIds.has(id)),
     ),
     recommendations: (Array.isArray(scope?.recommendations) ? scope.recommendations : [])
       .filter((rec) => rec && rec.id && rec.label)
@@ -54,7 +56,8 @@ export function formFamilyForType(typeId) {
 }
 
 export function formFamilyTypeIds(familyId) {
-  return FORM_GROUPS.find((group) => group.id === familyId)?.typeIds || [];
+  const normalizedId = normalizeFormGroupId(familyId);
+  return FORM_GROUPS.find((group) => group.id === normalizedId)?.typeIds || [];
 }
 
 export function isWordExcludedFromReview(state = {}, word) {
@@ -66,7 +69,7 @@ export function isWordExcludedFromReview(state = {}, word) {
 export function isFormFamilyExcludedFromReview(state = {}, familyId) {
   if (!familyId) return false;
   const scope = normalizeReviewScope(state.reviewScope);
-  return scope.excludedFormFamilyIds.includes(familyId);
+  return scope.excludedFormFamilyIds.includes(normalizeFormGroupId(familyId));
 }
 
 export function isTypeExcludedFromReview(state = {}, typeId) {
@@ -117,17 +120,19 @@ export function includeWordKeyInReviewState(state = {}, key) {
 
 export function excludeFormFamilyFromReviewState(state = {}, familyId) {
   if (!familyId) return state;
+  const normalizedId = normalizeFormGroupId(familyId);
   return updateReviewScope(state, (scope) => ({
     ...scope,
-    excludedFormFamilyIds: uniqueStrings([...scope.excludedFormFamilyIds, familyId]),
+    excludedFormFamilyIds: uniqueStrings([...scope.excludedFormFamilyIds, normalizedId]),
   }));
 }
 
 export function includeFormFamilyInReviewState(state = {}, familyId) {
   if (!familyId) return state;
+  const normalizedId = normalizeFormGroupId(familyId);
   return updateReviewScope(state, (scope) => ({
     ...scope,
-    excludedFormFamilyIds: scope.excludedFormFamilyIds.filter((item) => item !== familyId),
+    excludedFormFamilyIds: scope.excludedFormFamilyIds.filter((item) => item !== normalizedId),
   }));
 }
 

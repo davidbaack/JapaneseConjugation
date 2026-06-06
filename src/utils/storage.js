@@ -6,6 +6,7 @@ import {
   TEXTBOOK_CORE_TYPE_IDS,
   LEGACY_BROAD_DEFAULT_TYPE_IDS,
   INTRODUCED_DEFAULT_TYPE_IDS,
+  RETIRED_STANDALONE_TYPE_IDS,
 } from '../data/conjugationTypes.js';
 import { RULES, wordKey, wordKind, getWordMeta, enabledTypeIdsFor } from './conjugator.js';
 import { filterWordsForStudyScope } from './vocabularyProgression.js';
@@ -45,9 +46,10 @@ const BEGINNER_LADDER_STAGES = [
 ];
 const SIMPLE_GODAN_ENDINGS = /[うくぐすつぬぶむ]$/;
 
-const LEGACY_VERB_DEFAULT_TYPE_IDS = CONJ_TYPES.filter((t) => t.id !== 'plain-present').map(
-  (t) => t.id,
-);
+const LEGACY_VERB_DEFAULT_TYPE_IDS = [
+  ...CONJ_TYPES.filter((t) => t.id !== 'plain-present').map((t) => t.id),
+  ...RETIRED_STANDALONE_TYPE_IDS,
+];
 const LEGACY_PREINTRO_DEFAULT_TYPE_IDS = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
   (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
 );
@@ -73,7 +75,9 @@ function isLegacyBroadDefaultTypeScope(ids) {
 }
 
 function normalizeDefaultTypeScope(ids) {
-  return isLegacyBroadDefaultTypeScope(ids) ? [...QUICK_PRACTICE_DEFAULT_TYPE_IDS] : ids;
+  if (isLegacyBroadDefaultTypeScope(ids)) return [...QUICK_PRACTICE_DEFAULT_TYPE_IDS];
+  const valid = new Set(ALL_CARD_TYPES.map((type) => type.id));
+  return [...new Set(ids || [])].map((id) => String(id || '').trim()).filter((id) => valid.has(id));
 }
 
 export function wordSrsKey(word) {
@@ -990,10 +994,12 @@ export function mergeState(saved, sessionOverride) {
     Array.isArray(saved.enabledTypes) &&
     !saved.enabledTypes.some((id) => id.startsWith('adj-'))
   ) {
-    merged.enabledTypes = [
+    merged.enabledTypes = normalizeDefaultTypeScope([
       ...saved.enabledTypes,
       ...base.enabledTypes.filter((id) => id.startsWith('adj-')),
-    ];
+    ]);
+  } else {
+    merged.enabledTypes = normalizeDefaultTypeScope(merged.enabledTypes);
   }
 
   return merged;

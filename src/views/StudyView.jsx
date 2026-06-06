@@ -9,7 +9,11 @@ import {
   IconMic,
   IconPlus,
 } from '../components/Icons.jsx';
-import { ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
+import {
+  ALL_CARD_TYPES,
+  FORM_GROUPS,
+  TE_TA_SOUND_CHANGE_FAMILY_ID,
+} from '../data/conjugationTypes.js';
 import {
   getSpeechRecognitionConstructor,
   playPronunciation,
@@ -722,7 +726,7 @@ function formFamilyStrengthRows(state = {}) {
 
 // Onbin (te/ta sound-change) practice lives in this family; when the learner's
 // misses cluster as godan sound-change errors its drill routes to Ending Lab.
-const TE_FORM_STEM_FAMILY_ID = 'te-form-stem';
+const TE_TA_FAMILY_ID = TE_TA_SOUND_CHANGE_FAMILY_ID;
 
 const READINESS_TONE = {
   strong: 'bg-emerald-500',
@@ -771,7 +775,7 @@ export function ReviewsDashboard({
   const readinessById = new Map(readinessFamilies.map((row) => [row.id, row]));
   const weakestToEndingLab =
     !!weakestSkill &&
-    weakestSkill.familyId === TE_FORM_STEM_FAMILY_ID &&
+    weakestSkill.familyId === TE_TA_FAMILY_ID &&
     onbinWeakness &&
     !!onDrillEndingLab;
   const weakestToRush = !!weakestSkill && weakestSkill.dimension === 'speed' && !!onDrillRush;
@@ -1023,7 +1027,7 @@ export function ReviewsDashboard({
                 const readiness = readinessById.get(row.id);
                 const weakest = readiness?.weakest;
                 const rowToEndingLab =
-                  row.id === TE_FORM_STEM_FAMILY_ID && onbinWeakness && !!onDrillEndingLab;
+                  row.id === TE_TA_FAMILY_ID && onbinWeakness && !!onDrillEndingLab;
                 const rowToRush = !rowToEndingLab && weakest?.id === 'speed' && !!onDrillRush;
                 const accuracyLabel = row.attempted ? `${row.accuracy}%` : 'new';
                 const bar = (
@@ -1345,7 +1349,7 @@ export default function StudyView() {
   }, [state.mistakes]);
   const topMistakeRoute = labRouteForMistakePattern(openMistakeSummary.patterns[0]);
   const retestableMisses = topMistakeRoute ? openMistakeSummary.count : 0;
-  // When open misses cluster as godan sound-change errors, the te-form/stem
+  // When open misses cluster as godan sound-change errors, the te/ta
   // readiness drill routes to Ending Lab's scaffolded onbin practice instead of
   // a generic scoped review.
   const onbinWeakness = openMistakeSummary.patterns.some(

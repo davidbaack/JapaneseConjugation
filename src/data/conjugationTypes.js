@@ -7,7 +7,6 @@ export const CONJ_TYPES = [
   { id: 'polite-past', label: 'Polite Past', sub: '', hint: '~ました' },
   { id: 'polite-negative', label: 'Polite Negative', sub: '', hint: '~ません' },
   { id: 'polite-past-negative', label: 'Polite Past Negative', sub: '', hint: '~ませんでした' },
-  { id: 'masu-stem', label: 'Masu Stem', sub: '連用形', hint: 'pre-ます stem' },
   {
     id: 'polite-volitional',
     label: 'Polite Volitional',
@@ -475,6 +474,19 @@ export const ALL_CARD_TYPES = [...CONJ_TYPES, ...ADJ_TYPES];
 
 const uniqueTypeIds = (ids) => [...new Set(ids)];
 
+export const RETIRED_STANDALONE_TYPE_IDS = ['masu-stem'];
+
+export const TE_TA_SOUND_CHANGE_FAMILY_ID = 'te-ta-sound-changes';
+
+const FORM_GROUP_ID_ALIASES = {
+  'te-form-stem': TE_TA_SOUND_CHANGE_FAMILY_ID,
+};
+
+export function normalizeFormGroupId(id = '') {
+  const cleaned = String(id || '').trim();
+  return FORM_GROUP_ID_ALIASES[cleaned] || cleaned;
+}
+
 export const BASICS_TYPE_IDS = [
   'plain-past',
   'plain-negative',
@@ -496,7 +508,6 @@ export const BASICS_TYPE_IDS = [
 
 export const LEARNER_DEFAULT_TYPE_IDS = uniqueTypeIds([
   ...BASICS_TYPE_IDS,
-  'masu-stem',
   'potential',
   'potential-negative',
   'volitional',
@@ -513,6 +524,7 @@ export const LEARNER_DEFAULT_TYPE_IDS = uniqueTypeIds([
 
 export const LEGACY_BROAD_DEFAULT_TYPE_IDS = [
   ...CONJ_TYPES.filter((t) => t.id !== 'plain-present').map((t) => t.id),
+  ...RETIRED_STANDALONE_TYPE_IDS,
   ...ADJ_TYPES.filter((t) => t.id !== 'adj-plain-present').map((t) => t.id),
 ];
 
@@ -663,10 +675,9 @@ export const TYPE_PACKS = [
 export const FORM_GROUPS = [
   {
     id: 'basic-tenses',
-    label: 'Basic Tenses',
+    label: 'Basics & Politeness',
     typeIds: [
       'plain-present',
-      'plain-past',
       'plain-negative',
       'plain-past-negative',
       'polite-present',
@@ -676,9 +687,9 @@ export const FORM_GROUPS = [
     ],
   },
   {
-    id: 'te-form-stem',
-    label: 'Te-form & Stem',
-    typeIds: ['masu-stem', 'te-form'],
+    id: TE_TA_SOUND_CHANGE_FAMILY_ID,
+    label: 'Te/Ta Sound Changes',
+    typeIds: ['plain-past', 'te-form'],
   },
   {
     id: 'volitional-desire',

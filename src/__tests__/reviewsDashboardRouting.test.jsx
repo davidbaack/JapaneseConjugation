@@ -48,7 +48,7 @@ function renderDashboard(overrides = {}) {
 
 const speedWeakest = {
   familyId: 'basic-tenses',
-  label: 'Basic Tenses',
+  label: 'Basics & Politeness',
   dimension: 'speed',
   dimensionLabel: 'Speed',
   status: 'weak',
@@ -56,15 +56,15 @@ const speedWeakest = {
 };
 const productionWeakest = {
   familyId: 'basic-tenses',
-  label: 'Basic Tenses',
+  label: 'Basics & Politeness',
   dimension: 'production',
   dimensionLabel: 'Production',
   status: 'weak',
   detail: '2/5',
 };
 const onbinWeakest = {
-  familyId: 'te-form-stem',
-  label: 'Te-form & Stem',
+  familyId: 'te-ta-sound-changes',
+  label: 'Te/Ta Sound Changes',
   dimension: 'production',
   dimensionLabel: 'Production',
   status: 'weak',
@@ -91,7 +91,7 @@ describe('ReviewsDashboard primary nudge priority ladder', () => {
     expect(spies.onDrillReadiness).not.toHaveBeenCalled();
   });
 
-  it('routes onbin sound-change misses on the te-form family to Ending Lab', () => {
+  it('routes onbin sound-change misses on the te/ta family to Ending Lab', () => {
     const spies = renderDashboard({
       onbinWeakness: true,
       weakestSkill: onbinWeakest,
@@ -124,7 +124,7 @@ describe('ReviewsDashboard primary nudge priority ladder', () => {
     const spies = renderDashboard({ weakestSkill: productionWeakest });
 
     const nudge = screen.getByRole('button', { name: /Sharpen/i });
-    expect(nudge.textContent).toMatch(/Basic Tenses/);
+    expect(nudge.textContent).toMatch(/Basics & Politeness/);
     fireEvent.click(nudge);
 
     expect(spies.onDrillReadiness).toHaveBeenCalledWith({

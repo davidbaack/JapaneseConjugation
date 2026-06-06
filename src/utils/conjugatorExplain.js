@@ -897,7 +897,7 @@ export function explainItem(item, type) {
     'progressive-past-negative': 'Use the te-form, then add いなかった.',
     'progressive-polite-past-negative': 'Use the te-form, then add いませんでした.',
     'command-nasai':
-      'Use the masu-stem, then add なさい. This is a firm instruction, often from a parent, teacher, sign, or test prompt.',
+      'Use the stem before ます, then add なさい. This is a firm instruction, often from a parent, teacher, sign, or test prompt.',
   };
   if (!e.rule && common[type]) e.rule = common[type];
   if (!e.rule && type === 'causative-passive')
@@ -921,7 +921,7 @@ export function explainItem(item, type) {
   if (!e.rule && type === 'negative-te') e.rule = 'Use the plain negative form, then add で.';
   if (!e.rule && type === 'prohibition')
     e.rule = 'Use the dictionary form, then add な for a blunt prohibition.';
-  if (!e.rule && type === 'command-nasai') e.rule = 'Use the masu-stem, then add なさい.';
+  if (!e.rule && type === 'command-nasai') e.rule = 'Use the stem before ます, then add なさい.';
   e.reason = buildReason(item, type);
   const compoundDeriv = buildCompoundDerivation(item, type);
   if (compoundDeriv) e.derivation = compoundDeriv;

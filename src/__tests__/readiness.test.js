@@ -88,14 +88,14 @@ describe('readiness family rollup', () => {
     });
 
     const rows = buildReadinessFamilyRows({ readiness });
-    const basics = rows.find((row) => row.id === 'basic-tenses');
+    const teTa = rows.find((row) => row.id === 'te-ta-sound-changes');
 
-    expect(basics.measured).toEqual(expect.arrayContaining(['production', 'speed']));
+    expect(teTa.measured).toEqual(expect.arrayContaining(['production', 'speed']));
     // Typed answers never populate recognition, so it stays untested/hidden.
-    expect(basics.measured).not.toContain('recognition');
-    expect(basics.cells.recognition.status).toBe('untested');
-    expect(basics.cells.production.attempted).toBe(2);
-    expect(basics.types.find((type) => type.typeId === 'plain-past')).toBeTruthy();
+    expect(teTa.measured).not.toContain('recognition');
+    expect(teTa.cells.recognition.status).toBe('untested');
+    expect(teTa.cells.production.attempted).toBe(2);
+    expect(teTa.types.find((type) => type.typeId === 'plain-past')).toBeTruthy();
 
     // A family with no reps reports nothing measured.
     const untouched = rows.find((row) => row.practiced === 0);
@@ -128,7 +128,7 @@ describe('readiness family rollup', () => {
     }
 
     const weak = weakestReadinessSkill({ readiness });
-    expect(weak.familyId).toBe('basic-tenses');
+    expect(weak.familyId).toBe('te-ta-sound-changes');
     expect(['production', 'speed']).toContain(weak.dimension);
     expect(weak.dimension).not.toBe('recognition');
   });

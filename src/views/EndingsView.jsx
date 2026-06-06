@@ -312,7 +312,7 @@ export default function EndingsView() {
     setAiErr('');
     try {
       const promptText = isRegisterMode
-        ? `Create one short memorable learner mnemonic for this Japanese register switch.\nVerb: ${current.dict} (${current.reading}, ${current.meaning})\nMasu-stem: ${masuStem}\nSource (${sourceType}): ${promptForm}\nTarget (${targetType}): ${expectedForm}\nKeep it under 35 words, friendly, and include the Japanese forms.`
+        ? `Create one short memorable learner mnemonic for this Japanese register switch.\nVerb: ${current.dict} (${current.reading}, ${current.meaning})\nStem before ます: ${masuStem}\nSource (${sourceType}): ${promptForm}\nTarget (${targetType}): ${expectedForm}\nKeep it under 35 words, friendly, and include the Japanese forms.`
         : `Create one short memorable learner mnemonic for this Japanese conjugation sound-change pattern.\nVerb: ${current.dict} (${current.reading}, ${current.meaning})\nTarget: ${
             effectiveTarget === 'te-form' ? 'te-form' : 'plain past / ta-form'
           }\nPattern: ${pattern.label}\nRule: ${pattern.cue}\nCorrect answer: ${expected}\nKeep it under 35 words, friendly, and include the Japanese ending.`;
@@ -572,7 +572,7 @@ export default function EndingsView() {
                     className="text-2xl mt-1 text-stone-900 dark:text-stone-100"
                     subClassName="text-xs text-stone-500 mt-1"
                   />
-                  {/* Masu-stem bridge */}
+                  {/* Stem-before-ます bridge */}
                   <div className="mt-3 flex items-center gap-2 text-sm flex-wrap">
                     <span lang="ja" className="font-medium text-stone-700 dark:text-stone-300">
                       {current.reading}

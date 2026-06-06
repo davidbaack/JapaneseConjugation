@@ -121,10 +121,12 @@ describe('App shell', () => {
     render(<App />);
 
     expect(await screen.findByRole('region', { name: 'Practice dashboard' })).toBeTruthy();
-    fireEvent.click(screen.getByText('Te-form & Stem'));
+    fireEvent.click(screen.getByText('Te/Ta Sound Changes'));
 
     expect(screen.getByText('2/2 enabled')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Disable all Te-form & Stem forms' })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Disable all Te/Ta Sound Changes forms' }),
+    ).toBeTruthy();
     expect(screen.getByText('Recent weak spots')).toBeTruthy();
     expect(screen.getByText('Te-form - Godan ku sound changes')).toBeTruthy();
     expect(screen.getByText('0/2')).toBeTruthy();
@@ -170,7 +172,7 @@ describe('App shell', () => {
       await screen.findByText(/\d+ forms in this workout/i, {}, { timeout: 5000 }),
     ).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
-    expect(screen.getByText('53 map forms')).toBeTruthy();
+    expect(screen.getByText('52 map forms')).toBeTruthy();
     // "Sentence" is now the cued-cloze presentation toggle — a valid review
     // control, not a legacy study-mode button.
     expect(screen.getByRole('button', { name: 'Sentence', exact: true })).toBeTruthy();

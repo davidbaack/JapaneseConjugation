@@ -10,6 +10,15 @@ describe('lesson content', () => {
     expect(coverage.missing).toEqual([]);
   });
 
+  it('keeps masu-stem retired and teaches plain past with te-form', () => {
+    const allTypeIds = ALL_CARD_TYPES.map((type) => type.id);
+    const teTa = LESSON_SECTIONS.find((lesson) => lesson.groupId === 'te-ta-sound-changes');
+
+    expect(allTypeIds).not.toContain('masu-stem');
+    expect(teTa).toBeTruthy();
+    expect(teTa.typeIds).toEqual(['plain-past', 'te-form']);
+  });
+
   it('does not include stale form ids', () => {
     const known = new Set(ALL_CARD_TYPES.map((type) => type.id));
     const stale = LESSON_SECTIONS.flatMap((lesson) =>

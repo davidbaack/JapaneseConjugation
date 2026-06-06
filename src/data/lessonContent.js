@@ -48,7 +48,7 @@ export const GODAN_ROW_KEYS = [
   },
   {
     row: 'i-row',
-    use: 'masu-stem, polite, tai',
+    use: 'polite, tai, stem-built forms',
     example: '書く -> 書きます / 書きたい',
   },
   {
@@ -113,36 +113,36 @@ export const RU_MASU_DIAGNOSTIC_ROWS = [
 
 export const LESSON_SECTIONS = [
   lessonFromGroup('basic-tenses', {
-    title: 'Plain and Polite Basics',
+    title: 'Basics and Politeness',
     kana: '普通形・ます形',
     summary:
-      'These are the everyday tense and register forms. Plain forms anchor casual speech and embedded clauses; polite forms are the default safe register for conversation.',
+      'These are the everyday dictionary, negative, and polite forms. Plain forms anchor casual speech and embedded clauses; polite forms are the default safe register for conversation.',
     build:
-      'Plain present is the dictionary form. Plain negative uses ichidan stem + ない or godan a-row + ない. Polite forms use the masu-stem plus ます, ました, ません, or ませんでした.',
+      'Plain present is the dictionary form. Plain negative uses ichidan stem + ない or godan a-row + ない. Plain past negative adds なかった to that negative base. Polite forms attach ます, ました, ません, or ませんでした to the stem before ます.',
     variants:
-      'Plain past uses た/だ sound changes. Plain past negative is the negative base plus なかった. Adjective polite forms usually add です or ではありません.',
+      'Verb plain past is practiced with Te/Ta Sound Changes because it uses the same sound-change table as te-form. Adjective polite forms usually add です or ではありません.',
     watch:
       'ある is special: its negative is ない. For い-adjectives, past and negative change the adjective itself before adding politeness.',
     examples: [
-      ['食べる', '食べた / 食べない / 食べます', 'ichidan drops る'],
-      ['書く', '書いた / 書かない / 書きます', 'godan uses sound change, a-row, i-row'],
-      ['高い', '高かった / 高くない / 高いです', 'い-adjective stem is 高'],
+      ['食べる', '食べる / 食べない / 食べます', 'ichidan drops る before polite endings'],
+      ['書く', '書く / 書かない / 書きます', 'godan uses a-row for negative and i-row before ます'],
+      ['高い', '高くない / 高いです / 高くないです', 'い-adjective stem is 高'],
     ],
   }),
-  lessonFromGroup('te-form-stem', {
-    title: 'Te-form and Masu-stem',
-    kana: 'て形・連用形',
+  lessonFromGroup('te-ta-sound-changes', {
+    title: 'Te/Ta Sound Changes',
+    kana: 'て形・た形',
     summary:
-      'The te-form connects actions and unlocks requests, permission, progressive aspect, and many sentence patterns. The masu-stem is the attachment point for polite forms and helper endings.',
+      'Te-form connects actions and unlocks requests, permission, progressive aspect, and many sentence patterns. Plain past marks completed action. For verbs, both forms use the same te/ta sound-change table.',
     build:
-      'Masu-stem: ichidan drop る; godan moves to i-row; する -> し; 来る -> き. Te-form: ichidan +て; godan uses the sound-change table; する -> して; 来る -> きて.',
+      'Ichidan drops る and adds て or た. Godan endings use the shared sound-change table: う/つ/る -> って/った, む/ぶ/ぬ -> んで/んだ, く -> いて/いた, ぐ -> いで/いだ, す -> して/した.',
     variants:
-      'The same te-form feeds てください, てもいい, and ている. The same masu-stem feeds ます, ましょう, たい, なさい, and stem-linking expressions.',
+      'The same te-form feeds てください, てもいい, and ている. The same ta-form feeds plain past and たら conditions.',
     watch: '行く is the famous exception for te/ta: 行って and 行った, not 行いて or 行いた.',
     examples: [
       ['読む', '読んで / 読んだ', 'む, ぶ, ぬ become んで / んだ'],
       ['話す', '話して / 話した', 'す becomes して / した'],
-      ['来る', 'きて / きます', 'kuru alternates き and こ depending on form'],
+      ['来る', 'きて / きた', 'kuru uses き for both te and ta'],
     ],
   }),
   lessonFromGroup('volitional-desire', {
@@ -151,7 +151,7 @@ export const LESSON_SECTIONS = [
     summary:
       'Volitional forms propose or intend an action. Tai-forms express wanting to do something and then behave like い-adjectives.',
     build:
-      'Volitional: ichidan stem + よう; godan o-row + う; する -> しよう; 来る -> こよう. Polite volitional is masu-stem + ましょう. Tai-form is masu-stem + たい.',
+      'Volitional: ichidan stem + よう; godan o-row + う; する -> しよう; 来る -> こよう. Polite volitional uses the stem before ます + ましょう. Tai-form uses that same stem + たい.',
     variants:
       'たい conjugates like an い-adjective: たくない, たかった, たくなかった. Polite tai usually adds です after the tai-form.',
     watch: 'The thing wanted is often marked with が in learner Japanese: 水が飲みたい.',
@@ -217,13 +217,13 @@ export const LESSON_SECTIONS = [
     summary:
       'These forms control action: direct commands, polite instructions, requests, permission, prohibition, and must-do obligations.',
     build:
-      'Imperative: godan e-row, ichidan stem + ろ, する -> しろ, 来る -> こい. なさい uses masu-stem + なさい. Requests use te-form + ください.',
+      'Imperative: godan e-row, ichidan stem + ろ, する -> しろ, 来る -> こい. なさい uses the stem before ます + なさい. Requests use te-form + ください.',
     variants:
       'Permission is te-form + もいい. Prohibition is dictionary form + な. Obligation is negative base + なければならない.',
     watch:
       'Plain imperatives and dictionary + な can sound sharp. てください, ないでください, and なさい are safer for learners.',
     examples: [
-      ['書く', '書け / 書きなさい / 書いてください', 'e-row, masu-stem, te-form'],
+      ['書く', '書け / 書きなさい / 書いてください', 'e-row, stem before ます, te-form'],
       ['食べる', '食べろ / 食べないでください', 'ichidan command and negative request'],
       ['行く', '行ってもいい / 行かなければならない', 'permission and obligation'],
     ],
@@ -284,7 +284,7 @@ export const LESSON_SECTIONS = [
     summary:
       'Keigo changes social perspective. Honorific forms raise someone else’s action; humble forms lower your own or your in-group’s action.',
     build:
-      'Regular honorific often uses お/ご + masu-stem + になる. Regular humble often uses お/ご + masu-stem + する. Suru compounds commonly use ご + noun + なさる/いたす.',
+      'Regular honorific often uses お/ご + the stem before ます + になる. Regular humble often uses お/ご + the stem before ます + する. Suru compounds commonly use ご + noun + なさる/いたす.',
     variants:
       'Polite keigo uses the polite version of the keigo verb. Common verbs have special replacements: 行く/来る/いる -> いらっしゃる, する -> なさる/いたす, 言う -> おっしゃる/申す.',
     watch:
@@ -338,7 +338,7 @@ export const LESSON_TRACKS = [
     title: 'Build the everyday core',
     summary:
       'Start with the forms learners need constantly: tense, politeness, te-form links, adjectives, and wanting or inviting.',
-    lessonGroupIds: ['basic-tenses', 'te-form-stem', 'adjectives', 'volitional-desire'],
+    lessonGroupIds: ['basic-tenses', 'te-ta-sound-changes', 'adjectives', 'volitional-desire'],
     suggestedCount: 12,
     wordLimit: 18,
   },

@@ -56,7 +56,6 @@ const CUES = {
   'polite-negative': 'Polite negative uses ～ません to say the action does not happen politely.',
   'polite-past-negative':
     'Polite past negative uses ～ませんでした for did-not-do in polite speech.',
-  'masu-stem': 'The masu-stem attaches to helpers like たい, ながら, and に行く.',
   'te-form': 'Te-form links actions or attaches helper patterns after the verb.',
   potential: 'Potential form expresses ability; the thing you can do often takes が.',
   'potential-negative': 'Potential negative says someone cannot do the action.',
@@ -64,13 +63,13 @@ const CUES = {
   'polite-volitional': 'Polite volitional uses ～ましょう to suggest doing something together.',
   'conditional-tara': 'たら sets up an if/when condition based on the completed form.',
   'conditional-ba': 'ば sets up an if condition and focuses on the condition itself.',
-  desiderative: 'Tai-form uses the masu-stem plus たい to say want to do.',
+  desiderative: 'Tai-form uses the stem before ます plus たい to say want to do.',
   'desiderative-negative': 'Tai negative uses ～たくない to say do not want to do.',
   progressive: 'Progressive uses te-form plus いる for an ongoing action or resulting state.',
   passive: 'Passive form marks receiving an action, often with the actor marked by に.',
   causative: 'Causative form means make or let someone do the action.',
   imperative: 'Imperative form gives a direct command and can sound abrupt.',
-  'command-nasai': 'なさい gives a firm instruction built from the masu-stem.',
+  'command-nasai': 'なさい gives a firm instruction built from the stem before ます.',
   'negative-te': 'ないで means without doing or tells someone not to do before another action.',
   'negative-request': 'ないでください is a polite request not to do something.',
   prohibition: 'Dictionary form plus な gives a strong do-not-do command.',
@@ -262,17 +261,6 @@ const VERB_FRAMES = {
       ['昨日は忙しくて {b}。', 'Yesterday was busy, so it did not happen.'],
       ['先週は一度も {b}。', 'Last week, not even once.'],
       ['時間が足りなかったので {b}。', 'Because there was not enough time.'],
-    ],
-  },
-  'masu-stem': {
-    general: [
-      ['明日、駅前へ {b}に行きます。', 'Go to the station area to do it.'],
-      ['休みの日に {b}ながら音楽を聞きます。', 'Do it while listening to music.'],
-      ['週末はゆっくり {b}たいです。', 'Want to do it slowly on the weekend.'],
-    ],
-    study: [
-      ['図書館へ {b}に行きます。', 'Go to the library to do it.'],
-      ['夜、音楽を聞きながら {b}ます。', 'At night, while listening to music.'],
     ],
   },
   'te-form': {

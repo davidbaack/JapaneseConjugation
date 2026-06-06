@@ -1,4 +1,9 @@
-import { EVERYDAY_TYPE_IDS, FORM_GROUPS, getTypeInfo } from '../data/conjugationTypes.js';
+import {
+  EVERYDAY_TYPE_IDS,
+  FORM_GROUPS,
+  getTypeInfo,
+  normalizeFormGroupId,
+} from '../data/conjugationTypes.js';
 import { ONBIN_PATTERN_META, onbinPatternForVerb, wordKey } from './conjugator.js';
 import { groupDisplayLabel } from './groupDisplay.js';
 
@@ -228,7 +233,7 @@ export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
 
 export function activeWorkoutTypeIdsForFamilies(enabledTypes = [], familyId = '') {
   const selected = uniqueStrings(enabledTypes);
-  const family = FORM_GROUPS.find((group) => group.id === familyId);
+  const family = FORM_GROUPS.find((group) => group.id === normalizeFormGroupId(familyId));
   if (!family) return selected;
   const familyTypeIds = new Set(family.typeIds || []);
   return selected.filter((typeId) => familyTypeIds.has(typeId));

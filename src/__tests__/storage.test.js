@@ -26,9 +26,11 @@ import { conjugateItem } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import {
   ALL_CARD_TYPES,
+  CONJ_TYPES,
   EVERYDAY_TYPE_IDS,
   INTRODUCED_DEFAULT_TYPE_IDS,
   LEGACY_BROAD_DEFAULT_TYPE_IDS,
+  RETIRED_STANDALONE_TYPE_IDS,
   TEXTBOOK_CORE_TYPE_IDS,
 } from '../data/conjugationTypes.js';
 import {
@@ -423,6 +425,7 @@ describe('mergeState', () => {
   it('starts new learners on the Core plus Everyday conjugation scope', () => {
     const state = defaultState();
     expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(state.enabledTypes).not.toContain('masu-stem');
     expect(state.enabledTypes).not.toContain('request-kudasai');
     expect(state.enabledTypes).not.toContain('permission');
     expect(state.enabledTypes).not.toContain('obligation');
@@ -441,6 +444,15 @@ describe('mergeState', () => {
     expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
   });
 
+  it('migrates old verb-only broad scopes with retired forms to Core plus Everyday', () => {
+    const oldVerbDefault = [
+      ...CONJ_TYPES.filter((type) => type.id !== 'plain-present').map((type) => type.id),
+      ...RETIRED_STANDALONE_TYPE_IDS,
+    ];
+    const state = mergeState({ enabledTypes: oldVerbDefault }, null);
+    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+  });
+
   it('migrates pre-introduced broad default scopes to Core plus Everyday', () => {
     const preIntroducedIds = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
       (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
@@ -453,6 +465,19 @@ describe('mergeState', () => {
     const allTypeIds = ALL_CARD_TYPES.map((t) => t.id);
     const state = mergeState({ schemaVersion: SRS_SCHEMA_VERSION, enabledTypes: allTypeIds }, null);
     expect(state.enabledTypes).toEqual(allTypeIds);
+    expect(state.enabledTypes).not.toContain('masu-stem');
+  });
+
+  it('filters retired standalone practice forms from saved scopes', () => {
+    const state = mergeState(
+      {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        enabledTypes: ['plain-past', 'masu-stem', 'adj-plain-past'],
+      },
+      null,
+    );
+
+    expect(state.enabledTypes).toEqual(['plain-past', 'adj-plain-past']);
   });
 
   it('preserves saved cards from the current SRS schema', () => {
@@ -777,16 +802,27 @@ describe('word-form SRS selection', () => {
       },
     };
 
-    const excluded = excludeFormFamilyFromReviewState(state, 'basic-tenses');
-    expect(reviewTypeIdsForState(excluded, ['plain-past', 'te-form'])).toEqual(['te-form']);
+    const excluded = excludeFormFamilyFromReviewState(state, 'te-ta-sound-changes');
+    expect(reviewTypeIdsForState(excluded, ['plain-past', 'te-form', 'plain-negative'])).toEqual([
+      'plain-negative',
+    ]);
     expect(excluded.cards[dueCardId]).toEqual(state.cards[dueCardId]);
 
-    const restored = includeFormFamilyInReviewState(excluded, 'basic-tenses');
+    const restored = includeFormFamilyInReviewState(excluded, 'te-ta-sound-changes');
     expect(reviewTypeIdsForState(restored, ['plain-past', 'te-form'])).toEqual([
       'plain-past',
       'te-form',
     ]);
     expect(restored.cards[dueCardId]).toEqual(state.cards[dueCardId]);
+  });
+
+  it('normalizes the retired te-form/stem family id to Te/Ta Sound Changes', () => {
+    const state = excludeFormFamilyFromReviewState(defaultState(), 'te-form-stem');
+
+    expect(state.reviewScope.excludedFormFamilyIds).toEqual(['te-ta-sound-changes']);
+    expect(reviewTypeIdsForState(state, ['plain-past', 'te-form', 'plain-negative'])).toEqual([
+      'plain-negative',
+    ]);
   });
 
   it('schedules due cards by exact word-form card id', () => {
