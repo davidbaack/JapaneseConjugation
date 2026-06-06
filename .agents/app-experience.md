@@ -14,8 +14,8 @@ confirms the new direction, update this document in the same change.
   short workouts, not a visible long-term SRS queue.
 - Learn teaches forms and verb/adjective groups from start to finish. It can
   recommend focused Practice, but it does not gate Practice.
-- Tools contains lookup, word management, saved lists, custom words, Ending Lab,
-  group drills, and speed games.
+- Tools contains lookup, check, word management, saved lists, custom words,
+  Ending Lab, group drills, and speed games.
 - Settings is for durable display, audio, sync, backup, and reset preferences.
   Controls that affect the active workout belong in Practice or Tools.
 
@@ -63,7 +63,7 @@ confirms the new direction, update this document in the same change.
 - Word inclusion and exclusion management lives in Tools under Words.
 - Form/category management lives in the Practice map, not Settings and not the
   Words tool.
-- Lookup / Check can launch targeted Practice for a selected word or exact form.
+- Lookup and Check can launch targeted Practice for a selected word or exact form.
 - Ending Lab supports onbin and te/ta repair. Groups supports verb/adjective
   classification. Rush supports speed and recall.
 - Tools can create visible recommended Practice sets. The learner starts the set

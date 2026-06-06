@@ -5,6 +5,8 @@ import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/re
 // No Supabase configured in tests → auth/sync effects no-op (offline-first path).
 vi.mock('../utils/supabase.js', () => ({ supabase: null }));
 
+globalThis.HTMLElement.prototype.scrollIntoView = vi.fn();
+
 import App from '../App.jsx';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
 import { defaultState, localDateKey } from '../utils/storage.js';
@@ -348,14 +350,19 @@ describe('App shell', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
 
-    await screen.findByText('Lookup, repair drills, and word management.', {}, { timeout: 5000 });
+    await screen.findByText(
+      'Lookup, check, repair drills, and word management.',
+      {},
+      { timeout: 5000 },
+    );
     expect(screen.getByRole('tab', { name: /^Words/i })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: /^Lookup \/ Check/i })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /^Lookup/i })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /^Check/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Lists/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Custom words/i })).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /^Words/i }));
     expect(await screen.findAllByRole('button', { name: 'Practice now' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('tab', { name: /^Lookup \/ Check/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Lookup/i }));
     const drillWord = await screen.findByRole('button', { name: 'Drill word' });
     expect(drillWord).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
@@ -365,6 +372,11 @@ describe('App shell', () => {
     expect(screen.getByRole('button', { name: 'Favorite', exact: true })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Drill favorites' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Copy table' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /^Check/i }));
+    expect(await screen.findByText('Check a conjugation')).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText(/tabeta/i), { target: { value: 'tabeta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
+    expect(await screen.findByText('Correct conjugation')).toBeTruthy();
   }, 15000);
 
   it('keeps Tools reverse lookup details aligned with the confirmed hit', async () => {
@@ -395,7 +407,7 @@ describe('App shell', () => {
     await screen.findByRole('region', { name: 'Practice dashboard' }, { timeout: 5000 });
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
 
-    fireEvent.click(await screen.findByRole('tab', { name: /^Lookup \/ Check/i }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));
     expect((await screen.findAllByText('to write')).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
