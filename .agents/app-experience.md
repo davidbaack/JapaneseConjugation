@@ -42,6 +42,11 @@ confirms the new direction, update this document in the same change.
   cue, and falls back to the normal prompt for reverse, listening, and
   minimal-pair cards.
 - Session completion leads with "Map updated" and one next action.
+- A targeted "Practice this" launch (a word from Check/Library, a reference
+  drill, or a form family) routes straight into the focused cards. It never
+  shows the completion summary on arrival, leads with a prominent title banner
+  naming what is being studied, and locks the workout to that item until the
+  learner exits through the banner.
 
 ## Weakness Steering
 
