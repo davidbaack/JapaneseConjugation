@@ -263,6 +263,173 @@ function replacementFromParts(parts, expected, stem) {
   return expected || '';
 }
 
+function longestCommonPrefix(a = '', b = '') {
+  let index = 0;
+  while (index < a.length && index < b.length && a[index] === b[index]) index++;
+  return a.slice(0, index);
+}
+
+function learnerCategoryInfo(item) {
+  const group = item?.group || '';
+  const dict = item?.dict || item?.reading || '';
+  const reading = item?.reading || '';
+  const ending = reading.slice(-1);
+
+  if (group === 'godan') {
+    return {
+      label: 'godan / u-verb',
+      why:
+        ending === 'る'
+          ? `${dict} ends in る, but this word is still learned as godan / u-verb: the final る changes instead of simply dropping.`
+          : `${dict} is godan / u-verb because its final dictionary kana ${ending} is the moving part; it changes rows or sound-change clusters by form.`,
+    };
+  }
+
+  if (group === 'ichidan') {
+    return {
+      label: 'ichidan / ru-verb',
+      why: `${dict} is ichidan / ru-verb: the final る drops, then the requested ending attaches to the stem.`,
+    };
+  }
+
+  if (group === 'suru') {
+    return {
+      label: 'irregular',
+      why: `${dict} belongs in the irregular bucket because the する core changes as し, せ, さ, or でき instead of following godan or ichidan rules.`,
+    };
+  }
+
+  if (group === 'kuru') {
+    return {
+      label: 'irregular',
+      why: `${dict} belongs in the irregular bucket because 来る changes its root sound by form: き, こ, and く all appear.`,
+    };
+  }
+
+  if (group === 'i-adjective') {
+    const irregular = item?.irregular || reading === 'いい' || reading === 'かっこいい';
+    return {
+      label: irregular ? 'irregular' : 'い-adjective',
+      why: irregular
+        ? `${dict} belongs in the irregular bucket because most forms use the よい stem, not the visible いい form.`
+        : `${dict} is an い-adjective: drop or transform final い, then attach the adjective ending.`,
+    };
+  }
+
+  if (group === 'na-adjective') {
+    return {
+      label: 'な-adjective',
+      why: `${dict} is a な-adjective: keep the base, then attach the copula, connector, or な ending.`,
+    };
+  }
+
+  return {
+    label: group || 'category',
+    why: group
+      ? `${dict} is treated as ${group} for this form.`
+      : `Use this word's stored category to choose the rule.`,
+  };
+}
+
+const DIRECT_MASU_STEM_TYPES = new Set([
+  'masu-stem',
+  'polite-present',
+  'polite-past',
+  'polite-negative',
+  'polite-past-negative',
+  'polite-volitional',
+  'polite-te',
+  'polite-conditional-tara',
+  'desiderative',
+  'desiderative-polite',
+  'desiderative-negative',
+  'desiderative-polite-negative',
+  'desiderative-past',
+  'desiderative-polite-past',
+  'desiderative-past-negative',
+  'desiderative-polite-past-negative',
+  'command-nasai',
+]);
+
+const TE_TA_BRIDGE_BASE = {
+  'te-form': { type: 'te-form', role: 'te-form' },
+  'plain-past': { type: 'plain-past', role: 'ta-form' },
+  'conditional-tara': { type: 'plain-past', role: 'ta-form', after: 'ら' },
+  'request-kudasai': { type: 'te-form', role: 'te-form', after: 'ください' },
+  permission: { type: 'te-form', role: 'te-form', after: 'もいい' },
+  progressive: { type: 'te-form', role: 'te-form', after: 'いる' },
+  'progressive-polite': { type: 'te-form', role: 'te-form', after: 'います' },
+  'progressive-negative': { type: 'te-form', role: 'te-form', after: 'いない' },
+  'progressive-polite-negative': { type: 'te-form', role: 'te-form', after: 'いません' },
+  'progressive-past': { type: 'te-form', role: 'te-form', after: 'いた' },
+  'progressive-polite-past': { type: 'te-form', role: 'te-form', after: 'いました' },
+  'progressive-past-negative': { type: 'te-form', role: 'te-form', after: 'いなかった' },
+  'progressive-polite-past-negative': {
+    type: 'te-form',
+    role: 'te-form',
+    after: 'いませんでした',
+  },
+};
+
+function buildMasuStemBridge(item, type, expected) {
+  if (!item || isAdjective(item)) return null;
+  const polite = surfaceFormFor(item, 'polite-present') || conjugateItem(item, 'polite-present');
+  const masuStem = surfaceFormFor(item, 'masu-stem') || conjugateItem(item, 'masu-stem');
+  const result = surfaceFormFor(item, type) || expected;
+  if (!polite || !masuStem || !result) return null;
+
+  if (DIRECT_MASU_STEM_TYPES.has(type) && result.startsWith(masuStem)) {
+    const added = result.slice(masuStem.length);
+    return {
+      title: 'From polite/masu stem',
+      kind: 'direct-masu-stem',
+      cells: [
+        { label: 'Polite', value: polite },
+        { label: 'Drop ます', value: masuStem },
+        { label: added ? 'Attach' : 'Use stem', value: added || 'same stem' },
+        { label: 'Result', value: result },
+      ],
+      formula: added
+        ? `${polite} -> ${masuStem} + ${added} = ${result}`
+        : `${polite} -> ${masuStem}`,
+      detail: added
+        ? `If you start from polite form, drop ます to get the masu stem, then attach ${added}.`
+        : 'If you start from polite form, drop ます; the remaining part is the masu stem.',
+    };
+  }
+
+  const bridge = TE_TA_BRIDGE_BASE[type];
+  if (!bridge) return null;
+
+  const bridgeForm = surfaceFormFor(item, bridge.type) || conjugateItem(item, bridge.type);
+  if (!bridgeForm) return null;
+  const prefix = longestCommonPrefix(masuStem, bridgeForm);
+  const fromEnding = masuStem.slice(prefix.length);
+  const toEnding = bridgeForm.slice(prefix.length);
+  const bridgePhrase = fromEnding ? `${fromEnding} -> ${toEnding}` : `add ${toEnding}`;
+  const cells = [
+    { label: 'Polite', value: polite },
+    { label: 'Drop ます', value: masuStem },
+    { label: bridge.role, value: bridgePhrase },
+    { label: 'Result', value: result },
+  ];
+  const formula =
+    bridgeForm === result
+      ? `${polite} -> ${masuStem} -> ${bridgeForm}`
+      : `${polite} -> ${masuStem} -> ${bridgeForm} -> ${result}`;
+
+  return {
+    title: 'From polite/masu stem',
+    kind: 'te-ta-bridge',
+    cells,
+    formula,
+    detail:
+      bridgeForm === result
+        ? `If you learned this through polite form, drop ます first, then bridge the masu stem into the ${bridge.role}: ${bridgePhrase}.`
+        : `If you learned this through polite form, drop ます first, make the ${bridge.role}, then attach ${bridge.after || 'the rest of the form'}.`,
+  };
+}
+
 function expectedOnbinRule(item, type, replacement) {
   const ending = originalEndingFor(item);
   const romaji = GODAN_ENDING_ROMAJI[ending];
@@ -476,6 +643,8 @@ export function getConjugationDebugInfo(word, type, userAnswer = '') {
   const rule = ruleSummaryFor(word, type, parts, ans);
   const label = typeLabel(type);
   const source = word?.reading || word?.dict || '';
+  const category = learnerCategoryInfo(word);
+  const bridge = buildMasuStemBridge(word, type, ans);
   const formula = {
     stem,
     originalEnding,
@@ -521,6 +690,7 @@ export function getConjugationDebugInfo(word, type, userAnswer = '') {
     source,
     targetType: type,
     targetLabel: label,
+    category,
     groupLabel: groupLabel(word),
     stem,
     originalEnding,
@@ -528,6 +698,20 @@ export function getConjugationDebugInfo(word, type, userAnswer = '') {
     result: ans,
     formula,
     rule,
+    routes: {
+      plain: {
+        title: 'From dictionary/plain form',
+        cells: [
+          { label: 'Stem', value: stem || source },
+          { label: 'Ending', value: originalEnding },
+          { label: 'Replace', value: replacement || 'same form' },
+          { label: 'Result', value: ans },
+        ],
+        formula: formula.expression,
+        detail: rule.detail,
+      },
+      polite: bridge,
+    },
     groupConnection: groupRuleConnection(word, type, parts, ans),
     steps,
     mistake: inferMistakenConjugationPattern(word, type, userAnswer),

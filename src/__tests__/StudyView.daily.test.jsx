@@ -681,7 +681,7 @@ describe('StudyView daily startup guards', () => {
     expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
   });
 
-  it('shows Gemini review help after a correct answer when configured', async () => {
+  it('offers Gemini review chat after a correct answer without opening it automatically', async () => {
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
     mockedApp.value = makeApp({
@@ -698,7 +698,8 @@ describe('StudyView daily startup guards', () => {
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 
     await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
-    expect(screen.getAllByText('Ask Gemini why').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Chat about this').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Gemini is thinking…')).toBeNull();
   });
 
   it('keeps direct kana in the input and flags mismatches inline', async () => {

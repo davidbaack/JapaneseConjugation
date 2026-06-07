@@ -274,7 +274,8 @@ describe('App shell', () => {
     expect(screen.getByText('Review this form.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Next (Enter)' }).closest('.sticky')).toBeNull();
     expect(screen.getByText(/Rule:/)).toBeTruthy();
-    expect(screen.getByText('Full rule path').closest('details')?.hasAttribute('open')).toBe(false);
+    expect(screen.getByText('Answer breakdown').closest('details')).toBeNull();
+    expect(screen.getByText('1. What category is this and why?')).toBeTruthy();
     expect(screen.queryByText('Gemini is not configured for AI chat.')).toBeNull();
   }, 15000);
 
@@ -325,9 +326,10 @@ describe('App shell', () => {
     if (checkButton) fireEvent.click(checkButton);
 
     await screen.findAllByText('Correct!', {}, { timeout: 5000 });
-    const rationale = screen.getByText('Why this is right');
+    const rationale = screen.getByText('Answer breakdown');
     expect(rationale.closest('details')).toBeNull();
-    expect(screen.getByText(/Dictionary Form -> Plain Past transformation/)).toBeTruthy();
+    expect(screen.getByText('Visual Rule Path')).toBeTruthy();
+    expect(screen.getByText('From polite/masu stem')).toBeTruthy();
     expect(screen.queryByText('More')).toBeNull();
   }, 15000);
 

@@ -219,6 +219,40 @@ function ReviewDisclosure({ tone = 'stone', summary, children, alwaysOpen = fals
   );
 }
 
+function ReviewChatSection({ tone = 'stone', chatOpen, onOpen, children }) {
+  const toneClass =
+    tone === 'rose'
+      ? 'border-rose-200 dark:border-rose-900/60 bg-white/70 dark:bg-stone-950/50'
+      : tone === 'emerald'
+        ? 'border-emerald-200 dark:border-emerald-900/60 bg-white/70 dark:bg-stone-950/50'
+        : 'border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-950/50';
+  const buttonClass =
+    tone === 'rose'
+      ? 'border-rose-200 text-rose-700 hover:bg-rose-100/50 dark:border-rose-900 dark:text-rose-450 dark:hover:bg-rose-950/50'
+      : tone === 'emerald'
+        ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-100/50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950/50'
+        : 'border-stone-200 text-stone-700 hover:bg-stone-100/50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-900/60';
+
+  return (
+    <section className={`rounded-xl border ${toneClass} px-3 py-2`}>
+      <div className="text-sm font-semibold text-stone-800 dark:text-stone-100">
+        3. Follow-up chat with AI
+      </div>
+      {!chatOpen ? (
+        <button
+          onClick={onOpen}
+          aria-expanded={chatOpen}
+          className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border py-2 text-sm transition ${buttonClass}`}
+        >
+          <IconChat className="h-4 w-4" /> Chat about this
+        </button>
+      ) : (
+        <div className="mt-3">{children}</div>
+      )}
+    </section>
+  );
+}
+
 function loadPersistedCurrent(state, words, enabledTypes, prefs) {
   try {
     if (typeof sessionStorage === 'undefined') return null;
@@ -2269,7 +2303,7 @@ export default function StudyView() {
     };
     if (ok && queuedDueRuleIds.includes(rid)) markSrsQueueCompleted?.(rid);
     setState(nextState);
-    setChatOpen(!ok && !!geminiKey && !!practicePrefs.autoAiExplainErrors);
+    setChatOpen(false);
     setLastDiagnosis(mistakeDiagnosis);
     setReviewChoiceLabel('');
     setRevealedMiss(false);
@@ -2434,7 +2468,7 @@ export default function StudyView() {
     setReviewChoiceLabel(label);
     setRevealedMiss(!ok);
     setSelfCheckOpen(false);
-    setChatOpen(!ok && !!geminiKey && !!practicePrefs.autoAiExplainErrors);
+    setChatOpen(false);
     setLastDiagnosis(mistakeDiagnosis);
     setWasCorrect(ok);
     setPhase('reviewing');
@@ -2531,7 +2565,7 @@ export default function StudyView() {
     setState(nextState);
     setAnswer('');
     setTypoGuard(null);
-    setChatOpen(!!geminiKey && !!practicePrefs.autoAiExplainErrors);
+    setChatOpen(false);
     setLastDiagnosis(mistakeDiagnosis);
     setReviewChoiceLabel("I don't know");
     setSelfCheckOpen(false);
@@ -3938,61 +3972,22 @@ export default function StudyView() {
                     </div>
                   </div>
 
-                  <ContextExamplePanel
-                    item={current.verb}
-                    type={practicedType}
-                    geminiKey={geminiKey}
-                    practicePrefs={practicePrefs}
-                  />
-
                   {wasCorrect && reviewExplanation && (
-                    <div className="mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-900/50 text-left">
-                      <ReviewDisclosure tone="emerald" summary="Why this is right" alwaysOpen>
-                        <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                          {reviewExplanation.intro}
-                        </div>
-                        {reviewExplanation.reason && (
-                          <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
-                            {reviewExplanation.reason}
-                          </div>
-                        )}
-                        {reviewExplanation.rule && (
-                          <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                            {reviewExplanation.rule}
-                          </div>
-                        )}
-                        {reviewExplanation.derivation &&
-                          reviewExplanation.derivation !== expected && (
-                            <div
-                              className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
-                              lang="ja"
-                            >
-                              {reviewExplanation.derivation}
-                            </div>
-                          )}
-                        {reviewExplanation.note && (
-                          <div className="text-xs text-stone-605 dark:text-stone-400 italic bg-stone-50/80 dark:bg-stone-950/80 rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-800">
-                            {reviewExplanation.note}
-                          </div>
-                        )}
+                    <div className="mt-4 space-y-2.5 border-t border-emerald-200 pt-4 text-left dark:border-emerald-900/50">
+                      <ReviewDisclosure tone="emerald" summary="Answer breakdown" alwaysOpen>
                         <ConjugationBreakdown
                           word={current.verb}
                           type={practicedType}
-                          geminiKey={geminiKey}
                           practicePrefs={practicePrefs}
                         />
                       </ReviewDisclosure>
                       {geminiKey && (
-                        <ReviewDisclosure tone="emerald" summary="Ask Gemini why">
-                          {!chatOpen ? (
-                            <button
-                              onClick={() => setChatOpen(true)}
-                              aria-expanded={chatOpen}
-                              className="w-full py-2 border border-emerald-200 dark:border-emerald-900 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/50 rounded-xl text-sm text-emerald-700 dark:text-emerald-400 flex items-center justify-center gap-1.5 transition"
-                            >
-                              <IconChat className="w-4 h-4" /> Ask Gemini why
-                            </button>
-                          ) : (
+                        <ReviewChatSection
+                          tone="emerald"
+                          chatOpen={chatOpen}
+                          onOpen={() => setChatOpen(true)}
+                        >
+                          {chatOpen && (
                             <ChatPanel
                               verb={current.verb}
                               type={practicedType}
@@ -4006,7 +4001,7 @@ export default function StudyView() {
                               reviewTone="emerald"
                             />
                           )}
-                        </ReviewDisclosure>
+                        </ReviewChatSection>
                       )}
                     </div>
                   )}
@@ -4103,39 +4098,21 @@ export default function StudyView() {
                           </div>
                         </ReviewDisclosure>
                       )}
-                      <ReviewDisclosure tone="rose" summary="Full rule path">
-                        <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                          {explanation.intro}
-                        </div>
-                        {explanation.reason && (
-                          <div className="text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
-                            {explanation.reason}
-                          </div>
-                        )}
-                        {explanation.note && (
-                          <div className="text-xs text-stone-600 dark:text-stone-400 italic bg-stone-50/80 dark:bg-stone-950/80 rounded-lg px-3 py-2 border border-stone-200 dark:border-stone-800">
-                            {explanation.note}
-                          </div>
-                        )}
+                      <ReviewDisclosure tone="rose" summary="Answer breakdown" alwaysOpen>
                         <ConjugationBreakdown
                           word={current.verb}
                           type={practicedType}
                           userAnswer={revealedMiss ? '' : submittedAnswer}
-                          geminiKey={geminiKey}
                           practicePrefs={practicePrefs}
                         />
                       </ReviewDisclosure>
                       {geminiKey && (
-                        <ReviewDisclosure tone="rose" summary="Ask Gemini why">
-                          {!chatOpen ? (
-                            <button
-                              onClick={() => setChatOpen(true)}
-                              aria-expanded={chatOpen}
-                              className="w-full py-2 border border-rose-200 dark:border-rose-900 hover:bg-rose-100/50 dark:hover:bg-rose-950/50 rounded-xl text-sm text-rose-700 dark:text-rose-450 flex items-center justify-center gap-1.5 transition"
-                            >
-                              <IconChat className="w-4 h-4" /> Ask Gemini why
-                            </button>
-                          ) : (
+                        <ReviewChatSection
+                          tone="rose"
+                          chatOpen={chatOpen}
+                          onOpen={() => setChatOpen(true)}
+                        >
+                          {chatOpen && (
                             <ChatPanel
                               verb={current.verb}
                               type={practicedType}
@@ -4148,10 +4125,17 @@ export default function StudyView() {
                               wasCorrected={wasCorrected}
                             />
                           )}
-                        </ReviewDisclosure>
+                        </ReviewChatSection>
                       )}
                     </div>
                   )}
+
+                  <ContextExamplePanel
+                    item={current.verb}
+                    type={practicedType}
+                    geminiKey={geminiKey}
+                    practicePrefs={practicePrefs}
+                  />
 
                   {wasCorrect ? (
                     <StickyAction className="mt-3">
