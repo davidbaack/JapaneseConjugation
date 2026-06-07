@@ -8,6 +8,7 @@ surface rather than preserving older navigation names.
 The current app shape is:
 
 - **Practice** - the landing page and main learner loop.
+- **Stats** - progress, recommendations, upcoming reviews, and readiness.
 - **Learn** - formation lessons and guided tracks for every app form.
 - **Tools** - lookup, word management, saved lists, custom words, repair drills,
   group drills, and speed practice.
@@ -17,10 +18,11 @@ The current app shape is:
 
 ### Practice
 
-Practice opens to a dashboard instead of auto-starting a card. It shows one
-primary Start workout action, ready-card progress when cards are due, daily
-progress, recent misses, focused recommendations from Learn and Tools, next
-workout timing, and form-family strength once the learner has history.
+Practice opens directly into the default workout when cards are available. The
+active workout shows session-card progress, ready-card progress when cards are
+due, the current prompt, answer controls, and a persistent Practice map. Focused
+"Practice this" launches from Learn or Tools route straight into their targeted
+cards and stay focused until the learner exits the banner.
 
 The workout stream prioritizes ready cards, then fills the session with recent
 misses and varied words in the same weak patterns. A normal workout target is 12
@@ -33,9 +35,19 @@ from Tools, and removed words can be restored there.
 
 Active cards support typed answers, multiple choice, self-check, and spoken
 answers; forward production, reading/reverse practice, and automatic mixing;
-romaji-to-kana conversion; an on-screen kana pad; live kana help with hide/show
-and reveal-next controls; deterministic hints; optional sentence-mode cloze
-prompts; speech playback; and optional Gemini clue/chat support.
+inline romaji-to-kana conversion in the text field; live kana help with
+hide/show behavior and Reveal next kana controls; deterministic hints; optional
+sentence-mode cloze prompts; speech playback; and optional Gemini clue/chat
+support.
+
+### Stats
+
+Stats keeps progress and planning information out of the active workout. It
+shows the Practice pulse, ready cards, daily progress, recent misses,
+recommended practice from Learn and Tools, upcoming review timing, and
+form-family readiness once the learner has enough history. Readiness gaps can
+launch focused Practice or route the learner to the matching Tool, such as
+Ending Lab, Groups, or Rush.
 
 ### Learn
 
@@ -248,7 +260,7 @@ src/
   i18n/         String catalog and translation helper
   state/        Global app state provider and cloud/auth wiring
   utils/        Conjugation, scheduling, storage, display, romaji, AI, speech, backup, drill logic
-  views/        Practice, Learn, Tools, Settings, and nested tool surfaces
+  views/        Practice, Stats, Learn, Tools, Settings, and nested tool surfaces
   __tests__/    Vitest tests
 e2e/            Playwright E2E tests
 public/         PWA icons, Apple touch icon, and generated vocabulary data
