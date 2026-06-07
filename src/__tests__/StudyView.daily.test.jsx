@@ -152,6 +152,7 @@ class FakeSpeechRecognition {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   localStorage.clear();
   sessionStorage.clear();
@@ -645,6 +646,37 @@ describe('StudyView daily startup guards', () => {
     expect(nextState.session.correct).toBe(1);
     expect(nextState.cards[cardId].correct).toBe(1);
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+  });
+
+  it('auto-advances after a brief correct visual by default', async () => {
+    const target = STARTER_VERBS[0];
+    const nextTarget = STARTER_VERBS[1];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      allWords: [target, nextTarget],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    vi.useFakeTimers();
+
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.getByText('Next card coming up...')).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(850);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => expect(screen.queryByText('Correct!')).toBeNull());
+    expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
   });
 
   it('shows Gemini review help after a correct answer when configured', async () => {

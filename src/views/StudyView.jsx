@@ -101,6 +101,7 @@ const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
 const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation']);
 const REVIEW_SESSION_HISTORY_SIZE = 4;
+const CORRECT_AUTO_ADVANCE_MS = 850;
 
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
@@ -1283,6 +1284,7 @@ export default function StudyView() {
   ]);
 
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
+  const autoAdvanceCorrect = practicePrefs.autoAdvanceCorrect !== false;
   const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
   const typedAnswerMode = answerMode === 'input';
   const transformationMode = false;
@@ -2267,7 +2269,7 @@ export default function StudyView() {
       !startedGoalHit.current && !bonusMode && newDaily.goalHit && !daily.goalHit;
     const reviewWillComplete =
       (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) || willClearDue || willHitDailyGoal;
-    if (ok && practicePrefs.autoAdvanceCorrect && !reviewWillComplete) {
+    if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
         setChatOpen(false);
@@ -2287,7 +2289,7 @@ export default function StudyView() {
         setWasCorrected(false);
         setPhase('answering');
         setCurrent(selectNextReviewCard(nextState, current.id));
-      }, 850);
+      }, CORRECT_AUTO_ADVANCE_MS);
     }
   }
 
@@ -2422,7 +2424,7 @@ export default function StudyView() {
       !startedGoalHit.current && !bonusMode && newDaily.goalHit && !daily.goalHit;
     const reviewWillComplete =
       (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) || willClearDue || willHitDailyGoal;
-    if (ok && practicePrefs.autoAdvanceCorrect && !reviewWillComplete) {
+    if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
         setChatOpen(false);
@@ -2442,7 +2444,7 @@ export default function StudyView() {
         setWasCorrected(false);
         setPhase('answering');
         setCurrent(selectNextReviewCard(nextState, current.id));
-      }, 850);
+      }, CORRECT_AUTO_ADVANCE_MS);
     }
   }
 
@@ -3849,8 +3851,16 @@ export default function StudyView() {
                           </div>
                         </>
                       )}
-                      {wasCorrect && practicePrefs.autoAdvanceCorrect && (
-                        <div className="text-xs text-emerald-700 mt-2">Next card coming up...</div>
+                      {wasCorrect && autoAdvanceCorrect && (
+                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-100/80 px-3 py-2 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+                          <span className="relative flex h-5 w-5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                            <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
+                              <IconCheck className="h-3 w-3" />
+                            </span>
+                          </span>
+                          Next card coming up...
+                        </div>
                       )}
                     </div>
                   </div>
