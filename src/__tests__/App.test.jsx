@@ -378,6 +378,21 @@ describe('App shell', () => {
     expect(await screen.findByText('Correct conjugation')).toBeTruthy();
   }, 15000);
 
+  it('renders a Check near-miss explanation without crashing', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
+
+    fireEvent.click(await screen.findByRole('tab', { name: /^Check/i }));
+    fireEvent.change(screen.getByPlaceholderText(/tabeta/i), {
+      target: { value: '\u98df\u3079\u308c\u308b' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
+
+    expect(await screen.findByText('Not quite')).toBeTruthy();
+    expect(screen.getAllByText('Correct form').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Something went wrong')).toBeNull();
+  }, 15000);
+
   it('keeps Tools reverse lookup details aligned with the confirmed hit', async () => {
     const savedState = defaultState();
     localStorage.setItem(

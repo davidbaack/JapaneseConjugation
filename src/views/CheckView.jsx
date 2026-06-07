@@ -210,6 +210,10 @@ function CandidateMatchList({ matches, practicePrefs, onSpeak }) {
   );
 }
 
+function explanationLine(value) {
+  return typeof value === 'string' ? value : '';
+}
+
 export default function CheckView() {
   const {
     setTab,
@@ -340,6 +344,13 @@ export default function CheckView() {
       ]
     : [];
   const showMatchRows = secondaryMatchRows.length > 0;
+  const nearExplanation =
+    result?.status === 'near' && result.near?.[0]
+      ? explainItem(result.near[0].word, result.near[0].type)
+      : null;
+  const nearRule =
+    explanationLine(nearExplanation?.rule) || explanationLine(nearExplanation?.intro);
+  const nearDerivation = explanationLine(nearExplanation?.derivation);
 
   return (
     <div className="space-y-4">
@@ -629,12 +640,15 @@ export default function CheckView() {
 
               {/* Lead with the rule — the most useful part for learning. */}
               <p className="mt-4 text-sm text-stone-700 dark:text-stone-200">
-                {explainItem(result.near[0].word, result.near[0].type)}
+                {nearRule}
                 <span className="text-stone-400">
                   {' '}
                   ({englishForForm(result.near[0].word, result.near[0].type)})
                 </span>
               </p>
+              {nearDerivation && nearDerivation !== result.near[0].kana && (
+                <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{nearDerivation}</p>
+              )}
 
               {headForm && (
                 <div className="mt-3">
