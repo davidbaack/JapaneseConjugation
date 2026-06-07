@@ -39,8 +39,8 @@ describe('App shell', () => {
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
     expect(screen.getByText('Practice map scope')).toBeTruthy();
-    expect(screen.getByText('Saved forms for future workouts.')).toBeTruthy();
-    expect(screen.getByRole('progressbar', { name: 'Workout progress' })).toBeTruthy();
+    expect(screen.getByText('Saved form scope for future workouts.')).toBeTruthy();
+    expect(screen.getByRole('progressbar', { name: 'Session cards' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
     expect(screen.queryByText('Next workout')).toBeNull();
     expect(screen.queryByText('Form families')).toBeNull();
@@ -120,7 +120,7 @@ describe('App shell', () => {
     expect(await waitForPracticeCard()).toBeTruthy();
     fireEvent.click(screen.getByText('Te/Ta Sound Changes'));
 
-    expect(screen.getByText('2/2 enabled')).toBeTruthy();
+    expect(screen.getByText('2/2 saved')).toBeTruthy();
     expect(
       screen.getByRole('button', { name: 'Disable all Te/Ta Sound Changes forms' }),
     ).toBeTruthy();
@@ -166,10 +166,10 @@ describe('App shell', () => {
     render(<App />);
     await waitForPracticeCard();
     expect(
-      await screen.findByText(/\d+ forms in this workout/i, {}, { timeout: 5000 }),
+      await screen.findByText(/\d+ form types this session/i, {}, { timeout: 5000 }),
     ).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
-    expect(screen.getByText('52 map forms')).toBeTruthy();
+    expect(screen.getByText('52 saved forms')).toBeTruthy();
     // "Sentence" is now the cued-cloze presentation toggle — a valid review
     // control, not a legacy study-mode button.
     expect(screen.getByRole('button', { name: 'Sentence', exact: true })).toBeTruthy();

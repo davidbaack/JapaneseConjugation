@@ -726,4 +726,15 @@ describe('mergePracticePrefs', () => {
       kanaAssist: 'live',
     });
   });
+
+  it('defaults correct answers to auto-advance while preserving an explicit opt-out', () => {
+    expect(mergePracticePrefs({}).autoAdvanceCorrect).toBe(true);
+    expect(mergePracticePrefs({ autoAdvanceCorrect: false }).autoAdvanceCorrect).toBe(true);
+    expect(
+      mergePracticePrefs({ autoAdvanceCorrect: false, autoAdvanceCorrectUserSet: true }),
+    ).toMatchObject({
+      autoAdvanceCorrect: false,
+      autoAdvanceCorrectUserSet: true,
+    });
+  });
 });

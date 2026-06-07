@@ -96,6 +96,10 @@ export function mergePracticePrefs(prefs) {
   const displayScripts = source.displayScripts
     ? { ...DEFAULT_PREFS.displayScripts, ...source.displayScripts }
     : resolveDisplayScripts(source);
+  const autoAdvanceCorrectUserSet = !!source.autoAdvanceCorrectUserSet;
+  const autoAdvanceCorrect = autoAdvanceCorrectUserSet
+    ? source.autoAdvanceCorrect !== false
+    : DEFAULT_PREFS.autoAdvanceCorrect;
   let wordGroups = Array.isArray(source.wordGroups)
     ? [...source.wordGroups]
     : DEFAULT_PREFS.wordGroups;
@@ -113,6 +117,8 @@ export function mergePracticePrefs(prefs) {
     answerMode,
     kanaAssist,
     displayScripts,
+    autoAdvanceCorrect,
+    autoAdvanceCorrectUserSet,
     reviewStyle,
     sourceFormStrategy,
     newCardsPerDay,

@@ -5,6 +5,10 @@ function readRepoJson(path) {
   return JSON.parse(readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8'));
 }
 
+function readRepoText(path) {
+  return readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
+}
+
 describe('static coverage configuration', () => {
   it('lints the maintained JavaScript surface instead of src only', () => {
     const pkg = readRepoJson('package.json');
@@ -39,5 +43,25 @@ describe('static coverage configuration', () => {
     expect(supabase.include).toEqual(
       expect.arrayContaining(['types/deno.d.ts', 'supabase/functions/**/*.ts']),
     );
+  });
+
+  it('allows every browser API origin used by visible import features', () => {
+    const html = readRepoText('index.html');
+    const wanikani = readRepoText('src/utils/wanikani.js');
+    const wanikaniBase = wanikani.match(/WANIKANI_API_BASE = '([^']+)'/)?.[1];
+    expect(wanikaniBase).toBeTruthy();
+
+    const connectSrc = html.match(/connect-src ([^;"]+)/)?.[1] || '';
+    expect(connectSrc).toContain('https://*.supabase.co');
+    expect(connectSrc).toContain(new URL(wanikaniBase).origin);
+  });
+
+  it('keeps the Gemini proxy fail-closed unless public origins are explicit', () => {
+    const proxy = readRepoText('supabase/functions/gemini-proxy/index.ts');
+
+    expect(proxy).not.toContain("Deno.env.get('ALLOWED_ORIGIN') ?? '*'");
+    expect(proxy).toContain('MISSING_ALLOWED_ORIGIN_ERROR');
+    expect(proxy).toContain('GEMINI_ALLOW_PUBLIC_ORIGIN');
+    expect(proxy).toContain('ALLOWED_ORIGIN=* requires GEMINI_ALLOW_PUBLIC_ORIGIN=true');
   });
 });

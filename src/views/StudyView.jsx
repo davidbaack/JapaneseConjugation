@@ -101,6 +101,7 @@ const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
 const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation']);
 const REVIEW_SESSION_HISTORY_SIZE = 4;
+const CORRECT_AUTO_ADVANCE_MS = 850;
 
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
@@ -545,11 +546,11 @@ function PracticeScopeSidebar({
               Practice map scope
             </h2>
             <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              Saved forms for future workouts.
+              Saved form scope for future workouts.
             </p>
           </div>
           <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
-            {activeCount} map forms
+            {activeCount} saved forms
           </span>
         </div>
         <div className="mt-3 space-y-2">
@@ -569,7 +570,7 @@ function PracticeScopeSidebar({
                         {family.label}
                       </div>
                       <div className="mt-0.5 text-xs text-stone-500">
-                        {enabledInFamily.length}/{family.typeIds.length} enabled
+                        {enabledInFamily.length}/{family.typeIds.length} saved
                       </div>
                     </div>
                     <button
@@ -869,7 +870,7 @@ export function ReviewsDashboard({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                  Workout progress
+                  Session cards
                 </div>
                 <div className="mt-1 text-sm text-stone-600 dark:text-stone-300">
                   {dueTotal
@@ -879,7 +880,7 @@ export function ReviewsDashboard({
                 {!!workoutTypeCount && (
                   <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 text-xs dark:border-indigo-900/60 dark:bg-stone-950/30">
                     <span className="font-medium text-stone-600 dark:text-stone-300">
-                      Forms in this workout
+                      Form types selected
                     </span>
                     <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
                       {workoutTypeCount}
@@ -1196,6 +1197,7 @@ export default function StudyView() {
   const startedGoalHit = useRef(isDailyGoalHitToday(state.daily || {}));
   const seededInitialDailyGoalRef = useRef(false);
   const autoStartedTodayRef = useRef(false);
+  const defaultWorkoutTargetRef = useRef(null);
   const [bonusMode, setBonusMode] = useState(false);
   const [undoReviewScopeAction, setUndoReviewScopeAction] = useState(null);
   const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
@@ -1283,6 +1285,7 @@ export default function StudyView() {
   ]);
 
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
+  const autoAdvanceCorrect = practicePrefs.autoAdvanceCorrect !== false;
   const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
   const typedAnswerMode = answerMode === 'input';
   const transformationMode = false;
@@ -1806,7 +1809,13 @@ export default function StudyView() {
   // the focused cards and keep serving them until the learner exits the banner.
   const focusSession = !!(focusWordLock || sessionFilterWord || sessionFilterFormGroupId);
   const reviewComplete = (dueQueueDone || dailyGoalJustHit) && !focusSession;
-  const defaultProgressMax = Math.max(1, Number(todayPlan?.reviewLimit || dailyGoalTarget));
+  const plannedDefaultProgressMax = Math.max(1, Number(todayPlan?.reviewLimit || dailyGoalTarget));
+  if (reviewLimit > 0 || initialDue > 0 || bonusMode || !todayDrillActive) {
+    defaultWorkoutTargetRef.current = null;
+  } else if (!defaultWorkoutTargetRef.current) {
+    defaultWorkoutTargetRef.current = plannedDefaultProgressMax;
+  }
+  const defaultProgressMax = defaultWorkoutTargetRef.current || plannedDefaultProgressMax;
   const workoutProgress =
     reviewLimit > 0
       ? {
@@ -1823,7 +1832,7 @@ export default function StudyView() {
         : {
             now: Math.min(reviewsDone, defaultProgressMax),
             max: defaultProgressMax,
-            label: bonusMode ? 'Bonus progress' : 'Workout progress',
+            label: bonusMode ? 'Bonus cards' : 'Session cards',
           };
   const workoutProgressPct = workoutProgress.max
     ? Math.min(100, Math.round((workoutProgress.now / workoutProgress.max) * 100))
@@ -2046,6 +2055,10 @@ export default function StudyView() {
     clearPersistedCurrent();
     const launched = startTodayDrill?.(todayPlan);
     if (launched === false) return;
+    defaultWorkoutTargetRef.current = Math.max(
+      1,
+      Number(todayPlan?.reviewLimit || dailyGoalTarget),
+    );
     setBonusMode(false);
     setTodayMinimalPairSetIds(todayPlan.minimalPairSetIds);
     setFocusWordLock(null);
@@ -2276,7 +2289,7 @@ export default function StudyView() {
       !startedGoalHit.current && !bonusMode && newDaily.goalHit && !daily.goalHit;
     const reviewWillComplete =
       (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) || willClearDue || willHitDailyGoal;
-    if (ok && practicePrefs.autoAdvanceCorrect && !reviewWillComplete) {
+    if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
         setChatOpen(false);
@@ -2296,7 +2309,7 @@ export default function StudyView() {
         setWasCorrected(false);
         setPhase('answering');
         setCurrent(selectNextReviewCard(nextState, current.id));
-      }, 850);
+      }, CORRECT_AUTO_ADVANCE_MS);
     }
   }
 
@@ -2431,7 +2444,7 @@ export default function StudyView() {
       !startedGoalHit.current && !bonusMode && newDaily.goalHit && !daily.goalHit;
     const reviewWillComplete =
       (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) || willClearDue || willHitDailyGoal;
-    if (ok && practicePrefs.autoAdvanceCorrect && !reviewWillComplete) {
+    if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
         setChatOpen(false);
@@ -2451,7 +2464,7 @@ export default function StudyView() {
         setWasCorrected(false);
         setPhase('answering');
         setCurrent(selectNextReviewCard(nextState, current.id));
-      }, 850);
+      }, CORRECT_AUTO_ADVANCE_MS);
     }
   }
 
@@ -2744,6 +2757,10 @@ export default function StudyView() {
         <button
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
+            defaultWorkoutTargetRef.current = Math.max(
+              1,
+              Number(todayPlan?.reviewLimit || dailyGoalTarget),
+            );
             setCurrent(selectNextReviewCard(state, current.id));
             setAnswer('');
             setPhase('answering');
@@ -2954,7 +2971,7 @@ export default function StudyView() {
               </div>
               <div className="text-sm text-stone-600 dark:text-stone-300">
                 {todayDrillActive && todayPlan?.typeIds?.length
-                  ? `${todayPlan.typeIds.length} forms in this workout`
+                  ? `${todayPlan.typeIds.length} form types this session`
                   : reverseDrill
                     ? 'Reading practice'
                     : 'Form practice'}
@@ -3012,7 +3029,7 @@ export default function StudyView() {
           </div>
           <div
             role="progressbar"
-            aria-label="Workout progress"
+            aria-label={workoutProgress.label}
             aria-valuemin={0}
             aria-valuemax={workoutProgress.max}
             aria-valuenow={workoutProgress.now}
@@ -3907,8 +3924,16 @@ export default function StudyView() {
                           </div>
                         </>
                       )}
-                      {wasCorrect && practicePrefs.autoAdvanceCorrect && (
-                        <div className="text-xs text-emerald-700 mt-2">Next card coming up...</div>
+                      {wasCorrect && autoAdvanceCorrect && (
+                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-100/80 px-3 py-2 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+                          <span className="relative flex h-5 w-5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                            <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
+                              <IconCheck className="h-3 w-3" />
+                            </span>
+                          </span>
+                          Next card coming up...
+                        </div>
                       )}
                     </div>
                   </div>

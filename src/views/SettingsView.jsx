@@ -158,6 +158,7 @@ export default function SettingsView() {
   const theme = practicePrefs.theme || DEFAULT_PREFS.theme;
   const englishHints = practicePrefs.englishHints || DEFAULT_PREFS.englishHints;
   const showWordCategory = !!practicePrefs.showWordCategory;
+  const autoAdvanceCorrect = practicePrefs.autoAdvanceCorrect !== false;
   const furiganaEnabled =
     practicePrefs.furigana !== false && displayScripts.kanji && displayScripts.kana;
   const selectedVoiceAvailable =
@@ -300,12 +301,13 @@ export default function SettingsView() {
               onClick={() =>
                 setPracticePrefs({
                   ...practicePrefs,
-                  autoAdvanceCorrect: !practicePrefs.autoAdvanceCorrect,
+                  autoAdvanceCorrect: !autoAdvanceCorrect,
+                  autoAdvanceCorrectUserSet: true,
                 })
               }
-              aria-pressed={!!practicePrefs.autoAdvanceCorrect}
+              aria-pressed={autoAdvanceCorrect}
               className={`w-full px-3 py-2 rounded-lg text-sm border transition inline-flex items-center justify-center gap-1.5 ${
-                practicePrefs.autoAdvanceCorrect
+                autoAdvanceCorrect
                   ? 'bg-indigo-600 text-white border-indigo-600'
                   : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
               }`}
