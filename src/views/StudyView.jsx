@@ -1404,6 +1404,10 @@ export default function StudyView() {
     if (focus?.word && !focusSeededRef.current) {
       focusSeededRef.current = true;
       setFocusWordLock(focus.word);
+      // Lock the workout to this word so every follow-up card stays on it until
+      // the learner exits the focus banner (rather than mixing back into the
+      // general queue after the first seeded card).
+      setSessionFilterWord(focus.word);
       if (focus.returnTo === 'reference') setLaunchContext(focus);
       const card = buildFocusCard(state, focus.word, focus.type);
       onFocusConsumed?.();
@@ -1799,7 +1803,12 @@ export default function StudyView() {
   const dueQueueDone = initialDue > 0 && completedDueCount >= initialDue && !bonusMode;
   const dailyGoalJustHit =
     todayGoalHit && !startedGoalHit.current && seededInitialDailyGoalRef.current && !bonusMode;
-  const reviewComplete = dueQueueDone || dailyGoalJustHit;
+  // A targeted "Practice this" launch (a word, a reference drill, or a form
+  // family) locks the workout to that item. While a focus is active we never
+  // surface the "Map updated" completion summary — entries route straight into
+  // the focused cards and keep serving them until the learner exits the banner.
+  const focusSession = !!(focusWordLock || sessionFilterWord || sessionFilterFormGroupId);
+  const reviewComplete = (dueQueueDone || dailyGoalJustHit) && !focusSession;
   const plannedDefaultProgressMax = Math.max(1, Number(todayPlan?.reviewLimit || dailyGoalTarget));
   if (reviewLimit > 0 || initialDue > 0 || bonusMode || !todayDrillActive) {
     defaultWorkoutTargetRef.current = null;
@@ -1814,7 +1823,7 @@ export default function StudyView() {
           max: reviewLimit,
           label: reviewLimitSource === 'recommendation' ? 'Recommended progress' : 'Drill progress',
         }
-      : initialDue > 0 && !bonusMode
+      : initialDue > 0 && !bonusMode && !focusSession
         ? {
             now: Math.min(completedDueCount, initialDue),
             max: initialDue,
@@ -2847,6 +2856,38 @@ export default function StudyView() {
     setTab('stats');
   }
 
+  // Title banner for a focused "Practice this" launch. Generalizes the older
+  // reference-drill banner so every targeted entry (a Check/Library word, a
+  // reference drill, or a form family) leads the active workout with a clear
+  // title of what is being studied plus a single exit affordance.
+  const focusBannerGroup = sessionFilterFormGroupId
+    ? FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId)
+    : null;
+  const focusBannerWord = sessionFilterWord || focusWordLock;
+  const focusBanner = focusBannerGroup
+    ? {
+        kicker: 'Form family workout',
+        title: focusBannerGroup.label,
+        reading: '',
+        subtitle: focusBannerGroup.typeIds?.length
+          ? `${focusBannerGroup.typeIds.length} forms in this family`
+          : 'Focused form practice',
+        exitLabel: 'Exit focus',
+        onExit: returnToOverview,
+      }
+    : focusBannerWord
+      ? {
+          kicker: referenceLaunch ? 'Reference drill' : 'Focused practice',
+          title: focusBannerWord.dict,
+          reading: focusBannerWord.reading || '',
+          subtitle: [focusBannerWord.meaning, referenceLaunch?.referenceLabel || typeInfo.label]
+            .filter(Boolean)
+            .join(' · '),
+          exitLabel: referenceLaunch ? 'Back to reference' : 'Exit focus',
+          onExit: referenceLaunch ? returnToReference : returnToOverview,
+        }
+      : null;
+
   return (
     <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <PracticeScopeSidebar
@@ -2857,23 +2898,40 @@ export default function StudyView() {
         onToggleType={togglePracticeType}
       />
       <div className="order-1 min-w-0 space-y-4 lg:order-2">
-        {referenceLaunch && (
-          <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="text-left">
-              <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
-                Reference drill
+        {focusBanner && (
+          <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 px-5 py-4 dark:border-indigo-800 dark:bg-indigo-950/20">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+                  {focusBanner.kicker}
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <h2
+                    lang="ja"
+                    className="text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-50"
+                  >
+                    {focusBanner.title}
+                  </h2>
+                  {focusBanner.reading && focusBanner.reading !== focusBanner.title && (
+                    <span lang="ja" className="text-sm text-indigo-600 dark:text-indigo-300">
+                      {focusBanner.reading}
+                    </span>
+                  )}
+                </div>
+                {focusBanner.subtitle && (
+                  <div className="mt-0.5 text-sm text-stone-600 dark:text-stone-300">
+                    {focusBanner.subtitle}
+                  </div>
+                )}
               </div>
-              <div className="text-sm text-stone-700 dark:text-stone-250">
-                {referenceLaunch.referenceLabel || 'Focused reference practice'}
-              </div>
+              <button
+                type="button"
+                onClick={focusBanner.onExit}
+                className="shrink-0 rounded-lg border border-indigo-200 bg-white/70 px-3 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-white dark:border-indigo-800 dark:bg-stone-950/40 dark:text-indigo-300 dark:hover:bg-stone-900"
+              >
+                {focusBanner.exitLabel}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={returnToReference}
-              className="px-3 py-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white/70 dark:bg-stone-950/40 text-sm text-indigo-700 dark:text-indigo-250 hover:bg-white dark:hover:bg-stone-900 transition"
-            >
-              Back to reference
-            </button>
           </div>
         )}
         {undoReviewScopeAction && (
@@ -2897,7 +2955,7 @@ export default function StudyView() {
         )}
         <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3">
           <div className="flex items-center gap-2.5">
-            {!referenceLaunch && (
+            {!focusBanner && (
               <button
                 type="button"
                 onClick={returnToOverview}

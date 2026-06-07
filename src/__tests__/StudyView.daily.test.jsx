@@ -216,9 +216,11 @@ describe('StudyView daily startup guards', () => {
 
     render(<StudyView />);
 
-    // A focus launch is a "special" session — it previously hid Overview.
+    // A focus launch is a "special" session: it leads with a title banner and
+    // exits the locked focus through that banner rather than the generic
+    // "Back to Stats" header button.
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Stats' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
 
     expect(app.setTab).toHaveBeenCalledWith('stats');
   });
