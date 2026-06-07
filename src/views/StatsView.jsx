@@ -206,19 +206,19 @@ export function StatsDashboard({
             </div>
             <div className="mt-2 grid gap-2 text-sm text-stone-700 dark:text-stone-200">
               <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 dark:border-indigo-900/60 dark:bg-stone-950/30">
-                <span>Ready practiced</span>
+                <span>Ready cards practiced</span>
                 <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
                   {dueDone}/{dueTotal || dashboardDue || 0}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 dark:border-indigo-900/60 dark:bg-stone-950/30">
-                <span>Forms in workout</span>
+                <span>Form types selected</span>
                 <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
                   {workoutTypeCount}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 dark:border-indigo-900/60 dark:bg-stone-950/30">
-                <span>Default target</span>
+                <span>Session target</span>
                 <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
                   {todayPlan?.reviewLimit || dailyGoal} cards
                 </span>

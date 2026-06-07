@@ -546,11 +546,11 @@ function PracticeScopeSidebar({
               Practice map scope
             </h2>
             <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              Saved forms for future workouts.
+              Saved form scope for future workouts.
             </p>
           </div>
           <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
-            {activeCount} map forms
+            {activeCount} saved forms
           </span>
         </div>
         <div className="mt-3 space-y-2">
@@ -570,7 +570,7 @@ function PracticeScopeSidebar({
                         {family.label}
                       </div>
                       <div className="mt-0.5 text-xs text-stone-500">
-                        {enabledInFamily.length}/{family.typeIds.length} enabled
+                        {enabledInFamily.length}/{family.typeIds.length} saved
                       </div>
                     </div>
                     <button
@@ -870,7 +870,7 @@ export function ReviewsDashboard({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                  Workout progress
+                  Session cards
                 </div>
                 <div className="mt-1 text-sm text-stone-600 dark:text-stone-300">
                   {dueTotal
@@ -880,7 +880,7 @@ export function ReviewsDashboard({
                 {!!workoutTypeCount && (
                   <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 text-xs dark:border-indigo-900/60 dark:bg-stone-950/30">
                     <span className="font-medium text-stone-600 dark:text-stone-300">
-                      Forms in this workout
+                      Form types selected
                     </span>
                     <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
                       {workoutTypeCount}
@@ -1197,6 +1197,7 @@ export default function StudyView() {
   const startedGoalHit = useRef(isDailyGoalHitToday(state.daily || {}));
   const seededInitialDailyGoalRef = useRef(false);
   const autoStartedTodayRef = useRef(false);
+  const defaultWorkoutTargetRef = useRef(null);
   const [bonusMode, setBonusMode] = useState(false);
   const [undoReviewScopeAction, setUndoReviewScopeAction] = useState(null);
   const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
@@ -1799,7 +1800,13 @@ export default function StudyView() {
   const dailyGoalJustHit =
     todayGoalHit && !startedGoalHit.current && seededInitialDailyGoalRef.current && !bonusMode;
   const reviewComplete = dueQueueDone || dailyGoalJustHit;
-  const defaultProgressMax = Math.max(1, Number(todayPlan?.reviewLimit || dailyGoalTarget));
+  const plannedDefaultProgressMax = Math.max(1, Number(todayPlan?.reviewLimit || dailyGoalTarget));
+  if (reviewLimit > 0 || initialDue > 0 || bonusMode || !todayDrillActive) {
+    defaultWorkoutTargetRef.current = null;
+  } else if (!defaultWorkoutTargetRef.current) {
+    defaultWorkoutTargetRef.current = plannedDefaultProgressMax;
+  }
+  const defaultProgressMax = defaultWorkoutTargetRef.current || plannedDefaultProgressMax;
   const workoutProgress =
     reviewLimit > 0
       ? {
@@ -1816,7 +1823,7 @@ export default function StudyView() {
         : {
             now: Math.min(reviewsDone, defaultProgressMax),
             max: defaultProgressMax,
-            label: bonusMode ? 'Bonus progress' : 'Workout progress',
+            label: bonusMode ? 'Bonus cards' : 'Session cards',
           };
   const workoutProgressPct = workoutProgress.max
     ? Math.min(100, Math.round((workoutProgress.now / workoutProgress.max) * 100))
@@ -2039,6 +2046,10 @@ export default function StudyView() {
     clearPersistedCurrent();
     const launched = startTodayDrill?.(todayPlan);
     if (launched === false) return;
+    defaultWorkoutTargetRef.current = Math.max(
+      1,
+      Number(todayPlan?.reviewLimit || dailyGoalTarget),
+    );
     setBonusMode(false);
     setTodayMinimalPairSetIds(todayPlan.minimalPairSetIds);
     setFocusWordLock(null);
@@ -2737,6 +2748,10 @@ export default function StudyView() {
         <button
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
+            defaultWorkoutTargetRef.current = Math.max(
+              1,
+              Number(todayPlan?.reviewLimit || dailyGoalTarget),
+            );
             setCurrent(selectNextReviewCard(state, current.id));
             setAnswer('');
             setPhase('answering');
@@ -2898,7 +2913,7 @@ export default function StudyView() {
               </div>
               <div className="text-sm text-stone-600 dark:text-stone-300">
                 {todayDrillActive && todayPlan?.typeIds?.length
-                  ? `${todayPlan.typeIds.length} forms in this workout`
+                  ? `${todayPlan.typeIds.length} form types this session`
                   : reverseDrill
                     ? 'Reading practice'
                     : 'Form practice'}
@@ -2956,7 +2971,7 @@ export default function StudyView() {
           </div>
           <div
             role="progressbar"
-            aria-label="Workout progress"
+            aria-label={workoutProgress.label}
             aria-valuemin={0}
             aria-valuemax={workoutProgress.max}
             aria-valuenow={workoutProgress.now}

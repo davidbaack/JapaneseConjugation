@@ -170,7 +170,7 @@ describe('StudyView daily startup guards', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    const progress = screen.getByRole('progressbar', { name: 'Workout progress' });
+    const progress = screen.getByRole('progressbar', { name: 'Session cards' });
     expect(progress.getAttribute('aria-valuenow')).toBe('0');
     expect(progress.getAttribute('aria-valuemax')).toBe(String(app.todayPlan.reviewLimit));
     expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
@@ -185,7 +185,7 @@ describe('StudyView daily startup guards', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    const progress = screen.getByRole('progressbar', { name: 'Workout progress' });
+    const progress = screen.getByRole('progressbar', { name: 'Session cards' });
     expect(progress.getAttribute('aria-valuenow')).toBe('0');
     expect(progress.getAttribute('aria-valuemax')).toBe(String(app.todayPlan.reviewLimit));
     expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
@@ -570,7 +570,7 @@ describe('StudyView daily startup guards', () => {
     render(<StudyView />);
 
     await waitForPracticeCard();
-    const progress = screen.getByRole('progressbar', { name: 'Workout progress' });
+    const progress = screen.getByRole('progressbar', { name: 'Ready-card progress' });
     expect(progress.getAttribute('aria-valuenow')).toBe('0');
     expect(progress.getAttribute('aria-valuemax')).toBe('1');
     expect(await screen.findByText('0/1 ready')).toBeTruthy();
