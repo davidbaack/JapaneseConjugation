@@ -5,6 +5,8 @@ import {
   IconVolume,
   IconSpark,
   IconChat,
+  IconEye,
+  IconEyeOff,
   IconFlame,
   IconMic,
   IconPlus,
@@ -62,6 +64,8 @@ import {
   makeReverseChoices,
   dictionaryAnswerMatches,
   normalizeAnswerMode,
+  resolveKanaAssist,
+  kanaMatchDisplayForPrefs,
   typoGuardForAnswer,
   spokenAnswerResult,
 } from '../utils/display.js';
@@ -102,6 +106,12 @@ const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint:
 const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation']);
 const REVIEW_SESSION_HISTORY_SIZE = 4;
 const CORRECT_AUTO_ADVANCE_MS = 850;
+const ANSWER_STYLE_OPTIONS = [
+  { id: 'input', label: 'Type' },
+  { id: 'choice', label: 'Choose' },
+  { id: 'self-check', label: 'Self-check' },
+  { id: 'speak', label: 'Speak' },
+];
 
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
@@ -1788,7 +1798,11 @@ export default function StudyView() {
       : null;
   const englishHintsHidden =
     (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden';
-  const kanaMatchDisplay = 'color-count';
+  const resolvedKanaAssist = resolveKanaAssist(practicePrefs);
+  const kanaMatchDisplay =
+    typedAnswerMode && !reverseDrill ? kanaMatchDisplayForPrefs(practicePrefs) : 'none';
+  const liveKanaHelpEnabled = kanaMatchDisplay !== 'none';
+  const readinessKanaAssist = liveKanaHelpEnabled ? resolvedKanaAssist : 'off';
   const typeInfo = reverseDrill ? DICTIONARY_TYPE_INFO : getTypeInfo(current.type);
   const sourceTypeId = reverseDrill ? sourceTypeForReading : promptType || DICTIONARY_TYPE_ID;
   const targetTypeId = current.type;
@@ -1897,7 +1911,7 @@ export default function StudyView() {
   const hideEnglishMeaning = englishHintsHidden && phase === 'answering';
   // Guided kana is now an in-box "reveal next" action, not a separate mode.
   const guidedKana = false;
-  const liveKana = typedAnswerMode && !reverseDrill;
+  const liveKana = typedAnswerMode && !reverseDrill && liveKanaHelpEnabled;
   const coachPreview = toHiragana(answer);
   const coachProgress = toHiraganaProgress(answer);
   const preview = coachPreview;
@@ -2304,7 +2318,7 @@ export default function StudyView() {
         correct: ok,
         responseMs,
         answerMode,
-        kanaAssist: 'live',
+        kanaAssist: readinessKanaAssist,
         reverseDrill,
       }),
       weakness: recordWeaknessAttempt(state.weakness, {
@@ -2464,7 +2478,7 @@ export default function StudyView() {
         correct: ok,
         responseMs,
         answerMode,
-        kanaAssist: 'live',
+        kanaAssist: readinessKanaAssist,
         reverseDrill,
       }),
       weakness: recordWeaknessAttempt(state.weakness, {
@@ -2565,7 +2579,7 @@ export default function StudyView() {
         correct: false,
         responseMs,
         answerMode,
-        kanaAssist: 'live',
+        kanaAssist: readinessKanaAssist,
         reverseDrill,
       }),
       weakness: recordWeaknessAttempt(state.weakness, {
@@ -2601,6 +2615,21 @@ export default function StudyView() {
 
   function focusAnswerInput() {
     setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  function setAnswerStyle(nextMode) {
+    if (nextMode === answerMode) return;
+    setPracticePrefs((prev) => ({ ...prev, answerMode: nextMode }));
+  }
+
+  function toggleKanaHelp() {
+    setPracticePrefs((prev) => ({
+      ...prev,
+      kanaAssist: resolveKanaAssist(prev) === 'off' ? 'live' : 'off',
+    }));
+    hadKanaMistakeRef.current = false;
+    wrongSnapshotRef.current = null;
+    setTypoGuard(null);
   }
 
   function submitIfCompleteTypedAnswer(nextAnswer) {
@@ -3064,6 +3093,51 @@ export default function StudyView() {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <div
+              role="group"
+              aria-label="Answer style"
+              className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-stone-200 bg-white p-1 dark:border-stone-800 dark:bg-stone-900"
+            >
+              <span className="px-1.5 text-xs font-medium text-stone-400">Answer</span>
+              {ANSWER_STYLE_OPTIONS.map((option) => {
+                const active = answerMode === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setAnswerStyle(option.id)}
+                    aria-pressed={active}
+                    className={`rounded-md px-2 py-1 text-xs font-medium transition ${
+                      active
+                        ? 'bg-stone-800 text-white dark:bg-indigo-600'
+                        : 'text-stone-500 hover:bg-stone-50 hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            {typedAnswerMode && !reverseDrill && (
+              <button
+                type="button"
+                onClick={toggleKanaHelp}
+                aria-pressed={liveKanaHelpEnabled}
+                title={liveKanaHelpEnabled ? 'Turn kana help off' : 'Turn kana help on'}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                  liveKanaHelpEnabled
+                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                    : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+                }`}
+              >
+                {liveKanaHelpEnabled ? (
+                  <IconEye className="h-3.5 w-3.5" />
+                ) : (
+                  <IconEyeOff className="h-3.5 w-3.5" />
+                )}
+                Kana help {liveKanaHelpEnabled ? 'on' : 'off'}
+              </button>
+            )}
             <div className="text-xs text-stone-400 text-right">Workout</div>
             <button
               type="button"
@@ -3737,12 +3811,12 @@ export default function StudyView() {
                           value={answer}
                           onChange={(e) =>
                             updateAnswerFromInput(e, {
-                              trackKanaMistake: !reverseDrill,
+                              trackKanaMistake: liveKanaHelpEnabled,
                             })
                           }
                           onCompositionEnd={(e) =>
                             commitAnswerComposition(e, {
-                              trackKanaMistake: !reverseDrill,
+                              trackKanaMistake: liveKanaHelpEnabled,
                             })
                           }
                           onKeyDown={(e) => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
@@ -203,6 +203,35 @@ describe('StudyView daily startup guards', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to Stats' }));
     expect(app.setTab).toHaveBeenCalledWith('stats');
+  });
+
+  it('surfaces answer style and kana help controls on the Practice card', async () => {
+    const setPracticePrefs = vi.fn();
+    mockedApp.value = makeApp({
+      setPracticePrefs,
+      studyFocus: {
+        word: STARTER_VERBS[0],
+        type: 'plain-past',
+      },
+    });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    const answerStyle = within(screen.getByRole('group', { name: 'Answer style' }));
+    expect(answerStyle.getByRole('button', { name: 'Type' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+
+    fireEvent.click(answerStyle.getByRole('button', { name: 'Choose' }));
+    const answerUpdater = setPracticePrefs.mock.calls.at(-1)[0];
+    expect(answerUpdater({ ...DEFAULT_PREFS }).answerMode).toBe('choice');
+
+    const kanaToggle = screen.getByRole('button', { name: 'Kana help on' });
+    expect(kanaToggle.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(kanaToggle);
+    const kanaUpdater = setPracticePrefs.mock.calls.at(-1)[0];
+    expect(kanaUpdater({ ...DEFAULT_PREFS }).kanaAssist).toBe('off');
   });
 
   it('offers an Overview return path from a focused (special) session', async () => {
@@ -728,6 +757,41 @@ describe('StudyView daily startup guards', () => {
     fireEvent.change(input, { target: { value: 'たべ' } });
     await waitFor(() => expect(screen.queryByText('Expected \u3079 at kana 2.')).toBeNull());
     expect(input.className).not.toContain('border-rose-400');
+  });
+
+  it('hides live kana mismatch feedback and penalty when kana help is off', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'off',
+      },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    expect(screen.getByRole('button', { name: 'Kana help off' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+
+    fireEvent.change(input, { target: { value: '\u305f\u306a\u3053' } });
+    await waitFor(() => expect(input.value).toBe('\u305f\u306a\u3053'));
+    expect(screen.queryByText('Expected \u3079 at kana 2.')).toBeNull();
+    expect(input.className).not.toContain('border-rose-400');
+
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
   });
 
   it('focuses the review advance button without asking the browser to scroll', async () => {
