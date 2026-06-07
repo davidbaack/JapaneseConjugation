@@ -24,6 +24,7 @@ export default function PracticeLabView() {
     labFocus,
     practicePrefs,
     setTab,
+    startReviewRecommendation,
     state,
     wordLists,
   } = useApp();
@@ -54,6 +55,7 @@ export default function PracticeLabView() {
 
   function sendRecommendation(recommendation = recommendations[0]) {
     if (!recommendation) return;
+    if (startReviewRecommendation?.(recommendation)) return;
     addReviewRecommendation(recommendation);
     setTab('practice');
   }

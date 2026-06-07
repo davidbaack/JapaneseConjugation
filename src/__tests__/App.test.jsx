@@ -378,6 +378,39 @@ describe('App shell', () => {
     expect(await screen.findByText('Correct conjugation')).toBeTruthy();
   }, 15000);
 
+  it('starts Learn practice tracks as focused Practice sessions', async () => {
+    render(<App />);
+    expect(await waitForPracticeCard()).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Learn', exact: true }));
+    const trackButtons = await screen.findAllByRole('button', { name: 'Practice track' });
+    fireEvent.click(trackButtons[0]);
+
+    expect(await screen.findByText('Learn focus')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Beginner track Practice/i })).toBeTruthy();
+    expect(screen.getByText(/Locked Practice set/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Exit focus' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
+  }, 15000);
+
+  it('starts Lookup Drill word as focused word Practice', async () => {
+    render(<App />);
+    expect(await waitForPracticeCard()).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));
+    fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
+      target: { value: 'tabeta' },
+    });
+    expect(await screen.findByText('1 hit')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: 'Drill word' }));
+
+    expect(await screen.findByText('Reference drill')).toBeTruthy();
+    expect(screen.getByText(/Word focus/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Back to reference' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
+  }, 15000);
+
   it('renders a Check near-miss explanation without crashing', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));

@@ -81,7 +81,7 @@ function useAppController() {
   });
   const [practicePrefs, setPracticePrefs] = useState(DEFAULT_PREFS);
   const [session, setSession] = useState(null);
-  // A { word, type } the user asked to practise from Check; consumed by Study.
+  // A focused Practice launch requested by another view; consumed by Study.
   const [studyFocus, setStudyFocus] = useState(null);
   const [labFocus, setLabFocus] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -502,6 +502,7 @@ function useAppController() {
     if (!recommendation) return false;
     const wordKeys = Array.isArray(recommendation.wordKeys) ? recommendation.wordKeys : [];
     const typeIds = Array.isArray(recommendation.typeIds) ? recommendation.typeIds : [];
+    const suggestedCount = Math.max(0, Number(recommendation.suggestedCount || 0));
     const listId = `list-review-rec-${recommendation.id}`;
     setState((prev) => {
       let next = { ...prev };
@@ -531,15 +532,27 @@ function useAppController() {
       reviewStyle: 'auto',
       minimalPairSetId: '',
       minimalPairReturn: null,
-      reviewLimit: Math.max(0, Number(recommendation.suggestedCount || 0)),
-      reviewLimitSource: recommendation.suggestedCount ? 'recommendation' : '',
+      reviewLimit: suggestedCount,
+      reviewLimitSource: suggestedCount ? 'recommendation' : '',
       practicePath: '',
       wordListIds: wordKeys.length ? [listId] : [],
     }));
     try {
       sessionStorage.removeItem('jp-study-current');
     } catch {}
-    setStudyFocus(null);
+    setStudyFocus({
+      source: recommendation.source || 'recommendation',
+      launchMode: 'recommendation',
+      recommendation: {
+        id: recommendation.id,
+        source: recommendation.source || '',
+        label: recommendation.label || 'Recommended practice',
+        detail: recommendation.detail || '',
+        suggestedCount,
+        wordCount: wordKeys.length,
+        typeCount: typeIds.length,
+      },
+    });
     setTab('practice');
     return true;
   }

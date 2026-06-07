@@ -216,7 +216,16 @@ export default function ReferenceViewSub({
     setWordLists(result.wordLists);
     setPracticePrefs(focusPracticePrefsForWord(practicePrefs, selected));
     setFavoriteMsg(`Drilling only ${selected.dict}.`);
-    if (setTab) setTab('practice');
+    if (practiceWord) {
+      practiceWord(selected, null, {
+        source: 'reference',
+        launchMode: 'word',
+        returnTo: 'reference',
+        referenceLabel: 'Word focus',
+      });
+    } else if (setTab) {
+      setTab('practice');
+    }
   }
 
   function applyReferencePracticeTarget(target, sourceWord = selected) {

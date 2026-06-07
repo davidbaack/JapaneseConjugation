@@ -80,6 +80,7 @@ export default function ToolsView() {
     setState,
     setTab,
     setWordLists,
+    startReviewRecommendation,
     state,
     activeGeminiKey: geminiKey,
     practiceWord,
@@ -114,6 +115,7 @@ export default function ToolsView() {
 
   function sendRecommendation(recommendation = recommendations[0]) {
     if (!recommendation) return;
+    if (startReviewRecommendation?.(recommendation)) return;
     addReviewRecommendation(recommendation);
     setTab('practice');
   }

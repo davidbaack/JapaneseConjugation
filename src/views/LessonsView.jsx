@@ -157,7 +157,7 @@ function lessonMatches(lesson, query) {
 }
 
 export default function LessonsView() {
-  const { addReviewRecommendation, allWords, setTab } = useApp();
+  const { addReviewRecommendation, allWords, setTab, startReviewRecommendation } = useApp();
   const [query, setQuery] = useState('');
   const [showFormationKeys, setShowFormationKeys] = useState(false);
   const [openLessonIds, setOpenLessonIds] = useState(() => new Set());
@@ -184,6 +184,7 @@ export default function LessonsView() {
   function sendLessonRecommendation(lesson, options = {}) {
     const recommendation = buildLessonReviewRecommendation(lesson, allWords, options);
     if (!recommendation) return;
+    if (startReviewRecommendation?.(recommendation)) return;
     addReviewRecommendation(recommendation);
     setTab('practice');
   }

@@ -1242,6 +1242,9 @@ export default function StudyView() {
   const [launchContext, setLaunchContext] = useState(() =>
     focus?.returnTo === 'reference' ? focus : null,
   );
+  const [recommendationFocus, setRecommendationFocus] = useState(
+    () => focus?.recommendation || null,
+  );
   const [todayMinimalPairSetIds, setTodayMinimalPairSetIds] = useState([]);
   const inputRef = useRef(null);
   const nextButtonRef = useRef(null);
@@ -1379,9 +1382,11 @@ export default function StudyView() {
   const specialLaunchActive =
     !!focus?.word ||
     !!focus?.formGroupId ||
+    !!focus?.recommendation ||
     !!focusWordLock ||
     !!sessionFilterWord ||
     !!sessionFilterFormGroupId ||
+    !!recommendationFocus ||
     !!launchContext ||
     boundedReviewLaunchActive ||
     !!activeMinimalPairSet;
@@ -1438,6 +1443,7 @@ export default function StudyView() {
     if (focus?.word && !focusSeededRef.current) {
       focusSeededRef.current = true;
       setFocusWordLock(focus.word);
+      setRecommendationFocus(null);
       // Lock the workout to this word so every follow-up card stays on it until
       // the learner exits the focus banner (rather than mixing back into the
       // general queue after the first seeded card).
@@ -1456,14 +1462,25 @@ export default function StudyView() {
       focusSeededRef.current = true;
       setSessionFilterFormGroupId(focus.formGroupId);
       setFocusWordLock(null);
+      setRecommendationFocus(null);
       onFocusConsumed?.();
+    }
+    if (focus?.recommendation && !focusSeededRef.current) {
+      focusSeededRef.current = true;
+      setRecommendationFocus(focus.recommendation);
+      setFocusWordLock(null);
+      setSessionFilterWord(null);
+      setSessionFilterFormGroupId(null);
+      setLaunchContext(null);
+      onFocusConsumed?.();
+      resetActiveAttempt();
     }
     if (!autoStartedTodayRef.current && canAutoStartDefaultWorkout) {
       launchTodayDrill();
     }
     if (current !== null) return;
     const persisted =
-      focus?.word || focus?.formGroupId
+      focus?.word || focus?.formGroupId || focus?.recommendation
         ? null
         : loadPersistedCurrent(state, practiceWords, enabledTypes, practicePrefs);
     if (persisted) {
@@ -1829,7 +1846,7 @@ export default function StudyView() {
   const reviewLimitSource = practicePrefs.reviewLimitSource || '';
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const sessionSkipped = state.session?.skipped || 0;
-  const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
+  const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit && !recommendationFocus;
   // Ready-card completion flags
   const queuedDueRuleIds = srsQueue?.dueRuleIds || [];
   const completedDueCount = srsQueue?.completedDueRuleIds?.length || 0;
@@ -1841,7 +1858,12 @@ export default function StudyView() {
   // family) locks the workout to that item. While a focus is active we never
   // surface the "Map updated" completion summary — entries route straight into
   // the focused cards and keep serving them until the learner exits the banner.
-  const focusSession = !!(focusWordLock || sessionFilterWord || sessionFilterFormGroupId);
+  const focusSession = !!(
+    focusWordLock ||
+    sessionFilterWord ||
+    sessionFilterFormGroupId ||
+    recommendationFocus
+  );
   const reviewComplete = (dueQueueDone || dailyGoalJustHit) && !focusSession;
   const plannedDefaultProgressMax = Math.max(1, Number(todayPlan?.reviewLimit || dailyGoalTarget));
   if (reviewLimit > 0 || initialDue > 0 || bonusMode || !todayDrillActive) {
@@ -2096,6 +2118,7 @@ export default function StudyView() {
     setBonusMode(false);
     setTodayMinimalPairSetIds(todayPlan.minimalPairSetIds);
     setFocusWordLock(null);
+    setRecommendationFocus(null);
     setLaunchContext(null);
     setReviewBase(state.session?.reviewed || 0);
     resetActiveAttempt();
@@ -2106,6 +2129,7 @@ export default function StudyView() {
     if (word) {
       setState((prev) => includeWordInReviewState(prev, word));
     }
+    setRecommendationFocus(null);
     setSessionFilterWord(word);
     setCurrent(null);
   }
@@ -2120,6 +2144,7 @@ export default function StudyView() {
         enabledTypes: [...new Set([...(restored.enabledTypes || []), ...group.typeIds])],
       };
     });
+    setRecommendationFocus(null);
     setSessionFilterFormGroupId(groupId);
     setCurrent(null);
   }
@@ -2853,6 +2878,7 @@ export default function StudyView() {
   function returnToReference() {
     setLaunchContext(null);
     setFocusWordLock(null);
+    setRecommendationFocus(null);
     onFocusConsumed?.();
     setTab('tools');
   }
@@ -2882,6 +2908,7 @@ export default function StudyView() {
     }
     setLaunchContext(null);
     setFocusWordLock(null);
+    setRecommendationFocus(null);
     setSessionFilterWord(null);
     setSessionFilterFormGroupId(null);
     onFocusConsumed?.();
@@ -2898,29 +2925,53 @@ export default function StudyView() {
     ? FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId)
     : null;
   const focusBannerWord = sessionFilterWord || focusWordLock;
-  const focusBanner = focusBannerGroup
+  const recommendationCountParts = recommendationFocus
+    ? [
+        recommendationFocus.suggestedCount
+          ? `${recommendationFocus.suggestedCount}-card target`
+          : '',
+        recommendationFocus.wordCount ? `${recommendationFocus.wordCount} words` : '',
+        recommendationFocus.typeCount ? `${recommendationFocus.typeCount} form types` : '',
+      ].filter(Boolean)
+    : [];
+  const recommendationSubtitle = recommendationFocus
+    ? [recommendationFocus.detail, recommendationCountParts.join(' - '), 'Locked Practice set']
+        .filter(Boolean)
+        .join(' - ')
+    : '';
+  const focusBanner = recommendationFocus
     ? {
-        kicker: 'Form family workout',
-        title: focusBannerGroup.label,
+        kicker: recommendationFocus.source === 'lesson' ? 'Learn focus' : 'Tools focus',
+        title: recommendationFocus.label || 'Recommended practice',
         reading: '',
-        subtitle: focusBannerGroup.typeIds?.length
-          ? `${focusBannerGroup.typeIds.length} forms in this family`
-          : 'Focused form practice',
+        subtitle: recommendationSubtitle,
         exitLabel: 'Exit focus',
         onExit: returnToOverview,
       }
-    : focusBannerWord
+    : focusBannerGroup
       ? {
-          kicker: referenceLaunch ? 'Reference drill' : 'Focused practice',
-          title: focusBannerWord.dict,
-          reading: focusBannerWord.reading || '',
-          subtitle: [focusBannerWord.meaning, referenceLaunch?.referenceLabel || typeInfo.label]
-            .filter(Boolean)
-            .join(' · '),
-          exitLabel: referenceLaunch ? 'Back to reference' : 'Exit focus',
-          onExit: referenceLaunch ? returnToReference : returnToOverview,
+          kicker: 'Form family workout',
+          title: focusBannerGroup.label,
+          reading: '',
+          subtitle: focusBannerGroup.typeIds?.length
+            ? `${focusBannerGroup.typeIds.length} forms in this family`
+            : 'Focused form practice',
+          exitLabel: 'Exit focus',
+          onExit: returnToOverview,
         }
-      : null;
+      : focusBannerWord
+        ? {
+            kicker: referenceLaunch ? 'Reference drill' : 'Focused practice',
+            title: focusBannerWord.dict,
+            lang: 'ja',
+            reading: focusBannerWord.reading || '',
+            subtitle: [focusBannerWord.meaning, referenceLaunch?.referenceLabel || typeInfo.label]
+              .filter(Boolean)
+              .join(' · '),
+            exitLabel: referenceLaunch ? 'Back to reference' : 'Exit focus',
+            onExit: referenceLaunch ? returnToReference : returnToOverview,
+          }
+        : null;
 
   return (
     <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
@@ -2941,7 +2992,7 @@ export default function StudyView() {
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <h2
-                    lang="ja"
+                    lang={focusBanner.lang || undefined}
                     className="text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-50"
                   >
                     {focusBanner.title}
