@@ -169,10 +169,16 @@ To self-host AI coaching:
 
 1. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for the app build.
 2. Add `GEMINI_API_KEY` as a Supabase project secret.
-3. Deploy `supabase/functions/gemini-proxy`.
+3. Set `ALLOWED_ORIGIN` to the exact production app origin, such as
+   `https://example.com`.
 4. Keep `verify_jwt = false` for the proxy in `supabase/config.toml` if
    anonymous AI coaching should work.
-5. Set `ALLOWED_ORIGIN` to the production app origin.
+5. Deploy `supabase/functions/gemini-proxy`.
+
+The proxy fails closed when `ALLOWED_ORIGIN` is missing. To intentionally allow
+every browser origin for a public anonymous AI deployment, set
+`ALLOWED_ORIGIN=*` and `GEMINI_ALLOW_PUBLIC_ORIGIN=true`; keep rate limits and
+provider spend alerts in place because origin checks are not authentication.
 
 ## Cloud Sync
 

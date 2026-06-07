@@ -1,7 +1,8 @@
 // Public Gemini proxy for Katachiya. The Gemini key stays in Supabase project
 // secrets; browser clients only call this Edge Function.
 
-const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGIN') ?? '*')
+const PUBLIC_ORIGIN_OPT_IN = Deno.env.get('GEMINI_ALLOW_PUBLIC_ORIGIN') === 'true';
+const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGIN') ?? '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -18,30 +19,44 @@ type Bucket = {
 
 const buckets = new Map<string, Bucket>();
 
+const MISSING_ALLOWED_ORIGIN_ERROR =
+  'Configuration Error: ALLOWED_ORIGIN is not set on the Supabase project';
+const WILDCARD_ALLOWED_ORIGIN_ERROR =
+  'Configuration Error: ALLOWED_ORIGIN=* requires GEMINI_ALLOW_PUBLIC_ORIGIN=true';
+
 function readPositiveNumber(name: string, fallback: number) {
   const value = Number(Deno.env.get(name) ?? '');
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 function resolveAllowedOrigin(origin: string | null) {
-  if (ALLOWED_ORIGINS.includes('*')) return '*';
+  if (PUBLIC_ORIGIN_OPT_IN && ALLOWED_ORIGINS.includes('*')) return '*';
   if (origin && ALLOWED_ORIGINS.includes(origin)) return origin;
-  return ALLOWED_ORIGINS[0] ?? '';
+  return '';
 }
 
 function corsHeaders(req: Request) {
-  return {
-    'Access-Control-Allow-Origin': resolveAllowedOrigin(req.headers.get('Origin')),
+  const allowedOrigin = resolveAllowedOrigin(req.headers.get('Origin'));
+  const headers: Record<string, string> = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
+  if (allowedOrigin) headers['Access-Control-Allow-Origin'] = allowedOrigin;
+  return headers;
+}
+
+function originConfigurationError() {
+  if (ALLOWED_ORIGINS.length === 0) return MISSING_ALLOWED_ORIGIN_ERROR;
+  if (!PUBLIC_ORIGIN_OPT_IN && ALLOWED_ORIGINS.includes('*')) return WILDCARD_ALLOWED_ORIGIN_ERROR;
+  return '';
 }
 
 function isOriginAllowed(req: Request) {
+  if (originConfigurationError()) return false;
   const origin = req.headers.get('Origin');
-  return !origin || ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin);
+  return !!origin && resolveAllowedOrigin(origin) !== '';
 }
 
 function jsonResponse(
@@ -173,6 +188,11 @@ async function readGeminiPayload(req: Request): Promise<GeminiPayloadResult> {
 }
 
 Deno.serve(async (req) => {
+  const originError = originConfigurationError();
+  if (originError) {
+    return jsonResponse(req, { error: originError }, 500);
+  }
+
   if (req.method === 'OPTIONS') {
     return new Response(isOriginAllowed(req) ? 'ok' : 'forbidden', {
       status: isOriginAllowed(req) ? 200 : 403,
