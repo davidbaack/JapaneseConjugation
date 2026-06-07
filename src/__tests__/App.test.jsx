@@ -119,6 +119,9 @@ describe('App shell', () => {
 
     expect(await waitForPracticeCard()).toBeTruthy();
     fireEvent.click(screen.getByText('Te/Ta Sound Changes'));
+    expect(
+      screen.getByText('Te/Ta Sound Changes').closest('button')?.getAttribute('aria-expanded'),
+    ).toBe('true');
 
     expect(screen.getByText('2/2 saved')).toBeTruthy();
     expect(
@@ -127,6 +130,13 @@ describe('App shell', () => {
     expect(screen.getByText('Recent weak spots')).toBeTruthy();
     expect(screen.getByText('Te-form - Godan ku sound changes')).toBeTruthy();
     expect(screen.getByText('0/2')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disable all Te/Ta Sound Changes forms' }));
+    await waitFor(() => expect(screen.getByText('0/2 saved')).toBeTruthy());
+    expect(
+      screen.getByText('Te/Ta Sound Changes').closest('button')?.getAttribute('aria-expanded'),
+    ).toBe('true');
+    expect(screen.getByText('Recent weak spots')).toBeTruthy();
   });
 
   it('does not auto-start a daily drill after today is complete while signed out', async () => {

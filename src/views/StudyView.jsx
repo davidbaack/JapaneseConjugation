@@ -113,6 +113,16 @@ const ANSWER_STYLE_OPTIONS = [
   { id: 'speak', label: 'Speak' },
 ];
 
+function focusWithoutScroll(element) {
+  if (!element || typeof window === 'undefined') return;
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+  element.focus({ preventScroll: true });
+  if (window.scrollX !== scrollX || window.scrollY !== scrollY) {
+    window.scrollTo(scrollX, scrollY);
+  }
+}
+
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
   const limit = Number(prefs.reviewLimit || 0);
@@ -567,6 +577,8 @@ const WEAKNESS_ROW_TONE = {
 function PracticeScopeSidebar({
   state,
   weaknessFamilies = [],
+  openFamilyIds,
+  onToggleFamilyOpen,
   onToggleFamily,
   onToggleType,
   className = '',
@@ -602,105 +614,113 @@ function PracticeScopeSidebar({
             const enabledInFamily = family.typeIds.filter((typeId) => enabled.has(typeId));
             const allEnabled = enabledInFamily.length === family.typeIds.length;
             const weaknessRows = weaknessByFamily.get(family.id)?.rows || [];
+            const open = openFamilyIds.has(family.id);
+            const contentId = `practice-map-family-${family.id}`;
             return (
-              <details
+              <div
                 key={family.id}
                 className="rounded-xl border border-stone-200 bg-stone-50/80 dark:border-stone-800 dark:bg-stone-950/70"
               >
-                <summary className="cursor-pointer list-none px-3 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-                        {family.label}
-                      </div>
-                      <div className="mt-0.5 text-xs text-stone-500">
-                        {enabledInFamily.length}/{family.typeIds.length} saved
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        onToggleFamily(family);
-                      }}
-                      className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-                        allEnabled
-                          ? 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300'
-                          : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400'
-                      }`}
-                      aria-label={`${allEnabled ? 'Disable' : 'Enable'} all ${family.label} forms`}
-                    >
-                      {allEnabled ? 'Disable all' : 'Enable all'}
-                    </button>
-                  </div>
-                </summary>
-                <div className="border-t border-stone-200 px-3 py-3 dark:border-stone-800">
-                  {weaknessRows.length > 0 && (
-                    <div className="mb-3 space-y-1.5">
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
-                        Recent weak spots
-                      </div>
-                      {weaknessRows.slice(0, 4).map((row) => (
-                        <div
-                          key={row.key}
-                          className="rounded-lg border border-stone-200 bg-white px-2.5 py-2 dark:border-stone-800 dark:bg-stone-900"
-                        >
-                          <div className="flex items-center justify-between gap-2 text-xs">
-                            <span className="truncate font-medium text-stone-700 dark:text-stone-200">
-                              {row.typeLabel} - {row.subcategoryLabel}
-                            </span>
-                            <span className="tabular-nums text-stone-500">
-                              {row.correct}/{row.attempted}
-                            </span>
-                          </div>
-                          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
-                            <span
-                              className={`block h-full ${WEAKNESS_ROW_TONE[row.status] || 'bg-stone-300'}`}
-                              style={{ width: `${Math.max(8, row.accuracy)}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="grid gap-1.5">
-                    {family.typeIds.map((typeId) => {
-                      const type = ALL_CARD_TYPES.find((item) => item.id === typeId);
-                      if (!type) return null;
-                      const checked = enabled.has(typeId);
-                      return (
-                        <button
-                          key={typeId}
-                          type="button"
-                          aria-pressed={checked}
-                          onClick={() => onToggleType(typeId)}
-                          className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
-                            checked
-                              ? 'border-indigo-200 bg-indigo-50 text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100'
-                              : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800'
-                          }`}
-                        >
-                          <span
-                            className={`mt-0.5 h-3.5 w-3.5 rounded border ${
-                              checked
-                                ? 'border-indigo-600 bg-indigo-600 dark:border-indigo-400 dark:bg-indigo-400'
-                                : 'border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-950'
-                            }`}
-                          />
-                          <span className="min-w-0">
-                            <span className="block text-xs font-semibold">{type.label}</span>
-                            {type.sub && (
-                              <span className="block truncate text-[11px] opacity-70">
-                                {type.sub}
-                              </span>
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div className="flex items-start justify-between gap-3 px-3 py-3">
+                  <button
+                    type="button"
+                    onClick={() => onToggleFamilyOpen(family.id)}
+                    aria-expanded={open}
+                    aria-controls={contentId}
+                    className="min-w-0 flex-1 cursor-pointer rounded-lg bg-transparent p-0 text-left"
+                  >
+                    <span className="block text-sm font-semibold text-stone-900 dark:text-stone-100">
+                      {family.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-stone-500">
+                      {enabledInFamily.length}/{family.typeIds.length} saved
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onToggleFamily(family)}
+                    className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                      allEnabled
+                        ? 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400'
+                    }`}
+                    aria-label={`${allEnabled ? 'Disable' : 'Enable'} all ${family.label} forms`}
+                  >
+                    {allEnabled ? 'Disable all' : 'Enable all'}
+                  </button>
                 </div>
-              </details>
+                {open && (
+                  <div
+                    id={contentId}
+                    className="border-t border-stone-200 px-3 py-3 dark:border-stone-800"
+                  >
+                    {weaknessRows.length > 0 && (
+                      <div className="mb-3 space-y-1.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+                          Recent weak spots
+                        </div>
+                        {weaknessRows.slice(0, 4).map((row) => (
+                          <div
+                            key={row.key}
+                            className="rounded-lg border border-stone-200 bg-white px-2.5 py-2 dark:border-stone-800 dark:bg-stone-900"
+                          >
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <span className="truncate font-medium text-stone-700 dark:text-stone-200">
+                                {row.typeLabel} - {row.subcategoryLabel}
+                              </span>
+                              <span className="tabular-nums text-stone-500">
+                                {row.correct}/{row.attempted}
+                              </span>
+                            </div>
+                            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
+                              <span
+                                className={`block h-full ${WEAKNESS_ROW_TONE[row.status] || 'bg-stone-300'}`}
+                                style={{ width: `${Math.max(8, row.accuracy)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="grid gap-1.5">
+                      {family.typeIds.map((typeId) => {
+                        const type = ALL_CARD_TYPES.find((item) => item.id === typeId);
+                        if (!type) return null;
+                        const checked = enabled.has(typeId);
+                        return (
+                          <button
+                            key={typeId}
+                            type="button"
+                            aria-pressed={checked}
+                            onClick={() => onToggleType(typeId)}
+                            className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
+                              checked
+                                ? 'border-indigo-200 bg-indigo-50 text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100'
+                                : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800'
+                            }`}
+                          >
+                            <span
+                              className={`mt-0.5 h-3.5 w-3.5 rounded border ${
+                                checked
+                                  ? 'border-indigo-600 bg-indigo-600 dark:border-indigo-400 dark:bg-indigo-400'
+                                  : 'border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-950'
+                              }`}
+                            />
+                            <span className="min-w-0">
+                              <span className="block text-xs font-semibold">{type.label}</span>
+                              {type.sub && (
+                                <span className="block truncate text-[11px] opacity-70">
+                                  {type.sub}
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -1255,6 +1275,7 @@ export default function StudyView() {
   const [recommendationFocus, setRecommendationFocus] = useState(
     () => focus?.recommendation || null,
   );
+  const [openPracticeMapFamilyIds, setOpenPracticeMapFamilyIds] = useState(() => new Set());
   const [todayMinimalPairSetIds, setTodayMinimalPairSetIds] = useState([]);
   const inputRef = useRef(null);
   const nextButtonRef = useRef(null);
@@ -1573,7 +1594,7 @@ export default function StudyView() {
 
   useEffect(() => {
     if (phase === 'answering' && inputRef.current) {
-      inputRef.current.focus();
+      focusWithoutScroll(inputRef.current);
     }
   }, [current, phase]);
 
@@ -1595,12 +1616,7 @@ export default function StudyView() {
     if (phase !== 'reviewing') return;
     const button = nextButtonRef.current;
     if (!button || typeof window === 'undefined') return;
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-    button.focus({ preventScroll: true });
-    if (window.scrollX !== scrollX || window.scrollY !== scrollY) {
-      window.scrollTo(scrollX, scrollY);
-    }
+    focusWithoutScroll(button);
   }, [current?.id, phase]);
 
   // Handle TTS speech synthesis inside StudyView
@@ -2194,6 +2210,15 @@ export default function StudyView() {
     setCurrent(null);
   }
 
+  function togglePracticeMapFamilyOpen(familyId) {
+    setOpenPracticeMapFamilyIds((current) => {
+      const next = new Set(current);
+      if (next.has(familyId)) next.delete(familyId);
+      else next.add(familyId);
+      return next;
+    });
+  }
+
   // Deterministic, offline step coach — no API key required. Irregular forms
   // are masked on the first click; a second click reveals the spelled-out steps.
   function showStepHint() {
@@ -2614,7 +2639,7 @@ export default function StudyView() {
   }
 
   function focusAnswerInput() {
-    setTimeout(() => inputRef.current?.focus(), 0);
+    setTimeout(() => focusWithoutScroll(inputRef.current), 0);
   }
 
   function setAnswerStyle(nextMode) {
@@ -3008,6 +3033,8 @@ export default function StudyView() {
         className="order-2 lg:order-1"
         state={state}
         weaknessFamilies={weaknessFamilies}
+        openFamilyIds={openPracticeMapFamilyIds}
+        onToggleFamilyOpen={togglePracticeMapFamilyOpen}
         onToggleFamily={togglePracticeFamily}
         onToggleType={togglePracticeType}
       />
