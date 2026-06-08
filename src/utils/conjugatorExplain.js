@@ -269,6 +269,24 @@ function longestCommonPrefix(a = '', b = '') {
   return a.slice(0, index);
 }
 
+function categoryExampleForm(item, type) {
+  try {
+    return surfaceFormFor(item, type) || conjugateItem(item, type) || '';
+  } catch {
+    return '';
+  }
+}
+
+function slashList(values) {
+  return values.filter(Boolean).join(' / ');
+}
+
+function dictStemForFinal(item, ending) {
+  const dict = item?.dict || item?.reading || '';
+  if (ending && dict.endsWith(ending)) return dict.slice(0, -ending.length);
+  return fallbackStem(item, ending);
+}
+
 function learnerCategoryInfo(item) {
   const group = item?.group || '';
   const dict = item?.dict || item?.reading || '';
@@ -276,33 +294,45 @@ function learnerCategoryInfo(item) {
   const ending = reading.slice(-1);
 
   if (group === 'godan') {
+    const rowExamples = slashList([
+      categoryExampleForm(item, 'plain-negative'),
+      categoryExampleForm(item, 'polite-present'),
+    ]);
+    const soundChangeExamples = slashList([
+      categoryExampleForm(item, 'te-form'),
+      categoryExampleForm(item, 'plain-past'),
+    ]);
+    const rowExampleText = rowExamples || 'row-shift forms';
+    const soundChangeExampleText = soundChangeExamples || 'te/ta forms';
+    const finalKana = ending ? `final dictionary kana ${ending}` : 'final dictionary kana';
     return {
       label: 'godan / u-verb',
       why:
         ending === 'る'
-          ? `${dict} ends in る, but this word is still learned as godan / u-verb: the final る changes instead of simply dropping.`
-          : `${dict} is godan / u-verb because its final dictionary kana ${ending} is the moving part; it changes rows or sound-change clusters by form.`,
+          ? `${dict} ends in る, but it is still godan / u-verb: る changes to ら / り / れ / ろ or って / った instead of simply dropping. For this word, that gives forms like ${rowExampleText} and ${soundChangeExampleText}; it does not use the ichidan drop-る pattern.`
+          : `${dict} is godan / u-verb: the ${finalKana} changes instead of dropping. Use its row for forms like ${rowExampleText}, or its te/ta sound-change group for ${soundChangeExampleText}.`,
     };
   }
 
   if (group === 'ichidan') {
+    const stem = dictStemForFinal(item, 'る');
     return {
       label: 'ichidan / ru-verb',
-      why: `${dict} is ichidan / ru-verb: the final る drops, then the requested ending attaches to the stem.`,
+      why: `${dict} is ichidan / ru-verb: drop the final る, then attach the requested ending to ${stem || 'the stem'}. The stem stays stable across forms.`,
     };
   }
 
   if (group === 'suru') {
     return {
       label: 'irregular',
-      why: `${dict} belongs in the irregular bucket because the する core changes as し, せ, さ, or でき instead of following godan or ichidan rules.`,
+      why: `${dict} belongs in the irregular bucket: keep the part before する, then change the する core to し, せ, さ, or でき depending on the form.`,
     };
   }
 
   if (group === 'kuru') {
     return {
       label: 'irregular',
-      why: `${dict} belongs in the irregular bucket because 来る changes its root sound by form: き, こ, and く all appear.`,
+      why: `${dict} belongs in the irregular bucket: 来る changes its root sound by form, with き, こ, and く all appearing.`,
     };
   }
 
@@ -312,14 +342,14 @@ function learnerCategoryInfo(item) {
       label: irregular ? 'irregular' : 'い-adjective',
       why: irregular
         ? `${dict} belongs in the irregular bucket because most forms use the よい stem, not the visible いい form.`
-        : `${dict} is an い-adjective: drop or transform final い, then attach the adjective ending.`,
+        : `${dict} is an い-adjective: the final い changes or drops, then the adjective ending attaches.`,
     };
   }
 
   if (group === 'na-adjective') {
     return {
       label: 'な-adjective',
-      why: `${dict} is a な-adjective: keep the base, then attach the copula, connector, or な ending.`,
+      why: `${dict} is a な-adjective: the base ${dict} stays; the connector after it changes, like だ / です / ではない / な.`,
     };
   }
 
