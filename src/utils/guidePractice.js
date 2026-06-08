@@ -155,10 +155,6 @@ export function buildGuideCard(words, state = defaultState(), prefs = DEFAULT_PR
     expectedAnswerVariants: [expectedAnswer, conjugateItem(row.word, row.typeId)],
     targetLabel: getTypeInfo(row.typeId).label || row.typeId,
     sourceLabel: getTypeInfo(sourceTypeId).label || sourceTypeId,
-    weaknessLabel:
-      row.score > 0
-        ? weakLane?.label || `${getTypeInfo(row.typeId).label || row.typeId} - ${row.word.group}`
-        : '',
   };
 }
 

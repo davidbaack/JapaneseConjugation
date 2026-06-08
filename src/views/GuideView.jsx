@@ -222,11 +222,6 @@ export default function GuideView() {
             <span className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 font-semibold text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-200">
               {card.targetLabel}
             </span>
-            {card.weaknessLabel && (
-              <span className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 font-semibold text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-200">
-                {card.weaknessLabel}
-              </span>
-            )}
           </div>
         </div>
       </section>
