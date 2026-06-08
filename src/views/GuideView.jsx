@@ -258,13 +258,13 @@ export default function GuideView() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <label className="min-w-0 flex-1">
                 <span className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-                  1. Find the base
+                  1. Find plain form
                 </span>
                 <input
                   value={answers.base}
                   onChange={(e) => setAnswers((prev) => ({ ...prev, base: e.target.value }))}
                   disabled={!!result}
-                  aria-label="Base form"
+                  aria-label="Plain form"
                   placeholder="Dictionary/plain form"
                   className="mt-2 w-full rounded-xl border border-stone-250 bg-white px-3 py-2 text-lg text-stone-950 outline-none transition focus:border-indigo-400 dark:border-stone-750 dark:bg-stone-950 dark:text-stone-50"
                 />

@@ -168,7 +168,7 @@ export function gradeGuideSteps(card, answers = {}, assistedSteps = {}) {
   const steps = {
     base: {
       id: 'base',
-      label: 'Find the base',
+      label: 'Find plain form',
       correct: baseOk,
       expected: card.expectedBase,
       submitted: answers.base || '',
