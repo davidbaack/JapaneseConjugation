@@ -74,26 +74,52 @@ async function fetchExistingPairs() {
 
 const PROMPT = `# Tailored sentence generation
 
-Each line of a batch .jsonl file is one request:
+You are writing real example sentences for Japanese learners. Quality is the
+whole point: each one is read by a human studying that exact word and form.
+
+## What you get
+Each line of a batch .jsonl file is ONE request:
   { word_key, dict, reading, group, jlpt, type, type_label, transitive,
     expected_surface, expected_kana }
 
-For each line, write ONE natural, level-appropriate Japanese sentence that uses
-the verb/adjective in the requested form, then return ONE JSON line:
+## What you return
+For each request line, return exactly ONE JSON line:
+  { "word_key": <copied>, "type": <copied>,
+    "ja": "<one natural Japanese sentence containing expected_surface verbatim>",
+    "en": "<the real English translation of that exact sentence>" }
 
-  { "word_key": <same>, "type": <same>,
-    "ja": "<sentence containing expected_surface verbatim>",
-    "en": "<natural English translation>" }
+Output JSONL only — one object per request line, same order, nothing else.
 
-Rules:
-- "ja" MUST contain expected_surface exactly once, written verbatim.
-- Keep it simple and beginner-friendly; output JSONL only, one object per line.
+## Hard requirements (the importer auto-rejects violations)
+1. "ja" contains "expected_surface" exactly once, written verbatim, used in a
+   grammatically correct, meaningful sentence at level "jlpt".
+2. "en" is a faithful English translation of THAT sentence. It must read like a
+   normal English sentence — no Japanese characters, and it must NOT mention the
+   grammar form, the word id, or the task.
+3. Every sentence is genuinely different and context-appropriate. Do NOT reuse a
+   fill-in-the-blank template across words. Vary subjects, objects, time words,
+   and situations so the corpus reads naturally.
 
-Per-token furigana is derived automatically by the importer (kuromoji), so you
-do NOT need to provide readings. (You may optionally include a "segments" array
-that tiles the sentence with {"t","r"} tokens and a single {"w":true} sentinel
-for the conjugated word; it is used only as a fallback if automatic derivation
-fails.)
+## Do NOT
+- Do NOT write the output with a script, a fixed template, or a formula.
+- Do NOT emit placeholder English such as
+  "A short practice sentence using X in the Plain Negative form." (auto-rejected)
+- Do NOT pad "ja" so the form technically appears; the sentence must make sense.
+
+## Examples (word 買う / type plain-negative, expected_surface 買わない)
+GOOD: {"word_key":"godan:買う","type":"plain-negative","ja":"お金がないので、今日は何も買わない。","en":"I have no money, so I won't buy anything today."}
+BAD:  {"word_key":"godan:買う","type":"plain-negative","ja":"今日、私も買わない。","en":"A short practice sentence using 買う in the Plain Negative form."}
+
+## Enforcement
+The importer rejects to *.rejects.jsonl any line whose "en" contains Japanese,
+is boilerplate, or names the form; whose sentence doesn't contain the exact
+conjugated form; or whose sentence template is reused more than ~100 times in a
+run. Rejected lines must be regenerated, so write them properly the first time.
+
+Furigana is derived automatically (kuromoji) — you do NOT provide readings. You
+may optionally include a "segments" array (tiles the sentence with {"t","r"}
+tokens and a single {"w":true} sentinel for the conjugated word); it is only a
+fallback if automatic derivation fails.
 `;
 
 async function main() {

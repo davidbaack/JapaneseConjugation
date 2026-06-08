@@ -53,6 +53,22 @@ git commit -m "Regenerate verb lexicon with transitivity"
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | — | Required to import; when set, `sentences:batches` skips pairs already in the DB (resumable). |
 | `SENTENCE_DRY_RUN` | unset | `1` validates without upserting. |
 | `SENTENCE_NO_KUROMOJI` | unset | `1` uses model-provided segments instead of kuromoji. |
+| `SENTENCE_TEMPLATE_CAP` | `100` | Max times one sentence template may be reused across a single import invocation (`0` disables). |
+
+## Quality gates (anti-stub)
+
+The importer rejects, to `*.rejects.jsonl`, any line that isn't a genuine
+tailored sentence:
+
+- `en` that contains Japanese, has no letters, is boilerplate
+  (e.g. "A short practice sentence using … form."), or names the grammar form.
+- The conjugated `expected_surface` not appearing verbatim in `ja`.
+- Furigana segments that don't tile the sentence, or non-kana readings.
+- A sentence template reused more than `SENTENCE_TEMPLATE_CAP` times.
+
+The template cap is enforced across everything in **one** `sentences:import`
+invocation, so pass all outputs at once (e.g. `out-*.jsonl`) for it to apply
+globally rather than per file.
 
 `sentences:batches` now defaults to **every form for every word at every JLPT
 level** — a plain run covers everything the engine can produce. Narrow it with
@@ -78,6 +94,10 @@ set, it will work through the entire lexicon, resuming where it left off.
 >    - `ja` is one short, natural, beginner-appropriate sentence that uses the
 >      word in the requested form and contains `expected_surface` **verbatim,
 >      exactly once**.
+>    - `en` is a real English translation of that sentence — NOT a description of
+>      the task, no Japanese, and never names the grammar form.
+>    - Write a different, context-appropriate sentence per word; do not reuse one
+>      template for everything (the importer caps template reuse).
 >    - Use the `transitive` hint and `type_label` to phrase the form correctly.
 >    - Do not include readings; furigana is derived automatically. JSONL only.
 > 4. Validate: `SENTENCE_DRY_RUN=1 node scripts/import-sentence-library.js tmp/sentence-batches/out-XXXX.jsonl`

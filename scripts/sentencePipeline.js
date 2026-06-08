@@ -115,6 +115,61 @@ function fail(reason) {
   return { ok: false, reason };
 }
 
+// Any kana or CJK ideograph — a real English translation should contain none.
+const JP_RE = /[぀-ヿ一-鿿豈-﫿]/;
+
+/**
+ * Return a reason string when `en` doesn't look like a genuine English
+ * translation, or '' when it passes. Blocks stub output such as
+ * "A short practice sentence using 買う in the Plain Negative form."
+ * @param {string} en
+ * @param {string} type
+ * @returns {string}
+ */
+export function englishQualityIssue(en, type) {
+  const text = String(en || '').trim();
+  if (!text) return 'no-en';
+  if (JP_RE.test(text)) return 'en-not-english';
+  if (!/[A-Za-z]/.test(text)) return 'en-not-english';
+  if (/practice sentence/i.test(text) || /\bin the\b[^.]*\bform\b/i.test(text)) {
+    return 'en-boilerplate';
+  }
+  const label = String(getTypeInfo(type)?.label || '').trim();
+  if (label && text.toLowerCase().includes(label.toLowerCase())) return 'en-echoes-form';
+  const words = text.split(/\s+/).filter(Boolean);
+  if (text.length < 4 || (words.length < 2 && text.length < 8)) return 'en-too-short';
+  return '';
+}
+
+/**
+ * Cap how many times any single `ja_template` (word-independent context) may
+ * appear, so a run can't shortcut by reusing a handful of scaffolds for every
+ * word. Counts are cumulative with `existingCounts` (e.g. rows already in the
+ * DB). Deterministic by input order.
+ *
+ * @param {Array<{ja_template:string}>} rows
+ * @param {number} cap  Max appearances per template (<=0 disables the check).
+ * @param {Record<string, number>} [existingCounts]
+ * @returns {{ kept: Array, rejected: Array }}
+ */
+export function capTemplates(rows, cap, existingCounts = {}) {
+  if (!cap || cap <= 0) return { kept: rows, rejected: [] };
+  const counts = { ...existingCounts };
+  const kept = [];
+  const rejected = [];
+  for (const row of rows) {
+    const key = row.ja_template;
+    const used = counts[key] || 0;
+    if (used >= cap) {
+      rejected.push(row);
+    } else {
+      counts[key] = used + 1;
+      kept.push(row);
+    }
+  }
+  return { kept, rejected };
+}
+
 /**
  * Validate a Codex-generated entry and build the DB row.
  *
@@ -140,6 +195,8 @@ export function validateGenerated(word, type, out) {
   if (!ja) return fail('no-ja');
   const en = String(out.en ?? '').trim();
   if (!en) return fail('no-en');
+  const enIssue = englishQualityIssue(en, type);
+  if (enIssue) return fail(enIssue);
 
   // Reconstruct the filled sentence from the segments and require an exact match
   // with the model's sentence. This proves the segments tile `ja` and that the

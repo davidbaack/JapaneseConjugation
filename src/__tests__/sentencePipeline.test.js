@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildPair,
   buildSegments,
+  capTemplates,
+  englishQualityIssue,
   isKana,
   validateGenerated,
 } from '../../scripts/sentencePipeline.js';
@@ -148,5 +150,81 @@ describe('buildSegments', () => {
   it('fails when the form is not aligned to token boundaries', () => {
     expect(buildSegments(TOKENS, '買う').ok).toBe(false);
     expect(buildSegments([], '買う').reason).toBe('no-tokens');
+  });
+});
+
+describe('englishQualityIssue', () => {
+  it('accepts a genuine translation', () => {
+    expect(englishQualityIssue("On rainy days, I usually don't buy.", 'plain-negative')).toBe('');
+    expect(englishQualityIssue('I ate a meal today.', 'plain-past')).toBe('');
+  });
+
+  it('rejects the stub boilerplate pattern', () => {
+    expect(
+      englishQualityIssue(
+        'A short practice sentence using 買う in the Plain Negative form.',
+        'plain-negative',
+      ),
+    ).not.toBe('');
+  });
+
+  it('rejects English that contains Japanese', () => {
+    expect(englishQualityIssue('I will 買う it.', 'plain-past')).toBe('en-not-english');
+  });
+
+  it('rejects English that names the grammar form', () => {
+    expect(englishQualityIssue('This is the potential form of the verb.', 'potential')).toBe(
+      'en-echoes-form',
+    );
+  });
+
+  it('rejects empty or letterless text', () => {
+    expect(englishQualityIssue('', 'plain-past')).toBe('no-en');
+    expect(englishQualityIssue('!!! ???', 'plain-past')).toBe('en-not-english');
+  });
+
+  it('is enforced by validateGenerated', () => {
+    const KAU = { dict: '買う', reading: 'かう', meaning: 'to buy', group: 'godan' };
+    const { segments } = buildSegments(
+      [
+        { surface: '私', reading: 'わたし' },
+        { surface: 'は', reading: '' },
+        { surface: '買わない', reading: '' },
+        { surface: '。', reading: '' },
+      ],
+      '買わない',
+    );
+    const result = validateGenerated(KAU, 'plain-negative', {
+      ja: '私は買わない。',
+      en: 'A short practice sentence using 買う in the Plain Negative form.',
+      segments,
+    });
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe('capTemplates', () => {
+  const rows = [
+    { ja_template: 'A{w}', word_key: 'w1' },
+    { ja_template: 'A{w}', word_key: 'w2' },
+    { ja_template: 'A{w}', word_key: 'w3' },
+    { ja_template: 'B{w}', word_key: 'w4' },
+  ];
+
+  it('rejects rows beyond the per-template cap', () => {
+    const { kept, rejected } = capTemplates(rows, 2);
+    expect(kept).toHaveLength(3); // 2x A + 1x B
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].word_key).toBe('w3');
+  });
+
+  it('counts existing DB usage toward the cap', () => {
+    const { kept, rejected } = capTemplates(rows, 2, { 'A{w}': 2 });
+    expect(kept.map((r) => r.ja_template)).toEqual(['B{w}']);
+    expect(rejected).toHaveLength(3);
+  });
+
+  it('is a no-op when disabled', () => {
+    expect(capTemplates(rows, 0).rejected).toHaveLength(0);
   });
 });
