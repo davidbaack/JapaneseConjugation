@@ -9,6 +9,12 @@ function loadSyncMigration() {
   return readFileSync(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8');
 }
 
+function loadSentencesMigration() {
+  const name = readdirSync(migrationsDir).find((entry) => entry.endsWith('_create_sentences.sql'));
+  if (!name) throw new Error('Missing Supabase migration for public.sentences');
+  return readFileSync(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8');
+}
+
 function compactSql(sql) {
   return sql.replace(/\s+/g, ' ').trim().toLowerCase();
 }
@@ -40,5 +46,24 @@ describe('Supabase cloud sync schema', () => {
 
     expect(sql.match(/using \(id = auth\.uid\(\)::text\)/g) || []).toHaveLength(3);
     expect(sql.match(/with check \(id = auth\.uid\(\)::text\)/g) || []).toHaveLength(2);
+  });
+});
+
+describe('Supabase sentence library schema', () => {
+  const migrationSql = loadSentencesMigration();
+  const sql = compactSql(migrationSql);
+
+  it('creates the shared sentence table used by the generated library importer', () => {
+    expect(sql).toContain('create table if not exists public.sentences');
+    expect(sql).toContain('primary key (word_key, type)');
+    expect(sql).toContain('segments jsonb not null');
+  });
+
+  it('allows public reads and service-role upserts for the offline importer', () => {
+    expect(sql).toContain('alter table public.sentences enable row level security');
+    expect(sql).toContain('grant select on table public.sentences to anon, authenticated');
+    expect(sql).toContain('grant usage on schema public to service_role');
+    expect(sql).toContain('grant select, insert, update on table public.sentences to service_role');
+    expect(sql).toContain('for select to anon, authenticated');
   });
 });

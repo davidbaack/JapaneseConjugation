@@ -30,6 +30,8 @@ alter table public.sentences enable row level security;
 
 grant usage on schema public to anon, authenticated;
 grant select on table public.sentences to anon, authenticated;
+grant usage on schema public to service_role;
+grant select, insert, update on table public.sentences to service_role;
 
 drop policy if exists "Anyone can read sentences" on public.sentences;
 create policy "Anyone can read sentences"
