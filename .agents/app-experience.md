@@ -42,7 +42,7 @@ confirms the new direction, update this document in the same change.
   counts, and an overall skill visualization. Expanded families show exact-form
   toggles plus subgroup weakness rows once there is data.
 - Form scope persists through `state.enabledTypes`. The default and reset scope
-  is Core plus Everyday.
+  is Everyday.
 - The active card may remove the current word from automatic Practice with an
   undo affordance. It must not remove a whole form family from the active card.
 - Sentence mode remains an active-card presentation toggle. It wraps a normal

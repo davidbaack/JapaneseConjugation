@@ -41,7 +41,6 @@ export const DAY = 86400000;
 export const SRS_SCHEMA_VERSION = 3;
 export const DICTIONARY_TYPE_ID = 'dictionary';
 const REVIEW_ROTATION_SIZE = 8;
-const RECENT_REVIEW_COOLDOWN_MS = 5 * 60 * 1000;
 const BEGINNER_LADDER_CARD_COUNT = 5;
 const BEGINNER_LADDER_STAGES = [
   { group: 'ichidan', type: 'plain-past' },
@@ -1347,11 +1346,6 @@ function lastSeenForCandidate(state, entry) {
   return Number(state.cards?.[entry.id]?.lastSeen || 0);
 }
 
-function candidateWasSeenRecently(state, entry, now) {
-  const lastSeen = lastSeenForCandidate(state, entry);
-  return lastSeen > 0 && now - lastSeen < RECENT_REVIEW_COOLDOWN_MS;
-}
-
 function rotateReviewCandidates(candidates, state, options = {}) {
   if (!candidates.length) return null;
   const ranked = [...candidates]
@@ -1525,18 +1519,20 @@ export function selectNext(
     ? future.filter((p) => state.cards[p.id].nextReview <= now + DAY)
     : [];
   const retryCandidateIds = new Set(retry.map((p) => p.id));
+  const recentIds = new Set((options.recentCardIds || []).filter(Boolean));
   const skill = [...reviewed, ...fresh]
     .filter((p) => !retryCandidateIds.has(p.id) && p.familySkillStatus !== 'untested')
     .filter((p, index, arr) => arr.findIndex((item) => item.id === p.id) === index);
   const hasReviewFallback = fresh.length || nearDue.length || future.length;
+  // Keep recently shown skill cards out of rotation by card count (they reappear
+  // roughly five cards later), not by wall-clock time.
   const readySkill = hasReviewFallback
-    ? skill.filter((p) => !candidateWasSeenRecently(state, p, now))
+    ? skill.filter((p) => !recentIds.has(p.id))
     : skill;
   const openBeginnerStage =
     options.beginnerLadder && reviewedCardCount(state) < BEGINNER_LADDER_CARD_COUNT
       ? openBeginnerLadderStage(pool, state)
       : -1;
-  const recentIds = new Set((options.recentCardIds || []).filter(Boolean));
   const lastFamilyId =
     options.lastFamilyId ||
     familyIdFromCardId((options.recentCardIds || []).find(Boolean) || lastCardId);
