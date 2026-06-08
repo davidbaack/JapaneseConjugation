@@ -12,16 +12,69 @@
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  Required unless SENTENCE_DRY_RUN=1.
 //   SENTENCE_DRY_RUN=1                        Validate + report, do not upsert.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { inflateVerbRows, mergeBuiltInWords } from '../src/data/verbLexicon.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../src/data/starterWords.js';
-import { wordKey } from '../src/utils/conjugator.js';
-import { validateGenerated } from './sentencePipeline.js';
+import { surfaceFormFor, wordKey } from '../src/utils/conjugator.js';
+import { buildSegments, validateGenerated } from './sentencePipeline.js';
 
 const LEXICON_PATH = join('public', 'data', 'verb-lexicon.json');
 const DRY_RUN = process.env.SENTENCE_DRY_RUN === '1';
 const UPSERT_CHUNK = 500;
 const MODEL = process.env.SENTENCE_MODEL || 'codex';
+// Set SENTENCE_NO_KUROMOJI=1 to skip kuromoji and use the model's own segments.
+const USE_KUROMOJI = process.env.SENTENCE_NO_KUROMOJI !== '1';
+
+// Lazily build the kuromoji tokenizer once (the dictionary load is async).
+let tokenizerPromise = null;
+function getTokenizer() {
+  if (!tokenizerPromise) {
+    tokenizerPromise = (async () => {
+      const require = createRequire(import.meta.url);
+      const dicPath = join(dirname(require.resolve('kuromoji')), '..', 'dict');
+      const kuromoji = /** @type {any} */ ((await import('kuromoji')).default);
+      return new Promise((resolve, reject) => {
+        kuromoji
+          .builder({ dicPath })
+          .build((err, tokenizer) => (err ? reject(err) : resolve(tokenizer)));
+      });
+    })();
+  }
+  return tokenizerPromise;
+}
+
+function katakanaToHiragana(value) {
+  return String(value || '').replace(/[ァ-ヶ]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60),
+  );
+}
+
+// Derive accurate per-token furigana segments from the sentence via kuromoji,
+// collapsing the conjugated form into the {w:true} placeholder. Returns null on
+// any failure so the caller can fall back to the model-provided segments.
+async function deriveSegments(ja, expectedSurface) {
+  if (!USE_KUROMOJI || !expectedSurface) return null;
+  try {
+    const tokenizer = await getTokenizer();
+    const tokens = tokenizer.tokenize(ja).map((t) => ({
+      surface: t.surface_form,
+      reading: t.reading && t.reading !== '*' ? katakanaToHiragana(t.reading) : '',
+    }));
+    const result = buildSegments(tokens, expectedSurface);
+    return result.ok ? result.segments : null;
+  } catch {
+    return null;
+  }
+}
+
+function expectedSurfaceFor(word, type) {
+  try {
+    return surfaceFormFor(word, type) || '';
+  } catch {
+    return '';
+  }
+}
 
 function loadWordMap() {
   const data = JSON.parse(readFileSync(LEXICON_PATH, 'utf8'));
@@ -88,7 +141,10 @@ async function main() {
         rejects.push({ ...out, reason: 'unknown-word' });
         continue;
       }
-      const result = validateGenerated(word, out.type, out);
+      // Prefer kuromoji-derived readings; fall back to the model's segments.
+      const derived = await deriveSegments(out.ja, expectedSurfaceFor(word, out.type));
+      const segments = derived || out.segments;
+      const result = validateGenerated(word, out.type, { ...out, segments });
       if (!result.ok) {
         rejects.push({ ...out, reason: result.reason });
         continue;

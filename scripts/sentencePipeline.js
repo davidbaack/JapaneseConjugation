@@ -14,9 +14,66 @@ import { resolveTransitivity } from '../src/utils/clozeSentences.js';
 // Hiragana (U+3040–309F), katakana (U+30A0–30FF, incl. the long-vowel mark),
 // and ASCII whitespace.
 const KANA_RE = /^[぀-ヿ\s]*$/;
+// CJK ideographs (kanji), incl. the compatibility block.
+const KANJI_RE = /[一-鿿豈-﫿]/;
 
 export function isKana(value) {
   return KANA_RE.test(String(value ?? ''));
+}
+
+// Keep a ruby reading only when it adds information: the token has kanji, the
+// reading is kana, and it isn't identical to the surface.
+function rubyFor(surface, reading) {
+  const r = String(reading ?? '');
+  if (!r || !KANJI_RE.test(surface) || !isKana(r) || r === surface) return '';
+  return r;
+}
+
+/**
+ * Build per-token furigana segments from tokenizer output, collapsing the
+ * contiguous run of tokens that spells `expectedSurface` into the single
+ * { w: true } placeholder.
+ *
+ * `tokens` = [{ surface, reading }], reading in hiragana ('' when unknown).
+ * Used by the importer to derive accurate readings via kuromoji rather than
+ * trusting the model.
+ *
+ * @returns {{ ok: true, segments: Array<{t:string,r:string}|{w:true}> }
+ *          | { ok: false, reason: string }}
+ */
+export function buildSegments(tokens, expectedSurface) {
+  if (!Array.isArray(tokens) || tokens.length === 0) return fail('no-tokens');
+  const surface = String(expectedSurface ?? '');
+  if (!surface) return fail('no-surface');
+
+  // Locate the contiguous token run whose surfaces concatenate to the form.
+  let runStart = -1;
+  let runEnd = -1;
+  for (let i = 0; i < tokens.length && runStart < 0; i += 1) {
+    let acc = '';
+    for (let j = i; j < tokens.length; j += 1) {
+      acc += String(tokens[j]?.surface ?? '');
+      if (acc === surface) {
+        runStart = i;
+        runEnd = j;
+        break;
+      }
+      if (acc.length >= surface.length) break;
+    }
+  }
+  if (runStart < 0) return fail('surface-not-token-aligned');
+
+  const segments = [];
+  for (let i = 0; i < tokens.length; i += 1) {
+    if (i === runStart) {
+      segments.push({ w: /** @type {const} */ (true) });
+      i = runEnd;
+      continue;
+    }
+    const t = String(tokens[i]?.surface ?? '');
+    segments.push({ t, r: rubyFor(t, tokens[i]?.reading) });
+  }
+  return { ok: true, segments };
 }
 
 function safeForm(fn) {

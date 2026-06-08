@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildPair, isKana, validateGenerated } from '../../scripts/sentencePipeline.js';
+import {
+  buildPair,
+  buildSegments,
+  isKana,
+  validateGenerated,
+} from '../../scripts/sentencePipeline.js';
 
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
 
@@ -95,5 +100,53 @@ describe('validateGenerated', () => {
   it('rejects empty/garbage output', () => {
     expect(validateGenerated(TABERU, 'plain-past', null).reason).toBe('not-an-object');
     expect(validateGenerated(TABERU, 'plain-past', validOut({ en: '' })).reason).toBe('no-en');
+  });
+});
+
+describe('buildSegments', () => {
+  // Mimics kuromoji output (readings already converted to hiragana).
+  const TOKENS = [
+    { surface: '雨', reading: 'あめ' },
+    { surface: 'の', reading: 'の' },
+    { surface: '日', reading: 'ひ' },
+    { surface: 'は', reading: 'は' },
+    { surface: '、', reading: '' },
+    { surface: 'たいてい', reading: 'たいてい' },
+    { surface: '買わ', reading: 'かわ' },
+    { surface: 'ない', reading: 'ない' },
+    { surface: '。', reading: '' },
+  ];
+
+  it('collapses the multi-token conjugated run into one placeholder', () => {
+    const result = buildSegments(TOKENS, '買わない');
+    expect(result.ok).toBe(true);
+    // Kanji tokens keep readings; kana tokens drop them; one {w:true}.
+    expect(result.segments).toEqual([
+      { t: '雨', r: 'あめ' },
+      { t: 'の', r: '' },
+      { t: '日', r: 'ひ' },
+      { t: 'は', r: '' },
+      { t: '、', r: '' },
+      { t: 'たいてい', r: '' },
+      { w: true },
+      { t: '。', r: '' },
+    ]);
+  });
+
+  it('produces segments that pass validateGenerated', () => {
+    const KAU = { dict: '買う', reading: 'かう', meaning: 'to buy', group: 'godan' };
+    const { segments } = buildSegments(TOKENS, '買わない');
+    const result = validateGenerated(KAU, 'plain-negative', {
+      ja: '雨の日は、たいてい買わない。',
+      en: "On rainy days, I usually don't buy.",
+      segments,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.row.ja_template).toBe('雨の日は、たいてい{w}。');
+  });
+
+  it('fails when the form is not aligned to token boundaries', () => {
+    expect(buildSegments(TOKENS, '買う').ok).toBe(false);
+    expect(buildSegments([], '買う').reason).toBe('no-tokens');
   });
 });

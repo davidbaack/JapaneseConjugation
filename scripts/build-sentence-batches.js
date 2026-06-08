@@ -82,17 +82,17 @@ the verb/adjective in the requested form, then return ONE JSON line:
 
   { "word_key": <same>, "type": <same>,
     "ja": "<sentence containing expected_surface verbatim>",
-    "en": "<natural English translation>",
-    "segments": [ {"t":"surface","r":"kana reading"}, ..., {"w":true}, ... ] }
+    "en": "<natural English translation>" }
 
 Rules:
 - "ja" MUST contain expected_surface exactly once, written verbatim.
-- "segments" tile the ENTIRE sentence in order. Each token is {"t","r"} where
-  "r" is the hiragana reading ("" for kana/punctuation). The conjugated word is
-  the single sentinel {"w":true} (do NOT include its text/reading).
-- Concatenating segment "t" (with the sentinel replaced by expected_surface)
-  MUST reproduce "ja" exactly.
 - Keep it simple and beginner-friendly; output JSONL only, one object per line.
+
+Per-token furigana is derived automatically by the importer (kuromoji), so you
+do NOT need to provide readings. (You may optionally include a "segments" array
+that tiles the sentence with {"t","r"} tokens and a single {"w":true} sentinel
+for the conjugated word; it is used only as a fallback if automatic derivation
+fails.)
 `;
 
 async function main() {
