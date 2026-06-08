@@ -1426,6 +1426,7 @@ export default function StudyView() {
   const speechRecognitionRef = useRef(null);
   const speechSubmittedRef = useRef(false);
   const speechAutoStartKeyRef = useRef('');
+  const answerComposingRef = useRef(false);
   const minimalPairSetIdRef = useRef(practicePrefs.minimalPairSetId || '');
   const recentCardIdsRef = useRef([]);
   // Snapshots the typed answer the moment a kana mistake first occurs, so the
@@ -1729,6 +1730,10 @@ export default function StudyView() {
 
   useEffect(() => {
     if (phase === 'answering') answerStartedAtRef.current = Date.now();
+  }, [current?.id, phase]);
+
+  useEffect(() => {
+    answerComposingRef.current = false;
   }, [current?.id, phase]);
 
   useEffect(() => {
@@ -2050,7 +2055,7 @@ export default function StudyView() {
     coachWrongIndex >= 0
       ? `Kana ${coachWrongIndex + 1} should be ${coachCells[coachWrongIndex].expected}.`
       : coachPreview === expected
-        ? 'Complete match. Press Enter.'
+        ? ''
         : coachTypedCount > expectedKanaCount
           ? 'Extra kana after the answer.'
           : '';
@@ -2064,7 +2069,7 @@ export default function StudyView() {
         ? 'Extra kana after the answer.'
         : `Expected ${liveCells[liveWrongIndex].expected} at kana ${liveWrongIndex + 1}.`
       : preview === expected
-        ? 'Complete match. Press Enter.'
+        ? ''
         : '';
   const liveAnswerTone =
     liveKana && phase === 'answering'
@@ -2381,7 +2386,7 @@ export default function StudyView() {
     const nextCount = Math.min(expectedChars.length, Math.max(coachRevealed, typedCount) + 1);
     setCoachRevealed(nextCount);
     setGreenRevealed((prev) => Math.max(prev, nextCount));
-    setAnswer(expectedChars.slice(0, nextCount).join(''));
+    updateTypedAnswer(expectedChars.slice(0, nextCount).join(''));
     focusAnswerInput();
   }
 
@@ -2832,6 +2837,15 @@ export default function StudyView() {
     setTypoGuard(null);
     rememberKanaMistake(nextAnswer, options.trackKanaMistake !== false);
     setAnswer(nextAnswer);
+    if (
+      !answerComposingRef.current &&
+      liveKana &&
+      phase === 'answering' &&
+      !!expected &&
+      toHiragana(nextAnswer) === expected
+    ) {
+      submit(nextAnswer, { fromTypedInput: true });
+    }
   }
 
   function updateAnswerFromInput(event, options = {}) {
@@ -2842,7 +2856,9 @@ export default function StudyView() {
   }
 
   function commitAnswerComposition(event, options = {}) {
-    updateTypedAnswer(toKanaInputValue(event.currentTarget.value), options);
+    const nextAnswer = toKanaInputValue(event.currentTarget.value);
+    answerComposingRef.current = false;
+    updateTypedAnswer(nextAnswer, options);
   }
 
   // Focused word-form sweeps can complete; default Practice keeps going.
@@ -3630,7 +3646,6 @@ export default function StudyView() {
                       <div className="text-xs mt-0.5">{typoGuard.detail}</div>
                     </div>
                   )}
-
                   {answerMode === 'self-check' ? (
                     <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
                       <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
@@ -3917,6 +3932,9 @@ export default function StudyView() {
                           ref={inputRef}
                           type="text"
                           value={answer}
+                          onCompositionStart={() => {
+                            answerComposingRef.current = true;
+                          }}
                           onChange={(e) =>
                             updateAnswerFromInput(e, {
                               trackKanaMistake: kanaMatchDisplay !== 'none',
@@ -4019,6 +4037,9 @@ export default function StudyView() {
                           ref={inputRef}
                           type="text"
                           value={answer}
+                          onCompositionStart={() => {
+                            answerComposingRef.current = true;
+                          }}
                           onChange={(e) =>
                             updateAnswerFromInput(e, {
                               trackKanaMistake: liveKanaHelpEnabled,
