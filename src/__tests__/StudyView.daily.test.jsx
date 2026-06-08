@@ -1158,10 +1158,14 @@ describe('StudyView continuous Practice startup', () => {
         {},
         { timeout: 5000 },
       );
-      fireEvent.change(input, { target: { value: 'zzzz' } });
+      fireEvent.change(input, { target: { value: 'tanako' } });
       fireEvent.keyDown(input, { key: 'Enter' });
 
       await waitFor(() => expect(screen.getByText('Review this form.')).toBeTruthy());
+      const typedAnswer = screen.getByRole('group', { name: 'Your typed answer' });
+      expect(within(typedAnswer).getByText('\u305f')).toBeTruthy();
+      expect(within(typedAnswer).getByText('\u306a')).toBeTruthy();
+      expect(within(typedAnswer).getByText('\u3053')).toBeTruthy();
       await waitFor(() => expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true }));
     } finally {
       window.HTMLButtonElement.prototype.focus = originalFocus;

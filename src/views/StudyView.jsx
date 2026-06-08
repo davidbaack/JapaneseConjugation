@@ -2092,6 +2092,9 @@ export default function StudyView() {
     typedAnswerMode && !reverseDrill
       ? kanaCoachCells(expected, reviewAnswerSource, coachRevealed)
       : [];
+  const reviewSubmittedDisplay =
+    phase === 'reviewing' && submittedAnswer ? submittedAnswer.trim() : '';
+  const reviewSubmittedChars = Array.from(reviewSubmittedDisplay);
 
   function nextMinimalPairProgress(correct) {
     return recordMinimalPairResult(
@@ -4222,17 +4225,31 @@ export default function StudyView() {
                                     ? 'You chose'
                                     : revealedMiss
                                       ? "You chose: I don't know"
-                                      : 'Your guess'}
-                                  {!revealedMiss && !reviewChoiceLabel && (
-                                    <span lang="ja" className="ml-1 font-medium">
-                                      (
-                                      {reverseDrill
-                                        ? submittedAnswer.trim() || 'empty'
-                                        : toHiragana(submittedAnswer) || 'empty'}
-                                      )
-                                    </span>
-                                  )}
+                                      : 'Your Answer'}
                                 </div>
+                                {!revealedMiss &&
+                                  !reviewChoiceLabel &&
+                                  reviewSubmittedChars.length > 0 && (
+                                    <div
+                                      role="group"
+                                      aria-label="Your typed answer"
+                                      className="mb-2 rounded-xl border border-rose-200/70 bg-rose-50/35 p-2 dark:border-rose-900/45 dark:bg-rose-950/10"
+                                    >
+                                      <div
+                                        className="flex flex-wrap justify-center gap-1.5"
+                                        lang="ja"
+                                      >
+                                        {reviewSubmittedChars.map((char, i) => (
+                                          <div
+                                            key={`${char}-${i}`}
+                                            className="flex h-10 w-9 items-center justify-center rounded-xl border border-rose-300 bg-white text-base font-semibold text-rose-800 shadow-sm dark:border-rose-800 dark:bg-stone-950/70 dark:text-rose-300 sm:h-11 sm:w-10 sm:text-lg"
+                                          >
+                                            {char}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 <div className="rounded-xl border border-stone-200/60 dark:border-stone-800/60 bg-stone-50/40 dark:bg-stone-900/20 p-2">
                                   <div className="flex flex-wrap justify-center gap-1" lang="ja">
                                     {reviewKanaCells.map((cell, i) => {
