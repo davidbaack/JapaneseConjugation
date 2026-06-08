@@ -170,6 +170,8 @@ The deterministic dev page listens at
 | `npm run format` | Format source JavaScript/JSX, E2E, scripts, Supabase functions, and root JS/TS files with Prettier. |
 | `npm run format:check` | Check source formatting. |
 | `npm run vocab:build` | Regenerate `public/data/verb-lexicon.json`. |
+| `npm run sentences:batches` | Emit batch files of pending `(word, conjugation)` pairs for the tailored sentence library. See [docs/sentence-library.md](docs/sentence-library.md). |
+| `npm run sentences:import` | Validate generated sentences and upsert them to Supabase. See [docs/sentence-library.md](docs/sentence-library.md). |
 | `npm run size` | Check bundle budget after a build. |
 | `npm run ci:fast` | Run format check, lint, typecheck, and unit tests. |
 | `npm run ci` | Run the full local pipeline: fast CI, E2E, build, and size check. |
