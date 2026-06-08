@@ -74,6 +74,7 @@ import {
   spokenAnswerResult,
 } from '../utils/display.js';
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
+import { fetchTailoredSentence } from '../utils/sentenceLibrary.js';
 import {
   bumpSessionMistakePattern,
   labRouteForMistakePattern,
@@ -116,6 +117,19 @@ const ANSWER_STYLE_OPTIONS = [
   { id: 'self-check', label: 'Self-check' },
   { id: 'speak', label: 'Speak' },
 ];
+
+// Blank shown where the conjugated word goes in a cloze sentence.
+const CLOZE_BLANK = '[______]';
+
+// Convert the database's per-token furigana segments into the { text, ruby }
+// parts that sentenceDisplay/ScriptDisplay render. The placeholder token
+// ({ w: true }) becomes the blank.
+function partsFromSegments(segments) {
+  if (!Array.isArray(segments)) return null;
+  return segments.map((seg) =>
+    seg && seg.w ? { text: CLOZE_BLANK, ruby: '' } : { text: seg?.t || '', ruby: seg?.r || '' },
+  );
+}
 
 function focusWithoutScroll(element) {
   if (!element || typeof window === 'undefined') return;
@@ -2073,20 +2087,53 @@ export default function StudyView({ mode = 'practice' }) {
   // are shown (never the "Fill in: word (reading)" prefix, which would leak the
   // reading regardless of script settings). Null for reverse/listening/minimal
   // -pair cards, which keep their normal prompt.
-  const clozePrompt = useMemo(() => {
+  const offlineClozePrompt = useMemo(() => {
     if (!current || !sentenceMode) return null;
     if (reverseDrill || listeningPrompt || minimalPairSetForCurrent) return null;
     try {
       const built = getOfflineTemplateSentence(current.verb, current.type);
       return built?.sentence
-        ? { sentence: built.sentence, cue: built.cue, note: built.note }
+        ? { sentence: built.sentence, cue: built.cue, note: built.note, parts: null }
         : null;
     } catch {
       return null;
     }
   }, [current, sentenceMode, reverseDrill, listeningPrompt, minimalPairSetForCurrent]);
+  // The offline frame renders instantly; a tailored per-word sentence from the
+  // database (when present) swaps in once it resolves for the current card.
+  const [tailoredCloze, setTailoredCloze] = useState(null);
+  useEffect(() => {
+    setTailoredCloze(null);
+    if (!current || !sentenceMode) return undefined;
+    if (reverseDrill || listeningPrompt || minimalPairSetForCurrent) return undefined;
+    let ignore = false;
+    const cue = offlineClozePrompt?.cue || '';
+    fetchTailoredSentence(current.verb, current.type)
+      .then((res) => {
+        if (ignore || !res?.jaTemplate) return;
+        setTailoredCloze({
+          sentence: res.jaTemplate.replace('{w}', CLOZE_BLANK),
+          cue,
+          note: res.en,
+          parts: partsFromSegments(res.segments),
+        });
+      })
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, [
+    current,
+    sentenceMode,
+    reverseDrill,
+    listeningPrompt,
+    minimalPairSetForCurrent,
+    offlineClozePrompt,
+  ]);
+  const clozePrompt = tailoredCloze || offlineClozePrompt;
   const clozePromptView = useMemo(
-    () => (clozePrompt ? sentenceDisplay(clozePrompt.sentence, practicePrefs) : null),
+    () =>
+      clozePrompt ? sentenceDisplay(clozePrompt.sentence, practicePrefs, clozePrompt.parts) : null,
     [clozePrompt, practicePrefs],
   );
 

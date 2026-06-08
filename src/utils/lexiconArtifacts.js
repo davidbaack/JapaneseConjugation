@@ -10,6 +10,7 @@ export const GENERATED_ARTIFACT_MEANING = /\bmath operator\b/i;
  * @property {number[]} [genkiLessons]
  * @property {number[]} [minnaLessons]
  * @property {boolean} [common]
+ * @property {string} [transitive]
  */
 
 const BLOCKED_ROW_KEYS = new Set(['godan:ある:ある:A certain ~, One ~']);

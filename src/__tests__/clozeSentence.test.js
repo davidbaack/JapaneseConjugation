@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LEARNER_DEFAULT_TYPE_IDS } from '../data/conjugationTypes.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
-import { buildOfflineCuedCloze } from '../utils/clozeSentences.js';
+import { buildOfflineCuedCloze, resolveTransitivity } from '../utils/clozeSentences.js';
 import { getOfflineTemplateSentence } from '../utils/conjugatorExplain.js';
 
 const VERB = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
@@ -80,5 +80,57 @@ describe('buildOfflineCuedCloze', () => {
 
     expectSafeCloze(passive, STARTER_VERBS[1]);
     expectSafeCloze(attributive, STARTER_ADJECTIVES[2]);
+  });
+});
+
+describe('transitivity-aware frames', () => {
+  const TRANS = {
+    dict: '買う',
+    reading: 'かう',
+    meaning: 'to buy',
+    group: 'godan',
+    transitive: 'transitive',
+  };
+  const INTRANS = {
+    dict: '行く',
+    reading: 'いく',
+    meaning: 'to go',
+    group: 'godan',
+    transitive: 'intransitive',
+  };
+  const NO_META = { dict: '帰る', reading: 'かえる', meaning: 'to return home', group: 'godan' };
+
+  it('uses a direct passive for transitive verbs', () => {
+    const out = buildOfflineCuedCloze(TRANS, 'passive');
+    expect(out.note).toMatch(/was bought/);
+  });
+
+  it('avoids a broken past participle for intransitive passive', () => {
+    const out = buildOfflineCuedCloze(INTRANS, 'passive');
+    // Suffering passive renders as a simple past ("... went ... on me"),
+    // never the nonsensical "was gone".
+    expect(out.note).not.toMatch(/was gone/);
+    expect(out.note).toMatch(/on me/);
+  });
+
+  it('drops the object in intransitive negative-te frames', () => {
+    const out = buildOfflineCuedCloze(INTRANS, 'negative-te');
+    expect(out.note).not.toMatch(/breakfast|anything/);
+  });
+
+  it('keeps an object-bearing negative-te frame for transitive verbs', () => {
+    const out = buildOfflineCuedCloze(TRANS, 'negative-te');
+    expect(out.note).toMatch(/breakfast|anything/);
+  });
+
+  it('falls back to a meaning heuristic when no transitivity metadata exists', () => {
+    expect(resolveTransitivity(NO_META)).toBe('intransitive');
+    expect(resolveTransitivity({ meaning: 'to read', group: 'godan' })).toBe('transitive');
+    // Must not throw for custom words with no metadata.
+    expect(() => buildOfflineCuedCloze(NO_META, 'passive')).not.toThrow();
+  });
+
+  it('treats "both" transitivity as transitive', () => {
+    expect(resolveTransitivity({ meaning: 'to open', transitive: 'both' })).toBe('transitive');
   });
 });

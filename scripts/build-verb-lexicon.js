@@ -224,6 +224,20 @@ function posSet(entry) {
   return new Set((entry?.sense || []).flatMap((sense) => sense.partOfSpeech || []));
 }
 
+// JMdict tags verbs as transitive (vt) and/or intransitive (vi). Surface this as
+// 't' / 'i' / 'b' (both) / '' (unknown) so the offline cloze generator can pick
+// argument-structure-appropriate frames (e.g. suppress passive-by-agent frames
+// for intransitive verbs).
+function transitivityFromPos(entry) {
+  const pos = posSet(entry);
+  const vt = pos.has('vt');
+  const vi = pos.has('vi');
+  if (vt && vi) return 'b';
+  if (vt) return 't';
+  if (vi) return 'i';
+  return '';
+}
+
 function allowsSuru(row = {}) {
   const dict = cleanTerm(row.dict || row.expression);
   const reading = cleanTerm(row.reading);
@@ -329,6 +343,7 @@ function normalizeSupportedWord(row, jmdictIndex) {
     meaning: row.meaning,
     group,
     common: entryIsCommon(entry),
+    transitive: transitivityFromPos(entry),
   };
 }
 
@@ -352,12 +367,14 @@ function mergeWord(map, rawWord) {
       genkiLessons: uniqueSorted(word.genkiLessons || [], 1, 23),
       minnaLessons: uniqueSorted(word.minnaLessons || [], 1, 50),
       common: Boolean(word.common),
+      transitive: word.transitive || '',
     });
     return;
   }
   existing.jlpt = easierLevel(existing.jlpt, word.jlpt);
   existing.meaning = existing.meaning || normalizeMeaning(word.meaning);
   existing.common = existing.common || Boolean(word.common);
+  existing.transitive = existing.transitive || word.transitive || '';
   existing.genkiLessons = uniqueSorted(
     [...existing.genkiLessons, ...(word.genkiLessons || [])],
     1,
@@ -433,6 +450,7 @@ function rowFromVerb(word) {
     word.genkiLessons,
     word.minnaLessons,
     Boolean(word.common),
+    word.transitive || '',
   ];
 }
 

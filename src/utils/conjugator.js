@@ -242,7 +242,7 @@ export function pickPromptType(item, targetType, prefs = DEFAULT_PREFS) {
       ) % types.length
     ].id;
   if (source === 'dict-masu') {
-    const candidates = [null];
+    const candidates = /** @type {(string | null)[]} */ ([null]);
     if (isTypeCompatible(item, 'polite-present') && (allowTrick || 'polite-present' !== targetType))
       candidates.push('polite-present');
     if (candidates.length === 1) return null;
