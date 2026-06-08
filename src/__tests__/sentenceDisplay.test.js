@@ -32,4 +32,32 @@ describe('sentenceDisplay', () => {
       { text: 'に', ruby: '' },
     ]);
   });
+
+  // Precomputed parts let DB-tailored sentences render correct readings for
+  // kanji that aren't in the local SENTENCE_READING_ENTRIES map.
+  const DB_PARTS = [
+    { text: '彼', ruby: 'かれ' }, // not in the local map
+    { text: 'は', ruby: '' },
+    { text: '[______]', ruby: '' },
+    { text: '。', ruby: '' },
+  ];
+
+  it('uses precomputed parts for furigana instead of the local map', () => {
+    const view = sentenceDisplay('彼は [______]。', { furigana: true }, DB_PARTS);
+    expect(view.parts).toContainEqual({ text: '彼', ruby: 'かれ' });
+  });
+
+  it('uses precomputed readings for kana-only mode', () => {
+    const view = sentenceDisplay(
+      '彼は [______]。',
+      { furigana: true, displayScripts: { kanji: false, kana: true, romaji: false } },
+      DB_PARTS,
+    );
+    expect(view.main).toBe('かれは[______]。');
+  });
+
+  it('ignores empty precomputed parts and falls back to the local map', () => {
+    const view = sentenceDisplay('週末はよく [______]。', { furigana: true }, []);
+    expect(view.parts).toContainEqual({ text: '週末', ruby: 'しゅうまつ' });
+  });
 });
