@@ -9,7 +9,7 @@ test.describe('Study flow', () => {
     await page.waitForLoadState('networkidle');
 
     await expect(page.getByText('Sign in to save SRS progress')).toHaveCount(0);
-    await expect(page.getByText('Continuous practice', { exact: true })).toBeVisible();
+    await expect(page.getByText('Practice run', { exact: true })).toBeVisible();
 
     // Forward (conjugate) drill renders a free-text answer box.
     const input = page.getByPlaceholder('Type romaji or kana...');
@@ -37,7 +37,7 @@ test.describe('Study flow', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Continuous practice', { exact: true })).toBeVisible();
+    await expect(page.getByText('Practice run', { exact: true })).toBeVisible();
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
     await page.getByRole('button', { name: 'Reveal', exact: true }).click();
 
