@@ -825,7 +825,7 @@ describe('word-form SRS selection', () => {
     ]);
   });
 
-  it('schedules due cards by exact word-form card id', () => {
+  it('does not prioritize due cards in default continuous Practice', () => {
     const dueCardId = cardIdFor(TABERU, 'plain-past');
     const state = {
       ...defaultState(),
@@ -842,6 +842,28 @@ describe('word-form SRS selection', () => {
       },
     };
     const card = selectNext(state, [TABERU, KAKU], ['plain-past'], null, DEFAULT_PREFS);
+    expect(card.id).toBe(cardIdFor(KAKU, 'plain-past'));
+  });
+
+  it('can still schedule due cards by exact word-form card id when explicitly requested', () => {
+    const dueCardId = cardIdFor(TABERU, 'plain-past');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [dueCardId]: {
+          reps: 1,
+          interval: 1,
+          ease: 2.5,
+          nextReview: 1,
+          correct: 1,
+          incorrect: 0,
+          lastSeen: 1,
+        },
+      },
+    };
+    const card = selectNext(state, [TABERU, KAKU], ['plain-past'], null, DEFAULT_PREFS, null, {
+      prioritizeDue: true,
+    });
     expect(card.id).toBe(dueCardId);
     expect(card.type).toBe('plain-past');
     expect(card.verb).toBe(TABERU);
@@ -949,11 +971,11 @@ describe('word-form SRS selection', () => {
     expect(seen.map((card) => card.verb.dict)).not.toContain(IKU.dict);
   });
 
-  it('caps fresh workout cards by daily goal and uses a smaller bonus batch', () => {
-    expect(dailyNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(10);
-    expect(bonusNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(5);
+  it('uses a continuous fresh-card budget instead of the visible daily goal', () => {
+    expect(dailyNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(60);
+    expect(bonusNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(30);
     const introduced = {};
-    for (let i = 0; i < 10; i += 1) {
+    for (let i = 0; i < 60; i += 1) {
       introduced[`synthetic-${i}`] = {
         introducedDate: localDateKey(),
         reps: 1,
@@ -972,6 +994,88 @@ describe('word-form SRS selection', () => {
       { ...DEFAULT_PREFS, dailyGoal: 10 },
     );
     expect(card).toBeNull();
+  });
+
+  it('prefers the lowest-skill enabled family after retry handling', () => {
+    const now = Date.now();
+    const weakPast = cardIdFor(TABERU, 'plain-negative');
+    const strongTe = cardIdFor(KAKU, 'te-form');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [weakPast]: {
+          reps: 3,
+          interval: 8,
+          ease: 2.3,
+          nextReview: now + DAY,
+          correct: 1,
+          incorrect: 4,
+          lastSeen: now - DAY,
+        },
+        [strongTe]: {
+          reps: 3,
+          interval: 8,
+          ease: 2.5,
+          nextReview: now + DAY,
+          correct: 5,
+          incorrect: 0,
+          lastSeen: now - DAY,
+        },
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU],
+      ['plain-negative', 'te-form'],
+      null,
+      DEFAULT_PREFS,
+    );
+
+    expect(card.type).toBe('plain-negative');
+  });
+
+  it('avoids repeating the same family back-to-back when another enabled family is available', () => {
+    const now = Date.now();
+    const weakPast = cardIdFor(TABERU, 'plain-negative');
+    const otherFamily = cardIdFor(KAKU, 'te-form');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [weakPast]: {
+          reps: 3,
+          interval: 8,
+          ease: 2.3,
+          nextReview: now + DAY,
+          correct: 1,
+          incorrect: 4,
+          lastSeen: now - DAY,
+        },
+        [otherFamily]: {
+          reps: 3,
+          interval: 8,
+          ease: 2.3,
+          nextReview: now + DAY,
+          correct: 2,
+          incorrect: 3,
+          lastSeen: now - DAY,
+        },
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU],
+      ['plain-negative', 'te-form'],
+      weakPast,
+      DEFAULT_PREFS,
+      null,
+      {
+        recentCardIds: [weakPast],
+      },
+    );
+
+    expect(card.id).toBe(otherFamily);
   });
 
   it('moves to fresh material instead of looping recently reviewed weak cards', () => {

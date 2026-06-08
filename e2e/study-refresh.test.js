@@ -16,7 +16,7 @@ async function waitForStableStoredCurrent(page) {
 }
 
 async function waitForPracticeCard(page) {
-  await expect(page.getByRole('progressbar', { name: 'Session cards' })).toBeVisible();
+  await expect(page.getByText('Continuous practice')).toBeVisible();
   await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
 }
 

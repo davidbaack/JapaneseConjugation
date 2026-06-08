@@ -17,7 +17,7 @@ const RESET_ACTIONS = [
     title: 'Reset practice progress',
     description: 'Clears card history, mistakes, streaks, weakness map, and tool stats.',
     clears: 'Practice history and weakness signals',
-    keeps: 'Settings, Practice map scope, Tools word exclusions, custom words, and lists',
+    keeps: 'Settings, category scope, Tools word exclusions, custom words, and lists',
     confirm: 'Reset progress',
     done: 'Practice progress reset.',
   },

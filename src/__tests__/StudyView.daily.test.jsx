@@ -162,21 +162,21 @@ afterEach(() => {
   FakeSpeechRecognition.instance = null;
 });
 
-describe('StudyView daily startup guards', () => {
-  it('auto-starts the default Practice workout for signed-in learners', async () => {
+describe('StudyView continuous Practice startup', () => {
+  it('opens continuous Practice for signed-in learners', async () => {
     const app = makeApp();
     mockedApp.value = app;
 
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    const progress = screen.getByRole('progressbar', { name: 'Session cards' });
-    expect(progress.getAttribute('aria-valuenow')).toBe('0');
-    expect(progress.getAttribute('aria-valuemax')).toBe(String(app.todayPlan.reviewLimit));
-    expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
+    expect(screen.getByText('Continuous practice')).toBeTruthy();
+    expect(screen.getByText('Practice keeps going until you leave this page.')).toBeTruthy();
+    expect(screen.queryByRole('progressbar', { name: 'Session cards' })).toBeNull();
+    expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
-  it('auto-starts the default Practice workout while signed out', async () => {
+  it('opens continuous Practice while signed out', async () => {
     const app = makeApp({
       session: null,
     });
@@ -185,10 +185,9 @@ describe('StudyView daily startup guards', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    const progress = screen.getByRole('progressbar', { name: 'Session cards' });
-    expect(progress.getAttribute('aria-valuenow')).toBe('0');
-    expect(progress.getAttribute('aria-valuemax')).toBe(String(app.todayPlan.reviewLimit));
-    expect(app.startTodayDrill).toHaveBeenCalledWith(app.todayPlan);
+    expect(screen.getByText('Continuous practice')).toBeTruthy();
+    expect(screen.getByText('Practice keeps going until you leave this page.')).toBeTruthy();
+    expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
   it('returns to Stats from an active card', async () => {
@@ -582,7 +581,7 @@ describe('StudyView daily startup guards', () => {
     expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
   });
 
-  it('shows ready-card progress for an active Today drill in the Practice flow', async () => {
+  it('keeps continuous Practice status even when old Today drill prefs are present', async () => {
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
     const dueCardId = cardIdFor(target, type);
@@ -601,15 +600,14 @@ describe('StudyView daily startup guards', () => {
     render(<StudyView />);
 
     await waitForPracticeCard();
-    const progress = screen.getByRole('progressbar', { name: 'Ready-card progress' });
-    expect(progress.getAttribute('aria-valuenow')).toBe('0');
-    expect(progress.getAttribute('aria-valuemax')).toBe('1');
-    expect(await screen.findByText('0/1 ready')).toBeTruthy();
-    expect(screen.getByText('Practice')).toBeTruthy();
+    expect(screen.getByText('Continuous practice')).toBeTruthy();
+    expect(screen.getByText('Practice keeps going until you leave this page.')).toBeTruthy();
+    expect(screen.queryByText('0/1 ready')).toBeNull();
+    expect(screen.getAllByText('Practice').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
   });
 
-  it('counts a correct Practice answer toward the ready queue and daily progress', async () => {
+  it('counts a correct Practice answer without completing the old ready queue', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
@@ -645,7 +643,7 @@ describe('StudyView daily startup guards', () => {
     expect(nextState.cards[dueCardId].correct).toBe(1);
     expect(nextState.daily.count).toBe(1);
     expect(nextState.transformation.attempted).toBe(0);
-    expect(markSrsQueueCompleted).toHaveBeenCalledWith(dueCardId);
+    expect(markSrsQueueCompleted).not.toHaveBeenCalled();
   });
 
   it('checks an exact romaji answer as soon as typing completes it', async () => {

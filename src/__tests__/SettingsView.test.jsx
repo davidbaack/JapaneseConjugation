@@ -50,9 +50,7 @@ describe('SettingsView controls', () => {
     expect(screen.getByText('Reset & cleanup')).toBeTruthy();
     expect(screen.getByText('Reset practice progress')).toBeTruthy();
     expect(
-      screen.getByText(
-        'Settings, Practice map scope, Tools word exclusions, custom words, and lists',
-      ),
+      screen.getByText('Settings, category scope, Tools word exclusions, custom words, and lists'),
     ).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore settings', exact: true }));

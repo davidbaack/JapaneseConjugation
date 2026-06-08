@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { FORM_GROUPS, TE_TA_SOUND_CHANGE_FAMILY_ID } from '../data/conjugationTypes.js';
-import { DEFAULT_PREFS } from '../data/defaults.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import {
   buildReadinessFamilyRows,
@@ -94,7 +93,6 @@ function statTile(label, value) {
 
 export function StatsDashboard({
   daily,
-  practicePrefs,
   srsQueue,
   state,
   todayPlan,
@@ -111,11 +109,10 @@ export function StatsDashboard({
   onDrillClassify,
   onDrillRush,
 }) {
-  const dailyGoal = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
   const dueDone = srsQueue?.completedDueRuleIds?.length || 0;
   const dashboardDue = todayPlan?.sourceCounts?.due || dueTotal;
-  const workoutTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
+  const practiceTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
   const recommendations = state.reviewScope?.recommendations || [];
   const mistakeHistoryCount = (state.mistakes || []).length;
   const strengthRows = formFamilyStrengthRows(state);
@@ -167,11 +164,9 @@ export function StatsDashboard({
               }
             : null;
   const weakCount = strengthRows.filter((row) => row.status === 'weak').length;
-  const streak = daily.goalStreak || 0;
   const hasHistory =
     strengthRows.some((row) => row.attempted > 0) ||
     (daily.count || 0) > 0 ||
-    streak > 0 ||
     dueTotal > 0 ||
     recommendations.length > 0 ||
     mistakeHistoryCount > 0;
@@ -188,21 +183,20 @@ export function StatsDashboard({
               Practice pulse.
             </h2>
             <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
-              Ready cards, recent misses, and form-family readiness live here so Practice can open
-              straight to the next card.
+              Recent misses, form-family readiness, and upcoming reviews live here so Practice can
+              open straight to the next card.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               {[
                 ['Ready now', dashboardDue],
-                ['Today', `${daily.count || 0}/${dailyGoal}`],
+                ['Today', `${daily.count || 0} cards`],
                 ['Recent misses', weakCount],
-                ['Streak', streak ? `${streak} day${streak === 1 ? '' : 's'}` : '0 days'],
               ].map(([label, value]) => statTile(label, value))}
             </div>
           </div>
           <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/20">
             <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-              Current workout
+              Practice scope
             </div>
             <div className="mt-2 grid gap-2 text-sm text-stone-700 dark:text-stone-200">
               <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 dark:border-indigo-900/60 dark:bg-stone-950/30">
@@ -214,13 +208,13 @@ export function StatsDashboard({
               <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 dark:border-indigo-900/60 dark:bg-stone-950/30">
                 <span>Form types selected</span>
                 <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                  {workoutTypeCount}
+                  {practiceTypeCount}
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 dark:border-indigo-900/60 dark:bg-stone-950/30">
-                <span>Session target</span>
+                <span>Mode</span>
                 <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                  {todayPlan?.reviewLimit || dailyGoal} cards
+                  Continuous
                 </span>
               </div>
             </div>
@@ -296,7 +290,7 @@ export function StatsDashboard({
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
           <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
-            Next workout
+            Upcoming reviews
           </div>
           <div className="grid grid-cols-5 gap-2">
             {reviewForecastRows(todayPlan.upcomingForecast).map(([label, value]) => (
@@ -464,7 +458,6 @@ export function StatsDashboard({
 export default function StatsView() {
   const {
     state,
-    practicePrefs,
     daily,
     todayPlan,
     srsQueue,
@@ -515,7 +508,6 @@ export default function StatsView() {
   return (
     <StatsDashboard
       daily={daily}
-      practicePrefs={practicePrefs}
       srsQueue={srsQueue}
       state={state}
       todayPlan={todayPlan}

@@ -6,6 +6,7 @@ import {
 } from '../data/conjugationTypes.js';
 import { ONBIN_PATTERN_META, onbinPatternForVerb, wordKey } from './conjugator.js';
 import { groupDisplayLabel } from './groupDisplay.js';
+import { READINESS_DIMENSIONS, buildReadinessFamilyRows } from './readiness.js';
 
 export const QUICK_WORKOUT_LIMIT = 12;
 export const QUICK_PRACTICE_DEFAULT_TYPE_IDS = EVERYDAY_TYPE_IDS;
@@ -78,8 +79,34 @@ function laneTotalsForFamily(rows = []) {
   return { correct, incorrect, attempted, totalResponseMs, recent };
 }
 
-function skillForFamily({ correct, attempted, laneAttempted, totalResponseMs, recent }) {
-  if (attempted < MIN_SKILL_ATTEMPTS) {
+function readinessSkillForFamily(row = {}) {
+  const scoreByStatus = { strong: 92, developing: 68, weak: 35 };
+  const measured = READINESS_DIMENSIONS.map((dimension) => row.cells?.[dimension.id]).filter(
+    (cell) => cell && cell.status !== 'untested' && cell.attempted > 0,
+  );
+  const attempted = measured.reduce((sum, cell) => sum + cleanNumber(cell.attempted), 0);
+  if (!attempted) return { readinessScore: null, readinessAttempted: 0 };
+  const weighted = measured.reduce(
+    (sum, cell) => sum + (scoreByStatus[cell.status] || 50) * cleanNumber(cell.attempted),
+    0,
+  );
+  return {
+    readinessScore: clampSkillScore(weighted / attempted),
+    readinessAttempted: attempted,
+  };
+}
+
+function skillForFamily({
+  correct,
+  attempted,
+  laneAttempted,
+  totalResponseMs,
+  recent,
+  readinessScore = null,
+  readinessAttempted = 0,
+}) {
+  const hasReadiness = readinessAttempted > 0 && readinessScore !== null;
+  if (attempted < MIN_SKILL_ATTEMPTS && !hasReadiness) {
     const status = skillStatusFor(0, attempted);
     return {
       accuracy: attempted ? Math.round((correct / attempted) * 100) : 0,
@@ -89,15 +116,27 @@ function skillForFamily({ correct, attempted, laneAttempted, totalResponseMs, re
       avgResponseMs: laneAttempted ? Math.round(totalResponseMs / laneAttempted) : 0,
     };
   }
-  const accuracy = Math.round((correct / attempted) * 100);
+  const accuracy = attempted ? Math.round((correct / attempted) * 100) : readinessScore || 0;
   const recentAttempts = recent.length;
   const recentAccuracy = recentAttempts
     ? Math.round((recent.filter((attempt) => attempt.correct).length / recentAttempts) * 100)
     : accuracy;
   const avgResponseMs = laneAttempted ? Math.round(totalResponseMs / laneAttempted) : 0;
   const slowPenalty = avgResponseMs > 8000 ? Math.min(15, ((avgResponseMs - 8000) / 8000) * 10) : 0;
-  const skillScore = clampSkillScore(accuracy * 0.65 + recentAccuracy * 0.35 - slowPenalty);
-  const status = skillStatusFor(skillScore, attempted);
+  const answerSkill =
+    attempted >= MIN_SKILL_ATTEMPTS
+      ? clampSkillScore(accuracy * 0.65 + recentAccuracy * 0.35 - slowPenalty)
+      : null;
+  const skillScore =
+    answerSkill === null
+      ? readinessScore
+      : hasReadiness
+        ? clampSkillScore(answerSkill * 0.75 + readinessScore * 0.25)
+        : answerSkill;
+  const status = skillStatusFor(
+    skillScore,
+    Math.max(attempted, hasReadiness ? MIN_SKILL_ATTEMPTS : 0),
+  );
   return {
     accuracy,
     skillScore,
@@ -284,17 +323,22 @@ export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
   const normalized = normalizeWeaknessState(state.weakness);
   const allLanes = Object.values(normalized.byLane);
   const rankedLanes = rankedWeaknessLanes(normalized);
+  const readinessByFamily = new Map(
+    buildReadinessFamilyRows(state, families).map((row) => [row.id, row]),
+  );
   return families.map((family) => {
     const typeIds = new Set(family.typeIds || []);
     const familyLanes = allLanes.filter((lane) => typeIds.has(lane.typeId));
     const laneTotals = laneTotalsForFamily(familyLanes);
     const cardTotals = cardTotalsForFamily(state, family);
     const totals = cardTotals.attempted ? cardTotals : laneTotals;
+    const readiness = readinessSkillForFamily(readinessByFamily.get(family.id));
     const skill = skillForFamily({
       ...totals,
       laneAttempted: laneTotals.attempted,
       totalResponseMs: laneTotals.totalResponseMs,
       recent: laneTotals.recent,
+      ...readiness,
     });
     const rows = rankedLanes
       .filter((lane) => typeIds.has(lane.typeId))
@@ -315,6 +359,7 @@ export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
       incorrect: totals.incorrect,
       accuracy: skill.accuracy,
       avgResponseMs: skill.avgResponseMs,
+      readinessAttempted: readiness.readinessAttempted,
       skillScore: skill.skillScore,
       skillStatus: skill.skillStatus,
       skillLabel: skill.skillLabel,

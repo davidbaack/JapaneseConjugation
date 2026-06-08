@@ -11,32 +11,33 @@ confirms the new direction, update this document in the same change.
 
 - Top-level sections are Practice, Guide, Stats, Learn, Drills, Tools, and Settings.
 - Practice is the landing page and the main learner loop. It is built around
-  short workouts, not a visible long-term SRS queue.
+  continuous practice, not bounded workouts or a visible long-term SRS queue.
 - Guide is a scaffolded practice mode for recovering the base form, identifying
   the word group, and producing the target conjugation before one final submit.
   It can count as Practice progress after the full guided card is submitted, and
   it records step-level diagnostics separately.
 - Stats contains progress, recommendations, upcoming reviews, and readiness
-  summaries that do not need to block the active workout.
+  summaries that do not need to block active Practice.
 - Learn teaches forms and verb/adjective groups from start to finish. It can
   recommend focused Practice, but it does not gate Practice.
 - Drills contains Ending Lab, group drills, and speed games.
 - Tools contains lookup, check, word management, saved lists, and custom words.
 - Settings is for durable display, audio, sync, backup, and reset preferences.
-  Controls that affect the active workout belong in Practice, Drills, or Tools.
+  Controls that affect active Practice belong in Practice, Drills, or Tools.
 
 ## Practice
 
-- Practice opens directly into the default workout without requiring a Start
-  action.
-- The default workout target is 12 cards. Ready cards still matter, but the
-  learner-facing framing is session progress, ready cards, recent misses,
-  practice history, and next workout rather than SRS intervals.
-- The active card shows session progress. Detailed form and subgroup weakness
-  data lives in the Practice map and Stats.
+- Practice opens directly into the next continuous card without requiring a
+  Start action.
+- Default Practice has no 12-card target, daily-goal stop, or completion
+  summary. The learner-facing framing is continuous cards practiced, recent
+  misses, category progress, practice history, and upcoming reviews.
+- The active card shows continuous Practice status. Detailed form and subgroup
+  weakness data lives in the Practice map and Stats.
 - The persistent Practice map shows all form families, including disabled and
-  untried families. Expanded families show exact-form toggles plus subgroup
-  weakness rows once there is data.
+  untried families. Each family row shows an on/off toggle, lifetime right/wrong
+  counts, and an overall skill visualization. Expanded families show exact-form
+  toggles plus subgroup weakness rows once there is data.
 - Form scope persists through `state.enabledTypes`. The default and reset scope
   is Core plus Everyday.
 - The active card may remove the current word from automatic Practice with an
@@ -45,11 +46,10 @@ confirms the new direction, update this document in the same change.
   forward production card in a cued example sentence with a blank and grammar
   cue, and falls back to the normal prompt for reverse, listening, and
   minimal-pair cards.
-- Session completion leads with "Map updated" and one next action.
 - A targeted "Practice this" launch (a word from Check/Library, a reference
   drill, or a form family) routes straight into the focused cards. It never
   shows the completion summary on arrival, leads with a prominent title banner
-  naming what is being studied, and locks the workout to that item until the
+  naming what is being studied, and locks Practice to that item until the
   learner exits through the banner.
 
 ## Weakness Steering
@@ -60,15 +60,20 @@ confirms the new direction, update this document in the same change.
   na-adjective, iku exception, and godan te/ta sound-change buckets.
 - Each answered card records correctness, response time, form type, word group,
   derived subcategory, and word key.
-- Weakness steering affects workout selection only. It must not shorten SRS
+- Weakness steering affects Practice selection only. It must not shorten SRS
   intervals in this version.
-- Selection uses subcategory-first weighting. Exact missed cards receive some
-  boost, but the broader weak lane receives the main boost.
+- Selection uses the lowest-skill enabled family after delayed retry handling.
+  Exact missed cards reappear roughly five cards later when alternatives exist,
+  and family skill blends lifetime correctness, recent misses, readiness data,
+  and response speed. Untested and barely tested families display as neutral,
+  not weak.
 - Missing godan te-form should boost related godan te-form cards, especially
   fresh or older words in that lane.
-- A workout should avoid repeating the same verb unless there are no good
-  alternatives. Repeat the category plus subcategory pattern more than the exact
-  same word.
+- Default Practice does not prioritize due cards. SRS data may remain stored,
+  but it should not drive the default queue.
+- Practice should avoid repeating the same family or verb unless there are no
+  good alternatives. Repeat the category plus subcategory pattern more than the
+  exact same word.
 
 ## Tools
 

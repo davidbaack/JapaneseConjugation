@@ -11,7 +11,6 @@ import App from '../App.jsx';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
 import { defaultState, localDateKey } from '../utils/storage.js';
 import { recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
-import { TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 
 afterEach(() => {
   cleanup();
@@ -34,13 +33,16 @@ describe('App shell', () => {
     }
   });
 
-  it('lazy-loads Practice directly into a workout for a brand-new learner', async () => {
+  it('lazy-loads directly into continuous Practice for a brand-new learner', async () => {
     render(<App />);
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
-    expect(screen.getByText('Practice map scope')).toBeTruthy();
-    expect(screen.getByText('Saved form scope for future workouts.')).toBeTruthy();
-    expect(screen.getByRole('progressbar', { name: 'Session cards' })).toBeTruthy();
+    expect(screen.getByText('Category progress')).toBeTruthy();
+    expect(screen.getByText('Toggle categories for continuous Practice.')).toBeTruthy();
+    expect(screen.getAllByText('No reps yet').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Untested').length).toBeGreaterThan(0);
+    expect(screen.getByText('Continuous practice')).toBeTruthy();
+    expect(screen.getByText('Practice keeps going until you leave this page.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
     expect(screen.queryByText('Next workout')).toBeNull();
     expect(screen.queryByText('Form families')).toBeNull();
@@ -77,7 +79,7 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Stats', exact: true }));
     expect(await screen.findByRole('region', { name: 'Stats dashboard' })).toBeTruthy();
     expect(screen.getByText('Practice pulse.')).toBeTruthy();
-    expect(screen.getByText('Next workout')).toBeTruthy();
+    expect(screen.getByText('Upcoming reviews')).toBeTruthy();
     expect(screen.getByText('Form families')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
   });
@@ -124,6 +126,8 @@ describe('App shell', () => {
     ).toBe('true');
 
     expect(screen.getByText('2/2 saved')).toBeTruthy();
+    expect(screen.getByText('0 right / 2 wrong')).toBeTruthy();
+    expect(screen.getByText('Gathering data')).toBeTruthy();
     expect(
       screen.getByRole('button', { name: 'Disable all Te/Ta Sound Changes forms' }),
     ).toBeTruthy();
@@ -139,7 +143,7 @@ describe('App shell', () => {
     expect(screen.getByText('Recent weak spots')).toBeTruthy();
   });
 
-  it('does not auto-start a daily drill after today is complete while signed out', async () => {
+  it('keeps continuous Practice available after old daily goal data is complete', async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -165,19 +169,14 @@ describe('App shell', () => {
     render(<App />);
 
     await waitForPracticeCard();
-    await waitFor(() => {
-      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      expect(raw.practicePrefs.wordListIds || []).not.toContain(TODAY_DRILL_LIST_ID);
-    });
+    expect(screen.getByText('Continuous practice')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
   });
 
   it('shows the single Practice flow instead of legacy Study mode controls', async () => {
     render(<App />);
     await waitForPracticeCard();
-    expect(
-      await screen.findByText(/\d+ form types this session/i, {}, { timeout: 5000 }),
-    ).toBeTruthy();
+    expect(await screen.findByText('Form practice', {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
     expect(screen.getByText('52 saved forms')).toBeTruthy();
     // "Sentence" is now the cued-cloze presentation toggle — a valid review

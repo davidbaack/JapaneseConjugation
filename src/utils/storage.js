@@ -21,9 +21,15 @@ import { getMinimalPairSet, mergeMinimalPairProgress } from './minimalPairs.js';
 import { mergePracticePrefs } from './display.js';
 import { normalizeWordListKeys } from './lexiconArtifacts.js';
 import { buildRuleCandidates } from './ruleCandidates.js';
-import { defaultReviewScope, normalizeReviewScope, reviewTypeIdsForState } from './reviewScope.js';
+import {
+  defaultReviewScope,
+  formFamilyForType,
+  normalizeReviewScope,
+  reviewTypeIdsForState,
+} from './reviewScope.js';
 import {
   QUICK_PRACTICE_DEFAULT_TYPE_IDS,
+  buildWeaknessFamilyRows,
   defaultWeaknessState,
   mergeWeaknessState,
   normalizeWeaknessState,
@@ -105,9 +111,7 @@ export function wordKeyFromCardId(cardId) {
 export function dailyNewCardLimit(prefs = DEFAULT_PREFS) {
   const explicit = Number(prefs?.newCardsPerDay || 0);
   if (Number.isFinite(explicit) && explicit > 0) return Math.round(explicit);
-  const dailyGoal = Number(prefs?.dailyGoal || DEFAULT_PREFS.dailyGoal);
-  const goal = Number.isFinite(dailyGoal) && dailyGoal > 0 ? dailyGoal : DEFAULT_PREFS.dailyGoal;
-  return Math.min(60, Math.round(goal));
+  return 60;
 }
 
 export function bonusNewCardLimit(prefs = DEFAULT_PREFS) {
@@ -1354,15 +1358,39 @@ function rotateReviewCandidates(candidates, state, options = {}) {
   return ranked[0] || null;
 }
 
-function pickWeakReview(pool, state, options = {}) {
+function pickSkillReview(pool, state, options = {}) {
   return rotateReviewCandidates(pool, state, {
     ...options,
     rank:
       options.rank ||
       ((a, b) =>
+        a.familySkillScore - b.familySkillScore ||
         b.weakScore - a.weakScore ||
         candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
-    tie: options.tie || ((a, b) => b.weakScore - a.weakScore),
+    tie:
+      options.tie ||
+      ((a, b) =>
+        a.familySkillScore - b.familySkillScore ||
+        b.weakScore - a.weakScore ||
+        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
+  });
+}
+
+function pickReviewedReview(pool, state, options = {}) {
+  return rotateReviewCandidates(pool, state, {
+    ...options,
+    rank:
+      options.rank ||
+      ((a, b) =>
+        a.familySkillScore - b.familySkillScore ||
+        b.weakScore - a.weakScore ||
+        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
+    tie:
+      options.tie ||
+      ((a, b) =>
+        a.familySkillScore - b.familySkillScore ||
+        b.weakScore - a.weakScore ||
+        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
   });
 }
 
@@ -1400,12 +1428,25 @@ function pickFreshReview(pool, options, openBeginnerStage) {
   if (!pool.length) return null;
   return [...pool].sort(
     (a, b) =>
+      (a.familySkillScore || 0) - (b.familySkillScore || 0) ||
       (openBeginnerStage >= 0
         ? beginnerLadderSortScore(a, openBeginnerStage) -
           beginnerLadderSortScore(b, openBeginnerStage)
         : (b.weakScore || 0) - (a.weakScore || 0)) ||
       candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists),
   )[0];
+}
+
+function familyIdForType(typeId) {
+  return formFamilyForType(typeId)?.id || '';
+}
+
+function candidateFamilyId(candidate) {
+  return familyIdForType(candidate?.type || '');
+}
+
+function familyIdFromCardId(cardId) {
+  return familyIdForType(typeIdFromCardId(cardId));
 }
 
 export function selectNext(
@@ -1427,48 +1468,54 @@ export function selectNext(
   const pool = buildWordFormCandidates(verbs, enabledTypes, prefs, candidates);
   if (!pool.length) return null;
   const avail = pool.length > 1 ? pool.filter((p) => p.id !== lastCardId) : pool;
-  const retryIds = new Set(state.retryQueue || []);
-  const retry = avail.filter((p) => retryIds.has(p.id));
-  const due = avail.filter((p) => {
-    const c = state.cards[p.id];
-    return c && c.nextReview <= now;
+  const familySkills = new Map(buildWeaknessFamilyRows(state).map((row) => [row.id, row]));
+  const scoredAvail = avail.map((p) => {
+    const familyId = candidateFamilyId(p);
+    const familySkill = familySkills.get(familyId);
+    const familySkillStatus = familySkill?.skillStatus || 'untested';
+    return {
+      ...p,
+      familyId,
+      familySkillScore: familySkillStatus === 'untested' ? 50 : familySkill?.skillScore || 50,
+      familySkillStatus,
+      weakScore: cardWeakScore(state, p.id, p.verb, p.type),
+    };
   });
+  const retryIds = new Set(state.retryQueue || []);
+  const retry = scoredAvail.filter((p) => retryIds.has(p.id));
+  const due = options.prioritizeDue
+    ? scoredAvail.filter((p) => {
+        const c = state.cards[p.id];
+        return c && c.nextReview <= now;
+      })
+    : [];
   const freshLimit = options.bonusMode ? bonusNewCardLimit(prefs) : dailyNewCardLimit(prefs);
   const canIntroduceFresh = newCardsIntroducedToday(state) < freshLimit;
-  const fresh = canIntroduceFresh
-    ? avail
-        .filter((p) => !state.cards[p.id])
-        .map((p) => ({
-          ...p,
-          weakScore: cardWeakScore(state, p.id, p.verb, p.type),
-        }))
-    : [];
-  const future = avail.filter((p) => {
+  const fresh = canIntroduceFresh ? scoredAvail.filter((p) => !state.cards[p.id]) : [];
+  const reviewed = scoredAvail.filter((p) => state.cards[p.id]);
+  const future = reviewed.filter((p) => {
     const c = state.cards[p.id];
     return c && c.nextReview > now;
   });
   const nearDue = options.bonusMode
     ? future.filter((p) => state.cards[p.id].nextReview <= now + DAY)
     : [];
-  const reviewed = avail.filter((p) => state.cards[p.id]);
-  const dueIds = new Set(due.map((p) => p.id));
   const retryCandidateIds = new Set(retry.map((p) => p.id));
-  const weak = reviewed
-    .filter((p) => !dueIds.has(p.id) && !retryCandidateIds.has(p.id))
-    .map((p) => ({
-      ...p,
-      weakScore: cardWeakScore(state, p.id, p.verb, p.type),
-    }))
-    .filter((p) => p.weakScore > 0);
+  const skill = [...reviewed, ...fresh]
+    .filter((p) => !retryCandidateIds.has(p.id) && p.familySkillStatus !== 'untested')
+    .filter((p, index, arr) => arr.findIndex((item) => item.id === p.id) === index);
   const hasReviewFallback = fresh.length || nearDue.length || future.length;
-  const readyWeak = hasReviewFallback
-    ? weak.filter((p) => !candidateWasSeenRecently(state, p, now))
-    : weak;
+  const readySkill = hasReviewFallback
+    ? skill.filter((p) => !candidateWasSeenRecently(state, p, now))
+    : skill;
   const openBeginnerStage =
     options.beginnerLadder && reviewedCardCount(state) < BEGINNER_LADDER_CARD_COUNT
       ? openBeginnerLadderStage(pool, state)
       : -1;
   const recentIds = new Set((options.recentCardIds || []).filter(Boolean));
+  const lastFamilyId =
+    options.lastFamilyId ||
+    familyIdFromCardId((options.recentCardIds || []).find(Boolean) || lastCardId);
   const recentWordKeys = new Set(
     [...recentIds, ...(options.recentWordKeys || [])]
       .map((id) => (String(id).includes('|') ? wordKeyFromCardId(id) : id))
@@ -1480,22 +1527,28 @@ export function selectNext(
     const wordFiltered = cardFiltered.filter((item) => !recentWordKeys.has(wordSrsKey(item.verb)));
     return wordFiltered.length ? wordFiltered : cardFiltered;
   };
+  const avoidLastFamily = (items) => {
+    if (!lastFamilyId) return items;
+    const filtered = items.filter((item) => item.familyId !== lastFamilyId);
+    return filtered.length ? filtered : items;
+  };
+  const vary = (items) => avoidLastFamily(dropRecentWords(items));
   const choose = (groups) =>
     pickDueReview(groups.due, state) ||
     pickRetryReview(groups.retry, state) ||
-    pickWeakReview(groups.readyWeak, state, options) ||
+    pickSkillReview(groups.readySkill, state, options) ||
     pickFreshReview(groups.fresh, options, openBeginnerStage) ||
     pickFutureReview(groups.nearDue, state, options) ||
-    pickFutureReview(groups.future, state, options);
+    pickReviewedReview(groups.reviewed, state, options);
   let chosen = choose({
-    due: dropRecentWords(due),
-    retry: dropRecentWords(retry),
-    readyWeak: dropRecentWords(readyWeak),
-    fresh: dropRecentWords(fresh),
-    nearDue: dropRecentWords(nearDue),
-    future: dropRecentWords(future),
+    due: vary(due),
+    retry: vary(retry),
+    readySkill: vary(readySkill),
+    fresh: vary(fresh),
+    nearDue: vary(nearDue),
+    reviewed: vary([...nearDue, ...future, ...reviewed]),
   });
-  if (!chosen) chosen = choose({ due, retry, readyWeak, fresh, nearDue, future });
+  if (!chosen) chosen = choose({ due, retry, readySkill, fresh, nearDue, reviewed });
   if (!chosen) return null;
   return {
     id: chosen.id,

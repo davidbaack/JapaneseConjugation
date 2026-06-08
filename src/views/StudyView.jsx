@@ -52,7 +52,6 @@ import {
   markMistakeResolved,
   gradeCard,
   bumpDaily,
-  localDateKey,
   typeIdFromCardId,
 } from '../utils/storage.js';
 import { READINESS_DIMENSIONS, recordReadinessAttempt } from '../utils/readiness.js';
@@ -85,7 +84,6 @@ import {
   recordMinimalPairResult,
 } from '../utils/minimalPairs.js';
 import { buildRuleCandidates } from '../utils/ruleCandidates.js';
-import { TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 import { buildWeaknessFamilyRows, recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
 import {
   excludeWordFromReviewState,
@@ -128,10 +126,6 @@ function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
   const limit = Number(prefs.reviewLimit || 0);
   return Number.isFinite(limit) && limit > 0 ? limit : 0;
-}
-
-function isDailyGoalHitToday(daily) {
-  return daily?.date === localDateKey() && !!daily.goalHit;
 }
 
 function transformationRouteText(sourceInfo, targetInfo) {
@@ -394,15 +388,6 @@ function clearPersistedCurrent() {
   } catch {}
 }
 
-function hasPersistedCurrent() {
-  try {
-    if (typeof sessionStorage === 'undefined') return false;
-    return !!sessionStorage.getItem(STUDY_CURRENT_KEY);
-  } catch {
-    return false;
-  }
-}
-
 function StudyFocusBar({
   allWords,
   sessionFilterWord,
@@ -587,6 +572,13 @@ const WEAKNESS_ROW_TONE = {
   weak: 'bg-rose-500',
 };
 
+const FAMILY_SKILL_TONE = {
+  strong: 'bg-emerald-500',
+  developing: 'bg-amber-500',
+  weak: 'bg-rose-500',
+  untested: 'bg-stone-300 dark:bg-stone-700',
+};
+
 function PracticeScopeSidebar({
   state,
   weaknessFamilies = [],
@@ -612,10 +604,10 @@ function PracticeScopeSidebar({
               Practice map
             </div>
             <h2 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
-              Practice map scope
+              Category progress
             </h2>
             <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              Saved form scope for future workouts.
+              Toggle categories for continuous Practice.
             </p>
           </div>
           <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
@@ -626,7 +618,17 @@ function PracticeScopeSidebar({
           {FORM_GROUPS.map((family) => {
             const enabledInFamily = family.typeIds.filter((typeId) => enabled.has(typeId));
             const allEnabled = enabledInFamily.length === family.typeIds.length;
-            const weaknessRows = weaknessByFamily.get(family.id)?.rows || [];
+            const progress = weaknessByFamily.get(family.id) || {};
+            const weaknessRows = progress.rows || [];
+            const attempted = progress.attempted || 0;
+            const correct = progress.correct || 0;
+            const incorrect = progress.incorrect || 0;
+            const skillStatus = progress.skillStatus || 'untested';
+            const skillLabel = progress.skillLabel || (attempted ? 'Gathering data' : 'Untested');
+            const skillScore = progress.skillScore || 0;
+            const correctPct = attempted ? Math.round((correct / attempted) * 100) : 0;
+            const wrongPct = attempted ? Math.max(0, 100 - correctPct) : 0;
+            const skillWidth = skillStatus === 'untested' ? 8 : Math.max(6, skillScore);
             const open = openFamilyIds.has(family.id);
             const contentId = `practice-map-family-${family.id}`;
             return (
@@ -647,6 +649,44 @@ function PracticeScopeSidebar({
                     </span>
                     <span className="mt-0.5 block text-xs text-stone-500">
                       {enabledInFamily.length}/{family.typeIds.length} saved
+                    </span>
+                    <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-stone-500">
+                      <span>
+                        {attempted ? `${correct} right / ${incorrect} wrong` : 'No reps yet'}
+                      </span>
+                      <span className="font-semibold text-stone-700 dark:text-stone-300">
+                        {skillStatus === 'untested' ? skillLabel : `${skillScore}% skill`}
+                      </span>
+                    </span>
+                    <span className="mt-2 block space-y-1.5">
+                      <span
+                        className="block h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
+                        aria-label={`${family.label} lifetime right and wrong`}
+                      >
+                        {attempted ? (
+                          <>
+                            <span
+                              className="inline-block h-full bg-emerald-500 align-top"
+                              style={{ width: `${correctPct}%` }}
+                            />
+                            <span
+                              className="inline-block h-full bg-rose-400 align-top"
+                              style={{ width: `${wrongPct}%` }}
+                            />
+                          </>
+                        ) : (
+                          <span className="block h-full w-[8%] bg-stone-300 dark:bg-stone-700" />
+                        )}
+                      </span>
+                      <span
+                        className="block h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
+                        aria-label={`${family.label} skill`}
+                      >
+                        <span
+                          className={`block h-full ${FAMILY_SKILL_TONE[skillStatus] || FAMILY_SKILL_TONE.untested}`}
+                          style={{ width: `${skillWidth}%` }}
+                        />
+                      </span>
                     </span>
                   </button>
                   <button
@@ -809,7 +849,6 @@ const READINESS_TONE = {
 // renders it through StudyView's default export.
 export function ReviewsDashboard({
   daily,
-  practicePrefs,
   srsQueue,
   state,
   todayPlan,
@@ -828,16 +867,13 @@ export function ReviewsDashboard({
   onDrillClassify,
   onDrillRush,
 }) {
-  const dailyGoal = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
   const dueDone = srsQueue?.completedDueRuleIds?.length || 0;
   const dashboardDue = todayPlan?.sourceCounts?.due || dueTotal;
-  const workoutTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
-  const progressPct = dueTotal
-    ? Math.min(100, Math.round((dueDone / dueTotal) * 100))
-    : Math.min(100, Math.round(((daily.count || 0) / dailyGoal) * 100));
-  const progressNow = dueTotal ? dueDone : Math.min(daily.count || 0, dailyGoal);
-  const progressMax = dueTotal || dailyGoal;
+  const practiceTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
+  const progressPct = dueTotal ? Math.min(100, Math.round((dueDone / dueTotal) * 100)) : 100;
+  const progressNow = dueTotal ? dueDone : 1;
+  const progressMax = dueTotal || 1;
   const recommendations = state.reviewScope?.recommendations || [];
   const mistakeHistoryCount = (state.mistakes || []).length;
   const strengthRows = formFamilyStrengthRows(state);
@@ -892,14 +928,12 @@ export function ReviewsDashboard({
               }
             : null;
   const weakCount = strengthRows.filter((row) => row.status === 'weak').length;
-  const streak = daily.goalStreak || 0;
   // Progressive disclosure: the forecast, form-family strength, and stat tiles
   // are returning-user signals. A brand-new learner with no history sees only a
   // clean hero and a single Start action — not a wall of zeros.
   const hasHistory =
     strengthRows.some((row) => row.attempted > 0) ||
     (daily.count || 0) > 0 ||
-    streak > 0 ||
     dueTotal > 0 ||
     recommendations.length > 0 ||
     mistakeHistoryCount > 0;
@@ -913,20 +947,19 @@ export function ReviewsDashboard({
               Practice
             </div>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
-              {hasHistory ? 'Start a focused workout.' : 'Begin with practical forms.'}
+              {hasHistory ? 'Continue continuous Practice.' : 'Begin with practical forms.'}
             </h2>
             <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
               {hasHistory
-                ? 'Ready cards come first, then the workout fills with recent misses and varied words in the same weak patterns.'
-                : 'Start with a 12-card workout drawn from your Practice map. The map will learn what to repeat as you answer.'}
+                ? 'Practice starts with your lowest-skill enabled categories, with recent misses returning after a short delay.'
+                : 'Start continuous Practice from your Practice map. The map will learn what to repeat as you answer.'}
             </p>
             {hasHistory && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {[
                   ['Ready now', dashboardDue],
-                  ['Today', `${daily.count || 0}/${dailyGoal}`],
+                  ['Today', `${daily.count || 0} cards`],
                   ['Recent misses', weakCount],
-                  ...(streak > 0 ? [['Streak', `${streak} day${streak === 1 ? '' : 's'}`]] : []),
                 ].map(([label, value]) => (
                   <div
                     key={label}
@@ -947,20 +980,18 @@ export function ReviewsDashboard({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                  Session cards
+                  Continuous Practice
                 </div>
                 <div className="mt-1 text-sm text-stone-600 dark:text-stone-300">
-                  {dueTotal
-                    ? `${dueDone}/${dueTotal} ready cards practiced`
-                    : '12-card workout ready'}
+                  {dueTotal ? `${dueDone}/${dueTotal} ready cards practiced` : 'Practice is ready'}
                 </div>
-                {!!workoutTypeCount && (
+                {!!practiceTypeCount && (
                   <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 text-xs dark:border-indigo-900/60 dark:bg-stone-950/30">
                     <span className="font-medium text-stone-600 dark:text-stone-300">
                       Form types selected
                     </span>
                     <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                      {workoutTypeCount}
+                      {practiceTypeCount}
                     </span>
                   </div>
                 )}
@@ -984,7 +1015,7 @@ export function ReviewsDashboard({
               disabled={!todayPlan.available && !todayDrillActive}
               className="mt-4 w-full rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400"
             >
-              {todayDrillActive ? 'Continue workout' : 'Start workout'}
+              Open Practice
             </button>
             {retestCount > 0 && (
               <button
@@ -1053,7 +1084,7 @@ export function ReviewsDashboard({
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
             <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
-              Next workout
+              Upcoming reviews
             </div>
             <div className="grid grid-cols-5 gap-2">
               {reviewForecastRows(todayPlan.upcomingForecast).map(([label, value]) => (
@@ -1246,11 +1277,6 @@ export default function StudyView() {
     studyFocus: focus,
     clearStudyFocus: onFocusConsumed,
     hydrated,
-    todayPlan,
-    todayDrillActive: contextTodayDrillActive,
-    srsQueue,
-    startTodayDrill,
-    markSrsQueueCompleted,
   } = useApp();
   const [current, setCurrent] = useState(null);
   const [answer, setAnswer] = useState('');
@@ -1275,10 +1301,6 @@ export default function StudyView() {
   const [speechListening, setSpeechListening] = useState(false);
   const [speechError, setSpeechError] = useState('');
   const [reviewBase, setReviewBase] = useState(state.session.reviewed || 0);
-  const startedGoalHit = useRef(isDailyGoalHitToday(state.daily || {}));
-  const seededInitialDailyGoalRef = useRef(false);
-  const autoStartedTodayRef = useRef(false);
-  const defaultWorkoutTargetRef = useRef(null);
   const [bonusMode, setBonusMode] = useState(false);
   const [undoReviewScopeAction, setUndoReviewScopeAction] = useState(null);
   const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
@@ -1306,7 +1328,6 @@ export default function StudyView() {
     () => focus?.recommendation || null,
   );
   const [openPracticeMapFamilyIds, setOpenPracticeMapFamilyIds] = useState(() => new Set());
-  const [todayMinimalPairSetIds, setTodayMinimalPairSetIds] = useState([]);
   const inputRef = useRef(null);
   const nextButtonRef = useRef(null);
   const focusSeededRef = useRef(false);
@@ -1324,22 +1345,14 @@ export default function StudyView() {
   const wrongSnapshotRef = useRef(null);
   const typingHintRef = useRef(null);
 
-  const todayDrillActive =
-    contextTodayDrillActive ??
-    (!practicePrefs.minimalPairSetId &&
-      !practicePrefs.reviewLimitSource &&
-      (practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID));
   const enabledTypes = useMemo(() => {
     if (sessionFilterFormGroupId) {
       const group = FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId);
       if (group?.typeIds?.length) return group.typeIds;
     }
-    if (todayDrillActive && todayPlan?.typeIds?.length) {
-      return reviewTypeIdsForState(state, todayPlan.typeIds);
-    }
     const baseTypes = state.enabledTypes?.length ? state.enabledTypes : ['plain-past'];
     return reviewTypeIdsForState(state, baseTypes);
-  }, [state, sessionFilterFormGroupId, todayDrillActive, todayPlan?.typeIds]);
+  }, [state, sessionFilterFormGroupId]);
   const practiceWords = useMemo(() => {
     const base = filterWordsForStudyScope(
       verbs,
@@ -1437,9 +1450,7 @@ export default function StudyView() {
   const weaknessFamilies = useMemo(() => buildWeaknessFamilyRows(state), [state.weakness]);
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
-  const todayGoalHit = isDailyGoalHitToday(daily);
   const boundedReviewLaunchActive = activeReviewLimitFromPrefs(practicePrefs) > 0;
-  const canResumePersistedCurrent = hasPersistedCurrent();
   const specialLaunchActive =
     !!focus?.word ||
     !!focus?.formGroupId ||
@@ -1452,32 +1463,15 @@ export default function StudyView() {
     !!launchContext ||
     boundedReviewLaunchActive ||
     !!activeMinimalPairSet;
-  const retiredReviewLimitSource =
-    !!practicePrefs.reviewLimitSource && !REVIEW_LIMIT_SOURCES.has(practicePrefs.reviewLimitSource);
-  const canAutoStartDefaultWorkout =
-    !todayDrillActive &&
-    !specialLaunchActive &&
-    !canResumePersistedCurrent &&
-    !todayGoalHit &&
-    !retiredReviewLimitSource &&
-    !!todayPlan?.available;
   const reviewSelectionOptions = useMemo(
     () => ({
       bonusMode,
       wordLists,
-      beginnerLadder: todayDrillActive && !specialLaunchActive,
+      beginnerLadder: !specialLaunchActive,
     }),
-    [bonusMode, wordLists, todayDrillActive, specialLaunchActive],
+    [bonusMode, wordLists, specialLaunchActive],
   );
-  const todayMinimalPairSet = useMemo(() => {
-    if (activeMinimalPairSet || !current) return null;
-    return (
-      todayMinimalPairSetIds
-        .map((setId) => getMinimalPairSet(setId))
-        .find((set) => minimalPairSetMatchesCard(set, current.verb, current.type)) || null
-    );
-  }, [activeMinimalPairSet, current, todayMinimalPairSetIds]);
-  const minimalPairSetForCurrent = activeMinimalPairSet || todayMinimalPairSet;
+  const minimalPairSetForCurrent = activeMinimalPairSet;
   // Cued cloze: when Sentence mode is on, wrap a normal forward production card
   // in an example sentence with a blank. Only the Japanese frame + grammar cue
   // are shown (never the "Fill in: word (reading)" prefix, which would leak the
@@ -1506,7 +1500,7 @@ export default function StudyView() {
       focusSeededRef.current = true;
       setFocusWordLock(focus.word);
       setRecommendationFocus(null);
-      // Lock the workout to this word so every follow-up card stays on it until
+      // Lock Practice to this word so every follow-up card stays on it until
       // the learner exits the focus banner (rather than mixing back into the
       // general queue after the first seeded card).
       setSessionFilterWord(focus.word);
@@ -1558,9 +1552,6 @@ export default function StudyView() {
       onFocusConsumed?.();
       resetActiveAttempt();
     }
-    if (!autoStartedTodayRef.current && canAutoStartDefaultWorkout) {
-      launchTodayDrill();
-    }
     if (current !== null) return;
     const persisted =
       focus?.word || focus?.formGroupId || focus?.recommendation
@@ -1594,14 +1585,7 @@ export default function StudyView() {
     reviewSelectionOptions,
     focus,
     specialLaunchActive,
-    canAutoStartDefaultWorkout,
   ]);
-
-  useEffect(() => {
-    if (!hydrated || seededInitialDailyGoalRef.current) return;
-    seededInitialDailyGoalRef.current = true;
-    if (todayGoalHit) startedGoalHit.current = true;
-  }, [hydrated, todayGoalHit]);
 
   // Persist the active card so a refresh resumes it instead of drawing fresh.
   useEffect(() => {
@@ -1930,31 +1914,7 @@ export default function StudyView() {
   const sessionSkipped = state.session?.skipped || 0;
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit && !recommendationFocus;
   const wordSweepComplete = !!wordSweep?.complete;
-  // Ready-card completion flags
-  const queuedDueRuleIds = srsQueue?.dueRuleIds || [];
-  const completedDueCount = srsQueue?.completedDueRuleIds?.length || 0;
-  const initialDue = queuedDueRuleIds.length;
-  const dueQueueDone = initialDue > 0 && completedDueCount >= initialDue && !bonusMode;
-  const dailyGoalJustHit =
-    todayGoalHit && !startedGoalHit.current && seededInitialDailyGoalRef.current && !bonusMode;
-  // A targeted "Practice this" launch (a word, a reference drill, or a form
-  // family) locks the workout to that item. While a focus is active we never
-  // surface the "Map updated" completion summary — entries route straight into
-  // the focused cards and keep serving them until the learner exits the banner.
-  const focusSession = !!(
-    focusWordLock ||
-    sessionFilterWord ||
-    sessionFilterFormGroupId ||
-    recommendationFocus
-  );
-  const reviewComplete = wordSweepComplete || ((dueQueueDone || dailyGoalJustHit) && !focusSession);
-  const plannedDefaultProgressMax = Math.max(1, Number(todayPlan?.reviewLimit || dailyGoalTarget));
-  if (reviewLimit > 0 || initialDue > 0 || bonusMode || !todayDrillActive) {
-    defaultWorkoutTargetRef.current = null;
-  } else if (!defaultWorkoutTargetRef.current) {
-    defaultWorkoutTargetRef.current = plannedDefaultProgressMax;
-  }
-  const defaultProgressMax = defaultWorkoutTargetRef.current || plannedDefaultProgressMax;
+  const reviewComplete = wordSweepComplete;
   const workoutProgress = wordSweep
     ? {
         now: Math.min(wordSweep.completedTypeIds?.length || 0, wordSweep.allTypeIds?.length || 1),
@@ -1967,20 +1927,16 @@ export default function StudyView() {
           max: reviewLimit,
           label: reviewLimitSource === 'recommendation' ? 'Recommended progress' : 'Drill progress',
         }
-      : initialDue > 0 && !bonusMode && !focusSession
-        ? {
-            now: Math.min(completedDueCount, initialDue),
-            max: initialDue,
-            label: 'Ready-card progress',
-          }
-        : {
-            now: Math.min(reviewsDone, defaultProgressMax),
-            max: defaultProgressMax,
-            label: bonusMode ? 'Bonus cards' : 'Session cards',
-          };
-  const workoutProgressPct = workoutProgress.max
-    ? Math.min(100, Math.round((workoutProgress.now / workoutProgress.max) * 100))
-    : 0;
+      : {
+          now: reviewsDone,
+          max: 0,
+          label: bonusMode ? 'Bonus practice' : 'Continuous practice',
+          continuous: true,
+        };
+  const workoutProgressPct =
+    workoutProgress.max && !workoutProgress.continuous
+      ? Math.min(100, Math.round((workoutProgress.now / workoutProgress.max) * 100))
+      : 0;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishMeaning = englishHintsHidden && phase === 'answering';
   // Guided kana is now an in-box "reveal next" action, not a separate mode.
@@ -2237,27 +2193,6 @@ export default function StudyView() {
     setCurrent(null);
   }
 
-  function launchTodayDrill() {
-    if (!todayPlan.available) return;
-    autoStartedTodayRef.current = true;
-    clearPersistedCurrent();
-    const launched = startTodayDrill?.(todayPlan);
-    if (launched === false) return;
-    defaultWorkoutTargetRef.current = Math.max(
-      1,
-      Number(todayPlan?.reviewLimit || dailyGoalTarget),
-    );
-    setBonusMode(false);
-    setTodayMinimalPairSetIds(todayPlan.minimalPairSetIds);
-    setFocusWordLock(null);
-    setWordSweep(null);
-    setRecommendationFocus(null);
-    setLaunchContext(null);
-    setReviewBase(state.session?.reviewed || 0);
-    resetActiveAttempt();
-    setTab('practice');
-  }
-
   function chooseFocusWord(word) {
     if (word) {
       setState((prev) => includeWordInReviewState(prev, word));
@@ -2471,7 +2406,6 @@ export default function StudyView() {
       },
       daily: newDaily,
     };
-    if (ok && queuedDueRuleIds.includes(rid)) markSrsQueueCompleted?.(rid);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
@@ -2491,15 +2425,9 @@ export default function StudyView() {
     setWasCorrected(finalOk && !ok);
     setWasCorrect(ok);
     setPhase('reviewing');
-    const willClearDue =
-      initialDue > 0 && ok && queuedDueRuleIds.includes(rid) && completedDueCount + 1 >= initialDue;
-    const willHitDailyGoal =
-      !startedGoalHit.current && !bonusMode && newDaily.goalHit && !daily.goalHit;
     const reviewWillComplete =
       sweepStep?.sweep?.complete ||
-      (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) ||
-      willClearDue ||
-      willHitDailyGoal;
+      (reviewLimit > 0 && !recommendationFocus && reviewsDone + 1 >= reviewLimit);
     if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
@@ -2649,7 +2577,6 @@ export default function StudyView() {
       },
       daily: newDaily,
     };
-    if (ok && queuedDueRuleIds.includes(rid)) markSrsQueueCompleted?.(rid);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
@@ -2664,15 +2591,9 @@ export default function StudyView() {
     setLastDiagnosis(mistakeDiagnosis);
     setWasCorrect(ok);
     setPhase('reviewing');
-    const willClearDue =
-      initialDue > 0 && ok && queuedDueRuleIds.includes(rid) && completedDueCount + 1 >= initialDue;
-    const willHitDailyGoal =
-      !startedGoalHit.current && !bonusMode && newDaily.goalHit && !daily.goalHit;
     const reviewWillComplete =
       sweepStep?.sweep?.complete ||
-      (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) ||
-      willClearDue ||
-      willHitDailyGoal;
+      (reviewLimit > 0 && !recommendationFocus && reviewsDone + 1 >= reviewLimit);
     if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
@@ -2838,8 +2759,7 @@ export default function StudyView() {
     updateTypedAnswer(toKanaInputValue(event.currentTarget.value), options);
   }
 
-  // Workout completion screen — shown once when the ready queue is cleared
-  // or the session limit is reached. Bonus mode lets the user keep practicing.
+  // Focused word-form sweeps can complete; default Practice keeps going.
   if (reviewComplete && phase === 'answering') {
     const sessionCorrect = state.session.correct || 0;
     const sessionReviewed = state.session.reviewed || 0;
@@ -2847,18 +2767,15 @@ export default function StudyView() {
     const sessionAccuracy = sessionReviewed
       ? Math.round((sessionCorrect / sessionReviewed) * 100)
       : 0;
-    const fLabel = todayPlan.forecastLabel;
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
-          {wordSweepComplete ? 'Drill complete' : 'Map updated'}
+          Drill complete
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-1">
-          {dueQueueDone ? `${completedDueCount}/${initialDue}` : sessionReviewed}
+          {sessionReviewed}
         </div>
-        <div className="text-sm text-stone-400 mb-3">
-          {dueQueueDone ? 'ready cards practiced' : 'cards practiced'}
-        </div>
+        <div className="text-sm text-stone-400 mb-3">cards practiced</div>
         <div className="flex justify-center gap-2 mb-2">
           <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
             {sessionCorrect} correct
@@ -2875,26 +2792,12 @@ export default function StudyView() {
           )}
         </div>
         <div className="text-sm text-stone-500 mb-1">{sessionAccuracy}% accuracy</div>
-        {fLabel && (
-          <div className="mt-3 mb-2 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 px-4 py-2.5">
-            <div className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-1">
-              Coming up
-            </div>
-            <div className="text-xs text-stone-600 dark:text-stone-300">{fLabel}</div>
-          </div>
-        )}
-        {!fLabel && <div className="mb-3" />}
         {(daily.bestAnswerStreak || 0) >= 5 && (
           <div className="text-xs text-stone-400 mb-1">
             Best streak: {daily.bestAnswerStreak} in a row
           </div>
         )}
-        {!!daily.goalStreak && (
-          <div className="text-amber-600 dark:text-amber-400 text-sm mt-1 mb-3">
-            🔥 {daily.goalStreak}-day streak
-          </div>
-        )}
-        {!daily.goalStreak && <div className="mb-3" />}
+        <div className="mb-3" />
         {sessionMistakePatterns.length > 0 ? (
           <div className="mb-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/10 px-4 py-3 text-left">
             <div className="flex items-start justify-between gap-3">
@@ -2932,7 +2835,7 @@ export default function StudyView() {
           sessionWrong === 0 &&
           sessionReviewed > 0 && (
             <div className="text-xs text-emerald-600 dark:text-emerald-400 mb-4">
-              Perfect session — no missed answers!
+              No missed answers in this drill.
             </div>
           )
         )}
@@ -2945,7 +2848,7 @@ export default function StudyView() {
           }}
           className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium"
         >
-          Start next workout
+          Continue Practice
         </button>
       </div>
     );
@@ -2963,7 +2866,7 @@ export default function StudyView() {
           {state.session.correct}/{state.session.reviewed}
         </div>
         <div className="text-sm text-stone-500 mb-1">
-          Session accuracy:{' '}
+          Drill accuracy:{' '}
           {state.session.reviewed
             ? Math.round((state.session.correct / state.session.reviewed) * 100)
             : 0}
@@ -3013,17 +2916,13 @@ export default function StudyView() {
         <button
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
-            defaultWorkoutTargetRef.current = Math.max(
-              1,
-              Number(todayPlan?.reviewLimit || dailyGoalTarget),
-            );
             setCurrent(selectNextReviewCard(state, current.id));
             setAnswer('');
             setPhase('answering');
           }}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium"
         >
-          Start next workout
+          Continue Practice
         </button>
       </div>
     );
@@ -3091,8 +2990,8 @@ export default function StudyView() {
     return next;
   }
 
-  // Universal escape hatch back to Stats. Exits whatever focused session is
-  // active (minimal-pair contrast, bounded practice, or a focus-word lock).
+  // Universal escape hatch back to Stats. Exits whatever focused practice is
+  // active (minimal-pair contrast, bounded drill, or a focus-word lock).
   function returnToOverview() {
     if (activeMinimalPairSet) {
       const restoreTypes = minimalPairReturnEnabledTypes(practicePrefs) || [];
@@ -3118,7 +3017,7 @@ export default function StudyView() {
 
   // Title banner for a focused "Practice this" launch. Generalizes the older
   // reference-drill banner so every targeted entry (a Check/Library word, a
-  // reference drill, or a form family) leads the active workout with a clear
+  // reference drill, or a form family) leads the active practice with a clear
   // title of what is being studied plus a single exit affordance.
   const focusBannerGroup = sessionFilterFormGroupId
     ? FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId)
@@ -3154,7 +3053,7 @@ export default function StudyView() {
       }
     : focusBannerGroup
       ? {
-          kicker: 'Form family workout',
+          kicker: 'Form family practice',
           title: focusBannerGroup.label,
           reading: '',
           subtitle: focusBannerGroup.typeIds?.length
@@ -3253,8 +3152,8 @@ export default function StudyView() {
             </div>
           </div>
         )}
-        <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3">
-          <div className="flex items-center gap-2.5">
+        <div className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex w-full items-center gap-2.5 sm:w-auto">
             {!focusBanner && (
               <button
                 type="button"
@@ -3270,15 +3169,11 @@ export default function StudyView() {
                 Practice
               </div>
               <div className="text-sm text-stone-600 dark:text-stone-300">
-                {todayDrillActive && todayPlan?.typeIds?.length
-                  ? `${todayPlan.typeIds.length} form types this session`
-                  : reverseDrill
-                    ? 'Reading practice'
-                    : 'Form practice'}
+                {reverseDrill ? 'Reading practice' : 'Form practice'}
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
             <div
               role="group"
               aria-label="Answer style"
@@ -3324,7 +3219,7 @@ export default function StudyView() {
                 Kana help {liveKanaHelpEnabled ? 'on' : 'off'}
               </button>
             )}
-            <div className="text-xs text-stone-400 text-right">Workout</div>
+            <div className="text-xs text-stone-400 text-right">Practice</div>
             <button
               type="button"
               onClick={() =>
@@ -3368,23 +3263,38 @@ export default function StudyView() {
             <div className="text-xs font-semibold uppercase tracking-wider text-stone-500">
               {workoutProgress.label}
             </div>
-            <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
-              {workoutProgress.now}/{workoutProgress.max} cards
+            {workoutProgress.continuous ? (
+              <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
+                {workoutProgress.now} cards this run
+              </div>
+            ) : (
+              <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
+                {workoutProgress.now}/{workoutProgress.max} cards
+              </div>
+            )}
+          </div>
+          {workoutProgress.continuous ? (
+            <div
+              role="status"
+              className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-500 dark:bg-stone-950 dark:text-stone-400"
+            >
+              Practice keeps going until you leave this page.
             </div>
-          </div>
-          <div
-            role="progressbar"
-            aria-label={workoutProgress.label}
-            aria-valuemin={0}
-            aria-valuemax={workoutProgress.max}
-            aria-valuenow={workoutProgress.now}
-            className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
-          >
-            <span
-              className="block h-full rounded-full bg-indigo-600 dark:bg-indigo-400"
-              style={{ width: `${workoutProgressPct}%` }}
-            />
-          </div>
+          ) : (
+            <div
+              role="progressbar"
+              aria-label={workoutProgress.label}
+              aria-valuemin={0}
+              aria-valuemax={workoutProgress.max}
+              aria-valuenow={workoutProgress.now}
+              className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
+            >
+              <span
+                className="block h-full rounded-full bg-indigo-600 dark:bg-indigo-400"
+                style={{ width: `${workoutProgressPct}%` }}
+              />
+            </div>
+          )}
           {!!sessionSkipped && (
             <div className="mt-1 text-right text-[11px] text-stone-400">
               {sessionSkipped} skipped
@@ -3396,21 +3306,13 @@ export default function StudyView() {
             <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
               JLPT {getWordMeta(current.verb).jlpt}
             </div>
-            {reviewLimit > 0 ||
-            !!sessionSkipped ||
-            initialDue > 0 ||
-            (!daily.goalHit && !bonusMode) ? (
+            {reviewLimit > 0 || !!sessionSkipped || bonusMode ? (
               <div className="flex justify-end mb-3">
                 <div className="text-xs text-stone-400 text-right shrink-0">
                   {reviewLimit > 0 && (
                     <div className="text-indigo-600 dark:text-indigo-400 font-medium">
                       {Math.min(reviewsDone, reviewLimit)}/{reviewLimit}{' '}
                       {reviewLimitSource === 'recommendation' ? 'recommended' : 'drill'}
-                    </div>
-                  )}
-                  {initialDue > 0 && !bonusMode && (
-                    <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-                      {completedDueCount}/{initialDue} ready
                     </div>
                   )}
                   {bonusMode && (
@@ -3576,9 +3478,7 @@ export default function StudyView() {
                         </span>
                         <span>{minimalPairSetForCurrent.label}</span>
                         {reviewsDone > 0 && (
-                          <span className="tabular-nums opacity-70">
-                            {reviewsDone} this session
-                          </span>
+                          <span className="tabular-nums opacity-70">{reviewsDone} this run</span>
                         )}
                       </div>
                       {activeMinimalPairSet && (

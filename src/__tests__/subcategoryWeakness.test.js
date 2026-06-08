@@ -100,9 +100,13 @@ describe('subcategory weakness model', () => {
 
     expect(weaknessScoreForCard(weakness, TABERU, 'plain-past')).toBe(0);
     expect(rankedWeaknessLanes(weakness)).toEqual([]);
-    expect(buildWeaknessFamilyRows({ weakness }).every((family) => family.rows.length === 0)).toBe(
-      true,
-    );
+    const familyRows = buildWeaknessFamilyRows({ weakness });
+    expect(familyRows.every((family) => family.rows.length === 0)).toBe(true);
+    const teTa = familyRows.find((family) => family.id === 'te-ta-sound-changes');
+    expect(teTa.correct).toBe(1);
+    expect(teTa.incorrect).toBe(0);
+    expect(teTa.skillStatus).toBe('untested');
+    expect(teTa.skillLabel).toBe('Gathering data');
   });
 
   it('selects fresh related cards in a weak subcategory before unrelated cards', () => {
@@ -139,7 +143,7 @@ describe('subcategory weakness model', () => {
     expect(second.verb.dict).not.toBe(first.verb.dict);
   });
 
-  it('still prefers an actually ready card before filling with weak fresh lanes', () => {
+  it('prefers weak family practice before due cards in default continuous Practice', () => {
     const weakness = withMisses(defaultWeaknessState(), KAKU, 'te-form', 3);
     const dueId = cardIdFor(TABERU, 'plain-past');
     const state = {
@@ -160,6 +164,7 @@ describe('subcategory weakness model', () => {
 
     const card = selectNext(state, [TABERU, KAKU, KIKU], ['plain-past', 'te-form']);
 
-    expect(card.id).toBe(dueId);
+    expect(card.type).toBe('te-form');
+    expect(card.id).not.toBe(dueId);
   });
 });

@@ -56,7 +56,8 @@ test.describe('Tab navigation', () => {
     const practiceTab = page.locator('nav').getByRole('tab', { name: 'Practice', exact: true });
     await expect(practiceTab).toHaveClass(/font-semibold/);
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
-    await expect(page.getByRole('progressbar', { name: 'Session cards' })).toBeVisible();
+    await expect(page.getByText('Continuous practice')).toBeVisible();
+    await expect(page.getByText('Practice keeps going until you leave this page.')).toBeVisible();
     await expect(page.getByRole('button', { name: /Start workout|Continue workout/ })).toHaveCount(
       0,
     );
