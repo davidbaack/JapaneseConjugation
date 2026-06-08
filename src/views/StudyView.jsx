@@ -3306,60 +3306,23 @@ export default function StudyView() {
             <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
               JLPT {getWordMeta(current.verb).jlpt}
             </div>
-            {reviewLimit > 0 || !!sessionSkipped || bonusMode ? (
-              <div className="flex justify-end mb-3">
-                <div className="text-xs text-stone-400 text-right shrink-0">
-                  {reviewLimit > 0 && (
-                    <div className="text-indigo-600 dark:text-indigo-400 font-medium">
-                      {Math.min(reviewsDone, reviewLimit)}/{reviewLimit}{' '}
-                      {reviewLimitSource === 'recommendation' ? 'recommended' : 'drill'}
-                    </div>
-                  )}
-                  {bonusMode && (
-                    <div className="text-emerald-600 dark:text-emerald-400 font-medium">bonus</div>
-                  )}
-                  {!!sessionSkipped && (
-                    <div className="text-stone-500">{sessionSkipped} skipped</div>
-                  )}
-                  <div className="text-[9px]">
-                    {[
-                      getWordMeta(current.verb).lesson &&
-                        `Genki L${getWordMeta(current.verb).lesson}`,
-                      getWordMeta(current.verb).minnaLesson &&
-                        `Minna L${getWordMeta(current.verb).minnaLesson}`,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="absolute top-4 right-4 sm:top-8 sm:right-6 text-right text-[9px] text-stone-400">
-                {[
-                  getWordMeta(current.verb).lesson && `Genki L${getWordMeta(current.verb).lesson}`,
-                  getWordMeta(current.verb).minnaLesson &&
-                    `Minna L${getWordMeta(current.verb).minnaLesson}`,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
-            )}
+            <div className="absolute top-4 right-4 sm:top-8 sm:right-6 text-right text-[9px] text-stone-400">
+              {[
+                getWordMeta(current.verb).lesson && `Genki L${getWordMeta(current.verb).lesson}`,
+                getWordMeta(current.verb).minnaLesson &&
+                  `Minna L${getWordMeta(current.verb).minnaLesson}`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
             {clozePrompt && (
               <div className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-                  Sentence
-                </div>
                 <ScriptDisplay
                   view={clozePromptView}
-                  className="mt-1 text-lg leading-relaxed text-stone-900 dark:text-stone-100"
+                  className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
                   subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
                   colorHighlight={false}
                 />
-                {clozePrompt.cue && (
-                  <div className="mt-1.5 text-[11px] leading-snug text-indigo-700/80 dark:text-indigo-300/80">
-                    {clozePrompt.cue}
-                  </div>
-                )}
               </div>
             )}
             {hidePromptText ? (
