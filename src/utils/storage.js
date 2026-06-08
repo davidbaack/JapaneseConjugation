@@ -1526,9 +1526,7 @@ export function selectNext(
   const hasReviewFallback = fresh.length || nearDue.length || future.length;
   // Keep recently shown skill cards out of rotation by card count (they reappear
   // roughly five cards later), not by wall-clock time.
-  const readySkill = hasReviewFallback
-    ? skill.filter((p) => !recentIds.has(p.id))
-    : skill;
+  const readySkill = hasReviewFallback ? skill.filter((p) => !recentIds.has(p.id)) : skill;
   const openBeginnerStage =
     options.beginnerLadder && reviewedCardCount(state) < BEGINNER_LADDER_CARD_COUNT
       ? openBeginnerLadderStage(pool, state)
