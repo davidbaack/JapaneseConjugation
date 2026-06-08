@@ -17,12 +17,15 @@ import { dirname, join } from 'node:path';
 import { inflateVerbRows, mergeBuiltInWords } from '../src/data/verbLexicon.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../src/data/starterWords.js';
 import { surfaceFormFor, wordKey } from '../src/utils/conjugator.js';
-import { buildSegments, validateGenerated } from './sentencePipeline.js';
+import { buildSegments, capTemplates, validateGenerated } from './sentencePipeline.js';
 
 const LEXICON_PATH = join('public', 'data', 'verb-lexicon.json');
 const DRY_RUN = process.env.SENTENCE_DRY_RUN === '1';
 const UPSERT_CHUNK = 500;
 const MODEL = process.env.SENTENCE_MODEL || 'codex';
+// Max times any single sentence template may be reused across this run (0 = off).
+// Enforced across all files passed to one invocation, so import outputs together.
+const TEMPLATE_CAP = Number(process.env.SENTENCE_TEMPLATE_CAP || 100);
 // Set SENTENCE_NO_KUROMOJI=1 to skip kuromoji and use the model's own segments.
 const USE_KUROMOJI = process.env.SENTENCE_NO_KUROMOJI !== '1';
 
@@ -161,10 +164,36 @@ async function main() {
     }
   }
 
-  console.log(`${accepted.length} valid row(s)${DRY_RUN ? ' (dry run, not upserted)' : ''}`);
-  if (!DRY_RUN && accepted.length) {
-    await upsertRows(accepted);
-    console.log(`Upserted ${accepted.length} row(s).`);
+  // Reject over-reused sentence templates across the whole run.
+  let toUpsert = accepted;
+  if (TEMPLATE_CAP > 0 && accepted.length) {
+    const { kept, rejected } = capTemplates(accepted, TEMPLATE_CAP);
+    if (rejected.length) {
+      const path = join(dirname(inputs[0]), 'template-overused.rejects.jsonl');
+      writeFileSync(
+        path,
+        rejected
+          .map((r) =>
+            JSON.stringify({
+              word_key: r.word_key,
+              type: r.type,
+              ja_template: r.ja_template,
+              reason: 'template-overused',
+            }),
+          )
+          .join('\n') + '\n',
+      );
+      console.log(
+        `${rejected.length} row(s) exceeded the template cap (${TEMPLATE_CAP}) -> ${path}`,
+      );
+    }
+    toUpsert = kept;
+  }
+
+  console.log(`${toUpsert.length} valid row(s)${DRY_RUN ? ' (dry run, not upserted)' : ''}`);
+  if (!DRY_RUN && toUpsert.length) {
+    await upsertRows(toUpsert);
+    console.log(`Upserted ${toUpsert.length} row(s).`);
   }
 }
 
