@@ -12,13 +12,14 @@ import { useTablist } from './components/useTablist.js';
 const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
 const StatsView = React.lazy(() => import('./views/StatsView.jsx'));
 const LessonsView = React.lazy(() => import('./views/LessonsView.jsx'));
+const PracticeLabView = React.lazy(() => import('./views/PracticeLabView.jsx'));
 const ToolsView = React.lazy(() => import('./views/ToolsView.jsx'));
 const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
 const DevHistoryPanel = import.meta.env.DEV
   ? React.lazy(() => import('./components/DevHistoryPanel.jsx'))
   : null;
 
-const TABS = ['practice', 'stats', 'learn', 'tools', 'settings'];
+const TABS = ['practice', 'stats', 'learn', 'drills', 'tools', 'settings'];
 
 function AppShell() {
   const { tab, setTab, showAuthModal, setShowAuthModal, supabase } = useApp();
@@ -66,6 +67,7 @@ function AppShell() {
             {tab === 'practice' && <StudyView />}
             {tab === 'stats' && <StatsView />}
             {tab === 'learn' && <LessonsView />}
+            {tab === 'drills' && <PracticeLabView />}
             {tab === 'tools' && <ToolsView />}
             {tab === 'settings' && <SettingsView />}
           </div>

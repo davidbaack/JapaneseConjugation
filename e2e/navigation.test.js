@@ -4,6 +4,7 @@ const TABS = [
   { id: 'practice', label: 'Practice' },
   { id: 'stats', label: 'Stats' },
   { id: 'learn', label: 'Learn' },
+  { id: 'drills', label: 'Drills' },
   { id: 'tools', label: 'Tools' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -12,7 +13,8 @@ const VIEW_ANCHORS = {
   practice: () => /Practice map/,
   stats: () => /Practice pulse/,
   learn: () => /Conjugation formation guide/,
-  tools: () => /Lookup, check, repair drills, and word management/,
+  drills: () => /Focused exercises for endings, groups, and speed/,
+  tools: () => /Lookup, check, word lists, and word management/,
   settings: () => /Display scripts/,
 };
 
@@ -68,8 +70,9 @@ test.describe('Tab navigation', () => {
     await expect(page.getByRole('tab', { name: /^Lookup/ })).toBeVisible();
     await expect(page.getByRole('tab', { name: /^Check/ })).toBeVisible();
     await expect(page.getByRole('tab', { name: /^Words/ })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /^Groups/ })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /^Rush/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Ending Lab/ })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: /^Groups/ })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: /^Rush/ })).toHaveCount(0);
     await expect(page.getByRole('tab', { name: /^Lists/ })).toBeVisible();
     await expect(page.getByRole('tab', { name: /^Custom words/ })).toBeVisible();
 
@@ -94,6 +97,23 @@ test.describe('Tab navigation', () => {
     await page.getByRole('tab', { name: /^Lists/ }).click();
     await expect(page.getByText('AI list builder')).toBeVisible();
     await expect(page.getByText('WaniKani import')).toBeVisible();
+  });
+
+  test('drills exposes ending, group, and rush exercises', async ({ page }) => {
+    await gotoFreshApp(page);
+
+    await page.locator('nav').getByRole('tab', { name: 'Drills', exact: true }).click();
+
+    await expect(page.getByRole('tab', { name: /^Ending Lab/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Groups/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Rush/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Check/ })).toHaveCount(0);
+
+    await expect(page.getByText('Ending Lab').first()).toBeVisible();
+    await page.getByRole('tab', { name: /^Groups/ }).click();
+    await expect(page.getByText('Classification drill')).toBeVisible();
+    await page.getByRole('tab', { name: /^Rush/ }).click();
+    await expect(page.getByText('Kotoba Rush').first()).toBeVisible();
   });
 
   test('settings keeps durable preferences and omits old practice controls', async ({ page }) => {

@@ -10,6 +10,7 @@ describe('t', () => {
     expect(t('nav.practice')).toBe('Practice');
     expect(t('nav.stats')).toBe('Stats');
     expect(t('nav.learn')).toBe('Learn');
+    expect(t('nav.drills')).toBe('Drills');
     expect(t('nav.tools')).toBe('Tools');
     expect(t('app.title')).toBe('Katachiya');
   });

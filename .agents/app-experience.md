@@ -1,7 +1,7 @@
 # Practice-First App Experience
 
 This document is the product experience source of truth for learner-facing work.
-Agents must read it before changing Practice, Learn, Tools, Settings,
+Agents must read it before changing Practice, Learn, Drills, Tools, Settings,
 navigation, scheduling behavior, or learner progress language.
 
 If a proposed change goes against this design, ask the user first. If the user
@@ -9,17 +9,17 @@ confirms the new direction, update this document in the same change.
 
 ## Product Shape
 
-- Top-level sections are Practice, Stats, Learn, Tools, and Settings.
+- Top-level sections are Practice, Stats, Learn, Drills, Tools, and Settings.
 - Practice is the landing page and the main learner loop. It is built around
   short workouts, not a visible long-term SRS queue.
 - Stats contains progress, recommendations, upcoming reviews, and readiness
   summaries that do not need to block the active workout.
 - Learn teaches forms and verb/adjective groups from start to finish. It can
   recommend focused Practice, but it does not gate Practice.
-- Tools contains lookup, check, word management, saved lists, custom words,
-  Ending Lab, group drills, and speed games.
+- Drills contains Ending Lab, group drills, and speed games.
+- Tools contains lookup, check, word management, saved lists, and custom words.
 - Settings is for durable display, audio, sync, backup, and reset preferences.
-  Controls that affect the active workout belong in Practice or Tools.
+  Controls that affect the active workout belong in Practice, Drills, or Tools.
 
 ## Practice
 
@@ -72,11 +72,14 @@ confirms the new direction, update this document in the same change.
 - Form/category management lives in the Practice map, not Settings and not the
   Words tool.
 - Lookup and Check can launch targeted Practice for a selected word or exact form.
+
+## Drills
+
 - Ending Lab supports onbin and te/ta repair. Groups supports verb/adjective
   classification. Rush supports speed and recall.
-- Tools can create visible recommended Practice sets. The learner starts the set
+- Drills can create visible recommended Practice sets. The learner starts the set
   explicitly; once practiced in Practice, it updates normal progress.
-- Practice can also route a detected weakness into the matching Tool: godan
+- Practice can also route a detected weakness into the matching Drill: godan
   sound-change misses to Ending Lab, verb-group confusion to Groups, and weak
   speed to Rush.
 

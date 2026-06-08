@@ -50,8 +50,11 @@ const AppStateContext = createContext(null);
 function normalizeAppTab(tab) {
   if (tab === 'study') return 'practice';
   if (tab === 'lessons') return 'learn';
-  if (tab === 'library' || tab === 'lab') return 'tools';
-  return ['practice', 'stats', 'learn', 'tools', 'settings'].includes(tab) ? tab : 'practice';
+  if (tab === 'library') return 'tools';
+  if (tab === 'lab') return 'drills';
+  return ['practice', 'stats', 'learn', 'drills', 'tools', 'settings'].includes(tab)
+    ? tab
+    : 'practice';
 }
 
 function isTodayDrillPractice(prefs = DEFAULT_PREFS) {
@@ -487,11 +490,11 @@ function useAppController() {
     return true;
   }
   const clearStudyFocus = () => setStudyFocus(null);
-  // Open a specific Tools drill from another view (e.g. the dashboard routing
-  // a detected weakness into the matching drill).
+  // Open a specific Drills exercise from another view (e.g. the dashboard
+  // routing a detected weakness into the matching drill).
   function openLabTool(tool) {
     setLabFocus(tool ? { tool } : null);
-    setTab('tools');
+    setTab('drills');
   }
   const clearLabFocus = () => setLabFocus(null);
   const showAuth = () => setShowAuthModal(true);

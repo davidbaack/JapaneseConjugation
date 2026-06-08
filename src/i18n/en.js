@@ -12,6 +12,7 @@ export default {
   'nav.practice': 'Practice',
   'nav.stats': 'Stats',
   'nav.learn': 'Learn',
+  'nav.drills': 'Drills',
   'nav.tools': 'Tools',
   'nav.settings': 'Settings',
 

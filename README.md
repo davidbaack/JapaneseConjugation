@@ -10,8 +10,8 @@ The current app shape is:
 - **Practice** - the landing page and main learner loop.
 - **Stats** - progress, recommendations, upcoming reviews, and readiness.
 - **Learn** - formation lessons and guided tracks for every app form.
-- **Tools** - lookup, word management, saved lists, custom words, repair drills,
-  group drills, and speed practice.
+- **Drills** - focused exercises for endings, group recognition, and speed.
+- **Tools** - lookup, word management, saved lists, and custom words.
 - **Settings** - durable display, audio, sync, backup, and reset preferences.
 
 ## Current App Surface
@@ -21,8 +21,8 @@ The current app shape is:
 Practice opens directly into the default workout when cards are available. The
 active workout shows session-card progress, ready-card progress when cards are
 due, the current prompt, answer controls, and a persistent Practice map. Focused
-"Practice this" launches from Learn or Tools route straight into their targeted
-cards and stay focused until the learner exits the banner.
+"Practice this" launches from Learn, Drills, or Tools route straight into their
+targeted cards and stay focused until the learner exits the banner.
 
 The workout stream prioritizes ready cards, then fills the session with recent
 misses and varied words in the same weak patterns. A normal workout target is 12
@@ -44,9 +44,9 @@ support.
 
 Stats keeps progress and planning information out of the active workout. It
 shows the Practice pulse, ready cards, daily progress, recent misses,
-recommended practice from Learn and Tools, upcoming review timing, and
+recommended practice from Learn and Drills, upcoming review timing, and
 form-family readiness once the learner has enough history. Readiness gaps can
-launch focused Practice or route the learner to the matching Tool, such as
+launch focused Practice or route the learner to the matching Drill, such as
 Ending Lab, Groups, or Rush.
 
 ### Learn
@@ -64,8 +64,7 @@ focused recommended set back to Practice, but Learn does not gate workouts.
 ### Tools
 
 Tools keeps lookup, durable word management, saved lists, custom vocabulary, and
-specialized drills outside the main workout while still allowing focused work to
-be sent back to Practice.
+word-level targeted Practice outside the main workout.
 
 - **Lookup / Check** searches dictionary words or real conjugated forms, accepts
   romaji/kana/kanji input, shows exact and near matches, displays form tables,
@@ -73,6 +72,17 @@ be sent back to Practice.
 - **Words** removes or restores words from automatic Practice, shows excluded
   counts, searches the word inventory, and can launch "Practice now" for a
   selected word.
+- **Lists** manages study lists, built-in packs, WaniKani imports, Gemini-built
+  list suggestions, favorites, weak-form lists, CSV/TSV bulk import, vocab CSV
+  export, and Anki TSV export.
+- **Custom words** adds and manages custom verbs and adjectives, including
+  optional Gemini lookup/suggestion support when AI is configured.
+
+### Drills
+
+Drills keeps specialized exercises outside the main workout while still allowing
+focused work to be sent back to Practice.
+
 - **Ending Lab** drills te-form/plain-past sound changes and plain/polite
   register switching with hints, pattern maps, register maps, streaks, and
   optional AI memory hooks.
@@ -81,11 +91,6 @@ be sent back to Practice.
   explanations.
 - **Rush** opens Kotoba Rush, a timed typing game with filtered cards, score,
   combo, wave, best score, live answer checking, kana progress, and a rush log.
-- **Lists** manages study lists, built-in packs, WaniKani imports, Gemini-built
-  list suggestions, favorites, weak-form lists, CSV/TSV bulk import, vocab CSV
-  export, and Anki TSV export.
-- **Custom words** adds and manages custom verbs and adjectives, including
-  optional Gemini lookup/suggestion support when AI is configured.
 
 Tool attempts do not silently change word-form scheduling unless the learner
 starts and completes the recommended work in Practice.
@@ -260,7 +265,7 @@ src/
   i18n/         String catalog and translation helper
   state/        Global app state provider and cloud/auth wiring
   utils/        Conjugation, scheduling, storage, display, romaji, AI, speech, backup, drill logic
-  views/        Practice, Stats, Learn, Tools, Settings, and nested tool surfaces
+  views/        Practice, Stats, Learn, Drills, Tools, Settings, and nested surfaces
   __tests__/    Vitest tests
 e2e/            Playwright E2E tests
 public/         PWA icons, Apple touch icon, and generated vocabulary data

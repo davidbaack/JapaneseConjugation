@@ -29,7 +29,7 @@ describe('App shell', () => {
     expect(screen.getByRole('heading', { name: /Katachiya/ })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Conjugation Practice/ })).toBeTruthy();
     // Nav labels (accessible name is the catalog string; CSS only capitalizes).
-    for (const label of ['Practice', 'Stats', 'Learn', 'Tools', 'Settings']) {
+    for (const label of ['Practice', 'Stats', 'Learn', 'Drills', 'Tools', 'Settings']) {
       expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
     }
   });
@@ -346,7 +346,7 @@ describe('App shell', () => {
   it('mounts every tab without hitting the error boundary', async () => {
     render(<App />);
     // Each nav button's accessible name is its catalog label.
-    const labels = ['Practice', 'Stats', 'Learn', 'Tools', 'Settings'];
+    const labels = ['Practice', 'Stats', 'Learn', 'Drills', 'Tools', 'Settings'];
     for (const label of labels) {
       fireEvent.click(screen.getByRole('tab', { name: label, exact: true }));
       // Each view lazy-loads; wait until its chunk resolves (nav stays mounted).
@@ -355,12 +355,12 @@ describe('App shell', () => {
     }
   });
 
-  it('restores Tools learning and management sections with drill handoffs', async () => {
+  it('keeps Tools focused on lookup, check, and word management', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
 
     await screen.findByText(
-      'Lookup, check, repair drills, and word management.',
+      'Lookup, check, word lists, and word management.',
       {},
       { timeout: 5000 },
     );
@@ -369,6 +369,9 @@ describe('App shell', () => {
     expect(screen.getByRole('tab', { name: /^Check/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Lists/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Custom words/i })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: /^Ending Lab/i })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /^Groups/i })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /^Rush/i })).toBeNull();
     fireEvent.click(screen.getByRole('tab', { name: /^Words/i }));
     expect(await screen.findAllByRole('button', { name: 'Practice now' })).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /^Lookup/i }));
@@ -386,6 +389,27 @@ describe('App shell', () => {
     fireEvent.change(screen.getByPlaceholderText(/tabeta/i), { target: { value: 'tabeta' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
     expect(await screen.findByText('Correct conjugation')).toBeTruthy();
+  }, 15000);
+
+  it('exposes practice exercises in the Drills tab', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Drills', exact: true }));
+
+    await screen.findByText(
+      'Focused exercises for endings, groups, and speed.',
+      {},
+      { timeout: 5000 },
+    );
+    expect(screen.getByRole('tab', { name: /^Ending Lab/i })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /^Groups/i })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /^Rush/i })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: /^Check/i })).toBeNull();
+
+    expect(await screen.findByRole('heading', { name: 'Ending Lab' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /^Groups/i }));
+    expect(await screen.findByText('Classification drill')).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /^Rush/i }));
+    expect(await screen.findAllByText('Kotoba Rush')).toBeTruthy();
   }, 15000);
 
   it('starts Learn practice tracks as focused Practice sessions', async () => {

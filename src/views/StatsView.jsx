@@ -241,7 +241,7 @@ export function StatsDashboard({
                 Recommended practice
               </div>
               <div className="text-sm text-stone-600 dark:text-stone-300">
-                Learn and Tools can send focused work back into Practice.
+                Learn and Drills can send focused work back into Practice.
               </div>
             </div>
           </div>
@@ -256,7 +256,11 @@ export function StatsDashboard({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                      {rec.source === 'lesson' ? 'Learn' : 'Tools'}
+                      {rec.source === 'lesson'
+                        ? 'Learn'
+                        : rec.source === 'lab'
+                          ? 'Drills'
+                          : 'Tools'}
                     </div>
                     <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
                       {rec.label}

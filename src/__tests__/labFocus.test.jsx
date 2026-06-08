@@ -7,7 +7,7 @@ vi.mock('../utils/supabase.js', () => ({ supabase: null }));
 import { AppStateProvider, useApp } from '../state/AppStateContext.jsx';
 
 // Exercises the cross-view nav used to route a detected weakness from the
-// Practice dashboard into the matching Tools drill (e.g. Ending Lab).
+// Practice dashboard into the matching Drills exercise (e.g. Ending Lab).
 function LabProbe() {
   const app = useApp();
   return (
@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe('openLabTool', () => {
-  it('focuses a Tools drill and switches to the Tools tab', () => {
+  it('focuses a Drills exercise and switches to the Drills tab', () => {
     render(
       <AppStateProvider>
         <LabProbe />
@@ -43,7 +43,7 @@ describe('openLabTool', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'open endings' }));
 
-    expect(screen.getByTestId('tab').textContent).toBe('tools');
+    expect(screen.getByTestId('tab').textContent).toBe('drills');
     expect(JSON.parse(screen.getByTestId('lab-focus').textContent)).toEqual({ tool: 'endings' });
 
     // The consumer clears the request so a later manual visit lands on default.

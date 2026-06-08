@@ -792,7 +792,7 @@ const READINESS_TONE = {
   weak: 'bg-rose-500',
   untested: 'bg-stone-300 dark:bg-stone-700',
 };
-// Exported for unit tests of the Practice-to-Tools routing nudge ladder; the app
+// Exported for unit tests of the Practice-to-Drills routing nudge ladder; the app
 // renders it through StudyView's default export.
 export function ReviewsDashboard({
   daily,
@@ -838,7 +838,7 @@ export function ReviewsDashboard({
     !!onDrillEndingLab;
   const weakestToRush = !!weakestSkill && weakestSkill.dimension === 'speed' && !!onDrillRush;
   // One prioritized "do this next" nudge that routes a detected weakness to the
-  // matching Tools drill: group confusion (foundational) > onbin sound
+  // matching Drills exercise: group confusion (foundational) > onbin sound
   // changes > slow recall > generic scoped practice of the weakest skill.
   const primaryNudge =
     groupConfusion && onDrillClassify
@@ -996,7 +996,7 @@ export function ReviewsDashboard({
                 Recommended practice
               </div>
               <div className="text-sm text-stone-600 dark:text-stone-300">
-                Learn and Tools can send focused work back into Practice.
+                Learn and Drills can send focused work back into Practice.
               </div>
             </div>
           </div>
@@ -1011,7 +1011,11 @@ export function ReviewsDashboard({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                      {rec.source === 'lesson' ? 'Learn' : 'Tools'}
+                      {rec.source === 'lesson'
+                        ? 'Learn'
+                        : rec.source === 'lab'
+                          ? 'Drills'
+                          : 'Tools'}
                     </div>
                     <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
                       {rec.label}
@@ -2995,7 +2999,12 @@ export default function StudyView() {
     : '';
   const focusBanner = recommendationFocus
     ? {
-        kicker: recommendationFocus.source === 'lesson' ? 'Learn focus' : 'Tools focus',
+        kicker:
+          recommendationFocus.source === 'lesson'
+            ? 'Learn focus'
+            : recommendationFocus.source === 'lab'
+              ? 'Drills focus'
+              : 'Tools focus',
         title: recommendationFocus.label || 'Recommended practice',
         reading: '',
         subtitle: recommendationSubtitle,

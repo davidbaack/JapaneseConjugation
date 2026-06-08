@@ -1,23 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  IconBook,
-  IconCheck,
-  IconList,
-  IconPen,
-  IconRefresh,
-  IconSpark,
-} from '../components/Icons.jsx';
+import React, { useState } from 'react';
+import { IconBook, IconCheck, IconList, IconPen } from '../components/Icons.jsx';
 import { useTablist } from '../components/useTablist.js';
 import { useApp } from '../state/AppStateContext.jsx';
-import { buildLabReviewRecommendations } from '../utils/reviewRecommendations.js';
 import ReferenceViewSub from './ReferenceViewSub.jsx';
 import CheckView from './CheckView.jsx';
 import ReviewInventoryView from './ReviewInventoryView.jsx';
 import ListsViewSub from './ListsViewSub.jsx';
 import CustomDictionaryViewSub from './CustomDictionaryViewSub.jsx';
-import EndingsView from './EndingsView.jsx';
-import ClassificationView from './ClassificationView.jsx';
-import GamesView from './GamesView.jsx';
 
 const TOOL_TABS = [
   {
@@ -38,19 +27,6 @@ const TOOL_TABS = [
     desc: 'Remove or restore words from automatic practice.',
     icon: IconCheck,
   },
-  {
-    id: 'endings',
-    label: 'Ending Lab',
-    desc: 'Repair te/ta and sound-change patterns.',
-    icon: IconSpark,
-  },
-  {
-    id: 'classify',
-    label: 'Groups',
-    desc: 'Practice verb and adjective group recognition.',
-    icon: IconList,
-  },
-  { id: 'games', label: 'Rush', desc: 'Build speed on familiar forms.', icon: IconRefresh },
   { id: 'lists', label: 'Lists', desc: 'Manage saved practice decks.', icon: IconList },
   {
     id: 'dictionary',
@@ -60,19 +36,12 @@ const TOOL_TABS = [
   },
 ];
 
-const LAB_TOOL_IDS = new Set(['endings', 'classify', 'games']);
-
 export default function ToolsView() {
   const {
-    addReviewRecommendation,
     allAdjectives: adjectives,
     allVerbs: verbs,
-    allWords,
-    builtInWords,
-    clearLabFocus,
     customAdjectives,
     customVerbs,
-    labFocus,
     practicePrefs,
     setCustomAdjectives,
     setCustomVerbs,
@@ -80,7 +49,6 @@ export default function ToolsView() {
     setState,
     setTab,
     setWordLists,
-    startReviewRecommendation,
     state,
     activeGeminiKey: geminiKey,
     practiceWord,
@@ -88,37 +56,11 @@ export default function ToolsView() {
   } = useApp();
   const [active, setActive] = useState('lookup');
 
-  useEffect(() => {
-    const tool = labFocus?.tool;
-    if (tool && TOOL_TABS.some((tab) => tab.id === tool)) {
-      setActive(tool);
-      clearLabFocus();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [labFocus]);
-
   const { tabProps, panelProps } = useTablist(
     TOOL_TABS.map((tab) => tab.id),
     active,
     setActive,
   );
-  const recommendations = useMemo(
-    () =>
-      LAB_TOOL_IDS.has(active)
-        ? buildLabReviewRecommendations(state, allWords, practicePrefs, wordLists, {
-            activeTool: active,
-            builtInWords,
-          })
-        : [],
-    [active, allWords, builtInWords, practicePrefs, state, wordLists],
-  );
-
-  function sendRecommendation(recommendation = recommendations[0]) {
-    if (!recommendation) return;
-    if (startReviewRecommendation?.(recommendation)) return;
-    addReviewRecommendation(recommendation);
-    setTab('practice');
-  }
 
   return (
     <div className="space-y-4">
@@ -129,19 +71,9 @@ export default function ToolsView() {
               Tools
             </div>
             <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
-              Lookup, check, repair drills, and word management.
+              Lookup, check, word lists, and word management.
             </h2>
           </div>
-          {recommendations.length > 0 && (
-            <button
-              type="button"
-              onClick={() => sendRecommendation()}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
-            >
-              <IconRefresh className="h-4 w-4" />
-              Send to Practice
-            </button>
-          )}
         </div>
 
         <div role="tablist" aria-label="Tools" className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -181,28 +113,6 @@ export default function ToolsView() {
             );
           })}
         </div>
-
-        {recommendations.length > 0 && (
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {recommendations.map((recommendation) => (
-              <button
-                key={recommendation.id}
-                type="button"
-                onClick={() => sendRecommendation(recommendation)}
-                className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-left transition hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35"
-              >
-                <div className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
-                  {recommendation.label}
-                </div>
-                {recommendation.detail && (
-                  <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-350">
-                    {recommendation.detail}
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
       </section>
 
       <section {...panelProps(active)}>
@@ -224,9 +134,6 @@ export default function ToolsView() {
         )}
         {active === 'check' && <CheckView />}
         {active === 'words' && <ReviewInventoryView />}
-        {active === 'endings' && <EndingsView />}
-        {active === 'classify' && <ClassificationView />}
-        {active === 'games' && <GamesView />}
         {active === 'lists' && (
           <ListsViewSub
             words={[...verbs, ...adjectives]}
