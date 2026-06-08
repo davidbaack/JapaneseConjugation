@@ -367,6 +367,54 @@ describe('App shell', () => {
     expect(screen.getByRole('button', { name: 'Next card' })).toBeTruthy();
   });
 
+  it('hides Guide prompt English meaning before submitting by default', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          enabledTypes: ['plain-past'],
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Guide', exact: true }));
+
+    expect(await screen.findByText('Build the conjugation step by step.')).toBeTruthy();
+    expect(
+      screen.queryByText((content) => content.includes(' · ') && content.split(' · ').length === 3),
+    ).toBeNull();
+  });
+
+  it('shows Guide prompt English meaning when the setting is enabled', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          enabledTypes: ['plain-past'],
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: { ...DEFAULT_PREFS, englishHints: 'show' },
+      }),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Guide', exact: true }));
+
+    expect(await screen.findByText('Build the conjugation step by step.')).toBeTruthy();
+    expect(
+      screen.getByText((content) => content.includes(' · ') && content.split(' · ').length === 3),
+    ).toBeTruthy();
+  });
+
   it('keeps Tools focused on lookup, check, and word management', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { IconVolume, IconRefresh, IconCloud } from '../components/Icons.jsx';
+import { IconVolume, IconCloud, IconRefresh } from '../components/Icons.jsx';
 import { mergeState, normalizeWordLists } from '../utils/storage.js';
 import {
   mergePracticePrefs,
@@ -230,8 +230,8 @@ export default function SettingsView() {
             </button>
           </div>
           <div>
-            <label className="text-xs text-stone-500 block mb-1">English hints</label>
-            <div role="group" aria-label="English hints" className="grid grid-cols-2 gap-2">
+            <label className="text-xs text-stone-500 block mb-1">English meaning</label>
+            <div role="group" aria-label="English meaning" className="grid grid-cols-2 gap-2">
               {[
                 { id: 'show', label: 'Show' },
                 { id: 'hidden', label: 'Hide' },
@@ -251,7 +251,8 @@ export default function SettingsView() {
               ))}
             </div>
             <p className="text-[11px] text-stone-400 mt-1">
-              Hidden mode can still ask Gemini for a non-answer clue.
+              Hidden mode hides the English meaning while answering. AI clues can still avoid the
+              answer.
             </p>
           </div>
           <div>

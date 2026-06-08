@@ -88,6 +88,8 @@ export default function GuideView() {
   const groupOptions = card ? guideGroupOptions(card.word) : [];
   const allFilled = !!answers.base.trim() && !!answers.group && !!answers.answer.trim();
   const sessionDone = completed >= GUIDE_SESSION_TARGET;
+  const hideEnglishMeaning =
+    (practicePrefs.englishHints || DEFAULT_PREFS.englishHints) === 'hidden' && !result;
   const sourceView = card
     ? formDisplay(card.sourceForm, practicePrefs, card.word, card.sourceTypeId)
     : null;
@@ -245,7 +247,9 @@ export default function GuideView() {
                 <ScriptDisplay view={sourceView} word={card.word} type={card.sourceTypeId} />
               </div>
               <div className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-                {card.word.dict} · {card.word.meaning} · {card.sourceLabel}
+                {[card.word.dict, !hideEnglishMeaning && card.word.meaning, card.sourceLabel]
+                  .filter(Boolean)
+                  .join(' · ')}
               </div>
             </div>
             <div className="text-sm font-semibold text-stone-700 dark:text-stone-250">

@@ -41,7 +41,7 @@ describe('SettingsView controls', () => {
     expectPressed(displayScripts.getByRole('button', { name: 'Kanji', exact: true }), true);
     expectPressed(displayScripts.getByRole('button', { name: 'Romaji', exact: true }), false);
 
-    const englishHints = within(screen.getByRole('group', { name: 'English hints' }));
+    const englishHints = within(screen.getByRole('group', { name: 'English meaning' }));
     expectPressed(englishHints.getByRole('button', { name: 'Hide', exact: true }), true);
 
     expect(screen.getByText('Word category label')).toBeTruthy();
