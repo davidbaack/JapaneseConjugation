@@ -1571,7 +1571,9 @@ export default function StudyView() {
     if (reverseDrill || listeningPrompt || minimalPairSetForCurrent) return null;
     try {
       const built = getOfflineTemplateSentence(current.verb, current.type);
-      return built?.sentence ? { sentence: built.sentence, cue: built.cue } : null;
+      return built?.sentence
+        ? { sentence: built.sentence, cue: built.cue, note: built.note }
+        : null;
     } catch {
       return null;
     }
@@ -3487,6 +3489,11 @@ export default function StudyView() {
                   subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
                   colorHighlight={false}
                 />
+                {!hideEnglishMeaning && clozePrompt.note && (
+                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-500 dark:text-stone-400">
+                    {clozePrompt.note}
+                  </div>
+                )}
               </div>
             )}
             {hidePromptText ? (

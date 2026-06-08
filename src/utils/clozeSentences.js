@@ -530,6 +530,7 @@ export function buildOfflineCuedCloze(word, type) {
   return {
     sentence,
     cue: cueFor(word, type),
+    note: rendered.note,
     variantId,
     translation: `Fill in: ${word.dict} (${word.reading}) -> ${targetLabel} (${rendered.note})`,
   };
