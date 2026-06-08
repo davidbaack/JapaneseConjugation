@@ -843,6 +843,7 @@ describe('word-form SRS selection', () => {
     };
     const card = selectNext(state, [TABERU, KAKU], ['plain-past'], null, DEFAULT_PREFS);
     expect(card.id).toBe(cardIdFor(KAKU, 'plain-past'));
+    expect(card.selectionReason).toBe('New enabled form');
   });
 
   it('can still schedule due cards by exact word-form card id when explicitly requested', () => {
@@ -867,6 +868,7 @@ describe('word-form SRS selection', () => {
     expect(card.id).toBe(dueCardId);
     expect(card.type).toBe('plain-past');
     expect(card.verb).toBe(TABERU);
+    expect(card.selectionReason).toBe('Due review');
   });
 
   it('surfaces retryQueue cards before fresh fallback until they are cleared', () => {
@@ -891,6 +893,7 @@ describe('word-form SRS selection', () => {
 
     expect(card.id).toBe(retryCardId);
     expect(card.verb).toBe(TABERU);
+    expect(card.selectionReason).toBe('Recent miss returning');
   });
 
   it('uses dictionary target cards for reading practice without adding dictionary to core', () => {
@@ -926,6 +929,7 @@ describe('word-form SRS selection', () => {
     );
 
     expect(card.verb).toBe(earlyWord);
+    expect(card.selectionReason).toBe('New enabled form');
   });
 
   it('ladders fresh Core Warmup through regular ichidan and godan before irregulars', () => {
@@ -1033,6 +1037,7 @@ describe('word-form SRS selection', () => {
     );
 
     expect(card.type).toBe('plain-negative');
+    expect(card.selectionReason).toBe('Strengthening Basics & Politeness');
   });
 
   it('avoids repeating the same family back-to-back when another enabled family is available', () => {

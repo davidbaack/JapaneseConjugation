@@ -32,8 +32,11 @@ confirms the new direction, update this document in the same change.
 - Default Practice has no 12-card target, daily-goal stop, or completion
   summary. The learner-facing framing is continuous cards practiced, recent
   misses, category progress, practice history, and upcoming reviews.
-- The active card shows continuous Practice status. Detailed form and subgroup
-  weakness data lives in the Practice map and Stats.
+- The active card shows a compact continuous Practice coach strip: current-run
+  cards, missed count, streak, and why the current card appeared. Detailed form
+  and subgroup weakness data lives in the Practice map and Stats, with coach
+  strip details limited to the selection reason, top session miss pattern, and
+  recent answer trail.
 - The persistent Practice map shows all form families, including disabled and
   untried families. Each family row shows an on/off toggle, lifetime right/wrong
   counts, and an overall skill visualization. Expanded families show exact-form

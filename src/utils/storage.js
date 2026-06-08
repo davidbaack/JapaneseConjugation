@@ -956,7 +956,15 @@ export function defaultState() {
     reviewScope: defaultReviewScope(),
     enabledTypes: [...QUICK_PRACTICE_DEFAULT_TYPE_IDS],
     weakness: defaultWeaknessState(),
-    session: { reviewed: 0, correct: 0, skipped: 0, mistakePatterns: {} },
+    session: {
+      reviewed: 0,
+      correct: 0,
+      skipped: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+      recentOutcomes: [],
+      mistakePatterns: {},
+    },
     daily: {
       date: localDateKey(),
       count: 0,
@@ -1445,6 +1453,22 @@ function candidateFamilyId(candidate) {
   return familyIdForType(candidate?.type || '');
 }
 
+function selectionReasonFor(candidate, bucket) {
+  if (bucket === 'due') return 'Due review';
+  if (bucket === 'retry') return 'Recent miss returning';
+  if (bucket === 'skill') {
+    const familyLabel = formFamilyForType(candidate?.type || '')?.label;
+    return familyLabel ? `Strengthening ${familyLabel}` : 'Strengthening enabled category';
+  }
+  if (bucket === 'fresh') return 'New enabled form';
+  return 'Varied practice from enabled categories';
+}
+
+function withSelectionReason(candidate, bucket) {
+  if (!candidate) return null;
+  return { ...candidate, selectionReason: selectionReasonFor(candidate, bucket) };
+}
+
 function familyIdFromCardId(cardId) {
   return familyIdForType(typeIdFromCardId(cardId));
 }
@@ -1534,12 +1558,12 @@ export function selectNext(
   };
   const vary = (items) => avoidLastFamily(dropRecentWords(items));
   const choose = (groups) =>
-    pickDueReview(groups.due, state) ||
-    pickRetryReview(groups.retry, state) ||
-    pickSkillReview(groups.readySkill, state, options) ||
-    pickFreshReview(groups.fresh, options, openBeginnerStage) ||
-    pickFutureReview(groups.nearDue, state, options) ||
-    pickReviewedReview(groups.reviewed, state, options);
+    withSelectionReason(pickDueReview(groups.due, state), 'due') ||
+    withSelectionReason(pickRetryReview(groups.retry, state), 'retry') ||
+    withSelectionReason(pickSkillReview(groups.readySkill, state, options), 'skill') ||
+    withSelectionReason(pickFreshReview(groups.fresh, options, openBeginnerStage), 'fresh') ||
+    withSelectionReason(pickFutureReview(groups.nearDue, state, options), 'varied') ||
+    withSelectionReason(pickReviewedReview(groups.reviewed, state, options), 'varied');
   let chosen = choose({
     due: vary(due),
     retry: vary(retry),
@@ -1557,6 +1581,7 @@ export function selectNext(
     sourceType: chosen.sourceType,
     card: state.cards[chosen.id],
     ruleLabel: chosen.ruleLabel,
+    selectionReason: chosen.selectionReason,
   };
 }
 

@@ -170,8 +170,9 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    expect(screen.getByText('Continuous practice')).toBeTruthy();
-    expect(screen.getByText('Practice keeps going until you leave this page.')).toBeTruthy();
+    expect(screen.getByText('Practice run')).toBeTruthy();
+    expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
+    expect(screen.getByText('New enabled form.')).toBeTruthy();
     expect(screen.queryByRole('progressbar', { name: 'Session cards' })).toBeNull();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
@@ -185,8 +186,8 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    expect(screen.getByText('Continuous practice')).toBeTruthy();
-    expect(screen.getByText('Practice keeps going until you leave this page.')).toBeTruthy();
+    expect(screen.getByText('Practice run')).toBeTruthy();
+    expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
@@ -523,6 +524,12 @@ describe('StudyView continuous Practice startup', () => {
     const nextState = setState.mock.calls[0][0];
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
+    expect(nextState.session.currentStreak).toBe(1);
+    expect(nextState.session.bestStreak).toBe(1);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'correct',
+      label: 'Plain Past',
+    });
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
   });
 
@@ -610,8 +617,8 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     await waitForPracticeCard();
-    expect(screen.getByText('Continuous practice')).toBeTruthy();
-    expect(screen.getByText('Practice keeps going until you leave this page.')).toBeTruthy();
+    expect(screen.getByText('Practice run')).toBeTruthy();
+    expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
     expect(screen.queryByText('0/1 ready')).toBeNull();
     expect(screen.getAllByText('Practice').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
@@ -650,6 +657,11 @@ describe('StudyView continuous Practice startup', () => {
       .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
 
     expect(nextState).toBeTruthy();
+    expect(nextState.session.currentStreak).toBe(1);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'correct',
+      label: 'Plain Past',
+    });
     expect(nextState.cards[dueCardId].correct).toBe(1);
     expect(nextState.daily.count).toBe(1);
     expect(nextState.transformation.attempted).toBe(0);
@@ -683,8 +695,209 @@ describe('StudyView continuous Practice startup', () => {
     const nextState = setState.mock.calls[0][0];
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
+    expect(nextState.session.currentStreak).toBe(1);
+    expect(nextState.session.bestStreak).toBe(1);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'correct',
+      label: 'Plain Past',
+    });
     expect(nextState.cards[cardId].correct).toBe(1);
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+  });
+
+  it('updates the coach strip after a correct answer in the current run', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    let app;
+    const setState = vi.fn((nextState) => {
+      app = { ...app, state: nextState };
+      mockedApp.value = app;
+    });
+    app = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+    mockedApp.value = app;
+    const { rerender } = render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'tabeta' } });
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    rerender(<StudyView />);
+
+    expect(screen.getByText('1 card · 0 missed · 1 streak')).toBeTruthy();
+    expect(screen.getByText('Focused practice: 食べる. Clean run so far.')).toBeTruthy();
+  });
+
+  it('counts a typed wrong answer as missed and resets the current streak', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-negative';
+    mockedApp.value = makeApp({
+      setState,
+      state: {
+        ...defaultState(),
+        session: { ...defaultState().session, currentStreak: 3, bestStreak: 5 },
+      },
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'tabeta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.currentStreak).toBe(0);
+    expect(nextState.session.bestStreak).toBe(5);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Negative',
+    });
+  });
+
+  it('counts Reveal as missed and resets the current streak', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      state: {
+        ...defaultState(),
+        session: { ...defaultState().session, currentStreak: 2, bestStreak: 4 },
+      },
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal' }));
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.currentStreak).toBe(0);
+    expect(nextState.session.bestStreak).toBe(4);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Past',
+    });
+  });
+
+  it("counts I don't know as missed in choice mode", async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'choice' },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    fireEvent.click(await screen.findByRole('button', { name: "I don't know" }));
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.currentStreak).toBe(0);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Past',
+    });
+  });
+
+  it('keeps Skip separate from missed and streak penalties', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      state: {
+        ...defaultState(),
+        session: { ...defaultState().session, currentStreak: 2, bestStreak: 4 },
+      },
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(0);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.skipped).toBe(1);
+    expect(nextState.session.currentStreak).toBe(2);
+    expect(nextState.session.bestStreak).toBe(4);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'skipped',
+      label: 'Plain Past',
+    });
+  });
+
+  it('shows the top session mistake pattern and recent trail in run details', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-negative';
+    let app;
+    const setState = vi.fn((nextState) => {
+      app = { ...app, state: nextState };
+      mockedApp.value = app;
+    });
+    app = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+    mockedApp.value = app;
+    const { rerender } = render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'tabeta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    rerender(<StudyView />);
+
+    fireEvent.click(screen.getByText('Run details'));
+    expect(screen.getByText('Why this card')).toBeTruthy();
+    expect(screen.getByText('Top miss')).toBeTruthy();
+    expect(
+      screen.getAllByText(/Negative\/affirmative mismatch: Plain Negative/).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText('missed: Plain Negative')).toBeTruthy();
   });
 
   it('walks a word form sweep in order and repeats missed forms before completion', async () => {
@@ -726,7 +939,7 @@ describe('StudyView continuous Practice startup', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
 
-    expect(await screen.findByText('Repeating missed forms')).toBeTruthy();
+    expect((await screen.findAllByText(/Repeating missed forms/)).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Plain Past').length).toBeGreaterThan(0);
     fireEvent.change(await waitForPracticeCard(), {
       target: { value: conjugateItem(target, 'plain-past') },

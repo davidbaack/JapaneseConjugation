@@ -108,6 +108,7 @@ const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint:
 const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation']);
 const REVIEW_SESSION_HISTORY_SIZE = 4;
 const CORRECT_AUTO_ADVANCE_MS = 850;
+const SESSION_RECENT_OUTCOME_LIMIT = 6;
 const ANSWER_STYLE_OPTIONS = [
   { id: 'input', label: 'Type' },
   { id: 'choice', label: 'Choose' },
@@ -219,6 +220,84 @@ function cardMatchesPractice(card, words, enabledTypes, prefs = DEFAULT_PREFS) {
   return !isRedundantPracticeType(card.verb, card.type, activeTypes, prefs);
 }
 
+function isReadingPracticeCard(card) {
+  return card?.type === DICTIONARY_TYPE_ID || card?.sourceType === DICTIONARY_TYPE_ID;
+}
+
+function sessionBaseFrom(session = {}) {
+  return {
+    reviewed: session.reviewed || 0,
+    correct: session.correct || 0,
+    skipped: session.skipped || 0,
+  };
+}
+
+function sessionRunStats(session = {}, base = {}) {
+  const reviewed = Math.max(0, (session.reviewed || 0) - (base.reviewed || 0));
+  const correct = Math.max(0, (session.correct || 0) - (base.correct || 0));
+  const skipped = Math.max(0, (session.skipped || 0) - (base.skipped || 0));
+  return {
+    reviewed,
+    correct,
+    missed: Math.max(0, reviewed - correct),
+    skipped,
+    streak: session.currentStreak || 0,
+  };
+}
+
+function sessionOutcomeLabel(card) {
+  if (!card) return 'Practice card';
+  if (isReadingPracticeCard(card)) return 'Reading';
+  return getTypeInfo(card.type).label || 'Practice card';
+}
+
+function appendSessionOutcome(session = {}, outcome) {
+  const recentOutcomes = Array.isArray(session.recentOutcomes) ? session.recentOutcomes : [];
+  const nextOutcome = {
+    at: Date.now(),
+    cardId: outcome.cardId || '',
+    kind: outcome.kind,
+    label: outcome.label || 'Practice card',
+  };
+  return {
+    ...session,
+    recentOutcomes: [nextOutcome, ...recentOutcomes].slice(0, SESSION_RECENT_OUTCOME_LIMIT),
+  };
+}
+
+function sessionAfterAnswer(session = {}, { card, correct, mistakeDiagnosis }) {
+  const currentStreak = correct ? (session.currentStreak || 0) + 1 : 0;
+  const nextSession = bumpSessionMistakePattern(
+    {
+      ...session,
+      reviewed: (session.reviewed || 0) + 1,
+      correct: (session.correct || 0) + (correct ? 1 : 0),
+      currentStreak,
+      bestStreak: Math.max(session.bestStreak || 0, currentStreak),
+    },
+    mistakeDiagnosis,
+  );
+  return appendSessionOutcome(nextSession, {
+    cardId: card?.id,
+    kind: correct ? 'correct' : 'missed',
+    label: sessionOutcomeLabel(card),
+  });
+}
+
+function sessionAfterSkip(session = {}, card) {
+  return appendSessionOutcome(
+    {
+      ...session,
+      skipped: (session.skipped || 0) + 1,
+    },
+    {
+      cardId: card?.id,
+      kind: 'skipped',
+      label: sessionOutcomeLabel(card),
+    },
+  );
+}
+
 function ReviewDisclosure({ tone = 'stone', summary, children, alwaysOpen = false }) {
   const toneClass =
     tone === 'rose'
@@ -312,7 +391,11 @@ function loadPersistedCurrent(state, words, enabledTypes, prefs) {
       clearPersistedCurrent();
       return null;
     }
-    return saved.sourceType ? { ...card, sourceType: saved.sourceType } : card;
+    return {
+      ...card,
+      ...(saved.sourceType ? { sourceType: saved.sourceType } : {}),
+      ...(saved.selectionReason ? { selectionReason: saved.selectionReason } : {}),
+    };
   } catch {
     clearPersistedCurrent();
     return null;
@@ -346,6 +429,7 @@ function persistCurrent(card) {
         group: card.verb.group,
         type: card.type,
         sourceType: card.sourceType || null,
+        selectionReason: card.selectionReason || null,
         word: snapshotStudyWord(card.verb),
       }),
     );
@@ -1304,6 +1388,7 @@ export default function StudyView() {
   const [speechListening, setSpeechListening] = useState(false);
   const [speechError, setSpeechError] = useState('');
   const [reviewBase, setReviewBase] = useState(state.session.reviewed || 0);
+  const [runBase, setRunBase] = useState(() => sessionBaseFrom(state.session));
   const [bonusMode, setBonusMode] = useState(false);
   const [undoReviewScopeAction, setUndoReviewScopeAction] = useState(null);
   const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
@@ -1752,6 +1837,7 @@ export default function StudyView() {
 
   useEffect(() => {
     setReviewBase(state.session.reviewed || 0);
+    setRunBase(sessionBaseFrom(state.session));
     // state.session.reviewed intentionally omitted — only reset baseline when limit setting changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [practicePrefs.reviewLimit, practicePrefs.reviewLimitSource]);
@@ -1915,7 +2001,10 @@ export default function StudyView() {
   const reviewLimit = activeReviewLimitFromPrefs(practicePrefs);
   const reviewLimitSource = practicePrefs.reviewLimitSource || '';
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
-  const sessionSkipped = state.session?.skipped || 0;
+  const runStats = sessionRunStats(state.session, runBase);
+  const runStatsLabel = `${runStats.reviewed} ${runStats.reviewed === 1 ? 'card' : 'cards'} · ${
+    runStats.missed
+  } missed · ${runStats.streak} streak`;
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit && !recommendationFocus;
   const wordSweepComplete = !!wordSweep?.complete;
   const reviewComplete = wordSweepComplete;
@@ -2398,16 +2487,11 @@ export default function StudyView() {
         responseMs,
       }),
       minimalPairs: nextMinimalPairProgress(ok),
-      session: {
-        ...bumpSessionMistakePattern(
-          {
-            ...(state.session || {}),
-            reviewed: (state.session?.reviewed || 0) + 1,
-            correct: (state.session?.correct || 0) + (ok ? 1 : 0),
-          },
-          mistakeDiagnosis,
-        ),
-      },
+      session: sessionAfterAnswer(state.session, {
+        card: current,
+        correct: ok,
+        mistakeDiagnosis,
+      }),
       daily: newDaily,
     };
     const sweepStep = wordSweep
@@ -2472,7 +2556,7 @@ export default function StudyView() {
     stopSpeechRecognition();
     const nextState = {
       ...state,
-      session: { ...(state.session || {}), skipped: (state.session?.skipped || 0) + 1 },
+      session: sessionAfterSkip(state.session, current),
     };
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, false)
@@ -2569,16 +2653,11 @@ export default function StudyView() {
         responseMs,
       }),
       minimalPairs: nextMinimalPairProgress(ok),
-      session: {
-        ...bumpSessionMistakePattern(
-          {
-            ...(state.session || {}),
-            reviewed: (state.session?.reviewed || 0) + 1,
-            correct: (state.session?.correct || 0) + (ok ? 1 : 0),
-          },
-          mistakeDiagnosis,
-        ),
-      },
+      session: sessionAfterAnswer(state.session, {
+        card: current,
+        correct: ok,
+        mistakeDiagnosis,
+      }),
       daily: newDaily,
     };
     const sweepStep = wordSweep
@@ -2677,16 +2756,11 @@ export default function StudyView() {
         responseMs,
       }),
       minimalPairs: nextMinimalPairProgress(false),
-      session: {
-        ...bumpSessionMistakePattern(
-          {
-            ...(state.session || {}),
-            reviewed: (state.session?.reviewed || 0) + 1,
-            correct: state.session?.correct || 0,
-          },
-          mistakeDiagnosis,
-        ),
-      },
+      session: sessionAfterAnswer(state.session, {
+        card: current,
+        correct: false,
+        mistakeDiagnosis,
+      }),
       daily: bumpDaily(state.daily, false, dailyGoalTarget),
     };
     const sweepStep = wordSweep
@@ -2781,9 +2855,10 @@ export default function StudyView() {
 
   // Focused word-form sweeps can complete; default Practice keeps going.
   if (reviewComplete && phase === 'answering') {
-    const sessionCorrect = state.session.correct || 0;
-    const sessionReviewed = state.session.reviewed || 0;
-    const sessionWrong = sessionReviewed - sessionCorrect;
+    const sessionCorrect = runStats.correct;
+    const sessionReviewed = runStats.reviewed;
+    const sessionWrong = runStats.missed;
+    const sessionSkipped = runStats.skipped;
     const sessionAccuracy = sessionReviewed
       ? Math.round((sessionCorrect / sessionReviewed) * 100)
       : 0;
@@ -2936,6 +3011,7 @@ export default function StudyView() {
         <button
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
+            setRunBase(sessionBaseFrom(state.session));
             setCurrent(selectNextReviewCard(state, current.id));
             setAnswer('');
             setPhase('answering');
@@ -3104,6 +3180,20 @@ export default function StudyView() {
             onExit: referenceLaunch ? returnToReference : returnToOverview,
           }
         : null;
+  const topSessionMistake = sessionMistakePatterns[0] || null;
+  const currentSelectionReason = wordSweep?.repeatPass
+    ? 'Repeating missed forms'
+    : focusBanner
+      ? `${focusBanner.kicker}: ${focusBanner.title}`
+      : current.selectionReason || 'Varied practice from enabled categories';
+  const recentOutcomes = Array.isArray(state.session?.recentOutcomes)
+    ? state.session.recentOutcomes
+    : [];
+  const coachSentence = topSessionMistake
+    ? `${currentSelectionReason}. Watch ${topSessionMistake.label}.`
+    : runStats.reviewed > 0 && runStats.missed === 0
+      ? `${currentSelectionReason}. Clean run so far.`
+      : `${currentSelectionReason}.`;
 
   return (
     <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] xl:justify-center xl:grid-cols-[minmax(0,17rem)_minmax(0,42rem)_minmax(0,17rem)]">
@@ -3293,35 +3383,31 @@ export default function StudyView() {
           </div>
         </div>
         <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs font-semibold uppercase tracking-wider text-stone-500">
-              {workoutProgress.label}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                Practice run
+              </div>
+              <div
+                role="status"
+                aria-live="polite"
+                className="mt-1 text-sm leading-snug text-stone-600 dark:text-stone-300"
+              >
+                {coachSentence}
+              </div>
             </div>
-            {workoutProgress.continuous ? (
-              <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
-                {workoutProgress.now} cards this run
-              </div>
-            ) : (
-              <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
-                {workoutProgress.now}/{workoutProgress.max} cards
-              </div>
-            )}
+            <div className="shrink-0 text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
+              {runStatsLabel}
+            </div>
           </div>
-          {workoutProgress.continuous ? (
-            <div
-              role="status"
-              className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-500 dark:bg-stone-950 dark:text-stone-400"
-            >
-              Practice keeps going until you leave this page.
-            </div>
-          ) : (
+          {!workoutProgress.continuous && (
             <div
               role="progressbar"
               aria-label={workoutProgress.label}
               aria-valuemin={0}
               aria-valuemax={workoutProgress.max}
               aria-valuenow={workoutProgress.now}
-              className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
+              className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
             >
               <span
                 className="block h-full rounded-full bg-indigo-600 dark:bg-indigo-400"
@@ -3329,11 +3415,55 @@ export default function StudyView() {
               />
             </div>
           )}
-          {!!sessionSkipped && (
-            <div className="mt-1 text-right text-[11px] text-stone-400">
-              {sessionSkipped} skipped
+          <details className="mt-3">
+            <summary className="cursor-pointer list-none text-xs font-semibold text-stone-500 transition hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200">
+              Run details
+            </summary>
+            <div className="mt-2 grid gap-2 text-xs text-stone-500 dark:text-stone-400 sm:grid-cols-3">
+              <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
+                <div className="font-semibold text-stone-700 dark:text-stone-200">
+                  Why this card
+                </div>
+                <div className="mt-1 leading-snug">{currentSelectionReason}</div>
+              </div>
+              <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
+                <div className="font-semibold text-stone-700 dark:text-stone-200">Top miss</div>
+                <div className="mt-1 leading-snug">
+                  {topSessionMistake
+                    ? `${topSessionMistake.label} (${topSessionMistake.count}x)`
+                    : 'No pattern yet'}
+                </div>
+              </div>
+              <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
+                <div className="font-semibold text-stone-700 dark:text-stone-200">
+                  Recent answers
+                </div>
+                {recentOutcomes.length ? (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {recentOutcomes.map((outcome, index) => (
+                      <span
+                        key={`${outcome.at || 0}-${outcome.cardId || outcome.label}-${index}`}
+                        className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                          outcome.kind === 'correct'
+                            ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
+                            : outcome.kind === 'skipped'
+                              ? 'border-stone-200 text-stone-500 dark:border-stone-800 dark:text-stone-400'
+                              : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-300'
+                        }`}
+                      >
+                        {outcome.kind}: {outcome.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-1 leading-snug">No answers yet</div>
+                )}
+                {runStats.skipped > 0 && (
+                  <div className="mt-1 text-[11px] text-stone-400">{runStats.skipped} skipped</div>
+                )}
+              </div>
             </div>
-          )}
+          </details>
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
           <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">

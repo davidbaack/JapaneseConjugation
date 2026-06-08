@@ -41,8 +41,8 @@ describe('App shell', () => {
     expect(screen.getByText('Toggle categories for continuous Practice.')).toBeTruthy();
     expect(screen.getAllByText('No reps yet').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Untested').length).toBeGreaterThan(0);
-    expect(screen.getByText('Continuous practice')).toBeTruthy();
-    expect(screen.getByText('Practice keeps going until you leave this page.')).toBeTruthy();
+    expect(screen.getByText('Practice run')).toBeTruthy();
+    expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
     expect(screen.queryByText('Next workout')).toBeNull();
     expect(screen.queryByText('Form families')).toBeNull();
@@ -169,7 +169,7 @@ describe('App shell', () => {
     render(<App />);
 
     await waitForPracticeCard();
-    expect(screen.getByText('Continuous practice')).toBeTruthy();
+    expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
   });
 
