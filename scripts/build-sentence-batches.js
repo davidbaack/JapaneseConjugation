@@ -6,8 +6,8 @@
 //
 // Env:
 //   SENTENCE_JLPT        Comma list of JLPT levels to include (default: all).
-//   SENTENCE_TYPES       Comma list of type ids, or "all" (default: the 28
-//                        LEARNER_DEFAULT_TYPE_IDS).
+//   SENTENCE_TYPES       Comma list of type ids, "all", or "default" (the 28
+//                        LEARNER_DEFAULT_TYPE_IDS). Default: all 126 forms.
 //   SENTENCE_BATCH_SIZE  Pairs per batch file (default 200).
 //   SENTENCE_LIMIT       Cap total pairs emitted (0 = no cap).
 //   SENTENCE_OUT_DIR     Output directory (default tmp/sentence-batches).
@@ -36,8 +36,9 @@ function csv(value) {
 
 function targetTypeIds() {
   const raw = (process.env.SENTENCE_TYPES || '').trim();
-  if (!raw || raw === 'default') return [...LEARNER_DEFAULT_TYPE_IDS];
-  if (raw === 'all') return ALL_CARD_TYPES.map((t) => t.id);
+  // Default to every form so a plain run covers everything the engine can make.
+  if (!raw || raw === 'all') return ALL_CARD_TYPES.map((t) => t.id);
+  if (raw === 'default') return [...LEARNER_DEFAULT_TYPE_IDS];
   return csv(raw);
 }
 
