@@ -668,6 +668,37 @@ describe('StudyView continuous Practice startup', () => {
     expect(markSrsQueueCompleted).not.toHaveBeenCalled();
   });
 
+  it('records Transform drill answers in transformation progress', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      state: { ...defaultState(), enabledTypes: [type] },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        sourceFormStrategy: 'dictionary',
+      },
+    });
+
+    render(<StudyView mode="transform" />);
+
+    expect(await screen.findByText(/Conjugate to/i)).toBeTruthy();
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    const nextState = setState.mock.calls
+      .map(([arg]) => arg)
+      .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
+
+    expect(nextState.transformation.attempted).toBe(1);
+    expect(nextState.transformation.correct).toBe(1);
+    expect(Object.keys(nextState.transformation.byPair)).toHaveLength(1);
+    expect(nextState.cards).toEqual({});
+    expect(nextState.daily.count).toBe(0);
+  });
   it('keeps an exact romaji answer unsubmitted until Check or Enter when kana help is off', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];

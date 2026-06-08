@@ -23,7 +23,9 @@ const ASSET_DIR = 'dist/assets';
 // measured Supabase-enabled deploy build is ~282 KB gzipped.
 // Bumped 285->295: top-level Guide practice added a lazy ~4.5 KB gzipped view;
 // measured Supabase-enabled deploy build is ~292 KB gzipped.
-const TOTAL_GZIP_KB = 295;
+// Bumped 295->300: godan row-shift visuals plus Drills Transform put the
+// measured Supabase-enabled build at ~298 KB gzipped.
+const TOTAL_GZIP_KB = 300;
 const MAX_CHUNK_GZIP_KB = 70;
 
 const KB = 1024;

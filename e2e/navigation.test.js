@@ -13,7 +13,7 @@ const VIEW_ANCHORS = {
   practice: () => /Practice map/,
   stats: () => /Practice pulse/,
   learn: () => /Conjugation formation guide/,
-  drills: () => /Focused exercises for endings, groups, and speed/,
+  drills: () => /Focused exercises for endings, transformations, groups, and speed/,
   tools: () => /Lookup, check, word lists, and word management/,
   settings: () => /Display scripts/,
 };

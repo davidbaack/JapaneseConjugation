@@ -6,9 +6,11 @@ import { buildLabReviewRecommendations } from '../utils/reviewRecommendations.js
 import ClassificationView from './ClassificationView.jsx';
 import EndingsView from './EndingsView.jsx';
 import GamesView from './GamesView.jsx';
+import StudyView from './StudyView.jsx';
 
 const LAB_TABS = [
   { id: 'endings', label: 'Ending Lab', icon: IconSpark },
+  { id: 'transform', label: 'Transform', icon: IconRefresh },
   { id: 'classify', label: 'Groups', icon: IconList },
   { id: 'games', label: 'Rush', icon: IconRefresh },
 ];
@@ -69,7 +71,7 @@ export default function PracticeLabView() {
               Drills
             </div>
             <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
-              Focused exercises for endings, groups, and speed.
+              Focused exercises for endings, transformations, groups, and speed.
             </h2>
           </div>
           <button
@@ -134,6 +136,7 @@ export default function PracticeLabView() {
 
       <section {...panelProps(active)}>
         {active === 'endings' && <EndingsView />}
+        {active === 'transform' && <StudyView mode="transform" />}
         {active === 'classify' && <ClassificationView />}
         {active === 'games' && <GamesView />}
       </section>

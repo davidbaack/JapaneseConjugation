@@ -45,6 +45,9 @@ confirms the new direction, update this document in the same change.
   is Everyday.
 - The active card may remove the current word from automatic Practice with an
   undo affordance. It must not remove a whole form family from the active card.
+- Main Practice prompts from the dictionary form only for forward production
+  cards. Form-to-form transformations belong in Drills, not the main Practice
+  loop.
 - Sentence mode remains an active-card presentation toggle. It wraps a normal
   forward production card in a cued example sentence with a blank and grammar
   cue, and falls back to the normal prompt for reverse, listening, and
@@ -87,7 +90,8 @@ confirms the new direction, update this document in the same change.
 
 ## Drills
 
-- Ending Lab supports onbin and te/ta repair. Groups supports verb/adjective
+- Ending Lab supports onbin and te/ta repair. Transform supports practice
+  between non-dictionary source and target forms. Groups supports verb/adjective
   classification. Rush supports speed and recall.
 - Drills can create visible recommended Practice sets. The learner starts the set
   explicitly; once practiced in Practice, it updates normal progress.

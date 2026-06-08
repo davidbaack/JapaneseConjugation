@@ -53,6 +53,7 @@ import {
   recordMistake,
   markMistakeResolved,
   gradeCard,
+  gradeTransformationStats,
   bumpDaily,
   typeIdFromCardId,
 } from '../utils/storage.js';
@@ -1857,7 +1858,7 @@ function MistakeRouteHint({ route }) {
   );
 }
 
-export default function StudyView() {
+export default function StudyView({ mode = 'practice' }) {
   const {
     state,
     setState,
@@ -1998,10 +1999,12 @@ export default function StudyView() {
   const autoAdvanceCorrect = resolveAutoAdvanceCorrect(practicePrefs);
   const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
   const typedAnswerMode = answerMode === 'input';
-  const transformationMode = false;
+  const transformationMode = mode === 'transform';
   const listeningPrompt = !!practicePrefs.listeningPrompt;
-  const sentenceMode = !!practicePrefs.sentenceMode;
-  const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
+  const sentenceMode = !transformationMode && !!practicePrefs.sentenceMode;
+  const activeMinimalPairSet = transformationMode
+    ? null
+    : getMinimalPairSet(practicePrefs.minimalPairSetId);
   const practiceRuleCandidates = useMemo(
     () =>
       buildRuleCandidates(practiceWords, enabledTypes, practicePrefs, {
@@ -2017,16 +2020,10 @@ export default function StudyView() {
       : conjugateItem(current.verb, current.type)
     : '';
   const sourceStrategyPrefs = useMemo(() => {
-    const strategy = practicePrefs.sourceFormStrategy || DEFAULT_PREFS.sourceFormStrategy;
-    if (strategy === 'mixed') return { ...practicePrefs, promptForm: 'random' };
-    if (strategy === 'masu') return { ...practicePrefs, promptForm: 'polite-present' };
-    if (strategy === 'dictionary') return { ...practicePrefs, promptForm: 'dictionary' };
-    const reps = current?.card?.reps || 0;
-    return {
-      ...practicePrefs,
-      promptForm: reps >= 2 ? 'random' : reps >= 1 ? 'dict-masu' : 'dictionary',
-    };
-  }, [current?.card?.reps, practicePrefs]);
+    // Main Practice is dictionary -> target only; form-to-form work lives in Drills > Transform.
+    if (!transformationMode) return { ...practicePrefs, promptForm: 'dictionary' };
+    return { ...practicePrefs, promptForm: 'random' };
+  }, [practicePrefs, transformationMode]);
   const configuredPromptType =
     current && !reverseDrill
       ? pickPromptType(current.verb, current.type, sourceStrategyPrefs)
@@ -2155,7 +2152,7 @@ export default function StudyView() {
     }
     if (current !== null) return;
     const persisted =
-      focus?.word || focus?.formGroupId || focus?.recommendation
+      transformationMode || focus?.word || focus?.formGroupId || focus?.recommendation
         ? null
         : loadPersistedCurrent(state, practiceWords, enabledTypes, practicePrefs);
     if (persisted) {
@@ -2186,12 +2183,13 @@ export default function StudyView() {
     reviewSelectionOptions,
     focus,
     specialLaunchActive,
+    transformationMode,
   ]);
 
   // Persist the active card so a refresh resumes it instead of drawing fresh.
   useEffect(() => {
-    if (current) persistCurrent(current);
-  }, [current]);
+    if (current && !transformationMode) persistCurrent(current);
+  }, [current, transformationMode]);
 
   useEffect(() => {
     if (current && !cardMatchesPractice(current, practiceWords, enabledTypes, practicePrefs)) {
@@ -2622,9 +2620,72 @@ export default function StudyView() {
     );
   }
 
+  function nextTransformationStats(correct) {
+    if (!transformationMode) return state.transformation;
+    return gradeTransformationStats(state.transformation, {
+      correct,
+      sourceType: sourceTypeId,
+      targetType: targetTypeId,
+      direction: reverseDrill ? 'reverse' : 'forward',
+    });
+  }
+
   function mistakeRecordOptions() {
     return {
       ...(minimalPairSetForCurrent?.id ? { minimalPairSetId: minimalPairSetForCurrent.id } : {}),
+      ...(transformationMode
+        ? {
+            dimension: 'transformation',
+            sourceType: sourceTypeId,
+            targetType: targetTypeId,
+            direction: reverseDrill ? 'reverse' : 'forward',
+          }
+        : {}),
+    };
+  }
+
+  function nextGradedState({
+    correct,
+    rid,
+    responseMs,
+    nextMistakes,
+    mistakeDiagnosis,
+    verbStats,
+    daily,
+  }) {
+    const graded = {
+      ...state,
+      mistakes: nextMistakes,
+      minimalPairs: nextMinimalPairProgress(correct),
+      transformation: nextTransformationStats(correct),
+      session: sessionAfterAnswer(state.session, {
+        card: current,
+        correct,
+        mistakeDiagnosis,
+      }),
+    };
+    if (transformationMode) return graded;
+    return {
+      ...graded,
+      cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], correct) },
+      retryQueue: correct
+        ? (state.retryQueue || []).filter((id) => id !== rid)
+        : [...new Set([...(state.retryQueue || []), rid])].slice(-20),
+      verbStats,
+      readiness: recordReadinessAttempt(state.readiness, rid, {
+        correct,
+        responseMs,
+        answerMode,
+        kanaAssist: readinessKanaAssist,
+        reverseDrill,
+      }),
+      weakness: recordWeaknessAttempt(state.weakness, {
+        word: current.verb,
+        typeId: current.type,
+        correct,
+        responseMs,
+      }),
+      daily,
     };
   }
 
@@ -3030,35 +3091,15 @@ export default function StudyView() {
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
     const submittedForReview =
       finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw;
-    const nextState = {
-      ...state,
-      cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
-      retryQueue: ok
-        ? (state.retryQueue || []).filter((id) => id !== rid)
-        : [...new Set([...(state.retryQueue || []), rid])].slice(-20),
+    const nextState = nextGradedState({
+      correct: ok,
+      rid,
+      responseMs,
+      nextMistakes,
+      mistakeDiagnosis,
       verbStats: newVerbStats,
-      mistakes: nextMistakes,
-      readiness: recordReadinessAttempt(state.readiness, rid, {
-        correct: ok,
-        responseMs,
-        answerMode,
-        kanaAssist: readinessKanaAssist,
-        reverseDrill,
-      }),
-      weakness: recordWeaknessAttempt(state.weakness, {
-        word: current.verb,
-        typeId: current.type,
-        correct: ok,
-        responseMs,
-      }),
-      minimalPairs: nextMinimalPairProgress(ok),
-      session: sessionAfterAnswer(state.session, {
-        card: current,
-        correct: ok,
-        mistakeDiagnosis,
-      }),
       daily: newDaily,
-    };
+    });
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
@@ -3201,35 +3242,15 @@ export default function StudyView() {
         );
     const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
-    const nextState = {
-      ...state,
-      cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
-      retryQueue: ok
-        ? (state.retryQueue || []).filter((id) => id !== rid)
-        : [...new Set([...(state.retryQueue || []), rid])].slice(-20),
+    const nextState = nextGradedState({
+      correct: ok,
+      rid,
+      responseMs,
+      nextMistakes,
+      mistakeDiagnosis,
       verbStats: newVerbStats,
-      mistakes: nextMistakes,
-      readiness: recordReadinessAttempt(state.readiness, rid, {
-        correct: ok,
-        responseMs,
-        answerMode,
-        kanaAssist: readinessKanaAssist,
-        reverseDrill,
-      }),
-      weakness: recordWeaknessAttempt(state.weakness, {
-        word: current.verb,
-        typeId: current.type,
-        correct: ok,
-        responseMs,
-      }),
-      minimalPairs: nextMinimalPairProgress(ok),
-      session: sessionAfterAnswer(state.session, {
-        card: current,
-        correct: ok,
-        mistakeDiagnosis,
-      }),
       daily: newDaily,
-    };
+    });
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
@@ -3314,33 +3335,15 @@ export default function StudyView() {
       mistakeRecordOptions(),
     );
     const mistakeDiagnosis = nextMistakes[0]?.diagnosis || null;
-    const nextState = {
-      ...state,
-      cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], false) },
-      retryQueue: [...new Set([...(state.retryQueue || []), rid])].slice(-20),
+    const nextState = nextGradedState({
+      correct: false,
+      rid,
+      responseMs,
+      nextMistakes,
+      mistakeDiagnosis,
       verbStats: newVerbStats,
-      mistakes: nextMistakes,
-      readiness: recordReadinessAttempt(state.readiness, rid, {
-        correct: false,
-        responseMs,
-        answerMode,
-        kanaAssist: readinessKanaAssist,
-        reverseDrill,
-      }),
-      weakness: recordWeaknessAttempt(state.weakness, {
-        word: current.verb,
-        typeId: current.type,
-        correct: false,
-        responseMs,
-      }),
-      minimalPairs: nextMinimalPairProgress(false),
-      session: sessionAfterAnswer(state.session, {
-        card: current,
-        correct: false,
-        mistakeDiagnosis,
-      }),
       daily: bumpDaily(state.daily, false, dailyGoalTarget),
-    };
+    });
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, false, { holdNext: true })
       : null;

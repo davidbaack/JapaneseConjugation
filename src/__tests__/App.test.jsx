@@ -459,16 +459,19 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Drills', exact: true }));
 
     await screen.findByText(
-      'Focused exercises for endings, groups, and speed.',
+      'Focused exercises for endings, transformations, groups, and speed.',
       {},
       { timeout: 5000 },
     );
     expect(screen.getByRole('tab', { name: /^Ending Lab/i })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /^Transform/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Groups/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Rush/i })).toBeTruthy();
     expect(screen.queryByRole('tab', { name: /^Check/i })).toBeNull();
 
     expect(await screen.findByRole('heading', { name: 'Ending Lab' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /^Transform/i }));
+    expect(await screen.findByText(/Conjugate to/i)).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /^Groups/i }));
     expect(await screen.findByText('Classification drill')).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /^Rush/i }));
