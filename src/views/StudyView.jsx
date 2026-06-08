@@ -69,7 +69,6 @@ import {
   autoAdvanceAnswerFormKey,
   resolveAutoAdvanceCorrect,
   kanaMatchDisplayForPrefs,
-  typoGuardForAnswer,
   spokenAnswerResult,
 } from '../utils/display.js';
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
@@ -1384,7 +1383,6 @@ export default function StudyView() {
   const [submittedAnswer, setSubmittedAnswer] = useState('');
   const [lastDiagnosis, setLastDiagnosis] = useState(null);
   const [selfCheckOpen, setSelfCheckOpen] = useState(false);
-  const [typoGuard, setTypoGuard] = useState(null);
   const [speechListening, setSpeechListening] = useState(false);
   const [speechError, setSpeechError] = useState('');
   const [reviewBase, setReviewBase] = useState(state.session.reviewed || 0);
@@ -1702,7 +1700,6 @@ export default function StudyView() {
     setPhase('answering');
     setChatOpen(false);
     setStepHint('');
-    setTypoGuard(null);
     setWasCorrect(false);
     setLastDiagnosis(null);
   }, [current, activeMinimalPairSet]);
@@ -1716,7 +1713,6 @@ export default function StudyView() {
     setPhase('answering');
     setChatOpen(false);
     setStepHint('');
-    setTypoGuard(null);
     setWasCorrect(false);
     setLastDiagnosis(null);
   }, [practicePrefs.minimalPairSetId]);
@@ -1835,10 +1831,6 @@ export default function StudyView() {
     // startSpeechAnswer closes over the current spoken-answer targets.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, phase, answerMode, speechRecognitionAvailable, speechListening]);
-
-  useEffect(() => {
-    setTypoGuard(null);
-  }, [current?.id, phase]);
 
   useEffect(() => {
     setReviewBase(state.session.reviewed || 0);
@@ -2282,7 +2274,6 @@ export default function StudyView() {
     setRevealedMiss(false);
     setReviewChoiceLabel('');
     setSelfCheckOpen(false);
-    setTypoGuard(null);
     setStepHint('');
     setHintMasked(false);
     setHintRevealed(false);
@@ -2411,7 +2402,6 @@ export default function StudyView() {
       setRevealedMiss(false);
       setReviewChoiceLabel('');
       setSelfCheckOpen(false);
-      setTypoGuard(null);
       setStepHint('');
       setHintMasked(false);
       setHintRevealed(false);
@@ -2440,14 +2430,6 @@ export default function StudyView() {
         ? spokenAnswerResult(spokenAnswerTargets, raw).ok
         : normalized === expected;
     const ok = finalOk && (spoken || !hadKanaMistakeRef.current);
-    const nearMiss =
-      choiceValue === undefined && !spoken && !ok
-        ? typoGuardForAnswer(raw, normalized, expected, current.verb, reverseDrill)
-        : null;
-    if (nearMiss && typoGuard?.key !== nearMiss.key) {
-      setTypoGuard(nearMiss);
-      return;
-    }
     if (choiceValue !== undefined) setAnswer(raw);
     const dict = current.verb.dict,
       rid = current.id;
@@ -2533,7 +2515,6 @@ export default function StudyView() {
         setRevealedMiss(false);
         setReviewChoiceLabel('');
         setSelfCheckOpen(false);
-        setTypoGuard(null);
         setStepHint('');
         setHintMasked(false);
         setHintRevealed(false);
@@ -2578,7 +2559,6 @@ export default function StudyView() {
     setRevealedMiss(false);
     setReviewChoiceLabel('');
     setSelfCheckOpen(false);
-    setTypoGuard(null);
     setStepHint('');
     setHintMasked(false);
     setHintRevealed(false);
@@ -2675,7 +2655,6 @@ export default function StudyView() {
     if (sweepStep) setWordSweep(sweepStep.sweep);
     setState(nextState);
     setAnswer('');
-    setTypoGuard(null);
     setReviewChoiceLabel(label);
     setRevealedMiss(!ok);
     setSelfCheckOpen(false);
@@ -2695,7 +2674,6 @@ export default function StudyView() {
         setRevealedMiss(false);
         setReviewChoiceLabel('');
         setSelfCheckOpen(false);
-        setTypoGuard(null);
         setStepHint('');
         setHintMasked(false);
         setHintRevealed(false);
@@ -2779,7 +2757,6 @@ export default function StudyView() {
     if (sweepStep) setWordSweep(sweepStep.sweep);
     setState(nextState);
     setAnswer('');
-    setTypoGuard(null);
     setChatOpen(false);
     setLastDiagnosis(mistakeDiagnosis);
     setReviewChoiceLabel("I don't know");
@@ -2805,7 +2782,6 @@ export default function StudyView() {
     }));
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
-    setTypoGuard(null);
   }
 
   function toggleAutoNext() {
@@ -2834,7 +2810,6 @@ export default function StudyView() {
   }
 
   function updateTypedAnswer(nextAnswer, options = {}) {
-    setTypoGuard(null);
     rememberKanaMistake(nextAnswer, options.trackKanaMistake !== false);
     setAnswer(nextAnswer);
     if (
@@ -3638,12 +3613,6 @@ export default function StudyView() {
                           ×
                         </button>
                       )}
-                    </div>
-                  )}
-                  {typoGuard && (
-                    <div className="mb-3 rounded-xl border border-amber-250 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-                      <div className="font-medium">Almost - possible typo.</div>
-                      <div className="text-xs mt-0.5">{typoGuard.detail}</div>
                     </div>
                   )}
                   {answerMode === 'self-check' ? (

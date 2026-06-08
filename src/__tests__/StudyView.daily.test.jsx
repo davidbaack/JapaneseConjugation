@@ -764,10 +764,6 @@ describe('StudyView continuous Practice startup', () => {
     expect(setState).not.toHaveBeenCalled();
 
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(screen.getByText('Almost - possible typo.')).toBeTruthy();
-    expect(setState).not.toHaveBeenCalled();
-
-    fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
     const nextState = setState.mock.calls[0][0];
