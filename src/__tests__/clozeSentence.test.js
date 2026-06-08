@@ -16,6 +16,8 @@ function expectSafeCloze(out, word) {
   expect(blankCount(out.sentence)).toBe(1);
   expect(typeof out.cue).toBe('string');
   expect(out.cue.length).toBeGreaterThan(0);
+  expect(typeof out.note).toBe('string');
+  expect(out.note.length).toBeGreaterThan(0);
   expect(typeof out.variantId).toBe('string');
   expect(out.variantId.length).toBeGreaterThan(0);
   expect(out.sentence).not.toContain(word.reading);
