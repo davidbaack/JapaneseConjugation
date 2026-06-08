@@ -1102,7 +1102,9 @@ describe('word-form SRS selection', () => {
       },
     };
 
-    const card = selectNext(state, [TABERU, KAKU, YOMU], ['plain-past'], null, DEFAULT_PREFS);
+    const card = selectNext(state, [TABERU, KAKU, YOMU], ['plain-past'], null, DEFAULT_PREFS, null, {
+      recentCardIds: [cardIdFor(TABERU, 'plain-past'), cardIdFor(KAKU, 'plain-past')],
+    });
 
     expect(card.id).toBe(cardIdFor(YOMU, 'plain-past'));
   });
@@ -1136,7 +1138,9 @@ describe('word-form SRS selection', () => {
       },
     };
 
-    const card = selectNext(state, [TABERU, KAKU, YOMU], ['plain-past'], null, DEFAULT_PREFS);
+    const card = selectNext(state, [TABERU, KAKU, YOMU], ['plain-past'], null, DEFAULT_PREFS, null, {
+      recentCardIds: [cardIdFor(TABERU, 'plain-past'), cardIdFor(KAKU, 'plain-past')],
+    });
 
     expect(card.id).toBe(cardIdFor(YOMU, 'plain-past'));
   });
