@@ -26,13 +26,14 @@ function AppShell() {
   const { tab, setTab, showAuthModal, setShowAuthModal, supabase } = useApp();
 
   const { tabProps, panelProps } = useTablist(TABS, tab, setTab);
+  const shellWidthClass = tab === 'practice' ? 'max-w-[80rem]' : 'max-w-4xl';
 
   return (
     <div
       className="min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-800 dark:text-stone-200 transition-colors duration-200"
       style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif' }}
     >
-      <div className="max-w-4xl mx-auto px-4 py-3 sm:py-6">
+      <div className={`${shellWidthClass} mx-auto px-4 py-3 sm:py-6`}>
         <header className="mb-4 sm:mb-6">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">

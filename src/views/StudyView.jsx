@@ -3106,7 +3106,7 @@ export default function StudyView() {
         : null;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+    <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] xl:justify-center xl:grid-cols-[minmax(0,17rem)_minmax(0,42rem)_minmax(0,17rem)]">
       <PracticeScopeSidebar
         className="order-2 lg:order-1"
         state={state}
@@ -3116,7 +3116,7 @@ export default function StudyView() {
         onToggleFamily={togglePracticeFamily}
         onToggleType={togglePracticeType}
       />
-      <div className="order-1 min-w-0 space-y-4 lg:order-2">
+      <div className="order-1 min-w-0 space-y-4 lg:order-2 xl:w-full">
         {focusBanner && (
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 px-5 py-4 dark:border-indigo-800 dark:bg-indigo-950/20">
             <div className="flex items-start justify-between gap-3">
