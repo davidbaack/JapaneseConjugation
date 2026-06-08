@@ -10,6 +10,7 @@ import { useTablist } from './components/useTablist.js';
 // needs from the central app state via useApp(), so the shell renders them
 // without prop-drilling.
 const StudyView = React.lazy(() => import('./views/StudyView.jsx'));
+const GuideView = React.lazy(() => import('./views/GuideView.jsx'));
 const StatsView = React.lazy(() => import('./views/StatsView.jsx'));
 const LessonsView = React.lazy(() => import('./views/LessonsView.jsx'));
 const PracticeLabView = React.lazy(() => import('./views/PracticeLabView.jsx'));
@@ -19,7 +20,7 @@ const DevHistoryPanel = import.meta.env.DEV
   ? React.lazy(() => import('./components/DevHistoryPanel.jsx'))
   : null;
 
-const TABS = ['practice', 'stats', 'learn', 'drills', 'tools', 'settings'];
+const TABS = ['practice', 'guide', 'stats', 'learn', 'drills', 'tools', 'settings'];
 
 function AppShell() {
   const { tab, setTab, showAuthModal, setShowAuthModal, supabase } = useApp();
@@ -65,6 +66,7 @@ function AppShell() {
         <Suspense fallback={<ViewSkeleton />}>
           <div {...panelProps(tab)}>
             {tab === 'practice' && <StudyView />}
+            {tab === 'guide' && <GuideView />}
             {tab === 'stats' && <StatsView />}
             {tab === 'learn' && <LessonsView />}
             {tab === 'drills' && <PracticeLabView />}

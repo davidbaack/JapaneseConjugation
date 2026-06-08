@@ -30,6 +30,7 @@ describe('buildBackup / serializeBackup', () => {
   it('captures progress and settings sections', () => {
     const b = buildBackup(parts());
     expect(b.state.cards).toEqual({ 'a|b': { reps: 2 } });
+    expect(b.state.guide).toBeTruthy();
     expect(b.customVerbs).toHaveLength(1);
     expect(b.wordLists[0].name).toBe('N5');
     expect(b.practicePrefs.theme).toBe('dark');

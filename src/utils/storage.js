@@ -810,6 +810,30 @@ export function mergeCloudState(local, cloud) {
       lastAt: maxNum(local.mock?.lastAt, cloud.mock?.lastAt) || null,
       bySkill: { ...(cloud.mock?.bySkill || {}), ...(local.mock?.bySkill || {}) },
     },
+    guide: {
+      attempted: maxNum(local.guide?.attempted, 0) + maxNum(cloud.guide?.attempted, 0),
+      correct: maxNum(local.guide?.correct, 0) + maxNum(cloud.guide?.correct, 0),
+      assisted: maxNum(local.guide?.assisted, 0) + maxNum(cloud.guide?.assisted, 0),
+      byStep: Object.fromEntries(
+        ['base', 'group', 'answer'].map((id) => [
+          id,
+          {
+            attempted:
+              maxNum(local.guide?.byStep?.[id]?.attempted, 0) +
+              maxNum(cloud.guide?.byStep?.[id]?.attempted, 0),
+            correct:
+              maxNum(local.guide?.byStep?.[id]?.correct, 0) +
+              maxNum(cloud.guide?.byStep?.[id]?.correct, 0),
+            assisted:
+              maxNum(local.guide?.byStep?.[id]?.assisted, 0) +
+              maxNum(cloud.guide?.byStep?.[id]?.assisted, 0),
+          },
+        ]),
+      ),
+      recent: [...(local.guide?.recent || []), ...(cloud.guide?.recent || [])]
+        .sort((a, b) => (b?.at || 0) - (a?.at || 0))
+        .slice(0, 20),
+    },
     transformation: mergeTransformationStats(local.transformation, cloud.transformation),
     minimalPairs: mergeMinimalPairProgress(local.minimalPairs, cloud.minimalPairs),
     reviewScope: normalizeReviewScope({
@@ -911,6 +935,17 @@ export function defaultState() {
     },
     reader: { sessions: 0, chars: 0, encounters: 0, wordSeen: {}, lastAt: null },
     production: { attempted: 0, correct: 0, lastScore: 0, lastAt: null },
+    guide: {
+      attempted: 0,
+      correct: 0,
+      assisted: 0,
+      byStep: {
+        base: { attempted: 0, correct: 0, assisted: 0 },
+        group: { attempted: 0, correct: 0, assisted: 0 },
+        answer: { attempted: 0, correct: 0, assisted: 0 },
+      },
+      recent: [],
+    },
     transformation: emptyTransformationStats(),
     minimalPairs: { bySet: {} },
     reference: normalizeReferenceState(),
@@ -970,6 +1005,17 @@ export function mergeState(saved, sessionOverride) {
       wordSeen: (saved && saved.reader && saved.reader.wordSeen) || {},
     },
     production: (saved && saved.production) || base.production,
+    guide: {
+      ...base.guide,
+      ...((saved && saved.guide) || {}),
+      byStep: {
+        ...base.guide.byStep,
+        ...((saved && saved.guide && saved.guide.byStep) || {}),
+      },
+      recent: Array.isArray(saved && saved.guide && saved.guide.recent)
+        ? saved.guide.recent.slice(0, 20)
+        : [],
+    },
     transformation: oldSrsSchema
       ? emptyTransformationStats()
       : mergeTransformationStats(base.transformation, saved && saved.transformation),

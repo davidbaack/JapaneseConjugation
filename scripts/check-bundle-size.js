@@ -21,7 +21,9 @@ const ASSET_DIR = 'dist/assets';
 // Supabase-enabled builds remained under that cap.
 // Bumped 280->285: global SRS queue shell work added a small amount of app code;
 // measured Supabase-enabled deploy build is ~282 KB gzipped.
-const TOTAL_GZIP_KB = 285;
+// Bumped 285->295: top-level Guide practice added a lazy ~4.5 KB gzipped view;
+// measured Supabase-enabled deploy build is ~292 KB gzipped.
+const TOTAL_GZIP_KB = 295;
 const MAX_CHUNK_GZIP_KB = 70;
 
 const KB = 1024;

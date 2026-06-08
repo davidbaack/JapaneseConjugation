@@ -5,7 +5,7 @@
 import { defaultState } from './storage.js';
 
 export const BACKUP_FORMAT = 'jp-verb-srs';
-export const BACKUP_VERSION = 39;
+export const BACKUP_VERSION = 40;
 
 /**
  * Build the export object capturing all persistable progress + settings.
@@ -29,6 +29,7 @@ export function buildBackup({ state, customVerbs, customAdjectives, wordLists, p
       mock: state.mock,
       reader: state.reader,
       production: state.production || defaultState().production,
+      guide: state.guide || defaultState().guide,
       reference: state.reference,
       daily: state.daily,
       classify: state.classify,

@@ -1,7 +1,7 @@
 # Practice-First App Experience
 
 This document is the product experience source of truth for learner-facing work.
-Agents must read it before changing Practice, Learn, Drills, Tools, Settings,
+Agents must read it before changing Practice, Guide, Learn, Drills, Tools, Settings,
 navigation, scheduling behavior, or learner progress language.
 
 If a proposed change goes against this design, ask the user first. If the user
@@ -9,9 +9,13 @@ confirms the new direction, update this document in the same change.
 
 ## Product Shape
 
-- Top-level sections are Practice, Stats, Learn, Drills, Tools, and Settings.
+- Top-level sections are Practice, Guide, Stats, Learn, Drills, Tools, and Settings.
 - Practice is the landing page and the main learner loop. It is built around
   short workouts, not a visible long-term SRS queue.
+- Guide is a scaffolded practice mode for recovering the base form, identifying
+  the word group, and producing the target conjugation before one final submit.
+  It can count as Practice progress after the full guided card is submitted, and
+  it records step-level diagnostics separately.
 - Stats contains progress, recommendations, upcoming reviews, and readiness
   summaries that do not need to block the active workout.
 - Learn teaches forms and verb/adjective groups from start to finish. It can

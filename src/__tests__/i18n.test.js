@@ -8,6 +8,7 @@ beforeEach(() => {
 describe('t', () => {
   it('returns the English string for a known key', () => {
     expect(t('nav.practice')).toBe('Practice');
+    expect(t('nav.guide')).toBe('Guide');
     expect(t('nav.stats')).toBe('Stats');
     expect(t('nav.learn')).toBe('Learn');
     expect(t('nav.drills')).toBe('Drills');

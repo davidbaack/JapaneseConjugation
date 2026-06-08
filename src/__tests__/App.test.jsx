@@ -29,7 +29,7 @@ describe('App shell', () => {
     expect(screen.getByRole('heading', { name: /Katachiya/ })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Conjugation Practice/ })).toBeTruthy();
     // Nav labels (accessible name is the catalog string; CSS only capitalizes).
-    for (const label of ['Practice', 'Stats', 'Learn', 'Drills', 'Tools', 'Settings']) {
+    for (const label of ['Practice', 'Guide', 'Stats', 'Learn', 'Drills', 'Tools', 'Settings']) {
       expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
     }
   });
@@ -346,13 +346,26 @@ describe('App shell', () => {
   it('mounts every tab without hitting the error boundary', async () => {
     render(<App />);
     // Each nav button's accessible name is its catalog label.
-    const labels = ['Practice', 'Stats', 'Learn', 'Drills', 'Tools', 'Settings'];
+    const labels = ['Practice', 'Guide', 'Stats', 'Learn', 'Drills', 'Tools', 'Settings'];
     for (const label of labels) {
       fireEvent.click(screen.getByRole('tab', { name: label, exact: true }));
       // Each view lazy-loads; wait until its chunk resolves (nav stays mounted).
       await waitFor(() => expect(screen.queryByText('Something went wrong')).toBeNull());
       expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
     }
+  });
+
+  it('opens Guide and submits a completed assisted guide card', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Guide', exact: true }));
+
+    expect(await screen.findByText('Build the conjugation step by step.')).toBeTruthy();
+    const skipButtons = await screen.findAllByRole('button', { name: 'Skip' });
+    for (const button of skipButtons) fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: 'Submit guide card' }));
+
+    expect(await screen.findAllByText(/assisted/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Next card' })).toBeTruthy();
   });
 
   it('keeps Tools focused on lookup, check, and word management', async () => {

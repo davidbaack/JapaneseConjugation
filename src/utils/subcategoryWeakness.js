@@ -13,6 +13,7 @@ export const QUICK_PRACTICE_DEFAULT_TYPE_IDS = EVERYDAY_TYPE_IDS;
 const MAX_RECENT_ATTEMPTS = 30;
 const RECENT_DECAY_MS = 14 * 86400000;
 const TE_TA_TYPES = new Set(['te-form', 'plain-past']);
+const MIN_SKILL_ATTEMPTS = 3;
 const ONBIN_IDS = new Map([
   ['utsuru', { id: 'godan-onbin-utsuru', label: 'Godan u/tsu/ru sound changes' }],
   ['mnb', { id: 'godan-onbin-mnb', label: 'Godan mu/bu/nu sound changes' }],
@@ -32,6 +33,78 @@ function uniqueStrings(values = []) {
 
 function typeLabel(typeId) {
   return getTypeInfo(typeId).label || typeId;
+}
+
+function typeIdFromCardId(cardId) {
+  const id = String(cardId || '');
+  const marker = id.lastIndexOf('|');
+  return marker >= 0 ? id.slice(marker + 1) : id;
+}
+
+function clampSkillScore(score) {
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function skillStatusFor(score, attempted) {
+  if (attempted < MIN_SKILL_ATTEMPTS) {
+    return { status: 'untested', label: attempted ? 'Gathering data' : 'Untested' };
+  }
+  if (score >= 85) return { status: 'strong', label: 'Strong' };
+  if (score >= 60) return { status: 'developing', label: 'Developing' };
+  return { status: 'weak', label: 'Needs practice' };
+}
+
+function cardTotalsForFamily(state = {}, family) {
+  const typeIds = new Set(family.typeIds || []);
+  let correct = 0;
+  let incorrect = 0;
+  for (const [cardId, card] of Object.entries(state.cards || {})) {
+    if (!typeIds.has(typeIdFromCardId(cardId))) continue;
+    correct += cleanNumber(card?.correct);
+    incorrect += cleanNumber(card?.incorrect);
+  }
+  return { correct, incorrect, attempted: correct + incorrect };
+}
+
+function laneTotalsForFamily(rows = []) {
+  const correct = rows.reduce((sum, row) => sum + cleanNumber(row.correct), 0);
+  const incorrect = rows.reduce((sum, row) => sum + cleanNumber(row.incorrect), 0);
+  const attempted = correct + incorrect;
+  const totalResponseMs = rows.reduce((sum, row) => sum + cleanNumber(row.totalResponseMs), 0);
+  const recent = rows
+    .flatMap((row) => row.recent || [])
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 12);
+  return { correct, incorrect, attempted, totalResponseMs, recent };
+}
+
+function skillForFamily({ correct, attempted, laneAttempted, totalResponseMs, recent }) {
+  if (attempted < MIN_SKILL_ATTEMPTS) {
+    const status = skillStatusFor(0, attempted);
+    return {
+      accuracy: attempted ? Math.round((correct / attempted) * 100) : 0,
+      skillScore: 0,
+      skillStatus: status.status,
+      skillLabel: status.label,
+      avgResponseMs: laneAttempted ? Math.round(totalResponseMs / laneAttempted) : 0,
+    };
+  }
+  const accuracy = Math.round((correct / attempted) * 100);
+  const recentAttempts = recent.length;
+  const recentAccuracy = recentAttempts
+    ? Math.round((recent.filter((attempt) => attempt.correct).length / recentAttempts) * 100)
+    : accuracy;
+  const avgResponseMs = laneAttempted ? Math.round(totalResponseMs / laneAttempted) : 0;
+  const slowPenalty = avgResponseMs > 8000 ? Math.min(15, ((avgResponseMs - 8000) / 8000) * 10) : 0;
+  const skillScore = clampSkillScore(accuracy * 0.65 + recentAccuracy * 0.35 - slowPenalty);
+  const status = skillStatusFor(skillScore, attempted);
+  return {
+    accuracy,
+    skillScore,
+    skillStatus: status.status,
+    skillLabel: status.label,
+    avgResponseMs,
+  };
 }
 
 export function deriveWeaknessSubcategory(word, typeId = '') {
@@ -208,10 +281,22 @@ export function rankedWeaknessLanes(weakness, options = {}) {
 }
 
 export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
-  const lanes = rankedWeaknessLanes(state.weakness);
+  const normalized = normalizeWeaknessState(state.weakness);
+  const allLanes = Object.values(normalized.byLane);
+  const rankedLanes = rankedWeaknessLanes(normalized);
   return families.map((family) => {
     const typeIds = new Set(family.typeIds || []);
-    const rows = lanes
+    const familyLanes = allLanes.filter((lane) => typeIds.has(lane.typeId));
+    const laneTotals = laneTotalsForFamily(familyLanes);
+    const cardTotals = cardTotalsForFamily(state, family);
+    const totals = cardTotals.attempted ? cardTotals : laneTotals;
+    const skill = skillForFamily({
+      ...totals,
+      laneAttempted: laneTotals.attempted,
+      totalResponseMs: laneTotals.totalResponseMs,
+      recent: laneTotals.recent,
+    });
+    const rows = rankedLanes
       .filter((lane) => typeIds.has(lane.typeId))
       .map((lane) => ({
         ...lane,
@@ -225,6 +310,14 @@ export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
     return {
       id: family.id,
       label: family.label,
+      attempted: totals.attempted,
+      correct: totals.correct,
+      incorrect: totals.incorrect,
+      accuracy: skill.accuracy,
+      avgResponseMs: skill.avgResponseMs,
+      skillScore: skill.skillScore,
+      skillStatus: skill.skillStatus,
+      skillLabel: skill.skillLabel,
       rows,
       top: rows[0] || null,
     };

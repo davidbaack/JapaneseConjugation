@@ -1955,14 +1955,13 @@ export default function StudyView() {
     defaultWorkoutTargetRef.current = plannedDefaultProgressMax;
   }
   const defaultProgressMax = defaultWorkoutTargetRef.current || plannedDefaultProgressMax;
-  const workoutProgress =
-    wordSweep
-      ? {
-          now: Math.min(wordSweep.completedTypeIds?.length || 0, wordSweep.allTypeIds?.length || 1),
-          max: Math.max(1, wordSweep.allTypeIds?.length || 0),
-          label: wordSweep.repeatPass ? 'Repeating missed forms' : 'Enabled forms progress',
-        }
-      : reviewLimit > 0
+  const workoutProgress = wordSweep
+    ? {
+        now: Math.min(wordSweep.completedTypeIds?.length || 0, wordSweep.allTypeIds?.length || 1),
+        max: Math.max(1, wordSweep.allTypeIds?.length || 0),
+        label: wordSweep.repeatPass ? 'Repeating missed forms' : 'Enabled forms progress',
+      }
+    : reviewLimit > 0
       ? {
           now: Math.min(reviewsDone, reviewLimit),
           max: reviewLimit,
