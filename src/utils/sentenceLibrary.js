@@ -12,9 +12,6 @@ import { getAICache, setAICache } from './storage.js';
 import { retryWithBackoff } from './retry.js';
 
 const CACHE_STORE = 'katachiya_ai_sentence_cache';
-// Sentinel cached for known misses so we do not re-query every card for words
-// that have no row yet. Shares the AI cache's 7-day TTL.
-const MISS = '__miss__';
 
 function cacheKey(word, type) {
   return `${wordKey(word)}|${type}`;
@@ -48,7 +45,6 @@ export async function fetchTailoredSentence(word, type) {
 
   const key = cacheKey(word, type);
   const cached = getAICache(CACHE_STORE, key);
-  if (cached === MISS) return null;
   if (cached && typeof cached === 'object') return hydrate(cached, word, type);
 
   let row;
@@ -70,7 +66,6 @@ export async function fetchTailoredSentence(word, type) {
   }
 
   if (!row?.ja_template || !Array.isArray(row.segments)) {
-    setAICache(CACHE_STORE, key, MISS);
     return null;
   }
 

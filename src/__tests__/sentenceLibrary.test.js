@@ -66,13 +66,23 @@ describe('fetchTailoredSentence', () => {
     expect(chain.maybeSingle).toHaveBeenCalledTimes(1);
   });
 
-  it('negative-caches a miss so it does not re-query', async () => {
+  it('does not cache a table miss so later imports can appear', async () => {
     const chain = selectChain({ data: null, error: null });
     const { fetchTailoredSentence } = await load(chain);
 
     expect(await fetchTailoredSentence(WORD, 'plain-negative')).toBeNull();
-    expect(await fetchTailoredSentence(WORD, 'plain-negative')).toBeNull();
-    expect(chain.maybeSingle).toHaveBeenCalledTimes(1);
+    chain.maybeSingle.mockResolvedValueOnce({
+      data: {
+        ja_template: 'later {w}',
+        segments: [{ t: 'later ', r: '' }, { w: true }],
+        en: 'Later.',
+      },
+      error: null,
+    });
+
+    const res = await fetchTailoredSentence(WORD, 'plain-negative');
+    expect(res).toMatchObject({ jaTemplate: 'later {w}', source: 'db' });
+    expect(chain.maybeSingle).toHaveBeenCalledTimes(2);
   });
 
   it('returns null on a query error without caching the miss', async () => {
