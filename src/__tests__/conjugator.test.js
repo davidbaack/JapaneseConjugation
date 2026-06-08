@@ -19,6 +19,7 @@ const KAKU = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'g
 const HANASU = { dict: '話す', reading: 'はなす', meaning: 'to speak', group: 'godan' };
 const MATSU = { dict: '待つ', reading: 'まつ', meaning: 'to wait', group: 'godan' };
 const NOMU = { dict: '飲む', reading: 'のむ', meaning: 'to drink', group: 'godan' };
+const YOMU = { dict: '読む', reading: 'よむ', meaning: 'to read', group: 'godan' };
 const KAEРУ = { dict: '買う', reading: 'かう', meaning: 'to buy', group: 'godan' };
 const OYOGU = { dict: '泳ぐ', reading: 'およぐ', meaning: 'to swim', group: 'godan' };
 const SHINU = { dict: '死ぬ', reading: 'しぬ', meaning: 'to die', group: 'godan' };
@@ -469,6 +470,15 @@ describe('visual conjugation debugger metadata', () => {
     expect(mistake.kind).toBe('form');
     expect(mistake.userRule).toContain('Plain Negative');
     expect(mistake.expectedResult).toBe('たべた');
+  });
+
+  it('infers when a learner keeps a godan dictionary ending before a row-shift suffix', () => {
+    const mistake = getConjugationDebugInfo(YOMU, 'plain-negative', 'よむない').mistake;
+
+    expect(mistake.kind).toBe('row-shift');
+    expect(mistake.userRule).toBe('Kept dictionary ending む + ない');
+    expect(mistake.expectedRule).toBe('む -> ま + ない');
+    expect(mistake.detail).toContain('change む to ま first');
   });
 });
 

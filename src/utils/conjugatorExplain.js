@@ -708,6 +708,69 @@ function inferOnbinMistake(item, type, got, expected, expectedRule) {
   };
 }
 
+function godanRowShiftRecipe(item, type) {
+  if (!item || item.group !== 'godan') return null;
+  const ending = originalEndingFor(item);
+  const row = {
+    'plain-negative': A_ROW[ending],
+    'plain-past-negative': A_ROW[ending],
+    'polite-present': I_ROW[ending],
+    'polite-past': I_ROW[ending],
+    'polite-negative': I_ROW[ending],
+    'polite-past-negative': I_ROW[ending],
+    potential: E_ROW[ending],
+    'conditional-ba': E_ROW[ending],
+    imperative: E_ROW[ending],
+    passive: A_ROW[ending],
+    causative: A_ROW[ending],
+    'short-causative-passive': A_ROW[ending],
+    volitional: O_ROW[ending],
+  }[type];
+  const suffix = {
+    'plain-negative': 'ない',
+    'plain-past-negative': 'なかった',
+    'polite-present': 'ます',
+    'polite-past': 'ました',
+    'polite-negative': 'ません',
+    'polite-past-negative': 'ませんでした',
+    potential: 'る',
+    'conditional-ba': 'ば',
+    imperative: '',
+    passive: 'れる',
+    causative: 'せる',
+    'short-causative-passive': 'される',
+    volitional: 'う',
+  }[type];
+  if (!ending || !row || suffix === undefined) return null;
+  return { ending, row, suffix };
+}
+
+function inferGodanRowShiftMistake(item, type, got, expected, expectedRule) {
+  if (!item || isAdjective(item) || item.group !== 'godan') return null;
+  const recipe = godanRowShiftRecipe(item, type);
+  if (!recipe) return null;
+  const source = item.reading || item.dict || '';
+  if (!source.endsWith(recipe.ending)) return null;
+  const stem = source.slice(0, -recipe.ending.length);
+  const keptDictionaryEnding = `${stem}${recipe.ending}${recipe.suffix}`;
+  const shiftedEnding = `${stem}${recipe.row}${recipe.suffix}`;
+  if (got !== keptDictionaryEnding || expected !== shiftedEnding) return null;
+
+  const mistakeIntro = recipe.suffix
+    ? `You added ${recipe.suffix}, but kept ${recipe.ending}.`
+    : `You kept ${recipe.ending}, but this form needs a row shift.`;
+  const suffixPhrase = recipe.suffix ? `, then add ${recipe.suffix}` : '';
+  return {
+    kind: 'row-shift',
+    userAnswer: got,
+    userRule: `Kept dictionary ending ${recipe.ending}${recipe.suffix ? ` + ${recipe.suffix}` : ''}`,
+    userResult: got,
+    expectedRule: expectedRule.short,
+    expectedResult: expected,
+    detail: `${mistakeIntro} For ${groupDisplayLabel(item.group)} ${typeLabel(type).toLowerCase()}, change ${recipe.ending} to ${recipe.row} first${suffixPhrase}: ${expected}.`,
+  };
+}
+
 export function inferMistakenConjugationPattern(item, type, userAnswer) {
   const raw = String(userAnswer || '').trim();
   if (raw.startsWith('self-check:') || raw === '(revealed)') return null;
@@ -717,6 +780,9 @@ export function inferMistakenConjugationPattern(item, type, userAnswer) {
 
   const expectedParts = getConjugationParts(item, type, expected);
   const expectedRule = ruleSummaryFor(item, type, expectedParts, expected);
+  const rowShift = inferGodanRowShiftMistake(item, type, got, expected, expectedRule);
+  if (rowShift) return rowShift;
+
   const onbin = inferOnbinMistake(item, type, got, expected, expectedRule);
   if (onbin) return onbin;
 

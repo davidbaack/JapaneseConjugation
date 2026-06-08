@@ -2091,6 +2091,13 @@ export default function StudyView() {
       : [];
   const reviewSubmittedDisplay =
     phase === 'reviewing' && submittedAnswer ? submittedAnswer.trim() : '';
+  const reviewSubmittedAnswer = reverseDrill
+    ? reviewSubmittedDisplay
+    : toHiragana(reviewSubmittedDisplay) || reviewSubmittedDisplay;
+  const reviewSubmittedComparison = reviewSubmittedAnswer || '(empty)';
+  const missedComparisonLabel = reviewChoiceLabel || revealedMiss ? 'You chose' : 'Your answer';
+  const missedComparisonValue =
+    reviewChoiceLabel || (revealedMiss ? "I don't know" : reviewSubmittedComparison);
   const reviewSubmittedChars = Array.from(reviewSubmittedDisplay);
 
   function nextMinimalPairProgress(correct) {
@@ -4348,10 +4355,31 @@ export default function StudyView() {
                   {!wasCorrect && explanation && (
                     <div className="mt-4 pt-4 border-t border-rose-200 dark:border-rose-900/50 space-y-2.5 text-left">
                       <div className="text-xs uppercase tracking-wider text-rose-700 dark:text-rose-400 font-medium">
-                        Why it's{' '}
-                        <span lang="ja" className="normal-case tracking-normal">
-                          {expected}
-                        </span>
+                        Compare your answer
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                            Correct answer
+                          </div>
+                          <div
+                            className="mt-1 break-words text-base font-semibold text-emerald-900 dark:text-emerald-100"
+                            lang="ja"
+                          >
+                            {expected}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 dark:border-rose-900/60 dark:bg-rose-950/20">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                            {missedComparisonLabel}
+                          </div>
+                          <div
+                            className="mt-1 break-words text-base font-semibold text-rose-900 dark:text-rose-100"
+                            lang={reviewChoiceLabel || revealedMiss ? undefined : 'ja'}
+                          >
+                            {missedComparisonValue}
+                          </div>
+                        </div>
                       </div>
                       {minimalPairFeedback && (
                         <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2">
@@ -4441,7 +4469,7 @@ export default function StudyView() {
                         <ConjugationBreakdown
                           word={current.verb}
                           type={practicedType}
-                          userAnswer={revealedMiss ? '' : submittedAnswer}
+                          userAnswer={revealedMiss ? '' : reviewSubmittedAnswer}
                           practicePrefs={practicePrefs}
                         />
                       </ReviewDisclosure>

@@ -9,6 +9,7 @@ afterEach(cleanup);
 
 const KAKU = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan' };
 const KAERU = { dict: '帰る', reading: 'かえる', meaning: 'to return home', group: 'godan' };
+const YOMU = { dict: '読む', reading: 'よむ', meaning: 'to read', group: 'godan' };
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
 const BENKYOU = { dict: '勉強する', reading: 'べんきょうする', meaning: 'to study', group: 'suru' };
 const KURU = { dict: '来る', reading: 'くる', meaning: 'to come', group: 'kuru' };
@@ -64,6 +65,18 @@ describe('ConjugationBreakdown', () => {
     expect(screen.getByText(/う\/つ\/る -> って/)).toBeTruthy();
     expect(screen.getAllByText(/く -> いて/).length).toBeGreaterThan(0);
     expect(screen.getByText(/kaku -> kaite/)).toBeTruthy();
+    expect(screen.getByText('What went wrong')).toBeTruthy();
+    expect(screen.getByText('What should have happened')).toBeTruthy();
+  });
+
+  it('explains a godan row-shift miss as the learner action versus the target action', () => {
+    render(<ConjugationBreakdown word={YOMU} type="plain-negative" userAnswer="よむない" />);
+
+    expect(screen.getByText('What went wrong')).toBeTruthy();
+    expect(screen.getByText('Kept dictionary ending む + ない')).toBeTruthy();
+    expect(screen.getByText('What should have happened')).toBeTruthy();
+    expect(screen.getAllByText('む -> ま + ない').length).toBeGreaterThan(0);
+    expect(screen.getByText(/change む to ま first, then add ない: よまない/)).toBeTruthy();
   });
 
   it('labels ichidan as ichidan / ru-verb and bridges ta-form from masu stem', () => {

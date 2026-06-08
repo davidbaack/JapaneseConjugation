@@ -155,7 +155,7 @@ export function ConjugationBreakdown({
         <div className="grid gap-2 rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 dark:border-rose-900/50 dark:bg-rose-950/15 sm:grid-cols-2">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-350">
-              Your answer used
+              What went wrong
             </div>
             <div className="mt-1 text-sm font-semibold text-rose-900 dark:text-rose-200">
               {debug.mistake.userRule}
@@ -166,7 +166,7 @@ export function ConjugationBreakdown({
           </div>
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-650 dark:text-emerald-350">
-              Expected
+              What should have happened
             </div>
             <div className="mt-1 text-sm font-semibold text-emerald-900 dark:text-emerald-200">
               {debug.mistake.expectedRule}
@@ -196,7 +196,7 @@ export function ConjugationBreakdown({
           </div>
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-650 dark:text-emerald-350">
-              Correct form
+              Correct answer
             </div>
             <div
               className="mt-1 text-sm font-semibold text-emerald-900 dark:text-emerald-200"

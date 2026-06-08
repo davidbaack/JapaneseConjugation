@@ -181,7 +181,7 @@ function CandidateMatchList({ matches, practicePrefs, onSpeak }) {
                 <div className="flex shrink-0 items-center gap-2 sm:justify-end">
                   <div className="text-left sm:text-right">
                     <div className="text-[11px] uppercase tracking-wide text-stone-400">
-                      {correct ? 'Entered form' : 'Correct form'}
+                      {correct ? 'Entered form' : 'Correct answer'}
                     </div>
                     <ScriptDisplay
                       view={formDisplay(match.kana, practicePrefs, match.word, match.type)}
@@ -606,7 +606,7 @@ export default function CheckView() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm mt-2">
-                  <span className="text-stone-400">Correct form</span>
+                  <span className="text-stone-400">Correct answer</span>
                   <span className="flex items-center gap-1.5">
                     <span className="text-emerald-700 dark:text-emerald-300 text-lg">
                       <DiffForm
