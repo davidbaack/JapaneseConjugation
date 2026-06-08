@@ -699,6 +699,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(nextState.cards).toEqual({});
     expect(nextState.daily.count).toBe(0);
   });
+
   it('keeps an exact romaji answer unsubmitted until Check or Enter when kana help is off', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];

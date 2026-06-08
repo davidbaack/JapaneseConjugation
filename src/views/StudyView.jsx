@@ -2347,7 +2347,7 @@ export default function StudyView({ mode = 'practice' }) {
     setRunReviewOpen(false);
     // state.session.reviewed intentionally omitted — only reset baseline when limit setting changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [practicePrefs.reviewLimit, practicePrefs.reviewLimitSource]);
+  }, [mode, practicePrefs.reviewLimit, practicePrefs.reviewLimitSource]);
 
   useEffect(() => {
     return () => {
