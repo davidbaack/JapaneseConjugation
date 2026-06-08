@@ -1420,6 +1420,7 @@ export default function StudyView() {
   const nextButtonRef = useRef(null);
   const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
+  const refocusAfterAutoAdvanceRef = useRef(false);
   const answerStartedAtRef = useRef(0);
   const hadKanaMistakeRef = useRef(false);
   const speechRecognitionRef = useRef(null);
@@ -1719,9 +1720,10 @@ export default function StudyView() {
     setLastDiagnosis(null);
   }, [practicePrefs.minimalPairSetId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (phase === 'answering' && inputRef.current) {
       focusWithoutScroll(inputRef.current);
+      refocusAfterAutoAdvanceRef.current = false;
     }
   }, [current, phase]);
 
@@ -1741,10 +1743,11 @@ export default function StudyView() {
 
   useEffect(() => {
     if (phase !== 'reviewing') return;
+    if (wasCorrect && autoAdvanceCorrect && autoAdvanceRef.current) return;
     const button = nextButtonRef.current;
     if (!button || typeof window === 'undefined') return;
     focusWithoutScroll(button);
-  }, [current?.id, phase]);
+  }, [autoAdvanceCorrect, current?.id, phase, wasCorrect]);
 
   // Handle TTS speech synthesis inside StudyView
   useEffect(() => {
@@ -2535,6 +2538,7 @@ export default function StudyView() {
         setLastDiagnosis(null);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
+        refocusAfterAutoAdvanceRef.current = true;
         setWasCorrected(false);
         setPhase('answering');
         if (sweepStep?.nextCard) {
@@ -2696,6 +2700,7 @@ export default function StudyView() {
         setLastDiagnosis(null);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
+        refocusAfterAutoAdvanceRef.current = true;
         setWasCorrected(false);
         setPhase('answering');
         if (sweepStep?.nextCard) {

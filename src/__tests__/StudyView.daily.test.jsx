@@ -981,7 +981,8 @@ describe('StudyView continuous Practice startup', () => {
     vi.useRealTimers();
 
     await waitFor(() => expect(screen.queryByText('Correct!')).toBeNull());
-    expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
+    const nextInput = screen.getByPlaceholderText(/Type romaji or kana/i);
+    expect(document.activeElement).toBe(nextInput);
   });
 
   it('does not auto-advance non-guided typed answers by default', async () => {
@@ -1034,6 +1035,8 @@ describe('StudyView continuous Practice startup', () => {
     vi.useRealTimers();
 
     await waitFor(() => expect(screen.queryByText('Correct!')).toBeNull());
+    const nextInput = screen.getByPlaceholderText(/Type romaji or kana/i);
+    expect(document.activeElement).toBe(nextInput);
   });
 
   it('offers Gemini review chat after a correct answer without opening it automatically', async () => {
