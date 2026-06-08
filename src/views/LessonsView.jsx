@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { IconBook, IconList, IconRefresh, IconSpark } from '../components/Icons.jsx';
-import { ALL_CARD_TYPES, getTypeInfo } from '../data/conjugationTypes.js';
+import { getTypeInfo } from '../data/conjugationTypes.js';
 import {
   FOUNDATION_CARDS,
   GODAN_ROW_KEYS,
@@ -162,7 +162,6 @@ export default function LessonsView() {
   const [showFormationKeys, setShowFormationKeys] = useState(false);
   const [openLessonIds, setOpenLessonIds] = useState(() => new Set());
   const coverage = useMemo(() => getLessonCoverage(), []);
-  const allTypeIds = useMemo(() => ALL_CARD_TYPES.map((type) => type.id), []);
   const lessonMap = useMemo(
     () => new Map(LESSON_SECTIONS.map((lesson) => [lesson.groupId, lesson])),
     [],
@@ -234,32 +233,18 @@ export default function LessonsView() {
   return (
     <div className="space-y-4">
       <section className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
-              <IconBook className="w-4 h-4" />
-              Lessons
-            </div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
-              Conjugation formation guide
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600 dark:text-stone-300">
-              Follow a track when you want a learning path, or use the reference sections when you
-              need a specific rule. Each lesson can hand a focused set back to Practice.
-            </p>
+        <div className="max-w-2xl">
+          <div className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
+            <IconBook className="w-4 h-4" />
+            Lessons
           </div>
-          <button
-            onClick={() =>
-              sendLessonRecommendation(
-                { groupId: 'all-forms', title: 'All forms', typeIds: allTypeIds },
-                { suggestedCount: 20, wordLimit: 16 },
-              )
-            }
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-850 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-950 dark:hover:bg-stone-100"
-          >
-            <IconRefresh className="w-4 h-4" />
-            Send all to Practice
-          </button>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
+            Conjugation formation guide
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+            Follow a track when you want a learning path, or use the reference sections when you
+            need a specific rule. Each lesson can hand a focused set back to Practice.
+          </p>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
