@@ -9,6 +9,7 @@ import {
   IconEyeOff,
   IconFlame,
   IconMic,
+  IconList,
   IconPlus,
   IconRefresh,
 } from '../components/Icons.jsx';
@@ -356,6 +357,513 @@ function ReviewChatSection({ tone = 'stone', chatOpen, onOpen, children }) {
         </button>
       ) : (
         <div className="mt-3">{children}</div>
+      )}
+    </section>
+  );
+}
+
+function snapshotPracticePrefs(prefs = DEFAULT_PREFS) {
+  return {
+    ...prefs,
+    wordGroups: Array.isArray(prefs.wordGroups) ? [...prefs.wordGroups] : prefs.wordGroups,
+    wordListIds: Array.isArray(prefs.wordListIds) ? [...prefs.wordListIds] : prefs.wordListIds,
+    wordTypes: Array.isArray(prefs.wordTypes) ? [...prefs.wordTypes] : prefs.wordTypes,
+    autoAdvanceCorrectByAnswerForm: prefs.autoAdvanceCorrectByAnswerForm
+      ? { ...prefs.autoAdvanceCorrectByAnswerForm }
+      : prefs.autoAdvanceCorrectByAnswerForm,
+  };
+}
+
+function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
+  const [chatOpen, setChatOpen] = useState(false);
+  if (!record) return null;
+
+  const prefs = record.practicePrefs || DEFAULT_PREFS;
+  const reviewSubmittedDisplay = record.submittedAnswer ? record.submittedAnswer.trim() : '';
+  const reviewSubmittedAnswer = record.reverseDrill
+    ? reviewSubmittedDisplay
+    : toHiragana(reviewSubmittedDisplay) || reviewSubmittedDisplay;
+  const reviewSubmittedComparison = reviewSubmittedAnswer || '(empty)';
+  const missedComparisonLabel =
+    record.reviewChoiceLabel || record.revealedMiss ? 'You chose' : 'Your answer';
+  const missedComparisonValue =
+    record.reviewChoiceLabel || (record.revealedMiss ? "I don't know" : reviewSubmittedComparison);
+  const reviewSubmittedChars = Array.from(reviewSubmittedDisplay);
+  const reviewKanaCells =
+    record.answerMode === 'input' && !record.reverseDrill
+      ? kanaCoachCells(record.expected, reviewSubmittedDisplay, record.coachRevealed || 0)
+      : [];
+  const expectedView = record.reverseDrill
+    ? promptDisplay(record.word, null, prefs)
+    : formDisplay(record.expected, prefs, record.word, record.cardType);
+  const targetEnglish = record.reverseDrill
+    ? englishForForm(record.word, null)
+    : englishForForm(record.word, record.cardType);
+  const explanation = record.explanation;
+  const minimalPairFeedback = record.minimalPairFeedback;
+  const diagnostic =
+    !record.correct && !record.revealedMiss ? record.diagnosis?.feedback || '' : '';
+  const panelClass = record.correct
+    ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
+    : record.wasCorrected
+      ? 'bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/50'
+      : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50';
+
+  return (
+    <div className={`rounded-xl p-4 ${panelClass}`}>
+      <div className="flex items-start gap-3 text-left">
+        <div
+          className={`mt-0.5 flex-shrink-0 ${
+            record.correct
+              ? 'text-emerald-600'
+              : record.wasCorrected
+                ? 'text-amber-600'
+                : 'text-rose-600'
+          }`}
+        >
+          {record.correct ? <IconCheck className="h-5 w-5" /> : <IconX className="h-5 w-5" />}
+        </div>
+        <div className="flex-1">
+          <h3
+            className={`text-sm font-semibold ${
+              record.correct
+                ? 'text-emerald-800 dark:text-emerald-300'
+                : record.wasCorrected
+                  ? 'text-amber-800 dark:text-amber-300'
+                  : 'text-rose-800 dark:text-rose-300'
+            }`}
+          >
+            {record.correct
+              ? 'Correct!'
+              : record.wasCorrected
+                ? 'Self-corrected.'
+                : 'Review this form.'}
+          </h3>
+          {record.wasCorrected && (
+            <div className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+              You fixed it mid-type, but the mistake still counts.
+            </div>
+          )}
+
+          {record.correct ? (
+            <>
+              {reviewKanaCells.length > 0 && (
+                <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50 p-2 dark:border-stone-700 dark:bg-stone-900/50">
+                  <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                    {reviewKanaCells.map((cell, i) => {
+                      const cls =
+                        cell.state === 'correct'
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
+                          : cell.state === 'wrong' || cell.state === 'extra'
+                            ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
+                            : cell.state === 'hint'
+                              ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
+                              : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
+                      return (
+                        <div
+                          key={i}
+                          className={`flex h-9 w-8 items-center justify-center rounded-lg border text-base font-medium tabular-nums sm:h-10 sm:w-9 ${cls}`}
+                        >
+                          {cell.shown || '\u00b7'}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <ScriptDisplay
+                view={expectedView}
+                word={record.word}
+                type={record.practicedType}
+                colorHighlight={prefs.colorCodeConjugations !== false}
+                className="mt-2 text-xl text-emerald-900 dark:text-emerald-100"
+                subClassName="mt-1 text-xs text-stone-500"
+              />
+              <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
+                {targetEnglish}
+              </div>
+            </>
+          ) : (
+            <>
+              {reviewKanaCells.length > 0 ? (
+                <>
+                  <div className="mt-3">
+                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-455">
+                      Correct Answer
+                    </div>
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-2 dark:border-emerald-900/50 dark:bg-emerald-950/10">
+                      <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
+                        {Array.from(record.expected).map((char, i) => (
+                          <div
+                            key={i}
+                            className="flex h-10 w-9 items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50 text-lg font-semibold text-emerald-850 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300 sm:h-11 sm:w-10"
+                          >
+                            {char}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <ScriptDisplay
+                      view={expectedView}
+                      word={record.word}
+                      type={record.practicedType}
+                      colorHighlight={prefs.colorCodeConjugations !== false}
+                      className="mt-2 text-xl text-emerald-900 dark:text-emerald-100"
+                      subClassName="mt-1 text-xs text-stone-500"
+                    />
+                    <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
+                      {targetEnglish}
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <div
+                      className={`mb-1 text-[11px] uppercase tracking-wider ${
+                        record.wasCorrected
+                          ? 'text-amber-700/80 dark:text-amber-400/80'
+                          : 'text-rose-700/80 dark:text-rose-400/80'
+                      }`}
+                    >
+                      {record.reviewChoiceLabel
+                        ? 'You chose'
+                        : record.revealedMiss
+                          ? "You chose: I don't know"
+                          : 'Your Answer'}
+                    </div>
+                    {!record.revealedMiss &&
+                      !record.reviewChoiceLabel &&
+                      reviewSubmittedChars.length > 0 && (
+                        <div
+                          role="group"
+                          aria-label="Your typed answer"
+                          className="mb-2 rounded-xl border border-rose-200/70 bg-rose-50/35 p-2 dark:border-rose-900/45 dark:bg-rose-950/10"
+                        >
+                          <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
+                            {reviewSubmittedChars.map((char, i) => (
+                              <div
+                                key={`${char}-${i}`}
+                                className="flex h-10 w-9 items-center justify-center rounded-xl border border-rose-300 bg-white text-base font-semibold text-rose-800 shadow-sm dark:border-rose-800 dark:bg-stone-950/70 dark:text-rose-300 sm:h-11 sm:w-10 sm:text-lg"
+                              >
+                                {char}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    <div className="rounded-xl border border-stone-200/60 bg-stone-50/40 p-2 dark:border-stone-800/60 dark:bg-stone-900/20">
+                      <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                        {reviewKanaCells.map((cell, i) => {
+                          const cls =
+                            cell.state === 'correct'
+                              ? 'bg-emerald-50/50 border-emerald-350/40 text-emerald-800/80 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-300/80'
+                              : cell.state === 'wrong' || cell.state === 'extra'
+                                ? 'bg-rose-50/50 border-rose-350/40 text-rose-800/80 dark:bg-rose-950/20 dark:border-rose-800/30 dark:text-rose-300/80'
+                                : cell.state === 'hint'
+                                  ? 'bg-amber-50/50 border-amber-350/40 text-amber-800/80 dark:bg-amber-950/20 dark:border-amber-300/30 dark:text-amber-300/80'
+                                  : 'bg-white/50 dark:bg-stone-900/50 border-stone-200/40 dark:border-stone-800/40 text-stone-300/85';
+                          return (
+                            <div
+                              key={i}
+                              className={`flex h-8 w-7 items-center justify-center rounded-lg border text-sm font-medium tabular-nums sm:h-9 sm:w-8 ${cls}`}
+                            >
+                              {cell.shown || '\u00b7'}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-1 text-xs text-rose-700">
+                  {record.reviewChoiceLabel
+                    ? `You chose: ${record.reviewChoiceLabel}`
+                    : record.revealedMiss
+                      ? "You chose: I don't know"
+                      : 'You wrote:'}{' '}
+                  {!record.revealedMiss && !record.reviewChoiceLabel && (
+                    <span lang="ja" className="font-semibold">
+                      {record.reverseDrill
+                        ? reviewSubmittedDisplay || '(empty)'
+                        : toHiragana(record.submittedAnswer) || '(empty)'}
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {record.correct && explanation && (
+        <div className="mt-4 space-y-2.5 border-t border-emerald-200 pt-4 text-left dark:border-emerald-900/50">
+          <ReviewDisclosure tone="emerald" summary="Answer breakdown" alwaysOpen>
+            <ConjugationBreakdown
+              word={record.word}
+              type={record.practicedType}
+              practicePrefs={prefs}
+              onOpenLearn={onOpenLearn}
+            />
+          </ReviewDisclosure>
+          {geminiKey && (
+            <ReviewChatSection tone="emerald" chatOpen={chatOpen} onOpen={() => setChatOpen(true)}>
+              {chatOpen && (
+                <ChatPanel
+                  verb={record.word}
+                  type={record.practicedType}
+                  userAnswer={record.expected}
+                  expected={record.expected}
+                  explanation={explanation}
+                  geminiKey={geminiKey}
+                  practicePrefs={prefs}
+                  taskOverride={record.taskOverride}
+                  wasCorrect
+                  reviewTone="emerald"
+                />
+              )}
+            </ReviewChatSection>
+          )}
+        </div>
+      )}
+
+      {!record.correct && explanation && (
+        <div className="mt-4 space-y-2.5 border-t border-rose-200 pt-4 text-left dark:border-rose-900/50">
+          <div className="text-xs font-medium uppercase tracking-wider text-rose-700 dark:text-rose-400">
+            Compare your answer
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                Correct answer
+              </div>
+              <div
+                className="mt-1 break-words text-base font-semibold text-emerald-900 dark:text-emerald-100"
+                lang="ja"
+              >
+                {record.expected}
+              </div>
+            </div>
+            <div className="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 dark:border-rose-900/60 dark:bg-rose-950/20">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                {missedComparisonLabel}
+              </div>
+              <div
+                className="mt-1 break-words text-base font-semibold text-rose-900 dark:text-rose-100"
+                lang={record.reviewChoiceLabel || record.revealedMiss ? undefined : 'ja'}
+              >
+                {missedComparisonValue}
+              </div>
+            </div>
+          </div>
+          {minimalPairFeedback && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+              <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                Contrast check: {minimalPairFeedback.label}
+              </div>
+              {minimalPairFeedback.masuDiagnostic && (
+                <div className="mt-1 border-l-2 border-emerald-300 pl-3 text-sm text-stone-700 dark:border-emerald-700 dark:text-stone-300">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                    Masu check
+                  </div>
+                  <div className="mt-0.5">
+                    <span lang="ja" className="font-semibold text-stone-900 dark:text-stone-100">
+                      {minimalPairFeedback.masuDiagnostic.dict}
+                      {' -> '}
+                      {minimalPairFeedback.masuDiagnostic.politeSurface}
+                    </span>
+                    <span className="ml-2">{minimalPairFeedback.masuDiagnostic.contrast}</span>
+                  </div>
+                </div>
+              )}
+              {!minimalPairFeedback.masuDiagnostic && (
+                <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
+                  {minimalPairFeedback.intro}
+                </div>
+              )}
+            </div>
+          )}
+          {diagnostic && (
+            <div className="rounded-lg bg-white/70 px-3 py-2 text-sm text-rose-800 dark:bg-stone-900/70 dark:text-rose-300">
+              <span className="font-medium text-rose-900 dark:text-rose-200">Diagnosis: </span>
+              {record.diagnosis?.label ? `${record.diagnosis.label}. ` : ''}
+              {diagnostic}
+            </div>
+          )}
+          {!minimalPairFeedback && (
+            <div className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+              {explanation.intro}
+            </div>
+          )}
+          {explanation.rule && (
+            <div className="rounded-lg bg-white/70 px-3 py-2 text-sm leading-relaxed text-stone-700 dark:bg-stone-900/70 dark:text-stone-300">
+              <span className="font-semibold text-stone-900 dark:text-stone-100">Rule: </span>
+              {explanation.rule}
+            </div>
+          )}
+          {explanation.derivation && explanation.derivation !== record.expected && (
+            <div
+              className="rounded-lg bg-white/70 px-3 py-2 text-center text-base text-stone-900 dark:bg-stone-900/70 dark:text-stone-100"
+              lang="ja"
+            >
+              {explanation.derivation}
+            </div>
+          )}
+          {minimalPairFeedback && (
+            <ReviewDisclosure tone="emerald" summary="Full contrast details">
+              <div className="text-sm text-stone-700 dark:text-stone-300">
+                {minimalPairFeedback.intro}
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {minimalPairFeedback.contrasts.map((contrast) => (
+                  <div
+                    key={contrast.id}
+                    className={`rounded-lg border px-2.5 py-2 text-xs ${
+                      contrast.id === minimalPairFeedback.active.id
+                        ? 'border-emerald-300 bg-white/80 text-emerald-900 dark:border-emerald-800 dark:bg-stone-950/50 dark:text-emerald-200'
+                        : 'border-stone-200 bg-white/60 text-stone-600 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-300'
+                    }`}
+                  >
+                    <div className="font-semibold">{contrast.label}</div>
+                    <div className="mt-0.5">{contrast.cue}</div>
+                  </div>
+                ))}
+              </div>
+            </ReviewDisclosure>
+          )}
+          <ReviewDisclosure tone="rose" summary="Answer breakdown" alwaysOpen>
+            <ConjugationBreakdown
+              word={record.word}
+              type={record.practicedType}
+              userAnswer={record.revealedMiss ? '' : reviewSubmittedAnswer}
+              practicePrefs={prefs}
+              onOpenLearn={onOpenLearn}
+            />
+          </ReviewDisclosure>
+          {geminiKey && (
+            <ReviewChatSection tone="rose" chatOpen={chatOpen} onOpen={() => setChatOpen(true)}>
+              {chatOpen && (
+                <ChatPanel
+                  verb={record.word}
+                  type={record.practicedType}
+                  userAnswer={record.revealedMiss ? '(revealed)' : record.submittedAnswer}
+                  expected={record.expected}
+                  explanation={explanation}
+                  geminiKey={geminiKey}
+                  practicePrefs={prefs}
+                  taskOverride={record.taskOverride}
+                  wasCorrected={record.wasCorrected}
+                />
+              )}
+            </ReviewChatSection>
+          )}
+        </div>
+      )}
+
+      <ContextExamplePanel
+        item={record.word}
+        type={record.practicedType}
+        geminiKey={geminiKey}
+        practicePrefs={prefs}
+      />
+    </div>
+  );
+}
+
+function RunAnswerReviewItem({ record, geminiKey, onOpenLearn }) {
+  const answerText =
+    record.reviewChoiceLabel ||
+    (record.revealedMiss ? "I don't know" : record.submittedAnswer?.trim() || '(empty)');
+  const toneClass = record.correct
+    ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
+    : record.wasCorrected
+      ? 'border-amber-200 text-amber-700 dark:border-amber-900 dark:text-amber-300'
+      : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-300';
+  const statusLabel = record.correct
+    ? 'Correct'
+    : record.wasCorrected
+      ? 'Self-corrected'
+      : 'Missed';
+
+  return (
+    <details className="group rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+      <summary className="cursor-pointer list-none px-4 py-3 transition hover:bg-stone-50 dark:hover:bg-stone-950/40">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+                Answer #{record.number}
+              </span>
+              <span lang="ja" className="text-base font-semibold text-stone-900 dark:text-stone-50">
+                {record.word?.dict}
+              </span>
+              <span className="text-xs text-stone-500 dark:text-stone-400">{record.typeLabel}</span>
+            </div>
+            <div className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">
+              Your answer: <span lang="ja">{answerText}</span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${toneClass}`}
+            >
+              {statusLabel}
+            </span>
+            <span className="text-xs font-semibold text-stone-400 group-open:hidden">Expand</span>
+            <span className="hidden text-xs font-semibold text-stone-400 group-open:inline">
+              Collapse
+            </span>
+          </div>
+        </div>
+      </summary>
+      <div className="border-t border-stone-100 p-3 dark:border-stone-800">
+        <RunAnswerReveal record={record} geminiKey={geminiKey} onOpenLearn={onOpenLearn} />
+      </div>
+    </details>
+  );
+}
+
+function PracticeRunReviewPage({ answers, runStatsLabel, onBack, geminiKey, onOpenLearn }) {
+  return (
+    <section className="mx-auto max-w-3xl space-y-4" aria-label="Practice run review">
+      <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+              Practice run review
+            </div>
+            <h2 className="mt-0.5 text-xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
+              Answers from this run
+            </h2>
+            <div className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+              {answers.length
+                ? `${answers.length} answer${answers.length === 1 ? '' : 's'} captured - ${runStatsLabel}`
+                : 'No answers captured yet.'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center justify-center rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+          >
+            Back to Practice
+          </button>
+        </div>
+      </div>
+      {answers.length ? (
+        <div className="space-y-2">
+          {answers.map((record) => (
+            <RunAnswerReviewItem
+              key={record.id}
+              record={record}
+              geminiKey={geminiKey}
+              onOpenLearn={onOpenLearn}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-stone-300 bg-white px-4 py-8 text-center text-sm text-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400">
+          Answer a card, then come back here to expand the reveal details.
+        </div>
       )}
     </section>
   );
@@ -1414,6 +1922,8 @@ export default function StudyView() {
     () => focus?.recommendation || null,
   );
   const [openPracticeMapFamilyIds, setOpenPracticeMapFamilyIds] = useState(() => new Set());
+  const [runAnswerHistory, setRunAnswerHistory] = useState([]);
+  const [runReviewOpen, setRunReviewOpen] = useState(false);
   const inputRef = useRef(null);
   const nextButtonRef = useRef(null);
   const focusSeededRef = useRef(false);
@@ -1835,6 +2345,8 @@ export default function StudyView() {
   useEffect(() => {
     setReviewBase(state.session.reviewed || 0);
     setRunBase(sessionBaseFrom(state.session));
+    setRunAnswerHistory([]);
+    setRunReviewOpen(false);
     // state.session.reviewed intentionally omitted — only reset baseline when limit setting changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [practicePrefs.reviewLimit, practicePrefs.reviewLimitSource]);
@@ -2114,6 +2626,60 @@ export default function StudyView() {
     return {
       ...(minimalPairSetForCurrent?.id ? { minimalPairSetId: minimalPairSetForCurrent.id } : {}),
     };
+  }
+
+  function buildRunAnswerRecord({
+    correct,
+    submittedAnswer: answerSnapshot = '',
+    reviewChoiceLabel: choiceLabel = '',
+    revealedMiss: wasRevealed = false,
+    wasCorrected: corrected = false,
+    mistakeDiagnosis = null,
+  }) {
+    if (!current) return null;
+    const explanationSnapshot = transformationReviewExplanation({
+      item: current.verb,
+      type: practicedType,
+      reverseDrill,
+      sourceInfo: sourceTypeInfo,
+      targetInfo: targetTypeInfo,
+      sourceForm: promptSourceForm,
+      expected,
+    });
+    return {
+      answeredAt: Date.now(),
+      cardId: current.id,
+      word: { ...current.verb },
+      cardType: current.type,
+      practicedType,
+      typeLabel: typeInfo.label || sessionOutcomeLabel(current),
+      reverseDrill,
+      expected,
+      answerMode,
+      submittedAnswer: answerSnapshot,
+      reviewChoiceLabel: choiceLabel,
+      revealedMiss: wasRevealed,
+      correct,
+      wasCorrected: corrected,
+      diagnosis: mistakeDiagnosis ? { ...mistakeDiagnosis } : null,
+      explanation: explanationSnapshot,
+      minimalPairFeedback,
+      taskOverride,
+      practicePrefs: snapshotPracticePrefs(practicePrefs),
+      coachRevealed,
+    };
+  }
+
+  function appendRunAnswerRecord(record) {
+    if (!record) return;
+    setRunAnswerHistory((previous) => [
+      ...previous,
+      {
+        ...record,
+        id: `${record.cardId || 'card'}-${record.answeredAt}-${previous.length}`,
+        number: previous.length + 1,
+      },
+    ]);
   }
 
   function resolveMistakesForCurrentCard(mistakes = []) {
@@ -2462,6 +3028,8 @@ export default function StudyView() {
         );
     const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
+    const submittedForReview =
+      finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw;
     const nextState = {
       ...state,
       cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
@@ -2495,6 +3063,14 @@ export default function StudyView() {
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
+    appendRunAnswerRecord(
+      buildRunAnswerRecord({
+        correct: ok,
+        submittedAnswer: submittedForReview,
+        mistakeDiagnosis,
+        wasCorrected: finalOk && !ok,
+      }),
+    );
     setState(nextState);
     setChatOpen(false);
     setLastDiagnosis(mistakeDiagnosis);
@@ -2504,9 +3080,7 @@ export default function StudyView() {
     // When the final string matched but the card was still marked wrong (a kana
     // mistake was made and then corrected mid-typing), show the snapshot from
     // when it went wrong instead of the corrected text.
-    setSubmittedAnswer(
-      finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw,
-    );
+    setSubmittedAnswer(submittedForReview);
     setWasCorrected(finalOk && !ok);
     setWasCorrect(ok);
     setPhase('reviewing');
@@ -2660,6 +3234,15 @@ export default function StudyView() {
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
+    appendRunAnswerRecord(
+      buildRunAnswerRecord({
+        correct: ok,
+        submittedAnswer: '',
+        reviewChoiceLabel: label,
+        revealedMiss: !ok,
+        mistakeDiagnosis,
+      }),
+    );
     setState(nextState);
     setAnswer('');
     setReviewChoiceLabel(label);
@@ -2762,6 +3345,15 @@ export default function StudyView() {
       ? nextWordSweepStep(wordSweep, nextState, current.type, false, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
+    appendRunAnswerRecord(
+      buildRunAnswerRecord({
+        correct: false,
+        submittedAnswer: '',
+        reviewChoiceLabel: "I don't know",
+        revealedMiss: true,
+        mistakeDiagnosis,
+      }),
+    );
     setState(nextState);
     setAnswer('');
     setChatOpen(false);
@@ -2841,6 +3433,21 @@ export default function StudyView() {
     const nextAnswer = toKanaInputValue(event.currentTarget.value);
     answerComposingRef.current = false;
     updateTypedAnswer(nextAnswer, options);
+  }
+
+  if (runReviewOpen) {
+    return (
+      <PracticeRunReviewPage
+        answers={runAnswerHistory}
+        runStatsLabel={runStatsLabel}
+        onBack={() => setRunReviewOpen(false)}
+        geminiKey={geminiKey}
+        onOpenLearn={() => {
+          window.location.hash = 'formation-keys';
+          setTab('learn');
+        }}
+      />
+    );
   }
 
   // Focused word-form sweeps can complete; default Practice keeps going.
@@ -2928,6 +3535,8 @@ export default function StudyView() {
           onClick={() => {
             setWordSweep(null);
             setBonusMode(true);
+            setRunAnswerHistory([]);
+            setRunReviewOpen(false);
             setCurrent(selectNextReviewCard(state, current?.id, { bonusMode: true, wordLists }));
             setPhase('answering');
           }}
@@ -3002,6 +3611,8 @@ export default function StudyView() {
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
             setRunBase(sessionBaseFrom(state.session));
+            setRunAnswerHistory([]);
+            setRunReviewOpen(false);
             setCurrent(selectNextReviewCard(state, current.id));
             setAnswer('');
             setPhase('answering');
@@ -3386,8 +3997,19 @@ export default function StudyView() {
                 {coachSentence}
               </div>
             </div>
-            <div className="shrink-0 text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
-              {runStatsLabel}
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setRunReviewOpen(true)}
+                disabled={!runAnswerHistory.length}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-45 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+              >
+                <IconList className="h-3.5 w-3.5" />
+                Review answers
+              </button>
+              <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
+                {runStatsLabel}
+              </div>
             </div>
           </div>
           {!workoutProgress.continuous && (

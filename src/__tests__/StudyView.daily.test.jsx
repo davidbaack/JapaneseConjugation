@@ -972,6 +972,42 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByText('missed: Plain Negative')).toBeTruthy();
   });
 
+  it('opens a run review page with expandable answer reveals', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    expect(screen.getByRole('button', { name: 'Review answers' }).disabled).toBe(true);
+
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+
+    const reviewButton = screen.getByRole('button', { name: 'Review answers' });
+    expect(reviewButton.disabled).toBe(false);
+    fireEvent.click(reviewButton);
+
+    expect(screen.getByRole('region', { name: 'Practice run review' })).toBeTruthy();
+    expect(screen.getByText('Answers from this run')).toBeTruthy();
+    expect(screen.getByText('Answer #1')).toBeTruthy();
+    expect(screen.getByText('Your answer:')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Answer #1'));
+    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.getByText('Answer breakdown')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Practice' }));
+    expect(screen.getByText('Practice run')).toBeTruthy();
+  });
+
   it('walks a word form sweep in order and repeats missed forms before completion', async () => {
     const target = STARTER_VERBS[0];
     const state = {
