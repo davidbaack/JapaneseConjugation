@@ -745,6 +745,36 @@ function godanRowShiftRecipe(item, type) {
   return { ending, row, suffix };
 }
 
+const ROW_SHIFT_LABELS = [
+  ['a-row', A_ROW],
+  ['i-row', I_ROW],
+  ['e-row', E_ROW],
+  ['o-row', O_ROW],
+];
+
+function buildGodanRowShiftVisual(item, parts, expected) {
+  if (!item || item.group !== 'godan' || !parts?.change) return null;
+  const ending = originalEndingFor(item);
+  const stem = parts.stem || fallbackStem(item, ending);
+  const rows = ROW_SHIFT_LABELS.map(([label, map]) => ({
+    label,
+    kana: map[ending] || '',
+    active: map[ending] === parts.change,
+  })).filter((row) => row.kana);
+  const activeRow = rows.find((row) => row.active);
+  if (!ending || !stem || !activeRow) return null;
+  return {
+    ending,
+    stem,
+    rows,
+    targetRow: activeRow.label,
+    shiftedKana: parts.change,
+    suffix: parts.suffix || '',
+    result: expected,
+    formula: `${stem} + ${parts.change}${parts.suffix ? ` + ${parts.suffix}` : ''} = ${expected}`,
+  };
+}
+
 function inferGodanRowShiftMistake(item, type, got, expected, expectedRule) {
   if (!item || isAdjective(item) || item.group !== 'godan') return null;
   const recipe = godanRowShiftRecipe(item, type);
@@ -891,6 +921,7 @@ export function getConjugationDebugInfo(word, type, userAnswer = '') {
     result: ans,
     formula,
     rule,
+    rowShiftVisual: buildGodanRowShiftVisual(word, parts, ans),
     routes: {
       plain: {
         title: 'From dictionary/plain form',

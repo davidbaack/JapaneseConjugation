@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import { getConjugationDebugInfo } from '../utils/conjugatorExplain.js';
 
@@ -65,6 +65,7 @@ describe('ConjugationBreakdown', () => {
     expect(screen.getByText(/う\/つ\/る -> って/)).toBeTruthy();
     expect(screen.getAllByText(/く -> いて/).length).toBeGreaterThan(0);
     expect(screen.getByText(/kaku -> kaite/)).toBeTruthy();
+    expect(screen.queryByText('Row visual')).toBeNull();
     expect(screen.getByText('What went wrong')).toBeTruthy();
     expect(screen.getByText('What should have happened')).toBeTruthy();
   });
@@ -77,6 +78,9 @@ describe('ConjugationBreakdown', () => {
     expect(screen.getByText('What should have happened')).toBeTruthy();
     expect(screen.getAllByText('む -> ま + ない').length).toBeGreaterThan(0);
     expect(screen.getByText(/change む to ま first, then add ない: よまない/)).toBeTruthy();
+    expect(screen.getByText('Row visual')).toBeTruthy();
+    expect(screen.getByText(/moves to the a-row/)).toBeTruthy();
+    expect(screen.getByText('よ + ま + ない = よまない')).toBeTruthy();
   });
 
   it('labels ichidan as ichidan / ru-verb and bridges ta-form from masu stem', () => {
@@ -175,12 +179,15 @@ describe('ConjugationBreakdown', () => {
   });
 
   it('connects group choice to the conjugation rule', () => {
-    render(<ConjugationBreakdown word={KAKU} type="plain-negative" />);
+    const openLearn = vi.fn();
+    render(<ConjugationBreakdown word={KAKU} type="plain-negative" onOpenLearn={openLearn} />);
 
     expect(
       screen.getByText(
         'Because this is godan: row-shift, 書く uses the か row for negative: 書かない.',
       ),
     ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'See Learn table' }));
+    expect(openLearn).toHaveBeenCalledTimes(1);
   });
 });

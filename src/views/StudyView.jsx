@@ -4325,6 +4325,10 @@ export default function StudyView() {
                           word={current.verb}
                           type={practicedType}
                           practicePrefs={practicePrefs}
+                          onOpenLearn={() => {
+                            window.location.hash = 'formation-keys';
+                            setTab('learn');
+                          }}
                         />
                       </ReviewDisclosure>
                       {geminiKey && (
@@ -4471,6 +4475,10 @@ export default function StudyView() {
                           type={practicedType}
                           userAnswer={revealedMiss ? '' : reviewSubmittedAnswer}
                           practicePrefs={practicePrefs}
+                          onOpenLearn={() => {
+                            window.location.hash = 'formation-keys';
+                            setTab('learn');
+                          }}
                         />
                       </ReviewDisclosure>
                       {geminiKey && (

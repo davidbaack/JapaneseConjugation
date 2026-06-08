@@ -564,6 +564,10 @@ export default function CheckView() {
                       userAnswer={result.normalized}
                       geminiKey={geminiKey}
                       practicePrefs={practicePrefs}
+                      onOpenLearn={() => {
+                        window.location.hash = 'formation-keys';
+                        setTab('learn');
+                      }}
                     />
                   )}
                 </div>
@@ -666,6 +670,10 @@ export default function CheckView() {
                       userAnswer={result.normalized}
                       geminiKey={geminiKey}
                       practicePrefs={practicePrefs}
+                      onOpenLearn={() => {
+                        window.location.hash = 'formation-keys';
+                        setTab('learn');
+                      }}
                     />
                   )}
                 </div>

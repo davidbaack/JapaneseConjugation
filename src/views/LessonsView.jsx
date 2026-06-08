@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { IconBook, IconList, IconRefresh, IconSpark } from '../components/Icons.jsx';
 import { ALL_CARD_TYPES, getTypeInfo } from '../data/conjugationTypes.js';
 import {
@@ -180,6 +180,17 @@ export default function LessonsView() {
     return LESSON_SECTIONS.filter((lesson) => lessonMatches(lesson, q));
   }, [query]);
   const searchActive = query.trim().length > 0;
+
+  useEffect(() => {
+    function openKeysFromHash() {
+      if (window.location.hash === '#formation-keys') {
+        setShowFormationKeys(true);
+      }
+    }
+    openKeysFromHash();
+    window.addEventListener('hashchange', openKeysFromHash);
+    return () => window.removeEventListener('hashchange', openKeysFromHash);
+  }, []);
 
   function sendLessonRecommendation(lesson, options = {}) {
     const recommendation = buildLessonReviewRecommendation(lesson, allWords, options);

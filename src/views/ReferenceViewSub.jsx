@@ -992,6 +992,14 @@ export default function ReferenceViewSub({
                               type={r.type.id}
                               geminiKey={geminiKey}
                               practicePrefs={practicePrefs}
+                              onOpenLearn={
+                                setTab
+                                  ? () => {
+                                      window.location.hash = 'formation-keys';
+                                      setTab('learn');
+                                    }
+                                  : undefined
+                              }
                             />
                           </td>
                         </tr>
