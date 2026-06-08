@@ -1,7 +1,7 @@
 import { STARTER_ADJECTIVES, STARTER_VERBS } from './starterWords.js';
 import { isLexiconArtifactRow, normalizeLexiconRow } from '../utils/lexiconArtifacts.js';
 
-const BASE_URL = import.meta.env?.BASE_URL || '/';
+const BASE_URL = /** @type {any} */ (import.meta).env?.BASE_URL || '/';
 
 export const VERB_LEXICON_URL = `${BASE_URL}data/verb-lexicon.json`;
 

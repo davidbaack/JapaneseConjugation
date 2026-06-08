@@ -19,6 +19,8 @@
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"e2e/**/*.js\" \"scripts/**/*.js\" \"supabase/functions/**/*.ts\" \"*.{js,jsx,ts}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"e2e/**/*.js\" \"scripts/**/*.js\" \"supabase/functions/**/*.ts\" \"*.{js,jsx,ts}\"",
     "vocab:build": "node scripts/build-verb-lexicon.js",
+    "sentences:batches": "node scripts/build-sentence-batches.js",
+    "sentences:import": "node scripts/import-sentence-library.js",
     "size": "node scripts/check-bundle-size.js",
     "ci:fast": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "ci": "npm run ci:fast && npm run test:e2e && npm run build && npm run size",
