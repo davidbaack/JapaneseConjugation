@@ -381,6 +381,7 @@ describe('StudyView continuous Practice startup', () => {
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
 
     await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
     expect(screen.getByText(englishForForm(target, type))).toBeTruthy();
@@ -650,6 +651,7 @@ describe('StudyView continuous Practice startup', () => {
     await waitForPracticeCard();
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
 
     await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
@@ -668,7 +670,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(markSrsQueueCompleted).not.toHaveBeenCalled();
   });
 
-  it('checks an exact romaji answer as soon as typing completes it', async () => {
+  it('keeps an exact romaji answer unsubmitted until Check or Enter', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
@@ -690,7 +692,12 @@ describe('StudyView continuous Practice startup', () => {
     expect(setState).not.toHaveBeenCalled();
 
     fireEvent.change(input, { target: { value: 'tabeta' } });
-    expect(setState).toHaveBeenCalled();
+    expect(input.value).toBe('\u305f\u3079\u305f');
+    expect(setState).not.toHaveBeenCalled();
+    expect(screen.queryByText('Correct!')).toBeNull();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(setState).toHaveBeenCalled());
 
     const nextState = setState.mock.calls[0][0];
     expect(nextState.session.reviewed).toBe(1);
@@ -726,6 +733,7 @@ describe('StudyView continuous Practice startup', () => {
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: 'tabeta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
     rerender(<StudyView />);
 
@@ -931,12 +939,14 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.change(await waitForPracticeCard(), {
       target: { value: conjugateItem(target, 'plain-negative') },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
 
     await waitFor(() => expect(screen.getAllByText('Polite Present').length).toBeGreaterThan(0));
     fireEvent.change(await waitForPracticeCard(), {
       target: { value: conjugateItem(target, 'polite-present') },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
 
     expect((await screen.findAllByText(/Repeating missed forms/)).length).toBeGreaterThan(0);
@@ -944,6 +954,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.change(await waitForPracticeCard(), {
       target: { value: conjugateItem(target, 'plain-past') },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
 
     expect(await screen.findByText('Drill complete')).toBeTruthy();
@@ -971,6 +982,7 @@ describe('StudyView continuous Practice startup', () => {
     vi.useFakeTimers();
 
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
 
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
     expect(screen.getByText('Next card coming up...')).toBeTruthy();
@@ -999,6 +1011,7 @@ describe('StudyView continuous Practice startup', () => {
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
 
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
     expect(screen.queryByText('Next card coming up...')).toBeNull();
@@ -1026,6 +1039,7 @@ describe('StudyView continuous Practice startup', () => {
     vi.useFakeTimers();
 
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
 
     expect(screen.getByText('Next card coming up...')).toBeTruthy();
 
@@ -1054,6 +1068,7 @@ describe('StudyView continuous Practice startup', () => {
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
 
     await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
     expect(screen.getAllByText('Chat about this').length).toBeGreaterThan(0);
@@ -1117,6 +1132,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(input.className).not.toContain('border-rose-400');
 
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
     const nextState = setState.mock.calls[0][0];
     expect(nextState.session.reviewed).toBe(1);

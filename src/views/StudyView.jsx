@@ -1778,11 +1778,6 @@ export default function StudyView() {
     setGreenRevealed(0);
   }, [current?.id, answerMode]);
 
-  useEffect(() => {
-    if (!current) return;
-    submitIfCompleteTypedAnswer(answer);
-  }, [answer]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Remember how many leading kana have turned green so they stay green through
   // a backspace and reappear as green immediately when re-typed.
   useEffect(() => {
@@ -2821,18 +2816,6 @@ export default function StudyView() {
     });
   }
 
-  function submitIfCompleteTypedAnswer(nextAnswer) {
-    if (!current) return false;
-    if (phase !== 'answering') return false;
-    if (reverseDrill) return false;
-    if (!typedAnswerMode) return false;
-    if (expected && toHiragana(nextAnswer) === expected) {
-      submit(nextAnswer, { fromTypedInput: true });
-      return true;
-    }
-    return false;
-  }
-
   function rememberKanaMistake(nextAnswer, enabled) {
     if (!enabled) return;
     const cells = kanaCoachCells(expected, nextAnswer, coachRevealed, true);
@@ -2846,7 +2829,6 @@ export default function StudyView() {
     setTypoGuard(null);
     rememberKanaMistake(nextAnswer, options.trackKanaMistake !== false);
     setAnswer(nextAnswer);
-    return submitIfCompleteTypedAnswer(nextAnswer);
   }
 
   function updateAnswerFromInput(event, options = {}) {
