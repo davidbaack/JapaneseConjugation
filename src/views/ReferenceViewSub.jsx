@@ -228,6 +228,17 @@ export default function ReferenceViewSub({
     }
   }
 
+  function drillSelectedWordSweep() {
+    if (!detailWord || !practiceWord) return;
+    setFavoriteMsg(`Drilling enabled forms for ${detailWord.dict}.`);
+    practiceWord(detailWord, null, {
+      source: 'reference',
+      launchMode: 'word-sweep',
+      returnTo: 'reference',
+      referenceLabel: 'Enabled forms',
+    });
+  }
+
   function applyReferencePracticeTarget(target, sourceWord = selected) {
     if (!target || !setPracticePrefs) return;
     const typeIds = target.typeIds?.length ? target.typeIds : [target.typeId].filter(Boolean);
@@ -814,6 +825,14 @@ export default function ReferenceViewSub({
                 >
                   <IconRefresh className="w-4 h-4" />
                   Drill word
+                </button>
+                <button
+                  onClick={drillSelectedWordSweep}
+                  disabled={!detailWord || !practiceWord}
+                  className="px-3 py-2 border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 disabled:opacity-40 dark:border-indigo-900/60 dark:bg-indigo-950/25 dark:text-indigo-300 dark:hover:bg-indigo-950/40 rounded-lg text-sm inline-flex items-center gap-1.5 transition"
+                >
+                  <IconList className="w-4 h-4" />
+                  Drill enabled forms
                 </button>
                 <button
                   onClick={toggleFavorite}

@@ -445,6 +445,38 @@ describe('App shell', () => {
     expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
   }, 15000);
 
+  it('starts Lookup Drill enabled forms as a word form sweep', async () => {
+    render(<App />);
+    expect(await waitForPracticeCard()).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));
+    fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
+      target: { value: 'tabeta' },
+    });
+    expect(await screen.findByText('1 hit')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: 'Drill enabled forms' }));
+
+    expect(await screen.findByText('Word form sweep')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /食べる/ })).toBeTruthy();
+    const progress = screen.getByRole('progressbar', { name: 'Enabled forms progress' });
+    expect(Number(progress.getAttribute('aria-valuemax'))).toBeGreaterThan(1);
+    expect(screen.getByRole('button', { name: 'Back to reference' })).toBeTruthy();
+  }, 15000);
+
+  it('does not offer Drill enabled forms for unmatched scratch lookup words', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));
+    fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
+      target: { value: 'みらる' },
+    });
+
+    expect((await screen.findAllByText(/Local/)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Drill enabled forms' })).toBeNull();
+  }, 15000);
+
   it('renders a Check near-miss explanation without crashing', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));

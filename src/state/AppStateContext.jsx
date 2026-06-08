@@ -52,7 +52,7 @@ function normalizeAppTab(tab) {
   if (tab === 'lessons') return 'learn';
   if (tab === 'library') return 'tools';
   if (tab === 'lab') return 'drills';
-  return ['practice', 'stats', 'learn', 'drills', 'tools', 'settings'].includes(tab)
+  return ['practice', 'guide', 'stats', 'learn', 'drills', 'tools', 'settings'].includes(tab)
     ? tab
     : 'practice';
 }
@@ -457,6 +457,11 @@ function useAppController() {
       setState((prev) =>
         includeTypeFamilyInReviewState(includeWordInReviewState(prev, word), type),
       );
+    }
+    if (options.launchMode === 'word-sweep') {
+      try {
+        sessionStorage.removeItem('jp-study-current');
+      } catch {}
     }
     setStudyFocus({ word, type, ...options });
     setTab('practice');

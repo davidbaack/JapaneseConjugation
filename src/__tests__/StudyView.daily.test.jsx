@@ -679,6 +679,55 @@ describe('StudyView daily startup guards', () => {
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
   });
 
+  it('walks a word form sweep in order and repeats missed forms before completion', async () => {
+    const target = STARTER_VERBS[0];
+    const state = {
+      ...defaultState(),
+      enabledTypes: ['plain-past', 'plain-negative', 'polite-present'],
+    };
+    mockedApp.value = makeApp({
+      state,
+      allWords: [target],
+      practicePrefs: { ...DEFAULT_PREFS, autoAdvanceCorrect: false },
+      studyFocus: {
+        word: target,
+        launchMode: 'word-sweep',
+        returnTo: 'reference',
+      },
+    });
+
+    render(<StudyView />);
+
+    expect(await screen.findByText('Word form sweep')).toBeTruthy();
+    expect(screen.getByText(/3 enabled forms/)).toBeTruthy();
+    expect(screen.getAllByText('Plain Past').length).toBeGreaterThan(0);
+
+    fireEvent.change(await waitForPracticeCard(), { target: { value: 'wrong' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
+
+    await waitFor(() => expect(screen.getAllByText('Plain Negative').length).toBeGreaterThan(0));
+    fireEvent.change(await waitForPracticeCard(), {
+      target: { value: conjugateItem(target, 'plain-negative') },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
+
+    await waitFor(() => expect(screen.getAllByText('Polite Present').length).toBeGreaterThan(0));
+    fireEvent.change(await waitForPracticeCard(), {
+      target: { value: conjugateItem(target, 'polite-present') },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
+
+    expect(await screen.findByText('Repeating missed forms')).toBeTruthy();
+    expect(screen.getAllByText('Plain Past').length).toBeGreaterThan(0);
+    fireEvent.change(await waitForPracticeCard(), {
+      target: { value: conjugateItem(target, 'plain-past') },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
+
+    expect(await screen.findByText('Drill complete')).toBeTruthy();
+  });
+
   it('auto-advances after a brief correct visual by default', async () => {
     const target = STARTER_VERBS[0];
     const nextTarget = STARTER_VERBS[1];

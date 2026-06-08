@@ -35,6 +35,7 @@ import {
   getWordMeta,
   isAdjective,
   isRedundantPracticeType,
+  practiceTypesForItem,
   surfaceFormFor,
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
@@ -192,6 +193,18 @@ function transformationReviewExplanation({
 
 function sameStudyWord(a, b) {
   return !!a && !!b && a.dict === b.dict && a.group === b.group;
+}
+
+function orderedFormTypeIds() {
+  return ALL_CARD_TYPES.map((type) => type.id);
+}
+
+function wordSweepTypeIdsFor(state, word, enabledTypes, prefs) {
+  if (!word) return [];
+  const available = new Set(practiceTypesForItem(word, enabledTypes, prefs).map((type) => type.id));
+  return orderedFormTypeIds().filter(
+    (typeId) => available.has(typeId) && !!buildFocusCard(state, word, typeId),
+  );
 }
 
 function cardMatchesPractice(card, words, enabledTypes, prefs = DEFAULT_PREFS) {
@@ -1269,6 +1282,19 @@ export default function StudyView() {
   const [bonusMode, setBonusMode] = useState(false);
   const [undoReviewScopeAction, setUndoReviewScopeAction] = useState(null);
   const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
+  const [wordSweep, setWordSweep] = useState(() =>
+    focus?.launchMode === 'word-sweep' && focus?.word
+      ? {
+          word: focus.word,
+          allTypeIds: [],
+          pendingTypeIds: [],
+          missedTypeIds: [],
+          completedTypeIds: [],
+          repeatPass: false,
+          complete: false,
+        }
+      : null,
+  );
   const [sessionFilterWord, setSessionFilterWord] = useState(null);
   const [sessionFilterFormGroupId, setSessionFilterFormGroupId] = useState(
     () => focus?.formGroupId || null,
@@ -1419,6 +1445,7 @@ export default function StudyView() {
     !!focus?.formGroupId ||
     !!focus?.recommendation ||
     !!focusWordLock ||
+    !!wordSweep ||
     !!sessionFilterWord ||
     !!sessionFilterFormGroupId ||
     !!recommendationFocus ||
@@ -1484,6 +1511,25 @@ export default function StudyView() {
       // general queue after the first seeded card).
       setSessionFilterWord(focus.word);
       if (focus.returnTo === 'reference') setLaunchContext(focus);
+      if (focus.launchMode === 'word-sweep') {
+        const allTypeIds = wordSweepTypeIdsFor(state, focus.word, enabledTypes, practicePrefs);
+        const nextTypeId = allTypeIds[0] || null;
+        setWordSweep({
+          word: focus.word,
+          allTypeIds,
+          pendingTypeIds: allTypeIds.slice(1),
+          missedTypeIds: [],
+          completedTypeIds: [],
+          repeatPass: false,
+          complete: !nextTypeId,
+        });
+        onFocusConsumed?.();
+        clearPersistedCurrent();
+        setAnswer('');
+        setPhase('answering');
+        setCurrent(nextTypeId ? buildFocusCard(state, focus.word, nextTypeId) : null);
+        return;
+      }
       const card = buildFocusCard(state, focus.word, focus.type);
       onFocusConsumed?.();
       if (card) {
@@ -1497,6 +1543,7 @@ export default function StudyView() {
       focusSeededRef.current = true;
       setSessionFilterFormGroupId(focus.formGroupId);
       setFocusWordLock(null);
+      setWordSweep(null);
       setRecommendationFocus(null);
       onFocusConsumed?.();
     }
@@ -1504,6 +1551,7 @@ export default function StudyView() {
       focusSeededRef.current = true;
       setRecommendationFocus(focus.recommendation);
       setFocusWordLock(null);
+      setWordSweep(null);
       setSessionFilterWord(null);
       setSessionFilterFormGroupId(null);
       setLaunchContext(null);
@@ -1881,6 +1929,7 @@ export default function StudyView() {
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const sessionSkipped = state.session?.skipped || 0;
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit && !recommendationFocus;
+  const wordSweepComplete = !!wordSweep?.complete;
   // Ready-card completion flags
   const queuedDueRuleIds = srsQueue?.dueRuleIds || [];
   const completedDueCount = srsQueue?.completedDueRuleIds?.length || 0;
@@ -1898,7 +1947,7 @@ export default function StudyView() {
     sessionFilterFormGroupId ||
     recommendationFocus
   );
-  const reviewComplete = (dueQueueDone || dailyGoalJustHit) && !focusSession;
+  const reviewComplete = wordSweepComplete || ((dueQueueDone || dailyGoalJustHit) && !focusSession);
   const plannedDefaultProgressMax = Math.max(1, Number(todayPlan?.reviewLimit || dailyGoalTarget));
   if (reviewLimit > 0 || initialDue > 0 || bonusMode || !todayDrillActive) {
     defaultWorkoutTargetRef.current = null;
@@ -1907,7 +1956,13 @@ export default function StudyView() {
   }
   const defaultProgressMax = defaultWorkoutTargetRef.current || plannedDefaultProgressMax;
   const workoutProgress =
-    reviewLimit > 0
+    wordSweep
+      ? {
+          now: Math.min(wordSweep.completedTypeIds?.length || 0, wordSweep.allTypeIds?.length || 1),
+          max: Math.max(1, wordSweep.allTypeIds?.length || 0),
+          label: wordSweep.repeatPass ? 'Repeating missed forms' : 'Enabled forms progress',
+        }
+      : reviewLimit > 0
       ? {
           now: Math.min(reviewsDone, reviewLimit),
           max: reviewLimit,
@@ -2112,6 +2167,50 @@ export default function StudyView() {
     );
   }
 
+  function nextWordSweepStep(sweep, nextState, typeId, correct, { holdNext = false } = {}) {
+    if (!sweep?.word || !typeId) return { sweep, nextCard: null };
+    const completed = new Set(sweep.completedTypeIds || []);
+    const missed = new Set(sweep.missedTypeIds || []);
+    if (correct) {
+      completed.add(typeId);
+      missed.delete(typeId);
+    } else {
+      missed.add(typeId);
+    }
+
+    let queue = (sweep.pendingTypeIds || []).filter((id) => id !== typeId);
+    let repeatPass = !!sweep.repeatPass;
+    if (!queue.length && missed.size) {
+      queue = [...missed].filter((id) => !completed.has(id));
+      repeatPass = true;
+    }
+
+    const nextTypeId = queue[0] || null;
+    const remainingTypeIds = nextTypeId ? queue.slice(1) : [];
+    const nextSweep = {
+      ...sweep,
+      pendingTypeIds: remainingTypeIds,
+      missedTypeIds: [...missed],
+      completedTypeIds: [...completed],
+      repeatPass,
+      nextTypeId: holdNext ? nextTypeId : null,
+      complete: !nextTypeId && missed.size === 0,
+    };
+    const nextCard = nextTypeId ? buildFocusCard(nextState, sweep.word, nextTypeId) : null;
+    return { sweep: nextSweep, nextCard };
+  }
+
+  function consumeHeldWordSweepCard(nextState = state) {
+    if (!wordSweep?.word || !wordSweep.nextTypeId) return null;
+    const card = buildFocusCard(nextState, wordSweep.word, wordSweep.nextTypeId);
+    setWordSweep((currentSweep) =>
+      currentSweep?.nextTypeId === wordSweep.nextTypeId
+        ? { ...currentSweep, nextTypeId: null }
+        : currentSweep,
+    );
+    return card;
+  }
+
   function resetActiveAttempt() {
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
@@ -2152,6 +2251,7 @@ export default function StudyView() {
     setBonusMode(false);
     setTodayMinimalPairSetIds(todayPlan.minimalPairSetIds);
     setFocusWordLock(null);
+    setWordSweep(null);
     setRecommendationFocus(null);
     setLaunchContext(null);
     setReviewBase(state.session?.reviewed || 0);
@@ -2164,6 +2264,7 @@ export default function StudyView() {
       setState((prev) => includeWordInReviewState(prev, word));
     }
     setRecommendationFocus(null);
+    setWordSweep(null);
     setSessionFilterWord(word);
     setCurrent(null);
   }
@@ -2179,6 +2280,7 @@ export default function StudyView() {
       };
     });
     setRecommendationFocus(null);
+    setWordSweep(null);
     setSessionFilterFormGroupId(groupId);
     setCurrent(null);
   }
@@ -2285,7 +2387,8 @@ export default function StudyView() {
       setWasCorrected(false);
       setPhase('answering');
       if (!reviewSetComplete && !reviewComplete) {
-        setCurrent(selectNextReviewCard(state, current.id));
+        const sweepCard = consumeHeldWordSweepCard(state);
+        setCurrent(sweepCard || selectNextReviewCard(state, current.id));
       }
       return;
     }
@@ -2370,6 +2473,10 @@ export default function StudyView() {
       daily: newDaily,
     };
     if (ok && queuedDueRuleIds.includes(rid)) markSrsQueueCompleted?.(rid);
+    const sweepStep = wordSweep
+      ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
+      : null;
+    if (sweepStep) setWordSweep(sweepStep.sweep);
     setState(nextState);
     setChatOpen(false);
     setLastDiagnosis(mistakeDiagnosis);
@@ -2390,7 +2497,10 @@ export default function StudyView() {
     const willHitDailyGoal =
       !startedGoalHit.current && !bonusMode && newDaily.goalHit && !daily.goalHit;
     const reviewWillComplete =
-      (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) || willClearDue || willHitDailyGoal;
+      sweepStep?.sweep?.complete ||
+      (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) ||
+      willClearDue ||
+      willHitDailyGoal;
     if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
@@ -2410,7 +2520,14 @@ export default function StudyView() {
         wrongSnapshotRef.current = null;
         setWasCorrected(false);
         setPhase('answering');
-        setCurrent(selectNextReviewCard(nextState, current.id));
+        if (sweepStep?.nextCard) {
+          setWordSweep((currentSweep) =>
+            currentSweep?.nextTypeId === sweepStep.sweep.nextTypeId
+              ? { ...currentSweep, nextTypeId: null }
+              : currentSweep,
+          );
+        }
+        setCurrent(sweepStep?.nextCard || selectNextReviewCard(nextState, current.id));
       }, CORRECT_AUTO_ADVANCE_MS);
     }
   }
@@ -2426,6 +2543,10 @@ export default function StudyView() {
       ...state,
       session: { ...(state.session || {}), skipped: (state.session?.skipped || 0) + 1 },
     };
+    const sweepStep = wordSweep
+      ? nextWordSweepStep(wordSweep, nextState, current.type, false)
+      : null;
+    if (sweepStep) setWordSweep(sweepStep.sweep);
     setState(nextState);
     setChatOpen(false);
     setAnswer('');
@@ -2444,7 +2565,7 @@ export default function StudyView() {
     setWasCorrected(false);
     setPhase('answering');
     setWasCorrect(false);
-    setCurrent(selectNextReviewCard(nextState, current.id));
+    setCurrent(sweepStep?.nextCard || selectNextReviewCard(nextState, current.id));
   }
 
   function removeCurrentWordFromReviews() {
@@ -2530,6 +2651,10 @@ export default function StudyView() {
       daily: newDaily,
     };
     if (ok && queuedDueRuleIds.includes(rid)) markSrsQueueCompleted?.(rid);
+    const sweepStep = wordSweep
+      ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
+      : null;
+    if (sweepStep) setWordSweep(sweepStep.sweep);
     setState(nextState);
     setAnswer('');
     setTypoGuard(null);
@@ -2545,7 +2670,10 @@ export default function StudyView() {
     const willHitDailyGoal =
       !startedGoalHit.current && !bonusMode && newDaily.goalHit && !daily.goalHit;
     const reviewWillComplete =
-      (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) || willClearDue || willHitDailyGoal;
+      sweepStep?.sweep?.complete ||
+      (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit) ||
+      willClearDue ||
+      willHitDailyGoal;
     if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
@@ -2565,7 +2693,14 @@ export default function StudyView() {
         wrongSnapshotRef.current = null;
         setWasCorrected(false);
         setPhase('answering');
-        setCurrent(selectNextReviewCard(nextState, current.id));
+        if (sweepStep?.nextCard) {
+          setWordSweep((currentSweep) =>
+            currentSweep?.nextTypeId === sweepStep.sweep.nextTypeId
+              ? { ...currentSweep, nextTypeId: null }
+              : currentSweep,
+          );
+        }
+        setCurrent(sweepStep?.nextCard || selectNextReviewCard(nextState, current.id));
       }, CORRECT_AUTO_ADVANCE_MS);
     }
   }
@@ -2630,6 +2765,10 @@ export default function StudyView() {
       },
       daily: bumpDaily(state.daily, false, dailyGoalTarget),
     };
+    const sweepStep = wordSweep
+      ? nextWordSweepStep(wordSweep, nextState, current.type, false, { holdNext: true })
+      : null;
+    if (sweepStep) setWordSweep(sweepStep.sweep);
     setState(nextState);
     setAnswer('');
     setTypoGuard(null);
@@ -2713,7 +2852,7 @@ export default function StudyView() {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
-          Map updated
+          {wordSweepComplete ? 'Drill complete' : 'Map updated'}
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-1">
           {dueQueueDone ? `${completedDueCount}/${initialDue}` : sessionReviewed}
@@ -2800,6 +2939,7 @@ export default function StudyView() {
         )}
         <button
           onClick={() => {
+            setWordSweep(null);
             setBonusMode(true);
             setCurrent(selectNextReviewCard(state, current?.id, { bonusMode: true, wordLists }));
             setPhase('answering');
@@ -2936,6 +3076,7 @@ export default function StudyView() {
   function returnToReference() {
     setLaunchContext(null);
     setFocusWordLock(null);
+    setWordSweep(null);
     setRecommendationFocus(null);
     onFocusConsumed?.();
     setTab('tools');
@@ -2966,6 +3107,7 @@ export default function StudyView() {
     }
     setLaunchContext(null);
     setFocusWordLock(null);
+    setWordSweep(null);
     setRecommendationFocus(null);
     setSessionFilterWord(null);
     setSessionFilterFormGroupId(null);
@@ -3024,11 +3166,20 @@ export default function StudyView() {
         }
       : focusBannerWord
         ? {
-            kicker: referenceLaunch ? 'Reference drill' : 'Focused practice',
+            kicker: wordSweep
+              ? 'Word form sweep'
+              : referenceLaunch
+                ? 'Reference drill'
+                : 'Focused practice',
             title: focusBannerWord.dict,
             lang: 'ja',
             reading: focusBannerWord.reading || '',
-            subtitle: [focusBannerWord.meaning, referenceLaunch?.referenceLabel || typeInfo.label]
+            subtitle: [
+              focusBannerWord.meaning,
+              wordSweep
+                ? `${wordSweep.allTypeIds?.length || 0} enabled forms`
+                : referenceLaunch?.referenceLabel || typeInfo.label,
+            ]
               .filter(Boolean)
               .join(' · '),
             exitLabel: referenceLaunch ? 'Back to reference' : 'Exit focus',
