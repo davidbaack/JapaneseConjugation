@@ -10,10 +10,12 @@ import {
   thirdPerson,
   resolveDisplayScripts,
   answerPhaseTaskDetails,
+  autoAdvanceAnswerFormKey,
   mergePracticePrefs,
   makeChoices,
   makeReverseChoices,
   normalizeSentenceBlankForTarget,
+  resolveAutoAdvanceCorrect,
   spokenAnswerResult,
 } from '../utils/display.js';
 import {
@@ -727,14 +729,55 @@ describe('mergePracticePrefs', () => {
     });
   });
 
-  it('defaults correct answers to auto-advance while preserving an explicit opt-out', () => {
-    expect(mergePracticePrefs({}).autoAdvanceCorrect).toBe(true);
-    expect(mergePracticePrefs({ autoAdvanceCorrect: false }).autoAdvanceCorrect).toBe(true);
+  it('resolves auto-advance by the active answer form', () => {
+    expect(autoAdvanceAnswerFormKey({ answerMode: 'input', kanaAssist: 'guided' })).toBe(
+      'input-guided',
+    );
+    expect(resolveAutoAdvanceCorrect({ answerMode: 'input', kanaAssist: 'guided' })).toBe(true);
+    expect(resolveAutoAdvanceCorrect({ answerMode: 'input', kanaAssist: 'live' })).toBe(false);
+    expect(resolveAutoAdvanceCorrect({ answerMode: 'input', kanaAssist: 'off' })).toBe(false);
+    expect(resolveAutoAdvanceCorrect({ answerMode: 'choice', kanaAssist: 'guided' })).toBe(false);
+    expect(resolveAutoAdvanceCorrect({ answerMode: 'self-check' })).toBe(false);
+    expect(resolveAutoAdvanceCorrect({ answerMode: 'speak' })).toBe(false);
+  });
+
+  it('persists independent auto-advance overrides per answer form', () => {
+    const prefs = mergePracticePrefs({
+      answerMode: 'choice',
+      autoAdvanceCorrectByAnswerForm: {
+        'input-guided': false,
+        choice: true,
+      },
+    });
+    expect(resolveAutoAdvanceCorrect({ ...prefs, answerMode: 'input', kanaAssist: 'guided' })).toBe(
+      false,
+    );
+    expect(resolveAutoAdvanceCorrect({ ...prefs, answerMode: 'choice' })).toBe(true);
+    expect(resolveAutoAdvanceCorrect({ ...prefs, answerMode: 'speak' })).toBe(false);
+  });
+
+  it('migrates explicit legacy auto-advance choices to the active answer form only', () => {
     expect(
-      mergePracticePrefs({ autoAdvanceCorrect: false, autoAdvanceCorrectUserSet: true }),
+      mergePracticePrefs({
+        answerMode: 'input',
+        kanaAssist: 'guided',
+        autoAdvanceCorrect: false,
+        autoAdvanceCorrectUserSet: true,
+      }),
     ).toMatchObject({
       autoAdvanceCorrect: false,
-      autoAdvanceCorrectUserSet: true,
+      autoAdvanceCorrectByAnswerForm: { 'input-guided': false },
     });
+    expect(
+      mergePracticePrefs({
+        answerMode: 'choice',
+        autoAdvanceCorrect: true,
+        autoAdvanceCorrectUserSet: true,
+      }),
+    ).toMatchObject({
+      autoAdvanceCorrect: true,
+      autoAdvanceCorrectByAnswerForm: { choice: true },
+    });
+    expect(mergePracticePrefs({ autoAdvanceCorrect: true }).autoAdvanceCorrect).toBe(false);
   });
 });

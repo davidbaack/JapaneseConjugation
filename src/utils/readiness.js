@@ -359,7 +359,7 @@ export function launchPrefsForReadinessDimension(dimensionId) {
     return {
       ...base,
       answerMode: 'input',
-      autoAdvanceCorrect: true,
+      autoAdvanceCorrectByAnswerForm: { 'input-live': true },
     };
   }
   return { ...base, answerMode: 'input' };

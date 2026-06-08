@@ -60,7 +60,7 @@ describe('readiness tracking', () => {
       answerMode: 'input',
       reviewStyle: 'forms',
       sourceFormStrategy: 'dictionary',
-      autoAdvanceCorrect: true,
+      autoAdvanceCorrectByAnswerForm: { 'input-live': true },
     });
     expect(launchPrefsForReadinessDimension('production')).toMatchObject({
       answerMode: 'input',

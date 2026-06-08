@@ -231,6 +231,16 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(kanaToggle);
     const kanaUpdater = setPracticePrefs.mock.calls.at(-1)[0];
     expect(kanaUpdater({ ...DEFAULT_PREFS }).kanaAssist).toBe('off');
+
+    const autoNextToggle = screen.getByRole('button', { name: 'Auto next off' });
+    expect(autoNextToggle.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(autoNextToggle);
+    const autoNextUpdater = setPracticePrefs.mock.calls.at(-1)[0];
+    expect(autoNextUpdater({ ...DEFAULT_PREFS })).toMatchObject({
+      autoAdvanceCorrect: true,
+      autoAdvanceCorrectUserSet: true,
+      autoAdvanceCorrectByAnswerForm: { 'input-live': true },
+    });
   });
 
   it('offers an Overview return path from a focused (special) session', async () => {
@@ -726,12 +736,16 @@ describe('StudyView continuous Practice startup', () => {
     expect(await screen.findByText('Drill complete')).toBeTruthy();
   });
 
-  it('auto-advances after a brief correct visual by default', async () => {
+  it('auto-advances after a brief correct visual by default for guided kana', async () => {
     const target = STARTER_VERBS[0];
     const nextTarget = STARTER_VERBS[1];
     const type = 'plain-past';
     mockedApp.value = makeApp({
       allWords: [target, nextTarget],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'guided',
+      },
       studyFocus: {
         word: target,
         type,
@@ -755,6 +769,58 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(screen.queryByText('Correct!')).toBeNull());
     expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
+  });
+
+  it('does not auto-advance non-guided typed answers by default', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Next card coming up...')).toBeNull();
+  });
+
+  it('auto-advances non-guided typed answers after enabling that answer form', async () => {
+    const target = STARTER_VERBS[0];
+    const nextTarget = STARTER_VERBS[1];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      allWords: [target, nextTarget],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        autoAdvanceCorrectByAnswerForm: { 'input-live': true },
+      },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    vi.useFakeTimers();
+
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    expect(screen.getByText('Next card coming up...')).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(850);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => expect(screen.queryByText('Correct!')).toBeNull());
   });
 
   it('offers Gemini review chat after a correct answer without opening it automatically', async () => {

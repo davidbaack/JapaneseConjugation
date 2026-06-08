@@ -10,6 +10,7 @@ import {
   IconFlame,
   IconMic,
   IconPlus,
+  IconRefresh,
 } from '../components/Icons.jsx';
 import {
   ALL_CARD_TYPES,
@@ -65,6 +66,8 @@ import {
   dictionaryAnswerMatches,
   normalizeAnswerMode,
   resolveKanaAssist,
+  autoAdvanceAnswerFormKey,
+  resolveAutoAdvanceCorrect,
   kanaMatchDisplayForPrefs,
   typoGuardForAnswer,
   spokenAnswerResult,
@@ -1396,7 +1399,8 @@ export default function StudyView() {
   ]);
 
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
-  const autoAdvanceCorrect = practicePrefs.autoAdvanceCorrect !== false;
+  const autoAdvanceFormKey = autoAdvanceAnswerFormKey(practicePrefs);
+  const autoAdvanceCorrect = resolveAutoAdvanceCorrect(practicePrefs);
   const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
   const typedAnswerMode = answerMode === 'input';
   const transformationMode = false;
@@ -2720,6 +2724,22 @@ export default function StudyView() {
     setTypoGuard(null);
   }
 
+  function toggleAutoNext() {
+    setPracticePrefs((prev) => {
+      const key = autoAdvanceAnswerFormKey(prev);
+      const current = resolveAutoAdvanceCorrect(prev);
+      return {
+        ...prev,
+        autoAdvanceCorrect: !current,
+        autoAdvanceCorrectUserSet: true,
+        autoAdvanceCorrectByAnswerForm: {
+          ...(prev.autoAdvanceCorrectByAnswerForm || {}),
+          [key]: !current,
+        },
+      };
+    });
+  }
+
   function submitIfCompleteTypedAnswer(nextAnswer) {
     if (!current) return false;
     if (phase !== 'answering') return false;
@@ -3219,6 +3239,20 @@ export default function StudyView() {
                 Kana help {liveKanaHelpEnabled ? 'on' : 'off'}
               </button>
             )}
+            <button
+              type="button"
+              onClick={toggleAutoNext}
+              aria-pressed={autoAdvanceCorrect}
+              title={`Auto next for ${autoAdvanceFormKey}`}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                autoAdvanceCorrect
+                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                  : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+              }`}
+            >
+              <IconRefresh className="h-3.5 w-3.5" />
+              Auto next {autoAdvanceCorrect ? 'on' : 'off'}
+            </button>
             <div className="text-xs text-stone-400 text-right">Practice</div>
             <button
               type="button"

@@ -37,6 +37,27 @@ export function resolveKanaAssist(prefs = DEFAULT_PREFS) {
   return DEFAULT_PREFS.kanaAssist;
 }
 
+export function autoAdvanceAnswerFormKey(prefs = DEFAULT_PREFS) {
+  const answerMode = normalizeAnswerMode(prefs?.answerMode);
+  if (answerMode !== 'input') return answerMode;
+  return `input-${resolveKanaAssist(prefs)}`;
+}
+
+function defaultAutoAdvanceForAnswerForm(key) {
+  return key === 'input-guided';
+}
+
+export function resolveAutoAdvanceCorrect(prefs = DEFAULT_PREFS) {
+  const key = autoAdvanceAnswerFormKey(prefs);
+  const byForm =
+    prefs?.autoAdvanceCorrectByAnswerForm &&
+    typeof prefs.autoAdvanceCorrectByAnswerForm === 'object'
+      ? prefs.autoAdvanceCorrectByAnswerForm
+      : {};
+  if (Object.prototype.hasOwnProperty.call(byForm, key)) return byForm[key] !== false;
+  return defaultAutoAdvanceForAnswerForm(key);
+}
+
 export function kanaMatchDisplayForPrefs(prefs = DEFAULT_PREFS) {
   return resolveKanaAssist(prefs) === 'off' ? 'none' : 'color-count';
 }
@@ -97,9 +118,33 @@ export function mergePracticePrefs(prefs) {
     ? { ...DEFAULT_PREFS.displayScripts, ...source.displayScripts }
     : resolveDisplayScripts(source);
   const autoAdvanceCorrectUserSet = !!source.autoAdvanceCorrectUserSet;
-  const autoAdvanceCorrect = autoAdvanceCorrectUserSet
-    ? source.autoAdvanceCorrect !== false
-    : DEFAULT_PREFS.autoAdvanceCorrect;
+  const activeAutoAdvanceKey = autoAdvanceAnswerFormKey({ ...source, answerMode, kanaAssist });
+  const autoAdvanceCorrectByAnswerForm =
+    source.autoAdvanceCorrectByAnswerForm &&
+    typeof source.autoAdvanceCorrectByAnswerForm === 'object' &&
+    !Array.isArray(source.autoAdvanceCorrectByAnswerForm)
+      ? Object.fromEntries(
+          Object.entries(source.autoAdvanceCorrectByAnswerForm)
+            .filter(([key]) =>
+              ['input-guided', 'input-live', 'input-off', 'choice', 'self-check', 'speak'].includes(
+                key,
+              ),
+            )
+            .map(([key, value]) => [key, value !== false]),
+        )
+      : {};
+  if (
+    autoAdvanceCorrectUserSet &&
+    !Object.prototype.hasOwnProperty.call(autoAdvanceCorrectByAnswerForm, activeAutoAdvanceKey)
+  ) {
+    autoAdvanceCorrectByAnswerForm[activeAutoAdvanceKey] = source.autoAdvanceCorrect !== false;
+  }
+  const autoAdvanceCorrect = resolveAutoAdvanceCorrect({
+    ...source,
+    answerMode,
+    kanaAssist,
+    autoAdvanceCorrectByAnswerForm,
+  });
   let wordGroups = Array.isArray(source.wordGroups)
     ? [...source.wordGroups]
     : DEFAULT_PREFS.wordGroups;
@@ -119,6 +164,7 @@ export function mergePracticePrefs(prefs) {
     displayScripts,
     autoAdvanceCorrect,
     autoAdvanceCorrectUserSet,
+    autoAdvanceCorrectByAnswerForm,
     reviewStyle,
     sourceFormStrategy,
     newCardsPerDay,
