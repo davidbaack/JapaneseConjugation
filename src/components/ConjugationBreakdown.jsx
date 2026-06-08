@@ -116,6 +116,13 @@ export function ConjugationBreakdown({
         <div className="mt-1 text-sm leading-relaxed text-stone-650 dark:text-stone-300">
           {debug.category.why}
         </div>
+        {Array.isArray(debug.category.checks) && debug.category.checks.length > 0 && (
+          <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs leading-relaxed text-stone-600 dark:text-stone-350">
+            {debug.category.checks.map((check) => (
+              <li key={check}>{check}</li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="space-y-2">

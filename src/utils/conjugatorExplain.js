@@ -281,6 +281,15 @@ function slashList(values) {
   return values.filter(Boolean).join(' / ');
 }
 
+function godanSoundChangeGroup(ending) {
+  if (['う', 'つ', 'る'].includes(ending)) return 'う/つ/る';
+  if (['む', 'ぶ', 'ぬ'].includes(ending)) return 'む/ぶ/ぬ';
+  if (ending === 'く') return 'く';
+  if (ending === 'ぐ') return 'ぐ';
+  if (ending === 'す') return 'す';
+  return 'godan';
+}
+
 function dictStemForFinal(item, ending) {
   const dict = item?.dict || item?.reading || '';
   if (ending && dict.endsWith(ending)) return dict.slice(0, -ending.length);
@@ -297,59 +306,147 @@ function learnerCategoryInfo(item) {
     const rowExamples = slashList([
       categoryExampleForm(item, 'plain-negative'),
       categoryExampleForm(item, 'polite-present'),
+      categoryExampleForm(item, 'conditional-ba'),
+      categoryExampleForm(item, 'volitional'),
     ]);
     const soundChangeExamples = slashList([
       categoryExampleForm(item, 'te-form'),
       categoryExampleForm(item, 'plain-past'),
     ]);
-    const rowExampleText = rowExamples || 'row-shift forms';
-    const soundChangeExampleText = soundChangeExamples || 'te/ta forms';
     const finalKana = ending ? `final dictionary kana ${ending}` : 'final dictionary kana';
+    const rowShift = slashList([A_ROW[ending], I_ROW[ending], E_ROW[ending], O_ROW[ending]]);
+    const soundChangeGroup = godanSoundChangeGroup(ending);
+    const isRuTrap = ending === 'る';
+    const isIkuException = reading === 'いく' || dict === '行く';
     return {
       label: 'godan / u-verb',
       why:
-        ending === 'る'
-          ? `${dict} ends in る, but it is still godan / u-verb: る changes to ら / り / れ / ろ or って / った instead of simply dropping. For this word, that gives forms like ${rowExampleText} and ${soundChangeExampleText}; it does not use the ichidan drop-る pattern.`
-          : `${dict} is godan / u-verb: the ${finalKana} changes instead of dropping. Use its row for forms like ${rowExampleText}, or its te/ta sound-change group for ${soundChangeExampleText}.`,
+        isRuTrap && rowShift
+          ? `${dict} ends in る, but it is godan / u-verb because that final る changes rows instead of disappearing. A る-ending godan verb uses forms with ${rowShift}, plus te/ta sound changes like ${soundChangeExamples || 'って / った'}.`
+          : `${dict} is godan / u-verb because the ${finalKana} is the moving part. It changes rows for many endings instead of dropping, and te/ta forms use a godan sound-change group.`,
+      checks: [
+        rowShift &&
+          rowExamples &&
+          `Row check: ${ending} can move to ${rowShift}, giving ${rowExamples}.`,
+        soundChangeExamples &&
+          `Te/past check: ${dict} uses the ${soundChangeGroup} sound-change group, giving ${soundChangeExamples}.`,
+        isRuTrap &&
+          `Trap check: final る alone is not enough. ${categoryExampleForm(item, 'polite-present')} and ${categoryExampleForm(item, 'plain-negative')} show り / ら, not a simple drop-る stem.`,
+        isIkuException &&
+          `${dict} is still godan, but its te/past forms are special: ${soundChangeExamples}, not the regular く pattern.`,
+        !isRuTrap &&
+          'Watch for る-ending godan verbs too: words like 帰る, 入る, 走る, and 切る look ichidan at first but row-shift like godan.',
+      ].filter(Boolean),
     };
   }
 
   if (group === 'ichidan') {
     const stem = dictStemForFinal(item, 'る');
+    const negative = categoryExampleForm(item, 'plain-negative');
+    const polite = categoryExampleForm(item, 'polite-present');
+    const tePast = slashList([
+      categoryExampleForm(item, 'te-form'),
+      categoryExampleForm(item, 'plain-past'),
+    ]);
     return {
       label: 'ichidan / ru-verb',
-      why: `${dict} is ichidan / ru-verb: drop the final る, then attach the requested ending to ${stem || 'the stem'}. The stem stays stable across forms.`,
+      why: `${dict} is ichidan / ru-verb because the final る drops and the stem ${stem || 'before る'} stays stable. It does not row-shift like godan.`,
+      checks: [
+        polite &&
+          `Masu check: ${dict} -> ${polite}. The same stem ${stem || 'before る'} stays before ます.`,
+        negative && `Negative check: drop る and attach ない, giving ${negative}.`,
+        tePast && `Te/past check: attach directly to the same stem, giving ${tePast}.`,
+        'Contrast: a る-ending godan verb would show ら / り / れ / ろ or って / った instead of only dropping る.',
+      ].filter(Boolean),
     };
   }
 
   if (group === 'suru') {
+    const stem = dictStemForFinal(item, 'する');
+    const anchors = slashList([
+      categoryExampleForm(item, 'plain-negative'),
+      categoryExampleForm(item, 'polite-present'),
+      categoryExampleForm(item, 'te-form'),
+      categoryExampleForm(item, 'potential'),
+    ]);
     return {
       label: 'irregular',
-      why: `${dict} belongs in the irregular bucket: keep the part before する, then change the する core to し, せ, さ, or でき depending on the form.`,
+      why: `${dict} belongs in the irregular bucket because the する core does not follow the normal godan or ichidan pattern. Keep ${stem || 'the part before する'}, then change する by form.`,
+      checks: [
+        `${dict} is treated as ${stem || 'noun part'} + する; the first part stays while the する core changes.`,
+        anchors && `Common anchors: ${anchors}.`,
+        'Pattern to memorize: する often becomes し for ます/て/た, せ for some negatives, さ for causative/passive-style forms, and でき for potential.',
+      ].filter(Boolean),
     };
   }
 
   if (group === 'kuru') {
+    const anchors = slashList([
+      categoryExampleForm(item, 'polite-present'),
+      categoryExampleForm(item, 'plain-negative'),
+      categoryExampleForm(item, 'te-form'),
+      categoryExampleForm(item, 'plain-past'),
+    ]);
     return {
       label: 'irregular',
-      why: `${dict} belongs in the irregular bucket: 来る changes its root sound by form, with き, こ, and く all appearing.`,
+      why: `${dict} belongs in the irregular bucket because 来る changes its root sound by form. The same word can use き, こ, or く depending on the ending.`,
+      checks: [
+        anchors && `Common anchors: ${anchors}.`,
+        'Masu/te/past usually use き, negatives and several derived forms use こ, and dictionary-style forms keep く.',
+        'Do not choose a godan or ichidan rule here; memorize 来る as its own core pattern.',
+      ].filter(Boolean),
     };
   }
 
   if (group === 'i-adjective') {
     const irregular = item?.irregular || reading === 'いい' || reading === 'かっこいい';
+    const negative = categoryExampleForm(item, 'adj-plain-negative');
+    const past = categoryExampleForm(item, 'adj-plain-past');
+    const teForm = categoryExampleForm(item, 'adj-te-form');
+    const attributive = categoryExampleForm(item, 'adj-attributive');
+    const adjectiveExamples = slashList([negative, past, teForm]);
     return {
       label: irregular ? 'irregular' : 'い-adjective',
       why: irregular
-        ? `${dict} belongs in the irregular bucket because most forms use the よい stem, not the visible いい form.`
-        : `${dict} is an い-adjective: the final い changes or drops, then the adjective ending attaches.`,
+        ? `${dict} belongs in the irregular bucket because the visible いい form is not the stem used by most conjugations. Most non-present forms use よ, from the older よい pattern.`
+        : `${dict} is an い-adjective because the final い is the part that changes. It is an adjective pattern, not a verb group.`,
+      checks: irregular
+        ? [
+            adjectiveExamples && `Stem check: use よ before endings, giving ${adjectiveExamples}.`,
+            `${dict} stays visible in the plain present, but most other forms should not be built from an いい stem.`,
+          ].filter(Boolean)
+        : [
+            adjectiveExamples &&
+              `Ending check: い changes into adjective endings, giving ${adjectiveExamples}.`,
+            attributive && `Before a noun, the dictionary form stays: ${attributive} + noun.`,
+            'Do not use godan or ichidan verb rules; there is no verb stem before ます here.',
+          ].filter(Boolean),
     };
   }
 
   if (group === 'na-adjective') {
+    const present = categoryExampleForm(item, 'adj-polite-present');
+    const negative = categoryExampleForm(item, 'adj-plain-negative');
+    const attributive = categoryExampleForm(item, 'adj-attributive');
     return {
       label: 'な-adjective',
-      why: `${dict} is a な-adjective: the base ${dict} stays; the connector after it changes, like だ / です / ではない / な.`,
+      why: `${dict} is a な-adjective because the base stays mostly unchanged and the connector after it carries the grammar. It behaves more like a noun plus だ / です than like an い-adjective.`,
+      checks: [
+        present && `Predicate check: attach です or だ-style endings, giving ${present}.`,
+        negative && `Negative check: use a copula-style negative, giving ${negative}.`,
+        attributive && `Before a noun, add な: ${attributive} + noun.`,
+      ].filter(Boolean),
+    };
+  }
+
+  if (group === 'noun') {
+    return {
+      label: 'noun',
+      why: `${dict} is a noun, so the noun itself does not conjugate. Tense, politeness, and negativity live in the copula after it, such as だ, です, ではない, or でした.`,
+      checks: [
+        'Do not force a noun into ichidan or godan rules.',
+        'If a noun can become a verb, it should appear as a する entry, like 勉強する, before verb rules apply.',
+      ],
     };
   }
 
