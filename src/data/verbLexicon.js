@@ -5,6 +5,10 @@ const BASE_URL = import.meta.env?.BASE_URL || '/';
 
 export const VERB_LEXICON_URL = `${BASE_URL}data/verb-lexicon.json`;
 
+// Lexicon rows encode JMdict transitivity compactly (see build-verb-lexicon.js):
+// 't' transitive, 'i' intransitive, 'b' both. Inflate to a readable field.
+const TRANSITIVITY_BY_CODE = { t: 'transitive', i: 'intransitive', b: 'both' };
+
 export function isGeneratedPracticeArtifactRow(row = []) {
   return isLexiconArtifactRow(row);
 }
@@ -12,7 +16,8 @@ export function isGeneratedPracticeArtifactRow(row = []) {
 export function inflateVerbRow(row) {
   const cleanRow = normalizeLexiconRow(row);
   if (!cleanRow) return null;
-  const [dict, reading, meaning, group, jlpt, genkiLessons, minnaLessons, common] = cleanRow;
+  const [dict, reading, meaning, group, jlpt, genkiLessons, minnaLessons, common, transitive] =
+    cleanRow;
   if (!dict || !reading || !group) return null;
   const cleanGenki = Array.isArray(genkiLessons) ? genkiLessons : [];
   const cleanMinna = Array.isArray(minnaLessons) ? minnaLessons : [];
@@ -25,6 +30,7 @@ export function inflateVerbRow(row) {
     ...(cleanGenki.length ? { lessons: cleanGenki, lesson: cleanGenki[0] } : {}),
     ...(cleanMinna.length ? { minnaLessons: cleanMinna, minnaLesson: cleanMinna[0] } : {}),
     ...(common ? { common: true } : {}),
+    ...(transitive ? { transitive: TRANSITIVITY_BY_CODE[transitive] || undefined } : {}),
   };
 }
 

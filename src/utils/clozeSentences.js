@@ -89,11 +89,35 @@ function simplePast(action) {
   return SIMPLE_PAST[action] || pastParticiple(action);
 }
 
+// Motion/existence/change-of-state verbs that read as intransitive. Used only
+// when the lexicon carries no JMdict transitivity (custom and starter words);
+// lexicon words use the real `word.transitive` field instead.
+const INTRANSITIVE_HINTS =
+  /\b(go|come|return|arrive|depart|leave|exit|enter|fall|drop|rise|climb|happen|occur|appear|disappear|vanish|die|be born|sleep|wake|sit|stand|stay|remain|live|exist|cry|laugh|smile|run|walk|swim|fly|float|sink|grow|become|begin|start|end|finish|gather|change|move)\b/;
+
+export function resolveTransitivity(word) {
+  const declared = word?.transitive;
+  if (declared === 'transitive' || declared === 'both') return 'transitive';
+  if (declared === 'intransitive') return 'intransitive';
+  return INTRANSITIVE_HINTS.test(String(word?.meaning || '').toLowerCase())
+    ? 'intransitive'
+    : 'transitive';
+}
+
+function isTransitiveWord(word) {
+  return resolveTransitivity(word) === 'transitive';
+}
+
 // Conjugates the English action into the short verb phrase that drops into a
 // frame's English gloss at the {b} slot. The surrounding sentence supplies any
 // clause structure (let's…, if/when…, make/let…), so this stays a bare phrase.
-function verbSlot(action, type) {
-  if (type.includes('passive')) return pastParticiple(action);
+function verbSlot(action, type, transitivity = 'transitive') {
+  if (type.includes('passive')) {
+    // Transitive: direct passive ("was bought"). Intransitive: the Japanese
+    // suffering passive reads naturally as a simple past in English
+    // ("a friend went home on me"), so avoid a broken past participle.
+    return transitivity === 'intransitive' ? simplePast(action) : pastParticiple(action);
+  }
   if (type.includes('causative')) return action;
   if (type.includes('imperative') || type.includes('command')) return action;
   if (type.includes('negative-te') || type.includes('negative-zu')) return gerund(action);
@@ -122,7 +146,7 @@ function verbSlot(action, type) {
 
 function weaveSlot(word, type) {
   if (isAdjective(word)) return word?.meaning || 'that way';
-  return verbSlot(actionOf(word), type);
+  return verbSlot(actionOf(word), type, resolveTransitivity(word));
 }
 
 const CUES = {
@@ -262,20 +286,20 @@ const VERB_FRAMES = {
   'plain-present': PRESENT_HABITUAL,
   'plain-negative': {
     general: [
-      ["今日は時間がないから {b}。", "I don't have time today, so I {b}."],
+      ['今日は時間がないから {b}。', "I don't have time today, so I {b}."],
       ['平日はあまり {b}。', 'On weekdays, I usually {b}.'],
       ['雨の日は、たいてい {b}。', 'On rainy days, I usually {b}.'],
     ],
     food: [
       ['朝はあまり {b}。', 'In the morning, I {b} much.'],
-      ["お腹がいっぱいだから、今は {b}。", "I'm full, so right now I {b}."],
+      ['お腹がいっぱいだから、今は {b}。', "I'm full, so right now I {b}."],
     ],
     movement: [
-      ["今日は雨だから、遠くへ {b}。", "It's rainy today, so I {b} far away."],
-      ["疲れているから、今夜は {b}。", "I'm tired, so tonight I {b}."],
+      ['今日は雨だから、遠くへ {b}。', "It's rainy today, so I {b} far away."],
+      ['疲れているから、今夜は {b}。', "I'm tired, so tonight I {b}."],
     ],
     study: [
-      ["眠いときは、あまり集中して {b}。", "When I'm sleepy, I {b} with much focus."],
+      ['眠いときは、あまり集中して {b}。', "When I'm sleepy, I {b} with much focus."],
       ['週末はその教科を {b}。', 'On weekends, I {b} that subject.'],
     ],
     communication: [
@@ -287,7 +311,7 @@ const VERB_FRAMES = {
     general: [
       ['昨日は忙しくて {b}。', 'Yesterday I was busy, so I {b}.'],
       ['先週は一度も {b}。', 'Last week, I {b} even once.'],
-      ['約束の時間までに {b}。', "By the promised time, I still {b}."],
+      ['約束の時間までに {b}。', 'By the promised time, I still {b}.'],
     ],
     food: [
       ['朝ごはんのあと、何も {b}。', 'After breakfast, I {b} anything.'],
@@ -295,7 +319,7 @@ const VERB_FRAMES = {
     ],
     movement: [
       ['雨が強かったので、外へ {b}。', 'Because the rain was heavy, I {b} outside.'],
-      ['時間がなくて、駅まで {b}。', "I had no time, so I {b} as far as the station."],
+      ['時間がなくて、駅まで {b}。', 'I had no time, so I {b} as far as the station.'],
     ],
     study: [
       ['昨日の夜は疲れていて {b}。', 'Last night I was tired, so I {b}.'],
@@ -333,7 +357,7 @@ const VERB_FRAMES = {
   'polite-negative': {
     general: [
       ['平日はあまり {b}。', 'On weekdays, I usually {b}.'],
-      ["今日は時間がないので {b}。", "I don't have time today, so I {b}."],
+      ['今日は時間がないので {b}。', "I don't have time today, so I {b}."],
       ['雨の日はたいてい {b}。', 'On rainy days, I usually {b}.'],
     ],
   },
@@ -341,7 +365,7 @@ const VERB_FRAMES = {
     general: [
       ['昨日は忙しくて {b}。', 'Yesterday I was busy, so I {b}.'],
       ['先週は一度も {b}。', 'Last week, I {b} even once.'],
-      ["時間が足りなかったので {b}。", "There wasn't enough time, so I {b}."],
+      ['時間が足りなかったので {b}。', "There wasn't enough time, so I {b}."],
     ],
   },
   'te-form': {
@@ -361,7 +385,10 @@ const VERB_FRAMES = {
   },
   potential: {
     general: [
-      ['練習すれば、もっと上手に {b}ようになります。', 'With practice, I become able to {b} better.'],
+      [
+        '練習すれば、もっと上手に {b}ようになります。',
+        'With practice, I become able to {b} better.',
+      ],
       [
         'このアプリで、一人でも {b}ようになります。',
         'With this app, I become able to {b} on my own too.',
@@ -375,37 +402,37 @@ const VERB_FRAMES = {
   },
   'potential-negative': {
     general: [
-      ["今日は忙しくて、まだ {b}。", "I'm busy today, so I still can't {b}."],
-      ["一人では、まだうまく {b}。", "On my own, I still can't {b} well."],
-      ["時間が短いので、全部は {b}。", "Time is short, so I can't {b} all of it."],
+      ['今日は忙しくて、まだ {b}。', "I'm busy today, so I still can't {b}."],
+      ['一人では、まだうまく {b}。', "On my own, I still can't {b} well."],
+      ['時間が短いので、全部は {b}。', "Time is short, so I can't {b} all of it."],
     ],
   },
   volitional: {
     general: [
-      ["少し休んでから、また {b}。", "After resting a little, let's {b} again."],
-      ["今日はここまでにして、明日 {b}。", "Let's stop here today and {b} tomorrow."],
-      ["友達もいるから、いっしょに {b}。", "A friend is here too, so let's {b} together."],
+      ['少し休んでから、また {b}。', "After resting a little, let's {b} again."],
+      ['今日はここまでにして、明日 {b}。', "Let's stop here today and {b} tomorrow."],
+      ['友達もいるから、いっしょに {b}。', "A friend is here too, so let's {b} together."],
     ],
   },
   'polite-volitional': {
     general: [
-      ["時間がありますから、いっしょに {b}。", "We have time, so let's {b} together."],
-      ["次は、この例文で {b}。", "Next, let's {b} with this example sentence."],
-      ["もう一度、ゆっくり {b}。", "Let's {b} once more, slowly."],
+      ['時間がありますから、いっしょに {b}。', "We have time, so let's {b} together."],
+      ['次は、この例文で {b}。', "Next, let's {b} with this example sentence."],
+      ['もう一度、ゆっくり {b}。', "Let's {b} once more, slowly."],
     ],
   },
   'conditional-tara': {
     general: [
       ['もし時間があったら、ここで {b}。', 'If I have time, I will {b} here.'],
-      ["宿題が終わったら、少し {b}。", "When my homework is done, I'll {b} a little."],
-      ["雨がやんだら、外で {b}。", "When the rain stops, I'll {b} outside."],
+      ['宿題が終わったら、少し {b}。', "When my homework is done, I'll {b} a little."],
+      ['雨がやんだら、外で {b}。', "When the rain stops, I'll {b} outside."],
     ],
   },
   'conditional-ba': {
     general: [
       ['毎日 {b}、だんだん上手になります。', 'If I {b} every day, I gradually improve.'],
       ['早く {b}、あとで楽になります。', 'If I {b} early, things get easier later.'],
-      ["友達と {b}、もっと楽しいです。", "If I {b} with a friend, it's more fun."],
+      ['友達と {b}、もっと楽しいです。', "If I {b} with a friend, it's more fun."],
     ],
   },
   desiderative: {
@@ -421,20 +448,20 @@ const VERB_FRAMES = {
   },
   'desiderative-negative': {
     general: [
-      ["今日は疲れているので、あまり {b}です。", "I'm tired today, so I really {b}."],
+      ['今日は疲れているので、あまり {b}です。', "I'm tired today, so I really {b}."],
       ['雨の日は、外で {b}です。', 'On rainy days, I {b} outside.'],
       ['今は一人で {b}です。', 'Right now, I {b} on my own.'],
     ],
   },
   progressive: {
     general: [
-      ["今、となりの部屋で {b}。", "Right now, I'm {b} in the next room."],
-      ["最近、毎日少しずつ {b}。", "Lately, I've been {b} a little every day."],
-      ["まだ途中なので、今も {b}。", "I'm still in the middle, so I'm {b} now too."],
+      ['今、となりの部屋で {b}。', "Right now, I'm {b} in the next room."],
+      ['最近、毎日少しずつ {b}。', "Lately, I've been {b} a little every day."],
+      ['まだ途中なので、今も {b}。', "I'm still in the middle, so I'm {b} now too."],
     ],
     study: [
-      ["今、図書館で {b}。", "Right now, I'm {b} at the library."],
-      ["最近、この文法を {b}。", "Lately, I've been {b} this grammar."],
+      ['今、図書館で {b}。', "Right now, I'm {b} at the library."],
+      ['最近、この文法を {b}。', "Lately, I've been {b} this grammar."],
     ],
   },
 };
@@ -442,7 +469,7 @@ const VERB_FRAMES = {
 const ADJ_PRESENT = [
   ['このカフェはとても {b}。', 'This cafe is very {b}.'],
   ['駅の近くの店は {b}。', 'The shop near the station is {b}.'],
-  ["このアプリの練習はけっこう {b}。", "This app's practice is quite {b}."],
+  ['このアプリの練習はけっこう {b}。', "This app's practice is quite {b}."],
 ];
 
 const ADJ_FRAMES = {
@@ -454,39 +481,39 @@ const ADJ_FRAMES = {
     ['昨日の部屋は少し {b}。', "Yesterday's room was a little {b}."],
   ],
   'adj-plain-negative': [
-    ["この道はあまり {b}。", "This road isn't very {b}."],
-    ["今日の宿題はそんなに {b}。", "Today's homework isn't that {b}."],
-    ["この店は思ったほど {b}。", "This shop isn't as {b} as I expected."],
+    ['この道はあまり {b}。', "This road isn't very {b}."],
+    ['今日の宿題はそんなに {b}。', "Today's homework isn't that {b}."],
+    ['この店は思ったほど {b}。', "This shop isn't as {b} as I expected."],
   ],
   'adj-plain-past-negative': [
-    ["昨日の映画はあまり {b}。", "Yesterday's movie wasn't very {b}."],
-    ["先週のテストは思ったほど {b}。", "Last week's test wasn't as {b} as I expected."],
-    ["朝の電車はそんなに {b}。", "The morning train wasn't that {b}."],
+    ['昨日の映画はあまり {b}。', "Yesterday's movie wasn't very {b}."],
+    ['先週のテストは思ったほど {b}。', "Last week's test wasn't as {b} as I expected."],
+    ['朝の電車はそんなに {b}。', "The morning train wasn't that {b}."],
   ],
   'adj-polite-past': [
-    ["昨日の天気は本当に {b}。", "Yesterday's weather was really {b}."],
-    ["先週の授業は思ったより {b}。", "Last week's class was more {b} than I expected."],
+    ['昨日の天気は本当に {b}。', "Yesterday's weather was really {b}."],
+    ['先週の授業は思ったより {b}。', "Last week's class was more {b} than I expected."],
     ['この前の旅行はとても {b}。', 'The recent trip was very {b}.'],
   ],
   'adj-polite-negative': [
-    ["この問題はあまり {b}。", "This problem isn't very {b}."],
-    ["今日は駅前がそんなに {b}。", "Today the area by the station isn't that {b}."],
-    ["この説明はまだ十分に {b}。", "This explanation isn't fully {b} yet."],
+    ['この問題はあまり {b}。', "This problem isn't very {b}."],
+    ['今日は駅前がそんなに {b}。', "Today the area by the station isn't that {b}."],
+    ['この説明はまだ十分に {b}。', "This explanation isn't fully {b} yet."],
   ],
   'adj-polite-past-negative': [
-    ["昨日の道はあまり {b}。", "Yesterday's road wasn't very {b}."],
-    ["先週の部屋はそんなに {b}。", "Last week's room wasn't that {b}."],
-    ["その答えは十分に {b}。", "That answer wasn't sufficiently {b}."],
+    ['昨日の道はあまり {b}。', "Yesterday's road wasn't very {b}."],
+    ['先週の部屋はそんなに {b}。', "Last week's room wasn't that {b}."],
+    ['その答えは十分に {b}。', "That answer wasn't sufficiently {b}."],
   ],
   'adj-te-form': [
     ['この町は {b}、住みやすいです。', 'This town is {b} and easy to live in.'],
     ['説明が {b}、よく分かりました。', 'The explanation was {b}, so I understood it well.'],
-    ["部屋が {b}、勉強しやすいです。", "The room is {b}, so it's easy to study."],
+    ['部屋が {b}、勉強しやすいです。', "The room is {b}, so it's easy to study."],
   ],
   'adj-adverb': [
     ['先生は {b}話しました。', 'The teacher spoke in a {b} way.'],
     ['この字を {b}書いてください。', 'Please write this character in a {b} way.'],
-    ["今日は {b}練習しましょう。", "Let's practice in a {b} way today."],
+    ['今日は {b}練習しましょう。', "Let's practice in a {b} way today."],
   ],
   'adj-sou': [
     ['この料理はとても {b}ですね。', 'This food looks very {b}.'],
@@ -502,7 +529,10 @@ const ADJ_FRAMES = {
 
 const ADVANCED_VERB_FALLBACKS = [
   ['この文では、自然な流れで {b}。', 'In this sentence, the verb to use is "to {b}".'],
-  ['会話の中で、先生がこの形を使って {b}。', 'In conversation, this example uses the verb "to {b}".'],
+  [
+    '会話の中で、先生がこの形を使って {b}。',
+    'In conversation, this example uses the verb "to {b}".',
+  ],
   ['例文をよく読んで、ここに {b}。', 'Read the example, then fill the blank with "to {b}".'],
 ];
 
@@ -559,38 +589,59 @@ function cueFor(word, type) {
   return 'Use the requested target form to complete the cued sentence.';
 }
 
+// Transitive passive: a direct passive with an agent reads naturally.
+const PASSIVE_TRANSITIVE_FRAMES = [
+  ['昨日、先生に {b}。', 'Yesterday, I was {b} by the teacher.'],
+  ['会議で、名前を {b}。', 'In the meeting, a name was {b}.'],
+  ['駅で知らない人に {b}。', 'At the station, I was {b} by a stranger.'],
+];
+
+// Intransitive (suffering) passive: someone's action affects the speaker. The
+// slot is a simple-past verb, so "a friend {went home} on me" stays grammatical.
+const PASSIVE_INTRANSITIVE_FRAMES = [
+  ['その日、友達に {b}。', 'That day, a friend {b} on me.'],
+  ['朝早く、子どもに {b}。', 'Early in the morning, the child {b} on me.'],
+  ['困ったことに、雨に {b}。', 'To my dismay, it {b} on me.'],
+];
+
+const CAUSATIVE_FRAMES = [
+  ['先生は学生にもう一度 {b}。', 'The teacher has the student {b} once more.'],
+  ['母は子どもに先に {b}。', 'The mother has the child {b} first.'],
+  ['先輩は後輩にゆっくり {b}。', 'The senior has the junior {b} slowly.'],
+];
+
+const IMPERATIVE_FRAMES = [
+  ['急いで、ここで {b}。', 'Hurry and {b} here.'],
+  ['忘れないで、今すぐ {b}。', "Don't forget — {b} right now."],
+  ['前を見て、まっすぐ {b}。', 'Look ahead and {b} straight on.'],
+];
+
+// Transitive negative-te frames can carry an object; intransitive ones cannot.
+const NEGATIVE_TE_TRANSITIVE_FRAMES = [
+  ['今日は {b}、早く寝ました。', 'Today, without {b}, I went to bed early.'],
+  ['何も {b}、そのまま出ました。', 'Without {b} anything, I left as I was.'],
+  ['朝ごはんを {b}、学校に行きました。', 'I went to school without {b} breakfast.'],
+];
+
+const NEGATIVE_TE_INTRANSITIVE_FRAMES = [
+  ['今日は {b}、早く寝ました。', 'Today, without {b}, I went to bed early.'],
+  ['その日は {b}、すぐに出かけました。', 'That day, without {b}, I went out right away.'],
+  ['結局 {b}、家にいました。', 'In the end, without {b}, I stayed home.'],
+];
+
 function frameOptionsFor(word, type, bucket) {
   const direct = type.startsWith('adj-') ? ADJ_FRAMES[type] : VERB_FRAMES[type];
   if (direct) return contextOptions(direct, bucket);
 
   if (type.startsWith('adj-')) return ADVANCED_ADJ_FALLBACKS;
+  const transitive = isTransitiveWord(word);
   if (type.includes('passive')) {
-    return [
-      ['昨日、先生に {b}。', 'Yesterday, I was {b} by the teacher.'],
-      ['会議で、名前を {b}。', 'In the meeting, a name was {b}.'],
-      ['駅で知らない人に {b}。', 'At the station, I was {b} by a stranger.'],
-    ];
+    return transitive ? PASSIVE_TRANSITIVE_FRAMES : PASSIVE_INTRANSITIVE_FRAMES;
   }
-  if (type.includes('causative')) {
-    return [
-      ['先生は学生にもう一度 {b}。', 'The teacher has the student {b} once more.'],
-      ['母は子どもに先に {b}。', 'The mother has the child {b} first.'],
-      ['先輩は後輩にゆっくり {b}。', 'The senior has the junior {b} slowly.'],
-    ];
-  }
-  if (type.includes('imperative') || type.includes('command')) {
-    return [
-      ['急いで、ここで {b}。', 'Hurry and {b} here.'],
-      ["忘れないで、今すぐ {b}。", "Don't forget — {b} right now."],
-      ['前を見て、まっすぐ {b}。', 'Look ahead and {b} straight on.'],
-    ];
-  }
+  if (type.includes('causative')) return CAUSATIVE_FRAMES;
+  if (type.includes('imperative') || type.includes('command')) return IMPERATIVE_FRAMES;
   if (type.includes('negative-te') || type === 'negative-zuni') {
-    return [
-      ['今日は {b}、早く寝ました。', 'Today, without {b}, I went to bed early.'],
-      ['何も {b}、そのまま出ました。', 'Without {b} anything, I left as I was.'],
-      ['朝ごはんを {b}、学校に行きました。', 'I went to school without {b} breakfast.'],
-    ];
+    return transitive ? NEGATIVE_TE_TRANSITIVE_FRAMES : NEGATIVE_TE_INTRANSITIVE_FRAMES;
   }
   return ADVANCED_VERB_FALLBACKS;
 }
