@@ -1452,6 +1452,11 @@ function selectionReasonFor(candidate, bucket) {
   if (bucket === 'retry') return 'Recent miss returning';
   if (bucket === 'skill') {
     const familyLabel = formFamilyForType(candidate?.type || '')?.label;
+    // A never-attempted family enters skill selection at neutral score; frame it as
+    // an introduction rather than strengthening so the coach strip stays truthful.
+    if (candidate?.familySkillStatus === 'untested') {
+      return familyLabel ? `Introducing ${familyLabel}` : 'New enabled form';
+    }
     return familyLabel ? `Strengthening ${familyLabel}` : 'Strengthening enabled category';
   }
   if (bucket === 'fresh') return 'New enabled form';
@@ -1520,17 +1525,24 @@ export function selectNext(
     : [];
   const retryCandidateIds = new Set(retry.map((p) => p.id));
   const recentIds = new Set((options.recentCardIds || []).filter(Boolean));
+  // Untested enabled families are neutral (familySkillScore 50), so they belong in
+  // the lowest-skill-first selection alongside started families. During the beginner
+  // ladder they stay out of skill so pickFreshReview's stage ordering still drives
+  // onboarding; once the ladder is done they interleave by neutral skill.
+  const beginnerLadderActive =
+    options.beginnerLadder && reviewedCardCount(state) < BEGINNER_LADDER_CARD_COUNT;
   const skill = [...reviewed, ...fresh]
-    .filter((p) => !retryCandidateIds.has(p.id) && p.familySkillStatus !== 'untested')
+    .filter(
+      (p) =>
+        !retryCandidateIds.has(p.id) &&
+        (!beginnerLadderActive || p.familySkillStatus !== 'untested'),
+    )
     .filter((p, index, arr) => arr.findIndex((item) => item.id === p.id) === index);
   const hasReviewFallback = fresh.length || nearDue.length || future.length;
   // Keep recently shown skill cards out of rotation by card count (they reappear
   // roughly five cards later), not by wall-clock time.
   const readySkill = hasReviewFallback ? skill.filter((p) => !recentIds.has(p.id)) : skill;
-  const openBeginnerStage =
-    options.beginnerLadder && reviewedCardCount(state) < BEGINNER_LADDER_CARD_COUNT
-      ? openBeginnerLadderStage(pool, state)
-      : -1;
+  const openBeginnerStage = beginnerLadderActive ? openBeginnerLadderStage(pool, state) : -1;
   const lastFamilyId =
     options.lastFamilyId ||
     familyIdFromCardId((options.recentCardIds || []).find(Boolean) || lastCardId);
