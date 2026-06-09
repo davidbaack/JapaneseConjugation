@@ -843,7 +843,7 @@ describe('word-form SRS selection', () => {
     };
     const card = selectNext(state, [TABERU, KAKU], ['plain-past'], null, DEFAULT_PREFS);
     expect(card.id).toBe(cardIdFor(KAKU, 'plain-past'));
-    expect(card.selectionReason).toBe('New enabled form');
+    expect(card.selectionReason).toBe('Introducing Te/Ta Sound Changes');
   });
 
   it('can still schedule due cards by exact word-form card id when explicitly requested', () => {
@@ -929,7 +929,7 @@ describe('word-form SRS selection', () => {
     );
 
     expect(card.verb).toBe(earlyWord);
-    expect(card.selectionReason).toBe('New enabled form');
+    expect(card.selectionReason).toBe('Introducing Te/Ta Sound Changes');
   });
 
   it('ladders fresh Core Warmup through regular ichidan and godan before irregulars', () => {
@@ -1038,6 +1038,32 @@ describe('word-form SRS selection', () => {
 
     expect(card.type).toBe('plain-negative');
     expect(card.selectionReason).toBe('Strengthening Basics & Politeness');
+  });
+
+  it('surfaces a neutral untested enabled family ahead of a higher-skill started family', () => {
+    const now = Date.now();
+    const strongTe = cardIdFor(KAKU, 'te-form');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [strongTe]: {
+          reps: 5,
+          interval: 8,
+          ease: 2.5,
+          nextReview: now + DAY,
+          correct: 5,
+          incorrect: 0,
+          lastSeen: now - DAY,
+        },
+      },
+    };
+
+    // 'volitional' (Volitional & Desire) is enabled but never attempted, so it is
+    // neutral (skill 50) and should beat the high-skill Te/Ta family.
+    const card = selectNext(state, [TABERU, KAKU], ['te-form', 'volitional'], null, DEFAULT_PREFS);
+
+    expect(card.type).toBe('volitional');
+    expect(card.selectionReason).toBe('Introducing Volitional & Desire');
   });
 
   it('avoids repeating the same family back-to-back when another enabled family is available', () => {
