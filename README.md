@@ -1,16 +1,17 @@
 # Katachiya - Japanese Conjugation Practice
 
 Katachiya is a React/Vite progressive web app for learning Japanese verb and
-adjective conjugation through Practice-first workouts. The app is still in
+adjective conjugation through a Practice-first continuous loop. The app is still in
 active product development, so this README describes the current learner-facing
 surface rather than preserving older navigation names.
 
 The current app shape is:
 
 - **Practice** - the landing page and main learner loop.
+- **Guide** - scaffolded step-by-step conjugation practice.
 - **Stats** - progress, recommendations, upcoming reviews, and readiness.
 - **Learn** - formation lessons and guided tracks for every app form.
-- **Drills** - focused exercises for endings, group recognition, and speed.
+- **Drills** - focused exercises for endings, transformations, groups, and speed.
 - **Tools** - lookup, word management, saved lists, and custom words.
 - **Settings** - durable display, audio, sync, backup, and reset preferences.
 
@@ -18,20 +19,23 @@ The current app shape is:
 
 ### Practice
 
-Practice opens directly into the default workout when cards are available. The
-active workout shows session-card progress, ready-card progress when cards are
-due, the current prompt, answer controls, and a persistent Practice map. Focused
-"Practice this" launches from Learn, Drills, or Tools route straight into their
-targeted cards and stay focused until the learner exits the banner.
+Practice opens directly into the next continuous card when cards are available.
+The active card shows the current prompt, answer controls, a compact Practice
+run strip with cards practiced, missed count, streak, and why the card appeared,
+plus access to the persistent Practice map. Focused "Practice this" launches
+from Learn, Drills, Guide, or Tools route straight into targeted cards and stay
+focused until the learner exits the banner.
 
-The workout stream prioritizes ready cards, then fills the session with recent
-misses and varied words in the same weak patterns. A normal workout target is 12
-cards, and completion leads with "Map updated" plus a next-workout action.
+Default Practice is continuous: it has no 12-card target, daily-goal stop, or
+completion summary. Selection favors the lowest-skill enabled families, delayed
+retry of recent misses, and varied words in the same weak patterns. SRS review
+data still exists for planning, but due cards do not drive the default queue.
 
 Practice has a persistent map for form scope. It shows every form family,
-expanded exact-form toggles, and recent weak spots once there is data. Word
-removal on the active card updates the same durable word-exclusion state managed
-from Tools, and removed words can be restored there.
+including disabled and untried families, expanded exact-form toggles, lifetime
+right/wrong counts, skill visualization, and subgroup weakness rows once there
+is data. Word removal on the active card updates the same durable word-exclusion
+state managed from Tools, and removed words can be restored there.
 
 Active cards support typed answers, multiple choice, self-check, and spoken
 answers; forward production, reading/reverse practice, and automatic mixing;
@@ -40,11 +44,19 @@ hide/show behavior and Reveal next kana controls; deterministic hints; optional
 sentence-mode cloze prompts; speech playback; and optional Gemini clue/chat
 support.
 
+### Guide
+
+Guide is a scaffolded practice mode for building one conjugation step by step.
+Each card asks the learner to recover the base form, identify the word group,
+and produce the target conjugation before one final submit. Hints and skips mark
+assisted steps, the guided set tracks accuracy, and completed guided cards can
+count toward Practice progress while recording step-level diagnostics.
+
 ### Stats
 
-Stats keeps progress and planning information out of the active workout. It
-shows the Practice pulse, ready cards, daily progress, recent misses,
-recommended practice from Learn and Drills, upcoming review timing, and
+Stats keeps progress and planning information out of active Practice. It
+shows the Practice pulse, ready cards, continuous cards practiced, recent
+misses, recommended practice from Learn and Drills, upcoming review timing, and
 form-family readiness once the learner has enough history. Readiness gaps can
 launch focused Practice or route the learner to the matching Drill, such as
 Ending Lab, Groups, or Rush.
@@ -59,12 +71,12 @@ forms.
 
 Learn has guided tracks, a formation-key reference, searchable lesson sections,
 and a Send all to Practice action. Individual lessons and tracks can hand a
-focused recommended set back to Practice, but Learn does not gate workouts.
+focused recommended set back to Practice, but Learn does not gate Practice.
 
 ### Tools
 
 Tools keeps lookup, durable word management, saved lists, custom vocabulary, and
-word-level targeted Practice outside the main workout.
+word-level targeted Practice outside the main Practice loop.
 
 - **Lookup / Check** searches dictionary words or real conjugated forms, accepts
   romaji/kana/kanji input, shows exact and near matches, displays form tables,
@@ -80,12 +92,14 @@ word-level targeted Practice outside the main workout.
 
 ### Drills
 
-Drills keeps specialized exercises outside the main workout while still allowing
+Drills keeps specialized exercises outside the main Practice loop while still allowing
 focused work to be sent back to Practice.
 
 - **Ending Lab** drills te-form/plain-past sound changes and plain/polite
   register switching with hints, pattern maps, register maps, streaks, and
   optional AI memory hooks.
+- **Transform** practices form-to-form transformations outside the main
+  dictionary-form Practice loop.
 - **Groups** drills group recognition before conjugation, including verb and
   adjective categories, decoder hints, per-group accuracy, and optional Gemini
   explanations.
@@ -164,13 +178,14 @@ The deterministic dev page listens at
 | `npm run test:e2e` | Run Playwright E2E tests. Set `PW_PROJECT=chromium` in PowerShell to scope a run. |
 | `npm run lint` | Lint the project with ESLint. |
 | `npm run typecheck` | Run app, tooling, and Supabase TypeScript checks. |
-| `npm run typecheck:app` | Run TypeScript checking for the app config. |
+| `npm run typecheck:app` | Run strict TypeScript checking for the app seed surface. |
 | `npm run typecheck:tooling` | Run TypeScript checking for scripts/tooling. |
 | `npm run typecheck:supabase` | Run TypeScript checking for Supabase functions. |
 | `npm run format` | Format source JavaScript/JSX, E2E, scripts, Supabase functions, and root JS/TS files with Prettier. |
 | `npm run format:check` | Check source formatting. |
 | `npm run vocab:build` | Regenerate `public/data/verb-lexicon.json`. |
 | `npm run sentences:batches` | Emit batch files of pending `(word, conjugation)` pairs for the tailored sentence library. See [docs/sentence-library.md](docs/sentence-library.md). |
+| `npm run sentences:english` | Rewrite legacy generated sentence-library outputs with natural English glosses. See [docs/sentence-library.md](docs/sentence-library.md). |
 | `npm run sentences:import` | Validate generated sentences and upsert them to Supabase. See [docs/sentence-library.md](docs/sentence-library.md). |
 | `npm run size` | Check bundle budget after a build. |
 | `npm run ci:fast` | Run format check, lint, typecheck, and unit tests. |
@@ -267,7 +282,7 @@ src/
   i18n/         String catalog and translation helper
   state/        Global app state provider and cloud/auth wiring
   utils/        Conjugation, scheduling, storage, display, romaji, AI, speech, backup, drill logic
-  views/        Practice, Stats, Learn, Drills, Tools, Settings, and nested surfaces
+  views/        Practice, Guide, Stats, Learn, Drills, Tools, Settings, and nested surfaces
   __tests__/    Vitest tests
 e2e/            Playwright E2E tests
 public/         PWA icons, Apple touch icon, and generated vocabulary data

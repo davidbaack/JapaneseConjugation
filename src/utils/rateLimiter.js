@@ -8,6 +8,7 @@
 // error the UI can surface.
 
 export class RateLimitError extends Error {
+  /** @param {number} retryAfterMs */
   constructor(retryAfterMs) {
     super('Too many AI requests in a short time — please wait a moment and try again.');
     this.name = 'RateLimitError';
@@ -18,6 +19,12 @@ export class RateLimitError extends Error {
 // A classic token bucket: `capacity` tokens, refilling at `refillPerMs` per ms.
 // `take()` consumes one if available; `retryAfter()` reports how long until the
 // next token. `now` is injectable for deterministic tests.
+/**
+ * @param {Object} [options]
+ * @param {number} [options.capacity]
+ * @param {number} [options.refillPerMs]
+ * @param {() => number} [options.now]
+ */
 export function createTokenBucket({
   capacity = 5,
   refillPerMs = 1 / 2000, // one token every 2s → ~0.5 sustained req/s, burst of 5
@@ -60,6 +67,9 @@ const aiBucket = createTokenBucket();
 
 // Consume one AI token or throw RateLimitError. Call this immediately before
 // dispatching a Gemini request.
+/**
+ * @param {{ take: () => boolean, retryAfter: () => number }} [bucket]
+ */
 export function guardAIRequest(bucket = aiBucket) {
   if (!bucket.take()) {
     throw new RateLimitError(bucket.retryAfter());

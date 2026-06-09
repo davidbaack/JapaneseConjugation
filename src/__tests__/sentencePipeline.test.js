@@ -57,7 +57,7 @@ describe('buildPair', () => {
 
 describe('validateGenerated', () => {
   it('accepts a well-formed entry and builds the row', () => {
-    const result = validateGenerated(TABERU, 'plain-past', validOut());
+    const result = /** @type {any} */ (validateGenerated(TABERU, 'plain-past', validOut()));
     expect(result.ok).toBe(true);
     expect(result.row).toMatchObject({
       word_key: 'ichidan:食べる',
@@ -82,7 +82,9 @@ describe('validateGenerated', () => {
 
   it('rejects a missing or multiple placeholder', () => {
     const noPlaceholder = validOut({ segments: [{ t: '今日', r: 'きょう' }] });
-    expect(validateGenerated(TABERU, 'plain-past', noPlaceholder).reason).toBe('placeholder-count');
+    expect(/** @type {any} */ (validateGenerated(TABERU, 'plain-past', noPlaceholder)).reason).toBe(
+      'placeholder-count',
+    );
   });
 
   it('rejects non-kana readings', () => {
@@ -96,12 +98,18 @@ describe('validateGenerated', () => {
       ],
       ja: '今日、ごはんを食べた。',
     });
-    expect(validateGenerated(TABERU, 'plain-past', out).reason).toBe('non-kana-reading');
+    expect(/** @type {any} */ (validateGenerated(TABERU, 'plain-past', out)).reason).toBe(
+      'non-kana-reading',
+    );
   });
 
   it('rejects empty/garbage output', () => {
-    expect(validateGenerated(TABERU, 'plain-past', null).reason).toBe('not-an-object');
-    expect(validateGenerated(TABERU, 'plain-past', validOut({ en: '' })).reason).toBe('no-en');
+    expect(/** @type {any} */ (validateGenerated(TABERU, 'plain-past', null)).reason).toBe(
+      'not-an-object',
+    );
+    expect(
+      /** @type {any} */ (validateGenerated(TABERU, 'plain-past', validOut({ en: '' }))).reason,
+    ).toBe('no-en');
   });
 });
 
@@ -120,7 +128,7 @@ describe('buildSegments', () => {
   ];
 
   it('collapses the multi-token conjugated run into one placeholder', () => {
-    const result = buildSegments(TOKENS, '買わない');
+    const result = /** @type {any} */ (buildSegments(TOKENS, '買わない'));
     expect(result.ok).toBe(true);
     // Kanji tokens keep readings; kana tokens drop them; one {w:true}.
     expect(result.segments).toEqual([
@@ -137,19 +145,21 @@ describe('buildSegments', () => {
 
   it('produces segments that pass validateGenerated', () => {
     const KAU = { dict: '買う', reading: 'かう', meaning: 'to buy', group: 'godan' };
-    const { segments } = buildSegments(TOKENS, '買わない');
-    const result = validateGenerated(KAU, 'plain-negative', {
-      ja: '雨の日は、たいてい買わない。',
-      en: "On rainy days, I usually don't buy.",
-      segments,
-    });
+    const { segments } = /** @type {any} */ (buildSegments(TOKENS, '買わない'));
+    const result = /** @type {any} */ (
+      validateGenerated(KAU, 'plain-negative', {
+        ja: '雨の日は、たいてい買わない。',
+        en: "On rainy days, I usually don't buy.",
+        segments,
+      })
+    );
     expect(result.ok).toBe(true);
     expect(result.row.ja_template).toBe('雨の日は、たいてい{w}。');
   });
 
   it('fails when the form is not aligned to token boundaries', () => {
-    expect(buildSegments(TOKENS, '買う').ok).toBe(false);
-    expect(buildSegments([], '買う').reason).toBe('no-tokens');
+    expect(/** @type {any} */ (buildSegments(TOKENS, '買う')).ok).toBe(false);
+    expect(/** @type {any} */ (buildSegments([], '買う')).reason).toBe('no-tokens');
   });
 });
 
@@ -185,14 +195,16 @@ describe('englishQualityIssue', () => {
 
   it('is enforced by validateGenerated', () => {
     const KAU = { dict: '買う', reading: 'かう', meaning: 'to buy', group: 'godan' };
-    const { segments } = buildSegments(
-      [
-        { surface: '私', reading: 'わたし' },
-        { surface: 'は', reading: '' },
-        { surface: '買わない', reading: '' },
-        { surface: '。', reading: '' },
-      ],
-      '買わない',
+    const { segments } = /** @type {any} */ (
+      buildSegments(
+        [
+          { surface: '私', reading: 'わたし' },
+          { surface: 'は', reading: '' },
+          { surface: '買わない', reading: '' },
+          { surface: '。', reading: '' },
+        ],
+        '買わない',
+      )
     );
     const result = validateGenerated(KAU, 'plain-negative', {
       ja: '私は買わない。',
