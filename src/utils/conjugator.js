@@ -172,19 +172,16 @@ export function typePreviewValues(typeId) {
     .filter((x) => x.answer);
 }
 
-// A handful of stative verbs are defective: the conjugation rules can
-// mechanically build advanced forms (あれる, あろう, あらせる, ありたい, あっている…)
-// but those don't occur in natural Japanese, so the app must never select or
-// present them. Restrict these exact words to the forms that genuinely exist.
-// Matched by word key so true verbs that merely share a reading are unaffected
-// (e.g. 煎る/炒る "to roast" read いる, 居る is the normal ichidan existence verb).
-const DEFECTIVE_STATIVE_KEYS = new Set([
-  'godan:在る', // ある — to exist/live
-  'godan:有る', // ある — to be/have
-  'godan:ある', // ある (kana)
-  'godan:要る', // いる — to need
-]);
-const STATIVE_NATURAL_TYPE_IDS = new Set([
+// Several stative verbs are defective: the conjugation rules can mechanically
+// build advanced forms (あれる, あろう, あらせる, ありたい…) that don't occur in
+// natural Japanese, so the app must never select or present them. Each verb is
+// restricted to the forms that genuinely exist, by profile:
+//   - existence (ある, 要る): basic tenses, te-form, conditionals, conjectural.
+//   - stative w/ progressive (できる, 見える, わかる…): the above plus ～ている.
+//   - cognition (分かる): the above plus causative (わからせる is real).
+// Matched by exact word key so true verbs that merely share a reading keep all
+// forms (煎る/炒る/煮る, and 居る the normal ichidan existence verb).
+const STATIVE_BASE_FORMS = [
   'plain-present',
   'plain-past',
   'plain-negative',
@@ -200,17 +197,62 @@ const STATIVE_NATURAL_TYPE_IDS = new Set([
   'negative-conditional-ba',
   'conditional-nara',
   'conjectural',
+];
+const PROGRESSIVE_FORMS = [
+  'progressive',
+  'progressive-polite',
+  'progressive-negative',
+  'progressive-polite-negative',
+  'progressive-past',
+  'progressive-polite-past',
+  'progressive-past-negative',
+  'progressive-polite-past-negative',
+];
+const CAUSATIVE_FORMS = [
+  'causative',
+  'causative-polite',
+  'causative-negative',
+  'causative-polite-negative',
+  'causative-polite-past',
+  'causative-polite-past-negative',
+  'causative-past',
+  'causative-past-negative',
+  'causative-conditional-ba',
+  'causative-negative-conditional-ba',
+];
+
+const STATIVE_EXISTENCE = new Set(STATIVE_BASE_FORMS);
+const STATIVE_PROGRESSIVE = new Set([...STATIVE_BASE_FORMS, ...PROGRESSIVE_FORMS]);
+const STATIVE_COGNITION = new Set([
+  ...STATIVE_BASE_FORMS,
+  ...PROGRESSIVE_FORMS,
+  ...CAUSATIVE_FORMS,
 ]);
 
-function isDefectiveStative(item) {
-  return DEFECTIVE_STATIVE_KEYS.has(wordKey(item));
+const DEFECTIVE_STATIVE_FORMS = new Map([
+  ['godan:在る', STATIVE_EXISTENCE], // ある — to exist/live
+  ['godan:有る', STATIVE_EXISTENCE], // ある — to be/have
+  ['godan:ある', STATIVE_EXISTENCE], // ある (kana)
+  ['godan:要る', STATIVE_EXISTENCE], // いる — to need
+  ['godan:違う', STATIVE_PROGRESSIVE], // to differ / be wrong
+  ['ichidan:できる', STATIVE_PROGRESSIVE], // to be able to
+  ['ichidan:見える', STATIVE_PROGRESSIVE], // to be visible
+  ['ichidan:聞こえる', STATIVE_PROGRESSIVE], // to be audible
+  ['ichidan:足りる', STATIVE_PROGRESSIVE], // to be enough
+  ['ichidan:似る', STATIVE_PROGRESSIVE], // to resemble
+  ['ichidan:優れる', STATIVE_PROGRESSIVE], // to excel
+  ['godan:異なる', STATIVE_PROGRESSIVE], // to differ (formal)
+  ['godan:分かる', STATIVE_COGNITION], // to understand (keeps わからせる)
+]);
+
+function defectiveStativeForms(item) {
+  return DEFECTIVE_STATIVE_FORMS.get(wordKey(item)) || null;
 }
 
 export function compatibleTypes(item) {
   if (isAdjective(item)) return ADJ_TYPES;
-  if (isDefectiveStative(item)) {
-    return CONJ_TYPES.filter((t) => STATIVE_NATURAL_TYPE_IDS.has(t.id));
-  }
+  const allowed = defectiveStativeForms(item);
+  if (allowed) return CONJ_TYPES.filter((t) => allowed.has(t.id));
   return CONJ_TYPES;
 }
 
