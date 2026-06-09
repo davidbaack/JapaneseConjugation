@@ -36,11 +36,11 @@ export function buildContext(
   const opener = gotItRight
     ? `I'm studying Japanese and just got this right.`
     : wasCorrected
-      ? `I'm studying Japanese. I made a mistake mid-typing but self-corrected to the right answer — it still counts as wrong.`
+      ? `I'm studying Japanese. I reached the right answer after self-correcting or using a hint, and it still counted as wrong.`
       : `I'm studying Japanese and just got this wrong.`;
-  const answerLabel = wasCorrected ? 'My answer when I went wrong' : 'My answer';
+  const answerLabel = wasCorrected ? 'My reviewed answer' : 'My answer';
   const correctedNote = wasCorrected
-    ? `\nSelf-correction: I later typed the right answer before submitting, but the initial mistake counted.`
+    ? `\nAssisted correction: I either self-corrected or used a hint before the final answer, and the attempt counted as wrong.`
     : '';
   const reviewRequest = gotItRight
     ? 'Help me understand why this answer is correct and how to remember this form.'

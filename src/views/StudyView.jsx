@@ -388,7 +388,7 @@ function snapshotPracticePrefs(prefs = DEFAULT_PREFS) {
   };
 }
 
-function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
+function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, footer }) {
   const [chatOpen, setChatOpen] = useState(false);
   if (!record) return null;
 
@@ -449,12 +449,13 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
             {record.correct
               ? 'Correct!'
               : record.wasCorrected
-                ? 'Self-corrected.'
+                ? 'Assisted correction.'
                 : 'Review this form.'}
           </h3>
           {record.wasCorrected && (
             <div className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
-              You fixed it mid-type, but the mistake still counts.
+              You reached the right answer after self-correction or a hint, so this still counts for
+              review.
             </div>
           )}
 
@@ -495,6 +496,17 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
               <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
                 {targetEnglish}
               </div>
+              {autoAdvanceHint && (
+                <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-100/80 px-3 py-2 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+                  <span className="relative flex h-5 w-5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                    <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
+                      <IconCheck className="h-3 w-3" />
+                    </span>
+                  </span>
+                  Next card coming up...
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -743,6 +755,7 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
           )}
         </div>
       )}
+      {footer}
     </div>
   );
 }
@@ -756,11 +769,7 @@ function RunAnswerReviewItem({ record, geminiKey, onOpenLearn }) {
     : record.wasCorrected
       ? 'border-amber-200 text-amber-700 dark:border-amber-900 dark:text-amber-300'
       : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-300';
-  const statusLabel = record.correct
-    ? 'Correct'
-    : record.wasCorrected
-      ? 'Self-corrected'
-      : 'Missed';
+  const statusLabel = record.correct ? 'Correct' : record.wasCorrected ? 'Assisted' : 'Missed';
 
   return (
     <details className="group rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
@@ -1855,7 +1864,6 @@ export default function StudyView({ mode = 'practice' }) {
   const [phase, setPhase] = useState('answering');
   const [wasCorrect, setWasCorrect] = useState(false);
   const [wasCorrected, setWasCorrected] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   const [showPromptText, setShowPromptText] = useState(false);
   const [stepHint, setStepHint] = useState('');
   const [hintMasked, setHintMasked] = useState(false);
@@ -1919,6 +1927,9 @@ export default function StudyView({ mode = 'practice' }) {
   // review panel can show what was actually entered when it went wrong rather
   // than the live (possibly self-corrected) input.
   const wrongSnapshotRef = useRef(null);
+  // Learner-requested hint help keeps a later exact answer in the assisted
+  // bucket instead of counting it fully correct.
+  const usedHintRef = useRef(false);
   const typingHintRef = useRef(null);
 
   const enabledTypes = useMemo(() => {
@@ -2216,7 +2227,6 @@ export default function StudyView({ mode = 'practice' }) {
     setCurrent(null);
     setAnswer('');
     setPhase('answering');
-    setChatOpen(false);
     setStepHint('');
     setWasCorrect(false);
     setLastDiagnosis(null);
@@ -2229,7 +2239,6 @@ export default function StudyView({ mode = 'practice' }) {
     setCurrent(null);
     setAnswer('');
     setPhase('answering');
-    setChatOpen(false);
     setStepHint('');
     setWasCorrect(false);
     setLastDiagnosis(null);
@@ -2296,6 +2305,10 @@ export default function StudyView({ mode = 'practice' }) {
     setCoachRevealed(0);
     setGreenRevealed(0);
   }, [current?.id, answerMode]);
+
+  useEffect(() => {
+    usedHintRef.current = false;
+  }, [current?.id]);
 
   // Remember how many leading kana have turned green so they stay green through
   // a backspace and reappear as green immediately when re-typed.
@@ -2470,21 +2483,6 @@ export default function StudyView({ mode = 'practice' }) {
   const targetTypeInfo =
     targetTypeId === DICTIONARY_TYPE_ID ? DICTIONARY_TYPE_INFO : getTypeInfo(targetTypeId);
   const transformationRoute = transformationRouteText(sourceTypeInfo, targetTypeInfo);
-  const reviewExplanation =
-    phase === 'reviewing'
-      ? transformationReviewExplanation({
-          item: current.verb,
-          type: reverseDrill ? sourceTypeForReading : current.type,
-          reverseDrill,
-          sourceInfo: sourceTypeInfo,
-          targetInfo: targetTypeInfo,
-          sourceForm: promptSourceForm,
-          expected,
-        })
-      : null;
-  const explanation = !wasCorrect ? reviewExplanation : null;
-  const diagnostic =
-    phase === 'reviewing' && !wasCorrect && !revealedMiss ? lastDiagnosis?.feedback || '' : '';
   const choices = reverseDrill
     ? makeReverseChoices(current, practiceWords)
     : makeChoices(current, practiceWords);
@@ -2604,20 +2602,20 @@ export default function StudyView({ mode = 'practice' }) {
       : liveAnswerTone === 'correct'
         ? 'text-emerald-700 dark:text-emerald-400'
         : 'text-stone-500 dark:text-stone-400';
-  const reviewAnswerSource = phase === 'reviewing' && submittedAnswer ? submittedAnswer : answer;
-  const reviewKanaCells =
-    typedAnswerMode && !reverseDrill
-      ? kanaCoachCells(expected, reviewAnswerSource, coachRevealed)
-      : [];
-  const reviewSubmittedDisplay =
-    phase === 'reviewing' && submittedAnswer ? submittedAnswer.trim() : '';
-  const reviewSubmittedAnswer = reverseDrill
-    ? reviewSubmittedDisplay
-    : toHiragana(reviewSubmittedDisplay) || reviewSubmittedDisplay;
-  const reviewSubmittedComparison = reviewSubmittedAnswer || '(empty)';
-  const missedComparisonLabel = reviewChoiceLabel || revealedMiss ? 'You chose' : 'Your answer';
-  const missedComparisonValue =
-    reviewChoiceLabel || (revealedMiss ? "I don't know" : reviewSubmittedComparison);
+  // The in-session review panel renders through the shared RunAnswerReveal
+  // component (the same one the post-run review page uses), built from the
+  // canonical record shape so the two surfaces can never drift apart.
+  const reviewRecord =
+    phase === 'reviewing'
+      ? buildRunAnswerRecord({
+          correct: wasCorrect,
+          submittedAnswer,
+          reviewChoiceLabel,
+          revealedMiss,
+          wasCorrected,
+          mistakeDiagnosis: lastDiagnosis,
+        })
+      : null;
 
   function nextMinimalPairProgress(correct) {
     return recordMinimalPairResult(
@@ -2911,7 +2909,6 @@ export default function StudyView({ mode = 'practice' }) {
     recentCardIdsRef.current = [];
     setAnswer('');
     setPhase('answering');
-    setChatOpen(false);
     setCoachRevealed(0);
     setGreenRevealed(0);
     setRevealedMiss(false);
@@ -2923,6 +2920,7 @@ export default function StudyView({ mode = 'practice' }) {
     setCoachChatOpen(false);
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
+    usedHintRef.current = false;
     setWasCorrected(false);
     setWasCorrect(false);
     setCurrent(null);
@@ -2998,6 +2996,7 @@ export default function StudyView({ mode = 'practice' }) {
   // are masked on the first click; a second click reveals the spelled-out steps.
   function showStepHint() {
     if (!current) return;
+    usedHintRef.current = true;
     const reveal = hintRevealed || (!!stepHint && hintMasked);
     const baseHint = stepCoachHint(current.verb, current.type, answer, reveal);
     const nextHint = transformationMode
@@ -3016,12 +3015,19 @@ export default function StudyView({ mode = 'practice' }) {
     if (!current || reverseDrill || phase !== 'answering') return;
     const expectedChars = Array.from(expected);
     if (!expectedChars.length) return;
+    usedHintRef.current = true;
     const typedCount = Array.from(toHiraganaProgress(answer)).length;
     const nextCount = Math.min(expectedChars.length, Math.max(coachRevealed, typedCount) + 1);
     setCoachRevealed(nextCount);
     setGreenRevealed((prev) => Math.max(prev, nextCount));
     updateTypedAnswer(expectedChars.slice(0, nextCount).join(''));
     focusAnswerInput();
+  }
+
+  function revealKanaHint() {
+    if (!current || reverseDrill || phase !== 'answering') return;
+    usedHintRef.current = true;
+    setCoachRevealed(Math.min(expectedKanaCount, Math.max(coachRevealed, coachTypedCount) + 1));
   }
 
   // Opens a continuous AI chat for deeper help, seeded with the current
@@ -3039,7 +3045,6 @@ export default function StudyView({ mode = 'practice' }) {
     }
     if (options.spoken) stopSpeechRecognition();
     if (phase === 'reviewing') {
-      setChatOpen(false);
       setAnswer('');
       setCoachRevealed(0);
       setRevealedMiss(false);
@@ -3052,6 +3057,7 @@ export default function StudyView({ mode = 'practice' }) {
       setLastDiagnosis(null);
       hadKanaMistakeRef.current = false;
       wrongSnapshotRef.current = null;
+      usedHintRef.current = false;
       setWasCorrected(false);
       setPhase('answering');
       if (!reviewSetComplete && !reviewComplete) {
@@ -3072,7 +3078,7 @@ export default function StudyView({ mode = 'practice' }) {
       : spoken
         ? spokenAnswerResult(spokenAnswerTargets, raw).ok
         : normalized === expected;
-    const ok = finalOk && (spoken || !hadKanaMistakeRef.current);
+    const ok = finalOk && (spoken || (!hadKanaMistakeRef.current && !usedHintRef.current));
     if (choiceValue !== undefined) setAnswer(raw);
     const dict = current.verb.dict,
       rid = current.id;
@@ -3122,7 +3128,6 @@ export default function StudyView({ mode = 'practice' }) {
       }),
     );
     setState(nextState);
-    setChatOpen(false);
     setLastDiagnosis(mistakeDiagnosis);
     setReviewChoiceLabel('');
     setRevealedMiss(false);
@@ -3140,7 +3145,6 @@ export default function StudyView({ mode = 'practice' }) {
     if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
-        setChatOpen(false);
         setAnswer('');
         setCoachRevealed(0);
         setRevealedMiss(false);
@@ -3153,6 +3157,7 @@ export default function StudyView({ mode = 'practice' }) {
         setLastDiagnosis(null);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
+        usedHintRef.current = false;
         refocusAfterAutoAdvanceRef.current = true;
         setWasCorrected(false);
         setPhase('answering');
@@ -3184,7 +3189,6 @@ export default function StudyView({ mode = 'practice' }) {
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
     setState(nextState);
-    setChatOpen(false);
     setAnswer('');
     setCoachRevealed(0);
     setRevealedMiss(false);
@@ -3197,6 +3201,7 @@ export default function StudyView({ mode = 'practice' }) {
     setLastDiagnosis(null);
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
+    usedHintRef.current = false;
     setWasCorrected(false);
     setPhase('answering');
     setWasCorrect(false);
@@ -3278,7 +3283,6 @@ export default function StudyView({ mode = 'practice' }) {
     setReviewChoiceLabel(label);
     setRevealedMiss(!ok);
     setSelfCheckOpen(false);
-    setChatOpen(false);
     setLastDiagnosis(mistakeDiagnosis);
     setWasCorrect(ok);
     setPhase('reviewing');
@@ -3288,7 +3292,6 @@ export default function StudyView({ mode = 'practice' }) {
     if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
-        setChatOpen(false);
         setAnswer('');
         setCoachRevealed(0);
         setRevealedMiss(false);
@@ -3301,6 +3304,7 @@ export default function StudyView({ mode = 'practice' }) {
         setLastDiagnosis(null);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
+        usedHintRef.current = false;
         refocusAfterAutoAdvanceRef.current = true;
         setWasCorrected(false);
         setPhase('answering');
@@ -3368,7 +3372,6 @@ export default function StudyView({ mode = 'practice' }) {
     );
     setState(nextState);
     setAnswer('');
-    setChatOpen(false);
     setLastDiagnosis(mistakeDiagnosis);
     setReviewChoiceLabel("I don't know");
     setSelfCheckOpen(false);
@@ -4143,7 +4146,6 @@ export default function StudyView({ mode = 'practice' }) {
             {!hideEnglishMeaning && (
               <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
             )}
-
             {clozePrompt && (
               <div className="mx-auto mt-3 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
                 <ScriptDisplay
@@ -4159,6 +4161,7 @@ export default function StudyView({ mode = 'practice' }) {
                 )}
               </div>
             )}
+
             {phase === 'reviewing' && practicePrefs.showWordCategory && (
               <div className="text-xs text-stone-400 mt-1">
                 {groupDisplayLabel(current.verb.group)} · {wordType}
@@ -4613,14 +4616,7 @@ export default function StudyView({ mode = 'practice' }) {
                       </StickyAction>
                       <div className="mt-2 grid grid-cols-3 gap-2">
                         <button
-                          onClick={() =>
-                            setCoachRevealed(
-                              Math.min(
-                                expectedKanaCount,
-                                Math.max(coachRevealed, coachTypedCount) + 1,
-                              ),
-                            )
-                          }
+                          onClick={revealKanaHint}
                           disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
                           className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
                         >
@@ -4745,391 +4741,43 @@ export default function StudyView({ mode = 'practice' }) {
                   )}
                 </>
               ) : (
-                <div
-                  className={`rounded-xl p-4 ${
-                    wasCorrect
-                      ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
-                      : wasCorrected
-                        ? 'bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/50'
-                        : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50'
-                  }`}
-                >
-                  {/* Scoped to the short verdict so screen readers announce the
-                    result without re-reading the breakdown/chat below. */}
+                <>
                   <span role="status" aria-live="polite" className="sr-only">
-                    {wasCorrect ? 'Correct!' : wasCorrected ? 'Self-corrected.' : 'Not quite.'}
+                    {wasCorrect ? 'Correct!' : wasCorrected ? 'Assisted correction.' : 'Not quite.'}
                   </span>
-                  <div className="flex items-start gap-3 text-left">
-                    <div
-                      className={`mt-0.5 flex-shrink-0 ${wasCorrect ? 'text-emerald-600' : wasCorrected ? 'text-amber-600' : 'text-rose-600'}`}
-                    >
-                      {wasCorrect ? (
-                        <IconCheck className="w-5 h-5" />
+                  <RunAnswerReveal
+                    record={reviewRecord}
+                    geminiKey={geminiKey}
+                    onOpenLearn={() => {
+                      window.location.hash = 'formation-keys';
+                      setTab('learn');
+                    }}
+                    autoAdvanceHint={wasCorrect && autoAdvanceCorrect}
+                    footer={
+                      wasCorrect ? (
+                        <StickyAction className="mt-3">
+                          <button
+                            ref={nextButtonRef}
+                            onClick={() => submit()}
+                            className="w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-lg transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150"
+                          >
+                            Next (Enter)
+                          </button>
+                        </StickyAction>
                       ) : (
-                        <IconX className="w-5 h-5" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h3
-                        className={`text-sm font-semibold ${wasCorrect ? 'text-emerald-800 dark:text-emerald-300' : wasCorrected ? 'text-amber-800 dark:text-amber-300' : 'text-rose-800 dark:text-rose-300'}`}
-                      >
-                        {wasCorrect
-                          ? 'Correct!'
-                          : wasCorrected
-                            ? 'Self-corrected.'
-                            : 'Review this form.'}
-                      </h3>
-                      {wasCorrected && (
-                        <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                          You fixed it mid-type, but the mistake still counts.
+                        <div className="mt-4">
+                          <button
+                            ref={nextButtonRef}
+                            onClick={() => submit()}
+                            className="w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-sm transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150"
+                          >
+                            Next (Enter)
+                          </button>
                         </div>
-                      )}
-                      {wasCorrect ? (
-                        /* Correct answer case */
-                        <>
-                          {reviewKanaCells.length > 0 && (
-                            <div className="mt-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50 p-2">
-                              <div className="flex flex-wrap justify-center gap-1" lang="ja">
-                                {reviewKanaCells.map((cell, i) => {
-                                  const cls =
-                                    cell.state === 'correct'
-                                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
-                                      : cell.state === 'wrong' || cell.state === 'extra'
-                                        ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
-                                        : cell.state === 'hint'
-                                          ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
-                                          : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
-                                  return (
-                                    <div
-                                      key={i}
-                                      className={`w-8 h-9 sm:w-9 sm:h-10 rounded-lg border flex items-center justify-center text-base font-medium tabular-nums ${cls}`}
-                                    >
-                                      {cell.shown || '·'}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        /* Incorrect answer case */
-                        <>
-                          {reviewKanaCells.length > 0 ? (
-                            <>
-                              {/* Correct Answer nice and clearly at the top */}
-                              <div className="mt-3">
-                                <div className="text-[11px] uppercase tracking-wider text-emerald-600 dark:text-emerald-455 font-semibold mb-1">
-                                  Correct Answer
-                                </div>
-                                <ScriptDisplay
-                                  view={expectedView}
-                                  word={current.verb}
-                                  type={practicedType}
-                                  colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                                  className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
-                                  subClassName="text-xs text-stone-500 mt-1"
-                                />
-                                <div className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
-                                  {targetEnglish}
-                                </div>
-                              </div>
-
-                              {/* Guessed answer below it */}
-                              <div className="mt-3">
-                                <div
-                                  className={`text-[11px] uppercase tracking-wider ${wasCorrected ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-rose-700/80 dark:text-rose-400/80'} mb-1`}
-                                >
-                                  {reviewChoiceLabel
-                                    ? 'You chose'
-                                    : revealedMiss
-                                      ? "You chose: I don't know"
-                                      : 'Your Answer'}
-                                </div>
-                                <div className="rounded-xl border border-stone-200/60 dark:border-stone-800/60 bg-stone-50/40 dark:bg-stone-900/20 p-2">
-                                  <div className="flex flex-wrap justify-center gap-1" lang="ja">
-                                    {reviewKanaCells.map((cell, i) => {
-                                      const cls =
-                                        cell.state === 'correct'
-                                          ? 'bg-emerald-50/50 border-emerald-350/40 text-emerald-800/80 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-300/80'
-                                          : cell.state === 'wrong' || cell.state === 'extra'
-                                            ? 'bg-rose-50/50 border-rose-350/40 text-rose-800/80 dark:bg-rose-950/20 dark:border-rose-800/30 dark:text-rose-300/80'
-                                            : cell.state === 'hint'
-                                              ? 'bg-amber-50/50 border-amber-350/40 text-amber-800/80 dark:bg-amber-950/20 dark:border-amber-300/30 dark:text-amber-300/80'
-                                              : 'bg-white/50 dark:bg-stone-900/50 border-stone-200/40 dark:border-stone-800/40 text-stone-300/85';
-                                      return (
-                                        <div
-                                          key={i}
-                                          className={`w-7 h-8 sm:w-8 sm:h-9 rounded-lg border flex items-center justify-center text-sm font-medium tabular-nums ${cls}`}
-                                        >
-                                          {cell.shown || '·'}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-xs text-rose-700 mt-1">
-                              {reviewChoiceLabel
-                                ? `You chose: ${reviewChoiceLabel}`
-                                : revealedMiss
-                                  ? "You chose: I don't know"
-                                  : 'You wrote:'}{' '}
-                              {!revealedMiss && !reviewChoiceLabel && (
-                                <span lang="ja" className="font-semibold">
-                                  {reverseDrill
-                                    ? submittedAnswer.trim() || '(empty)'
-                                    : toHiragana(submittedAnswer) || '(empty)'}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {wasCorrect && (
-                        <>
-                          <ScriptDisplay
-                            view={expectedView}
-                            word={current.verb}
-                            type={practicedType}
-                            colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                            className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
-                            subClassName="text-xs text-stone-500 mt-1"
-                          />
-                          <div className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
-                            {targetEnglish}
-                          </div>
-                        </>
-                      )}
-                      {wasCorrect && autoAdvanceCorrect && (
-                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-100/80 px-3 py-2 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-                          <span className="relative flex h-5 w-5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                            <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
-                              <IconCheck className="h-3 w-3" />
-                            </span>
-                          </span>
-                          Next card coming up...
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {wasCorrect && reviewExplanation && (
-                    <div className="mt-4 space-y-2.5 border-t border-emerald-200 pt-4 text-left dark:border-emerald-900/50">
-                      <ReviewDisclosure tone="emerald" summary="Answer breakdown" alwaysOpen>
-                        <ConjugationBreakdown
-                          word={current.verb}
-                          type={practicedType}
-                          practicePrefs={practicePrefs}
-                          onOpenLearn={() => {
-                            window.location.hash = 'formation-keys';
-                            setTab('learn');
-                          }}
-                        />
-                      </ReviewDisclosure>
-                      {geminiKey && (
-                        <ReviewChatSection
-                          tone="emerald"
-                          chatOpen={chatOpen}
-                          onOpen={() => setChatOpen(true)}
-                        >
-                          {chatOpen && (
-                            <ChatPanel
-                              verb={current.verb}
-                              type={practicedType}
-                              userAnswer={expected}
-                              expected={expected}
-                              explanation={reviewExplanation}
-                              geminiKey={geminiKey}
-                              practicePrefs={practicePrefs}
-                              taskOverride={taskOverride}
-                              wasCorrect
-                              reviewTone="emerald"
-                            />
-                          )}
-                        </ReviewChatSection>
-                      )}
-                    </div>
-                  )}
-
-                  {!wasCorrect && explanation && (
-                    <div className="mt-4 pt-4 border-t border-rose-200 dark:border-rose-900/50 space-y-2.5 text-left">
-                      {reviewKanaCells.length === 0 && (
-                        <>
-                          <div className="text-xs uppercase tracking-wider text-rose-700 dark:text-rose-400 font-medium">
-                            Compare your answer
-                          </div>
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-                              <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                                Correct answer
-                              </div>
-                              <div
-                                className="mt-1 break-words text-base font-semibold text-emerald-900 dark:text-emerald-100"
-                                lang="ja"
-                              >
-                                {expected}
-                              </div>
-                            </div>
-                            <div className="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 dark:border-rose-900/60 dark:bg-rose-950/20">
-                              <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
-                                {missedComparisonLabel}
-                              </div>
-                              <div
-                                className="mt-1 break-words text-base font-semibold text-rose-900 dark:text-rose-100"
-                                lang={reviewChoiceLabel || revealedMiss ? undefined : 'ja'}
-                              >
-                                {missedComparisonValue}
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                      {minimalPairFeedback && (
-                        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2">
-                          <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                            Contrast check: {minimalPairFeedback.label}
-                          </div>
-                          {minimalPairFeedback.masuDiagnostic && (
-                            <div className="mt-1 border-l-2 border-emerald-300 dark:border-emerald-700 pl-3 text-sm text-stone-700 dark:text-stone-300">
-                              <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                                Masu check
-                              </div>
-                              <div className="mt-0.5">
-                                <span
-                                  lang="ja"
-                                  className="font-semibold text-stone-900 dark:text-stone-100"
-                                >
-                                  {minimalPairFeedback.masuDiagnostic.dict}
-                                  {' -> '}
-                                  {minimalPairFeedback.masuDiagnostic.politeSurface}
-                                </span>
-                                <span className="ml-2">
-                                  {minimalPairFeedback.masuDiagnostic.contrast}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                          {!minimalPairFeedback.masuDiagnostic && (
-                            <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
-                              {minimalPairFeedback.intro}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {diagnostic && (
-                        <div className="text-sm text-rose-800 dark:text-rose-300 bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2">
-                          <span className="font-medium text-rose-900 dark:text-rose-200">
-                            Diagnosis:{' '}
-                          </span>
-                          {lastDiagnosis?.label ? `${lastDiagnosis.label}. ` : ''}
-                          {diagnostic}
-                        </div>
-                      )}
-                      {!minimalPairFeedback && (
-                        <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                          {explanation.intro}
-                        </div>
-                      )}
-                      {explanation.rule && (
-                        <div className="rounded-lg bg-white/70 dark:bg-stone-900/70 px-3 py-2 text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                          <span className="font-semibold text-stone-900 dark:text-stone-100">
-                            Rule:{' '}
-                          </span>
-                          {explanation.rule}
-                        </div>
-                      )}
-                      {explanation.derivation && explanation.derivation !== expected && (
-                        <div
-                          className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
-                          lang="ja"
-                        >
-                          {explanation.derivation}
-                        </div>
-                      )}
-                      {minimalPairFeedback && (
-                        <ReviewDisclosure tone="emerald" summary="Full contrast details">
-                          <div className="text-sm text-stone-700 dark:text-stone-300">
-                            {minimalPairFeedback.intro}
-                          </div>
-                          <div className="grid gap-1.5 sm:grid-cols-2">
-                            {minimalPairFeedback.contrasts.map((contrast) => (
-                              <div
-                                key={contrast.id}
-                                className={`rounded-lg border px-2.5 py-2 text-xs ${
-                                  contrast.id === minimalPairFeedback.active.id
-                                    ? 'border-emerald-300 bg-white/80 text-emerald-900 dark:border-emerald-800 dark:bg-stone-950/50 dark:text-emerald-200'
-                                    : 'border-stone-200 bg-white/60 text-stone-600 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-300'
-                                }`}
-                              >
-                                <div className="font-semibold">{contrast.label}</div>
-                                <div className="mt-0.5">{contrast.cue}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </ReviewDisclosure>
-                      )}
-                      <ReviewDisclosure tone="rose" summary="Answer breakdown" alwaysOpen>
-                        <ConjugationBreakdown
-                          word={current.verb}
-                          type={practicedType}
-                          userAnswer={revealedMiss ? '' : reviewSubmittedAnswer}
-                          practicePrefs={practicePrefs}
-                          onOpenLearn={() => {
-                            window.location.hash = 'formation-keys';
-                            setTab('learn');
-                          }}
-                        />
-                      </ReviewDisclosure>
-                      {geminiKey && (
-                        <ReviewChatSection
-                          tone="rose"
-                          chatOpen={chatOpen}
-                          onOpen={() => setChatOpen(true)}
-                        >
-                          {chatOpen && (
-                            <ChatPanel
-                              verb={current.verb}
-                              type={practicedType}
-                              userAnswer={revealedMiss ? '(revealed)' : submittedAnswer}
-                              expected={expected}
-                              explanation={explanation}
-                              geminiKey={geminiKey}
-                              practicePrefs={practicePrefs}
-                              taskOverride={taskOverride}
-                              wasCorrected={wasCorrected}
-                            />
-                          )}
-                        </ReviewChatSection>
-                      )}
-                    </div>
-                  )}
-
-                  {wasCorrect ? (
-                    <StickyAction className="mt-3">
-                      <button
-                        ref={nextButtonRef}
-                        onClick={() => submit()}
-                        className="w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-lg transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150"
-                      >
-                        Next (Enter)
-                      </button>
-                    </StickyAction>
-                  ) : (
-                    <div className="mt-4">
-                      <button
-                        ref={nextButtonRef}
-                        onClick={() => submit()}
-                        className="w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-sm transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150"
-                      >
-                        Next (Enter)
-                      </button>
-                    </div>
-                  )}
-                </div>
+                      )
+                    }
+                  />
+                </>
               )}
             </div>
           </div>

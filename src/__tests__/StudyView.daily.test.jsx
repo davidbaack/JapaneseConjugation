@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
@@ -10,12 +10,18 @@ import { cardIdFor, defaultState } from '../utils/storage.js';
 import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
+let originalScrollIntoView;
 
 vi.mock('../state/AppStateContext.jsx', () => ({
   useApp: () => mockedApp.value,
 }));
 
 import StudyView from '../views/StudyView.jsx';
+
+beforeEach(() => {
+  originalScrollIntoView = window.Element.prototype.scrollIntoView;
+  window.Element.prototype.scrollIntoView = vi.fn();
+});
 
 function makeApp(overrides = {}) {
   const base = {
@@ -157,6 +163,11 @@ afterEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   vi.clearAllMocks();
+  if (originalScrollIntoView) {
+    window.Element.prototype.scrollIntoView = originalScrollIntoView;
+  } else {
+    delete window.Element.prototype.scrollIntoView;
+  }
   delete window.SpeechRecognition;
   delete window.webkitSpeechRecognition;
   FakeSpeechRecognition.instance = null;
@@ -773,6 +784,41 @@ describe('StudyView continuous Practice startup', () => {
     expect(nextState.cards[cardId].correct).toBe(1);
     expect(screen.queryByText('Complete match. Press Enter.')).toBeNull();
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+  });
+
+  it('counts a hinted exact answer as an assisted miss', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Hint' }));
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.currentStreak).toBe(0);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Past',
+    });
+    expect(nextState.cards[cardId].incorrect).toBe(1);
+    expect(screen.getAllByText('Assisted correction.').length).toBeGreaterThan(0);
+    expect(screen.getByText(/after self-correction or a hint/)).toBeTruthy();
   });
 
   it('counts a near-miss answer submitted with Enter as wrong', async () => {
