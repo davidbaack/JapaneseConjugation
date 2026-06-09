@@ -843,6 +843,7 @@ describe('word-form SRS selection', () => {
     };
     const card = selectNext(state, [TABERU, KAKU], ['plain-past'], null, DEFAULT_PREFS);
     expect(card.id).toBe(cardIdFor(KAKU, 'plain-past'));
+    expect(card.selectionOrigin).toBe('new');
     expect(card.selectionReason).toBe('Introducing Te/Ta Sound Changes');
   });
 
@@ -868,6 +869,7 @@ describe('word-form SRS selection', () => {
     expect(card.id).toBe(dueCardId);
     expect(card.type).toBe('plain-past');
     expect(card.verb).toBe(TABERU);
+    expect(card.selectionOrigin).toBe('review');
     expect(card.selectionReason).toBe('Due review');
   });
 
@@ -893,6 +895,7 @@ describe('word-form SRS selection', () => {
 
     expect(card.id).toBe(retryCardId);
     expect(card.verb).toBe(TABERU);
+    expect(card.selectionOrigin).toBe('missed');
     expect(card.selectionReason).toBe('Recent miss returning');
   });
 

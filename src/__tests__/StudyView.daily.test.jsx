@@ -1073,10 +1073,12 @@ describe('StudyView continuous Practice startup', () => {
     expect(reviewButton.disabled).toBe(false);
     fireEvent.click(reviewButton);
 
-    expect(screen.getByRole('region', { name: 'Practice run review' })).toBeTruthy();
+    const reviewRegion = screen.getByRole('region', { name: 'Practice run review' });
+    expect(reviewRegion).toBeTruthy();
     expect(screen.getByText('Answers from this run')).toBeTruthy();
     expect(screen.getByText('Answer #1')).toBeTruthy();
     expect(screen.getByText('Your answer:')).toBeTruthy();
+    expect(within(reviewRegion).getAllByText('New').length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByText('Answer #1'));
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);

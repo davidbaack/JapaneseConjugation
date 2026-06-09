@@ -388,11 +388,55 @@ function snapshotPracticePrefs(prefs = DEFAULT_PREFS) {
   };
 }
 
+const CARD_ORIGIN_META = {
+  new: {
+    label: 'New',
+    detail: 'First time for this word-form',
+    chipClass:
+      'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/70 dark:bg-sky-950/30 dark:text-sky-300',
+    detailClass: 'text-sky-700 dark:text-sky-300',
+    itemClass: 'border-sky-200 bg-sky-50/55 dark:border-sky-900/60 dark:bg-sky-950/10',
+  },
+  missed: {
+    label: 'Previously missed',
+    detail: 'Returning after a miss',
+    chipClass:
+      'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-300',
+    detailClass: 'text-amber-700 dark:text-amber-300',
+    itemClass: 'border-amber-200 bg-amber-50/55 dark:border-amber-900/60 dark:bg-amber-950/10',
+  },
+  review: {
+    label: 'Review',
+    detail: 'Seen before',
+    chipClass:
+      'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/70 dark:bg-indigo-950/30 dark:text-indigo-300',
+    detailClass: 'text-indigo-700 dark:text-indigo-300',
+    itemClass: 'border-indigo-200 bg-indigo-50/45 dark:border-indigo-900/60 dark:bg-indigo-950/10',
+  },
+};
+
+function cardOriginForStudyCard(card) {
+  if (card?.selectionOrigin === 'missed') return 'missed';
+  if (card?.selectionOrigin === 'new') return 'new';
+  if (card?.selectionOrigin === 'review') return 'review';
+  return card?.card ? 'review' : 'new';
+}
+
+function cardOriginMeta(origin) {
+  return CARD_ORIGIN_META[origin] || CARD_ORIGIN_META.review;
+}
+
+function withCardOrigin(card, origin) {
+  if (!card) return card;
+  return { ...card, selectionOrigin: origin || cardOriginForStudyCard(card) };
+}
+
 function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, footer }) {
   const [chatOpen, setChatOpen] = useState(false);
   if (!record) return null;
 
   const prefs = record.practicePrefs || DEFAULT_PREFS;
+  const originMeta = cardOriginMeta(record.cardOrigin);
   const reviewSubmittedDisplay = record.submittedAnswer ? record.submittedAnswer.trim() : '';
   const reviewSubmittedAnswer = record.reverseDrill
     ? reviewSubmittedDisplay
@@ -424,6 +468,16 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, foot
 
   return (
     <div className={`rounded-xl p-4 ${panelClass}`}>
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-left">
+        <span
+          className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${originMeta.chipClass}`}
+        >
+          {originMeta.label}
+        </span>
+        <span className={`text-xs ${originMeta.detailClass}`}>
+          {record.selectionReason || originMeta.detail}
+        </span>
+      </div>
       <div className="flex items-start gap-3 text-left">
         <div
           className={`mt-0.5 flex-shrink-0 ${
@@ -764,6 +818,7 @@ function RunAnswerReviewItem({ record, geminiKey, onOpenLearn }) {
   const answerText =
     record.reviewChoiceLabel ||
     (record.revealedMiss ? "I don't know" : record.submittedAnswer?.trim() || '(empty)');
+  const originMeta = cardOriginMeta(record.cardOrigin);
   const toneClass = record.correct
     ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
     : record.wasCorrected
@@ -772,7 +827,7 @@ function RunAnswerReviewItem({ record, geminiKey, onOpenLearn }) {
   const statusLabel = record.correct ? 'Correct' : record.wasCorrected ? 'Assisted' : 'Missed';
 
   return (
-    <details className="group rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+    <details className={`group rounded-xl border ${originMeta.itemClass}`}>
       <summary className="cursor-pointer list-none px-4 py-3 transition hover:bg-stone-50 dark:hover:bg-stone-950/40">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
@@ -790,6 +845,11 @@ function RunAnswerReviewItem({ record, geminiKey, onOpenLearn }) {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <span
+              className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${originMeta.chipClass}`}
+            >
+              {originMeta.label}
+            </span>
             <span
               className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${toneClass}`}
             >
@@ -888,6 +948,8 @@ function loadPersistedCurrent(state, words, enabledTypes, prefs) {
     return {
       ...card,
       ...(saved.sourceType ? { sourceType: saved.sourceType } : {}),
+      ...(saved.selectionBucket ? { selectionBucket: saved.selectionBucket } : {}),
+      ...(saved.selectionOrigin ? { selectionOrigin: saved.selectionOrigin } : {}),
       ...(saved.selectionReason ? { selectionReason: saved.selectionReason } : {}),
     };
   } catch {
@@ -923,6 +985,8 @@ function persistCurrent(card) {
         group: card.verb.group,
         type: card.type,
         sourceType: card.sourceType || null,
+        selectionBucket: card.selectionBucket || null,
+        selectionOrigin: cardOriginForStudyCard(card),
         selectionReason: card.selectionReason || null,
         word: snapshotStudyWord(card.verb),
       }),
@@ -2724,6 +2788,8 @@ export default function StudyView({ mode = 'practice' }) {
       reverseDrill,
       expected,
       answerMode,
+      cardOrigin: cardOriginForStudyCard(current),
+      selectionReason: current.selectionReason || null,
       submittedAnswer: answerSnapshot,
       reviewChoiceLabel: choiceLabel,
       revealedMiss: wasRevealed,
@@ -2885,13 +2951,21 @@ export default function StudyView({ mode = 'practice' }) {
       nextTypeId: holdNext ? nextTypeId : null,
       complete: !nextTypeId && missed.size === 0,
     };
-    const nextCard = nextTypeId ? buildFocusCard(nextState, sweep.word, nextTypeId) : null;
+    const nextCard = nextTypeId
+      ? withCardOrigin(
+          buildFocusCard(nextState, sweep.word, nextTypeId),
+          repeatPass ? 'missed' : null,
+        )
+      : null;
     return { sweep: nextSweep, nextCard };
   }
 
   function consumeHeldWordSweepCard(nextState = state) {
     if (!wordSweep?.word || !wordSweep.nextTypeId) return null;
-    const card = buildFocusCard(nextState, wordSweep.word, wordSweep.nextTypeId);
+    const card = withCardOrigin(
+      buildFocusCard(nextState, wordSweep.word, wordSweep.nextTypeId),
+      wordSweep.repeatPass ? 'missed' : null,
+    );
     setWordSweep((currentSweep) =>
       currentSweep?.nextTypeId === wordSweep.nextTypeId
         ? { ...currentSweep, nextTypeId: null }
@@ -3802,6 +3876,7 @@ export default function StudyView({ mode = 'practice' }) {
     : focusBanner
       ? `${focusBanner.kicker}: ${focusBanner.title}`
       : current.selectionReason || 'Varied practice from enabled categories';
+  const currentOriginMeta = cardOriginMeta(cardOriginForStudyCard(current));
   const recentOutcomes = Array.isArray(state.session?.recentOutcomes)
     ? state.session.recentOutcomes
     : [];
@@ -4051,7 +4126,14 @@ export default function StudyView({ mode = 'practice' }) {
                 <div className="font-semibold text-stone-700 dark:text-stone-200">
                   Why this card
                 </div>
-                <div className="mt-1 leading-snug">{currentSelectionReason}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 leading-snug">
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${currentOriginMeta.chipClass}`}
+                  >
+                    {currentOriginMeta.label}
+                  </span>
+                  <span>{currentSelectionReason}</span>
+                </div>
               </div>
               <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
                 <div className="font-semibold text-stone-700 dark:text-stone-200">Top miss</div>

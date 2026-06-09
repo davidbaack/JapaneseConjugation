@@ -1463,9 +1463,18 @@ function selectionReasonFor(candidate, bucket) {
   return 'Varied practice from enabled categories';
 }
 
+function selectionOriginFor(candidate, bucket, state = {}) {
+  if (bucket === 'retry') return 'missed';
+  return state.cards?.[candidate?.id] ? 'review' : 'new';
+}
+
 function withSelectionReason(candidate, bucket) {
   if (!candidate) return null;
-  return { ...candidate, selectionReason: selectionReasonFor(candidate, bucket) };
+  return {
+    ...candidate,
+    selectionBucket: bucket,
+    selectionReason: selectionReasonFor(candidate, bucket),
+  };
 }
 
 function familyIdFromCardId(cardId) {
@@ -1587,6 +1596,8 @@ export function selectNext(
     sourceType: chosen.sourceType,
     card: state.cards[chosen.id],
     ruleLabel: chosen.ruleLabel,
+    selectionBucket: chosen.selectionBucket,
+    selectionOrigin: selectionOriginFor(chosen, chosen.selectionBucket, state),
     selectionReason: chosen.selectionReason,
   };
 }
@@ -1601,26 +1612,31 @@ export function buildFocusCard(state, word, type) {
   if (!word || !type) return null;
   if (type === DICTIONARY_TYPE_ID) {
     const sourceRule = RULES.find((r) => r.verbFilter([word]).length === 1);
+    const id = cardIdFor(word, DICTIONARY_TYPE_ID);
+    const card = state.cards[id];
     return sourceRule
       ? {
-          id: cardIdFor(word, DICTIONARY_TYPE_ID),
+          id,
           verb: word,
           type: DICTIONARY_TYPE_ID,
           sourceType: sourceRule.type,
-          card: state.cards[cardIdFor(word, DICTIONARY_TYPE_ID)],
+          card,
           ruleLabel: sourceRule.label,
+          selectionOrigin: card ? 'review' : 'new',
         }
       : null;
   }
   const rule = RULES.find((r) => r.type === type && r.verbFilter([word]).length === 1);
   if (!rule) return null;
   const id = cardIdFor(word, rule.type);
+  const card = state.cards[id];
   return {
     id,
     verb: word,
     type: rule.type,
-    card: state.cards[id],
+    card,
     ruleLabel: rule.label,
+    selectionOrigin: card ? 'review' : 'new',
   };
 }
 
