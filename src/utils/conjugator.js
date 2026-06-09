@@ -2,6 +2,7 @@ import {
   CONJ_TYPES,
   ADJ_TYPES,
   ALL_CARD_TYPES,
+  FORM_GROUPS,
   getTypeInfo,
   TYPE_PREVIEW_VERBS,
   TYPE_PREVIEW_ADJECTIVES,
@@ -16,6 +17,68 @@ import {
 } from '../data/starterWords.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { groupDisplayLabel, groupShortLabel } from './groupDisplay.js';
+
+// ============================================================================
+// DEFECTIVE / STATIVE VERB FORM SUPPRESSION
+// ----------------------------------------------------------------------------
+// A few verbs don't actually inflect across the full 126-form matrix.
+// Conjugating them mechanically yields forms that don't exist in real Japanese
+// (e.g. passive 在られる, progressive あっている, potential 要れる, passive
+// 生まれられる). We return '' for those (verb, form) pairs so the rest of the
+// engine treats them as non-existent: practiceTypesForItem and
+// isRedundantPracticeType drop them from practice, and the sentence-library
+// pipeline (buildPair / validateGenerated in scripts/sentencePipeline.js) never
+// asks the model to write — or accepts — a sentence for them. This is the same
+// '' contract the engine already uses for forms like short-causative-passive on
+// ichidan verbs. See docs/sentence-library.md.
+const FORM_GROUP_TYPE_IDS = Object.fromEntries(FORM_GROUPS.map((g) => [g.id, g.typeIds]));
+
+// ある (在る・有る・或る) and the godan 要る ("to need") are inanimate / stative:
+// no potential, passive, causative, progressive, desiderative, keigo,
+// volitional, command, or request forms exist. Reduce them to the core everyday
+// forms only — plain/polite tenses, te-form, conditionals, conjectural, and the
+// negative te-forms (which use the suppletive ない for ある).
+const STATIVE_DEFECTIVE_SUPPRESSED = new Set([
+  ...FORM_GROUP_TYPE_IDS.potential,
+  ...FORM_GROUP_TYPE_IDS.progressive,
+  ...FORM_GROUP_TYPE_IDS.passive,
+  ...FORM_GROUP_TYPE_IDS.causative, // plain + short causative
+  ...FORM_GROUP_TYPE_IDS['causative-passive'], // plain + short causative-passive
+  ...FORM_GROUP_TYPE_IDS.keigo,
+  ...FORM_GROUP_TYPE_IDS['volitional-desire'], // volitional, polite-volitional, tai-forms
+  ...FORM_GROUP_TYPE_IDS['commands-requests'], // imperative, nasai, request, permission, obligation
+  'negative-zuni',
+  'prohibition',
+]);
+
+// 生まれる ("to be born") is intransitive and spontaneous: most forms are fine
+// (desiderative 生まれたい, volitional 生まれよう, progressive 生まれている, plain
+// causative 生まれさせる), but it has no passive and no causative-passive, and the
+// colloquial short causative is not used. Suppress only those families.
+const SPONTANEOUS_INTRANSITIVE_SUPPRESSED = new Set([
+  ...FORM_GROUP_TYPE_IDS.passive,
+  ...FORM_GROUP_TYPE_IDS['causative-passive'], // incl. short-causative-passive
+  ...FORM_GROUP_TYPE_IDS.causative.filter((id) => id.startsWith('short-causative')),
+]);
+
+function isStativeDefectiveVerb(verb) {
+  if (!verb) return false;
+  // 在る・有る・或る all read あ・る; 要る is keyed by its dictionary form so we do
+  // not catch other godan いる verbs (e.g. 煎る "to roast") or the ichidan 居る.
+  return verb.reading === 'ある' || verb.dict === '要る';
+}
+
+function isSpontaneousIntransitiveVerb(verb) {
+  return !!verb && (verb.dict === '生まれる' || verb.reading === 'うまれる');
+}
+
+// True when (verb, type) is a form the verb does not actually have, so the
+// engine should report it as non-existent ('').
+function isSuppressedVerbForm(verb, type) {
+  if (isStativeDefectiveVerb(verb)) return STATIVE_DEFECTIVE_SUPPRESSED.has(type);
+  if (isSpontaneousIntransitiveVerb(verb)) return SPONTANEOUS_INTRANSITIVE_SUPPRESSED.has(type);
+  return false;
+}
 
 // ============================================================================
 // DATA FILTERING & METADATA HELPERS
@@ -172,8 +235,88 @@ export function typePreviewValues(typeId) {
     .filter((x) => x.answer);
 }
 
+// Several stative verbs are defective: the conjugation rules can mechanically
+// build advanced forms (あれる, あろう, あらせる, ありたい…) that don't occur in
+// natural Japanese, so the app must never select or present them. Each verb is
+// restricted to the forms that genuinely exist, by profile:
+//   - existence (ある, 要る): basic tenses, te-form, conditionals, conjectural.
+//   - stative w/ progressive (できる, 見える, わかる…): the above plus ～ている.
+//   - cognition (分かる): the above plus causative (わからせる is real).
+// Matched by exact word key so true verbs that merely share a reading keep all
+// forms (煎る/炒る/煮る, and 居る the normal ichidan existence verb).
+const STATIVE_BASE_FORMS = [
+  'plain-present',
+  'plain-past',
+  'plain-negative',
+  'plain-past-negative',
+  'polite-present',
+  'polite-past',
+  'polite-negative',
+  'polite-past-negative',
+  'te-form',
+  'conditional-tara',
+  'negative-conditional-tara',
+  'conditional-ba',
+  'negative-conditional-ba',
+  'conditional-nara',
+  'conjectural',
+];
+const PROGRESSIVE_FORMS = [
+  'progressive',
+  'progressive-polite',
+  'progressive-negative',
+  'progressive-polite-negative',
+  'progressive-past',
+  'progressive-polite-past',
+  'progressive-past-negative',
+  'progressive-polite-past-negative',
+];
+const CAUSATIVE_FORMS = [
+  'causative',
+  'causative-polite',
+  'causative-negative',
+  'causative-polite-negative',
+  'causative-polite-past',
+  'causative-polite-past-negative',
+  'causative-past',
+  'causative-past-negative',
+  'causative-conditional-ba',
+  'causative-negative-conditional-ba',
+];
+
+const STATIVE_EXISTENCE = new Set(STATIVE_BASE_FORMS);
+const STATIVE_PROGRESSIVE = new Set([...STATIVE_BASE_FORMS, ...PROGRESSIVE_FORMS]);
+const STATIVE_COGNITION = new Set([
+  ...STATIVE_BASE_FORMS,
+  ...PROGRESSIVE_FORMS,
+  ...CAUSATIVE_FORMS,
+]);
+
+const DEFECTIVE_STATIVE_FORMS = new Map([
+  ['godan:在る', STATIVE_EXISTENCE], // ある — to exist/live
+  ['godan:有る', STATIVE_EXISTENCE], // ある — to be/have
+  ['godan:ある', STATIVE_EXISTENCE], // ある (kana)
+  ['godan:要る', STATIVE_EXISTENCE], // いる — to need
+  ['godan:違う', STATIVE_PROGRESSIVE], // to differ / be wrong
+  ['ichidan:できる', STATIVE_PROGRESSIVE], // to be able to
+  ['ichidan:見える', STATIVE_PROGRESSIVE], // to be visible
+  ['ichidan:聞こえる', STATIVE_PROGRESSIVE], // to be audible
+  ['ichidan:足りる', STATIVE_PROGRESSIVE], // to be enough
+  ['ichidan:似る', STATIVE_PROGRESSIVE], // to resemble
+  ['ichidan:優れる', STATIVE_PROGRESSIVE], // to excel
+  ['godan:異なる', STATIVE_PROGRESSIVE], // to differ (formal)
+  ['godan:分かる', STATIVE_COGNITION], // to understand (keeps わからせる)
+]);
+
+function defectiveStativeForms(item) {
+  return DEFECTIVE_STATIVE_FORMS.get(wordKey(item)) || null;
+}
+
 export function compatibleTypes(item) {
-  return isAdjective(item) ? ADJ_TYPES : CONJ_TYPES;
+  if (isAdjective(item)) return ADJ_TYPES;
+  const allowed = defectiveStativeForms(item);
+  if (allowed) return CONJ_TYPES.filter((t) => allowed.has(t.id));
+  return CONJ_TYPES;
 }
 
 export function isTypeCompatible(item, typeId) {
@@ -563,6 +706,7 @@ export function commandNasaiForm(verb) {
 
 export function conjugate(verb, type) {
   const { reading, group } = verb;
+  if (isSuppressedVerbForm(verb, type)) return '';
   if (type === 'honorific') return keigoForm(verb, 'honorific');
   if (type === 'humble') return keigoForm(verb, 'humble');
   if (type === 'honorific-polite') return politeKeigoForm(keigoForm(verb, 'honorific'));

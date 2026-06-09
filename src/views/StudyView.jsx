@@ -25,7 +25,6 @@ import {
 } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
-import { ContextExamplePanel } from '../components/ContextExamplePanel.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import { ChatPanel } from '../components/ChatPanel.jsx';
 import { toHiragana, toHiraganaProgress, toKanaInputValue } from '../utils/romaji.js';
@@ -403,7 +402,6 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
     record.reviewChoiceLabel || record.revealedMiss ? 'You chose' : 'Your answer';
   const missedComparisonValue =
     record.reviewChoiceLabel || (record.revealedMiss ? "I don't know" : reviewSubmittedComparison);
-  const reviewSubmittedChars = Array.from(reviewSubmittedDisplay);
   const reviewKanaCells =
     record.answerMode === 'input' && !record.reverseDrill
       ? kanaCoachCells(record.expected, reviewSubmittedDisplay, record.coachRevealed || 0)
@@ -506,18 +504,6 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
                     <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-455">
                       Correct Answer
                     </div>
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-2 dark:border-emerald-900/50 dark:bg-emerald-950/10">
-                      <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                        {Array.from(record.expected).map((char, i) => (
-                          <div
-                            key={i}
-                            className="flex h-10 w-9 items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50 text-lg font-semibold text-emerald-850 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300 sm:h-11 sm:w-10"
-                          >
-                            {char}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                     <ScriptDisplay
                       view={expectedView}
                       word={record.word}
@@ -545,26 +531,6 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
                           ? "You chose: I don't know"
                           : 'Your Answer'}
                     </div>
-                    {!record.revealedMiss &&
-                      !record.reviewChoiceLabel &&
-                      reviewSubmittedChars.length > 0 && (
-                        <div
-                          role="group"
-                          aria-label="Your typed answer"
-                          className="mb-2 rounded-xl border border-rose-200/70 bg-rose-50/35 p-2 dark:border-rose-900/45 dark:bg-rose-950/10"
-                        >
-                          <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                            {reviewSubmittedChars.map((char, i) => (
-                              <div
-                                key={`${char}-${i}`}
-                                className="flex h-10 w-9 items-center justify-center rounded-xl border border-rose-300 bg-white text-base font-semibold text-rose-800 shadow-sm dark:border-rose-800 dark:bg-stone-950/70 dark:text-rose-300 sm:h-11 sm:w-10 sm:text-lg"
-                              >
-                                {char}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     <div className="rounded-xl border border-stone-200/60 bg-stone-50/40 p-2 dark:border-stone-800/60 dark:bg-stone-900/20">
                       <div className="flex flex-wrap justify-center gap-1" lang="ja">
                         {reviewKanaCells.map((cell, i) => {
@@ -643,33 +609,37 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
 
       {!record.correct && explanation && (
         <div className="mt-4 space-y-2.5 border-t border-rose-200 pt-4 text-left dark:border-rose-900/50">
-          <div className="text-xs font-medium uppercase tracking-wider text-rose-700 dark:text-rose-400">
-            Compare your answer
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                Correct answer
+          {reviewKanaCells.length === 0 && (
+            <>
+              <div className="text-xs font-medium uppercase tracking-wider text-rose-700 dark:text-rose-400">
+                Compare your answer
               </div>
-              <div
-                className="mt-1 break-words text-base font-semibold text-emerald-900 dark:text-emerald-100"
-                lang="ja"
-              >
-                {record.expected}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                    Correct answer
+                  </div>
+                  <div
+                    className="mt-1 break-words text-base font-semibold text-emerald-900 dark:text-emerald-100"
+                    lang="ja"
+                  >
+                    {record.expected}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 dark:border-rose-900/60 dark:bg-rose-950/20">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                    {missedComparisonLabel}
+                  </div>
+                  <div
+                    className="mt-1 break-words text-base font-semibold text-rose-900 dark:text-rose-100"
+                    lang={record.reviewChoiceLabel || record.revealedMiss ? undefined : 'ja'}
+                  >
+                    {missedComparisonValue}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 dark:border-rose-900/60 dark:bg-rose-950/20">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
-                {missedComparisonLabel}
-              </div>
-              <div
-                className="mt-1 break-words text-base font-semibold text-rose-900 dark:text-rose-100"
-                lang={record.reviewChoiceLabel || record.revealedMiss ? undefined : 'ja'}
-              >
-                {missedComparisonValue}
-              </div>
-            </div>
-          </div>
+            </>
+          )}
           {minimalPairFeedback && (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
               <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
@@ -773,13 +743,6 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
           )}
         </div>
       )}
-
-      <ContextExamplePanel
-        item={record.word}
-        type={record.practicedType}
-        geminiKey={geminiKey}
-        practicePrefs={prefs}
-      />
     </div>
   );
 }
@@ -2655,7 +2618,6 @@ export default function StudyView({ mode = 'practice' }) {
   const missedComparisonLabel = reviewChoiceLabel || revealedMiss ? 'You chose' : 'Your answer';
   const missedComparisonValue =
     reviewChoiceLabel || (revealedMiss ? "I don't know" : reviewSubmittedComparison);
-  const reviewSubmittedChars = Array.from(reviewSubmittedDisplay);
 
   function nextMinimalPairProgress(correct) {
     return recordMinimalPairResult(
@@ -4860,18 +4822,6 @@ export default function StudyView({ mode = 'practice' }) {
                                 <div className="text-[11px] uppercase tracking-wider text-emerald-600 dark:text-emerald-455 font-semibold mb-1">
                                   Correct Answer
                                 </div>
-                                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/10 p-2">
-                                  <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                                    {Array.from(expected).map((char, i) => (
-                                      <div
-                                        key={i}
-                                        className="w-9 h-10 sm:w-10 sm:h-11 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-850 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300 flex items-center justify-center text-lg font-semibold tabular-nums shadow-sm"
-                                      >
-                                        {char}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
                                 <ScriptDisplay
                                   view={expectedView}
                                   word={current.verb}
@@ -4896,29 +4846,6 @@ export default function StudyView({ mode = 'practice' }) {
                                       ? "You chose: I don't know"
                                       : 'Your Answer'}
                                 </div>
-                                {!revealedMiss &&
-                                  !reviewChoiceLabel &&
-                                  reviewSubmittedChars.length > 0 && (
-                                    <div
-                                      role="group"
-                                      aria-label="Your typed answer"
-                                      className="mb-2 rounded-xl border border-rose-200/70 bg-rose-50/35 p-2 dark:border-rose-900/45 dark:bg-rose-950/10"
-                                    >
-                                      <div
-                                        className="flex flex-wrap justify-center gap-1.5"
-                                        lang="ja"
-                                      >
-                                        {reviewSubmittedChars.map((char, i) => (
-                                          <div
-                                            key={`${char}-${i}`}
-                                            className="flex h-10 w-9 items-center justify-center rounded-xl border border-rose-300 bg-white text-base font-semibold text-rose-800 shadow-sm dark:border-rose-800 dark:bg-stone-950/70 dark:text-rose-300 sm:h-11 sm:w-10 sm:text-lg"
-                                          >
-                                            {char}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
                                 <div className="rounded-xl border border-stone-200/60 dark:border-stone-800/60 bg-stone-50/40 dark:bg-stone-900/20 p-2">
                                   <div className="flex flex-wrap justify-center gap-1" lang="ja">
                                     {reviewKanaCells.map((cell, i) => {
@@ -5030,33 +4957,37 @@ export default function StudyView({ mode = 'practice' }) {
 
                   {!wasCorrect && explanation && (
                     <div className="mt-4 pt-4 border-t border-rose-200 dark:border-rose-900/50 space-y-2.5 text-left">
-                      <div className="text-xs uppercase tracking-wider text-rose-700 dark:text-rose-400 font-medium">
-                        Compare your answer
-                      </div>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-                          <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                            Correct answer
+                      {reviewKanaCells.length === 0 && (
+                        <>
+                          <div className="text-xs uppercase tracking-wider text-rose-700 dark:text-rose-400 font-medium">
+                            Compare your answer
                           </div>
-                          <div
-                            className="mt-1 break-words text-base font-semibold text-emerald-900 dark:text-emerald-100"
-                            lang="ja"
-                          >
-                            {expected}
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                              <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                                Correct answer
+                              </div>
+                              <div
+                                className="mt-1 break-words text-base font-semibold text-emerald-900 dark:text-emerald-100"
+                                lang="ja"
+                              >
+                                {expected}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 dark:border-rose-900/60 dark:bg-rose-950/20">
+                              <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+                                {missedComparisonLabel}
+                              </div>
+                              <div
+                                className="mt-1 break-words text-base font-semibold text-rose-900 dark:text-rose-100"
+                                lang={reviewChoiceLabel || revealedMiss ? undefined : 'ja'}
+                              >
+                                {missedComparisonValue}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 dark:border-rose-900/60 dark:bg-rose-950/20">
-                          <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
-                            {missedComparisonLabel}
-                          </div>
-                          <div
-                            className="mt-1 break-words text-base font-semibold text-rose-900 dark:text-rose-100"
-                            lang={reviewChoiceLabel || revealedMiss ? undefined : 'ja'}
-                          >
-                            {missedComparisonValue}
-                          </div>
-                        </div>
-                      </div>
+                        </>
+                      )}
                       {minimalPairFeedback && (
                         <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2">
                           <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
@@ -5176,13 +5107,6 @@ export default function StudyView({ mode = 'practice' }) {
                       )}
                     </div>
                   )}
-
-                  <ContextExamplePanel
-                    item={current.verb}
-                    type={practicedType}
-                    geminiKey={geminiKey}
-                    practicePrefs={practicePrefs}
-                  />
 
                   {wasCorrect ? (
                     <StickyAction className="mt-3">

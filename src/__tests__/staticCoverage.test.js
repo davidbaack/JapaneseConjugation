@@ -28,11 +28,23 @@ describe('static coverage configuration', () => {
 
   it('keeps strict checkJs coverage enabled for new typecheck surfaces', () => {
     const base = readRepoJson('tsconfig.json');
+    const app = readRepoJson('tsconfig.app.json');
     const tooling = readRepoJson('tsconfig.tooling.json');
     const supabase = readRepoJson('tsconfig.supabase.json');
 
     expect(base.compilerOptions.checkJs).toBe(true);
     expect(base.compilerOptions.strict).toBe(true);
+    expect(app.compilerOptions.checkJs).not.toBe(false);
+    expect(app.compilerOptions.strict).not.toBe(false);
+    expect(app.compilerOptions.noImplicitAny).not.toBe(false);
+    expect(app.include).toEqual(
+      expect.arrayContaining([
+        'src/data/defaults.js',
+        'src/i18n/**/*.js',
+        'src/utils/rateLimiter.js',
+        'src/utils/retry.js',
+      ]),
+    );
     expect(tooling.compilerOptions.checkJs).not.toBe(false);
     expect(tooling.compilerOptions.strict).not.toBe(false);
     expect(supabase.compilerOptions.checkJs).not.toBe(false);

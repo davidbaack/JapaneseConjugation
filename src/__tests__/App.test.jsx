@@ -282,9 +282,11 @@ describe('App shell', () => {
     expect(verdictStatus).toHaveLength(1);
     expect(screen.getByText('Review this form.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Next (Enter)' }).closest('.sticky')).toBeNull();
-    expect(screen.getByText('Compare your answer')).toBeTruthy();
-    expect(screen.getAllByText('Correct answer').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Your answer').length).toBeGreaterThan(0);
+    // Typed misses show the consolidated rich top (kanji + coach diff), not the
+    // redundant plain-text "Compare your answer" grid (kept only for non-typed cards).
+    expect(screen.queryByText('Compare your answer')).toBeNull();
+    expect(screen.getAllByText('Correct Answer').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Your Answer').length).toBeGreaterThan(0);
     expect(screen.getByText(/Rule:/)).toBeTruthy();
     expect(screen.getByText('Answer breakdown').closest('details')).toBeNull();
     expect(screen.getByText('1. What category is this and why?')).toBeTruthy();

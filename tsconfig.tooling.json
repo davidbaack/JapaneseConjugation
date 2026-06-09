@@ -7,6 +7,14 @@
     "noImplicitAny": false,
     "types": ["node"]
   },
-  "include": ["*.config.js", "eslint.config.js", "e2e/**/*.js", "scripts/**/*.js"],
+  "include": [
+    "*.config.js",
+    "eslint.config.js",
+    "e2e/**/*.js",
+    "scripts/**/*.js",
+    "src/__tests__/devHistoryPlugin.test.js",
+    "src/__tests__/sentenceEnglish.test.js",
+    "src/__tests__/sentencePipeline.test.js"
+  ],
   "exclude": ["node_modules", "dist", "test-results"]
 }

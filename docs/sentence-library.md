@@ -74,6 +74,18 @@ globally rather than per file.
 level** — a plain run covers everything the engine can produce. Narrow it with
 `SENTENCE_JLPT` / `SENTENCE_TYPES` when you want a smaller tranche.
 
+**Defective verbs are pruned at the engine.** A few verbs don't inflect across
+the full matrix, so the conjugator reports the missing forms as non-existent
+(`''`) and the pipeline never asks for — or accepts — a sentence for them: ある
+(在る・有る) and the godan 要る are limited to their core everyday forms (no
+potential, passive, causative, progressive, desiderative, keigo, volitional,
+command, or request), and 生まれる drops only its nonexistent passive and
+causative-passive. This is the same `''` contract used elsewhere (e.g.
+short-causative-passive on ichidan verbs) and applies everywhere
+`practiceTypesForItem` runs, including core practice — not just the corpus. See
+`STATIVE_DEFECTIVE_SUPPRESSED` / `SPONTANEOUS_INTRANSITIVE_SUPPRESSED` in
+`src/utils/conjugator.js`.
+
 ## Run everything (instructions for Codex)
 
 Paste the following to Codex. With `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
@@ -112,6 +124,22 @@ set, it will work through the entire lexicon, resuming where it left off.
 > Notes: `tmp/` is gitignored — do not commit batch/output files. The only thing
 > worth committing is a regenerated `public/data/verb-lexicon.json` from
 > `npm run vocab:build`.
+
+## Repairing legacy English glosses
+
+Older generated output files may have structurally valid Japanese sentences but
+generic English like "A short practice sentence using ...". To repair those
+outputs before import, rewrite only the `en` field into a separate temp folder:
+
+```bash
+npm run sentences:english -- tmp/sentence-batches tmp/sentence-natural-english
+```
+
+Then validate/import the corrected `out-*.jsonl` files from
+`tmp/sentence-natural-english`. If you are reseeding this legacy corpus exactly
+as-is, set `SENTENCE_TEMPLATE_CAP=0` during import because the legacy Japanese
+frames intentionally reuse a small fixed template set; do not use that override
+for new generation runs.
 
 ## Checking progress
 

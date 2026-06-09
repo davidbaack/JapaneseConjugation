@@ -1,11 +1,13 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "checkJs": false,
-    "strict": false,
-    "noImplicitAny": false,
-    "types": ["vite/client"]
+    "types": ["vite/client", "react", "react-dom"]
   },
-  "include": ["src"],
+  "include": [
+    "src/data/defaults.js",
+    "src/i18n/**/*.js",
+    "src/utils/rateLimiter.js",
+    "src/utils/retry.js"
+  ],
   "exclude": ["node_modules", "dist"]
 }
