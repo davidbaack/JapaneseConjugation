@@ -172,8 +172,46 @@ export function typePreviewValues(typeId) {
     .filter((x) => x.answer);
 }
 
+// A handful of stative verbs are defective: the conjugation rules can
+// mechanically build advanced forms (あれる, あろう, あらせる, ありたい, あっている…)
+// but those don't occur in natural Japanese, so the app must never select or
+// present them. Restrict these exact words to the forms that genuinely exist.
+// Matched by word key so true verbs that merely share a reading are unaffected
+// (e.g. 煎る/炒る "to roast" read いる, 居る is the normal ichidan existence verb).
+const DEFECTIVE_STATIVE_KEYS = new Set([
+  'godan:在る', // ある — to exist/live
+  'godan:有る', // ある — to be/have
+  'godan:ある', // ある (kana)
+  'godan:要る', // いる — to need
+]);
+const STATIVE_NATURAL_TYPE_IDS = new Set([
+  'plain-present',
+  'plain-past',
+  'plain-negative',
+  'plain-past-negative',
+  'polite-present',
+  'polite-past',
+  'polite-negative',
+  'polite-past-negative',
+  'te-form',
+  'conditional-tara',
+  'negative-conditional-tara',
+  'conditional-ba',
+  'negative-conditional-ba',
+  'conditional-nara',
+  'conjectural',
+]);
+
+function isDefectiveStative(item) {
+  return DEFECTIVE_STATIVE_KEYS.has(wordKey(item));
+}
+
 export function compatibleTypes(item) {
-  return isAdjective(item) ? ADJ_TYPES : CONJ_TYPES;
+  if (isAdjective(item)) return ADJ_TYPES;
+  if (isDefectiveStative(item)) {
+    return CONJ_TYPES.filter((t) => STATIVE_NATURAL_TYPE_IDS.has(t.id));
+  }
+  return CONJ_TYPES;
 }
 
 export function isTypeCompatible(item, typeId) {
