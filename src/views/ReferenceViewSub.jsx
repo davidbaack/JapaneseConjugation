@@ -95,7 +95,12 @@ export default function ReferenceViewSub({
         (w.dict === scratchCandidate.dict || w.reading === scratchCandidate.reading),
     )
   );
-  const showScratch = !!(query.trim() && scratchCandidate && !scratchMatchesKnown);
+  const showScratch = !!(
+    query.trim() &&
+    scratchCandidate &&
+    !scratchMatchesKnown &&
+    !lookupMatches.length
+  );
   const scratchRows = showScratch ? formRows(scratchCandidate) : [];
   const scratchMasuDiagnostic = showScratch ? ruMasuDiagnostic(scratchCandidate) : null;
   useEffect(() => {
@@ -562,7 +567,14 @@ export default function ReferenceViewSub({
               {lookupMatches.length > 0 ? (
                 <div className="mt-2 space-y-1.5">
                   {lookupMatches.slice(0, 5).map((m) => {
-                    const av = formDisplay(m.answer, practicePrefs, m.word, m.type.id);
+                    const av =
+                      m.matchKind === 'variant'
+                        ? {
+                            main: m.surface || m.answer,
+                            sub: m.surface && m.surface !== m.answer ? m.answer : '',
+                            lang: 'ja',
+                          }
+                        : formDisplay(m.answer, practicePrefs, m.word, m.type.id);
                     const bv = promptDisplay(m.word, null, practicePrefs);
                     return (
                       <button
@@ -600,7 +612,7 @@ export default function ReferenceViewSub({
                           {m.word.meaning}
                         </div>
                         <div className="mt-1 text-[11px] text-stone-400 leading-tight">
-                          {m.explanation.rule}
+                          {m.variantNote || m.explanation.rule}
                         </div>
                       </button>
                     );

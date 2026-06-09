@@ -537,6 +537,11 @@ export default function CheckView() {
                     <span className="font-semibold">{getTypeInfo(exactForms[0].type).label}</span>
                   </div>
                 )}
+                {exactForms[0].variantNote && (
+                  <div className="mt-3 text-sm text-stone-600 dark:text-stone-300">
+                    {exactForms[0].variantNote}
+                  </div>
+                )}
               </div>
 
               {showMatchRows && (

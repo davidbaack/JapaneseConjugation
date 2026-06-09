@@ -192,6 +192,25 @@ describe('identifyConjugation', () => {
     expect(types).toContain('passive');
   });
 
+  it('recognises conversational ら-dropping ichidan potential as the intended word', () => {
+    const suberu = { dict: '滑る', reading: 'すべる', meaning: 'to slide', group: 'godan' };
+    const res = identifyConjugation('食べれる', [...ALL, suberu], {
+      includeNearWhenExact: true,
+    });
+    expect(res.exact).toContainEqual(
+      expect.objectContaining({
+        word: taberu,
+        type: 'potential',
+        kana: 'たべれる',
+        kanji: '食べれる',
+        canonicalKana: 'たべられる',
+        canonicalKanji: '食べられる',
+        variantKind: 'colloquial-potential',
+      }),
+    );
+    expect(res.near.some((match) => match.word.reading === 'すべる')).toBe(false);
+  });
+
   it('returns an empty result for blank input', () => {
     const res = identifyConjugation('   ', ALL);
     expect(res.exact).toHaveLength(0);

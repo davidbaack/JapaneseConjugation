@@ -18,6 +18,7 @@ import { explainItem, GROUP_NAMES } from './conjugatorExplain.js';
 import { CONJ_TYPES, ADJ_TYPES, ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
 import { normalizeReferenceState, referenceProgressFor, defaultState } from './storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { matchColloquialPotentialVariant } from './colloquialPotential.js';
 import {
   VERB_GROUP_IDS,
   groupAliasText,
@@ -214,16 +215,18 @@ export function formLookupCandidates(query, words) {
     for (const row of lookupRows(word)) {
       const key = `${wordKeyLocal(word)}|${row.type.id}|${row.answer}`;
       let exactHit = row.answerVariants.find((v) => queryVariants.has(v));
+      const colloquialVariant = matchColloquialPotentialVariant(raw, word, row.type.id);
       let contextHit =
         allowContext &&
         !exactHit &&
+        !colloquialVariant &&
         row.answerVariants.find((v) => {
           const min = /^[a-z]+$/.test(v) ? 4 : 2;
           return (
             v.length >= min && [...queryVariants].some((q) => q.length > v.length && q.includes(v))
           );
         });
-      if (!exactHit && !contextHit && includeSurfaceVariants) {
+      if (!exactHit && !contextHit && !colloquialVariant && includeSurfaceVariants) {
         lookupSurface(word, row);
         exactHit = row.surfaceVariants.find((v) => queryVariants.has(v));
         contextHit =
@@ -237,9 +240,25 @@ export function formLookupCandidates(query, words) {
             );
           });
       }
-      if ((exactHit || contextHit) && !seen.has(key)) {
+      if ((exactHit || contextHit || colloquialVariant) && !seen.has(key)) {
         seen.add(key);
         const surface = lookupSurface(word, row);
+        if (colloquialVariant) {
+          exact.push({
+            word,
+            type: row.type,
+            answer: colloquialVariant.kana,
+            surface: colloquialVariant.kanji || colloquialVariant.kana,
+            canonicalAnswer: colloquialVariant.canonicalKana,
+            canonicalSurface: colloquialVariant.canonicalKanji,
+            explanation: explainItem(word, row.type.id),
+            matchKind: 'variant',
+            variantKind: colloquialVariant.variantKind,
+            variantNote: colloquialVariant.variantNote,
+            hitText: colloquialVariant.hitText || colloquialVariant.kanji,
+          });
+          continue;
+        }
         (exactHit ? exact : context).push({
           word,
           type: row.type,

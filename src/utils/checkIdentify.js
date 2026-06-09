@@ -4,6 +4,7 @@
 // explain how it differs.
 
 import { conjugateItem, compatibleTypes, surfaceFormFor, surfaceStemPair } from './conjugator.js';
+import { matchColloquialPotentialVariant } from './colloquialPotential.js';
 import { toHiragana } from './romaji.js';
 
 // Forms that are real conjugations but make poor free-form answers: the
@@ -185,6 +186,22 @@ export function identifyConjugation(input, words = [], options = {}) {
         exact.push({ word, type, kana, kanji });
         continue;
       }
+
+      const colloquialVariant = matchColloquialPotentialVariant(raw, word, type);
+      if (colloquialVariant) {
+        exact.push({
+          word,
+          type,
+          kana: colloquialVariant.kana,
+          kanji: colloquialVariant.kanji,
+          canonicalKana: colloquialVariant.canonicalKana,
+          canonicalKanji: colloquialVariant.canonicalKanji,
+          variantKind: colloquialVariant.variantKind,
+          variantNote: colloquialVariant.variantNote,
+        });
+        continue;
+      }
+
       if (normalized.length < 2) continue;
 
       const distance = levenshtein(normalized, kana);

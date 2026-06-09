@@ -269,6 +269,23 @@ describe('formLookupCandidates', () => {
     expect(hits.some((h) => h.word.dict === '食べる')).toBe(true);
   });
 
+  it('recognises conversational ら-dropping ichidan potential', () => {
+    const hits = formLookupCandidates('食べれる', [
+      ...words,
+      { dict: '滑る', reading: 'すべる', meaning: 'to slide', group: 'godan' },
+    ]);
+    expect(hits[0]).toMatchObject({
+      word: TABERU,
+      type: expect.objectContaining({ id: 'potential' }),
+      answer: 'たべれる',
+      surface: '食べれる',
+      canonicalAnswer: 'たべられる',
+      canonicalSurface: '食べられる',
+      matchKind: 'variant',
+      variantKind: 'colloquial-potential',
+    });
+  });
+
   it('result entries have word, type, answer, and matchKind', () => {
     const hits = formLookupCandidates('たべて', words);
     if (hits.length > 0) {

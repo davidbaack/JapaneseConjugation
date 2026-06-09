@@ -545,7 +545,7 @@ describe('App shell', () => {
     expect(screen.queryByRole('button', { name: 'Drill enabled forms' })).toBeNull();
   }, 15000);
 
-  it('renders a Check near-miss explanation without crashing', async () => {
+  it('recognizes conversational 食べれる in Check without guessing 滑る', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
 
@@ -555,9 +555,31 @@ describe('App shell', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
 
-    expect(await screen.findByText('Not quite')).toBeTruthy();
-    expect(screen.getAllByText('Correct answer').length).toBeGreaterThan(0);
+    expect(await screen.findByText('Correct conjugation')).toBeTruthy();
+    expect(
+      screen.getByText(/Recognized 食べれる as conversational ら-dropping potential/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/滑る/)).toBeNull();
+    expect(screen.queryByText('Not quite')).toBeNull();
     expect(screen.queryByText('Something went wrong')).toBeNull();
+  }, 15000);
+
+  it('recognizes conversational 食べれる in Lookup without showing scratch forms', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));
+    fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
+      target: { value: '\u98df\u3079\u308c\u308b' },
+    });
+
+    expect(await screen.findByText('1 hit')).toBeTruthy();
+    expect(screen.getByText('variant')).toBeTruthy();
+    expect(
+      screen.getByText(/Recognized 食べれる as conversational ら-dropping potential/),
+    ).toBeTruthy();
+    expect(screen.queryByText('Scratch conjugator')).toBeNull();
+    expect(screen.queryByText(/お食べれ/)).toBeNull();
   }, 15000);
 
   it('keeps Tools reverse lookup details aligned with the confirmed hit', async () => {
