@@ -4103,21 +4103,6 @@ export default function StudyView({ mode = 'practice' }) {
                 .filter(Boolean)
                 .join(' · ')}
             </div>
-            {clozePrompt && (
-              <div className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
-                <ScriptDisplay
-                  view={clozePromptView}
-                  className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
-                  subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
-                  colorHighlight={false}
-                />
-                {!hideEnglishMeaning && clozePrompt.note && (
-                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-500 dark:text-stone-400">
-                    {clozePrompt.note}
-                  </div>
-                )}
-              </div>
-            )}
             {hidePromptText ? (
               <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
                 <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-3">
@@ -4159,6 +4144,21 @@ export default function StudyView({ mode = 'practice' }) {
               <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
             )}
 
+            {clozePrompt && (
+              <div className="mx-auto mt-3 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
+                <ScriptDisplay
+                  view={clozePromptView}
+                  className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
+                  subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
+                  colorHighlight={false}
+                />
+                {!hideEnglishMeaning && clozePrompt.note && (
+                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-500 dark:text-stone-400">
+                    {clozePrompt.note}
+                  </div>
+                )}
+              </div>
+            )}
             {phase === 'reviewing' && practicePrefs.showWordCategory && (
               <div className="text-xs text-stone-400 mt-1">
                 {groupDisplayLabel(current.verb.group)} · {wordType}
