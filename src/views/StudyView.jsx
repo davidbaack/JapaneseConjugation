@@ -25,7 +25,6 @@ import {
 } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
-import { ContextExamplePanel } from '../components/ContextExamplePanel.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import { ChatPanel } from '../components/ChatPanel.jsx';
 import { toHiragana, toHiraganaProgress, toKanaInputValue } from '../utils/romaji.js';
@@ -773,13 +772,6 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn }) {
           )}
         </div>
       )}
-
-      <ContextExamplePanel
-        item={record.word}
-        type={record.practicedType}
-        geminiKey={geminiKey}
-        practicePrefs={prefs}
-      />
     </div>
   );
 }
@@ -5176,13 +5168,6 @@ export default function StudyView({ mode = 'practice' }) {
                       )}
                     </div>
                   )}
-
-                  <ContextExamplePanel
-                    item={current.verb}
-                    type={practicedType}
-                    geminiKey={geminiKey}
-                    practicePrefs={practicePrefs}
-                  />
 
                   {wasCorrect ? (
                     <StickyAction className="mt-3">
