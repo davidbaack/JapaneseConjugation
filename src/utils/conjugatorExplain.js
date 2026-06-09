@@ -139,6 +139,22 @@ function continuationHint(expected, correct, compound) {
     : 'Apply the next step above.';
 }
 
+function emptyAnswerNudge(item) {
+  if (item?.group === 'godan') {
+    return 'You have not typed anything yet. First identify the verb group, then look at the final kana of the dictionary form. Use those two facts to decide the first change before typing.';
+  }
+  if (item?.group === 'ichidan') {
+    return 'You have not typed anything yet. First confirm whether this is ichidan, then decide what happens to the final る before typing.';
+  }
+  if (item?.group === 'suru' || item?.group === 'kuru' || item?.irregular) {
+    return 'You have not typed anything yet. First recall the special base change for this irregular form before worrying about the ending.';
+  }
+  if (isAdjective(item)) {
+    return 'You have not typed anything yet. First identify the adjective type, then decide what part changes before the ending.';
+  }
+  return 'You have not typed anything yet. First identify the word type, then decide the next change before typing.';
+}
+
 // For compound forms (e.g. potential-past-negative), show the intermediate
 // form so the learner can see the two-step derivation.
 function buildCompoundDerivation(item, type) {
@@ -1337,8 +1353,9 @@ export function explainItem(item, type) {
 }
 
 // Deterministic, offline hint shown when the student clicks "Hint" while
-// answering. It states how the (possibly multi-step) form is built and where
-// the student currently is without printing the full final answer on first hint.
+// answering. Empty hints only nudge the next thinking step; once the learner
+// has typed something, the hint states how the form is built and where the
+// student currently is without printing the full final answer on first hint.
 //
 // Irregular forms (する, 来る, よい-based adjectives…) have no derivable rule —
 // their "rule" text spells out the answer. To keep the first hint spoiler-free,
@@ -1357,12 +1374,13 @@ export function stepCoachHint(item, type, typed, reveal = false) {
     masked = true;
   }
   const got = toHiragana(typed || '') || typed || '';
+  if (!got && !(wouldReveal && reveal)) return { text: emptyAnswerNudge(item), masked };
   let correct = 0;
   while (correct < got.length && correct < expected.length && got[correct] === expected[correct])
     correct++;
   let status;
   if (!got) {
-    status = `You haven't typed anything yet — start from the dictionary form ${item.reading}, then work through the steps above.`;
+    status = emptyAnswerNudge(item);
   } else if (correct === 0) {
     status = `The very beginning doesn't match yet. ${positionHint(type, got, expected, correct, compound)}`;
   } else if (correct < got.length) {

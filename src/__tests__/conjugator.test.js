@@ -358,8 +358,8 @@ describe('stepCoachHint (offline hint)', () => {
   const TYPE = 'potential-past-negative';
   const ANSWER = conjugateItem(MATSU, TYPE); // まてなかった
 
-  it('includes the multi-step build recipe', () => {
-    const { text } = stepCoachHint(MATSU, TYPE, '');
+  it('includes the multi-step build recipe once typing has started', () => {
+    const { text } = stepCoachHint(MATSU, TYPE, 'ま');
     expect(text).toContain('potential');
     expect(text).toContain('なかった');
   });
@@ -373,8 +373,22 @@ describe('stepCoachHint (offline hint)', () => {
     expect(stepCoachHint(MATSU, TYPE, '').masked).toBe(false);
   });
 
-  it('prompts to start when nothing is typed', () => {
-    expect(stepCoachHint(MATSU, TYPE, '').text).toMatch(/haven't typed/);
+  it('nudges the next thinking step when nothing is typed', () => {
+    const { text } = stepCoachHint(MATSU, TYPE, '');
+    expect(text).toMatch(/have not typed/);
+    expect(text).toContain('identify the verb group');
+    expect(text).toContain('final kana');
+    expect(text).not.toContain('potential');
+    expect(text).not.toContain('なかった');
+  });
+
+  it('does not give away the godan plain negative recipe before typing', () => {
+    const { text } = stepCoachHint(OYOGU, 'plain-negative', '');
+    expect(text).toContain('identify the verb group');
+    expect(text).toContain('final kana');
+    expect(text).not.toContain('あ-row');
+    expect(text).not.toContain('ない');
+    expect(text).not.toContain('およがない');
   });
 
   it('acknowledges a correct prefix and counts remaining kana', () => {
