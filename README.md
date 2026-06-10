@@ -64,7 +64,7 @@ Ending Lab, Groups, or Rush.
 ### Learn
 
 Learn is a searchable conjugation formation guide. It currently has 13 lesson
-sections covering all 127 app card types, including core verb families, godan
+sections covering all 126 app card types, including core verb families, godan
 row shifts, te/ta sound changes, ru-verb traps, potential, conditionals,
 passive, causative, causative-passive, keigo, special forms, and adjective
 forms.
@@ -127,7 +127,7 @@ than in global Settings.
   as of the current tracked build, including 1,374 verbs and 787 adjectives.
 - Word filters: JLPT N5-N1, 23 Genki lessons, 50 Minna no Nihongo lessons, word
   types, word groups, and custom study lists.
-- Card coverage: 127 selectable card types across 13 form families.
+- Card coverage: 126 selectable card types across 13 form families.
 - Type packs: Textbook Core, Basics, Everyday Expansion, Advanced Patterns,
   Compound Challenge, All forms, Weak mix, and Custom.
 - Minimal-pair support covers contrasts such as ichidan vs godan ru-verbs,
