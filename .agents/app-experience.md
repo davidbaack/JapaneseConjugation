@@ -73,13 +73,20 @@ confirms the new direction, update this document in the same change.
   and family skill blends lifetime correctness, recent misses, readiness data,
   and response speed. Untested and barely tested families display as neutral,
   not weak.
+- Per-card weakness is recency-weighted: misses fade over roughly two weeks
+  and with consecutive correct answers, so cards missed long ago but reliable
+  now stop counting as weak. Card and lane weakness can boost a card within
+  steady-state selection by a bounded amount, without overriding lowest-skill
+  family steering, boosting untested families, or shortening SRS intervals.
 - Missing godan te-form should boost related godan te-form cards, especially
   fresh or older words in that lane.
 - Default Practice does not prioritize due cards. SRS data may remain stored,
   but it should not drive the default queue.
 - Practice should avoid repeating the same family or verb unless there are no
   good alternatives. Repeat the category plus subcategory pattern more than the
-  exact same word.
+  exact same word. Exception: when a family's best candidate is severely
+  weaker (a full skill band, 15+ points) than every alternative, it may repeat
+  for up to three consecutive cards while still rotating words.
 
 ## Tools
 

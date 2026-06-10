@@ -17,6 +17,8 @@ import {
   defaultState,
   bonusNewCardLimit,
   selectNext,
+  cardWeakScore,
+  ruleWeakScore,
   SRS_SCHEMA_VERSION,
   gradeTransformationStats,
   mergeTransformationStats,
@@ -115,6 +117,116 @@ describe('gradeCard', () => {
     card = gradeCard(card, false);
     expect(card.correct).toBe(2);
     expect(card.incorrect).toBe(1);
+  });
+
+  it('accumulates recentMiss on misses and decays it with time and correct answers', () => {
+    const now = Date.now();
+    let card = gradeCard(null, false, now);
+    expect(card.recentMiss).toBe(1);
+    card = gradeCard(card, false, now);
+    expect(card.recentMiss).toBe(2);
+    // One half-life later the old misses count half before the new one lands.
+    card = gradeCard(card, false, now + 14 * DAY);
+    expect(card.recentMiss).toBeCloseTo(2, 5);
+    // A correct answer recovers faster than time alone.
+    card = gradeCard(card, true, now + 14 * DAY);
+    expect(card.recentMiss).toBeCloseTo(1.2, 5);
+  });
+
+  it('caps recentMiss so one card cannot dominate weighted sampling', () => {
+    const now = Date.now();
+    let card = null;
+    for (let i = 0; i < 12; i += 1) card = gradeCard(card, false, now);
+    expect(card.recentMiss).toBe(6);
+  });
+});
+
+describe('cardWeakScore', () => {
+  const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+  const cardId = cardIdFor(TABERU, 'plain-past');
+
+  it('scores a long-mastered card with old misses near zero', () => {
+    const now = Date.now();
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardId]: {
+          ease: 2.5,
+          interval: 30,
+          reps: 5,
+          nextReview: now + 30 * DAY,
+          correct: 20,
+          incorrect: 6,
+          lastSeen: now - 60 * DAY,
+        },
+      },
+    };
+    expect(cardWeakScore(state, cardId, TABERU, 'plain-past', { now })).toBeLessThan(1);
+  });
+
+  it('scores a card with fresh misses high', () => {
+    const now = Date.now();
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardId]: {
+          ease: 1.9,
+          interval: 0,
+          reps: 0,
+          nextReview: now + 60000,
+          correct: 1,
+          incorrect: 2,
+          recentMiss: 2,
+          lastSeen: now,
+        },
+      },
+    };
+    expect(cardWeakScore(state, cardId, TABERU, 'plain-past', { now })).toBeGreaterThan(5);
+  });
+
+  it('decays stored recentMiss as time passes', () => {
+    const now = Date.now();
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardId]: {
+          ease: 1.9,
+          interval: 0,
+          reps: 0,
+          nextReview: now + 60000,
+          correct: 1,
+          incorrect: 2,
+          recentMiss: 2,
+          lastSeen: now,
+        },
+      },
+    };
+    const fresh = cardWeakScore(state, cardId, TABERU, 'plain-past', { now });
+    const later = cardWeakScore(state, cardId, TABERU, 'plain-past', { now: now + 28 * DAY });
+    expect(later).toBeLessThan(fresh);
+  });
+
+  it('keeps ruleWeakScore consistent with cardWeakScore for an existing card', () => {
+    const now = Date.now();
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardId]: {
+          ease: 1.9,
+          interval: 0,
+          reps: 0,
+          nextReview: now + 60000,
+          correct: 1,
+          incorrect: 2,
+          recentMiss: 2,
+          lastSeen: now,
+        },
+      },
+    };
+    expect(ruleWeakScore(state, cardId, { now })).toBeCloseTo(
+      cardWeakScore(state, cardId, null, null, { now }),
+      5,
+    );
   });
 });
 
@@ -1069,7 +1181,7 @@ describe('word-form SRS selection', () => {
     expect(card.selectionReason).toBe('Introducing Volitional & Desire');
   });
 
-  it('avoids repeating the same family back-to-back when another enabled family is available', () => {
+  it('avoids repeating the same family back-to-back when a comparable family is available', () => {
     const now = Date.now();
     const weakPast = cardIdFor(TABERU, 'plain-negative');
     const otherFamily = cardIdFor(KAKU, 'te-form');
@@ -1081,8 +1193,8 @@ describe('word-form SRS selection', () => {
           interval: 8,
           ease: 2.3,
           nextReview: now + DAY,
-          correct: 1,
-          incorrect: 4,
+          correct: 2,
+          incorrect: 3,
           lastSeen: now - DAY,
         },
         [otherFamily]: {
@@ -1110,6 +1222,174 @@ describe('word-form SRS selection', () => {
     );
 
     expect(card.id).toBe(otherFamily);
+  });
+
+  it('boosts a stubborn weak card ahead of a nearby higher-skill family', () => {
+    const now = Date.now();
+    const reviewed = (overrides) => ({
+      ease: 2.3,
+      interval: 8,
+      nextReview: now + DAY,
+      recentMiss: 0,
+      lastSeen: now - DAY,
+      ...overrides,
+    });
+    const weakCardId = cardIdFor(TABERU, 'te-form');
+    const state = {
+      ...defaultState(),
+      cards: {
+        // Te/Ta family ~83 skill overall, but this one card keeps missing.
+        [cardIdFor(KAKU, 'te-form')]: reviewed({ reps: 5, correct: 19, incorrect: 0 }),
+        [weakCardId]: reviewed({ reps: 0, correct: 1, incorrect: 4, recentMiss: 4 }),
+        // Basics & Politeness sits at 75 skill with no weak cards.
+        [cardIdFor(TABERU, 'plain-negative')]: reviewed({ reps: 3, correct: 3, incorrect: 1 }),
+        [cardIdFor(KAKU, 'plain-negative')]: reviewed({ reps: 3, correct: 3, incorrect: 1 }),
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU],
+      ['plain-negative', 'te-form'],
+      null,
+      DEFAULT_PREFS,
+    );
+
+    expect(card.id).toBe(weakCardId);
+  });
+
+  it('never lets card weakness outrank a genuinely weak family', () => {
+    const now = Date.now();
+    const reviewed = (overrides) => ({
+      ease: 2.3,
+      interval: 8,
+      nextReview: now + DAY,
+      recentMiss: 0,
+      lastSeen: now - DAY,
+      ...overrides,
+    });
+    const state = {
+      ...defaultState(),
+      cards: {
+        // Te/Ta family at 85 skill with a maxed-out weak card: the bounded
+        // boost (85 - 12 = 73) must not undercut a family at 60.
+        [cardIdFor(KAKU, 'te-form')]: reviewed({ reps: 5, correct: 21, incorrect: 1 }),
+        [cardIdFor(TABERU, 'te-form')]: reviewed({
+          reps: 0,
+          correct: 1,
+          incorrect: 2,
+          recentMiss: 6,
+        }),
+        [cardIdFor(TABERU, 'plain-negative')]: reviewed({ reps: 3, correct: 3, incorrect: 2 }),
+        [cardIdFor(KAKU, 'plain-negative')]: reviewed({ reps: 3, correct: 3, incorrect: 2 }),
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU],
+      ['plain-negative', 'te-form'],
+      null,
+      DEFAULT_PREFS,
+    );
+
+    expect(card.type).toBe('plain-negative');
+  });
+
+  it('repeats a severely weak family with a different word instead of deferring it', () => {
+    const now = Date.now();
+    const lastCardId = cardIdFor(TABERU, 'plain-negative');
+    const weakBasics = (overrides = {}) => ({
+      ease: 1.9,
+      interval: 0,
+      reps: 0,
+      nextReview: now + DAY,
+      correct: 1,
+      incorrect: 3,
+      recentMiss: 3,
+      lastSeen: now - DAY,
+      ...overrides,
+    });
+    const state = {
+      ...defaultState(),
+      cards: {
+        [lastCardId]: weakBasics(),
+        [cardIdFor(KAKU, 'plain-negative')]: weakBasics(),
+        [cardIdFor(KAKU, 'te-form')]: {
+          ease: 2.5,
+          interval: 8,
+          reps: 3,
+          nextReview: now + DAY,
+          correct: 3,
+          incorrect: 1,
+          recentMiss: 0,
+          lastSeen: now - DAY,
+        },
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU],
+      ['plain-negative', 'te-form'],
+      lastCardId,
+      DEFAULT_PREFS,
+      null,
+      { recentCardIds: [lastCardId] },
+    );
+
+    expect(card.id).toBe(cardIdFor(KAKU, 'plain-negative'));
+  });
+
+  it('caps severe-weakness family repeats at three consecutive cards', () => {
+    const now = Date.now();
+    const weakBasics = (overrides = {}) => ({
+      ease: 1.9,
+      interval: 0,
+      reps: 0,
+      nextReview: now + DAY,
+      correct: 1,
+      incorrect: 3,
+      recentMiss: 3,
+      lastSeen: now - DAY,
+      ...overrides,
+    });
+    const recentRun = [
+      cardIdFor(YOMU, 'plain-negative'),
+      cardIdFor(KAKU, 'plain-negative'),
+      cardIdFor(TABERU, 'plain-negative'),
+    ];
+    const state = {
+      ...defaultState(),
+      cards: {
+        [recentRun[0]]: weakBasics(),
+        [recentRun[1]]: weakBasics(),
+        [recentRun[2]]: weakBasics(),
+        [cardIdFor(KAU, 'plain-negative')]: weakBasics(),
+        [cardIdFor(KAU, 'te-form')]: {
+          ease: 2.5,
+          interval: 8,
+          reps: 3,
+          nextReview: now + DAY,
+          correct: 3,
+          incorrect: 1,
+          recentMiss: 0,
+          lastSeen: now - DAY,
+        },
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU, YOMU, KAU],
+      ['plain-negative', 'te-form'],
+      recentRun[0],
+      DEFAULT_PREFS,
+      null,
+      { recentCardIds: recentRun },
+    );
+
+    expect(card.id).toBe(cardIdFor(KAU, 'te-form'));
   });
 
   it('moves to fresh material instead of looping recently reviewed weak cards', () => {

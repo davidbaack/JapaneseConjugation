@@ -12,7 +12,7 @@ export const QUICK_WORKOUT_LIMIT = 12;
 export const QUICK_PRACTICE_DEFAULT_TYPE_IDS = EVERYDAY_TYPE_IDS;
 
 const MAX_RECENT_ATTEMPTS = 30;
-const RECENT_DECAY_MS = 14 * 86400000;
+export const RECENT_DECAY_MS = 14 * 86400000;
 const TE_TA_TYPES = new Set(['te-form', 'plain-past']);
 const MIN_SKILL_ATTEMPTS = 3;
 const ONBIN_IDS = new Map([
@@ -23,6 +23,12 @@ const ONBIN_IDS = new Map([
   ['su', { id: 'godan-onbin-su', label: 'Godan su sound changes' }],
   ['iku', { id: 'iku-exception', label: 'iku exception' }],
 ]);
+
+// Exponential half-life decay for per-card weakness signals. The lane scorer
+// keeps its own linear decay; both cool over the same 14-day window.
+export function recencyDecayFactor(at, now = Date.now(), halfLifeMs = RECENT_DECAY_MS) {
+  return at > 0 ? Math.pow(0.5, Math.max(0, now - at) / halfLifeMs) : 1;
+}
 
 function cleanNumber(value) {
   return Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0;
