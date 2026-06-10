@@ -512,6 +512,7 @@ function useAppController() {
     const typeIds = Array.isArray(recommendation.typeIds) ? recommendation.typeIds : [];
     const suggestedCount = Math.max(0, Number(recommendation.suggestedCount || 0));
     const listId = `list-review-rec-${recommendation.id}`;
+    const returnEnabledTypes = Array.isArray(state.enabledTypes) ? [...state.enabledTypes] : [];
     setState((prev) => {
       let next = { ...prev };
       for (const key of wordKeys) next = includeWordKeyInReviewState(next, key);
@@ -559,6 +560,7 @@ function useAppController() {
         suggestedCount,
         wordCount: wordKeys.length,
         typeCount: typeIds.length,
+        returnEnabledTypes,
       },
     });
     setTab('practice');

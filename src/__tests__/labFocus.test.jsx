@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('../utils/supabase.js', () => ({ supabase: null }));
 
@@ -20,6 +20,30 @@ function LabProbe() {
       </button>
       <output data-testid="tab">{app.tab}</output>
       <output data-testid="lab-focus">{JSON.stringify(app.labFocus)}</output>
+    </div>
+  );
+}
+
+function RecommendationProbe() {
+  const app = useApp();
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() =>
+          app.startReviewRecommendation({
+            id: 'lab-test-review',
+            source: 'lab',
+            label: 'Lab test review',
+            typeIds: ['te-form'],
+            suggestedCount: 6,
+          })
+        }
+      >
+        start recommendation
+      </button>
+      <output data-testid="enabled-types">{JSON.stringify(app.state.enabledTypes)}</output>
+      <output data-testid="study-focus">{JSON.stringify(app.studyFocus)}</output>
     </div>
   );
 }
@@ -49,5 +73,25 @@ describe('openLabTool', () => {
     // The consumer clears the request so a later manual visit lands on default.
     fireEvent.click(screen.getByRole('button', { name: 'clear focus' }));
     expect(screen.getByTestId('lab-focus').textContent).toBe('null');
+  });
+});
+
+describe('startReviewRecommendation', () => {
+  it('keeps the pre-focus enabled forms so Exit Focus can restore them', async () => {
+    render(
+      <AppStateProvider>
+        <RecommendationProbe />
+      </AppStateProvider>,
+    );
+
+    const beforeTypes = JSON.parse(screen.getByTestId('enabled-types').textContent);
+
+    fireEvent.click(screen.getByRole('button', { name: 'start recommendation' }));
+
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId('enabled-types').textContent)).toEqual(['te-form']),
+    );
+    const focus = JSON.parse(screen.getByTestId('study-focus').textContent);
+    expect(focus.recommendation.returnEnabledTypes).toEqual(beforeTypes);
   });
 });

@@ -3818,6 +3818,14 @@ export default function StudyView({ mode = 'practice' }) {
     return next;
   }
 
+  function restoreRecommendationEnabledTypes() {
+    const returnEnabledTypes = Array.isArray(recommendationFocus?.returnEnabledTypes)
+      ? recommendationFocus.returnEnabledTypes.filter(Boolean)
+      : null;
+    if (!returnEnabledTypes) return;
+    setState((prev) => ({ ...prev, enabledTypes: returnEnabledTypes }));
+  }
+
   // Universal escape hatch back to Stats. Exits whatever focused practice is
   // active (minimal-pair contrast, bounded drill, or a focus-word lock).
   function returnToOverview() {
@@ -3828,8 +3836,9 @@ export default function StudyView({ mode = 'practice' }) {
         return clearBoundedReviewPrefs(cleared);
       });
       if (restoreTypes.length) setState((prev) => ({ ...prev, enabledTypes: restoreTypes }));
-    } else if (practicePrefs.reviewLimitSource || practicePrefs.reviewLimit > 0) {
+    } else {
       setPracticePrefs((prev) => clearBoundedReviewPrefs(prev));
+      restoreRecommendationEnabledTypes();
     }
     setLaunchContext(null);
     setFocusWordLock(null);

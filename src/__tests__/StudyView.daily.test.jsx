@@ -275,6 +275,72 @@ describe('StudyView continuous Practice startup', () => {
     expect(app.setTab).toHaveBeenCalledWith('stats');
   });
 
+  it('restores normal enabled forms when exiting a Drills recommendation focus', async () => {
+    const returnEnabledTypes = ['plain-past', 'plain-negative'];
+    const focusedTypes = ['te-form'];
+    const list = {
+      id: 'list-review-rec-lab-onbin-review',
+      name: 'Practice te/ta sound changes',
+      wordKeys: STARTER_VERBS.slice(0, 3).map(wordKey),
+    };
+    const app = makeApp({
+      state: { ...defaultState(), enabledTypes: focusedTypes },
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        reviewLimit: 6,
+        reviewLimitSource: 'recommendation',
+        wordListIds: [list.id],
+      },
+      wordLists: [list],
+      studyFocus: {
+        source: 'lab',
+        launchMode: 'recommendation',
+        recommendation: {
+          id: 'lab-onbin-review',
+          source: 'lab',
+          label: 'Practice te/ta sound changes',
+          detail: 'Full recall for te and ta forms.',
+          suggestedCount: 6,
+          wordCount: list.wordKeys.length,
+          typeCount: focusedTypes.length,
+          returnEnabledTypes,
+        },
+      },
+    });
+    app.clearStudyFocus = vi.fn(() => {
+      app.studyFocus = null;
+      mockedApp.value = app;
+    });
+    mockedApp.value = app;
+
+    render(<StudyView />);
+
+    expect(await screen.findByText('Drills focus')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
+
+    const stateUpdater = app.setState.mock.calls.at(-1)?.[0];
+    expect(typeof stateUpdater).toBe('function');
+    expect(stateUpdater({ ...app.state, enabledTypes: focusedTypes }).enabledTypes).toEqual(
+      returnEnabledTypes,
+    );
+
+    const prefsUpdater = app.setPracticePrefs.mock.calls.at(-1)?.[0];
+    expect(typeof prefsUpdater).toBe('function');
+    expect(
+      prefsUpdater({
+        ...DEFAULT_PREFS,
+        reviewLimit: 6,
+        reviewLimitSource: 'recommendation',
+        wordListIds: ['favorites', list.id, 'repair-drill'],
+      }),
+    ).toMatchObject({
+      reviewLimit: 0,
+      reviewLimitSource: '',
+      wordListIds: ['favorites'],
+    });
+    expect(app.setTab).toHaveBeenCalledWith('stats');
+  });
+
   it('does not auto-start today over a focused word launch', async () => {
     const clearStudyFocus = vi.fn();
     const app = makeApp({
