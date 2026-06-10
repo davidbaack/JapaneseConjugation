@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { cardIdFor, DAY, defaultState, localDateKey, selectNext } from '../utils/storage.js';
 import {
+  RECENT_DECAY_MS,
   buildWeaknessFamilyRows,
   defaultWeaknessState,
   deriveWeaknessSubcategory,
   rankedWeaknessLanes,
+  recencyDecayFactor,
   recordWeaknessAttempt,
   weaknessScoreForCard,
 } from '../utils/subcategoryWeakness.js';
@@ -46,6 +48,22 @@ const SURU = {
   meaning: 'to do',
   group: 'suru',
 };
+
+describe('recencyDecayFactor', () => {
+  it('returns 1 for an attempt happening now', () => {
+    const now = Date.now();
+    expect(recencyDecayFactor(now, now)).toBe(1);
+  });
+
+  it('halves after one half-life', () => {
+    const now = Date.now();
+    expect(recencyDecayFactor(now - RECENT_DECAY_MS, now)).toBeCloseTo(0.5, 5);
+  });
+
+  it('treats an unknown timestamp as undecayed', () => {
+    expect(recencyDecayFactor(0)).toBe(1);
+  });
+});
 
 function withMisses(weakness, word, typeId, count = 3) {
   let next = weakness;

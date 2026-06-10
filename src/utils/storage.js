@@ -34,6 +34,7 @@ import {
   mergeWeaknessState,
   normalizeWeaknessState,
   rankedWeaknessLanes,
+  recencyDecayFactor,
   weaknessScoreForCard,
 } from './subcategoryWeakness.js';
 
@@ -41,6 +42,10 @@ export const DAY = 86400000;
 export const SRS_SCHEMA_VERSION = 3;
 export const DICTIONARY_TYPE_ID = 'dictionary';
 const REVIEW_ROTATION_SIZE = 8;
+const WEAK_BOOST_CAP = 12;
+const WEAK_BOOST_SCALE = 1.5;
+const SEVERE_FAMILY_GAP = 15;
+const MAX_FAMILY_RUN = 3;
 const BEGINNER_LADDER_CARD_COUNT = 5;
 const BEGINNER_LADDER_STAGES = [
   { group: 'ichidan', type: 'plain-past' },
@@ -1145,8 +1150,15 @@ export function markMistakeResolved(mistakes, key) {
   );
 }
 
-export function gradeCard(card, correct) {
-  const now = Date.now();
+// recentMiss is a half-life-decayed miss accumulator (14-day half-life via
+// recencyDecayFactor). It cools both with elapsed time and with correct
+// answers (×0.6 each), so "missed often long ago, reliable now" converges to
+// ~0 within a good session. The cap bounds pickWeakWeighted's quadratic
+// weights so one disaster card cannot monopolize weighted sampling.
+const RECENT_MISS_CAP = 6;
+const RECENT_MISS_RECOVERY = 0.6;
+
+export function gradeCard(card, correct, now = Date.now()) {
   const isNew = !card;
   if (!card)
     card = {
@@ -1158,6 +1170,7 @@ export function gradeCard(card, correct) {
       incorrect: 0,
       lastSeen: 0,
     };
+  const decayedMiss = (Number(card.recentMiss) || 0) * recencyDecayFactor(card.lastSeen, now);
   if (correct) {
     let iv;
     if (card.reps === 0) iv = 1;
@@ -1176,6 +1189,7 @@ export function gradeCard(card, correct) {
       nextReview: now + iv * DAY,
       correct: card.correct + 1,
       incorrect: card.incorrect,
+      recentMiss: Math.min(RECENT_MISS_CAP, decayedMiss * RECENT_MISS_RECOVERY),
       lastSeen: now,
     };
   }
@@ -1189,42 +1203,59 @@ export function gradeCard(card, correct) {
     nextReview: now + 60000,
     correct: card.correct,
     incorrect: card.incorrect + 1,
+    recentMiss: Math.min(RECENT_MISS_CAP, decayedMiss + 1),
     lastSeen: now,
   };
 }
 
-export function cardWeakScore(state, cardId, word = null, typeId = null) {
-  const resolvedType = typeId || typeIdFromCardId(cardId);
-  const card = (state.cards || {})[cardId] || {};
+// Recency-weighted miss terms shared by cardWeakScore and ruleWeakScore.
+// reps resets to 0 on every miss, so it doubles as a consecutive-correct
+// streak that damps lifetime miss rate. Cards saved before recentMiss existed
+// fall back to a bounded, decayed slice of their lifetime incorrect count so
+// old saves stop scoring mastered cards as weak forever.
+function cardMissTerms(card = {}, now = Date.now()) {
   const reviews = (card.correct || 0) + (card.incorrect || 0);
   const missRate = reviews ? (card.incorrect || 0) / reviews : 0;
-  const laneScore =
-    word && resolvedType ? weaknessScoreForCard(state.weakness, word, resolvedType) : 0;
-  const unresolved = (state.mistakes || [])
-    .filter(
-      (m) =>
-        !m.resolved &&
-        (!resolvedType || m.type === resolvedType) &&
-        (!word || (m.dict === word.dict && m.group === word.group)),
-    )
-    .reduce((sum, m) => sum + (m.count || 1), 0);
-  return (card.incorrect || 0) * 2 + missRate * 4 + unresolved * 3 + laneScore * 1.4;
+  const streakDamp = 1 / (1 + 0.35 * (Number(card.reps) || 0));
+  const recentMiss = Number.isFinite(Number(card.recentMiss))
+    ? Number(card.recentMiss) * recencyDecayFactor(card.lastSeen, now)
+    : Math.min(3, card.incorrect || 0) * recencyDecayFactor(card.lastSeen, now) * streakDamp;
+  return recentMiss * 3 + missRate * 4 * streakDamp;
 }
 
-export function ruleWeakScore(state, ruleId) {
+function decayedMistakeCount(mistakes, now, filter) {
+  return (mistakes || [])
+    .filter((m) => !m.resolved && filter(m))
+    .reduce((sum, m) => sum + (m.count || 1) * Math.max(0.25, recencyDecayFactor(m.at, now)), 0);
+}
+
+export function cardWeakScore(state, cardId, word = null, typeId = null, options = {}) {
+  const now = options.now || Date.now();
+  const resolvedType = typeId || typeIdFromCardId(cardId);
+  const card = (state.cards || {})[cardId] || {};
+  const laneScore =
+    word && resolvedType ? weaknessScoreForCard(state.weakness, word, resolvedType, { now }) : 0;
+  const unresolved = decayedMistakeCount(
+    state.mistakes,
+    now,
+    (m) =>
+      (!resolvedType || m.type === resolvedType) &&
+      (!word || (m.dict === word.dict && m.group === word.group)),
+  );
+  return cardMissTerms(card, now) + unresolved * 3 + laneScore * 1.4;
+}
+
+export function ruleWeakScore(state, ruleId, options = {}) {
+  const now = options.now || Date.now();
   const cards = state.cards || {};
-  if (cards[ruleId]) return cardWeakScore(state, ruleId);
+  if (cards[ruleId]) return cardWeakScore(state, ruleId, null, null, { now });
   const typeId = typeIdFromCardId(ruleId);
   let score = 0;
   for (const [cardId, card] of Object.entries(cards)) {
     if (typeIdFromCardId(cardId) !== typeId) continue;
-    const reviews = (card.correct || 0) + (card.incorrect || 0);
-    const missRate = reviews ? (card.incorrect || 0) / reviews : 0;
-    score += (card.incorrect || 0) * 2 + missRate * 4;
+    score += cardMissTerms(card, now);
   }
-  const unresolved = (state.mistakes || [])
-    .filter((m) => !m.resolved && m.type === typeId)
-    .reduce((sum, m) => sum + (m.count || 1), 0);
+  const unresolved = decayedMistakeCount(state.mistakes, now, (m) => m.type === typeId);
   return score + unresolved * 3;
 }
 
@@ -1366,13 +1397,13 @@ function pickSkillReview(pool, state, options = {}) {
     rank:
       options.rank ||
       ((a, b) =>
-        a.familySkillScore - b.familySkillScore ||
+        a.selectionScore - b.selectionScore ||
         b.weakScore - a.weakScore ||
         candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
     tie:
       options.tie ||
       ((a, b) =>
-        a.familySkillScore - b.familySkillScore ||
+        a.selectionScore - b.selectionScore ||
         b.weakScore - a.weakScore ||
         candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
   });
@@ -1384,13 +1415,13 @@ function pickReviewedReview(pool, state, options = {}) {
     rank:
       options.rank ||
       ((a, b) =>
-        a.familySkillScore - b.familySkillScore ||
+        a.selectionScore - b.selectionScore ||
         b.weakScore - a.weakScore ||
         candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
     tie:
       options.tie ||
       ((a, b) =>
-        a.familySkillScore - b.familySkillScore ||
+        a.selectionScore - b.selectionScore ||
         b.weakScore - a.weakScore ||
         candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
   });
@@ -1430,7 +1461,7 @@ function pickFreshReview(pool, options, openBeginnerStage) {
   if (!pool.length) return null;
   return [...pool].sort(
     (a, b) =>
-      (a.familySkillScore || 0) - (b.familySkillScore || 0) ||
+      (a.selectionScore || 0) - (b.selectionScore || 0) ||
       (openBeginnerStage >= 0
         ? beginnerLadderSortScore(a, openBeginnerStage) -
           beginnerLadderSortScore(b, openBeginnerStage)
@@ -1505,12 +1536,21 @@ export function selectNext(
     const familyId = candidateFamilyId(p);
     const familySkill = familySkills.get(familyId);
     const familySkillStatus = familySkill?.skillStatus || 'untested';
+    const familySkillScore = familySkillStatus === 'untested' ? 50 : familySkill?.skillScore || 50;
+    const weakScore = cardWeakScore(state, p.id, p.verb, p.type);
+    // Card/lane weakness lowers the effective skill score by a bounded amount
+    // so a stubborn weak card can win within or near its family's band, while
+    // a strong family (85+) can never outrank a genuinely weak one (<60) on
+    // card weakness alone. Untested families stay exactly neutral.
+    const weakBoost =
+      familySkillStatus === 'untested' ? 0 : Math.min(WEAK_BOOST_CAP, weakScore * WEAK_BOOST_SCALE);
     return {
       ...p,
       familyId,
-      familySkillScore: familySkillStatus === 'untested' ? 50 : familySkill?.skillScore || 50,
+      familySkillScore,
       familySkillStatus,
-      weakScore: cardWeakScore(state, p.id, p.verb, p.type),
+      weakScore,
+      selectionScore: familySkillScore - weakBoost,
     };
   });
   const retryIds = new Set(state.retryQueue || []);
@@ -1555,6 +1595,15 @@ export function selectNext(
   const lastFamilyId =
     options.lastFamilyId ||
     familyIdFromCardId((options.recentCardIds || []).find(Boolean) || lastCardId);
+  // Consecutive cards already shown from lastFamilyId (recentCardIds is
+  // newest-first), used to cap severe-weakness family repeats.
+  const recentFamilySequence = (options.recentCardIds || []).filter(Boolean);
+  if (!recentFamilySequence.length && lastCardId) recentFamilySequence.push(lastCardId);
+  let lastFamilyRun = 0;
+  for (const id of recentFamilySequence) {
+    if (!lastFamilyId || familyIdFromCardId(id) !== lastFamilyId) break;
+    lastFamilyRun += 1;
+  }
   const recentWordKeys = new Set(
     [...recentIds, ...(options.recentWordKeys || [])]
       .map((id) => (String(id).includes('|') ? wordKeyFromCardId(id) : id))
@@ -1568,8 +1617,20 @@ export function selectNext(
   };
   const avoidLastFamily = (items) => {
     if (!lastFamilyId) return items;
-    const filtered = items.filter((item) => item.familyId !== lastFamilyId);
-    return filtered.length ? filtered : items;
+    const others = items.filter((item) => item.familyId !== lastFamilyId);
+    if (!others.length) return items;
+    // Variety still wins by default, but a family whose best candidate is a
+    // full band weaker than every alternative may repeat (words keep rotating
+    // via dropRecentWords) for at most MAX_FAMILY_RUN consecutive cards.
+    if (lastFamilyRun < MAX_FAMILY_RUN) {
+      const bestScore = (pool) =>
+        pool.reduce((min, item) => Math.min(min, item.selectionScore ?? 50), Infinity);
+      const sameFamily = items.filter((item) => item.familyId === lastFamilyId);
+      if (sameFamily.length && bestScore(sameFamily) + SEVERE_FAMILY_GAP <= bestScore(others)) {
+        return items;
+      }
+    }
+    return others;
   };
   const vary = (items) => avoidLastFamily(dropRecentWords(items));
   const choose = (groups) =>
