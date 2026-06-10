@@ -452,6 +452,12 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, foot
     record.answerMode === 'input' && !record.reverseDrill
       ? kanaCoachCells(record.expected, reviewSubmittedDisplay, record.coachRevealed || 0)
       : [];
+  // Cells for the correct answer itself, so a missed card can show the target
+  // kana in the same little boxes used when the answer is correct.
+  const correctKanaCells =
+    record.answerMode === 'input' && !record.reverseDrill
+      ? kanaCoachCells(record.expected, record.expected)
+      : [];
   const expectedView = record.reverseDrill
     ? promptDisplay(record.word, null, prefs)
     : formDisplay(record.expected, prefs, record.word, record.cardType);
@@ -573,6 +579,20 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, foot
                     <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-455">
                       Correct Answer
                     </div>
+                    {correctKanaCells.length > 0 && (
+                      <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50 p-2 dark:border-stone-700 dark:bg-stone-900/50">
+                        <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                          {correctKanaCells.map((cell, i) => (
+                            <div
+                              key={i}
+                              className="flex h-9 w-8 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 text-base font-medium tabular-nums text-emerald-800 dark:border-emerald-805 dark:bg-emerald-950/30 dark:text-emerald-300 sm:h-10 sm:w-9"
+                            >
+                              {cell.shown || '·'}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <ScriptDisplay
                       view={expectedView}
                       word={record.word}
