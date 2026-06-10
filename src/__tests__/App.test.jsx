@@ -557,6 +557,10 @@ describe('App shell', () => {
     });
 
     expect((await screen.findAllByText(/Local/)).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText('No local form match yet. Try a dictionary form or romaji.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Scanner/i)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Drill enabled forms' })).toBeNull();
   }, 15000);
 

@@ -620,8 +620,7 @@ export default function ReferenceViewSub({
                 </div>
               ) : (
                 <div className="mt-2 text-xs text-stone-400">
-                  No local form match yet. Try a dictionary form, romaji, or paste the sentence into
-                  Scanner.
+                  No local form match yet. Try a dictionary form or romaji.
                 </div>
               )}
               <button
