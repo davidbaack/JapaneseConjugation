@@ -2057,10 +2057,6 @@ export default function StudyView({ mode = 'practice' }) {
   const [coachSeedAnswer, setCoachSeedAnswer] = useState('');
   const [coachRevealed, setCoachRevealed] = useState(0);
   const [greenRevealed, setGreenRevealed] = useState(0);
-  const [revealedMiss, setRevealedMiss] = useState(false);
-  const [reviewChoiceLabel, setReviewChoiceLabel] = useState('');
-  const [submittedAnswer, setSubmittedAnswer] = useState('');
-  const [lastDiagnosis, setLastDiagnosis] = useState(null);
   // Snapshot of the just-graded answer for the in-session review panel, set by
   // the submit handlers (the only entries into the reviewing phase) so the
   // shared RunAnswerReveal renders from a stable reference instead of rebuilding
@@ -2420,7 +2416,6 @@ export default function StudyView({ mode = 'practice' }) {
     setPhase('answering');
     setStepHint('');
     setWasCorrect(false);
-    setLastDiagnosis(null);
   }, [current, activeMinimalPairSet]);
 
   useEffect(() => {
@@ -2432,7 +2427,6 @@ export default function StudyView({ mode = 'practice' }) {
     setPhase('answering');
     setStepHint('');
     setWasCorrect(false);
-    setLastDiagnosis(null);
   }, [practicePrefs.minimalPairSetId]);
 
   useLayoutEffect(() => {
@@ -2516,13 +2510,6 @@ export default function StudyView({ mode = 'practice' }) {
     }
     setGreenRevealed((prev) => (committed > prev ? committed : prev));
   }, [answer, phase]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (phase === 'answering') {
-      setRevealedMiss(false);
-      setReviewChoiceLabel('');
-    }
-  }, [current?.id, phase]);
 
   useEffect(() => {
     setSelfCheckOpen(false);
@@ -3105,8 +3092,6 @@ export default function StudyView({ mode = 'practice' }) {
     setPhase('answering');
     setCoachRevealed(0);
     setGreenRevealed(0);
-    setRevealedMiss(false);
-    setReviewChoiceLabel('');
     setSelfCheckOpen(false);
     setStepHint('');
     setHintMasked(false);
@@ -3241,14 +3226,11 @@ export default function StudyView({ mode = 'practice' }) {
     if (phase === 'reviewing') {
       setAnswer('');
       setCoachRevealed(0);
-      setRevealedMiss(false);
-      setReviewChoiceLabel('');
       setSelfCheckOpen(false);
       setStepHint('');
       setHintMasked(false);
       setHintRevealed(false);
       setCoachChatOpen(false);
-      setLastDiagnosis(null);
       hadKanaMistakeRef.current = false;
       wrongSnapshotRef.current = null;
       usedHintRef.current = false;
@@ -3322,14 +3304,7 @@ export default function StudyView({ mode = 'practice' }) {
     appendRunAnswerRecord(runRecord);
     setReviewRecord(runRecord);
     setState(nextState);
-    setLastDiagnosis(mistakeDiagnosis);
-    setReviewChoiceLabel('');
-    setRevealedMiss(false);
     setSelfCheckOpen(false);
-    // When the final string matched but the card was still marked wrong (a kana
-    // mistake was made and then corrected mid-typing), show the snapshot from
-    // when it went wrong instead of the corrected text.
-    setSubmittedAnswer(submittedForReview);
     setWasCorrected(finalOk && !ok);
     setWasCorrect(ok);
     setPhase('reviewing');
@@ -3341,14 +3316,11 @@ export default function StudyView({ mode = 'practice' }) {
         autoAdvanceRef.current = null;
         setAnswer('');
         setCoachRevealed(0);
-        setRevealedMiss(false);
-        setReviewChoiceLabel('');
         setSelfCheckOpen(false);
         setStepHint('');
         setHintMasked(false);
         setHintRevealed(false);
         setCoachChatOpen(false);
-        setLastDiagnosis(null);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
         usedHintRef.current = false;
@@ -3385,14 +3357,11 @@ export default function StudyView({ mode = 'practice' }) {
     setState(nextState);
     setAnswer('');
     setCoachRevealed(0);
-    setRevealedMiss(false);
-    setReviewChoiceLabel('');
     setSelfCheckOpen(false);
     setStepHint('');
     setHintMasked(false);
     setHintRevealed(false);
     setCoachChatOpen(false);
-    setLastDiagnosis(null);
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
     usedHintRef.current = false;
@@ -3474,10 +3443,7 @@ export default function StudyView({ mode = 'practice' }) {
     setReviewRecord(runRecord);
     setState(nextState);
     setAnswer('');
-    setReviewChoiceLabel(label);
-    setRevealedMiss(!ok);
     setSelfCheckOpen(false);
-    setLastDiagnosis(mistakeDiagnosis);
     setWasCorrect(ok);
     setPhase('reviewing');
     const reviewWillComplete =
@@ -3488,14 +3454,11 @@ export default function StudyView({ mode = 'practice' }) {
         autoAdvanceRef.current = null;
         setAnswer('');
         setCoachRevealed(0);
-        setRevealedMiss(false);
-        setReviewChoiceLabel('');
         setSelfCheckOpen(false);
         setStepHint('');
         setHintMasked(false);
         setHintRevealed(false);
         setCoachChatOpen(false);
-        setLastDiagnosis(null);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
         usedHintRef.current = false;
@@ -3566,10 +3529,7 @@ export default function StudyView({ mode = 'practice' }) {
     setReviewRecord(runRecord);
     setState(nextState);
     setAnswer('');
-    setLastDiagnosis(mistakeDiagnosis);
-    setReviewChoiceLabel("I don't know");
     setSelfCheckOpen(false);
-    setRevealedMiss(true);
     setWasCorrect(false);
     setPhase('reviewing');
   }
