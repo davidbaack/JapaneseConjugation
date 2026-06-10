@@ -25,10 +25,11 @@ test.describe('Study flow', () => {
     // Review phase: verdict + the canonical advance control.
     await expect(page.getByText('Not quite.').last()).toBeVisible();
     const next = page.getByRole('button', { name: 'Next (Enter)' });
-    await expect(next).toBeVisible();
+    await expect(next).toHaveCount(2);
+    await expect(next.first()).toBeVisible();
 
     // Advancing returns to the answering phase with a fresh input.
-    await next.click();
+    await next.first().click();
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Check (Enter)' })).toBeVisible();
   });
@@ -42,6 +43,8 @@ test.describe('Study flow', () => {
     await page.getByRole('button', { name: 'Reveal', exact: true }).click();
 
     // Revealing grades the card as missed and drops into the review phase.
-    await expect(page.getByRole('button', { name: 'Next (Enter)' })).toBeVisible();
+    const next = page.getByRole('button', { name: 'Next (Enter)' });
+    await expect(next).toHaveCount(2);
+    await expect(next.first()).toBeVisible();
   });
 });

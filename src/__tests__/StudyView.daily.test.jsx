@@ -118,6 +118,17 @@ function persistStudyCard(word, type) {
 async function waitForPracticeCard() {
   return screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
 }
+
+function openPracticeRunSettings() {
+  fireEvent.click(screen.getByRole('button', { name: 'Practice run settings' }));
+  return within(screen.getByRole('group', { name: 'Practice run settings' }));
+}
+
+async function clickTopReviewNext() {
+  const nextButtons = await screen.findAllByRole('button', { name: 'Next (Enter)' });
+  fireEvent.click(nextButtons[0]);
+}
+
 class FakeSpeechRecognition {
   static instance = null;
 
@@ -202,7 +213,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
-  it('returns to Stats from an active card', async () => {
+  it('does not surface a local Stats shortcut on an active card', async () => {
     const target = STARTER_VERBS[0];
     persistStudyCard(target, 'plain-past');
     const app = makeApp();
@@ -212,11 +223,11 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitForPracticeCard();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Stats' }));
-    expect(app.setTab).toHaveBeenCalledWith('stats');
+    expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
+    expect(app.setTab).not.toHaveBeenCalled();
   });
 
-  it('surfaces answer style and kana help controls on the Practice card', async () => {
+  it('surfaces answer style and kana help controls in the Practice run gear menu', async () => {
     const setPracticePrefs = vi.fn();
     mockedApp.value = makeApp({
       setPracticePrefs,
@@ -229,7 +240,11 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     await waitForPracticeCard();
-    const answerStyle = within(screen.getByRole('group', { name: 'Answer style' }));
+    expect(screen.getByRole('button', { name: 'Practice run settings' })).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Answer style' })).toBeNull();
+
+    const settings = openPracticeRunSettings();
+    const answerStyle = within(settings.getByRole('group', { name: 'Answer style' }));
     expect(answerStyle.getByRole('button', { name: 'Type' }).getAttribute('aria-pressed')).toBe(
       'true',
     );
@@ -238,13 +253,13 @@ describe('StudyView continuous Practice startup', () => {
     const answerUpdater = setPracticePrefs.mock.calls.at(-1)[0];
     expect(answerUpdater({ ...DEFAULT_PREFS }).answerMode).toBe('choice');
 
-    const kanaToggle = screen.getByRole('button', { name: 'Kana help on' });
+    const kanaToggle = settings.getByRole('button', { name: 'Kana help on' });
     expect(kanaToggle.getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(kanaToggle);
     const kanaUpdater = setPracticePrefs.mock.calls.at(-1)[0];
     expect(kanaUpdater({ ...DEFAULT_PREFS }).kanaAssist).toBe('off');
 
-    const autoNextToggle = screen.getByRole('button', { name: 'Auto next off' });
+    const autoNextToggle = settings.getByRole('button', { name: 'Auto next off' });
     expect(autoNextToggle.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(autoNextToggle);
     const autoNextUpdater = setPracticePrefs.mock.calls.at(-1)[0];
@@ -253,6 +268,10 @@ describe('StudyView continuous Practice startup', () => {
       autoAdvanceCorrectUserSet: true,
       autoAdvanceCorrectByAnswerForm: { 'input-live': true },
     });
+
+    expect(settings.getByRole('button', { name: 'Sentence off' })).toBeTruthy();
+    expect(settings.getByText('Adjust scope')).toBeTruthy();
+    expect(settings.getByRole('button', { name: 'Remove this word from Practice' })).toBeTruthy();
   });
 
   it('offers an Overview return path from a focused (special) session', async () => {
@@ -697,7 +716,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
     expect(screen.queryByText('0/1 ready')).toBeNull();
-    expect(screen.getAllByText('Practice').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Practice run settings' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
   });
 
@@ -1130,6 +1149,8 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    const cardSource = screen.getByLabelText('Current card source');
+    expect(within(cardSource).getByText('New')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Review answers' }).disabled).toBe(true);
 
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
@@ -1144,11 +1165,12 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByText('Answers from this run')).toBeTruthy();
     expect(screen.getByText('Answer #1')).toBeTruthy();
     expect(screen.getByText('Your answer:')).toBeTruthy();
-    expect(within(reviewRegion).getAllByText('New').length).toBeGreaterThan(0);
+    expect(within(reviewRegion).queryByText('New')).toBeNull();
 
     fireEvent.click(screen.getByText('Answer #1'));
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
     expect(screen.getByText('Answer breakdown')).toBeTruthy();
+    expect(within(reviewRegion).queryByText('New')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to Practice' }));
     expect(screen.getByText('Practice run')).toBeTruthy();
@@ -1179,26 +1201,26 @@ describe('StudyView continuous Practice startup', () => {
 
     fireEvent.change(await waitForPracticeCard(), { target: { value: 'wrong' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
+    await clickTopReviewNext();
 
     await waitFor(() => expect(screen.getAllByText('Plain Negative').length).toBeGreaterThan(0));
     fireEvent.change(await waitForPracticeCard(), {
       target: { value: conjugateItem(target, 'plain-negative') },
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
+    await clickTopReviewNext();
 
     await waitFor(() => expect(screen.getAllByText('Polite Present').length).toBeGreaterThan(0));
     fireEvent.change(await waitForPracticeCard(), {
       target: { value: conjugateItem(target, 'polite-present') },
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
+    await clickTopReviewNext();
 
     expect((await screen.findAllByText(/Repeating missed forms/)).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Plain Past').length).toBeGreaterThan(0);
     fireEvent.change(await waitForPracticeCard(), {
       target: { value: conjugateItem(target, 'plain-past') },
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Next (Enter)' }));
+    await clickTopReviewNext();
 
     expect(await screen.findByText('Drill complete')).toBeTruthy();
   });
@@ -1361,9 +1383,10 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    expect(screen.getByRole('button', { name: 'Kana help off' }).getAttribute('aria-pressed')).toBe(
-      'false',
-    );
+    const settings = openPracticeRunSettings();
+    expect(
+      settings.getByRole('button', { name: 'Kana help off' }).getAttribute('aria-pressed'),
+    ).toBe('false');
 
     fireEvent.change(input, { target: { value: '\u305f\u306a\u3053' } });
     await waitFor(() => expect(input.value).toBe('\u305f\u306a\u3053'));

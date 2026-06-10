@@ -12,6 +12,7 @@ import {
   IconList,
   IconPlus,
   IconRefresh,
+  IconSettings,
   IconBook,
 } from '../components/Icons.jsx';
 import {
@@ -27,7 +28,7 @@ import {
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
-import { lessonForType } from '../data/lessonContent.js';
+import { LESSON_SECTIONS, lessonForType } from '../data/lessonContent.js';
 import { ChatPanel } from '../components/ChatPanel.jsx';
 import { toHiragana, toHiraganaProgress, toKanaInputValue } from '../utils/romaji.js';
 import {
@@ -397,7 +398,6 @@ const CARD_ORIGIN_META = {
     chipClass:
       'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/70 dark:bg-sky-950/30 dark:text-sky-300',
     detailClass: 'text-sky-700 dark:text-sky-300',
-    itemClass: 'border-sky-200 bg-sky-50/55 dark:border-sky-900/60 dark:bg-sky-950/10',
   },
   missed: {
     label: 'Previously missed',
@@ -405,7 +405,6 @@ const CARD_ORIGIN_META = {
     chipClass:
       'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-300',
     detailClass: 'text-amber-700 dark:text-amber-300',
-    itemClass: 'border-amber-200 bg-amber-50/55 dark:border-amber-900/60 dark:bg-amber-950/10',
   },
   review: {
     label: 'Review',
@@ -413,7 +412,6 @@ const CARD_ORIGIN_META = {
     chipClass:
       'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/70 dark:bg-indigo-950/30 dark:text-indigo-300',
     detailClass: 'text-indigo-700 dark:text-indigo-300',
-    itemClass: 'border-indigo-200 bg-indigo-50/45 dark:border-indigo-900/60 dark:bg-indigo-950/10',
   },
 };
 
@@ -433,12 +431,11 @@ function withCardOrigin(card, origin) {
   return { ...card, selectionOrigin: origin || cardOriginForStudyCard(card) };
 }
 
-function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, footer }) {
+function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, topAction, footer }) {
   const [chatOpen, setChatOpen] = useState(false);
   if (!record) return null;
 
   const prefs = record.practicePrefs || DEFAULT_PREFS;
-  const originMeta = cardOriginMeta(record.cardOrigin);
   const reviewSubmittedDisplay = record.submittedAnswer ? record.submittedAnswer.trim() : '';
   const reviewSubmittedAnswer = record.reverseDrill
     ? reviewSubmittedDisplay
@@ -474,19 +471,29 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, foot
     : record.wasCorrected
       ? 'bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/50'
       : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50';
+  const missedAnswerLabel = record.reviewChoiceLabel
+    ? 'You chose'
+    : record.revealedMiss
+      ? "You chose: I don't know"
+      : 'Your Answer';
+  const missedAnswerValue = record.reviewChoiceLabel
+    ? record.reviewChoiceLabel
+    : record.revealedMiss
+      ? "I don't know"
+      : reviewSubmittedComparison;
+  const missedAnswerPanelClass = record.wasCorrected
+    ? 'border-amber-300/70 bg-amber-50/85 dark:border-amber-700/60 dark:bg-amber-950/30'
+    : 'border-rose-300/70 bg-rose-50/85 dark:border-rose-700/60 dark:bg-rose-950/30';
+  const missedAnswerLabelClass = record.wasCorrected
+    ? 'text-amber-800 dark:text-amber-200'
+    : 'text-rose-800 dark:text-rose-200';
+  const missedAnswerValueClass = record.wasCorrected
+    ? 'text-amber-950 dark:text-amber-50'
+    : 'text-rose-950 dark:text-rose-50';
 
   return (
     <div className={`rounded-xl p-4 ${panelClass}`}>
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-left">
-        <span
-          className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${originMeta.chipClass}`}
-        >
-          {originMeta.label}
-        </span>
-        <span className={`text-xs ${originMeta.detailClass}`}>
-          {record.selectionReason || originMeta.detail}
-        </span>
-      </div>
+      {topAction && <div className="mb-3">{topAction}</div>}
       <div className="flex items-start gap-3 text-left">
         <div
           className={`mt-0.5 flex-shrink-0 ${
@@ -574,18 +581,21 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, foot
           ) : (
             <>
               {reviewKanaCells.length > 0 ? (
-                <>
-                  <div className="mt-3">
-                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-455">
+                <div className="mt-4 grid gap-3">
+                  <section className="rounded-xl border border-emerald-300/70 bg-emerald-50/85 p-3 shadow-sm dark:border-emerald-700/60 dark:bg-emerald-950/30">
+                    <div className="text-[11px] font-semibold uppercase text-emerald-800 dark:text-emerald-200">
                       Correct Answer
                     </div>
                     {correctKanaCells.length > 0 && (
-                      <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50 p-2 dark:border-stone-700 dark:bg-stone-900/50">
-                        <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                      <div className="mt-3 rounded-lg bg-white/75 p-2 ring-1 ring-inset ring-emerald-200/80 dark:bg-stone-950/35 dark:ring-emerald-800/60">
+                        <div
+                          className="flex flex-wrap justify-start gap-1.5 sm:justify-center"
+                          lang="ja"
+                        >
                           {correctKanaCells.map((cell, i) => (
                             <div
                               key={i}
-                              className="flex h-9 w-8 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 text-base font-medium tabular-nums text-emerald-800 dark:border-emerald-805 dark:bg-emerald-950/30 dark:text-emerald-300 sm:h-10 sm:w-9"
+                              className="flex h-10 w-9 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 text-lg font-semibold tabular-nums text-emerald-900 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-100"
                             >
                               {cell.shown || '·'}
                             </div>
@@ -598,43 +608,44 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, foot
                       word={record.word}
                       type={record.practicedType}
                       colorHighlight={prefs.colorCodeConjugations !== false}
-                      className="mt-2 text-xl text-emerald-900 dark:text-emerald-100"
-                      subClassName="mt-1 text-xs text-stone-500"
+                      className="mt-2 text-2xl font-semibold leading-snug text-emerald-950 dark:text-emerald-50"
+                      subClassName="mt-1 text-xs text-emerald-700 dark:text-emerald-300"
                     />
-                    <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
+                    <div className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
                       {targetEnglish}
                     </div>
-                  </div>
+                  </section>
 
-                  <div className="mt-3">
+                  <section className={`rounded-xl border p-3 shadow-sm ${missedAnswerPanelClass}`}>
                     <div
-                      className={`mb-1 text-[11px] uppercase tracking-wider ${
-                        record.wasCorrected
-                          ? 'text-amber-700/80 dark:text-amber-400/80'
-                          : 'text-rose-700/80 dark:text-rose-400/80'
-                      }`}
+                      className={`text-[11px] font-semibold uppercase ${missedAnswerLabelClass}`}
                     >
-                      {record.reviewChoiceLabel
-                        ? 'You chose'
-                        : record.revealedMiss
-                          ? "You chose: I don't know"
-                          : 'Your Answer'}
+                      {missedAnswerLabel}
                     </div>
-                    <div className="rounded-xl border border-stone-200/60 bg-stone-50/40 p-2 dark:border-stone-800/60 dark:bg-stone-900/20">
-                      <div className="flex flex-wrap justify-center gap-1" lang="ja">
+                    <div
+                      className={`mt-2 break-words text-2xl font-semibold leading-snug ${missedAnswerValueClass}`}
+                      lang={record.reviewChoiceLabel || record.revealedMiss ? undefined : 'ja'}
+                    >
+                      {missedAnswerValue}
+                    </div>
+                    <div className="mt-3 rounded-lg bg-white/70 p-2 ring-1 ring-inset ring-stone-200/80 dark:bg-stone-950/35 dark:ring-stone-700/70">
+                      <div
+                        className="flex flex-wrap justify-start gap-1.5 sm:justify-center"
+                        lang="ja"
+                      >
                         {reviewKanaCells.map((cell, i) => {
                           const cls =
                             cell.state === 'correct'
-                              ? 'bg-emerald-50/50 border-emerald-350/40 text-emerald-800/80 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-300/80'
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-100'
                               : cell.state === 'wrong' || cell.state === 'extra'
-                                ? 'bg-rose-50/50 border-rose-350/40 text-rose-800/80 dark:bg-rose-950/20 dark:border-rose-800/30 dark:text-rose-300/80'
+                                ? 'border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-600 dark:bg-rose-950/40 dark:text-rose-100'
                                 : cell.state === 'hint'
-                                  ? 'bg-amber-50/50 border-amber-350/40 text-amber-800/80 dark:bg-amber-950/20 dark:border-amber-300/30 dark:text-amber-300/80'
-                                  : 'bg-white/50 dark:bg-stone-900/50 border-stone-200/40 dark:border-stone-800/40 text-stone-300/85';
+                                  ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500 dark:bg-amber-950/40 dark:text-amber-100'
+                                  : 'border-stone-300 bg-stone-100 text-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400';
                           return (
                             <div
                               key={i}
-                              className={`flex h-8 w-7 items-center justify-center rounded-lg border text-sm font-medium tabular-nums sm:h-9 sm:w-8 ${cls}`}
+                              className={`flex h-10 w-9 items-center justify-center rounded-lg border text-lg font-semibold tabular-nums ${cls}`}
                             >
                               {cell.shown || '\u00b7'}
                             </div>
@@ -642,8 +653,8 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, foot
                         })}
                       </div>
                     </div>
-                  </div>
-                </>
+                  </section>
+                </div>
               ) : (
                 <div className="mt-1 text-xs text-rose-700">
                   {record.reviewChoiceLabel
@@ -853,7 +864,6 @@ function RunAnswerReviewItem({ record, geminiKey, onOpenLearn }) {
   const answerText =
     record.reviewChoiceLabel ||
     (record.revealedMiss ? "I don't know" : record.submittedAnswer?.trim() || '(empty)');
-  const originMeta = cardOriginMeta(record.cardOrigin);
   const toneClass = record.correct
     ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
     : record.wasCorrected
@@ -862,7 +872,7 @@ function RunAnswerReviewItem({ record, geminiKey, onOpenLearn }) {
   const statusLabel = record.correct ? 'Correct' : record.wasCorrected ? 'Assisted' : 'Missed';
 
   return (
-    <details className={`group rounded-xl border ${originMeta.itemClass}`}>
+    <details className="group rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
       <summary className="cursor-pointer list-none px-4 py-3 transition hover:bg-stone-50 dark:hover:bg-stone-950/40">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
@@ -880,11 +890,6 @@ function RunAnswerReviewItem({ record, geminiKey, onOpenLearn }) {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <span
-              className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${originMeta.chipClass}`}
-            >
-              {originMeta.label}
-            </span>
             <span
               className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${toneClass}`}
             >
@@ -1252,12 +1257,7 @@ const WEAKNESS_ROW_TONE = {
   weak: 'bg-rose-500',
 };
 
-const FAMILY_SKILL_TONE = {
-  strong: 'bg-emerald-500',
-  developing: 'bg-amber-500',
-  weak: 'bg-rose-500',
-  untested: 'bg-stone-300 dark:bg-stone-700',
-};
+const LESSON_BY_GROUP_ID = new Map(LESSON_SECTIONS.map((lesson) => [lesson.groupId, lesson]));
 
 function PracticeScopeSidebar({
   state,
@@ -1306,9 +1306,9 @@ function PracticeScopeSidebar({
             const skillStatus = progress.skillStatus || 'untested';
             const skillLabel = progress.skillLabel || (attempted ? 'Gathering data' : 'Untested');
             const skillScore = progress.skillScore || 0;
-            const correctPct = attempted ? Math.round((correct / attempted) * 100) : 0;
-            const wrongPct = attempted ? Math.max(0, 100 - correctPct) : 0;
             const skillWidth = skillStatus === 'untested' ? 8 : Math.max(6, skillScore);
+            const skillText =
+              skillStatus === 'untested' ? skillLabel : `${skillScore}% skill - ${skillLabel}`;
             const open = openFamilyIds.has(family.id);
             const contentId = `practice-map-family-${family.id}`;
             return (
@@ -1322,6 +1322,7 @@ function PracticeScopeSidebar({
                     onClick={() => onToggleFamilyOpen(family.id)}
                     aria-expanded={open}
                     aria-controls={contentId}
+                    aria-label={`${family.label} category details`}
                     className="min-w-0 flex-1 cursor-pointer rounded-lg bg-transparent p-0 text-left"
                   >
                     <span className="block text-sm font-semibold text-stone-900 dark:text-stone-100">
@@ -1335,35 +1336,20 @@ function PracticeScopeSidebar({
                         {attempted ? `${correct} right / ${incorrect} wrong` : 'No reps yet'}
                       </span>
                       <span className="font-semibold text-stone-700 dark:text-stone-300">
-                        {skillStatus === 'untested' ? skillLabel : `${skillScore}% skill`}
+                        {skillText}
                       </span>
                     </span>
-                    <span className="mt-2 block space-y-1.5">
-                      <span
-                        className="block h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
-                        aria-label={`${family.label} lifetime right and wrong`}
-                      >
-                        {attempted ? (
-                          <>
-                            <span
-                              className="inline-block h-full bg-emerald-500 align-top"
-                              style={{ width: `${correctPct}%` }}
-                            />
-                            <span
-                              className="inline-block h-full bg-rose-400 align-top"
-                              style={{ width: `${wrongPct}%` }}
-                            />
-                          </>
-                        ) : (
-                          <span className="block h-full w-[8%] bg-stone-300 dark:bg-stone-700" />
-                        )}
-                      </span>
+                    <span className="mt-2 block">
                       <span
                         className="block h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
                         aria-label={`${family.label} skill`}
                       >
                         <span
-                          className={`block h-full ${FAMILY_SKILL_TONE[skillStatus] || FAMILY_SKILL_TONE.untested}`}
+                          className={`block h-full ${
+                            skillStatus === 'untested'
+                              ? 'bg-stone-300 dark:bg-stone-700'
+                              : 'bg-indigo-600 dark:bg-indigo-400'
+                          }`}
                           style={{ width: `${skillWidth}%` }}
                         />
                       </span>
@@ -1458,6 +1444,106 @@ function PracticeScopeSidebar({
           })}
         </div>
       </section>
+    </aside>
+  );
+}
+
+function FocusCategoryMap({ state, onToggleFamily, className = '' }) {
+  const enabled = new Set(state.enabledTypes || []);
+  const activeCount = enabled.size;
+
+  return (
+    <aside
+      className={`space-y-3 lg:sticky lg:top-4 lg:self-start ${className}`}
+      aria-label="Focus map"
+    >
+      <div className="flex items-start justify-between gap-3 px-1">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+            Focus map
+          </div>
+          <h2 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
+            Practice categories
+          </h2>
+        </div>
+        <span className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">
+          {activeCount} forms on
+        </span>
+      </div>
+      <div className="space-y-3">
+        {FORM_GROUPS.map((family) => {
+          const lesson = LESSON_BY_GROUP_ID.get(family.id);
+          const enabledInFamily = family.typeIds.filter((typeId) => enabled.has(typeId));
+          const allEnabled = enabledInFamily.length === family.typeIds.length;
+          const someEnabled = enabledInFamily.length > 0;
+          const statusLabel = allEnabled ? 'On' : someEnabled ? 'Partial' : 'Off';
+          const pressed = allEnabled ? true : someEnabled ? 'mixed' : false;
+          const title = lesson?.title || family.label;
+          const titleId = `focus-map-title-${family.id}`;
+
+          return (
+            <article
+              key={family.id}
+              aria-labelledby={titleId}
+              className={`rounded-2xl border p-3 transition ${
+                allEnabled
+                  ? 'border-indigo-200 bg-indigo-50/70 dark:border-indigo-900/70 dark:bg-indigo-950/20'
+                  : someEnabled
+                    ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/70 dark:bg-amber-950/20'
+                    : 'border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  {lesson?.kana && (
+                    <div
+                      lang="ja"
+                      className="text-sm font-semibold leading-tight text-indigo-600 dark:text-indigo-300"
+                    >
+                      {lesson.kana}
+                    </div>
+                  )}
+                  <h3
+                    id={titleId}
+                    className="mt-1 text-sm font-semibold leading-tight text-stone-950 dark:text-stone-50"
+                  >
+                    {title}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  aria-pressed={pressed}
+                  aria-label={`Turn ${title} focus ${allEnabled ? 'off' : 'on'}`}
+                  onClick={() => onToggleFamily(family)}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold transition ${
+                    allEnabled
+                      ? 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/50'
+                      : someEnabled
+                        ? 'border-amber-300 bg-white text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-stone-950 dark:text-amber-300 dark:hover:bg-amber-950/50'
+                        : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300'
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      allEnabled ? 'bg-emerald-500' : someEnabled ? 'bg-amber-500' : 'bg-stone-400'
+                    }`}
+                  />
+                  {statusLabel}
+                </button>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-stone-600 dark:text-stone-300">
+                {lesson?.summary || 'Practice the forms in this category.'}
+              </p>
+              <div className="mt-3 flex items-center justify-between gap-3 text-[11px] font-medium text-stone-500 dark:text-stone-400">
+                <span>
+                  {enabledInFamily.length}/{family.typeIds.length} forms on
+                </span>
+                <span>{family.label}</span>
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </aside>
   );
 }
@@ -2014,6 +2100,7 @@ export default function StudyView({ mode = 'practice' }) {
   const [openPracticeMapFamilyIds, setOpenPracticeMapFamilyIds] = useState(() => new Set());
   const [runAnswerHistory, setRunAnswerHistory] = useState([]);
   const [runReviewOpen, setRunReviewOpen] = useState(false);
+  const [practiceSettingsOpen, setPracticeSettingsOpen] = useState(false);
   const inputRef = useRef(null);
   const nextButtonRef = useRef(null);
   const focusSeededRef = useRef(false);
@@ -3918,7 +4005,14 @@ export default function StudyView({ mode = 'practice' }) {
     : focusBanner
       ? `${focusBanner.kicker}: ${focusBanner.title}`
       : current.selectionReason || 'Varied practice from enabled categories';
-  const currentOriginMeta = cardOriginMeta(cardOriginForStudyCard(current));
+  const currentOrigin = cardOriginForStudyCard(current);
+  const currentOriginMeta = cardOriginMeta(currentOrigin);
+  const currentOriginBadgeLabel =
+    currentOrigin === 'missed' && currentSelectionReason
+      ? currentSelectionReason
+      : currentOriginMeta.label;
+  const currentOriginDetail =
+    currentOrigin === 'missed' ? currentOriginMeta.detail : currentSelectionReason;
   const recentOutcomes = Array.isArray(state.session?.recentOutcomes)
     ? state.session.recentOutcomes
     : [];
@@ -3927,6 +4021,18 @@ export default function StudyView({ mode = 'practice' }) {
     : runStats.reviewed > 0 && runStats.missed === 0
       ? `${currentSelectionReason}. Clean run so far.`
       : `${currentSelectionReason}.`;
+  const reviewNextButtonClass =
+    'w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-sm transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150';
+  const renderReviewNextButton = (buttonRef = null, className = '') => (
+    <button
+      ref={buttonRef}
+      type="button"
+      onClick={() => submit()}
+      className={`${reviewNextButtonClass} ${className}`.trim()}
+    >
+      Next (Enter)
+    </button>
+  );
 
   return (
     <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] xl:justify-center xl:grid-cols-[minmax(0,17rem)_minmax(0,42rem)_minmax(0,17rem)]">
@@ -3995,126 +4101,6 @@ export default function StudyView({ mode = 'practice' }) {
             </div>
           </div>
         )}
-        <div className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex w-full items-center gap-2.5 sm:w-auto">
-            {!focusBanner && (
-              <button
-                type="button"
-                onClick={returnToOverview}
-                aria-label="Back to Stats"
-                className="shrink-0 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 hover:text-stone-700 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"
-              >
-                &lt;- Stats
-              </button>
-            )}
-            <div className="text-left">
-              <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
-                Practice
-              </div>
-              <div className="text-sm text-stone-600 dark:text-stone-300">
-                {reverseDrill ? 'Reading practice' : 'Form practice'}
-              </div>
-            </div>
-          </div>
-          <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
-            <div
-              role="group"
-              aria-label="Answer style"
-              className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-stone-200 bg-white p-1 dark:border-stone-800 dark:bg-stone-900"
-            >
-              <span className="px-1.5 text-xs font-medium text-stone-400">Answer</span>
-              {ANSWER_STYLE_OPTIONS.map((option) => {
-                const active = answerMode === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setAnswerStyle(option.id)}
-                    aria-pressed={active}
-                    className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-                      active
-                        ? 'bg-stone-800 text-white dark:bg-indigo-600'
-                        : 'text-stone-500 hover:bg-stone-50 hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-            {typedAnswerMode && !reverseDrill && (
-              <button
-                type="button"
-                onClick={toggleKanaHelp}
-                aria-pressed={liveKanaHelpEnabled}
-                title={liveKanaHelpEnabled ? 'Turn kana help off' : 'Turn kana help on'}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                  liveKanaHelpEnabled
-                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                    : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-                }`}
-              >
-                {liveKanaHelpEnabled ? (
-                  <IconEye className="h-3.5 w-3.5" />
-                ) : (
-                  <IconEyeOff className="h-3.5 w-3.5" />
-                )}
-                Kana help {liveKanaHelpEnabled ? 'on' : 'off'}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={toggleAutoNext}
-              aria-pressed={autoAdvanceCorrect}
-              title={`Auto next for ${autoAdvanceFormKey}`}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                autoAdvanceCorrect
-                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                  : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-              }`}
-            >
-              <IconRefresh className="h-3.5 w-3.5" />
-              Auto next {autoAdvanceCorrect ? 'on' : 'off'}
-            </button>
-            <div className="text-xs text-stone-400 text-right">Practice</div>
-            <button
-              type="button"
-              onClick={() =>
-                setPracticePrefs((prev) => ({ ...prev, sentenceMode: !prev.sentenceMode }))
-              }
-              aria-pressed={sentenceMode}
-              title="Show each prompt inside an example sentence (stays on until you turn it off)"
-              className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                sentenceMode
-                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                  : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-              }`}
-            >
-              Sentence{sentenceMode ? ' on' : ''}
-            </button>
-            <details className="relative">
-              <summary className="flex cursor-pointer list-none items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800">
-                Adjust scope
-              </summary>
-              <div className="absolute right-0 z-10 mt-1 w-64 rounded-lg border border-stone-200 bg-white p-2 text-left shadow-lg dark:border-stone-800 dark:bg-stone-900">
-                <p className="px-1 pb-1.5 text-[11px] leading-snug text-stone-500 dark:text-stone-400">
-                  Removes this word from automatic Practice. Restore words from Tools. To move on
-                  without changing scope, use Skip.
-                </p>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    removeCurrentWordFromReviews();
-                    e.currentTarget.closest('details')?.removeAttribute('open');
-                  }}
-                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-stone-700 transition hover:bg-rose-50 hover:text-rose-700 dark:text-stone-200 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
-                >
-                  Remove this word from Practice
-                </button>
-              </div>
-            </details>
-          </div>
-        </div>
         <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
@@ -4130,6 +4116,145 @@ export default function StudyView({ mode = 'practice' }) {
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <details className="relative" open={practiceSettingsOpen}>
+                <summary
+                  role="button"
+                  aria-label="Practice run settings"
+                  aria-expanded={practiceSettingsOpen}
+                  title="Practice run settings"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setPracticeSettingsOpen((open) => !open);
+                  }}
+                  className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border border-stone-200 text-stone-500 transition hover:bg-stone-50 hover:text-stone-800 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                >
+                  <IconSettings className="h-3.5 w-3.5" />
+                </summary>
+                {practiceSettingsOpen && (
+                  <div
+                    role="group"
+                    aria-label="Practice run settings"
+                    className="absolute right-0 z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-stone-200 bg-white p-3 text-left shadow-xl dark:border-stone-800 dark:bg-stone-900"
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                        Practice settings
+                      </div>
+                      <div className="text-[11px] font-medium text-stone-400">
+                        {reverseDrill ? 'Reading' : 'Form'}
+                      </div>
+                    </div>
+                    <div
+                      role="group"
+                      aria-label="Answer style"
+                      className="mb-3 inline-flex w-full flex-wrap items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
+                    >
+                      <span className="px-1.5 text-xs font-medium text-stone-400">Answer</span>
+                      {ANSWER_STYLE_OPTIONS.map((option) => {
+                        const active = answerMode === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => setAnswerStyle(option.id)}
+                            aria-pressed={active}
+                            className={`rounded-md px-2 py-1 text-xs font-medium transition ${
+                              active
+                                ? 'bg-stone-800 text-white dark:bg-indigo-600'
+                                : 'text-stone-500 hover:bg-white hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="space-y-2">
+                      {typedAnswerMode && !reverseDrill && (
+                        <button
+                          type="button"
+                          onClick={toggleKanaHelp}
+                          aria-pressed={liveKanaHelpEnabled}
+                          aria-label={`Kana help ${liveKanaHelpEnabled ? 'on' : 'off'}`}
+                          title={liveKanaHelpEnabled ? 'Turn kana help off' : 'Turn kana help on'}
+                          className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
+                            liveKanaHelpEnabled
+                              ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                              : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+                          }`}
+                        >
+                          <span className="inline-flex items-center gap-1.5">
+                            {liveKanaHelpEnabled ? (
+                              <IconEye className="h-3.5 w-3.5" />
+                            ) : (
+                              <IconEyeOff className="h-3.5 w-3.5" />
+                            )}
+                            Kana help
+                          </span>
+                          <span>{liveKanaHelpEnabled ? 'on' : 'off'}</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={toggleAutoNext}
+                        aria-pressed={autoAdvanceCorrect}
+                        aria-label={`Auto next ${autoAdvanceCorrect ? 'on' : 'off'}`}
+                        title={`Auto next for ${autoAdvanceFormKey}`}
+                        className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
+                          autoAdvanceCorrect
+                            ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                            : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          <IconRefresh className="h-3.5 w-3.5" />
+                          Auto next
+                        </span>
+                        <span>{autoAdvanceCorrect ? 'on' : 'off'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPracticePrefs((prev) => ({
+                            ...prev,
+                            sentenceMode: !prev.sentenceMode,
+                          }))
+                        }
+                        aria-pressed={sentenceMode}
+                        aria-label={`Sentence ${sentenceMode ? 'on' : 'off'}`}
+                        title="Show each prompt inside an example sentence (stays on until you turn it off)"
+                        className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
+                          sentenceMode
+                            ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                            : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+                        }`}
+                      >
+                        <span>Sentence</span>
+                        <span>{sentenceMode ? 'on' : 'off'}</span>
+                      </button>
+                    </div>
+                    <div className="mt-3 border-t border-stone-200 pt-3 dark:border-stone-800">
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                        Adjust scope
+                      </div>
+                      <p className="mb-2 text-[11px] leading-snug text-stone-500 dark:text-stone-400">
+                        Removes this word from automatic Practice. Restore words from Tools. To move
+                        on without changing scope, use Skip.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          removeCurrentWordFromReviews();
+                          setPracticeSettingsOpen(false);
+                        }}
+                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-stone-700 transition hover:bg-rose-50 hover:text-rose-700 dark:text-stone-200 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
+                      >
+                        Remove this word from Practice
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </details>
               <button
                 type="button"
                 onClick={() => setRunReviewOpen(true)}
@@ -4172,9 +4297,11 @@ export default function StudyView({ mode = 'practice' }) {
                   <span
                     className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${currentOriginMeta.chipClass}`}
                   >
-                    {currentOriginMeta.label}
+                    {currentOriginBadgeLabel}
                   </span>
-                  <span>{currentSelectionReason}</span>
+                  {currentOriginDetail && currentOriginDetail !== currentOriginBadgeLabel && (
+                    <span>{currentOriginDetail}</span>
+                  )}
                 </div>
               </div>
               <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
@@ -4226,8 +4353,23 @@ export default function StudyView({ mode = 'practice' }) {
                 {lessonMetaText}
               </div>
             )}
+            <div
+              aria-label="Current card source"
+              className="mx-auto mb-3 flex max-w-full flex-wrap items-center justify-center gap-1.5 pt-9 sm:pt-6"
+            >
+              <span
+                className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${currentOriginMeta.chipClass}`}
+              >
+                {currentOriginBadgeLabel}
+              </span>
+              {currentOriginDetail && currentOriginDetail !== currentOriginBadgeLabel && (
+                <span className={`text-[11px] font-medium ${currentOriginMeta.detailClass}`}>
+                  {currentOriginDetail}
+                </span>
+              )}
+            </div>
             {clozePrompt && (
-              <div className="mx-auto mb-4 mt-8 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 sm:mt-6">
+              <div className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
                 <ScriptDisplay
                   view={clozePromptView}
                   className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
@@ -4873,27 +5015,14 @@ export default function StudyView({ mode = 'practice' }) {
                       setTab('learn');
                     }}
                     autoAdvanceHint={wasCorrect && autoAdvanceCorrect}
+                    topAction={renderReviewNextButton(nextButtonRef)}
                     footer={
                       wasCorrect ? (
                         <StickyAction className="mt-3">
-                          <button
-                            ref={nextButtonRef}
-                            onClick={() => submit()}
-                            className="w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-lg transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150"
-                          >
-                            Next (Enter)
-                          </button>
+                          {renderReviewNextButton(null, 'shadow-lg')}
                         </StickyAction>
                       ) : (
-                        <div className="mt-4">
-                          <button
-                            ref={nextButtonRef}
-                            onClick={() => submit()}
-                            className="w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-sm transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150"
-                          >
-                            Next (Enter)
-                          </button>
-                        </div>
+                        <div className="mt-4">{renderReviewNextButton()}</div>
                       )
                     }
                   />
@@ -4910,6 +5039,11 @@ export default function StudyView({ mode = 'practice' }) {
           , or press Esc to skip without penalty.
         </div>
       </div>
+      <FocusCategoryMap
+        className="order-3 lg:col-span-2 xl:col-span-1"
+        state={state}
+        onToggleFamily={togglePracticeFamily}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-library/react';
 
 // No Supabase configured in tests → auth/sync effects no-op (offline-first path).
 vi.mock('../utils/supabase.js', () => ({ supabase: null }));
@@ -37,7 +37,9 @@ describe('App shell', () => {
     render(<App />);
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
+    expect(screen.getByRole('complementary', { name: 'Focus map' })).toBeTruthy();
     expect(screen.getByText('Category progress')).toBeTruthy();
+    expect(screen.getByText('Practice categories')).toBeTruthy();
     expect(screen.getByText('Toggle categories for continuous Practice.')).toBeTruthy();
     expect(screen.getAllByText('No reps yet').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Untested').length).toBeGreaterThan(0);
@@ -120,27 +122,29 @@ describe('App shell', () => {
     render(<App />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    fireEvent.click(screen.getByText('Te/Ta Sound Changes'));
-    expect(
-      screen.getByText('Te/Ta Sound Changes').closest('button')?.getAttribute('aria-expanded'),
-    ).toBe('true');
+    const practiceMap = () => screen.getByRole('complementary', { name: 'Practice map' });
+    const teTaDetailsButton = () =>
+      within(practiceMap()).getByRole('button', {
+        name: 'Te/Ta Sound Changes category details',
+      });
 
-    expect(screen.getByText('2/2 saved')).toBeTruthy();
-    expect(screen.getByText('0 right / 2 wrong')).toBeTruthy();
-    expect(screen.getByText('Gathering data')).toBeTruthy();
+    fireEvent.click(teTaDetailsButton());
+    expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
+
+    expect(within(practiceMap()).getByText('2/2 saved')).toBeTruthy();
+    expect(within(practiceMap()).getByText('0 right / 2 wrong')).toBeTruthy();
+    expect(within(practiceMap()).getByText('Gathering data')).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Disable all Te/Ta Sound Changes forms' }),
+      within(practiceMap()).getByRole('button', { name: 'Disable all Te/Ta Sound Changes forms' }),
     ).toBeTruthy();
-    expect(screen.getByText('Recent weak spots')).toBeTruthy();
-    expect(screen.getByText('Te-form - Godan ku sound changes')).toBeTruthy();
-    expect(screen.getByText('0/2')).toBeTruthy();
+    expect(within(practiceMap()).getByText('Recent weak spots')).toBeTruthy();
+    expect(within(practiceMap()).getByText('Te-form - Godan ku sound changes')).toBeTruthy();
+    expect(within(practiceMap()).getByText('0/2')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Disable all Te/Ta Sound Changes forms' }));
-    await waitFor(() => expect(screen.getByText('0/2 saved')).toBeTruthy());
-    expect(
-      screen.getByText('Te/Ta Sound Changes').closest('button')?.getAttribute('aria-expanded'),
-    ).toBe('true');
-    expect(screen.getByText('Recent weak spots')).toBeTruthy();
+    fireEvent.click(within(practiceMap()).getByRole('button', { name: /^Te-form/i }));
+    await waitFor(() => expect(within(practiceMap()).getByText('1/2 saved')).toBeTruthy());
+    expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
+    expect(within(practiceMap()).getByText('Recent weak spots')).toBeTruthy();
   });
 
   it('keeps continuous Practice available after old daily goal data is complete', async () => {
@@ -176,12 +180,10 @@ describe('App shell', () => {
   it('shows the single Practice flow instead of legacy Study mode controls', async () => {
     render(<App />);
     await waitForPracticeCard();
-    expect(await screen.findByText('Form practice', {}, { timeout: 5000 })).toBeTruthy();
+    expect(await screen.findByText('Practice run', {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
+    expect(screen.getByRole('complementary', { name: 'Focus map' })).toBeTruthy();
     expect(screen.getByText('52 saved forms')).toBeTruthy();
-    // "Sentence" is now the cued-cloze presentation toggle — a valid review
-    // control, not a legacy study-mode button.
-    expect(screen.getByRole('button', { name: 'Sentence', exact: true })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Transform', exact: true })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Study mode' })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();
@@ -281,7 +283,9 @@ describe('App shell', () => {
     const verdictStatus = await screen.findAllByText('Not quite.', {}, { timeout: 5000 });
     expect(verdictStatus).toHaveLength(1);
     expect(screen.getByText('Review this form.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Next (Enter)' }).closest('.sticky')).toBeNull();
+    const nextButtons = screen.getAllByRole('button', { name: 'Next (Enter)' });
+    expect(nextButtons).toHaveLength(2);
+    for (const button of nextButtons) expect(button.closest('.sticky')).toBeNull();
     // Typed misses show the consolidated rich top (kanji + coach diff), not the
     // redundant plain-text "Compare your answer" grid (kept only for non-typed cards).
     expect(screen.queryByText('Compare your answer')).toBeNull();
