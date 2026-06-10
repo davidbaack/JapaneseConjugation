@@ -2551,6 +2551,13 @@ export default function StudyView({ mode = 'practice' }) {
     ? makeReverseChoices(current, practiceWords)
     : makeChoices(current, practiceWords);
   const wordType = isAdjective(current.verb) ? 'Adjective' : 'Verb';
+  const currentWordMeta = getWordMeta(current.verb);
+  const lessonMetaText = [
+    currentWordMeta.lesson && `Genki L${currentWordMeta.lesson}`,
+    currentWordMeta.minnaLesson && `Minna L${currentWordMeta.minnaLesson}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const noChangePrompt = !reverseDrill && promptType === current.type;
   const taskLabel = reverseDrill ? `Recover dictionary form` : typeInfo.label;
   const transformationActionLabel = reverseDrill ? 'Answer with' : 'Conjugate to';
@@ -4176,18 +4183,29 @@ export default function StudyView({ mode = 'practice' }) {
         </div>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
           <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">
-            <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
-              JLPT {getWordMeta(current.verb).jlpt}
+            <div className="absolute top-4 left-4 rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-500 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70 sm:top-8 sm:left-6">
+              JLPT {currentWordMeta.jlpt}
             </div>
-            <div className="absolute top-4 right-4 sm:top-8 sm:right-6 text-right text-[9px] text-stone-400">
-              {[
-                getWordMeta(current.verb).lesson && `Genki L${getWordMeta(current.verb).lesson}`,
-                getWordMeta(current.verb).minnaLesson &&
-                  `Minna L${getWordMeta(current.verb).minnaLesson}`,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </div>
+            {lessonMetaText && (
+              <div className="absolute top-4 right-4 rounded-full bg-white/85 px-1.5 py-0.5 text-right text-[9px] text-stone-500 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70 sm:top-8 sm:right-6">
+                {lessonMetaText}
+              </div>
+            )}
+            {clozePrompt && (
+              <div className="mx-auto mb-4 mt-8 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 sm:mt-6">
+                <ScriptDisplay
+                  view={clozePromptView}
+                  className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
+                  subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
+                  colorHighlight={false}
+                />
+                {!hideEnglishMeaning && clozePrompt.note && (
+                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-500 dark:text-stone-400">
+                    {clozePrompt.note}
+                  </div>
+                )}
+              </div>
+            )}
             {hidePromptText ? (
               <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
                 <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-3">
@@ -4227,21 +4245,6 @@ export default function StudyView({ mode = 'practice' }) {
 
             {!hideEnglishMeaning && (
               <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
-            )}
-            {clozePrompt && (
-              <div className="mx-auto mt-3 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
-                <ScriptDisplay
-                  view={clozePromptView}
-                  className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
-                  subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
-                  colorHighlight={false}
-                />
-                {!hideEnglishMeaning && clozePrompt.note && (
-                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-500 dark:text-stone-400">
-                    {clozePrompt.note}
-                  </div>
-                )}
-              </div>
             )}
 
             {phase === 'reviewing' && practicePrefs.showWordCategory && (
