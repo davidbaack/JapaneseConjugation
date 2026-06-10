@@ -9,6 +9,7 @@ import {
   surfaceFormFor,
 } from '../utils/conjugator.js';
 import {
+  contextSentenceFor,
   getConjugationDebugInfo,
   inferMistakenConjugationPattern,
   stepCoachHint,
@@ -45,6 +46,13 @@ const CHOSHI_GA_II = {
   group: 'i-adjective',
 };
 const SHIZUKA = { dict: '静か', reading: 'しずか', meaning: 'quiet', group: 'na-adjective' };
+
+describe('contextSentenceFor', () => {
+  it('uses natural past glosses in verb context sentence help', () => {
+    expect(contextSentenceFor(TABERU, 'plain-past').en).toBe('Plain past meaning: ate.');
+    expect(contextSentenceFor(TABERU, 'polite-past').en).toBe('Polite past meaning: ate (polite).');
+  });
+});
 
 // ─── Ichidan verb (食べる) ────────────────────────────────────────────────────
 describe('ichidan verb: 食べる', () => {
