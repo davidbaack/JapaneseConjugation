@@ -119,6 +119,12 @@ async function waitForPracticeCard() {
   return screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
 }
 
+function expectElementBefore(first, second) {
+  expect(
+    Boolean(first.compareDocumentPosition(second) & window.Node.DOCUMENT_POSITION_FOLLOWING),
+  ).toBe(true);
+}
+
 function openPracticeRunSettings() {
   fireEvent.click(screen.getByRole('button', { name: 'Practice run settings' }));
   return within(screen.getByRole('group', { name: 'Practice run settings' }));
@@ -225,6 +231,19 @@ describe('StudyView continuous Practice startup', () => {
 
     expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
     expect(app.setTab).not.toHaveBeenCalled();
+  });
+
+  it('keeps the active card before the Practice map in DOM order', async () => {
+    mockedApp.value = makeApp();
+
+    render(<StudyView />);
+
+    const answerInput = await waitForPracticeCard();
+    const checkButton = screen.getByRole('button', { name: 'Check (Enter)' });
+    const practiceMap = screen.getByRole('complementary', { name: 'Practice map' });
+
+    expectElementBefore(answerInput, practiceMap);
+    expectElementBefore(checkButton, practiceMap);
   });
 
   it('surfaces answer style and kana help controls in the Practice run gear menu', async () => {
