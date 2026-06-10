@@ -151,11 +151,7 @@ export function isIrregularAdjective(word) {
   return !!(
     word &&
     word.group === 'i-adjective' &&
-    (word.irregular ||
-      word.reading === 'いい' ||
-      word.reading === 'かっこいい' ||
-      word.dict === 'いい' ||
-      word.dict === '良い')
+    (usesYoiAdjectiveStem(word) || word.dict === '良い')
   );
 }
 
@@ -1007,15 +1003,32 @@ export function conjugate(verb, type) {
 
 export function adjectiveStem(adj) {
   const reading = adj.reading;
-  if (adj.irregular || reading === 'いい' || reading === 'かっこいい')
-    return reading.slice(0, -2) + 'よ';
+  if (usesYoiAdjectiveStem(adj)) return reading.slice(0, -2) + 'よ';
   return reading.endsWith('い') ? reading.slice(0, -1) : reading;
+}
+
+function usesYoiAdjectiveStem(adj) {
+  const reading = adj?.reading || '';
+  return !!(
+    adj?.irregular ||
+    reading === 'いい' ||
+    reading === 'かっこいい' ||
+    reading === 'ちょうどいい' ||
+    reading.endsWith('がいい')
+  );
+}
+
+function yoiSurfaceStem(adj) {
+  if (adj?.dict?.endsWith('いい')) return adj.dict.slice(0, -2) + 'よ';
+  if (adj?.dict === '良い') return adj.dict.slice(0, -1);
+  return '';
 }
 
 export function conjugateAdjective(adj, type) {
   const { reading, group } = adj;
   if (group === 'i-adjective') {
     const stem = adjectiveStem(adj);
+    const sou = usesYoiAdjectiveStem(adj) ? stem + 'さそう' : stem + 'そう';
     const past = stem + 'かった',
       neg = stem + 'くない',
       pastNeg = stem + 'くなかった';
@@ -1036,7 +1049,7 @@ export function conjugateAdjective(adj, type) {
       'adj-negative-conditional': negativeBaForm(neg),
       'adj-tara': past + 'ら',
       'adj-negative-tara': pastNeg + 'ら',
-      'adj-sou': stem + 'そう',
+      'adj-sou': sou,
       'adj-sugiru': stem + 'すぎる',
       'adj-naru': stem + 'くなる',
     };
@@ -1239,8 +1252,13 @@ export function surfaceStemPair(item) {
       dictStem: item.dict.replace(/(来る|くる)$/, ''),
     };
   if (item.group === 'i-adjective') {
-    if (item.irregular || item.reading === 'いい' || item.reading === 'かっこいい')
-      return { readingStem: '', dictStem: '' };
+    if (usesYoiAdjectiveStem(item))
+      return {
+        readingStem: adjectiveStem(item),
+        dictStem: yoiSurfaceStem(item),
+      };
+    if (item.dict === '良い')
+      return { readingStem: adjectiveStem(item), dictStem: item.dict.slice(0, -1) };
     return {
       readingStem: adjectiveStem(item),
       dictStem: item.dict.endsWith('い') ? item.dict.slice(0, -1) : item.dict,
@@ -1254,6 +1272,15 @@ export function surfaceStemPair(item) {
 export function surfaceFormFor(item, typeId) {
   const answer = conjugateItem(item, typeId);
   if (!answer || !item || !item.dict || item.dict === item.reading) return answer || '';
+  if (item.group === 'i-adjective' && usesYoiAdjectiveStem(item)) {
+    if (answer.startsWith(item.reading)) return item.dict + answer.slice(item.reading.length);
+    const readingStem = adjectiveStem(item);
+    const dictStem = yoiSurfaceStem(item);
+    if (readingStem && dictStem && answer.startsWith(readingStem)) {
+      return dictStem + answer.slice(readingStem.length);
+    }
+    return answer;
+  }
   const { readingStem, dictStem } = surfaceStemPair(item);
   if (item.group === 'kuru' && answer.startsWith(readingStem)) {
     const tail = answer.slice(readingStem.length);

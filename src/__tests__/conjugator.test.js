@@ -6,6 +6,7 @@ import {
   isRedundantPracticeType,
   normalizePromptFormSetting,
   pickPromptType,
+  surfaceFormFor,
 } from '../utils/conjugator.js';
 import {
   getConjugationDebugInfo,
@@ -36,6 +37,12 @@ const II = {
   meaning: 'good',
   group: 'i-adjective',
   irregular: true,
+};
+const CHOSHI_GA_II = {
+  dict: '調子がいい',
+  reading: 'ちょうしがいい',
+  meaning: 'be in good condition',
+  group: 'i-adjective',
 };
 const SHIZUKA = { dict: '静か', reading: 'しずか', meaning: 'quiet', group: 'na-adjective' };
 
@@ -306,6 +313,15 @@ describe('irregular i-adjective: いい', () => {
     expect(conjugateAdjective(II, 'adj-polite-present')).toBe('いいです');
     expect(conjugateAdjective(II, 'adj-te-form')).toBe('よくて');
     expect(conjugateAdjective(II, 'adj-adverb')).toBe('よく');
+  });
+
+  it('uses the よ stem for fixed expressions ending in がいい', () => {
+    expect(conjugateAdjective(CHOSHI_GA_II, 'adj-plain-past')).toBe('ちょうしがよかった');
+    expect(surfaceFormFor(CHOSHI_GA_II, 'adj-plain-present')).toBe('調子がいい');
+    expect(surfaceFormFor(CHOSHI_GA_II, 'adj-plain-past')).toBe('調子がよかった');
+    expect(surfaceFormFor(CHOSHI_GA_II, 'adj-polite-present')).toBe('調子がいいです');
+    expect(surfaceFormFor(CHOSHI_GA_II, 'adj-polite-past-negative')).toBe('調子がよくなかったです');
+    expect(surfaceFormFor(CHOSHI_GA_II, 'adj-sou')).toBe('調子がよさそう');
   });
 });
 
