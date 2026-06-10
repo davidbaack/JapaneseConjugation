@@ -180,10 +180,21 @@ describe('App shell', () => {
   it('shows the single Practice flow instead of legacy Study mode controls', async () => {
     render(<App />);
     await waitForPracticeCard();
-    expect(await screen.findByText('Practice run', {}, { timeout: 5000 })).toBeTruthy();
+    const settingsButton = await screen.findByRole(
+      'button',
+      { name: 'Practice run settings' },
+      { timeout: 5000 },
+    );
+    expect(settingsButton).toBeTruthy();
+    expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Focus map' })).toBeTruthy();
     expect(screen.getByText('52 saved forms')).toBeTruthy();
+    // "Sentence" is now the cued-cloze presentation toggle: a valid review
+    // control, not a legacy study-mode button.
+    expect(screen.queryByRole('button', { name: 'Sentence off', exact: true })).toBeNull();
+    fireEvent.click(settingsButton);
+    expect(screen.getByRole('button', { name: 'Sentence off', exact: true })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Transform', exact: true })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Study mode' })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();
