@@ -496,6 +496,7 @@ function RunAnswerReveal({
   record,
   geminiKey,
   onOpenLearn,
+  onOpenLearnFocus = null,
   autoAdvanceHint = null,
   topAction = null,
   footer = null,
@@ -541,6 +542,13 @@ function RunAnswerReveal({
     reviewSubmittedAnswer,
     missedComparisonValue,
   });
+  const openRelatedLesson = () => {
+    const handled = onOpenLearnFocus?.(record);
+    if (!handled) onOpenLearn?.(relatedLesson?.groupId);
+  };
+  const learnActionLabel = record.correct
+    ? `Learn the ${relatedLesson?.title} lesson`
+    : 'Learn from this miss';
   const panelClass = record.correct
     ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
     : record.wasCorrected
@@ -895,15 +903,15 @@ function RunAnswerReveal({
           )}
         </div>
       )}
-      {relatedLesson && onOpenLearn && (
+      {relatedLesson && (onOpenLearn || onOpenLearnFocus) && (
         <div className="mt-4 border-t border-stone-200/60 pt-3 text-left dark:border-stone-800/60">
           <button
             type="button"
-            onClick={() => onOpenLearn(relatedLesson.groupId)}
+            onClick={openRelatedLesson}
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 underline decoration-indigo-300 underline-offset-4 transition hover:text-indigo-900 dark:text-indigo-300 dark:decoration-indigo-700 dark:hover:text-indigo-100"
           >
             <IconBook className="h-4 w-4" />
-            Learn the {relatedLesson.title} lesson
+            {learnActionLabel}
           </button>
         </div>
       )}
@@ -912,7 +920,7 @@ function RunAnswerReveal({
   );
 }
 
-function RunAnswerReviewItem({ record, geminiKey, onOpenLearn }) {
+function RunAnswerReviewItem({ record, geminiKey, onOpenLearn, onOpenLearnFocus }) {
   const answerText =
     record.reviewChoiceLabel ||
     (record.revealedMiss ? "I don't know" : record.submittedAnswer?.trim() || '(empty)');
@@ -955,13 +963,25 @@ function RunAnswerReviewItem({ record, geminiKey, onOpenLearn }) {
         </div>
       </summary>
       <div className="border-t border-stone-100 p-3 dark:border-stone-800">
-        <RunAnswerReveal record={record} geminiKey={geminiKey} onOpenLearn={onOpenLearn} />
+        <RunAnswerReveal
+          record={record}
+          geminiKey={geminiKey}
+          onOpenLearn={onOpenLearn}
+          onOpenLearnFocus={onOpenLearnFocus}
+        />
       </div>
     </details>
   );
 }
 
-function PracticeRunReviewPage({ answers, runStatsLabel, onBack, geminiKey, onOpenLearn }) {
+function PracticeRunReviewPage({
+  answers,
+  runStatsLabel,
+  onBack,
+  geminiKey,
+  onOpenLearn,
+  onOpenLearnFocus,
+}) {
   return (
     <section className="mx-auto max-w-3xl space-y-4" aria-label="Practice run review">
       <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
@@ -996,6 +1016,7 @@ function PracticeRunReviewPage({ answers, runStatsLabel, onBack, geminiKey, onOp
               record={record}
               geminiKey={geminiKey}
               onOpenLearn={onOpenLearn}
+              onOpenLearnFocus={onOpenLearnFocus}
             />
           ))}
         </div>
@@ -2118,6 +2139,9 @@ export default function StudyView({ mode = 'practice' }) {
     wordLists,
     studyFocus: focus,
     clearStudyFocus: onFocusConsumed,
+    learnFocus,
+    openLearnFocus,
+    clearLearnFocus,
     hydrated,
   } = useApp();
   const [current, setCurrent] = useState(null);
@@ -2377,6 +2401,34 @@ export default function StudyView({ mode = 'practice' }) {
 
   useLayoutEffect(() => {
     if (!hydrated) return;
+    if (learnFocus?.source === 'practice-result' && learnFocus.reviewRecord) {
+      const record = learnFocus.reviewRecord;
+      const card = buildFocusCard(
+        state,
+        record.word,
+        record.cardType || learnFocus.typeId || record.practicedType,
+      );
+      clearLearnFocus?.();
+      if (card) {
+        setCurrent(card);
+        setReviewRecord(record);
+        setAnswer(record.submittedAnswer || '');
+        setSelfCheckOpen(false);
+        setWasCorrect(!!record.correct);
+        setWasCorrected(!!record.wasCorrected);
+        setCoachRevealed(record.coachRevealed || 0);
+        setGreenRevealed(0);
+        setStepHint('');
+        setHintMasked(false);
+        setHintRevealed(false);
+        setCoachChatOpen(false);
+        hadKanaMistakeRef.current = false;
+        wrongSnapshotRef.current = null;
+        usedHintRef.current = false;
+        setPhase('reviewing');
+        return;
+      }
+    }
     // When arriving from Check's "Practice this verb", seed that exact word/form
     // once. If no rule covers it, fall through to normal selection.
     if (focus?.word && !focusSeededRef.current) {
@@ -2468,6 +2520,7 @@ export default function StudyView({ mode = 'practice' }) {
     practiceRuleCandidates,
     reviewSelectionOptions,
     focus,
+    learnFocus,
     specialLaunchActive,
     transformationMode,
   ]);
@@ -3682,6 +3735,33 @@ export default function StudyView({ mode = 'practice' }) {
     updateTypedAnswer(nextAnswer, options);
   }
 
+  function openLearnByGroupId(groupId) {
+    window.location.hash = groupId ? `lesson-${groupId}` : 'formation-keys';
+    setTab('learn');
+  }
+
+  function openLearnForRuleRecord(record) {
+    if (!record || record.correct) return false;
+    const typeId = record.practicedType || record.cardType;
+    const lesson = lessonForType(typeId);
+    if (!lesson) return false;
+    if (typeof window !== 'undefined') {
+      window.location.hash = `lesson-${lesson.groupId}`;
+    }
+    return (
+      openLearnFocus?.({
+        source: 'practice-result',
+        lessonGroupId: lesson.groupId,
+        lessonTitle: lesson.title,
+        typeId,
+        typeLabel: record.typeLabel || getTypeInfo(typeId).label || '',
+        word: record.word ? { ...record.word } : null,
+        reviewRecord: record,
+        answeredAt: record.answeredAt || Date.now(),
+      }) || false
+    );
+  }
+
   if (runReviewOpen) {
     return (
       <PracticeRunReviewPage
@@ -3689,10 +3769,8 @@ export default function StudyView({ mode = 'practice' }) {
         runStatsLabel={runStatsLabel}
         onBack={() => setRunReviewOpen(false)}
         geminiKey={geminiKey}
-        onOpenLearn={(groupId) => {
-          window.location.hash = groupId ? `lesson-${groupId}` : 'formation-keys';
-          setTab('learn');
-        }}
+        onOpenLearn={openLearnByGroupId}
+        onOpenLearnFocus={openLearnForRuleRecord}
       />
     );
   }
@@ -5043,10 +5121,8 @@ export default function StudyView({ mode = 'practice' }) {
                   <RunAnswerReveal
                     record={reviewRecord}
                     geminiKey={geminiKey}
-                    onOpenLearn={(groupId) => {
-                      window.location.hash = groupId ? `lesson-${groupId}` : 'formation-keys';
-                      setTab('learn');
-                    }}
+                    onOpenLearn={openLearnByGroupId}
+                    onOpenLearnFocus={openLearnForRuleRecord}
                     autoAdvanceHint={wasCorrect && autoAdvanceCorrect}
                     topAction={renderReviewNextButton(nextButtonRef)}
                     footer={

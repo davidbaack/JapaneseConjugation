@@ -316,6 +316,64 @@ describe('App shell', () => {
     expect(screen.queryByText('Gemini is not configured for AI chat.')).toBeNull();
   }, 15000);
 
+  it('returns from Learn to the same missed Practice card', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          enabledTypes: ['plain-negative'],
+          daily: {
+            date: localDateKey(),
+            count: DEFAULT_PREFS.dailyGoal,
+            goalHit: true,
+            goalStreak: 1,
+            bestGoalStreak: 1,
+            currentAnswerStreak: 0,
+            bestAnswerStreak: 0,
+          },
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: '話す',
+        group: 'godan',
+        type: 'plain-negative',
+        word: {
+          dict: '話す',
+          reading: 'はなす',
+          meaning: 'to speak',
+          group: 'godan',
+        },
+      }),
+    );
+
+    render(<App />);
+
+    const input = await waitForPracticeCard();
+    fireEvent.change(input, { target: { value: 'zzz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    expect(await screen.findByText('Review this form.')).toBeTruthy();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Learn from this miss' }));
+    expect(await screen.findByText('From your missed Practice card')).toBeTruthy();
+    expect(screen.getByText(/Plain Negative for/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Return to this card' }));
+
+    expect(await screen.findByText('Review this form.')).toBeTruthy();
+    expect(screen.getByText('Your Answer')).toBeTruthy();
+    expect(screen.getAllByText('話す').length).toBeGreaterThan(0);
+    expect(screen.queryByPlaceholderText(/Type romaji or kana/i)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Learn from this miss' })).toBeTruthy();
+  }, 15000);
+
   it('shows correct-answer rationale expanded without a More toggle', async () => {
     localStorage.setItem(
       STORAGE_KEY,

@@ -36,6 +36,62 @@ function TypeChip({ id }) {
   );
 }
 
+function PracticeCardReturnPanel({ focus, onReturn, onDismiss }) {
+  const type = getTypeInfo(focus?.typeId);
+  const typeLabel = focus?.typeLabel || type.label || 'this form';
+  const word = focus?.word || {};
+
+  return (
+    <section
+      aria-label="Missed Practice card"
+      className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900/70 dark:bg-amber-950/20"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
+            From your missed Practice card
+          </div>
+          <p className="mt-1 text-sm text-stone-700 dark:text-stone-250">
+            {word.dict ? (
+              <>
+                {typeLabel} for{' '}
+                <span lang="ja" className="font-semibold text-stone-950 dark:text-stone-50">
+                  {word.dict}
+                </span>
+                {word.reading && word.reading !== word.dict ? (
+                  <span lang="ja" className="text-stone-500 dark:text-stone-350">
+                    {' '}
+                    ({word.reading})
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              typeLabel
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onReturn?.(focus)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-50 dark:border-amber-700 dark:bg-stone-950 dark:text-amber-200 dark:hover:bg-amber-950/30"
+          >
+            <IconRefresh className="h-4 w-4" />
+            Return to this card
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-stone-850"
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 const TRACK_STYLES = {
   beginner: {
     shell: 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20',
@@ -157,7 +213,15 @@ function lessonMatches(lesson, query) {
 }
 
 export default function LessonsView() {
-  const { addReviewRecommendation, allWords, setTab, startReviewRecommendation } = useApp();
+  const {
+    addReviewRecommendation,
+    allWords,
+    clearLearnFocus,
+    learnFocus,
+    returnToLearnFocusCard,
+    setTab,
+    startReviewRecommendation,
+  } = useApp();
   const [query, setQuery] = useState('');
   const [showFormationKeys, setShowFormationKeys] = useState(false);
   const [openLessonIds, setOpenLessonIds] = useState(() => new Set());
@@ -197,9 +261,15 @@ export default function LessonsView() {
     return () => window.removeEventListener('hashchange', openFromHash);
   }, []);
 
+  useEffect(() => {
+    if (!learnFocus?.lessonGroupId) return;
+    setOpenLessonIds((prev) => new Set(prev).add(learnFocus.lessonGroupId));
+  }, [learnFocus]);
+
   function sendLessonRecommendation(lesson, options = {}) {
     const recommendation = buildLessonReviewRecommendation(lesson, allWords, options);
     if (!recommendation) return;
+    clearLearnFocus?.();
     if (startReviewRecommendation?.(recommendation)) return;
     addReviewRecommendation(recommendation);
     setTab('practice');
@@ -266,6 +336,14 @@ export default function LessonsView() {
           </div>
         )}
       </section>
+
+      {learnFocus?.lessonGroupId && (
+        <PracticeCardReturnPanel
+          focus={learnFocus}
+          onReturn={returnToLearnFocusCard}
+          onDismiss={clearLearnFocus}
+        />
+      )}
 
       <section aria-labelledby="lesson-tracks-heading">
         <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">

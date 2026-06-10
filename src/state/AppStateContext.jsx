@@ -86,6 +86,7 @@ function useAppController() {
   const [session, setSession] = useState(null);
   // A focused Practice launch requested by another view; consumed by Study.
   const [studyFocus, setStudyFocus] = useState(null);
+  const [learnFocus, setLearnFocus] = useState(null);
   const [labFocus, setLabFocus] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
@@ -125,6 +126,7 @@ function useAppController() {
     setWordLists(normalizeWordLists(payload.wordLists));
     setPracticePrefs(mergePracticePrefs(payload.practicePrefs));
     setStudyFocus(null);
+    setLearnFocus(null);
     setLabFocus(null);
     setSrsQueue({
       date: localDateKey(),
@@ -529,6 +531,18 @@ function useAppController() {
     return true;
   }
   const clearStudyFocus = () => setStudyFocus(null);
+  function openLearnFocus(focus) {
+    if (!focus?.lessonGroupId) return false;
+    setLearnFocus(focus);
+    setTab('learn');
+    return true;
+  }
+  function returnToLearnFocusCard() {
+    if (!learnFocus?.reviewRecord) return false;
+    setTab('practice');
+    return true;
+  }
+  const clearLearnFocus = () => setLearnFocus(null);
   // Open a specific Drills exercise from another view (e.g. the dashboard
   // routing a detected weakness into the matching drill).
   function openLabTool(tool) {
@@ -622,6 +636,7 @@ function useAppController() {
       startedAt: Date.now(),
     });
     setStudyFocus(null);
+    setLearnFocus(null);
     setTab('practice');
     return true;
   }
@@ -659,6 +674,10 @@ function useAppController() {
     practiceWord,
     practiceFormGroup,
     clearStudyFocus,
+    learnFocus,
+    openLearnFocus,
+    returnToLearnFocusCard,
+    clearLearnFocus,
     labFocus,
     openLabTool,
     clearLabFocus,
