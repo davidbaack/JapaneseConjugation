@@ -1975,6 +1975,11 @@ export default function StudyView({ mode = 'practice' }) {
   const [reviewChoiceLabel, setReviewChoiceLabel] = useState('');
   const [submittedAnswer, setSubmittedAnswer] = useState('');
   const [lastDiagnosis, setLastDiagnosis] = useState(null);
+  // Snapshot of the just-graded answer for the in-session review panel, set by
+  // the submit handlers (the only entries into the reviewing phase) so the
+  // shared RunAnswerReveal renders from a stable reference instead of rebuilding
+  // a record every render.
+  const [reviewRecord, setReviewRecord] = useState(null);
   const [selfCheckOpen, setSelfCheckOpen] = useState(false);
   const [speechListening, setSpeechListening] = useState(false);
   const [speechError, setSpeechError] = useState('');
@@ -2708,20 +2713,6 @@ export default function StudyView({ mode = 'practice' }) {
       : liveAnswerTone === 'correct'
         ? 'text-emerald-700 dark:text-emerald-400'
         : 'text-stone-500 dark:text-stone-400';
-  // The in-session review panel renders through the shared RunAnswerReveal
-  // component (the same one the post-run review page uses), built from the
-  // canonical record shape so the two surfaces can never drift apart.
-  const reviewRecord =
-    phase === 'reviewing'
-      ? buildRunAnswerRecord({
-          correct: wasCorrect,
-          submittedAnswer,
-          reviewChoiceLabel,
-          revealedMiss,
-          wasCorrected,
-          mistakeDiagnosis: lastDiagnosis,
-        })
-      : null;
 
   function nextMinimalPairProgress(correct) {
     return recordMinimalPairResult(
@@ -3235,14 +3226,14 @@ export default function StudyView({ mode = 'practice' }) {
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
-    appendRunAnswerRecord(
-      buildRunAnswerRecord({
-        correct: ok,
-        submittedAnswer: submittedForReview,
-        mistakeDiagnosis,
-        wasCorrected: finalOk && !ok,
-      }),
-    );
+    const runRecord = buildRunAnswerRecord({
+      correct: ok,
+      submittedAnswer: submittedForReview,
+      mistakeDiagnosis,
+      wasCorrected: finalOk && !ok,
+    });
+    appendRunAnswerRecord(runRecord);
+    setReviewRecord(runRecord);
     setState(nextState);
     setLastDiagnosis(mistakeDiagnosis);
     setReviewChoiceLabel('');
@@ -3385,15 +3376,15 @@ export default function StudyView({ mode = 'practice' }) {
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
-    appendRunAnswerRecord(
-      buildRunAnswerRecord({
-        correct: ok,
-        submittedAnswer: '',
-        reviewChoiceLabel: label,
-        revealedMiss: !ok,
-        mistakeDiagnosis,
-      }),
-    );
+    const runRecord = buildRunAnswerRecord({
+      correct: ok,
+      submittedAnswer: '',
+      reviewChoiceLabel: label,
+      revealedMiss: !ok,
+      mistakeDiagnosis,
+    });
+    appendRunAnswerRecord(runRecord);
+    setReviewRecord(runRecord);
     setState(nextState);
     setAnswer('');
     setReviewChoiceLabel(label);
@@ -3477,15 +3468,15 @@ export default function StudyView({ mode = 'practice' }) {
       ? nextWordSweepStep(wordSweep, nextState, current.type, false, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
-    appendRunAnswerRecord(
-      buildRunAnswerRecord({
-        correct: false,
-        submittedAnswer: '',
-        reviewChoiceLabel: "I don't know",
-        revealedMiss: true,
-        mistakeDiagnosis,
-      }),
-    );
+    const runRecord = buildRunAnswerRecord({
+      correct: false,
+      submittedAnswer: '',
+      reviewChoiceLabel: "I don't know",
+      revealedMiss: true,
+      mistakeDiagnosis,
+    });
+    appendRunAnswerRecord(runRecord);
+    setReviewRecord(runRecord);
     setState(nextState);
     setAnswer('');
     setLastDiagnosis(mistakeDiagnosis);
