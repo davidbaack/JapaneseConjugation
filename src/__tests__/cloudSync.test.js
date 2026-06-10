@@ -88,6 +88,13 @@ describe('cloudFetch', () => {
     expect(result).toEqual(row);
   });
 
+  it('rejects an expected-user mismatch before reading a cloud row', async () => {
+    mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
+
+    await expect(cloudFetch('other-user')).rejects.toThrow(/user changed/);
+    expect(mockSupabase.from).not.toHaveBeenCalled();
+  });
+
   it('preserves every field of the stored payload on the way back (round-trip fidelity)', async () => {
     const row = { data: SAMPLE_PAYLOAD, updated_at: '2026-05-29T00:00:00.000Z' };
     const builder = selectBuilder({ data: row, error: null });
@@ -131,6 +138,13 @@ describe('cloudUpsert', () => {
     expect(written.id).toBe('user-123');
     expect(written.data).toEqual(SAMPLE_PAYLOAD);
     expect(written.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+  });
+
+  it('rejects an expected-user mismatch before writing a cloud row', async () => {
+    mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
+
+    await expect(cloudUpsert(SAMPLE_PAYLOAD, 'other-user')).rejects.toThrow(/user changed/);
+    expect(mockSupabase.from).not.toHaveBeenCalled();
   });
 
   it('propagates a Supabase write error', async () => {

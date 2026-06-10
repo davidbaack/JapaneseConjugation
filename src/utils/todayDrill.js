@@ -246,8 +246,13 @@ export function upsertTodayDrillList(wordLists = [], plan) {
     : [...(wordLists || []), todayList];
 }
 
+/**
+ * @param {Record<string, any>} [prefs]
+ * @param {any} [plan]
+ * @returns {Record<string, any>}
+ */
 export function practicePrefsForTodayDrill(prefs = DEFAULT_PREFS, plan) {
-  const basePrefs = { ...(prefs || DEFAULT_PREFS) };
+  const basePrefs = /** @type {Record<string, any>} */ ({ ...(prefs || DEFAULT_PREFS) });
   delete basePrefs.drillMode;
   delete basePrefs.drillDirection;
   const sourceFormStrategy = basePrefs.sourceFormStrategy || DEFAULT_PREFS.sourceFormStrategy;

@@ -26,23 +26,39 @@ describe('static coverage configuration', () => {
     expect(pkg.scripts['ci:fast']).toContain('npm run typecheck');
   });
 
-  it('keeps strict checkJs coverage enabled for new typecheck surfaces', () => {
+  it('keeps strict seed coverage and broad app-surface coverage enabled', () => {
     const base = readRepoJson('tsconfig.json');
     const app = readRepoJson('tsconfig.app.json');
+    const appStrict = readRepoJson('tsconfig.app.strict.json');
     const tooling = readRepoJson('tsconfig.tooling.json');
     const supabase = readRepoJson('tsconfig.supabase.json');
+    const pkg = readRepoJson('package.json');
 
     expect(base.compilerOptions.checkJs).toBe(true);
     expect(base.compilerOptions.strict).toBe(true);
-    expect(app.compilerOptions.checkJs).not.toBe(false);
-    expect(app.compilerOptions.strict).not.toBe(false);
-    expect(app.compilerOptions.noImplicitAny).not.toBe(false);
-    expect(app.include).toEqual(
+    expect(pkg.scripts['typecheck:app']).toContain('tsconfig.app.strict.json');
+    expect(pkg.scripts['typecheck:app']).toContain('tsconfig.app.json');
+    expect(appStrict.compilerOptions.checkJs).not.toBe(false);
+    expect(appStrict.compilerOptions.strict).not.toBe(false);
+    expect(appStrict.compilerOptions.noImplicitAny).not.toBe(false);
+    expect(appStrict.include).toEqual(
       expect.arrayContaining([
         'src/data/defaults.js',
         'src/i18n/**/*.js',
         'src/utils/rateLimiter.js',
         'src/utils/retry.js',
+      ]),
+    );
+    expect(app.compilerOptions.checkJs).not.toBe(false);
+    expect(app.include).toEqual(
+      expect.arrayContaining([
+        'src/data/defaults.js',
+        'src/i18n/**/*.js',
+        'src/state/AppStateContext.jsx',
+        'src/utils/rateLimiter.js',
+        'src/utils/retry.js',
+        'src/utils/storage.js',
+        'src/views/StudyView.jsx',
       ]),
     );
     expect(tooling.compilerOptions.checkJs).not.toBe(false);

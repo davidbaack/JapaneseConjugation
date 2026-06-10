@@ -27,6 +27,8 @@ export function useCloudAutoSync({
 
   useEffect(() => {
     if (!hydrated) return;
+    let active = true;
+    const sessionUserId = session?.user?.id || '';
     const dummySync = { enabled: !!session };
     const syncPayload = buildSyncPayload({
       state,
@@ -45,12 +47,15 @@ export function useCloudAutoSync({
       syncPayload.practicePrefs,
     );
 
-    if (session?.user && supabase) {
+    if (sessionUserId && supabase) {
       if (pushTimer.current) clearTimeout(pushTimer.current);
       pushTimer.current = setTimeout(async () => {
+        pushTimer.current = null;
+        if (!active) return;
         setSyncStatus((s) => ({ ...s, kind: 'syncing', message: 'Saving to cloud…' }));
         try {
-          await cloudUpsert(syncPayload);
+          await cloudUpsert(syncPayload, sessionUserId);
+          if (!active) return;
           const now = Date.now();
           lastSyncedAtRef.current = now;
           saveAll(
@@ -64,11 +69,20 @@ export function useCloudAutoSync({
           );
           setSyncStatus({ kind: 'ok', message: 'Saved to cloud', at: now });
         } catch (e) {
+          if (!active) return;
           logWarn(e, { source: 'useCloudAutoSync.push' });
           setSyncStatus({ kind: 'error', message: e.message || 'Push failed', at: null });
         }
       }, PUSH_DEBOUNCE_MS);
     }
+
+    return () => {
+      active = false;
+      if (pushTimer.current) {
+        clearTimeout(pushTimer.current);
+        pushTimer.current = null;
+      }
+    };
   }, [
     state,
     customVerbs,

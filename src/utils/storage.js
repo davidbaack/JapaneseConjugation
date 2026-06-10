@@ -312,13 +312,30 @@ export function syncReady() {
   return !!supabase;
 }
 
-export async function cloudFetch() {
+/**
+ * @param {any} session
+ * @param {string} expectedUserId
+ */
+function assertExpectedCloudUser(session, expectedUserId) {
+  if (!expectedUserId) return;
+  const actualUserId = session?.user?.id || '';
+  if (actualUserId !== expectedUserId) {
+    throw new Error('Authenticated user changed before cloud sync completed');
+  }
+}
+
+/** @param {string} [expectedUserId] */
+export async function cloudFetch(expectedUserId = '') {
   if (!supabase) throw new Error('Supabase client is not configured');
 
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session) return null;
+  if (!session) {
+    assertExpectedCloudUser(session, expectedUserId);
+    return null;
+  }
+  assertExpectedCloudUser(session, expectedUserId);
 
   // Retry transient network/5xx failures so a flaky connection doesn't abort
   // the read; auth/RLS errors fail fast (non-transient) (improvement #14).
@@ -333,13 +350,18 @@ export async function cloudFetch() {
   });
 }
 
-export async function cloudUpsert(payload) {
+/**
+ * @param {any} payload
+ * @param {string} [expectedUserId]
+ */
+export async function cloudUpsert(payload, expectedUserId = '') {
   if (!supabase) throw new Error('Supabase client is not configured');
 
   const {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session) throw new Error('User is not authenticated');
+  assertExpectedCloudUser(session, expectedUserId);
 
   // Retry transient failures so a momentary network blip doesn't drop the
   // user's progress; a fresh timestamp is written on each attempt.
@@ -468,6 +490,15 @@ export function resolveSyncAction(cloud, localSyncedAt = 0, localState = null) {
   return 'noop';
 }
 
+/**
+ * @param {{
+ *   state?: any,
+ *   customVerbs?: any[],
+ *   customAdjectives?: any[],
+ *   wordLists?: any[],
+ *   practicePrefs?: any,
+ * }} [parts]
+ */
 export function buildSyncPayload({
   state,
   customVerbs,
@@ -918,6 +949,7 @@ export function normalizeReferenceState(ref = null) {
   return { recentSearches, history, selected, weakRules };
 }
 
+/** @returns {Record<string, any>} */
 export function defaultState() {
   return {
     schemaVersion: SRS_SCHEMA_VERSION,

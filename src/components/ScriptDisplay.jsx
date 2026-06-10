@@ -3,8 +3,8 @@ import { getConjugationParts } from '../utils/conjugator.js';
 
 export default function ScriptDisplay({
   view,
-  word,
-  type,
+  word = null,
+  type = null,
   className = '',
   subClassName = 'text-sm text-stone-500 mt-1',
   colorHighlight = true,

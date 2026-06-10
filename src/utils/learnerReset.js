@@ -58,6 +58,16 @@ export function buildLearnerResetPayload(parts = {}, kind) {
   };
 }
 
+/**
+ * @param {{
+ *   payload?: any,
+ *   session?: any,
+ *   writeCloud?: ((payload: any) => Promise<any>) | null,
+ *   applyLocal?: ((payload: any, syncedAt: number | null) => void) | null,
+ *   saveLocal?: ((payload: any, syncedAt: number | null) => void) | null,
+ *   now?: () => number,
+ * }} [options]
+ */
 export async function commitLearnerResetPayload({
   payload,
   session,

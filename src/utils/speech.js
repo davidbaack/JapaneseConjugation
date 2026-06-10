@@ -23,7 +23,9 @@ export function pickSpeechVoice(voiceURI) {
 
 export function getSpeechRecognitionConstructor() {
   if (typeof window === 'undefined') return null;
-  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  const speechWindow =
+    /** @type {Window & { SpeechRecognition?: any, webkitSpeechRecognition?: any }} */ (window);
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition || null;
 }
 
 export function speechRecognitionErrorMessage(error) {

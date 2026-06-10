@@ -431,7 +431,14 @@ function withCardOrigin(card, origin) {
   return { ...card, selectionOrigin: origin || cardOriginForStudyCard(card) };
 }
 
-function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, topAction, footer }) {
+function RunAnswerReveal({
+  record,
+  geminiKey,
+  onOpenLearn,
+  autoAdvanceHint = null,
+  topAction = null,
+  footer = null,
+}) {
   const [chatOpen, setChatOpen] = useState(false);
   if (!record) return null;
 
@@ -2079,6 +2086,7 @@ export default function StudyView({ mode = 'practice' }) {
           missedTypeIds: [],
           completedTypeIds: [],
           repeatPass: false,
+          nextTypeId: null,
           complete: false,
         }
       : null,
@@ -2321,6 +2329,7 @@ export default function StudyView({ mode = 'practice' }) {
           missedTypeIds: [],
           completedTypeIds: [],
           repeatPass: false,
+          nextTypeId,
           complete: !nextTypeId,
         });
         onFocusConsumed?.();
@@ -3847,7 +3856,11 @@ export default function StudyView({ mode = 'practice' }) {
   }
 
   function clearBoundedReviewPrefs(prefs = {}) {
-    const next = { ...prefs, reviewLimitSource: '', reviewLimit: 0 };
+    const next = /** @type {Record<string, any>} */ ({
+      ...prefs,
+      reviewLimitSource: '',
+      reviewLimit: 0,
+    });
     if (Array.isArray(next.wordListIds)) {
       next.wordListIds = next.wordListIds.filter(
         (id) => id !== 'repair-drill' && !String(id || '').startsWith('list-review-rec-'),
@@ -3996,15 +4009,6 @@ export default function StudyView({ mode = 'practice' }) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] xl:justify-center xl:grid-cols-[minmax(0,17rem)_minmax(0,42rem)_minmax(0,17rem)]">
-      <PracticeScopeSidebar
-        className="order-2 lg:order-1"
-        state={state}
-        weaknessFamilies={weaknessFamilies}
-        openFamilyIds={openPracticeMapFamilyIds}
-        onToggleFamilyOpen={togglePracticeMapFamilyOpen}
-        onToggleFamily={togglePracticeFamily}
-        onToggleType={togglePracticeType}
-      />
       <div className="order-1 min-w-0 space-y-4 lg:order-2 xl:w-full">
         {focusBanner && (
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 px-5 py-4 dark:border-indigo-800 dark:bg-indigo-950/20">
@@ -4094,7 +4098,7 @@ export default function StudyView({ mode = 'practice' }) {
                   <div
                     role="group"
                     aria-label="Practice run settings"
-                    className="absolute right-0 z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-stone-200 bg-white p-3 text-left shadow-xl dark:border-stone-800 dark:bg-stone-900"
+                    className="absolute left-0 right-auto z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-stone-200 bg-white p-3 text-left shadow-xl dark:border-stone-800 dark:bg-stone-900 sm:left-auto sm:right-0 sm:max-w-[calc(100vw-2rem)]"
                   >
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
@@ -4999,6 +5003,15 @@ export default function StudyView({ mode = 'practice' }) {
           , or press Esc to skip without penalty.
         </div>
       </div>
+      <PracticeScopeSidebar
+        className="order-2 lg:order-1"
+        state={state}
+        weaknessFamilies={weaknessFamilies}
+        openFamilyIds={openPracticeMapFamilyIds}
+        onToggleFamilyOpen={togglePracticeMapFamilyOpen}
+        onToggleFamily={togglePracticeFamily}
+        onToggleType={togglePracticeType}
+      />
       <FocusCategoryMap
         className="order-3 lg:col-span-2 xl:col-span-1"
         state={state}
