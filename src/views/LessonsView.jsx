@@ -181,14 +181,20 @@ export default function LessonsView() {
   const searchActive = query.trim().length > 0;
 
   useEffect(() => {
-    function openKeysFromHash() {
-      if (window.location.hash === '#formation-keys') {
+    function openFromHash() {
+      const hash = window.location.hash;
+      if (hash === '#formation-keys') {
         setShowFormationKeys(true);
+        return;
+      }
+      const lessonMatch = hash.match(/^#lesson-(.+)$/);
+      if (lessonMatch) {
+        setOpenLessonIds((prev) => new Set(prev).add(lessonMatch[1]));
       }
     }
-    openKeysFromHash();
-    window.addEventListener('hashchange', openKeysFromHash);
-    return () => window.removeEventListener('hashchange', openKeysFromHash);
+    openFromHash();
+    window.addEventListener('hashchange', openFromHash);
+    return () => window.removeEventListener('hashchange', openFromHash);
   }, []);
 
   function sendLessonRecommendation(lesson, options = {}) {

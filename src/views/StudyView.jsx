@@ -12,6 +12,7 @@ import {
   IconList,
   IconPlus,
   IconRefresh,
+  IconBook,
 } from '../components/Icons.jsx';
 import {
   ALL_CARD_TYPES,
@@ -26,6 +27,7 @@ import {
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
+import { lessonForType } from '../data/lessonContent.js';
 import { ChatPanel } from '../components/ChatPanel.jsx';
 import { toHiragana, toHiraganaProgress, toKanaInputValue } from '../utils/romaji.js';
 import {
@@ -457,6 +459,7 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, foot
     ? englishForForm(record.word, null)
     : englishForForm(record.word, record.cardType);
   const explanation = record.explanation;
+  const relatedLesson = lessonForType(record.practicedType);
   const minimalPairFeedback = record.minimalPairFeedback;
   const diagnostic =
     !record.correct && !record.revealedMiss ? record.diagnosis?.feedback || '' : '';
@@ -807,6 +810,18 @@ function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, foot
               )}
             </ReviewChatSection>
           )}
+        </div>
+      )}
+      {relatedLesson && onOpenLearn && (
+        <div className="mt-4 border-t border-stone-200/60 pt-3 text-left dark:border-stone-800/60">
+          <button
+            type="button"
+            onClick={() => onOpenLearn(relatedLesson.groupId)}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 underline decoration-indigo-300 underline-offset-4 transition hover:text-indigo-900 dark:text-indigo-300 dark:decoration-indigo-700 dark:hover:text-indigo-100"
+          >
+            <IconBook className="h-4 w-4" />
+            Learn the {relatedLesson.title} lesson
+          </button>
         </div>
       )}
       {footer}
@@ -3538,8 +3553,8 @@ export default function StudyView({ mode = 'practice' }) {
         runStatsLabel={runStatsLabel}
         onBack={() => setRunReviewOpen(false)}
         geminiKey={geminiKey}
-        onOpenLearn={() => {
-          window.location.hash = 'formation-keys';
+        onOpenLearn={(groupId) => {
+          window.location.hash = groupId ? `lesson-${groupId}` : 'formation-keys';
           setTab('learn');
         }}
       />
@@ -4833,8 +4848,8 @@ export default function StudyView({ mode = 'practice' }) {
                   <RunAnswerReveal
                     record={reviewRecord}
                     geminiKey={geminiKey}
-                    onOpenLearn={() => {
-                      window.location.hash = 'formation-keys';
+                    onOpenLearn={(groupId) => {
+                      window.location.hash = groupId ? `lesson-${groupId}` : 'formation-keys';
                       setTab('learn');
                     }}
                     autoAdvanceHint={wasCorrect && autoAdvanceCorrect}

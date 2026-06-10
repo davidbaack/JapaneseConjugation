@@ -364,6 +364,11 @@ export const LESSON_TRACKS = [
   },
 ];
 
+export function lessonForType(typeId) {
+  if (!typeId) return null;
+  return LESSON_SECTIONS.find((lesson) => lesson.typeIds.includes(typeId)) || null;
+}
+
 export function getLessonCoverage() {
   const covered = new Set(LESSON_SECTIONS.flatMap((lesson) => lesson.typeIds));
   const missing = ALL_CARD_TYPES.filter((type) => !covered.has(type.id));
