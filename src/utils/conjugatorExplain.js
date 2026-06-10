@@ -19,6 +19,7 @@ import {
   surfaceFormFor,
 } from './conjugator.js';
 import { buildOfflineCuedCloze } from './clozeSentences.js';
+import { englishForForm } from './display.js';
 import { GROUP_SENTENCE_LABELS, groupDisplayLabel, groupSentenceLabel } from './groupDisplay.js';
 
 export function getOfflineTemplateSentence(word, type) {
@@ -1473,15 +1474,25 @@ export function contextSentenceFor(item, type) {
     const picked = M[type] || [`${place}は${form}。`, `Short context using the ${label} form.`];
     return { ja: picked[0], en: picked[1], form, label };
   }
+  const plainPastMeaning = englishForForm(item, 'plain-past');
+  const plainPastNegativeMeaning = englishForForm(item, 'plain-past-negative');
+  const politePastMeaning = englishForForm(item, 'polite-past');
+  const politePastNegativeMeaning = englishForForm(item, 'polite-past-negative');
   const M = {
     'plain-present': [`毎日、${form}。`, 'I do this every day.'],
-    'plain-past': [`昨日、${form}。`, 'I did this yesterday.'],
+    'plain-past': [`昨日、${form}。`, `Plain past meaning: ${plainPastMeaning}.`],
     'plain-negative': [`今日は${form}。`, 'I will not do this today.'],
-    'plain-past-negative': [`昨日は${form}。`, 'I did not do this yesterday.'],
+    'plain-past-negative': [
+      `昨日は${form}。`,
+      `Plain past negative meaning: ${plainPastNegativeMeaning}.`,
+    ],
     'polite-present': [`毎日、${form}。`, 'Polite sentence for doing this every day.'],
-    'polite-past': [`昨日、${form}。`, 'Polite sentence for doing this yesterday.'],
+    'polite-past': [`昨日、${form}。`, `Polite past meaning: ${politePastMeaning}.`],
     'polite-negative': [`今日は${form}。`, 'Polite sentence for not doing this today.'],
-    'polite-past-negative': [`昨日は${form}。`, 'Polite sentence for not doing this yesterday.'],
+    'polite-past-negative': [
+      `昨日は${form}。`,
+      `Polite past negative meaning: ${politePastNegativeMeaning}.`,
+    ],
     'masu-stem': [
       `${form}ながら、音楽を聞きます。`,
       'Uses the stem with ながら for doing two things together.',
