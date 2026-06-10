@@ -100,6 +100,8 @@ function useAppController() {
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const [hydrated, setHydrated] = useState(false);
   const lastSyncedAtRef = useRef(0);
+  const authEventVersionRef = useRef(0);
+  const activeAuthUserIdRef = useRef('');
 
   function currentSyncPayload() {
     return buildSyncPayload({ state, customVerbs, customAdjectives, wordLists, practicePrefs });
@@ -163,13 +165,18 @@ function useAppController() {
     setHydrated(true);
 
     if (supabase) {
+      const sessionRequestVersion = authEventVersionRef.current;
       supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+        if (authEventVersionRef.current !== sessionRequestVersion) return;
+        activeAuthUserIdRef.current = currentSession?.user?.id || '';
         setSession(currentSession);
       });
 
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+        authEventVersionRef.current += 1;
+        activeAuthUserIdRef.current = currentSession?.user?.id || '';
         setSession(currentSession);
         if (_event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
           window.history.replaceState(null, '', window.location.pathname);
@@ -221,14 +228,22 @@ function useAppController() {
     };
   }, []);
 
+  useEffect(() => {
+    activeAuthUserIdRef.current = session?.user?.id || '';
+  }, [session]);
+
   // Cloud sync trigger on login / session restoration
   useEffect(() => {
     if (!hydrated || !supabase) return;
 
     if (session?.user) {
+      let cancelled = false;
+      const syncUserId = session.user.id;
+      const syncStillCurrent = () => !cancelled && activeAuthUserIdRef.current === syncUserId;
       setSyncStatus({ kind: 'syncing', message: 'Checking cloud…', at: null });
-      cloudFetch()
+      cloudFetch(syncUserId)
         .then((cloud) => {
+          if (!syncStillCurrent()) return;
           const localPayload = currentSyncPayload();
           const action = resolveSyncAction(cloud, lastSyncedAtRef.current, localPayload);
           if (action === 'merge') {
@@ -239,19 +254,21 @@ function useAppController() {
             applySyncPayload(mergedPayload);
             // Upload the merged result so the cloud reflects the combined state.
             setSyncStatus({ kind: 'syncing', message: 'Merging devices…', at: null });
-            cloudUpsert(mergedPayload)
+            cloudUpsert(mergedPayload, syncUserId)
               .then(() => {
+                if (!syncStillCurrent()) return;
                 const now = Date.now();
                 lastSyncedAtRef.current = now;
                 setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: cloudAt });
               })
-              .catch((e) =>
+              .catch((e) => {
+                if (!syncStillCurrent()) return;
                 setSyncStatus({
                   kind: 'error',
                   message: e.message || 'Merge push failed',
                   at: null,
-                }),
-              );
+                });
+              });
           } else if (action === 'pull') {
             const cloudAt = cloudTimestamp(cloud);
             applySyncPayload(cloud.data);
@@ -268,8 +285,9 @@ function useAppController() {
                 : 'Syncing local progress to cloud…',
               at: null,
             });
-            cloudUpsert(localPayload)
+            cloudUpsert(localPayload, syncUserId)
               .then(() => {
+                if (!syncStillCurrent()) return;
                 const now = Date.now();
                 lastSyncedAtRef.current = now;
                 setSyncStatus({
@@ -278,18 +296,23 @@ function useAppController() {
                   at: now,
                 });
               })
-              .catch((e) =>
+              .catch((e) => {
+                if (!syncStillCurrent()) return;
                 setSyncStatus({
                   kind: 'error',
                   message: e.message || (hadCloud ? 'Push failed' : 'Initial sync failed'),
                   at: null,
-                }),
-              );
+                });
+              });
           }
         })
-        .catch((e) =>
-          setSyncStatus({ kind: 'error', message: e.message || 'Cloud unreachable', at: null }),
-        );
+        .catch((e) => {
+          if (!syncStillCurrent()) return;
+          setSyncStatus({ kind: 'error', message: e.message || 'Cloud unreachable', at: null });
+        });
+      return () => {
+        cancelled = true;
+      };
     } else {
       setSyncStatus({ kind: 'idle', message: '', at: null });
     }
@@ -351,30 +374,37 @@ function useAppController() {
 
   async function syncNow() {
     if (!supabase || !session) return;
+    const syncUserId = session.user?.id || '';
+    const syncStillCurrent = () => !!syncUserId && activeAuthUserIdRef.current === syncUserId;
     setSyncStatus({ kind: 'syncing', message: 'Syncing…', at: null });
     try {
-      const cloud = await cloudFetch();
+      const cloud = await cloudFetch(syncUserId);
+      if (!syncStillCurrent()) return;
       const localPayload = currentSyncPayload();
       const action = resolveSyncAction(cloud, lastSyncedAtRef.current, localPayload);
       if (action === 'merge') {
         const mergedPayload = mergeSyncPayload(localPayload, cloud.data);
         applySyncPayload(mergedPayload);
-        await cloudUpsert(mergedPayload);
+        await cloudUpsert(mergedPayload, syncUserId);
+        if (!syncStillCurrent()) return;
         const now = Date.now();
         lastSyncedAtRef.current = now;
         setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: now });
       } else if (action === 'pull') {
         const cloudAt = cloudTimestamp(cloud);
+        if (!syncStillCurrent()) return;
         applySyncPayload(cloud.data);
         lastSyncedAtRef.current = cloudAt;
         setSyncStatus({ kind: 'ok', message: 'Pulled from cloud', at: cloudAt });
       } else {
-        await cloudUpsert(localPayload);
+        await cloudUpsert(localPayload, syncUserId);
+        if (!syncStillCurrent()) return;
         const now = Date.now();
         lastSyncedAtRef.current = now;
         setSyncStatus({ kind: 'ok', message: 'Pushed to cloud', at: now });
       }
     } catch (e) {
+      if (!syncStillCurrent()) return;
       setSyncStatus({ kind: 'error', message: e.message || 'Sync failed', at: null });
     }
   }
@@ -385,6 +415,7 @@ function useAppController() {
       kind,
     );
     const writesCloud = !!(session?.user && supabase);
+    const resetUserId = writesCloud ? session.user.id : '';
     if (writesCloud) {
       setSyncStatus({ kind: 'syncing', message: 'Saving reset to cloud...', at: null });
     }
@@ -393,7 +424,7 @@ function useAppController() {
       const result = await commitLearnerResetPayload({
         payload,
         session: writesCloud ? session : null,
-        writeCloud: writesCloud ? cloudUpsert : null,
+        writeCloud: writesCloud ? (nextPayload) => cloudUpsert(nextPayload, resetUserId) : null,
         saveLocal: saveResetPayload,
         applyLocal: applyLearnerResetPayload,
       });
@@ -466,6 +497,9 @@ function useAppController() {
     setStudyFocus({ word, type, ...options });
     setTab('practice');
   }
+  /**
+   * @param {{ familyId?: string, launchPrefs?: Record<string, any> }} [options]
+   */
   function practiceFormGroup({ familyId, launchPrefs = {} } = {}) {
     const family = FORM_GROUPS.find((item) => item.id === familyId);
     if (!family?.typeIds?.length) return false;
@@ -578,7 +612,9 @@ function useAppController() {
       ...prev,
       session: { ...(prev.session || {}), mistakePatterns: {} },
     }));
-    setPracticePrefs((prev) => practicePrefsForTodayDrill(prev, drillPlan));
+    setPracticePrefs(
+      (prev) => /** @type {typeof DEFAULT_PREFS} */ (practicePrefsForTodayDrill(prev, drillPlan)),
+    );
     setSrsQueue({
       date: localDateKey(),
       dueRuleIds: [...(drillPlan.dueRuleIds || [])],

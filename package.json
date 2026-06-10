@@ -13,7 +13,7 @@
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "typecheck": "npm run typecheck:app && npm run typecheck:tooling && npm run typecheck:supabase",
-    "typecheck:app": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck:app": "tsc --noEmit -p tsconfig.app.strict.json && tsc --noEmit -p tsconfig.app.json",
     "typecheck:tooling": "tsc --noEmit -p tsconfig.tooling.json",
     "typecheck:supabase": "tsc --noEmit -p tsconfig.supabase.json",
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"e2e/**/*.js\" \"scripts/**/*.js\" \"supabase/functions/**/*.ts\" \"*.{js,jsx,ts}\"",

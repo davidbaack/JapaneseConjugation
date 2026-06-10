@@ -205,6 +205,10 @@ function copyArray(value) {
   return Array.isArray(value) ? [...value] : undefined;
 }
 
+/**
+ * @param {Record<string, any>} [prefs]
+ * @param {{ enabledTypes?: any[] }} [options]
+ */
 function minimalPairReturnFromPrefs(prefs = {}, options = {}) {
   const snapshot = {};
   const wordListIds = copyArray(prefs.wordListIds);
@@ -218,6 +222,7 @@ function minimalPairReturnFromPrefs(prefs = {}, options = {}) {
   return snapshot;
 }
 
+/** @param {Record<string, any>} [prefs] */
 function restoreMinimalPairReturn(prefs = {}) {
   const saved = prefs.minimalPairReturn;
   if (!saved || typeof saved !== 'object') return { ...prefs };
@@ -228,6 +233,7 @@ function restoreMinimalPairReturn(prefs = {}) {
   return restored;
 }
 
+/** @param {Record<string, any>} [prefs] */
 export function minimalPairReturnEnabledTypes(prefs = {}) {
   const enabledTypes = prefs.minimalPairReturn?.enabledTypes;
   return Array.isArray(enabledTypes) ? [...enabledTypes] : null;

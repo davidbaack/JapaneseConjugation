@@ -1,18 +1,13 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "strict": false,
-    "noImplicitAny": false,
     "types": ["vite/client", "react", "react-dom"]
   },
   "include": [
     "src/data/defaults.js",
     "src/i18n/**/*.js",
-    "src/state/AppStateContext.jsx",
     "src/utils/rateLimiter.js",
-    "src/utils/retry.js",
-    "src/utils/storage.js",
-    "src/views/StudyView.jsx"
+    "src/utils/retry.js"
   ],
   "exclude": ["node_modules", "dist"]
 }

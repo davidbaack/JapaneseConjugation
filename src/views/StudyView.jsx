@@ -431,7 +431,14 @@ function withCardOrigin(card, origin) {
   return { ...card, selectionOrigin: origin || cardOriginForStudyCard(card) };
 }
 
-function RunAnswerReveal({ record, geminiKey, onOpenLearn, autoAdvanceHint, topAction, footer }) {
+function RunAnswerReveal({
+  record,
+  geminiKey,
+  onOpenLearn,
+  autoAdvanceHint = null,
+  topAction = null,
+  footer = null,
+}) {
   const [chatOpen, setChatOpen] = useState(false);
   if (!record) return null;
 
@@ -2079,6 +2086,7 @@ export default function StudyView({ mode = 'practice' }) {
           missedTypeIds: [],
           completedTypeIds: [],
           repeatPass: false,
+          nextTypeId: null,
           complete: false,
         }
       : null,
@@ -2321,6 +2329,7 @@ export default function StudyView({ mode = 'practice' }) {
           missedTypeIds: [],
           completedTypeIds: [],
           repeatPass: false,
+          nextTypeId,
           complete: !nextTypeId,
         });
         onFocusConsumed?.();
@@ -3847,7 +3856,11 @@ export default function StudyView({ mode = 'practice' }) {
   }
 
   function clearBoundedReviewPrefs(prefs = {}) {
-    const next = { ...prefs, reviewLimitSource: '', reviewLimit: 0 };
+    const next = /** @type {Record<string, any>} */ ({
+      ...prefs,
+      reviewLimitSource: '',
+      reviewLimit: 0,
+    });
     if (Array.isArray(next.wordListIds)) {
       next.wordListIds = next.wordListIds.filter(
         (id) => id !== 'repair-drill' && !String(id || '').startsWith('list-review-rec-'),
