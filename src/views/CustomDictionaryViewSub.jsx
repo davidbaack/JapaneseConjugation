@@ -16,6 +16,30 @@ import {
 const ROW_HEIGHT = 53; // approximate rendered row height in px
 const LIST_VIEWPORT = 600; // fixed scroll-container height when windowing
 const VIRTUAL_THRESHOLD = 60; // only window once the list exceeds this many rows
+const AI_HELP_UNAVAILABLE_MESSAGE = 'AI help is unavailable right now. Try again later.';
+const SUGGESTION_UNAVAILABLE_MESSAGE = 'Suggestions are unavailable right now. Try again later.';
+
+function isTransportOrProxyError(error) {
+  const msg = String(error?.message || error || '').toLowerCase();
+  return (
+    msg.includes('failed to fetch') ||
+    msg.includes('load failed') ||
+    msg.includes('network') ||
+    msg.includes('cors') ||
+    msg.includes('timed out') ||
+    msg.includes('timeout') ||
+    msg.includes('connection') ||
+    msg.includes('unreachable') ||
+    msg.includes('proxy') ||
+    msg.includes('not configured')
+  );
+}
+
+function calmAIError(error, fallback) {
+  if (isTransportOrProxyError(error)) return fallback;
+  const message = String(error?.message || error || '').trim();
+  return message || fallback;
+}
 
 export default function CustomDictionaryViewSub({
   customVerbs,
@@ -82,19 +106,17 @@ export default function CustomDictionaryViewSub({
       }
       setSugg(r);
     } catch (e) {
-      if (gen === suggGen.current) setSuggErr(e.message);
+      if (gen === suggGen.current) setSuggErr(calmAIError(e, SUGGESTION_UNAVAILABLE_MESSAGE));
     } finally {
       if (gen === suggGen.current) setSuggLoading(false);
     }
   }
 
   useEffect(() => {
+    suggGen.current += 1;
     setSugg(null);
     setSuggErr('');
     setSuggLoading(false);
-    if (geminiKey) fetchSugg();
-    // fetchSugg is defined inline without useCallback — adding it would cause infinite re-runs
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geminiAvailable, dictTab]);
 
   function resetAdd() {
@@ -126,7 +148,7 @@ export default function CustomDictionaryViewSub({
     } catch (e) {
       if (!lookupCancelledRef.current) {
         setAddPhase('error');
-        setAddError(e.message);
+        setAddError(calmAIError(e, AI_HELP_UNAVAILABLE_MESSAGE));
       }
     }
   }
@@ -146,8 +168,11 @@ export default function CustomDictionaryViewSub({
     }
     const newCustom = [...customWords, word];
     setCustomWords(newCustom);
+    suggGen.current += 1;
+    setSugg(null);
+    setSuggErr('');
+    setSuggLoading(false);
     resetAdd();
-    if (geminiAvailable) fetchSugg([...starterWords, ...newCustom]);
   }
 
   function addManual() {
@@ -232,7 +257,7 @@ export default function CustomDictionaryViewSub({
                 disabled={suggLoading}
                 className="text-xs text-indigo-500 hover:text-indigo-700 disabled:opacity-50 transition"
               >
-                {suggLoading ? '…' : 'Suggest another ↻'}
+                {suggLoading ? '...' : sugg || suggErr ? 'Suggest another' : 'Suggest word'}
               </button>
             </div>
             <div role="status" aria-live="polite">
