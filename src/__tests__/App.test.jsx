@@ -42,6 +42,7 @@ describe('App shell', () => {
     expect(screen.getByText('Practice categories')).toBeTruthy();
     expect(screen.getByText('Toggle categories for continuous Practice.')).toBeTruthy();
     expect(screen.getAllByText('No reps yet').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Not introduced').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Untested').length).toBeGreaterThan(0);
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
@@ -133,6 +134,7 @@ describe('App shell', () => {
 
     expect(within(practiceMap()).getByText('2/2 saved')).toBeTruthy();
     expect(within(practiceMap()).getByText('0 right / 2 wrong')).toBeTruthy();
+    expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
     expect(within(practiceMap()).getByText('Gathering data')).toBeTruthy();
     expect(
       within(practiceMap()).getByRole('button', { name: 'Disable all Te/Ta Sound Changes forms' }),

@@ -61,16 +61,29 @@ function skillStatusFor(score, attempted) {
   return { status: 'weak', label: 'Needs practice' };
 }
 
+function cardHasIntroductionSignal(card = {}) {
+  return Boolean(
+    card?.introducedDate ||
+    card?.createdAt ||
+    cleanNumber(card?.lastSeen) > 0 ||
+    cleanNumber(card?.reps) > 0 ||
+    cleanNumber(card?.correct) > 0 ||
+    cleanNumber(card?.incorrect) > 0,
+  );
+}
+
 function cardTotalsForFamily(state = {}, family) {
   const typeIds = new Set(family.typeIds || []);
   let correct = 0;
   let incorrect = 0;
+  let introduced = 0;
   for (const [cardId, card] of Object.entries(state.cards || {})) {
     if (!typeIds.has(typeIdFromCardId(cardId))) continue;
     correct += cleanNumber(card?.correct);
     incorrect += cleanNumber(card?.incorrect);
+    if (cardHasIntroductionSignal(card)) introduced += 1;
   }
-  return { correct, incorrect, attempted: correct + incorrect };
+  return { correct, incorrect, attempted: correct + incorrect, introduced };
 }
 
 function laneTotalsForFamily(rows = []) {
@@ -150,6 +163,19 @@ function skillForFamily({
     skillLabel: status.label,
     avgResponseMs,
   };
+}
+
+function learnerStateForFamily({
+  introduced = false,
+  skillStatus = 'untested',
+  weakRows = 0,
+} = {}) {
+  if (!introduced) return { id: 'not-introduced', label: 'Not introduced' };
+  if (skillStatus === 'weak' || weakRows > 0) {
+    return { id: 'needs-review', label: 'Needs review' };
+  }
+  if (skillStatus === 'strong') return { id: 'reliable', label: 'Reliable' };
+  return { id: 'learning', label: 'Learning' };
 }
 
 export function deriveWeaknessSubcategory(word, typeId = '') {
@@ -357,9 +383,17 @@ export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
               ? 'developing'
               : 'weak',
       }));
+    const introduced =
+      cardTotals.introduced > 0 || laneTotals.attempted > 0 || readiness.readinessAttempted > 0;
+    const learnerState = learnerStateForFamily({
+      introduced,
+      skillStatus: skill.skillStatus,
+      weakRows: rows.length,
+    });
     return {
       id: family.id,
       label: family.label,
+      introduced,
       attempted: totals.attempted,
       correct: totals.correct,
       incorrect: totals.incorrect,
@@ -369,6 +403,7 @@ export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
       skillScore: skill.skillScore,
       skillStatus: skill.skillStatus,
       skillLabel: skill.skillLabel,
+      learnerState,
       rows,
       top: rows[0] || null,
     };

@@ -125,6 +125,56 @@ describe('subcategory weakness model', () => {
     expect(teTa.incorrect).toBe(0);
     expect(teTa.skillStatus).toBe('untested');
     expect(teTa.skillLabel).toBe('Gathering data');
+    expect(teTa.learnerState).toEqual({ id: 'learning', label: 'Learning' });
+  });
+
+  it('labels family learner state from introduction, weakness, and reliability signals', () => {
+    const freshRows = buildWeaknessFamilyRows({});
+    const freshBasics = freshRows.find((family) => family.id === 'basic-tenses');
+    expect(freshBasics.introduced).toBe(false);
+    expect(freshBasics.skillLabel).toBe('Untested');
+    expect(freshBasics.learnerState).toEqual({
+      id: 'not-introduced',
+      label: 'Not introduced',
+    });
+
+    const introducedRows = buildWeaknessFamilyRows({
+      cards: {
+        [cardIdFor(TABERU, 'plain-negative')]: {
+          introducedDate: localDateKey(),
+          reps: 0,
+          correct: 0,
+          incorrect: 0,
+          lastSeen: 0,
+        },
+      },
+    });
+    const introducedBasics = introducedRows.find((family) => family.id === 'basic-tenses');
+    expect(introducedBasics.introduced).toBe(true);
+    expect(introducedBasics.skillLabel).toBe('Untested');
+    expect(introducedBasics.learnerState).toEqual({ id: 'learning', label: 'Learning' });
+
+    const weakRows = buildWeaknessFamilyRows({
+      weakness: withMisses(defaultWeaknessState(), KAKU, 'te-form', 2),
+    });
+    const weakTeTa = weakRows.find((family) => family.id === 'te-ta-sound-changes');
+    expect(weakTeTa.introduced).toBe(true);
+    expect(weakTeTa.learnerState).toEqual({ id: 'needs-review', label: 'Needs review' });
+
+    const reliableRows = buildWeaknessFamilyRows({
+      cards: {
+        [cardIdFor(KAKU, 'plain-negative')]: {
+          introducedDate: localDateKey(-1),
+          reps: 3,
+          correct: 3,
+          incorrect: 0,
+          lastSeen: Date.now(),
+        },
+      },
+    });
+    const reliableBasics = reliableRows.find((family) => family.id === 'basic-tenses');
+    expect(reliableBasics.introduced).toBe(true);
+    expect(reliableBasics.learnerState).toEqual({ id: 'reliable', label: 'Reliable' });
   });
 
   it('selects fresh related cards in a weak subcategory before unrelated cards', () => {

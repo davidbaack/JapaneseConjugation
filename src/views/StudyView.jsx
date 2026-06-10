@@ -1309,6 +1309,17 @@ const WEAKNESS_ROW_TONE = {
   weak: 'bg-rose-500',
 };
 
+const LEARNER_STATE_TONE = {
+  'not-introduced':
+    'border-stone-200 bg-white text-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300',
+  learning:
+    'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300',
+  'needs-review':
+    'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300',
+  reliable:
+    'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300',
+};
+
 const LESSON_BY_GROUP_ID = new Map(LESSON_SECTIONS.map((lesson) => [lesson.groupId, lesson]));
 
 function PracticeScopeSidebar({
@@ -1361,6 +1372,10 @@ function PracticeScopeSidebar({
             const skillWidth = skillStatus === 'untested' ? 8 : Math.max(6, skillScore);
             const skillText =
               skillStatus === 'untested' ? skillLabel : `${skillScore}% skill - ${skillLabel}`;
+            const learnerState = progress.learnerState || {
+              id: attempted ? 'learning' : 'not-introduced',
+              label: attempted ? 'Learning' : 'Not introduced',
+            };
             const open = openFamilyIds.has(family.id);
             const contentId = `practice-map-family-${family.id}`;
             return (
@@ -1377,8 +1392,17 @@ function PracticeScopeSidebar({
                     aria-label={`${family.label} category details`}
                     className="min-w-0 flex-1 cursor-pointer rounded-lg bg-transparent p-0 text-left"
                   >
-                    <span className="block text-sm font-semibold text-stone-900 dark:text-stone-100">
-                      {family.label}
+                    <span className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="min-w-0 truncate text-sm font-semibold text-stone-900 dark:text-stone-100">
+                        {family.label}
+                      </span>
+                      <span
+                        className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold leading-none ${
+                          LEARNER_STATE_TONE[learnerState.id] || LEARNER_STATE_TONE.learning
+                        }`}
+                      >
+                        {learnerState.label}
+                      </span>
                     </span>
                     <span className="mt-0.5 block text-xs text-stone-500">
                       {enabledInFamily.length}/{family.typeIds.length} saved
