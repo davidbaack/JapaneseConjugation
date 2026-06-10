@@ -4,6 +4,7 @@ import { onbinPatternForVerb, wordKey } from '../utils/conjugator.js';
 import {
   buildLabReviewRecommendations,
   buildLessonReviewRecommendation,
+  buildRuleReviewRecommendation,
 } from '../utils/reviewRecommendations.js';
 import { normalizeReviewScope } from '../utils/reviewScope.js';
 import { defaultState } from '../utils/storage.js';
@@ -123,6 +124,31 @@ describe('review recommendations', () => {
       typeIds: ['plain-past', 'te-form'],
     });
     expect(new Set(rec.wordKeys)).toEqual(new Set([wordKey(TABERU), wordKey(KAKU)]));
+  });
+
+  it('builds one-form rule handoffs with the current card word first', () => {
+    const rec = buildRuleReviewRecommendation(
+      {
+        lessonGroupId: 'te-ta-sound-changes',
+        lessonTitle: 'Te/Ta Sound Changes',
+        typeId: 'plain-past',
+        typeLabel: 'Plain Past',
+        word: KAKU,
+      },
+      [TABERU, KAKU, TAKAI],
+      { suggestedCount: 8 },
+    );
+
+    expect(rec).toMatchObject({
+      id: 'lesson-te-ta-sound-changes-plain-past',
+      source: 'lesson',
+      label: 'Plain Past Practice',
+      typeIds: ['plain-past'],
+      suggestedCount: 8,
+    });
+    expect(rec.wordKeys[0]).toBe(wordKey(KAKU));
+    expect(rec.wordKeys).toContain(wordKey(TABERU));
+    expect(rec.wordKeys).not.toContain(wordKey(TAKAI));
   });
 
   it('normalizes legacy saved recommendation copy to Practice language', () => {

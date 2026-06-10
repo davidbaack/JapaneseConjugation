@@ -27,6 +27,7 @@ function renderDashboard(overrides = {}) {
     onDrillEndingLab: vi.fn(),
     onDrillClassify: vi.fn(),
     onDrillRush: vi.fn(),
+    onOpenGuide: vi.fn(),
   };
   const props = {
     daily: { count: 1, goalStreak: 0 },
@@ -71,6 +72,42 @@ const onbinWeakest = {
   detail: '2/5',
 };
 
+function stateWithGuideGroupInsight() {
+  return {
+    ...defaultState(),
+    guide: {
+      attempted: 2,
+      correct: 0,
+      assisted: 0,
+      byStep: {
+        base: { attempted: 2, correct: 2, assisted: 0 },
+        group: { attempted: 2, correct: 0, assisted: 0 },
+        answer: { attempted: 2, correct: 2, assisted: 0 },
+      },
+      recent: [
+        {
+          group: 'godan',
+          expectedGroup: 'godan',
+          steps: {
+            base: { correct: true, assisted: false },
+            group: { correct: false, assisted: false },
+            answer: { correct: true, assisted: false },
+          },
+        },
+        {
+          group: 'godan',
+          expectedGroup: 'godan',
+          steps: {
+            base: { correct: true, assisted: false },
+            group: { correct: false, assisted: false },
+            answer: { correct: true, assisted: false },
+          },
+        },
+      ],
+    },
+  };
+}
+
 describe('StatsDashboard primary nudge priority ladder', () => {
   it('keeps recommendations actionable without a default Start workout gate', () => {
     const recommendation = {
@@ -111,6 +148,24 @@ describe('StatsDashboard primary nudge priority ladder', () => {
     expect(spies.onDrillEndingLab).not.toHaveBeenCalled();
     expect(spies.onDrillRush).not.toHaveBeenCalled();
     expect(spies.onDrillReadiness).not.toHaveBeenCalled();
+  });
+
+  it('lets Guide step diagnostics outrank broader drill nudges', () => {
+    const spies = renderDashboard({
+      state: stateWithGuideGroupInsight(),
+      groupConfusion: true,
+      onbinWeakness: true,
+      weakestSkill: onbinWeakest,
+    });
+
+    const nudge = screen.getByRole('button', { name: /You know the ending/i });
+    expect(nudge.textContent).toMatch(/misclassifying godan verbs/);
+    fireEvent.click(nudge);
+
+    expect(spies.onOpenGuide).toHaveBeenCalledTimes(1);
+    expect(spies.onDrillClassify).not.toHaveBeenCalled();
+    expect(spies.onDrillEndingLab).not.toHaveBeenCalled();
+    expect(spies.onDrillRush).not.toHaveBeenCalled();
   });
 
   it('routes onbin sound-change misses on the te/ta family to Ending Lab', () => {

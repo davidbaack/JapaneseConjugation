@@ -174,7 +174,9 @@ function learnerStateForFamily({
   if (skillStatus === 'weak' || weakRows > 0) {
     return { id: 'needs-review', label: 'Needs review' };
   }
-  if (skillStatus === 'strong') return { id: 'reliable', label: 'Reliable' };
+  if (skillStatus === 'strong') {
+    return { id: 'reliable', label: 'Reliable' };
+  }
   return { id: 'learning', label: 'Learning' };
 }
 
@@ -390,10 +392,16 @@ export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
       skillStatus: skill.skillStatus,
       weakRows: rows.length,
     });
+    const displayLearnerState =
+      learnerState.id === 'not-introduced'
+        ? { ...learnerState, label: 'Not introduced' }
+        : learnerState;
+    const displaySkillLabel = introduced ? skill.skillLabel : 'Not introduced';
     return {
       id: family.id,
       label: family.label,
       introduced,
+      learnerState: displayLearnerState,
       attempted: totals.attempted,
       correct: totals.correct,
       incorrect: totals.incorrect,
@@ -402,8 +410,7 @@ export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
       readinessAttempted: readiness.readinessAttempted,
       skillScore: skill.skillScore,
       skillStatus: skill.skillStatus,
-      skillLabel: skill.skillLabel,
-      learnerState,
+      skillLabel: displaySkillLabel,
       rows,
       top: rows[0] || null,
     };

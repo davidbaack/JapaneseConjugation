@@ -12,6 +12,7 @@ import {
   labRouteForMistakePattern,
 } from '../utils/mistakeDiagnosis.js';
 import { typeIdFromCardId } from '../utils/storage.js';
+import { buildGuideDiagnosticInsight } from '../utils/guidePractice.js';
 
 const TE_TA_FAMILY_ID = TE_TA_SOUND_CHANGE_FAMILY_ID;
 
@@ -108,6 +109,7 @@ export function StatsDashboard({
   groupConfusion = false,
   onDrillClassify,
   onDrillRush,
+  onOpenGuide,
 }) {
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
   const dueDone = srsQueue?.completedDueRuleIds?.length || 0;
@@ -119,6 +121,8 @@ export function StatsDashboard({
   const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
   const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
   const readinessById = new Map(readinessFamilies.map((row) => [row.id, row]));
+  const guideInsight = buildGuideDiagnosticInsight(state.guide);
+  const guideAttemptCount = Number(state.guide?.attempted) || 0;
   const weakestToEndingLab =
     !!weakestSkill &&
     weakestSkill.familyId === TE_TA_FAMILY_ID &&
@@ -126,50 +130,58 @@ export function StatsDashboard({
     !!onDrillEndingLab;
   const weakestToRush = !!weakestSkill && weakestSkill.dimension === 'speed' && !!onDrillRush;
   const primaryNudge =
-    groupConfusion && onDrillClassify
+    guideInsight && onOpenGuide
       ? {
-          onClick: onDrillClassify,
-          lead: 'You keep mixing up ',
-          emphasis: 'verb groups',
-          tail: ' - drill them in Groups',
-          action: 'Groups',
+          onClick: onOpenGuide,
+          message: guideInsight.message,
+          detail: guideInsight.detail,
+          action: guideInsight.actionLabel,
         }
-      : weakestSkill && weakestToEndingLab
+      : groupConfusion && onDrillClassify
         ? {
-            onClick: onDrillEndingLab,
-            lead: 'You keep missing ',
-            emphasis: 'sound changes',
-            tail: ' - drill them in Ending Lab',
-            action: 'Ending Lab',
+            onClick: onDrillClassify,
+            lead: 'You keep mixing up ',
+            emphasis: 'verb groups',
+            tail: ' - drill them in Groups',
+            action: 'Groups',
           }
-        : weakestSkill && weakestToRush
+        : weakestSkill && weakestToEndingLab
           ? {
-              onClick: onDrillRush,
-              lead: 'Your ',
-              emphasis: 'recall is slow',
-              tail: ' - build speed in Rush',
-              action: 'Rush',
+              onClick: onDrillEndingLab,
+              lead: 'You keep missing ',
+              emphasis: 'sound changes',
+              tail: ' - drill them in Ending Lab',
+              action: 'Ending Lab',
             }
-          : weakestSkill && onDrillReadiness
+          : weakestSkill && weakestToRush
             ? {
-                onClick: () =>
-                  onDrillReadiness({
-                    familyId: weakestSkill.familyId,
-                    dimension: weakestSkill.dimension,
-                  }),
-                lead: 'Sharpen ',
-                emphasis: weakestSkill.label,
-                tail: ` - ${weakestSkill.dimensionLabel.toLowerCase()} is ${weakestSkill.status}`,
-                action: 'Drill',
+                onClick: onDrillRush,
+                lead: 'Your ',
+                emphasis: 'recall is slow',
+                tail: ' - build speed in Rush',
+                action: 'Rush',
               }
-            : null;
+            : weakestSkill && onDrillReadiness
+              ? {
+                  onClick: () =>
+                    onDrillReadiness({
+                      familyId: weakestSkill.familyId,
+                      dimension: weakestSkill.dimension,
+                    }),
+                  lead: 'Sharpen ',
+                  emphasis: weakestSkill.label,
+                  tail: ` - ${weakestSkill.dimensionLabel.toLowerCase()} is ${weakestSkill.status}`,
+                  action: 'Drill',
+                }
+              : null;
   const weakCount = strengthRows.filter((row) => row.status === 'weak').length;
   const hasHistory =
     strengthRows.some((row) => row.attempted > 0) ||
     (daily.count || 0) > 0 ||
     dueTotal > 0 ||
     recommendations.length > 0 ||
-    mistakeHistoryCount > 0;
+    mistakeHistoryCount > 0 ||
+    guideAttemptCount > 0;
 
   return (
     <section className="space-y-4" aria-label="Stats dashboard">
@@ -319,9 +331,20 @@ export function StatsDashboard({
               className="mb-3 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs text-amber-900 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/40"
             >
               <span>
-                {primaryNudge.lead}
-                <span className="font-semibold">{primaryNudge.emphasis}</span>
-                {primaryNudge.tail}
+                {primaryNudge.message ? (
+                  <>
+                    <span className="font-semibold">{primaryNudge.message}</span>
+                    {primaryNudge.detail && (
+                      <span className="mt-0.5 block font-normal">{primaryNudge.detail}</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {primaryNudge.lead}
+                    <span className="font-semibold">{primaryNudge.emphasis}</span>
+                    {primaryNudge.tail}
+                  </>
+                )}
               </span>
               <span className="shrink-0 font-semibold">{primaryNudge.action} -&gt;</span>
             </button>
@@ -465,6 +488,7 @@ export default function StatsView() {
     openLabTool,
     practiceFormGroup,
     hydrated,
+    setTab,
   } = useApp();
 
   const openMistakeSummary = useMemo(() => {
@@ -523,6 +547,7 @@ export default function StatsView() {
       groupConfusion={groupConfusion}
       onDrillClassify={() => openLabTool('classify')}
       onDrillRush={() => openLabTool('games')}
+      onOpenGuide={() => setTab('guide')}
     />
   );
 }

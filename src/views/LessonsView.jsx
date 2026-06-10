@@ -11,7 +11,10 @@ import {
   getLessonCoverage,
 } from '../data/lessonContent.js';
 import { useApp } from '../state/AppStateContext.jsx';
-import { buildLessonReviewRecommendation } from '../utils/reviewRecommendations.js';
+import {
+  buildLessonReviewRecommendation,
+  buildRuleReviewRecommendation,
+} from '../utils/reviewRecommendations.js';
 
 function LessonStat({ label, value }) {
   return (
@@ -36,15 +39,14 @@ function TypeChip({ id }) {
   );
 }
 
-function PracticeCardReturnPanel({ focus, onReturn, onDismiss }) {
+function PracticeCardReturnPanel({ focus, onReturn, onGuide, onPractice, onDismiss }) {
   const type = getTypeInfo(focus?.typeId);
   const typeLabel = focus?.typeLabel || type.label || 'this form';
   const word = focus?.word || {};
-
   return (
     <section
       aria-label="Missed Practice card"
-      className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900/70 dark:bg-amber-950/20"
+      className="mb-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900/70 dark:bg-amber-950/20"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
@@ -78,6 +80,22 @@ function PracticeCardReturnPanel({ focus, onReturn, onDismiss }) {
           >
             <IconRefresh className="h-4 w-4" />
             Return to this card
+          </button>
+          <button
+            type="button"
+            onClick={() => onGuide?.(focus)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-50 dark:border-amber-700 dark:bg-stone-950 dark:text-amber-200 dark:hover:bg-amber-950/30"
+          >
+            <IconSpark className="h-4 w-4" />
+            Guide this form
+          </button>
+          <button
+            type="button"
+            onClick={() => onPractice?.(focus)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
+          >
+            <IconRefresh className="h-4 w-4" />
+            Practice this form
           </button>
           <button
             type="button"
@@ -218,6 +236,7 @@ export default function LessonsView() {
     allWords,
     clearLearnFocus,
     learnFocus,
+    openGuideForRule,
     returnToLearnFocusCard,
     setTab,
     startReviewRecommendation,
@@ -286,6 +305,34 @@ export default function LessonsView() {
     );
   }
 
+  function guideFocusedRule(focus) {
+    if (!focus) return;
+    openGuideForRule?.(focus.word, focus.typeId, {
+      source: 'learn-return',
+      lessonGroupId: focus.lessonGroupId,
+      lessonTitle: focus.lessonTitle,
+      typeLabel: focus.typeLabel,
+    });
+    clearLearnFocus?.();
+  }
+
+  function returnToPracticeCard() {
+    returnToLearnFocusCard?.();
+  }
+
+  function practiceFocusedRule(focus) {
+    if (!focus) return;
+    const recommendation = buildRuleReviewRecommendation(focus, allWords, {
+      suggestedCount: 8,
+      wordLimit: 10,
+    });
+    if (!recommendation) return;
+    clearLearnFocus?.();
+    if (startReviewRecommendation?.(recommendation)) return;
+    addReviewRecommendation(recommendation);
+    setTab('practice');
+  }
+
   function openLesson(groupId) {
     setOpenLessonIds((prev) => {
       const next = new Set(prev);
@@ -340,7 +387,9 @@ export default function LessonsView() {
       {learnFocus?.lessonGroupId && (
         <PracticeCardReturnPanel
           focus={learnFocus}
-          onReturn={returnToLearnFocusCard}
+          onReturn={returnToPracticeCard}
+          onGuide={guideFocusedRule}
+          onPractice={practiceFocusedRule}
           onDismiss={clearLearnFocus}
         />
       )}

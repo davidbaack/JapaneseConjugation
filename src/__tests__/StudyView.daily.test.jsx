@@ -16,7 +16,7 @@ vi.mock('../state/AppStateContext.jsx', () => ({
   useApp: () => mockedApp.value,
 }));
 
-import StudyView from '../views/StudyView.jsx';
+import StudyView, { reviewFeedbackActionForRecord } from '../views/StudyView.jsx';
 
 beforeEach(() => {
   originalScrollIntoView = window.Element.prototype.scrollIntoView;
@@ -76,6 +76,42 @@ function goalHitState() {
   };
 }
 
+function guideGroupInsightState() {
+  return {
+    ...defaultState(),
+    guide: {
+      attempted: 2,
+      correct: 0,
+      assisted: 0,
+      byStep: {
+        base: { attempted: 2, correct: 2, assisted: 0 },
+        group: { attempted: 2, correct: 0, assisted: 0 },
+        answer: { attempted: 2, correct: 2, assisted: 0 },
+      },
+      recent: [
+        {
+          group: 'godan',
+          expectedGroup: 'godan',
+          steps: {
+            base: { correct: true, assisted: false },
+            group: { correct: false, assisted: false },
+            answer: { correct: true, assisted: false },
+          },
+        },
+        {
+          group: 'godan',
+          expectedGroup: 'godan',
+          steps: {
+            base: { correct: true, assisted: false },
+            group: { correct: false, assisted: false },
+            answer: { correct: true, assisted: false },
+          },
+        },
+      ],
+    },
+  };
+}
+
 function stateWithDueRule(ruleId) {
   return {
     ...defaultState(),
@@ -131,8 +167,7 @@ function openPracticeRunSettings() {
 }
 
 async function clickTopReviewNext() {
-  const nextButtons = await screen.findAllByRole('button', { name: 'Next (Enter)' });
-  fireEvent.click(nextButtons[0]);
+  fireEvent.click(await screen.findByRole('button', { name: 'Try another' }));
 }
 
 class FakeSpeechRecognition {
@@ -190,6 +225,47 @@ afterEach(() => {
   FakeSpeechRecognition.instance = null;
 });
 
+describe('reviewFeedbackActionForRecord', () => {
+  it('chooses one concrete next action from the review context', () => {
+    const godan = STARTER_VERBS.find((word) => word.group === 'godan');
+    const ichidan = STARTER_VERBS.find((word) => word.group === 'ichidan');
+    expect(godan).toBeTruthy();
+    expect(ichidan).toBeTruthy();
+
+    expect(reviewFeedbackActionForRecord({ correct: true }).label).toBe('Try another');
+    expect(
+      reviewFeedbackActionForRecord({
+        correct: false,
+        diagnosis: {
+          category: 'godan-sound-change',
+          patternId: 'godan-onbin-ku',
+          targetType: 'plain-past',
+          repairTypeIds: ['plain-past'],
+        },
+        practicedType: 'plain-past',
+        word: godan,
+      }).label,
+    ).toBe('Drill the trap');
+    expect(
+      reviewFeedbackActionForRecord({
+        correct: false,
+        practicedType: 'plain-negative',
+        word: godan,
+      }).label,
+    ).toBe('Open Guide for this rule');
+    expect(
+      reviewFeedbackActionForRecord(
+        {
+          correct: false,
+          practicedType: 'plain-past',
+          word: ichidan,
+        },
+        { relatedLesson: { groupId: 'plain', title: 'Plain forms' } },
+      ).label,
+    ).toBe('Review lesson');
+  });
+});
+
 describe('StudyView continuous Practice startup', () => {
   it('opens continuous Practice for signed-in learners', async () => {
     const app = makeApp();
@@ -217,6 +293,24 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
+  });
+
+  it('surfaces Guide step diagnostics inside the active Practice run', async () => {
+    const setTab = vi.fn();
+    const app = makeApp({
+      state: guideGroupInsightState(),
+      setTab,
+    });
+    mockedApp.value = app;
+
+    render(<StudyView />);
+
+    expect(await waitForPracticeCard()).toBeTruthy();
+    const nudge = screen.getByRole('button', { name: /You know the ending/i });
+    expect(nudge.textContent).toMatch(/misclassifying godan verbs/);
+
+    fireEvent.click(nudge);
+    expect(setTab).toHaveBeenCalledWith('guide');
   });
 
   it('does not surface a local Stats shortcut on an active card', async () => {
@@ -1189,6 +1283,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByText('Answer #1'));
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
     expect(screen.getByText('Answer breakdown')).toBeTruthy();
+    expect(within(reviewRegion).getByRole('button', { name: 'Try another' })).toBeTruthy();
     expect(within(reviewRegion).queryByText('New')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to Practice' }));
@@ -1196,7 +1291,8 @@ describe('StudyView continuous Practice startup', () => {
   });
 
   it('opens missed run review answers with the full breakdown collapsed', async () => {
-    const target = STARTER_VERBS[0];
+    const target = STARTER_VERBS.find((word) => word.group === 'godan');
+    expect(target).toBeTruthy();
     const type = 'plain-negative';
     mockedApp.value = makeApp({
       allWords: [target],
@@ -1225,6 +1321,9 @@ describe('StudyView continuous Practice startup', () => {
     expect(within(fullBreakdown).queryByText('More')).toBeNull();
     expect(within(fullBreakdown).getByText('Visual Rule Path')).toBeTruthy();
     expect(within(fullBreakdown).getByText('1. What category is this and why?')).toBeTruthy();
+    expect(
+      within(reviewRegion).getByRole('button', { name: 'Open Guide for this rule' }),
+    ).toBeTruthy();
     expect(within(reviewRegion).queryByText('Answer breakdown')).toBeNull();
   });
 

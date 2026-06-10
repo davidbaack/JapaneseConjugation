@@ -99,6 +99,7 @@ import {
   includeWordInReviewState,
   reviewTypeIdsForState,
 } from '../utils/reviewScope.js';
+import { buildGuideDiagnosticInsight } from '../utils/guidePractice.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
@@ -110,7 +111,9 @@ export { kanaCoachCells, explainReversePrompt };
 const STUDY_CURRENT_KEY = 'jp-study-current';
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
-const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation']);
+const FAMILY_INTRO_REVIEW_LIMIT_SOURCE = 'intro-family';
+const FAMILY_INTRO_TYPE_LIMIT = 4;
+const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation', FAMILY_INTRO_REVIEW_LIMIT_SOURCE]);
 const REVIEW_SESSION_HISTORY_SIZE = 4;
 const CORRECT_AUTO_ADVANCE_MS = 850;
 const SESSION_RECENT_OUTCOME_LIMIT = 6;
@@ -492,14 +495,99 @@ function buildMissedContrast({
   };
 }
 
+function debugInfoForReviewRecord(record, reviewSubmittedAnswer) {
+  if (!record || record.reverseDrill || !record.word || !record.practicedType) return null;
+  try {
+    return getConjugationDebugInfo(record.word, record.practicedType, reviewSubmittedAnswer);
+  } catch {
+    return null;
+  }
+}
+
+function labRouteFromDebugMistake(mistake) {
+  if (mistake?.kind === 'group') {
+    return { tool: 'classify', toolLabel: 'Groups' };
+  }
+  if (mistake?.kind === 'onbin') {
+    return { tool: 'endings', toolLabel: 'Ending Lab' };
+  }
+  return null;
+}
+
+export function reviewFeedbackActionForRecord(
+  record,
+  {
+    canOpenGuide = true,
+    canOpenLab = true,
+    canOpenLearn = true,
+    preferTryAnother = false,
+    relatedLesson = null,
+    reviewSubmittedAnswer = '',
+  } = {},
+) {
+  if (!record || record.correct || record.wasCorrected || preferTryAnother) {
+    return { kind: 'try', label: 'Try another' };
+  }
+
+  const debug = debugInfoForReviewRecord(record, reviewSubmittedAnswer);
+  const labRoute =
+    labRouteForMistakePattern(record.diagnosis) || labRouteFromDebugMistake(debug?.mistake);
+  if (canOpenLab && labRoute) {
+    return { kind: 'drill', label: 'Drill the trap', route: labRoute };
+  }
+
+  if (canOpenGuide && (debug?.rowShiftVisual || debug?.mistake)) {
+    return { kind: 'guide', label: 'Open Guide for this rule' };
+  }
+
+  if (canOpenLearn && relatedLesson) {
+    return { kind: 'lesson', label: 'Review lesson', lesson: relatedLesson };
+  }
+
+  return { kind: 'try', label: 'Try another' };
+}
+
+function ReviewFeedbackAction({ action, buttonRef, onClick }) {
+  if (!action?.label || !onClick) return null;
+  const Icon =
+    action.kind === 'lesson'
+      ? IconBook
+      : action.kind === 'drill'
+        ? IconSpark
+        : action.kind === 'guide'
+          ? IconList
+          : IconRefresh;
+  const toneClass =
+    action.kind === 'try'
+      ? 'border-stone-800 bg-stone-850 text-white hover:bg-stone-700 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150'
+      : 'border-indigo-200 bg-white text-indigo-750 hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-200 dark:hover:bg-indigo-950/30';
+
+  return (
+    <div className="mt-4 border-t border-stone-200/70 pt-3 text-left dark:border-stone-800/70">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={onClick}
+        className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-sm transition ${toneClass}`}
+      >
+        <Icon className="h-4 w-4" />
+        {action.label}
+      </button>
+    </div>
+  );
+}
+
 function RunAnswerReveal({
   record,
   geminiKey,
   onOpenLearn,
   onOpenLearnFocus = null,
+  onOpenGuide,
+  onOpenLab,
+  onTryAnother,
+  actionButtonRef = null,
   autoAdvanceHint = null,
-  topAction = null,
-  footer = null,
+  preferTryAnother = false,
 }) {
   const [chatOpen, setChatOpen] = useState(false);
   if (!record) return null;
@@ -527,11 +615,12 @@ function RunAnswerReveal({
   const expectedView = record.reverseDrill
     ? promptDisplay(record.word, null, prefs)
     : formDisplay(record.expected, prefs, record.word, record.cardType);
+  const reviewTypeId = record.practicedType || record.cardType;
   const targetEnglish = record.reverseDrill
     ? englishForForm(record.word, null)
     : englishForForm(record.word, record.cardType);
   const explanation = record.explanation;
-  const relatedLesson = lessonForType(record.practicedType);
+  const relatedLesson = lessonForType(reviewTypeId);
   const minimalPairFeedback = record.minimalPairFeedback;
   const diagnostic =
     !record.correct && !record.revealedMiss ? record.diagnosis?.feedback || '' : '';
@@ -542,13 +631,30 @@ function RunAnswerReveal({
     reviewSubmittedAnswer,
     missedComparisonValue,
   });
-  const openRelatedLesson = () => {
-    const handled = onOpenLearnFocus?.(record);
-    if (!handled) onOpenLearn?.(relatedLesson?.groupId);
+  const reviewAction = reviewFeedbackActionForRecord(record, {
+    canOpenGuide: !!onOpenGuide,
+    canOpenLab: !!onOpenLab,
+    canOpenLearn: !!(onOpenLearn || onOpenLearnFocus),
+    preferTryAnother,
+    relatedLesson,
+    reviewSubmittedAnswer,
+  });
+  const runReviewAction = () => {
+    if (reviewAction.kind === 'guide') {
+      onOpenGuide?.(record.word, reviewTypeId);
+      return;
+    }
+    if (reviewAction.kind === 'drill') {
+      onOpenLab?.(reviewAction.route?.tool);
+      return;
+    }
+    if (reviewAction.kind === 'lesson') {
+      const handled = onOpenLearnFocus?.(record);
+      if (!handled) onOpenLearn?.(reviewAction.lesson?.groupId);
+      return;
+    }
+    onTryAnother?.();
   };
-  const learnActionLabel = record.correct
-    ? `Learn the ${relatedLesson?.title} lesson`
-    : 'Learn from this miss';
   const panelClass = record.correct
     ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
     : record.wasCorrected
@@ -576,7 +682,6 @@ function RunAnswerReveal({
 
   return (
     <div className={`rounded-xl p-4 ${panelClass}`}>
-      {topAction && <div className="mb-3">{topAction}</div>}
       <div className="flex items-start gap-3 text-left">
         <div
           className={`mt-0.5 flex-shrink-0 ${
@@ -749,7 +854,7 @@ function RunAnswerReveal({
                     <span lang="ja" className="font-semibold">
                       {record.reverseDrill
                         ? reviewSubmittedDisplay || '(empty)'
-                        : toHiragana(record.submittedAnswer) || '(empty)'}
+                        : toHiragana(record.submittedAnswer) || reviewSubmittedDisplay || '(empty)'}
                     </span>
                   )}
                 </div>
@@ -903,24 +1008,24 @@ function RunAnswerReveal({
           )}
         </div>
       )}
-      {relatedLesson && (onOpenLearn || onOpenLearnFocus) && (
-        <div className="mt-4 border-t border-stone-200/60 pt-3 text-left dark:border-stone-800/60">
-          <button
-            type="button"
-            onClick={openRelatedLesson}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 underline decoration-indigo-300 underline-offset-4 transition hover:text-indigo-900 dark:text-indigo-300 dark:decoration-indigo-700 dark:hover:text-indigo-100"
-          >
-            <IconBook className="h-4 w-4" />
-            {learnActionLabel}
-          </button>
-        </div>
-      )}
-      {footer}
+      <ReviewFeedbackAction
+        action={reviewAction}
+        buttonRef={actionButtonRef}
+        onClick={runReviewAction}
+      />
     </div>
   );
 }
 
-function RunAnswerReviewItem({ record, geminiKey, onOpenLearn, onOpenLearnFocus }) {
+function RunAnswerReviewItem({
+  record,
+  geminiKey,
+  onOpenGuide,
+  onOpenLab,
+  onOpenLearn,
+  onOpenLearnFocus,
+  onTryAnother,
+}) {
   const answerText =
     record.reviewChoiceLabel ||
     (record.revealedMiss ? "I don't know" : record.submittedAnswer?.trim() || '(empty)');
@@ -966,8 +1071,11 @@ function RunAnswerReviewItem({ record, geminiKey, onOpenLearn, onOpenLearnFocus 
         <RunAnswerReveal
           record={record}
           geminiKey={geminiKey}
+          onOpenGuide={onOpenGuide}
+          onOpenLab={onOpenLab}
           onOpenLearn={onOpenLearn}
           onOpenLearnFocus={onOpenLearnFocus}
+          onTryAnother={onTryAnother}
         />
       </div>
     </details>
@@ -979,6 +1087,8 @@ function PracticeRunReviewPage({
   runStatsLabel,
   onBack,
   geminiKey,
+  onOpenGuide,
+  onOpenLab,
   onOpenLearn,
   onOpenLearnFocus,
 }) {
@@ -1015,8 +1125,11 @@ function PracticeRunReviewPage({
               key={record.id}
               record={record}
               geminiKey={geminiKey}
+              onOpenGuide={onOpenGuide}
+              onOpenLab={onOpenLab}
               onOpenLearn={onOpenLearn}
               onOpenLearnFocus={onOpenLearnFocus}
+              onTryAnother={onBack}
             />
           ))}
         </div>
@@ -1342,6 +1455,25 @@ const LEARNER_STATE_TONE = {
 };
 
 const LESSON_BY_GROUP_ID = new Map(LESSON_SECTIONS.map((lesson) => [lesson.groupId, lesson]));
+const CARD_TYPE_BY_ID = new Map(ALL_CARD_TYPES.map((type) => [type.id, type]));
+
+function familyIntroTypeIds(family) {
+  return (family?.typeIds || [])
+    .filter((typeId) => CARD_TYPE_BY_ID.has(typeId))
+    .slice(0, FAMILY_INTRO_TYPE_LIMIT);
+}
+
+function familyIntroFocusFromLaunch(focus) {
+  if (focus?.launchMode !== FAMILY_INTRO_REVIEW_LIMIT_SOURCE || !focus?.formGroupId) return null;
+  const family = FORM_GROUPS.find((group) => group.id === focus.formGroupId);
+  const fallbackTypeIds = familyIntroTypeIds(family);
+  const launchTypeIds = Array.isArray(focus.typeIds)
+    ? focus.typeIds.filter((typeId) => CARD_TYPE_BY_ID.has(typeId))
+    : [];
+  const typeIds = launchTypeIds.length ? launchTypeIds : fallbackTypeIds;
+  if (!typeIds.length) return null;
+  return { familyId: focus.formGroupId, typeIds };
+}
 
 function PracticeScopeSidebar({
   state,
@@ -1349,6 +1481,7 @@ function PracticeScopeSidebar({
   openFamilyIds,
   onToggleFamilyOpen,
   onToggleFamily,
+  onIntroduceFamily,
   onToggleType,
   className = '',
 }) {
@@ -1374,9 +1507,14 @@ function PracticeScopeSidebar({
               Toggle categories for continuous Practice.
             </p>
           </div>
-          <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
-            {activeCount} saved forms
-          </span>
+          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+            <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
+              Not introduced
+            </span>
+            <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
+              {activeCount} saved forms
+            </span>
+          </div>
         </div>
         <div className="mt-3 space-y-2">
           {FORM_GROUPS.map((family) => {
@@ -1387,18 +1525,30 @@ function PracticeScopeSidebar({
             const attempted = progress.attempted || 0;
             const correct = progress.correct || 0;
             const incorrect = progress.incorrect || 0;
+            const introduced = progress.introduced ?? attempted > 0;
             const skillStatus = progress.skillStatus || 'untested';
-            const skillLabel = progress.skillLabel || (attempted ? 'Gathering data' : 'Untested');
+            const skillLabel =
+              progress.skillLabel ||
+              (attempted ? 'Gathering data' : introduced ? 'Untested' : 'Not introduced');
             const skillScore = progress.skillScore || 0;
             const skillWidth = skillStatus === 'untested' ? 8 : Math.max(6, skillScore);
-            const skillText =
-              skillStatus === 'untested' ? skillLabel : `${skillScore}% skill - ${skillLabel}`;
+            const skillText = !introduced
+              ? ''
+              : skillStatus === 'untested'
+                ? skillLabel
+                : `${skillScore}% skill - ${skillLabel}`;
             const learnerState = progress.learnerState || {
-              id: attempted ? 'learning' : 'not-introduced',
-              label: attempted ? 'Learning' : 'Not introduced',
+              id: introduced ? 'learning' : 'not-introduced',
+              label: introduced ? 'Learning' : 'Not introduced',
             };
+            const repsText = !introduced
+              ? 'Not introduced'
+              : attempted
+                ? `${correct} right / ${incorrect} wrong`
+                : 'No reps yet';
             const open = openFamilyIds.has(family.id);
             const contentId = `practice-map-family-${family.id}`;
+            const introEligible = enabledInFamily.length === 0 || !introduced;
             return (
               <div
                 key={family.id}
@@ -1429,12 +1579,12 @@ function PracticeScopeSidebar({
                       {enabledInFamily.length}/{family.typeIds.length} saved
                     </span>
                     <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-stone-500">
-                      <span>
-                        {attempted ? `${correct} right / ${incorrect} wrong` : 'No reps yet'}
-                      </span>
-                      <span className="font-semibold text-stone-700 dark:text-stone-300">
-                        {skillText}
-                      </span>
+                      <span>{repsText}</span>
+                      {skillText && (
+                        <span className="font-semibold text-stone-700 dark:text-stone-300">
+                          {skillText}
+                        </span>
+                      )}
                     </span>
                     <span className="mt-2 block">
                       <span
@@ -1452,18 +1602,32 @@ function PracticeScopeSidebar({
                       </span>
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onToggleFamily(family)}
-                    className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-                      allEnabled
-                        ? 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300'
-                        : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400'
-                    }`}
-                    aria-label={`${allEnabled ? 'Disable' : 'Enable'} all ${family.label} forms`}
-                  >
-                    {allEnabled ? 'Disable all' : 'Enable all'}
-                  </button>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    {introEligible && onIntroduceFamily && (
+                      <button
+                        type="button"
+                        onClick={() => onIntroduceFamily(family)}
+                        className="max-w-28 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-semibold leading-tight text-white transition hover:bg-indigo-700 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400"
+                        aria-label={`Introduce ${family.label} family`}
+                      >
+                        Introduce this family
+                      </button>
+                    )}
+                    {(!introEligible || allEnabled) && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleFamily(family)}
+                        className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                          allEnabled
+                            ? 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300'
+                            : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400'
+                        }`}
+                        aria-label={`${allEnabled ? 'Disable' : 'Enable'} all ${family.label} forms`}
+                      >
+                        {allEnabled ? 'Disable all' : 'Enable all'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {open && (
                   <div
@@ -1500,7 +1664,7 @@ function PracticeScopeSidebar({
                     )}
                     <div className="grid gap-1.5">
                       {family.typeIds.map((typeId) => {
-                        const type = ALL_CARD_TYPES.find((item) => item.id === typeId);
+                        const type = CARD_TYPE_BY_ID.get(typeId);
                         if (!type) return null;
                         const checked = enabled.has(typeId);
                         return (
@@ -2142,6 +2306,8 @@ export default function StudyView({ mode = 'practice' }) {
     learnFocus,
     openLearnFocus,
     clearLearnFocus,
+    openGuideForRule,
+    openLabTool,
     hydrated,
   } = useApp();
   const [current, setCurrent] = useState(null);
@@ -2188,6 +2354,7 @@ export default function StudyView({ mode = 'practice' }) {
   const [sessionFilterFormGroupId, setSessionFilterFormGroupId] = useState(
     () => focus?.formGroupId || null,
   );
+  const [familyIntroFocus, setFamilyIntroFocus] = useState(() => familyIntroFocusFromLaunch(focus));
   const [launchContext, setLaunchContext] = useState(() =>
     focus?.returnTo === 'reference' ? focus : null,
   );
@@ -2222,12 +2389,18 @@ export default function StudyView({ mode = 'practice' }) {
 
   const enabledTypes = useMemo(() => {
     if (sessionFilterFormGroupId) {
+      if (
+        familyIntroFocus?.familyId === sessionFilterFormGroupId &&
+        familyIntroFocus.typeIds?.length
+      ) {
+        return familyIntroFocus.typeIds;
+      }
       const group = FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId);
       if (group?.typeIds?.length) return group.typeIds;
     }
     const baseTypes = state.enabledTypes?.length ? state.enabledTypes : ['plain-past'];
     return reviewTypeIdsForState(state, baseTypes);
-  }, [state, sessionFilterFormGroupId]);
+  }, [state, sessionFilterFormGroupId, familyIntroFocus]);
   const practiceWords = useMemo(() => {
     const base = filterWordsForStudyScope(
       verbs,
@@ -2408,32 +2581,40 @@ export default function StudyView({ mode = 'practice' }) {
         record.word,
         record.cardType || learnFocus.typeId || record.practicedType,
       );
-      clearLearnFocus?.();
       if (card) {
-        setCurrent(card);
+        focusSeededRef.current = true;
+        setRecommendationFocus(null);
+        setWordSweep(null);
+        setSessionFilterWord(null);
+        setSessionFilterFormGroupId(null);
+        setLaunchContext(null);
+        setCurrent({
+          ...card,
+          selectionOrigin: record.cardOrigin || cardOriginForStudyCard(card),
+          selectionReason: record.selectionReason || card.selectionReason || null,
+        });
         setReviewRecord(record);
         setAnswer(record.submittedAnswer || '');
-        setSelfCheckOpen(false);
         setWasCorrect(!!record.correct);
         setWasCorrected(!!record.wasCorrected);
         setCoachRevealed(record.coachRevealed || 0);
-        setGreenRevealed(0);
+        setSelfCheckOpen(false);
         setStepHint('');
         setHintMasked(false);
         setHintRevealed(false);
         setCoachChatOpen(false);
-        hadKanaMistakeRef.current = false;
-        wrongSnapshotRef.current = null;
-        usedHintRef.current = false;
         setPhase('reviewing');
+        clearLearnFocus?.();
         return;
       }
+      clearLearnFocus?.();
     }
     // When arriving from Check's "Practice this verb", seed that exact word/form
     // once. If no rule covers it, fall through to normal selection.
     if (focus?.word && !focusSeededRef.current) {
       focusSeededRef.current = true;
       setFocusWordLock(focus.word);
+      setFamilyIntroFocus(null);
       setRecommendationFocus(null);
       // Lock Practice to this word so every follow-up card stays on it until
       // the learner exits the focus banner (rather than mixing back into the
@@ -2471,6 +2652,7 @@ export default function StudyView({ mode = 'practice' }) {
     }
     if (focus?.formGroupId && !focusSeededRef.current) {
       focusSeededRef.current = true;
+      setFamilyIntroFocus(familyIntroFocusFromLaunch(focus));
       setSessionFilterFormGroupId(focus.formGroupId);
       setFocusWordLock(null);
       setWordSweep(null);
@@ -2480,6 +2662,7 @@ export default function StudyView({ mode = 'practice' }) {
     if (focus?.recommendation && !focusSeededRef.current) {
       focusSeededRef.current = true;
       setRecommendationFocus(focus.recommendation);
+      setFamilyIntroFocus(null);
       setFocusWordLock(null);
       setWordSweep(null);
       setSessionFilterWord(null);
@@ -2521,6 +2704,7 @@ export default function StudyView({ mode = 'practice' }) {
     reviewSelectionOptions,
     focus,
     learnFocus,
+    clearLearnFocus,
     specialLaunchActive,
     transformationMode,
   ]);
@@ -2831,6 +3015,7 @@ export default function StudyView({ mode = 'practice' }) {
     : null;
   const reviewLimit = activeReviewLimitFromPrefs(practicePrefs);
   const reviewLimitSource = practicePrefs.reviewLimitSource || '';
+  const introReviewActive = reviewLimitSource === FAMILY_INTRO_REVIEW_LIMIT_SOURCE;
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const runStats = sessionRunStats(state.session, runBase);
   const runStatsLabel = `${runStats.reviewed} ${runStats.reviewed === 1 ? 'card' : 'cards'} · ${
@@ -2849,7 +3034,12 @@ export default function StudyView({ mode = 'practice' }) {
       ? {
           now: Math.min(reviewsDone, reviewLimit),
           max: reviewLimit,
-          label: reviewLimitSource === 'recommendation' ? 'Recommended progress' : 'Drill progress',
+          label:
+            reviewLimitSource === 'recommendation'
+              ? 'Recommended progress'
+              : introReviewActive
+                ? 'Intro progress'
+                : 'Drill progress',
         }
       : {
           now: reviewsDone,
@@ -3240,6 +3430,7 @@ export default function StudyView({ mode = 'practice' }) {
     if (word) {
       setState((prev) => includeWordInReviewState(prev, word));
     }
+    setFamilyIntroFocus(null);
     setRecommendationFocus(null);
     setWordSweep(null);
     setSessionFilterWord(word);
@@ -3256,6 +3447,7 @@ export default function StudyView({ mode = 'practice' }) {
         enabledTypes: [...new Set([...(restored.enabledTypes || []), ...group.typeIds])],
       };
     });
+    setFamilyIntroFocus(null);
     setRecommendationFocus(null);
     setWordSweep(null);
     setSessionFilterFormGroupId(groupId);
@@ -3735,31 +3927,38 @@ export default function StudyView({ mode = 'practice' }) {
     updateTypedAnswer(nextAnswer, options);
   }
 
-  function openLearnByGroupId(groupId) {
-    window.location.hash = groupId ? `lesson-${groupId}` : 'formation-keys';
-    setTab('learn');
-  }
-
   function openLearnForRuleRecord(record) {
-    if (!record || record.correct) return false;
-    const typeId = record.practicedType || record.cardType;
+    if (!record) return false;
+    const typeId = record?.practicedType || record?.cardType;
     const lesson = lessonForType(typeId);
     if (!lesson) return false;
     if (typeof window !== 'undefined') {
       window.location.hash = `lesson-${lesson.groupId}`;
     }
-    return (
-      openLearnFocus?.({
-        source: 'practice-result',
-        lessonGroupId: lesson.groupId,
-        lessonTitle: lesson.title,
-        typeId,
-        typeLabel: record.typeLabel || getTypeInfo(typeId).label || '',
-        word: record.word ? { ...record.word } : null,
-        reviewRecord: record,
-        answeredAt: record.answeredAt || Date.now(),
-      }) || false
-    );
+    const typeLabel = record?.typeLabel || getTypeInfo(typeId).label || '';
+    return openLearnFocus?.({
+      source: 'practice-result',
+      lessonGroupId: lesson.groupId,
+      lessonTitle: lesson.title,
+      typeId,
+      typeLabel,
+      word: record.word ? { ...record.word } : null,
+      reviewRecord: record,
+      answeredAt: record.answeredAt || Date.now(),
+    });
+  }
+
+  function openGuideForReviewRule(word, type) {
+    if (openGuideForRule) {
+      openGuideForRule(word, type, { source: 'practice-result' });
+      return;
+    }
+    setTab('guide');
+  }
+
+  function openLabForReviewRoute(tool) {
+    if (!tool) return;
+    openLabTool?.(tool);
   }
 
   if (runReviewOpen) {
@@ -3769,7 +3968,12 @@ export default function StudyView({ mode = 'practice' }) {
         runStatsLabel={runStatsLabel}
         onBack={() => setRunReviewOpen(false)}
         geminiKey={geminiKey}
-        onOpenLearn={openLearnByGroupId}
+        onOpenGuide={openGuideForReviewRule}
+        onOpenLab={openLabForReviewRoute}
+        onOpenLearn={(groupId) => {
+          window.location.hash = groupId ? `lesson-${groupId}` : 'formation-keys';
+          setTab('learn');
+        }}
         onOpenLearnFocus={openLearnForRuleRecord}
       />
     );
@@ -3879,13 +4083,15 @@ export default function StudyView({ mode = 'practice' }) {
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
           {reviewLimitSource === 'recommendation'
             ? 'Recommended practice complete'
-            : 'Drill complete'}
+            : introReviewActive
+              ? 'Family intro complete'
+              : 'Drill complete'}
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
           {state.session.correct}/{state.session.reviewed}
         </div>
         <div className="text-sm text-stone-500 mb-1">
-          Drill accuracy:{' '}
+          {introReviewActive ? 'Intro accuracy:' : 'Drill accuracy:'}{' '}
           {state.session.reviewed
             ? Math.round((state.session.correct / state.session.reviewed) * 100)
             : 0}
@@ -3893,7 +4099,8 @@ export default function StudyView({ mode = 'practice' }) {
         </div>
         {reviewLimit > 0 && (
           <div className="text-xs text-stone-400 mb-5">
-            {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this drill
+            {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this{' '}
+            {introReviewActive ? 'intro' : 'drill'}
           </div>
         )}
         {sessionMistakePatterns.length > 0 ? (
@@ -3938,7 +4145,14 @@ export default function StudyView({ mode = 'practice' }) {
             setRunBase(sessionBaseFrom(state.session));
             setRunAnswerHistory([]);
             setRunReviewOpen(false);
-            setCurrent(selectNextReviewCard(state, current.id));
+            if (introReviewActive) {
+              setPracticePrefs((prev) => clearBoundedReviewPrefs(prev));
+              setFamilyIntroFocus(null);
+              setSessionFilterFormGroupId(null);
+              setCurrent(null);
+            } else {
+              setCurrent(selectNextReviewCard(state, current.id));
+            }
             setAnswer('');
             setPhase('answering');
           }}
@@ -3995,6 +4209,7 @@ export default function StudyView({ mode = 'practice' }) {
 
   function returnToReference() {
     setLaunchContext(null);
+    setFamilyIntroFocus(null);
     setFocusWordLock(null);
     setWordSweep(null);
     setRecommendationFocus(null);
@@ -4039,6 +4254,7 @@ export default function StudyView({ mode = 'practice' }) {
       restoreRecommendationEnabledTypes();
     }
     setLaunchContext(null);
+    setFamilyIntroFocus(null);
     setFocusWordLock(null);
     setWordSweep(null);
     setRecommendationFocus(null);
@@ -4050,6 +4266,41 @@ export default function StudyView({ mode = 'practice' }) {
     setTab('stats');
   }
 
+  function introducePracticeFamily(family) {
+    const typeIds = familyIntroTypeIds(family);
+    if (!family?.id || !typeIds.length) return;
+    setState((prev) => {
+      const restored = includeFormFamilyInReviewState(prev, family.id);
+      return {
+        ...restored,
+        enabledTypes: [...new Set([...(restored.enabledTypes || []), ...typeIds])],
+        session: { ...(restored.session || {}), mistakePatterns: {} },
+      };
+    });
+    setPracticePrefs((prev) => ({
+      ...clearBoundedReviewPrefs(prev),
+      minimalPairSetId: '',
+      minimalPairReturn: null,
+      practicePath: '',
+      wordListIds: [],
+      reviewLimit: typeIds.length,
+      reviewLimitSource: FAMILY_INTRO_REVIEW_LIMIT_SOURCE,
+    }));
+    setSessionFilterFormGroupId(family.id);
+    setFamilyIntroFocus({ familyId: family.id, typeIds });
+    setSessionFilterWord(null);
+    setFocusWordLock(null);
+    setWordSweep(null);
+    setRecommendationFocus(null);
+    setLaunchContext(null);
+    onFocusConsumed?.();
+    clearPersistedCurrent();
+    resetActiveAttempt();
+    setCurrent(null);
+    setAnswer('');
+    setPhase('answering');
+  }
+
   // Title banner for a focused "Practice this" launch. Generalizes the older
   // reference-drill banner so every targeted entry (a Check/Library word, a
   // reference drill, or a form family) leads the active practice with a clear
@@ -4057,6 +4308,14 @@ export default function StudyView({ mode = 'practice' }) {
   const focusBannerGroup = sessionFilterFormGroupId
     ? FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId)
     : null;
+  const familyIntroActive =
+    !!familyIntroFocus && familyIntroFocus.familyId === focusBannerGroup?.id;
+  const familyIntroLesson = familyIntroActive
+    ? LESSON_BY_GROUP_ID.get(familyIntroFocus.familyId)
+    : null;
+  const familyIntroTypes = familyIntroActive
+    ? (familyIntroFocus.typeIds || []).map((typeId) => CARD_TYPE_BY_ID.get(typeId)).filter(Boolean)
+    : [];
   const focusBannerWord = sessionFilterWord || focusWordLock;
   const recommendationCountParts = recommendationFocus
     ? [
@@ -4088,12 +4347,14 @@ export default function StudyView({ mode = 'practice' }) {
       }
     : focusBannerGroup
       ? {
-          kicker: 'Form family practice',
+          kicker: familyIntroActive ? 'Family primer' : 'Form family practice',
           title: focusBannerGroup.label,
           reading: '',
-          subtitle: focusBannerGroup.typeIds?.length
-            ? `${focusBannerGroup.typeIds.length} forms in this family`
-            : 'Focused form practice',
+          subtitle: familyIntroActive
+            ? `${familyIntroTypes.length || familyIntroFocus?.typeIds?.length || 0}-card guided set`
+            : focusBannerGroup.typeIds?.length
+              ? `${focusBannerGroup.typeIds.length} forms in this family`
+              : 'Focused form practice',
           exitLabel: 'Exit focus',
           onExit: returnToOverview,
         }
@@ -4120,6 +4381,8 @@ export default function StudyView({ mode = 'practice' }) {
           }
         : null;
   const topSessionMistake = sessionMistakePatterns[0] || null;
+  const guideInsight =
+    mode === 'practice' ? buildGuideDiagnosticInsight(state.guide, { minAttempts: 2 }) : null;
   const currentSelectionReason = wordSweep?.repeatPass
     ? 'Repeating missed forms'
     : focusBanner
@@ -4141,19 +4404,6 @@ export default function StudyView({ mode = 'practice' }) {
     : runStats.reviewed > 0 && runStats.missed === 0
       ? `${currentSelectionReason}. Clean run so far.`
       : `${currentSelectionReason}.`;
-  const reviewNextButtonClass =
-    'w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-sm transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150';
-  const renderReviewNextButton = (buttonRef = null, className = '') => (
-    <button
-      ref={buttonRef}
-      type="button"
-      onClick={() => submit()}
-      className={`${reviewNextButtonClass} ${className}`.trim()}
-    >
-      Next (Enter)
-    </button>
-  );
-
   return (
     <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] xl:justify-center xl:grid-cols-[minmax(0,17rem)_minmax(0,42rem)_minmax(0,17rem)]">
       <div className="order-1 min-w-0 space-y-4 lg:order-2 xl:w-full">
@@ -4193,6 +4443,52 @@ export default function StudyView({ mode = 'practice' }) {
             </div>
           </div>
         )}
+        {familyIntroActive && (
+          <section
+            aria-label={`${focusBannerGroup.label} primer`}
+            className="rounded-2xl border border-sky-200 bg-sky-50/70 px-5 py-4 dark:border-sky-900/60 dark:bg-sky-950/20"
+          >
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 rounded-lg bg-sky-600 p-2 text-white dark:bg-sky-400 dark:text-stone-950">
+                <IconBook className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+                  Primer
+                </div>
+                <h3 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
+                  {familyIntroLesson?.title || focusBannerGroup.label}
+                </h3>
+                <p className="mt-1 text-sm leading-relaxed text-stone-650 dark:text-stone-300">
+                  {familyIntroLesson?.summary || 'Start with the core forms in this family.'}
+                </p>
+                {familyIntroLesson?.build && (
+                  <p className="mt-2 text-xs leading-relaxed text-stone-600 dark:text-stone-400">
+                    {familyIntroLesson.build}
+                  </p>
+                )}
+                {familyIntroTypes.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {familyIntroTypes.map((type) => (
+                      <span
+                        key={type.id}
+                        className="rounded-lg border border-sky-200 bg-white px-2.5 py-1 text-xs font-semibold text-sky-800 dark:border-sky-900 dark:bg-stone-950/60 dark:text-sky-200"
+                      >
+                        {type.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {familyIntroLesson?.watch && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-200">
+                    <span className="font-semibold">Watch: </span>
+                    {familyIntroLesson.watch}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
         {undoReviewScopeAction && (
           <div
             role="status"
@@ -4225,6 +4521,21 @@ export default function StudyView({ mode = 'practice' }) {
               >
                 {coachSentence}
               </div>
+              {guideInsight && (
+                <button
+                  type="button"
+                  onClick={() => setTab('guide')}
+                  className="mt-2 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs text-amber-900 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/40"
+                >
+                  <span>
+                    <span className="font-semibold">{guideInsight.message}</span>
+                    {guideInsight.detail && (
+                      <span className="mt-0.5 block font-normal">{guideInsight.detail}</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 font-semibold">{guideInsight.actionLabel} -&gt;</span>
+                </button>
+              )}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <details className="relative" open={practiceSettingsOpen}>
@@ -4381,18 +4692,26 @@ export default function StudyView({ mode = 'practice' }) {
             </div>
           </div>
           {!workoutProgress.continuous && (
-            <div
-              role="progressbar"
-              aria-label={workoutProgress.label}
-              aria-valuemin={0}
-              aria-valuemax={workoutProgress.max}
-              aria-valuenow={workoutProgress.now}
-              className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
-            >
-              <span
-                className="block h-full rounded-full bg-indigo-600 dark:bg-indigo-400"
-                style={{ width: `${workoutProgressPct}%` }}
-              />
+            <div className="mt-3 space-y-1.5">
+              <div className="flex items-center justify-between gap-3 text-xs text-stone-500 dark:text-stone-400">
+                <span className="font-semibold">{workoutProgress.label}</span>
+                <span className="tabular-nums">
+                  {workoutProgress.now}/{workoutProgress.max}
+                </span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label={workoutProgress.label}
+                aria-valuemin={0}
+                aria-valuemax={workoutProgress.max}
+                aria-valuenow={workoutProgress.now}
+                className="h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
+              >
+                <span
+                  className="block h-full rounded-full bg-indigo-600 dark:bg-indigo-400"
+                  style={{ width: `${workoutProgressPct}%` }}
+                />
+              </div>
             </div>
           )}
           <details className="mt-3">
@@ -5121,19 +5440,20 @@ export default function StudyView({ mode = 'practice' }) {
                   <RunAnswerReveal
                     record={reviewRecord}
                     geminiKey={geminiKey}
-                    onOpenLearn={openLearnByGroupId}
-                    onOpenLearnFocus={openLearnForRuleRecord}
-                    autoAdvanceHint={wasCorrect && autoAdvanceCorrect}
-                    topAction={renderReviewNextButton(nextButtonRef)}
-                    footer={
-                      wasCorrect ? (
-                        <StickyAction className="mt-3">
-                          {renderReviewNextButton(null, 'shadow-lg')}
-                        </StickyAction>
-                      ) : (
-                        <div className="mt-4">{renderReviewNextButton()}</div>
-                      )
+                    actionButtonRef={nextButtonRef}
+                    onOpenGuide={wordSweep ? null : openGuideForReviewRule}
+                    onOpenLab={wordSweep ? null : openLabForReviewRoute}
+                    onOpenLearn={
+                      wordSweep
+                        ? null
+                        : (groupId) => {
+                            window.location.hash = groupId ? `lesson-${groupId}` : 'formation-keys';
+                            setTab('learn');
+                          }
                     }
+                    onOpenLearnFocus={wordSweep ? null : openLearnForRuleRecord}
+                    onTryAnother={() => submit()}
+                    autoAdvanceHint={wasCorrect && autoAdvanceCorrect}
                   />
                 </>
               )}
@@ -5155,6 +5475,7 @@ export default function StudyView({ mode = 'practice' }) {
         openFamilyIds={openPracticeMapFamilyIds}
         onToggleFamilyOpen={togglePracticeMapFamilyOpen}
         onToggleFamily={togglePracticeFamily}
+        onIntroduceFamily={introducePracticeFamily}
         onToggleType={togglePracticeType}
       />
       <FocusCategoryMap

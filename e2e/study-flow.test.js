@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test';
 
 // Exercises the core practice loop on the default Practice tab with the default
 // answer mode ("input"): a card is shown, the learner submits an answer,
-// feedback appears, and advancing returns to the answering phase.
+// feedback appears, and the reveal ends with one concrete next action.
 test.describe('Study flow', () => {
-  test('answering a card shows feedback and advances', async ({ page }) => {
+  test('answering a card shows feedback with one next action', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -22,19 +22,16 @@ test.describe('Study flow', () => {
     await expect(checkBtn).toBeEnabled();
     await checkBtn.click();
 
-    // Review phase: verdict + the canonical advance control.
+    // Review phase: verdict + exactly one concrete next action.
     await expect(page.getByText('Not quite.').last()).toBeVisible();
-    const next = page.getByRole('button', { name: 'Next (Enter)' });
-    await expect(next).toHaveCount(2);
-    await expect(next.first()).toBeVisible();
-
-    // Advancing returns to the answering phase with a fresh input.
-    await next.first().click();
-    await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Check (Enter)' })).toBeVisible();
+    const nextAction = page.getByRole('button', {
+      name: /^(Try another|Open Guide for this rule|Drill the trap|Review lesson)$/,
+    });
+    await expect(nextAction).toHaveCount(1);
+    await expect(nextAction.first()).toBeVisible();
   });
 
-  test('Reveal exposes the answer and lets the learner continue', async ({ page }) => {
+  test('Reveal exposes the answer and shows one next action', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -43,8 +40,10 @@ test.describe('Study flow', () => {
     await page.getByRole('button', { name: 'Reveal', exact: true }).click();
 
     // Revealing grades the card as missed and drops into the review phase.
-    const next = page.getByRole('button', { name: 'Next (Enter)' });
-    await expect(next).toHaveCount(2);
-    await expect(next.first()).toBeVisible();
+    const nextAction = page.getByRole('button', {
+      name: /^(Try another|Open Guide for this rule|Drill the trap|Review lesson)$/,
+    });
+    await expect(nextAction).toHaveCount(1);
+    await expect(nextAction.first()).toBeVisible();
   });
 });

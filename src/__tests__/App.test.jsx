@@ -41,9 +41,9 @@ describe('App shell', () => {
     expect(screen.getByText('Category progress')).toBeTruthy();
     expect(screen.getByText('Practice categories')).toBeTruthy();
     expect(screen.getByText('Toggle categories for continuous Practice.')).toBeTruthy();
-    expect(screen.getAllByText('No reps yet').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Not introduced').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Untested').length).toBeGreaterThan(0);
+    expect(screen.queryByText('No reps yet')).toBeNull();
+    expect(screen.queryByText('Untested')).toBeNull();
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
@@ -133,6 +133,7 @@ describe('App shell', () => {
     expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
 
     expect(within(practiceMap()).getByText('2/2 saved')).toBeTruthy();
+    expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
     expect(within(practiceMap()).getByText('0 right / 2 wrong')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
     expect(within(practiceMap()).getByText('Gathering data')).toBeTruthy();
@@ -147,6 +148,29 @@ describe('App shell', () => {
     await waitFor(() => expect(within(practiceMap()).getByText('1/2 saved')).toBeTruthy());
     expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
     expect(within(practiceMap()).getByText('Recent weak spots')).toBeTruthy();
+  });
+
+  it('introduces a disabled Practice map family with a primer and small focused set', async () => {
+    render(<App />);
+
+    expect(await waitForPracticeCard()).toBeTruthy();
+    const practiceMap = () => screen.getByRole('complementary', { name: 'Practice map' });
+    expect(
+      within(practiceMap()).queryByRole('button', { name: 'Enable all Passive forms' }),
+    ).toBeNull();
+
+    fireEvent.click(
+      within(practiceMap()).getByRole('button', { name: 'Introduce Passive family' }),
+    );
+
+    expect(await screen.findByText('Family primer')).toBeTruthy();
+    expect(screen.getByText('4-card guided set')).toBeTruthy();
+    expect(screen.getByRole('progressbar', { name: 'Intro progress' })).toBeTruthy();
+    expect(within(practiceMap()).getByText('4/10 saved')).toBeTruthy();
+
+    const primer = screen.getByRole('region', { name: 'Passive primer' });
+    expect(within(primer).getByText('Passive Polite Negative')).toBeTruthy();
+    expect(within(primer).queryByText('Passive Polite Past')).toBeNull();
   });
 
   it('keeps continuous Practice available after old daily goal data is complete', async () => {
@@ -254,7 +278,7 @@ describe('App shell', () => {
       JSON.stringify({
         state: {
           ...defaultState(),
-          enabledTypes: ['plain-past'],
+          enabledTypes: ['plain-negative'],
           daily: {
             date: localDateKey(),
             count: DEFAULT_PREFS.dailyGoal,
@@ -296,9 +320,8 @@ describe('App shell', () => {
     const verdictStatus = await screen.findAllByText('Not quite.', {}, { timeout: 5000 });
     expect(verdictStatus).toHaveLength(1);
     expect(screen.getByText('Review this form.')).toBeTruthy();
-    const nextButtons = screen.getAllByRole('button', { name: 'Next (Enter)' });
-    expect(nextButtons).toHaveLength(2);
-    for (const button of nextButtons) expect(button.closest('.sticky')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Open Guide for this rule' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Next (Enter)' })).toBeNull();
     // Typed misses show the consolidated rich top (kanji + coach diff), not the
     // redundant plain-text "Compare your answer" grid (kept only for non-typed cards).
     expect(screen.queryByText('Compare your answer')).toBeNull();
@@ -316,7 +339,7 @@ describe('App shell', () => {
     expect(screen.queryByText('Gemini is not configured for AI chat.')).toBeNull();
   }, 15000);
 
-  it('returns from Learn to the same missed Practice card', async () => {
+  it('opens a focused Guide for the same missed form', async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -342,12 +365,12 @@ describe('App shell', () => {
     sessionStorage.setItem(
       'jp-study-current',
       JSON.stringify({
-        dict: '話す',
+        dict: '\u8a71\u3059',
         group: 'godan',
         type: 'plain-negative',
         word: {
-          dict: '話す',
-          reading: 'はなす',
+          dict: '\u8a71\u3059',
+          reading: '\u306f\u306a\u3059',
           meaning: 'to speak',
           group: 'godan',
         },
@@ -361,17 +384,73 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     expect(await screen.findByText('Review this form.')).toBeTruthy();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Learn from this miss' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Guide for this rule' }));
+    expect(await screen.findByText('Focused Guide')).toBeTruthy();
+    expect(screen.getAllByText('Plain Negative').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\u8a71\u3059/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Exit focus' })).toBeTruthy();
+  }, 15000);
+
+  it('returns from Learn to the same missed Practice card and offers focused follow-ups', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          enabledTypes: ['plain-past'],
+          daily: {
+            date: localDateKey(),
+            count: DEFAULT_PREFS.dailyGoal,
+            goalHit: true,
+            goalStreak: 1,
+            bestGoalStreak: 1,
+            currentAnswerStreak: 0,
+            bestAnswerStreak: 0,
+          },
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: '\u98df\u3079\u308b',
+        group: 'ichidan',
+        type: 'plain-past',
+        word: {
+          dict: '\u98df\u3079\u308b',
+          reading: '\u305f\u3079\u308b',
+          meaning: 'to eat',
+          group: 'ichidan',
+        },
+      }),
+    );
+
+    render(<App />);
+
+    const input = await waitForPracticeCard();
+    fireEvent.change(input, { target: { value: 'zzz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    expect(await screen.findByText('Review this form.')).toBeTruthy();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Review lesson' }, { timeout: 5000 }),
+    );
     expect(await screen.findByText('From your missed Practice card')).toBeTruthy();
-    expect(screen.getByText(/Plain Negative for/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Return to this card' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Guide this form' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Practice this form' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Return to this card' }));
 
     expect(await screen.findByText('Review this form.')).toBeTruthy();
     expect(screen.getByText('Your Answer')).toBeTruthy();
-    expect(screen.getAllByText('話す').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\u98df\u3079\u308b/).length).toBeGreaterThan(0);
     expect(screen.queryByPlaceholderText(/Type romaji or kana/i)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Learn from this miss' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Review lesson' })).toBeTruthy();
   }, 15000);
 
   it('shows correct-answer rationale expanded without a More toggle', async () => {
@@ -426,6 +505,7 @@ describe('App shell', () => {
     expect(screen.getByText('Visual Rule Path')).toBeTruthy();
     expect(screen.getByText('From polite/masu stem')).toBeTruthy();
     expect(screen.queryByText('More')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Try another' })).toBeTruthy();
   }, 15000);
 
   it('mounts every tab without hitting the error boundary', async () => {

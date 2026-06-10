@@ -22,6 +22,23 @@ import {
 export const GUIDE_SESSION_TARGET = 8;
 export const GUIDE_STEP_IDS = ['base', 'group', 'answer'];
 
+const GUIDE_STEP_LABELS = {
+  base: 'plain form',
+  group: 'word group',
+  answer: 'final answer',
+};
+
+const GUIDE_GROUP_DIAGNOSTIC_LABELS = {
+  godan: 'godan verbs',
+  ichidan: 'ichidan verbs',
+  suru: 'suru verbs',
+  kuru: 'kuru verbs',
+  irregular: 'irregular verbs',
+  'i-adjective': 'i-adjectives',
+  'na-adjective': 'na-adjectives',
+  'irregular-adjective': 'irregular adjectives',
+};
+
 const VERB_SOURCE_TYPES = [
   'polite-present',
   'plain-past',
@@ -39,6 +56,49 @@ const ADJECTIVE_SOURCE_TYPES = [
 
 function cleanText(value) {
   return normalizeJapaneseText(String(value || '').trim());
+}
+
+function pct(correct, attempted) {
+  return attempted ? correct / attempted : 0;
+}
+
+function stepRate(guide, stepId) {
+  const row = guide?.byStep?.[stepId] || {};
+  const attempted = Number(row.attempted) || 0;
+  const correct = Number(row.correct) || 0;
+  const assisted = Number(row.assisted) || 0;
+  return {
+    attempted,
+    correct,
+    assisted,
+    misses: Math.max(0, attempted - correct),
+    accuracy: pct(correct, attempted),
+    unassistedCorrect: Math.max(0, correct - Math.min(correct, assisted)),
+  };
+}
+
+function diagnosticGroupLabel(groupId) {
+  if (!groupId) return 'word groups';
+  return GUIDE_GROUP_DIAGNOSTIC_LABELS[groupId] || groupDisplayLabel(groupId).toLowerCase();
+}
+
+function recentRowsWithSteps(guide) {
+  return (guide?.recent || []).filter(
+    (row) => row?.steps && GUIDE_STEP_IDS.some((id) => row.steps[id]),
+  );
+}
+
+function topMissedGroup(rows, stepId, options = {}) {
+  const counts = new Map();
+  for (const row of rows) {
+    const step = row?.steps?.[stepId];
+    if (!step || step.correct) continue;
+    if (options.requireAnswerCorrect && !row?.steps?.answer?.correct) continue;
+    const groupId = row.group || row.expectedGroup || '';
+    if (!groupId) continue;
+    counts.set(groupId, (counts.get(groupId) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0];
 }
 
 function answerMatches(value, targets = []) {
@@ -104,14 +164,21 @@ export function selectGuideSourceType(word, targetTypeId, options = {}) {
 function candidateRows(words, state = defaultState(), prefs = DEFAULT_PREFS, options = {}) {
   const enabled = state.enabledTypes?.length ? state.enabledTypes : EVERYDAY_TYPE_IDS;
   const blockedWordKey = options.previousWord ? wordKey(options.previousWord) : '';
-  return (words || [])
-    .flatMap((word) =>
-      practiceTypesForItem(word, enabled, prefs).map((type) => ({
+  const targetWordKey = options.targetWord ? wordKey(options.targetWord) : '';
+  const targetTypeId = options.targetTypeId || '';
+  const rows = (words || [])
+    .flatMap((word) => {
+      const focusedWord = targetWordKey && wordKey(word) === targetWordKey;
+      const types =
+        focusedWord && targetTypeId && isTypeCompatible(word, targetTypeId)
+          ? [{ id: targetTypeId }]
+          : practiceTypesForItem(word, enabled, prefs);
+      return types.map((type) => ({
         word,
         typeId: type.id,
         score: weaknessScoreForCard(state.weakness, word, type.id),
-      })),
-    )
+      }));
+    })
     .filter((row) => row.word && row.typeId && conjugateItem(row.word, row.typeId))
     .sort((a, b) => {
       const repeatA = blockedWordKey && wordKey(a.word) === blockedWordKey ? 1 : 0;
@@ -120,6 +187,15 @@ function candidateRows(words, state = defaultState(), prefs = DEFAULT_PREFS, opt
         repeatA - repeatB || b.score - a.score || wordKey(a.word).localeCompare(wordKey(b.word))
       );
     });
+  if (targetWordKey || targetTypeId) {
+    const focusedRows = rows.filter(
+      (row) =>
+        (!targetWordKey || wordKey(row.word) === targetWordKey) &&
+        (!targetTypeId || row.typeId === targetTypeId),
+    );
+    if (focusedRows.length) return focusedRows;
+  }
+  return rows;
 }
 
 export function buildGuideCard(words, state = defaultState(), prefs = DEFAULT_PREFS, options = {}) {
@@ -232,6 +308,89 @@ export function normalizeGuideState(guide = null) {
   };
 }
 
+export function buildGuideDiagnosticInsight(guide = null, options = {}) {
+  const current = normalizeGuideState(guide);
+  const minAttempts = Math.max(1, Number(options.minAttempts) || 2);
+  if (current.attempted < minAttempts) return null;
+
+  const base = stepRate(current, 'base');
+  const group = stepRate(current, 'group');
+  const answer = stepRate(current, 'answer');
+  const recent = recentRowsWithSteps(current);
+  const recentAnswerKnown = recent.filter(
+    (row) => row.steps?.answer?.correct && !row.steps.answer.assisted,
+  ).length;
+  const recentGroupMissWithAnswer = recent.filter(
+    (row) => row.steps?.group && !row.steps.group.correct && row.steps?.answer?.correct,
+  ).length;
+  const answerLooksKnown =
+    answer.unassistedCorrect >= 2 ||
+    recentAnswerKnown >= 2 ||
+    (answer.attempted >= minAttempts && answer.accuracy >= 0.7);
+  const groupLooksWeak =
+    group.misses >= 2 ||
+    recentGroupMissWithAnswer >= 2 ||
+    (group.attempted >= minAttempts && group.accuracy <= 0.55);
+
+  if (answerLooksKnown && groupLooksWeak && group.accuracy + 0.2 < answer.accuracy) {
+    const groupId =
+      topMissedGroup(recent, 'group', { requireAnswerCorrect: true }) ||
+      topMissedGroup(recent, 'group') ||
+      '';
+    return {
+      id: 'guide-group-after-answer',
+      stepId: 'group',
+      message: `You know the ending but keep misclassifying ${diagnosticGroupLabel(groupId)}.`,
+      detail: 'Guide is seeing the final-answer step land more often than the group choice.',
+      actionLabel: 'Guide',
+    };
+  }
+
+  if (
+    base.misses >= 2 &&
+    base.accuracy + 0.2 < Math.min(group.accuracy || 0, answer.accuracy || 0)
+  ) {
+    return {
+      id: 'guide-base-gap',
+      stepId: 'base',
+      message:
+        'You can choose the group and build the ending, but recovering the plain form is still shaky.',
+      detail: 'Guide is catching misses before the final conjugation step.',
+      actionLabel: 'Guide',
+    };
+  }
+
+  if (
+    answer.misses >= 2 &&
+    answer.accuracy + 0.2 < Math.min(base.accuracy || 0, group.accuracy || 0)
+  ) {
+    return {
+      id: 'guide-answer-gap',
+      stepId: 'answer',
+      message: 'You can recover the plain form and group, but the final ending still needs reps.',
+      detail: 'Guide is seeing the setup work land before the final-answer step.',
+      actionLabel: 'Guide',
+    };
+  }
+
+  const weakest = [
+    { stepId: 'base', row: base },
+    { stepId: 'group', row: group },
+    { stepId: 'answer', row: answer },
+  ]
+    .filter(({ row }) => row.attempted >= minAttempts && row.misses > 0)
+    .sort((a, b) => a.row.accuracy - b.row.accuracy || b.row.misses - a.row.misses)[0];
+
+  if (!weakest) return null;
+  return {
+    id: `guide-${weakest.stepId}-weak`,
+    stepId: weakest.stepId,
+    message: `Guide is seeing ${GUIDE_STEP_LABELS[weakest.stepId]} as the weak step.`,
+    detail: 'Step-by-step practice can isolate that before it turns into a full-card miss.',
+    actionLabel: 'Guide',
+  };
+}
+
 export function recordGuideAttempt(guide, card, result, options = {}) {
   const current = normalizeGuideState(guide);
   const byStep = { ...current.byStep };
@@ -253,10 +412,21 @@ export function recordGuideAttempt(guide, card, result, options = {}) {
       {
         at: options.now || Date.now(),
         wordKey: wordKey(card.word),
+        group: card.word?.group || '',
+        expectedGroup: card.expectedGroup || '',
         typeId: card.typeId,
         sourceTypeId: card.sourceTypeId,
         correct: result.correct,
         assisted: result.assisted,
+        steps: Object.fromEntries(
+          GUIDE_STEP_IDS.map((id) => [
+            id,
+            {
+              correct: !!result.steps[id]?.correct,
+              assisted: !!result.steps[id]?.assisted,
+            },
+          ]),
+        ),
       },
       ...current.recent,
     ].slice(0, 20),

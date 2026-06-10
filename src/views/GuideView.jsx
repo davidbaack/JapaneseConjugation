@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IconCheck, IconRefresh, IconSpark, IconX } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import { getTypeInfo } from '../data/conjugationTypes.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
@@ -12,6 +13,7 @@ import {
   guideGroupOptions,
 } from '../utils/guidePractice.js';
 import { formDisplay } from '../utils/display.js';
+import { wordKey } from '../utils/conjugator.js';
 
 function pct(correct, attempted) {
   return attempted ? Math.round((correct / attempted) * 100) : 0;
@@ -52,7 +54,16 @@ function HintText({ stepId, card }) {
 }
 
 export default function GuideView() {
-  const { allWords, builtInWords, practicePrefs, setState, state, wordLists } = useApp();
+  const {
+    allWords,
+    builtInWords,
+    clearGuideFocus,
+    guideFocus,
+    practicePrefs,
+    setState,
+    state,
+    wordLists,
+  } = useApp();
   const filteredWords = useMemo(
     () =>
       filterWordsForStudyScope(allWords, { cards: state.cards }, practicePrefs, wordLists, {
@@ -60,6 +71,14 @@ export default function GuideView() {
       }),
     [allWords, builtInWords, practicePrefs, state.cards, wordLists],
   );
+  const [activeGuideFocus, setActiveGuideFocus] = useState(null);
+  const guideWords = useMemo(() => {
+    const focusedWord = activeGuideFocus?.word || guideFocus?.word;
+    if (!focusedWord || filteredWords.some((word) => wordKey(word) === wordKey(focusedWord))) {
+      return filteredWords;
+    }
+    return [...filteredWords, focusedWord];
+  }, [activeGuideFocus, filteredWords, guideFocus]);
   const [card, setCard] = useState(null);
   const [answers, setAnswers] = useState({ base: '', group: '', answer: '' });
   const [assistedSteps, setAssistedSteps] = useState({});
@@ -68,6 +87,20 @@ export default function GuideView() {
   const [completed, setCompleted] = useState(0);
   const [correct, setCorrect] = useState(0);
   const startedAtRef = useRef(0);
+  const completedFocusRef = useRef('');
+
+  const guideCardOptions = useCallback(
+    (options = {}) => {
+      const focus = activeGuideFocus || guideFocus;
+      if (!focus?.word || !focus?.type) return options;
+      return {
+        ...options,
+        targetWord: focus.word,
+        targetTypeId: focus.type,
+      };
+    },
+    [activeGuideFocus, guideFocus],
+  );
 
   function resetForCard(nextCard) {
     setCard(nextCard);
@@ -79,10 +112,40 @@ export default function GuideView() {
   }
 
   useEffect(() => {
-    if (!card && filteredWords.length && completed < GUIDE_SESSION_TARGET) {
-      resetForCard(buildGuideCard(filteredWords, state, practicePrefs, { seed: Date.now() }));
+    const focusKey =
+      guideFocus?.word && guideFocus?.type ? `${wordKey(guideFocus.word)}|${guideFocus.type}` : '';
+    if (focusKey && completedFocusRef.current !== focusKey && guideWords.length) {
+      const focusedCard = buildGuideCard(guideWords, state, practicePrefs, {
+        targetWord: guideFocus.word,
+        targetTypeId: guideFocus.type,
+        seed: Date.now(),
+      });
+      if (focusedCard) {
+        completedFocusRef.current = focusKey;
+        setActiveGuideFocus({ ...guideFocus });
+        setCompleted(0);
+        setCorrect(0);
+        resetForCard(focusedCard);
+        clearGuideFocus?.();
+        return;
+      }
     }
-  }, [card, completed, filteredWords, practicePrefs, state]);
+    if (!card && guideWords.length && completed < GUIDE_SESSION_TARGET) {
+      resetForCard(
+        buildGuideCard(guideWords, state, practicePrefs, guideCardOptions({ seed: Date.now() })),
+      );
+    }
+  }, [
+    activeGuideFocus,
+    card,
+    clearGuideFocus,
+    completed,
+    guideCardOptions,
+    guideFocus,
+    guideWords,
+    practicePrefs,
+    state,
+  ]);
 
   const guideStats = state.guide || {};
   const groupOptions = card ? guideGroupOptions(card.word) : [];
@@ -134,12 +197,17 @@ export default function GuideView() {
   }
 
   function nextCard() {
-    if (!filteredWords.length) return;
+    if (!guideWords.length) return;
     resetForCard(
-      buildGuideCard(filteredWords, state, practicePrefs, {
-        previousWord: card?.word,
-        seed: Date.now(),
-      }),
+      buildGuideCard(
+        guideWords,
+        state,
+        practicePrefs,
+        guideCardOptions({
+          previousWord: card?.word,
+          seed: Date.now(),
+        }),
+      ),
     );
   }
 
@@ -147,14 +215,27 @@ export default function GuideView() {
     setCompleted(0);
     setCorrect(0);
     resetForCard(
-      buildGuideCard(filteredWords, state, practicePrefs, {
-        previousWord: card?.word,
-        seed: Date.now(),
-      }),
+      buildGuideCard(
+        guideWords,
+        state,
+        practicePrefs,
+        guideCardOptions({
+          previousWord: card?.word,
+          seed: Date.now(),
+        }),
+      ),
     );
   }
 
-  if (!filteredWords.length) {
+  function exitGuideFocus() {
+    setActiveGuideFocus(null);
+    completedFocusRef.current = '';
+    setCompleted(0);
+    setCorrect(0);
+    resetForCard(buildGuideCard(filteredWords, state, practicePrefs, { seed: Date.now() }));
+  }
+
+  if (!guideWords.length) {
     return (
       <section className="rounded-xl border border-stone-200 bg-white p-6 text-center text-stone-600 dark:border-stone-850 dark:bg-stone-900 dark:text-stone-300">
         No words or forms are active in the Practice map right now.
@@ -207,6 +288,42 @@ export default function GuideView() {
 
   return (
     <div className="space-y-4">
+      {activeGuideFocus && (
+        <section className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 dark:border-indigo-900/70 dark:bg-indigo-950/20">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                Focused Guide
+              </div>
+              <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
+                {activeGuideFocus.typeLabel ||
+                  getTypeInfo(activeGuideFocus.type).label ||
+                  'This form'}
+              </h2>
+              <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
+                Step through the same form from the Learn lesson.
+                {activeGuideFocus.word?.dict ? (
+                  <>
+                    {' '}
+                    Current word:{' '}
+                    <span lang="ja" className="font-semibold text-stone-950 dark:text-stone-50">
+                      {activeGuideFocus.word.dict}
+                    </span>
+                    .
+                  </>
+                ) : null}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={exitGuideFocus}
+              className="inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-white/80 px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-white dark:border-indigo-800 dark:bg-stone-950/40 dark:text-indigo-300 dark:hover:bg-stone-900"
+            >
+              Exit focus
+            </button>
+          </div>
+        </section>
+      )}
       <section className="rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-850 dark:bg-stone-900 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
