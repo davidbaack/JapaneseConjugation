@@ -80,7 +80,7 @@ function RowShiftVisual({ visual, onOpenLearn }) {
         {onOpenLearn && (
           <button
             type="button"
-            onClick={onOpenLearn}
+            onClick={() => onOpenLearn()}
             className="text-xs font-semibold text-indigo-650 underline decoration-indigo-300 underline-offset-4 transition hover:text-indigo-800 dark:text-indigo-300 dark:decoration-indigo-700 dark:hover:text-indigo-100"
           >
             See Learn table
