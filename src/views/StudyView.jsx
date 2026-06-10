@@ -45,6 +45,7 @@ import {
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import {
   explainItem,
+  getConjugationDebugInfo,
   getOfflineTemplateSentence,
   stepCoachHint,
 } from '../utils/conjugatorExplain.js';
@@ -315,7 +316,13 @@ function sessionAfterSkip(session = {}, card) {
   );
 }
 
-function ReviewDisclosure({ tone = 'stone', summary, children, alwaysOpen = false }) {
+function ReviewDisclosure({
+  tone = 'stone',
+  summary,
+  children,
+  alwaysOpen = false,
+  hintLabel = 'More',
+}) {
   const toneClass =
     tone === 'rose'
       ? 'border-rose-200 dark:border-rose-900/60 bg-white/70 dark:bg-stone-950/50'
@@ -337,7 +344,11 @@ function ReviewDisclosure({ tone = 'stone', summary, children, alwaysOpen = fals
       <summary className="cursor-pointer list-none text-sm font-semibold text-stone-800 dark:text-stone-100">
         <span className="inline-flex items-center gap-2">
           <span>{summary}</span>
-          <span className="text-xs font-medium text-stone-500 dark:text-stone-400">More</span>
+          {hintLabel && (
+            <span className="text-xs font-medium text-stone-500 dark:text-stone-400">
+              {hintLabel}
+            </span>
+          )}
         </span>
       </summary>
       <div className="mt-3 space-y-2.5">{children}</div>
@@ -431,6 +442,56 @@ function withCardOrigin(card, origin) {
   return { ...card, selectionOrigin: origin || cardOriginForStudyCard(card) };
 }
 
+function buildMissedContrast({
+  record,
+  minimalPairFeedback,
+  diagnostic,
+  reviewSubmittedAnswer,
+  missedComparisonValue,
+}) {
+  if (!record || record.correct) return null;
+
+  if (minimalPairFeedback) {
+    const masu = minimalPairFeedback.masuDiagnostic;
+    return {
+      title: 'Contrast check',
+      body: masu
+        ? `${minimalPairFeedback.label}. ${masu.dict} -> ${masu.politeSurface}. ${masu.contrast}`
+        : `${minimalPairFeedback.label}. ${minimalPairFeedback.intro}`,
+    };
+  }
+
+  if (diagnostic) {
+    return {
+      title: 'Contrast',
+      body: `${record.diagnosis?.label ? `${record.diagnosis.label}. ` : ''}${diagnostic}`,
+    };
+  }
+
+  if (!record.revealedMiss) {
+    try {
+      const mistake = getConjugationDebugInfo(
+        record.word,
+        record.practicedType,
+        reviewSubmittedAnswer,
+      ).mistake;
+      if (mistake) {
+        return {
+          title: 'Contrast',
+          body: `${mistake.userRule} vs ${mistake.expectedRule}. ${mistake.detail}`,
+        };
+      }
+    } catch {}
+  }
+
+  return {
+    title: 'Contrast',
+    body: `${record.expected} is the target; ${missedComparisonValue} does not match the requested ${
+      record.typeLabel || 'form'
+    }.`,
+  };
+}
+
 function RunAnswerReveal({
   record,
   geminiKey,
@@ -473,6 +534,13 @@ function RunAnswerReveal({
   const minimalPairFeedback = record.minimalPairFeedback;
   const diagnostic =
     !record.correct && !record.revealedMiss ? record.diagnosis?.feedback || '' : '';
+  const missedContrast = buildMissedContrast({
+    record,
+    minimalPairFeedback,
+    diagnostic,
+    reviewSubmittedAnswer,
+    missedComparisonValue,
+  });
   const panelClass = record.correct
     ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
     : record.wasCorrected
@@ -747,82 +815,34 @@ function RunAnswerReveal({
               </div>
             </>
           )}
-          {minimalPairFeedback && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-              <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                Contrast check: {minimalPairFeedback.label}
-              </div>
-              {minimalPairFeedback.masuDiagnostic && (
-                <div className="mt-1 border-l-2 border-emerald-300 pl-3 text-sm text-stone-700 dark:border-emerald-700 dark:text-stone-300">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                    Masu check
-                  </div>
-                  <div className="mt-0.5">
-                    <span lang="ja" className="font-semibold text-stone-900 dark:text-stone-100">
-                      {minimalPairFeedback.masuDiagnostic.dict}
-                      {' -> '}
-                      {minimalPairFeedback.masuDiagnostic.politeSurface}
-                    </span>
-                    <span className="ml-2">{minimalPairFeedback.masuDiagnostic.contrast}</span>
-                  </div>
-                </div>
-              )}
-              {!minimalPairFeedback.masuDiagnostic && (
-                <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
-                  {minimalPairFeedback.intro}
-                </div>
-              )}
-            </div>
-          )}
-          {diagnostic && (
-            <div className="rounded-lg bg-white/70 px-3 py-2 text-sm text-rose-800 dark:bg-stone-900/70 dark:text-rose-300">
-              <span className="font-medium text-rose-900 dark:text-rose-200">Diagnosis: </span>
-              {record.diagnosis?.label ? `${record.diagnosis.label}. ` : ''}
-              {diagnostic}
-            </div>
-          )}
-          {!minimalPairFeedback && (
-            <div className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
-              {explanation.intro}
-            </div>
-          )}
           {explanation.rule && (
             <div className="rounded-lg bg-white/70 px-3 py-2 text-sm leading-relaxed text-stone-700 dark:bg-stone-900/70 dark:text-stone-300">
               <span className="font-semibold text-stone-900 dark:text-stone-100">Rule: </span>
               {explanation.rule}
             </div>
           )}
-          {explanation.derivation && explanation.derivation !== record.expected && (
-            <div
-              className="rounded-lg bg-white/70 px-3 py-2 text-center text-base text-stone-900 dark:bg-stone-900/70 dark:text-stone-100"
-              lang="ja"
-            >
-              {explanation.derivation}
+          {missedContrast && (
+            <div className="rounded-lg bg-white/70 px-3 py-2 text-sm leading-relaxed text-stone-700 dark:bg-stone-900/70 dark:text-stone-300">
+              <span className="font-semibold text-stone-900 dark:text-stone-100">
+                {missedContrast.title}:{' '}
+              </span>
+              {missedContrast.body}
             </div>
           )}
-          {minimalPairFeedback && (
-            <ReviewDisclosure tone="emerald" summary="Full contrast details">
-              <div className="text-sm text-stone-700 dark:text-stone-300">
-                {minimalPairFeedback.intro}
+          <ReviewDisclosure tone="rose" summary="Show full breakdown" hintLabel="">
+            {!minimalPairFeedback && (
+              <div className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+                {explanation.intro}
               </div>
-              <div className="grid gap-1.5 sm:grid-cols-2">
-                {minimalPairFeedback.contrasts.map((contrast) => (
-                  <div
-                    key={contrast.id}
-                    className={`rounded-lg border px-2.5 py-2 text-xs ${
-                      contrast.id === minimalPairFeedback.active.id
-                        ? 'border-emerald-300 bg-white/80 text-emerald-900 dark:border-emerald-800 dark:bg-stone-950/50 dark:text-emerald-200'
-                        : 'border-stone-200 bg-white/60 text-stone-600 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-300'
-                    }`}
-                  >
-                    <div className="font-semibold">{contrast.label}</div>
-                    <div className="mt-0.5">{contrast.cue}</div>
-                  </div>
-                ))}
+            )}
+            {explanation.derivation && explanation.derivation !== record.expected && (
+              <div
+                className="rounded-lg bg-white/70 px-3 py-2 text-center text-base text-stone-900 dark:bg-stone-900/70 dark:text-stone-100"
+                lang="ja"
+              >
+                {explanation.derivation}
               </div>
-            </ReviewDisclosure>
-          )}
-          <ReviewDisclosure tone="rose" summary="Answer breakdown" alwaysOpen>
+            )}
             <ConjugationBreakdown
               word={record.word}
               type={record.practicedType}
@@ -830,6 +850,31 @@ function RunAnswerReveal({
               practicePrefs={prefs}
               onOpenLearn={onOpenLearn}
             />
+            {minimalPairFeedback && (
+              <section className="space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                  Full contrast details
+                </div>
+                <div className="text-sm text-stone-700 dark:text-stone-300">
+                  {minimalPairFeedback.intro}
+                </div>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {minimalPairFeedback.contrasts.map((contrast) => (
+                    <div
+                      key={contrast.id}
+                      className={`rounded-lg border px-2.5 py-2 text-xs ${
+                        contrast.id === minimalPairFeedback.active.id
+                          ? 'border-emerald-300 bg-white/80 text-emerald-900 dark:border-emerald-800 dark:bg-stone-950/50 dark:text-emerald-200'
+                          : 'border-stone-200 bg-white/60 text-stone-600 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-300'
+                      }`}
+                    >
+                      <div className="font-semibold">{contrast.label}</div>
+                      <div className="mt-0.5">{contrast.cue}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </ReviewDisclosure>
           {geminiKey && (
             <ReviewChatSection tone="rose" chatOpen={chatOpen} onOpen={() => setChatOpen(true)}>

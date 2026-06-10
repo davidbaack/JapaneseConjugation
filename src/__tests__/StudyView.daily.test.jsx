@@ -1195,6 +1195,39 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByText('Practice run')).toBeTruthy();
   });
 
+  it('opens missed run review answers with the full breakdown collapsed', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-negative';
+    mockedApp.value = makeApp({
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'tabeta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    await waitFor(() => expect(screen.getByText('Review this form.')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review answers' }));
+    const reviewRegion = screen.getByRole('region', { name: 'Practice run review' });
+    fireEvent.click(screen.getByText('Answer #1'));
+
+    expect(within(reviewRegion).getByText('Review this form.')).toBeTruthy();
+    expect(within(reviewRegion).getByText(/Rule:/)).toBeTruthy();
+    const fullBreakdown = within(reviewRegion).getByText('Show full breakdown').closest('details');
+    expect(fullBreakdown).toBeTruthy();
+    expect(fullBreakdown.open).toBe(false);
+    expect(within(fullBreakdown).queryByText('More')).toBeNull();
+    expect(within(fullBreakdown).getByText('Visual Rule Path')).toBeTruthy();
+    expect(within(fullBreakdown).getByText('1. What category is this and why?')).toBeTruthy();
+    expect(within(reviewRegion).queryByText('Answer breakdown')).toBeNull();
+  });
+
   it('walks a word form sweep in order and repeats missed forms before completion', async () => {
     const target = STARTER_VERBS[0];
     const state = {

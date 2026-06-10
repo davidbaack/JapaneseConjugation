@@ -303,8 +303,14 @@ describe('App shell', () => {
     expect(screen.getAllByText('Correct Answer').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Your Answer').length).toBeGreaterThan(0);
     expect(screen.getByText(/Rule:/)).toBeTruthy();
-    expect(screen.getByText('Answer breakdown').closest('details')).toBeNull();
-    expect(screen.getByText('1. What category is this and why?')).toBeTruthy();
+    const fullBreakdown = screen.getByText('Show full breakdown').closest('details');
+    expect(fullBreakdown).toBeTruthy();
+    expect(fullBreakdown.open).toBe(false);
+    expect(within(fullBreakdown).queryByText('More')).toBeNull();
+    expect(screen.getByText('1. What category is this and why?').closest('details')).toBe(
+      fullBreakdown,
+    );
+    expect(screen.queryByText('Answer breakdown')).toBeNull();
     expect(screen.queryByText('Gemini is not configured for AI chat.')).toBeNull();
   }, 15000);
 

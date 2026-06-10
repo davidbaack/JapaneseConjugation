@@ -288,14 +288,227 @@ function beComplement(action) {
   return match ? match[1] : '';
 }
 
+function regularPast(action) {
+  if (!action) return '';
+  if (/e$/.test(action)) return action + 'd';
+  if (/[bcdfghjklmnpqrstvwxyz]y$/.test(action)) return action.slice(0, -1) + 'ied';
+  return action + 'ed';
+}
+
+function splitTrailingParenthetical(action) {
+  const match = action.match(/^(.*?)(\s+\([^)]*\))$/);
+  if (!match) return { core: action, suffix: '' };
+  return { core: match[1].trim(), suffix: match[2] };
+}
+
+export function simplePast(action = '') {
+  const normalized = String(action || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .replace(/^\((?:be|something)\)\s+/, '');
+  const { core, suffix } = splitTrailingParenthetical(normalized);
+  if (!core) return '';
+
+  const map = {
+    be: 'was',
+    have: 'had',
+    eat: 'ate',
+    see: 'saw',
+    watch: 'watched',
+    sleep: 'slept',
+    'wake up': 'woke up',
+    'get up': 'got up',
+    leave: 'left',
+    exit: 'exited',
+    teach: 'taught',
+    remember: 'remembered',
+    learn: 'learned',
+    wear: 'wore',
+    open: 'opened',
+    close: 'closed',
+    go: 'went',
+    write: 'wrote',
+    speak: 'spoke',
+    say: 'said',
+    tell: 'told',
+    wait: 'waited',
+    die: 'died',
+    play: 'played',
+    drink: 'drank',
+    take: 'took',
+    buy: 'bought',
+    swim: 'swam',
+    read: 'read',
+    stand: 'stood',
+    run: 'ran',
+    'return home': 'returned home',
+    listen: 'listened',
+    ask: 'asked',
+    hear: 'heard',
+    hold: 'held',
+    use: 'used',
+    make: 'made',
+    do: 'did',
+    try: 'tried',
+    come: 'came',
+    walk: 'walked',
+    enter: 'entered',
+    'take out': 'took out',
+    submit: 'submitted',
+    sit: 'sat',
+    stop: 'stopped',
+    ride: 'rode',
+    'get off': 'got off',
+    meet: 'met',
+    send: 'sent',
+    escort: 'escorted',
+    hurry: 'hurried',
+    wash: 'washed',
+    borrow: 'borrowed',
+    owe: 'owed',
+    lend: 'lent',
+    'return something': 'returned something',
+    forget: 'forgot',
+    begin: 'began',
+    end: 'ended',
+    study: 'studied',
+    practice: 'practiced',
+    cook: 'cooked',
+    choose: 'chose',
+    fix: 'fixed',
+    heal: 'healed',
+    'make a mistake': 'made a mistake',
+    investigate: 'investigated',
+    'look up': 'looked up',
+    explain: 'explained',
+    reserve: 'reserved',
+    drive: 'drove',
+    'break something': 'broke something',
+    break: 'broke',
+    need: 'needed',
+    know: 'knew',
+    cut: 'cut',
+    limit: 'limited',
+    decrease: 'decreased',
+    panic: 'panicked',
+    rush: 'rushed',
+    grasp: 'grasped',
+    compare: 'compared',
+    increase: 'increased',
+    continue: 'continued',
+    'continue something': 'continued something',
+    decide: 'decided',
+    convey: 'conveyed',
+    participate: 'participated',
+    prepare: 'prepared',
+    handle: 'handled',
+    treat: 'treated',
+    recognize: 'recognized',
+    approve: 'approved',
+    refuse: 'refused',
+    state: 'stated',
+    influence: 'influenced',
+    develop: 'developed',
+    solve: 'solved',
+    improve: 'improved',
+    attempt: 'attempted',
+    accompany: 'accompanied',
+    involve: 'involved',
+    harm: 'harmed',
+    impair: 'impaired',
+    urge: 'urged',
+    prompt: 'prompted',
+    overturn: 'overturned',
+    escape: 'escaped',
+    avoid: 'avoided',
+    decline: 'declined',
+    weaken: 'weakened',
+    understand: 'understood',
+    shop: 'shopped',
+    'do shopping': 'shopped',
+    'get married': 'got married',
+    'take a walk': 'took a walk',
+    feel: 'felt',
+    phone: 'phoned',
+    jump: 'jumped',
+  };
+
+  if (map[core]) return `${map[core]}${suffix}`;
+  const complement = beComplement(core);
+  if (complement) return `was ${complement}${suffix}`;
+  if (core.startsWith('it takes ')) return `it took ${core.slice('it takes '.length)}${suffix}`;
+
+  const irregularPrefixes = [
+    ['become ', 'became '],
+    ['begin ', 'began '],
+    ['break ', 'broke '],
+    ['bring ', 'brought '],
+    ['buy ', 'bought '],
+    ['catch ', 'caught '],
+    ['choose ', 'chose '],
+    ['come ', 'came '],
+    ['do ', 'did '],
+    ['drink ', 'drank '],
+    ['drive ', 'drove '],
+    ['eat ', 'ate '],
+    ['fall ', 'fell '],
+    ['feel ', 'felt '],
+    ['find ', 'found '],
+    ['fly ', 'flew '],
+    ['forget ', 'forgot '],
+    ['get ', 'got '],
+    ['give ', 'gave '],
+    ['go ', 'went '],
+    ['grow ', 'grew '],
+    ['have ', 'had '],
+    ['hear ', 'heard '],
+    ['hold ', 'held '],
+    ['know ', 'knew '],
+    ['leave ', 'left '],
+    ['lose ', 'lost '],
+    ['make ', 'made '],
+    ['meet ', 'met '],
+    ['pay ', 'paid '],
+    ['put ', 'put '],
+    ['read ', 'read '],
+    ['ride ', 'rode '],
+    ['run ', 'ran '],
+    ['say ', 'said '],
+    ['see ', 'saw '],
+    ['sell ', 'sold '],
+    ['send ', 'sent '],
+    ['sit ', 'sat '],
+    ['sleep ', 'slept '],
+    ['speak ', 'spoke '],
+    ['spend ', 'spent '],
+    ['stand ', 'stood '],
+    ['swim ', 'swam '],
+    ['take ', 'took '],
+    ['teach ', 'taught '],
+    ['tell ', 'told '],
+    ['think ', 'thought '],
+    ['understand ', 'understood '],
+    ['wake ', 'woke '],
+    ['wear ', 'wore '],
+    ['win ', 'won '],
+    ['write ', 'wrote '],
+  ];
+  const prefix = irregularPrefixes.find(([candidate]) => core.startsWith(candidate));
+  if (prefix) {
+    const [candidate, replacement] = prefix;
+    return `${replacement}${core.slice(candidate.length)}${suffix}`;
+  }
+  return `${regularPast(core)}${suffix}`;
+}
+
 function presentPhrase(action) {
   const complement = beComplement(action);
   return complement ? `is ${complement}` : action;
 }
 
 function pastPhrase(action) {
-  const complement = beComplement(action);
-  return complement ? `was ${complement}` : `did ${action}`;
+  return simplePast(action);
 }
 
 function negativePhrase(action) {
@@ -433,6 +646,31 @@ export function mapActionMeaning(meaning, fn) {
   return actionParts(meaning).map(fn).join(' / ');
 }
 
+function splitPastActionParts(action = '') {
+  const text = cleanEnglishAction(action);
+  const parts = [];
+  let current = '';
+  let depth = 0;
+
+  for (const char of text) {
+    if (char === '(') depth += 1;
+    if (char === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (char === '/' || char === ',')) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  parts.push(current);
+
+  return parts.map((part) => part.trim().replace(/^to\s+/i, '')).filter(Boolean);
+}
+
+function mapPastActionMeaning(meaning, fn) {
+  return splitPastActionParts(meaning).map(fn).join(' / ');
+}
+
 export function answerPhaseTaskDetails({
   reverseDrill = false,
   noChangePrompt = false,
@@ -480,9 +718,17 @@ export function englishForForm(item, type) {
   }
   const action = cleanEnglishAction(item.meaning);
   const present = presentPhrase(action);
-  const past = pastPhrase(action);
+  const past = mapPastActionMeaning(item.meaning, pastPhrase);
   const negative = negativePhrase(action);
   const pastNegative = pastNegativePhrase(action);
+  const conditionalPast = mapPastActionMeaning(
+    item.meaning,
+    (a) => `if/when someone ${pastPhrase(a)}`,
+  );
+  const conditionalPastPolite = mapPastActionMeaning(
+    item.meaning,
+    (a) => `if/when someone ${pastPhrase(a)} (polite)`,
+  );
   const M = {
     'plain-past': past,
     'plain-negative': negative,
@@ -494,7 +740,7 @@ export function englishForForm(item, type) {
     'masu-stem': `${action} stem`,
     'polite-volitional': `let's ${action} (polite)`,
     'polite-te': `${action} and... (polite)`,
-    'polite-conditional-tara': `if/when someone did ${action} (polite)`,
+    'polite-conditional-tara': conditionalPastPolite,
     honorific: `${action} (honorific, someone else's action)`,
     'honorific-polite': `${action} (honorific polite, someone else's action)`,
     humble: `${action} (humble, my/our action)`,
@@ -510,7 +756,7 @@ export function englishForForm(item, type) {
     'potential-past-negative': `could not ${action} / was not able to ${action}`,
     'potential-conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone can ${a}`),
     volitional: `let's ${action}`,
-    'conditional-tara': `if/when someone did ${action}`,
+    'conditional-tara': conditionalPast,
     'negative-conditional-tara': `if/when someone did not ${action}`,
     'conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone ${thirdPerson(a)}`),
     'negative-conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone does not ${a}`),
