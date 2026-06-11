@@ -99,6 +99,12 @@ describe('gerund', () => {
     expect(gerund('die')).toBe('dying');
     expect(gerund('lie')).toBe('lying');
   });
+
+  it('conjugates the head verb of phrasal meanings', () => {
+    expect(gerund('return home')).toBe('returning home');
+    expect(gerund('pick up')).toBe('picking up');
+    expect(gerund('take out')).toBe('taking out');
+  });
 });
 
 // ─── pastParticiple ───────────────────────────────────────────────────────────
@@ -118,6 +124,14 @@ describe('pastParticiple', () => {
   it('applies -ed to regular verbs', () => {
     expect(pastParticiple('walk')).toBe('walked');
     expect(pastParticiple('play')).toBe('played');
+  });
+
+  it('conjugates the head verb of phrasal meanings', () => {
+    expect(pastParticiple('return home')).toBe('returned home');
+    expect(pastParticiple('take out')).toBe('taken out');
+    expect(pastParticiple('get off')).toBe('gotten off');
+    expect(pastParticiple('wake up')).toBe('woken up');
+    expect(pastParticiple('look for')).toBe('looked for');
   });
 });
 
@@ -141,6 +155,18 @@ describe('simplePast', () => {
     expect(simplePast('Jump')).toBe('jumped');
     expect(simplePast('feel')).toBe('felt');
   });
+
+  it('conjugates the head verb of phrasal meanings, not the last word', () => {
+    expect(simplePast('return home')).toBe('returned home');
+    expect(simplePast('arrive at')).toBe('arrived at');
+    expect(simplePast('pick up')).toBe('picked up');
+    expect(simplePast('pass away')).toBe('passed away');
+    expect(simplePast('cross over')).toBe('crossed over');
+    expect(simplePast('look for')).toBe('looked for');
+    expect(simplePast('go back')).toBe('went back');
+    expect(simplePast('take out')).toBe('took out');
+    expect(simplePast('get off')).toBe('got off');
+  });
 });
 
 describe('thirdPerson', () => {
@@ -158,6 +184,12 @@ describe('thirdPerson', () => {
   it('adds -s to regular verbs', () => {
     expect(thirdPerson('eat')).toBe('eats');
     expect(thirdPerson('drink')).toBe('drinks');
+  });
+
+  it('conjugates the head verb of phrasal meanings', () => {
+    expect(thirdPerson('return home')).toBe('returns home');
+    expect(thirdPerson('go back')).toBe('goes back');
+    expect(thirdPerson('look for')).toBe('looks for');
   });
 });
 
@@ -221,6 +253,12 @@ describe('englishForForm', () => {
     expect(englishForForm(TABERU, 'obligation')).toBe('must eat');
     expect(englishForForm(TABERU, 'permission')).toBe('may eat');
     expect(englishForForm(TABERU, 'request-kudasai')).toBe('please eat');
+  });
+
+  it('conjugates the head verb for phrasal verb meanings (return home → returned home)', () => {
+    const kaeru = { dict: '帰る', reading: 'かえる', meaning: 'to return home', group: 'godan' };
+    expect(englishForForm(kaeru, 'plain-past')).toBe('returned home');
+    expect(englishForForm(kaeru, 'polite-past')).toBe('returned home (polite)');
   });
 
   it('maps slash-separated action meanings before generating simple past', () => {

@@ -301,136 +301,239 @@ function splitTrailingParenthetical(action) {
   return { core: match[1].trim(), suffix: match[2] };
 }
 
-export function simplePast(action = '') {
-  const normalized = String(action || '')
+// English glosses derive tense by conjugating the *head verb* of the meaning
+// phrase and leaving the rest intact (e.g. "return home" → "returned home"),
+// rather than suffixing the final word ("return homed"). The word maps cover
+// irregular head verbs; the phrase maps override the rare cases where the head
+// verb alone would mislead (e.g. "do shopping" → "shopped", not "did shopping").
+const SIMPLE_PAST_WORDS = {
+  be: 'was',
+  become: 'became',
+  begin: 'began',
+  break: 'broke',
+  bring: 'brought',
+  build: 'built',
+  buy: 'bought',
+  catch: 'caught',
+  choose: 'chose',
+  come: 'came',
+  cut: 'cut',
+  deal: 'dealt',
+  do: 'did',
+  draw: 'drew',
+  drink: 'drank',
+  drive: 'drove',
+  eat: 'ate',
+  fall: 'fell',
+  feel: 'felt',
+  find: 'found',
+  fly: 'flew',
+  forget: 'forgot',
+  get: 'got',
+  give: 'gave',
+  go: 'went',
+  grow: 'grew',
+  hang: 'hung',
+  have: 'had',
+  hear: 'heard',
+  hit: 'hit',
+  hold: 'held',
+  hurt: 'hurt',
+  keep: 'kept',
+  know: 'knew',
+  lay: 'laid',
+  lead: 'led',
+  leave: 'left',
+  lend: 'lent',
+  let: 'let',
+  lose: 'lost',
+  make: 'made',
+  meet: 'met',
+  overturn: 'overturned',
+  panic: 'panicked',
+  pay: 'paid',
+  put: 'put',
+  read: 'read',
+  ride: 'rode',
+  rise: 'rose',
+  run: 'ran',
+  say: 'said',
+  see: 'saw',
+  seek: 'sought',
+  sell: 'sold',
+  send: 'sent',
+  set: 'set',
+  shine: 'shone',
+  shoot: 'shot',
+  shop: 'shopped',
+  show: 'showed',
+  sit: 'sat',
+  sleep: 'slept',
+  speak: 'spoke',
+  spend: 'spent',
+  spread: 'spread',
+  stand: 'stood',
+  stop: 'stopped',
+  submit: 'submitted',
+  swim: 'swam',
+  take: 'took',
+  teach: 'taught',
+  tear: 'tore',
+  tell: 'told',
+  think: 'thought',
+  throw: 'threw',
+  understand: 'understood',
+  wake: 'woke',
+  wear: 'wore',
+  win: 'won',
+  write: 'wrote',
+};
+const SIMPLE_PAST_PHRASES = {
+  'do shopping': 'shopped',
+};
+
+const PAST_PARTICIPLE_WORDS = {
+  ask: 'asked',
+  begin: 'begun',
+  borrow: 'borrowed',
+  break: 'broken',
+  build: 'built',
+  buy: 'bought',
+  choose: 'chosen',
+  close: 'closed',
+  come: 'come',
+  cook: 'cooked',
+  deal: 'dealt',
+  die: 'died',
+  do: 'done',
+  draw: 'drawn',
+  drink: 'drunk',
+  drive: 'driven',
+  eat: 'eaten',
+  end: 'ended',
+  enter: 'entered',
+  escort: 'escorted',
+  exit: 'exited',
+  explain: 'explained',
+  fix: 'fixed',
+  forget: 'forgotten',
+  get: 'gotten',
+  go: 'gone',
+  hang: 'hung',
+  heal: 'healed',
+  hit: 'hit',
+  hold: 'held',
+  hurry: 'hurried',
+  hurt: 'hurt',
+  investigate: 'investigated',
+  keep: 'kept',
+  lay: 'laid',
+  lead: 'led',
+  leave: 'left',
+  lend: 'lent',
+  let: 'let',
+  listen: 'listened',
+  make: 'made',
+  meet: 'met',
+  open: 'opened',
+  play: 'played',
+  practice: 'practiced',
+  read: 'read',
+  remember: 'remembered',
+  reserve: 'reserved',
+  return: 'returned',
+  ride: 'ridden',
+  rise: 'risen',
+  run: 'run',
+  see: 'seen',
+  seek: 'sought',
+  send: 'sent',
+  set: 'set',
+  shine: 'shone',
+  shoot: 'shot',
+  show: 'shown',
+  sit: 'sat',
+  sleep: 'slept',
+  speak: 'spoken',
+  spread: 'spread',
+  stand: 'stood',
+  stop: 'stopped',
+  study: 'studied',
+  submit: 'submitted',
+  swim: 'swum',
+  take: 'taken',
+  teach: 'taught',
+  tear: 'torn',
+  throw: 'thrown',
+  use: 'used',
+  wait: 'waited',
+  wake: 'woken',
+  walk: 'walked',
+  wash: 'washed',
+  watch: 'watched',
+  wear: 'worn',
+  write: 'written',
+};
+const PAST_PARTICIPLE_PHRASES = {
+  'do shopping': 'shopped',
+};
+
+const GERUND_WORDS = {
+  come: 'coming',
+  die: 'dying',
+  drive: 'driving',
+  lie: 'lying',
+  make: 'making',
+  ride: 'riding',
+  take: 'taking',
+  tie: 'tying',
+  use: 'using',
+  write: 'writing',
+};
+
+const THIRD_PERSON_WORDS = {
+  do: 'does',
+  go: 'goes',
+};
+
+// Conjugate only the first (head) word of a phrase, preserving the remainder.
+function conjugateHead(core, wordMap, regularFn) {
+  const [head, ...rest] = core.split(' ');
+  const conjugated = wordMap[head] ?? regularFn(head);
+  return rest.length ? `${conjugated} ${rest.join(' ')}` : conjugated;
+}
+
+function regularGerund(action) {
+  if (!action) return '';
+  if (/ie$/.test(action)) return action.slice(0, -2) + 'ying';
+  if (/e$/.test(action) && !/ee$/.test(action)) return action.slice(0, -1) + 'ing';
+  return action + 'ing';
+}
+
+function regularThirdPerson(action) {
+  if (!action) return '';
+  if (/(s|sh|ch|x|z|o)$/.test(action)) return action + 'es';
+  if (/[bcdfghjklmnpqrstvwxyz]y$/.test(action)) return action.slice(0, -1) + 'ies';
+  return action + 's';
+}
+
+function normalizeAction(action = '') {
+  return String(action || '')
     .trim()
     .replace(/\s+/g, ' ')
     .toLowerCase()
     .replace(/^\((?:be|something)\)\s+/, '');
-  const { core, suffix } = splitTrailingParenthetical(normalized);
+}
+
+export function simplePast(action = '') {
+  const { core, suffix } = splitTrailingParenthetical(normalizeAction(action));
   if (!core) return '';
-
-  const map = {
-    be: 'was',
-    have: 'had',
-    eat: 'ate',
-    see: 'saw',
-    sleep: 'slept',
-    'wake up': 'woke up',
-    'get up': 'got up',
-    leave: 'left',
-    teach: 'taught',
-    wear: 'wore',
-    go: 'went',
-    write: 'wrote',
-    speak: 'spoke',
-    say: 'said',
-    tell: 'told',
-    drink: 'drank',
-    take: 'took',
-    buy: 'bought',
-    swim: 'swam',
-    read: 'read',
-    stand: 'stood',
-    run: 'ran',
-    hear: 'heard',
-    hold: 'held',
-    make: 'made',
-    do: 'did',
-    come: 'came',
-    'take out': 'took out',
-    submit: 'submitted',
-    sit: 'sat',
-    stop: 'stopped',
-    ride: 'rode',
-    'get off': 'got off',
-    meet: 'met',
-    send: 'sent',
-    lend: 'lent',
-    forget: 'forgot',
-    begin: 'began',
-    choose: 'chose',
-    'make a mistake': 'made a mistake',
-    'look up': 'looked up',
-    drive: 'drove',
-    'break something': 'broke something',
-    break: 'broke',
-    know: 'knew',
-    cut: 'cut',
-    panic: 'panicked',
-    overturn: 'overturned',
-    understand: 'understood',
-    shop: 'shopped',
-    'do shopping': 'shopped',
-    feel: 'felt',
-  };
-
-  if (map[core]) return `${map[core]}${suffix}`;
+  if (SIMPLE_PAST_PHRASES[core]) return `${SIMPLE_PAST_PHRASES[core]}${suffix}`;
   const complement = beComplement(core);
   if (complement) return `was ${complement}${suffix}`;
+  if (core === 'it takes') return `it took${suffix}`;
   if (core.startsWith('it takes ')) return `it took ${core.slice('it takes '.length)}${suffix}`;
-
-  const irregularPrefixes = [
-    ['become ', 'became '],
-    ['begin ', 'began '],
-    ['break ', 'broke '],
-    ['bring ', 'brought '],
-    ['buy ', 'bought '],
-    ['catch ', 'caught '],
-    ['choose ', 'chose '],
-    ['come ', 'came '],
-    ['do ', 'did '],
-    ['drink ', 'drank '],
-    ['drive ', 'drove '],
-    ['eat ', 'ate '],
-    ['fall ', 'fell '],
-    ['feel ', 'felt '],
-    ['find ', 'found '],
-    ['fly ', 'flew '],
-    ['forget ', 'forgot '],
-    ['get ', 'got '],
-    ['give ', 'gave '],
-    ['go ', 'went '],
-    ['grow ', 'grew '],
-    ['have ', 'had '],
-    ['hear ', 'heard '],
-    ['hold ', 'held '],
-    ['know ', 'knew '],
-    ['leave ', 'left '],
-    ['lose ', 'lost '],
-    ['make ', 'made '],
-    ['meet ', 'met '],
-    ['pay ', 'paid '],
-    ['put ', 'put '],
-    ['read ', 'read '],
-    ['ride ', 'rode '],
-    ['run ', 'ran '],
-    ['say ', 'said '],
-    ['see ', 'saw '],
-    ['sell ', 'sold '],
-    ['send ', 'sent '],
-    ['sit ', 'sat '],
-    ['sleep ', 'slept '],
-    ['speak ', 'spoke '],
-    ['spend ', 'spent '],
-    ['stand ', 'stood '],
-    ['swim ', 'swam '],
-    ['take ', 'took '],
-    ['teach ', 'taught '],
-    ['tell ', 'told '],
-    ['think ', 'thought '],
-    ['understand ', 'understood '],
-    ['wake ', 'woke '],
-    ['wear ', 'wore '],
-    ['win ', 'won '],
-    ['write ', 'wrote '],
-  ];
-  const prefix = irregularPrefixes.find(([candidate]) => core.startsWith(candidate));
-  if (prefix) {
-    const [candidate, replacement] = prefix;
-    return `${replacement}${core.slice(candidate.length)}${suffix}`;
-  }
-  return `${regularPast(core)}${suffix}`;
+  return `${conjugateHead(core, SIMPLE_PAST_WORDS, regularPast)}${suffix}`;
 }
 
 function presentPhrase(action) {
@@ -453,117 +556,22 @@ function pastNegativePhrase(action) {
 }
 
 export function pastParticiple(action) {
-  const map = {
-    eat: 'eaten',
-    see: 'seen',
-    watch: 'watched',
-    sleep: 'slept',
-    'wake up': 'woken up',
-    leave: 'left',
-    exit: 'exited',
-    teach: 'taught',
-    remember: 'remembered',
-    wear: 'worn',
-    open: 'opened',
-    close: 'closed',
-    go: 'gone',
-    write: 'written',
-    speak: 'spoken',
-    wait: 'waited',
-    die: 'died',
-    play: 'played',
-    drink: 'drunk',
-    take: 'taken',
-    buy: 'bought',
-    swim: 'swum',
-    read: 'read',
-    stand: 'stood',
-    run: 'run',
-    'return home': 'returned home',
-    listen: 'listened',
-    ask: 'asked',
-    hold: 'held',
-    use: 'used',
-    make: 'made',
-    do: 'done',
-    come: 'come',
-    walk: 'walked',
-    enter: 'entered',
-    'take out': 'taken out',
-    submit: 'submitted',
-    sit: 'sat',
-    stop: 'stopped',
-    ride: 'ridden',
-    'get off': 'gotten off',
-    meet: 'met',
-    send: 'sent',
-    escort: 'escorted',
-    hurry: 'hurried',
-    wash: 'washed',
-    borrow: 'borrowed',
-    lend: 'lent',
-    'return something': 'returned something',
-    forget: 'forgotten',
-    begin: 'begun',
-    end: 'ended',
-    study: 'studied',
-    practice: 'practiced',
-    cook: 'cooked',
-    choose: 'chosen',
-    fix: 'fixed',
-    heal: 'healed',
-    'make a mistake': 'made a mistake',
-    investigate: 'investigated',
-    'look up': 'looked up',
-    explain: 'explained',
-    reserve: 'reserved',
-    drive: 'driven',
-    'break something': 'broken something',
-    break: 'broken',
-  };
-  return (
-    map[action] ||
-    (/e$/.test(action)
-      ? action + 'd'
-      : /[bcdfghjklmnpqrstvwxyz]y$/.test(action)
-        ? action.slice(0, -1) + 'ied'
-        : action + 'ed')
-  );
+  const { core, suffix } = splitTrailingParenthetical(normalizeAction(action));
+  if (!core) return '';
+  if (PAST_PARTICIPLE_PHRASES[core]) return `${PAST_PARTICIPLE_PHRASES[core]}${suffix}`;
+  return `${conjugateHead(core, PAST_PARTICIPLE_WORDS, regularPast)}${suffix}`;
 }
 
 export function gerund(action) {
-  const map = {
-    die: 'dying',
-    lie: 'lying',
-    tie: 'tying',
-    use: 'using',
-    make: 'making',
-    come: 'coming',
-    write: 'writing',
-    take: 'taking',
-    ride: 'riding',
-    drive: 'driving',
-  };
-  return (
-    map[action] ||
-    (/ie$/.test(action)
-      ? action.slice(0, -2) + 'ying'
-      : /e$/.test(action) && !/ee$/.test(action)
-        ? action.slice(0, -1) + 'ing'
-        : action + 'ing')
-  );
+  const { core, suffix } = splitTrailingParenthetical(normalizeAction(action));
+  if (!core) return '';
+  return `${conjugateHead(core, GERUND_WORDS, regularGerund)}${suffix}`;
 }
 
 export function thirdPerson(action) {
-  const map = { do: 'does', go: 'goes' };
-  return (
-    map[action] ||
-    (/(s|sh|ch|x|z|o)$/.test(action)
-      ? action + 'es'
-      : /[bcdfghjklmnpqrstvwxyz]y$/.test(action)
-        ? action.slice(0, -1) + 'ies'
-        : action + 's')
-  );
+  const { core, suffix } = splitTrailingParenthetical(normalizeAction(action));
+  if (!core) return '';
+  return `${conjugateHead(core, THIRD_PERSON_WORDS, regularThirdPerson)}${suffix}`;
 }
 
 export function actionParts(meaning = '') {
