@@ -5,6 +5,7 @@ import {
   gerund,
   normalizeSentenceBlankForTarget,
   pastParticiple,
+  simplePast,
 } from './display.js';
 
 const BLANK = '[______]';
@@ -52,41 +53,8 @@ export function clozeContextBucket(word) {
   return 'general';
 }
 
-// Irregular simple-past forms. cleanEnglishAction's pastParticiple covers most
-// verbs, but several common irregulars differ between the simple past and the
-// past participle (go -> went/gone), so those are listed explicitly here.
-const SIMPLE_PAST = {
-  go: 'went',
-  see: 'saw',
-  eat: 'ate',
-  drink: 'drank',
-  swim: 'swam',
-  run: 'ran',
-  come: 'came',
-  take: 'took',
-  give: 'gave',
-  write: 'wrote',
-  speak: 'spoke',
-  ride: 'rode',
-  begin: 'began',
-  break: 'broke',
-  choose: 'chose',
-  drive: 'drove',
-  sing: 'sang',
-  do: 'did',
-  forget: 'forgot',
-  win: 'won',
-  lose: 'lost',
-  understand: 'understood',
-  'wake up': 'woke up',
-};
-
 function actionOf(word) {
   return cleanEnglishAction(String(word?.meaning || '').split('/')[0]);
-}
-
-function simplePast(action) {
-  return SIMPLE_PAST[action] || pastParticiple(action);
 }
 
 // Motion/existence/change-of-state verbs that read as intransitive. Used only
