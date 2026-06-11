@@ -539,11 +539,6 @@ function useAppController() {
     setTab('learn');
     return true;
   }
-  function returnToLearnFocusCard() {
-    if (!learnFocus?.reviewRecord) return false;
-    setTab('practice');
-    return true;
-  }
   const clearLearnFocus = () => setLearnFocus(null);
   const clearGuideFocus = () => setGuideFocus(null);
   function openGuideForRule(word, type, options = {}) {
@@ -687,7 +682,6 @@ function useAppController() {
     clearStudyFocus,
     learnFocus,
     openLearnFocus,
-    returnToLearnFocusCard,
     clearLearnFocus,
     guideFocus,
     openGuideForRule,

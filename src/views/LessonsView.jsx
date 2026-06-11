@@ -39,7 +39,7 @@ function TypeChip({ id }) {
   );
 }
 
-function PracticeCardReturnPanel({ focus, onReturn, onGuide, onPractice, onDismiss }) {
+function PracticeCardReturnPanel({ focus, onGuide, onPractice, onDismiss }) {
   const type = getTypeInfo(focus?.typeId);
   const typeLabel = focus?.typeLabel || type.label || 'this form';
   const word = focus?.word || {};
@@ -51,7 +51,7 @@ function PracticeCardReturnPanel({ focus, onReturn, onGuide, onPractice, onDismi
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
-            From your missed Practice card
+            From your Practice card
           </div>
           <p className="mt-1 text-sm text-stone-700 dark:text-stone-250">
             {word.dict ? (
@@ -73,14 +73,6 @@ function PracticeCardReturnPanel({ focus, onReturn, onGuide, onPractice, onDismi
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => onReturn?.(focus)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-50 dark:border-amber-700 dark:bg-stone-950 dark:text-amber-200 dark:hover:bg-amber-950/30"
-          >
-            <IconRefresh className="h-4 w-4" />
-            Return to this card
-          </button>
           <button
             type="button"
             onClick={() => onGuide?.(focus)}
@@ -237,7 +229,6 @@ export default function LessonsView() {
     clearLearnFocus,
     learnFocus,
     openGuideForRule,
-    returnToLearnFocusCard,
     setTab,
     startReviewRecommendation,
   } = useApp();
@@ -316,10 +307,6 @@ export default function LessonsView() {
     clearLearnFocus?.();
   }
 
-  function returnToPracticeCard() {
-    returnToLearnFocusCard?.();
-  }
-
   function practiceFocusedRule(focus) {
     if (!focus) return;
     const recommendation = buildRuleReviewRecommendation(focus, allWords, {
@@ -387,7 +374,6 @@ export default function LessonsView() {
       {learnFocus?.lessonGroupId && (
         <PracticeCardReturnPanel
           focus={learnFocus}
-          onReturn={returnToPracticeCard}
           onGuide={guideFocusedRule}
           onPractice={practiceFocusedRule}
           onDismiss={clearLearnFocus}

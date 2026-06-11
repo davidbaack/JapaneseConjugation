@@ -437,20 +437,16 @@ describe('App shell', () => {
     expect(await screen.findByText('Review this form.')).toBeTruthy();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Review lesson' }, { timeout: 5000 }),
+      await screen.findByRole('button', { name: 'I forgot this' }, { timeout: 5000 }),
     );
-    expect(await screen.findByText('From your missed Practice card')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Return to this card' })).toBeTruthy();
+    expect(await screen.findByText('From your Practice card')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Guide this form' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Practice this form' })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Return to this card' }));
-
-    expect(await screen.findByText('Review this form.')).toBeTruthy();
-    expect(screen.getByText('Your Answer')).toBeTruthy();
-    expect(screen.getAllByText(/\u98df\u3079\u308b/).length).toBeGreaterThan(0);
-    expect(screen.queryByPlaceholderText(/Type romaji or kana/i)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Review lesson' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Practice this form' }));
+    expect(await screen.findByText('Learn focus')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Plain Past Practice/i })).toBeTruthy();
+    expect(screen.getByText(/Locked Practice set/)).toBeTruthy();
   }, 15000);
 
   it('shows correct-answer rationale expanded without a More toggle', async () => {

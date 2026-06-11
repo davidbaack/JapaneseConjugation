@@ -634,11 +634,17 @@ function RunAnswerReveal({
   const reviewAction = reviewFeedbackActionForRecord(record, {
     canOpenGuide: !!onOpenGuide,
     canOpenLab: !!onOpenLab,
-    canOpenLearn: !!(onOpenLearn || onOpenLearnFocus),
+    canOpenLearn: false,
     preferTryAnother,
     relatedLesson,
     reviewSubmittedAnswer,
   });
+  const canOpenRuleLesson = !!relatedLesson && !!(onOpenLearn || onOpenLearnFocus);
+  const ruleLessonLabel = record.correct ? 'Teach me this rule' : 'I forgot this';
+  const openRuleLesson = () => {
+    const handled = onOpenLearnFocus?.(record);
+    if (!handled) onOpenLearn?.(relatedLesson.groupId);
+  };
   const runReviewAction = () => {
     if (reviewAction.kind === 'guide') {
       onOpenGuide?.(record.word, reviewTypeId);
@@ -1006,6 +1012,21 @@ function RunAnswerReveal({
               )}
             </ReviewChatSection>
           )}
+        </div>
+      )}
+      {canOpenRuleLesson && (
+        <div className="mt-4 border-t border-stone-200/60 pt-3 text-left dark:border-stone-800/60">
+          <button
+            type="button"
+            onClick={openRuleLesson}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
+          >
+            <IconBook className="h-4 w-4" />
+            {ruleLessonLabel}
+          </button>
+          <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+            Opens {relatedLesson.title}, then returns to this form.
+          </div>
         </div>
       )}
       <ReviewFeedbackAction
