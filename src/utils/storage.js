@@ -1900,7 +1900,7 @@ export function referenceProgressFor(state, item, typeId) {
       tone: 'bg-amber-50 text-amber-700 border-amber-200',
       levelInfo,
       reviews,
-      detail: `${reviews} review${reviews === 1 ? '' : 's'} · ready now`,
+      detail: `${reviews} review${reviews === 1 ? '' : 's'} · ready to review`,
     };
   }
   if (level >= 4) {
