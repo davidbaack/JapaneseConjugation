@@ -58,7 +58,7 @@ import {
   gradeCard,
   gradeTransformationStats,
   bumpDaily,
-  typeIdFromCardId,
+  cardIdFor,
 } from '../utils/storage.js';
 import { READINESS_DIMENSIONS, recordReadinessAttempt } from '../utils/readiness.js';
 import {
@@ -100,6 +100,7 @@ import {
   reviewTypeIdsForState,
 } from '../utils/reviewScope.js';
 import { buildGuideDiagnosticInsight } from '../utils/guidePractice.js';
+import { buildFormFamilyProgress } from '../utils/formFamilyProgress.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
@@ -270,6 +271,22 @@ function sessionOutcomeLabel(card) {
   if (!card) return 'Practice card';
   if (isReadingPracticeCard(card)) return 'Reading';
   return getTypeInfo(card.type).label || 'Practice card';
+}
+
+function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now()) {
+  if (!typeId || typeId === DICTIONARY_TYPE_ID) return card;
+  const current = card.sourceTypeStats?.[typeId] || {};
+  return {
+    ...card,
+    sourceTypeStats: {
+      ...(card.sourceTypeStats || {}),
+      [typeId]: {
+        correct: (Number(current.correct) || 0) + (correct ? 1 : 0),
+        incorrect: (Number(current.incorrect) || 0) + (correct ? 0 : 1),
+        lastAt: now,
+      },
+    },
+  };
 }
 
 function appendSessionOutcome(session = {}, outcome) {
@@ -1840,49 +1857,6 @@ function reviewForecastRows(forecast) {
   ];
 }
 
-function formFamilyStrengthRows(state = {}) {
-  return FORM_GROUPS.map((family) => {
-    const typeIds = new Set(family.typeIds || []);
-    let correct = 0;
-    let incorrect = 0;
-    for (const [cardId, card] of Object.entries(state.cards || {})) {
-      if (!typeIds.has(typeIdFromCardId(cardId))) continue;
-      correct += card?.correct || 0;
-      incorrect += card?.incorrect || 0;
-    }
-    const mistakeCount = (state.mistakes || []).filter(
-      (mistake) => !mistake.resolved && typeIds.has(mistake.type),
-    ).length;
-    const attempted = correct + incorrect;
-    const accuracy = attempted ? Math.round((correct / attempted) * 100) : 0;
-    const status =
-      attempted >= 3 && accuracy >= 85
-        ? 'strong'
-        : attempted > 0 && (accuracy < 60 || mistakeCount > 0)
-          ? 'weak'
-          : attempted > 0
-            ? 'developing'
-            : 'new';
-    return {
-      ...family,
-      attempted,
-      correct,
-      incorrect,
-      accuracy,
-      mistakeCount,
-      status,
-      sortScore:
-        status === 'weak'
-          ? -1000 - mistakeCount * 50 + accuracy
-          : status === 'new'
-            ? 500
-            : status === 'developing'
-              ? 100 + accuracy
-              : 1000 + accuracy,
-    };
-  }).sort((a, b) => a.sortScore - b.sortScore || a.label.localeCompare(b.label));
-}
-
 // Onbin (te/ta sound-change) practice lives in this family; when the learner's
 // misses cluster as godan sound-change errors its drill routes to Ending Lab.
 const TE_TA_FAMILY_ID = TE_TA_SOUND_CHANGE_FAMILY_ID;
@@ -1919,8 +1893,7 @@ export function ReviewsDashboard({
   const practiceTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
   const recommendations = state.reviewScope?.recommendations || [];
   const mistakeHistoryCount = (state.mistakes || []).length;
-  const strengthRows = formFamilyStrengthRows(state);
-  const totalPracticed = strengthRows.reduce((sum, row) => sum + (row.attempted || 0), 0);
+  const { rows: strengthRows, totalPracticed } = buildFormFamilyProgress(state);
   const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
   const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
   const readinessById = new Map(readinessFamilies.map((row) => [row.id, row]));
@@ -3155,6 +3128,13 @@ export default function StudyView({ mode = 'practice' }) {
     verbStats,
     daily,
   }) {
+    const progressTypeId = reverseDrill ? sourceTypeForReading : current.type;
+    const readinessRuleId = reverseDrill ? cardIdFor(current.verb, progressTypeId) : rid;
+    const gradedAt = Date.now();
+    const gradedCard = gradeCard(state.cards[rid], correct, gradedAt);
+    const storedCard = reverseDrill
+      ? withReadingSourceTypeStat(gradedCard, progressTypeId, correct, gradedAt)
+      : gradedCard;
     const graded = {
       ...state,
       mistakes: nextMistakes,
@@ -3169,23 +3149,25 @@ export default function StudyView({ mode = 'practice' }) {
     if (transformationMode) return graded;
     return {
       ...graded,
-      cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], correct) },
+      cards: { ...state.cards, [rid]: storedCard },
       retryQueue: correct
         ? (state.retryQueue || []).filter((id) => id !== rid)
         : [...new Set([...(state.retryQueue || []), rid])].slice(-20),
       verbStats,
-      readiness: recordReadinessAttempt(state.readiness, rid, {
+      readiness: recordReadinessAttempt(state.readiness, readinessRuleId, {
         correct,
         responseMs,
         answerMode,
         kanaAssist: readinessKanaAssist,
         reverseDrill,
+        now: gradedAt,
       }),
       weakness: recordWeaknessAttempt(state.weakness, {
         word: current.verb,
-        typeId: current.type,
+        typeId: progressTypeId,
         correct,
         responseMs,
+        now: gradedAt,
       }),
       daily,
     };

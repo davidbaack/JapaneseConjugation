@@ -682,6 +682,60 @@ describe('mergeCloudState', () => {
     expect(merged.enabledTypes).toHaveLength(allTypeIds.length);
   });
 
+  it('merges reading source-form stats when choosing the newer SRS card', () => {
+    const word = {
+      dict: '\u66f8\u304f',
+      reading: '\u304b\u304f',
+      meaning: 'to write',
+      group: 'godan',
+    };
+    const cardId = cardIdFor(word, 'dictionary');
+    const merged = mergeCloudState(
+      {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        cards: {
+          [cardId]: {
+            reps: 1,
+            interval: 1,
+            nextReview: 1000,
+            correct: 1,
+            incorrect: 0,
+            sourceTypeStats: {
+              'plain-past': { correct: 1, incorrect: 0, lastAt: 1000 },
+            },
+          },
+        },
+        verbStats: {},
+        mistakes: [],
+        enabledTypes: ['plain-past'],
+      },
+      {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        cards: {
+          [cardId]: {
+            reps: 2,
+            interval: 3,
+            nextReview: 2000,
+            correct: 2,
+            incorrect: 0,
+            sourceTypeStats: {
+              'te-form': { correct: 0, incorrect: 1, lastAt: 1500 },
+            },
+          },
+        },
+        verbStats: {},
+        mistakes: [],
+        enabledTypes: ['plain-past'],
+      },
+    );
+
+    expect(merged.cards[cardId].reps).toBe(2);
+    expect(merged.cards[cardId].sourceTypeStats).toMatchObject({
+      'plain-past': { correct: 1, incorrect: 0, lastAt: 1000 },
+      'te-form': { correct: 0, incorrect: 1, lastAt: 1500 },
+    });
+  });
+
   it('merges readiness dimensions from both devices', () => {
     const merged = mergeCloudState(
       {

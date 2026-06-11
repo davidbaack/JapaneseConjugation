@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { FORM_GROUPS, TE_TA_SOUND_CHANGE_FAMILY_ID } from '../data/conjugationTypes.js';
+import { TE_TA_SOUND_CHANGE_FAMILY_ID } from '../data/conjugationTypes.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import {
   buildReadinessFamilyRows,
@@ -11,8 +11,8 @@ import {
   aggregateDiagnosedMistakes,
   labRouteForMistakePattern,
 } from '../utils/mistakeDiagnosis.js';
-import { typeIdFromCardId } from '../utils/storage.js';
 import { buildGuideDiagnosticInsight } from '../utils/guidePractice.js';
+import { buildFormFamilyProgress } from '../utils/formFamilyProgress.js';
 
 const TE_TA_FAMILY_ID = TE_TA_SOUND_CHANGE_FAMILY_ID;
 
@@ -31,49 +31,6 @@ function reviewForecastRows(forecast) {
     ['Tomorrow', forecast?.tomorrow || 0],
     ['Week', forecast?.week || 0],
   ];
-}
-
-function formFamilyStrengthRows(state = {}) {
-  return FORM_GROUPS.map((family) => {
-    const typeIds = new Set(family.typeIds || []);
-    let correct = 0;
-    let incorrect = 0;
-    for (const [cardId, card] of Object.entries(state.cards || {})) {
-      if (!typeIds.has(typeIdFromCardId(cardId))) continue;
-      correct += card?.correct || 0;
-      incorrect += card?.incorrect || 0;
-    }
-    const mistakeCount = (state.mistakes || []).filter(
-      (mistake) => !mistake.resolved && typeIds.has(mistake.type),
-    ).length;
-    const attempted = correct + incorrect;
-    const accuracy = attempted ? Math.round((correct / attempted) * 100) : 0;
-    const status =
-      attempted >= 3 && accuracy >= 85
-        ? 'strong'
-        : attempted > 0 && (accuracy < 60 || mistakeCount > 0)
-          ? 'weak'
-          : attempted > 0
-            ? 'developing'
-            : 'new';
-    return {
-      ...family,
-      attempted,
-      correct,
-      incorrect,
-      accuracy,
-      mistakeCount,
-      status,
-      sortScore:
-        status === 'weak'
-          ? -1000 - mistakeCount * 50 + accuracy
-          : status === 'new'
-            ? 500
-            : status === 'developing'
-              ? 100 + accuracy
-              : 1000 + accuracy,
-    };
-  }).sort((a, b) => a.sortScore - b.sortScore || a.label.localeCompare(b.label));
 }
 
 function statTile(label, value) {
@@ -115,8 +72,7 @@ export function StatsDashboard({
   const practiceTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
   const recommendations = state.reviewScope?.recommendations || [];
   const mistakeHistoryCount = (state.mistakes || []).length;
-  const strengthRows = formFamilyStrengthRows(state);
-  const totalPracticed = strengthRows.reduce((sum, row) => sum + (row.attempted || 0), 0);
+  const { rows: strengthRows, totalPracticed } = buildFormFamilyProgress(state);
   const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
   const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
   const readinessById = new Map(readinessFamilies.map((row) => [row.id, row]));

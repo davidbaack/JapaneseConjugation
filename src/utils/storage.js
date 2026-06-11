@@ -586,13 +586,36 @@ export function mergeSyncPayload(localPayload, cloudPayload) {
 
 // Merge two SRS card maps: for each card key, keep the card with more reps;
 // break ties by taking the later nextReview.
+function mergeCardSourceTypeStats(local = {}, cloud = {}) {
+  const merged = {};
+  for (const typeId of new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})])) {
+    const left = local?.[typeId] || {};
+    const right = cloud?.[typeId] || {};
+    const correct = maxNum(left.correct, right.correct);
+    const incorrect = maxNum(left.incorrect, right.incorrect);
+    const lastAt = maxNum(left.lastAt, right.lastAt);
+    if (correct || incorrect || lastAt) {
+      merged[typeId] = {
+        correct,
+        incorrect,
+        lastAt: lastAt || null,
+      };
+    }
+  }
+  return merged;
+}
+
 export function mergeCards(local = {}, cloud = {}) {
   const merged = { ...cloud };
   for (const key of Object.keys(local)) {
     const lc = local[key],
       cc = cloud[key];
+    const sourceTypeStats = mergeCardSourceTypeStats(lc?.sourceTypeStats, cc?.sourceTypeStats);
+    const hasSourceTypeStats = Object.keys(sourceTypeStats).length > 0;
     if (!cc || lc.reps > cc.reps || (lc.reps === cc.reps && lc.nextReview > cc.nextReview)) {
-      merged[key] = lc;
+      merged[key] = hasSourceTypeStats ? { ...lc, sourceTypeStats } : lc;
+    } else if (hasSourceTypeStats) {
+      merged[key] = { ...cc, sourceTypeStats };
     }
   }
   return merged;
