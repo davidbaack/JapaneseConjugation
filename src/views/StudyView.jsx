@@ -1895,15 +1895,11 @@ export function ReviewsDashboard({
   onDrillRush,
 }) {
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
-  const dueDone = srsQueue?.completedDueRuleIds?.length || 0;
-  const dashboardDue = todayPlan?.sourceCounts?.due || dueTotal;
   const practiceTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
-  const progressPct = dueTotal ? Math.min(100, Math.round((dueDone / dueTotal) * 100)) : 100;
-  const progressNow = dueTotal ? dueDone : 1;
-  const progressMax = dueTotal || 1;
   const recommendations = state.reviewScope?.recommendations || [];
   const mistakeHistoryCount = (state.mistakes || []).length;
   const strengthRows = formFamilyStrengthRows(state);
+  const totalPracticed = strengthRows.reduce((sum, row) => sum + (row.attempted || 0), 0);
   const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
   const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
   const readinessById = new Map(readinessFamilies.map((row) => [row.id, row]));
@@ -1984,7 +1980,7 @@ export function ReviewsDashboard({
             {hasHistory && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {[
-                  ['Ready now', dashboardDue],
+                  ['Practiced', totalPracticed],
                   ['Today', `${daily.count || 0} cards`],
                   ['Recent misses', weakCount],
                 ].map(([label, value]) => (
@@ -2004,37 +2000,23 @@ export function ReviewsDashboard({
             )}
           </div>
           <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/20">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                  Continuous Practice
-                </div>
-                <div className="mt-1 text-sm text-stone-600 dark:text-stone-300">
-                  {dueTotal ? `${dueDone}/${dueTotal} ready cards practiced` : 'Practice is ready'}
-                </div>
-                {!!practiceTypeCount && (
-                  <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 text-xs dark:border-indigo-900/60 dark:bg-stone-950/30">
-                    <span className="font-medium text-stone-600 dark:text-stone-300">
-                      Form types selected
-                    </span>
-                    <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                      {practiceTypeCount}
-                    </span>
-                  </div>
-                )}
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                Continuous Practice
               </div>
-              <div className="text-xl font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                {progressPct}%
+              <div className="mt-1 text-sm text-stone-600 dark:text-stone-300">
+                {daily.count ? `${daily.count} practiced today` : 'Practice is ready'}
               </div>
-            </div>
-            <div
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={progressMax}
-              aria-valuenow={progressNow}
-              className="mt-3 h-2 overflow-hidden rounded-full bg-white dark:bg-stone-800"
-            >
-              <span className="block h-full bg-indigo-600" style={{ width: `${progressPct}%` }} />
+              {!!practiceTypeCount && (
+                <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 text-xs dark:border-indigo-900/60 dark:bg-stone-950/30">
+                  <span className="font-medium text-stone-600 dark:text-stone-300">
+                    Form types selected
+                  </span>
+                  <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
+                    {practiceTypeCount}
+                  </span>
+                </div>
+              )}
             </div>
             <button
               type="button"
