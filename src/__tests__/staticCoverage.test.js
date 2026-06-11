@@ -73,15 +73,12 @@ describe('static coverage configuration', () => {
     );
   });
 
-  it('allows every browser API origin used by visible import features', () => {
+  it('keeps browser API origins limited to current visible features', () => {
     const html = readRepoText('index.html');
-    const wanikani = readRepoText('src/utils/wanikani.js');
-    const wanikaniBase = wanikani.match(/WANIKANI_API_BASE = '([^']+)'/)?.[1];
-    expect(wanikaniBase).toBeTruthy();
 
     const connectSrc = html.match(/connect-src ([^;"]+)/)?.[1] || '';
     expect(connectSrc).toContain('https://*.supabase.co');
-    expect(connectSrc).toContain(new URL(wanikaniBase).origin);
+    expect(connectSrc).not.toContain('api.wanikani.com');
   });
 
   it('keeps the Gemini proxy fail-closed unless public origins are explicit', () => {

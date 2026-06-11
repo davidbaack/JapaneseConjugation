@@ -84,9 +84,8 @@ word-level targeted Practice outside the main Practice loop.
 - **Words** removes or restores words from automatic Practice, shows excluded
   counts, searches the word inventory, and can launch "Practice now" for a
   selected word.
-- **Lists** manages study lists, built-in packs, WaniKani imports, Gemini-built
-  list suggestions, favorites, weak-form lists, CSV/TSV bulk import, vocab CSV
-  export, and Anki TSV export.
+- **Lists** manages study lists, built-in packs, Gemini-built list suggestions,
+  favorites, and weak-form lists as internal drill scopes.
 - **Custom words** adds and manages custom verbs and adjectives, including
   optional Gemini lookup/suggestion support when AI is configured.
 

@@ -1,81 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { IconCloud, IconPlus, IconSpark } from '../components/Icons.jsx';
+import { IconPlus, IconSpark } from '../components/Icons.jsx';
 import { searchWords } from './ReferenceViewSub.jsx';
-import {
-  isAdjective,
-  wordKey,
-  normalizeJlptLevel,
-  getWordMeta,
-  compatibleTypes,
-  conjugateItem,
-  surfaceFormFor,
-} from '../utils/conjugator.js';
-import { explainItem, GROUP_NAMES } from '../utils/conjugatorExplain.js';
-import { toHiragana, isAllKana } from '../utils/romaji.js';
-import {
-  callGemini,
-  aiSystemFromPrefs,
-  normalizeGroup,
-  parseScannerAIWords,
-} from '../utils/gemini.js';
+import { isAdjective, wordKey, normalizeJlptLevel, getWordMeta } from '../utils/conjugator.js';
+import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
+import { callGemini, aiSystemFromPrefs, parseScannerAIWords } from '../utils/gemini.js';
 import { VOCAB_PACKS, AI_LIST_TARGETS } from '../data/vocabPacks.js';
-import {
-  buildWanikaniImport,
-  getWanikaniScope,
-  WANIKANI_IMPORT_SCOPES,
-  wanikaniListId,
-} from '../utils/wanikani.js';
-
-// Helper functions for CSV/TSV export and imports
-export function parseWordRows(text) {
-  const parseLessonList = (value) =>
-    [
-      ...new Set(
-        String(value || '')
-          .split(/[;|/]/)
-          .map(Number)
-          .filter((n) => Number.isInteger(n) && n > 0),
-      ),
-    ].sort((a, b) => a - b);
-
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const cols = line
-        .split(/\t|,/)
-        .map((c) => c.trim())
-        .filter(Boolean);
-      if (cols.length < 4) return null;
-      const groupText = cols[3].toLowerCase();
-      const group =
-        normalizeGroup(cols[3]) ||
-        (groupText.includes('i-adjective') || groupText.includes('i-adj') || cols[3].includes('い')
-          ? 'i-adjective'
-          : groupText.includes('na-adjective') ||
-              groupText.includes('na-adj') ||
-              cols[3].includes('な')
-            ? 'na-adjective'
-            : null);
-      if (!group) return null;
-      const reading = toHiragana(cols[1]);
-      if (!isAllKana(reading)) return null;
-      const jlpt = normalizeJlptLevel(cols[5] || cols[4]);
-      const lessons = parseLessonList(cols[6]);
-      const minnaLessons = parseLessonList(cols[7]);
-      return {
-        dict: cols[0],
-        reading,
-        meaning: cols[2],
-        group,
-        ...(jlpt ? { jlpt } : {}),
-        ...(lessons.length ? { lessons, lesson: lessons[0] } : {}),
-        ...(minnaLessons.length ? { minnaLessons, minnaLesson: minnaLessons[0] } : {}),
-      };
-    })
-    .filter(Boolean);
-}
 
 export function addUniqueWord(list, word) {
   return list.some((w) => w.dict === word.dict && w.group === word.group) ? list : [...list, word];
@@ -83,121 +12,10 @@ export function addUniqueWord(list, word) {
 
 const LEVEL_ORDER = ['N5', 'N4', 'N3', 'N2', 'N1'];
 
-export function sanitizeExportName(name = 'katachiya') {
-  return (
-    String(name || 'katachiya')
-      .normalize('NFKC')
-      .replace(/[\\/:*?"<>|]+/g, '-')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 64) || 'katachiya'
-  );
-}
-
-function csvCell(value) {
-  const s = String(value ?? '');
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-function tsvCell(value) {
-  return String(value ?? '')
-    .replace(/\r?\n/g, ' ')
-    .replace(/\t/g, ' ')
-    .trim();
-}
-
-function ankiTag(value) {
-  return (
-    sanitizeExportName(value)
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, '_') || 'katachiya'
-  );
-}
-
 export function wordsForList(list, words) {
   if (!list) return [];
   const byKey = new Map(words.map((w) => [wordKey(w), w]));
   return (list.wordKeys || []).map((k) => byKey.get(k)).filter(Boolean);
-}
-
-export function buildVocabularyCsv(list, words) {
-  const rows = [
-    [
-      'dictionary',
-      'reading',
-      'meaning',
-      'group',
-      'kind',
-      'jlpt',
-      'genki_lesson',
-      'minna_lesson',
-      'list',
-    ],
-  ];
-  for (const word of wordsForList(list, words)) {
-    const meta = getWordMeta(word);
-    rows.push([
-      word.dict,
-      word.reading,
-      word.meaning,
-      word.group,
-      isAdjective(word) ? 'adjective' : 'verb',
-      meta.jlpt || '',
-      meta.lessons?.length ? meta.lessons.join(';') : meta.lesson || '',
-      meta.minnaLessons?.length ? meta.minnaLessons.join(';') : meta.minnaLesson || '',
-      list.name || 'Study list',
-    ]);
-  }
-  return rows.map((row) => row.map(csvCell).join(',')).join('\n') + '\n';
-}
-
-export function buildConjugationAnkiTsv(list, words) {
-  const name = list?.name || 'Study list';
-  const rows = [
-    '#separator:Tab',
-    '#html:false',
-    `#deck:Katachiya::${tsvCell(name)}`,
-    `#tags:katachiya ${ankiTag(name)}`,
-    ['Prompt', 'Answer', 'Base', 'Reading', 'Meaning', 'Group', 'Form', 'Rule', 'Tags'].join('\t'),
-  ];
-  for (const word of wordsForList(list, words)) {
-    for (const type of compatibleTypes(word)) {
-      const answer = surfaceFormFor(word, type.id) || conjugateItem(word, type.id);
-      if (!answer) continue;
-      const explanation = explainItem(word, type.id);
-      const prompt = `Conjugate ${word.dict} (${word.reading}) to ${type.label}.`;
-      const tags = `katachiya ${ankiTag(name)} ${ankiTag(word.group)} ${ankiTag(type.id)}`;
-      rows.push(
-        [
-          prompt,
-          answer,
-          word.dict,
-          word.reading,
-          word.meaning,
-          GROUP_NAMES[word.group] || word.group,
-          type.label,
-          explanation.rule || '',
-          tags,
-        ]
-          .map(tsvCell)
-          .join('\t'),
-      );
-    }
-  }
-  return rows.join('\n') + '\n';
-}
-
-export function downloadTextFile(filename, text, mime = 'text/plain;charset=utf-8') {
-  const blob = new Blob([text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function ListsViewSub({
@@ -215,7 +33,6 @@ export default function ListsViewSub({
   const [name, setName] = useState('');
   const [activeId, setActiveId] = useState(wordLists[0]?.id || '');
   const [query, setQuery] = useState('');
-  const [importText, setImportText] = useState('');
   const [msg, setMsg] = useState('');
   const [aiTarget, setAiTarget] = useState('N5');
   const [aiTopic, setAiTopic] = useState('daily life');
@@ -223,19 +40,12 @@ export default function ListsViewSub({
   const [aiRows, setAiRows] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiErr, setAiErr] = useState('');
-  const [wkToken, setWkToken] = useState('');
-  const [wkScope, setWkScope] = useState('passed');
-  const [wkLoading, setWkLoading] = useState(false);
-  const [wkErr, setWkErr] = useState('');
-  const [wkSummary, setWkSummary] = useState(null);
   const aiAbortRef = useRef(null);
-  const wkAbortRef = useRef(null);
   const active = wordLists.find((l) => l.id === activeId) || wordLists[0] || null;
 
   useEffect(() => {
     return () => {
       aiAbortRef.current?.abort();
-      wkAbortRef.current?.abort();
     };
   }, []);
 
@@ -246,7 +56,6 @@ export default function ListsViewSub({
 
   const activeKeys = new Set(active?.wordKeys || []);
   const matches = useMemo(() => searchWords(query, words).slice(0, 120), [query, words]);
-  const activeWords = useMemo(() => wordsForList(active, words), [active, words]);
   const resolvedListCounts = useMemo(
     () => new Map(wordLists.map((list) => [list.id, wordsForList(list, words).length])),
     [wordLists, words],
@@ -292,57 +101,6 @@ export default function ListsViewSub({
       ? active.wordKeys.filter((k) => k !== key)
       : [...(active.wordKeys || []), key];
     setWordLists(wordLists.map((l) => (l.id === active.id ? { ...l, wordKeys: next } : l)));
-  }
-
-  function importRows() {
-    if (!active) return;
-    const rows = parseWordRows(importText);
-    if (!rows.length) {
-      setMsg('No valid rows found. Use dict,reading,meaning,group.');
-      return;
-    }
-    let verbs = customVerbs,
-      adjs = customAdjectives,
-      keys = new Set(active.wordKeys || []);
-    for (const r of rows) {
-      if (isAdjective(r)) adjs = addUniqueWord(adjs, r);
-      else verbs = addUniqueWord(verbs, r);
-      keys.add(wordKey(r));
-    }
-    setCustomVerbs(verbs);
-    setCustomAdjectives(adjs);
-    setWordLists(wordLists.map((l) => (l.id === active.id ? { ...l, wordKeys: [...keys] } : l)));
-    setImportText('');
-    setMsg(`Imported ${rows.length} row${rows.length === 1 ? '' : 's'} into ${active.name}.`);
-  }
-
-  function importRowsToList(rows, listId, listName, { enable = false } = {}) {
-    let verbs = customVerbs,
-      adjs = customAdjectives;
-    let nextLists = [...wordLists];
-    const existing = nextLists.find((l) => l.id === listId);
-    const keys = new Set(existing?.wordKeys || []);
-    const existingWordKeys = new Set(words.map(wordKey));
-    for (const row of rows) {
-      const key = wordKey(row);
-      if (!existingWordKeys.has(key)) {
-        if (isAdjective(row)) adjs = addUniqueWord(adjs, row);
-        else verbs = addUniqueWord(verbs, row);
-      }
-      keys.add(key);
-    }
-    const nextList = { id: listId, name: listName, wordKeys: [...keys] };
-    nextLists = existing
-      ? nextLists.map((l) => (l.id === listId ? { ...l, ...nextList } : l))
-      : [...nextLists, nextList];
-
-    setCustomVerbs(verbs);
-    setCustomAdjectives(adjs);
-    setWordLists(nextLists);
-    setActiveId(listId);
-    if (enable && !selectedIds.includes(listId)) {
-      setPracticePrefs({ ...practicePrefs, wordListIds: [...selectedIds, listId] });
-    }
   }
 
   function importPacks(packs) {
@@ -399,51 +157,6 @@ export default function ListsViewSub({
     const ids = new Set(packs.map((p) => 'pack-' + p.id));
     setPracticePrefs({ ...practicePrefs, wordListIds: selectedIds.filter((x) => !ids.has(x)) });
     setMsg(`Disabled ${packs.length} ${level} pack${packs.length === 1 ? '' : 's'}. Lists kept.`);
-  }
-
-  async function importWaniKani() {
-    if (wkLoading) {
-      wkAbortRef.current?.abort();
-      wkAbortRef.current = null;
-      setWkLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    wkAbortRef.current = controller;
-    setWkLoading(true);
-    setWkErr('');
-    setWkSummary(null);
-    setMsg('');
-    try {
-      const result = await buildWanikaniImport(wkToken, wkScope, { signal: controller.signal });
-      if (controller.signal.aborted) return;
-      if (!result.words.length) {
-        setWkErr(
-          `No conjugatable verbs or adjectives found. Skipped ${result.skipped} unsupported item${
-            result.skipped === 1 ? '' : 's'
-          }.`,
-        );
-        return;
-      }
-      const scope = getWanikaniScope(wkScope);
-      const listId = wanikaniListId(scope.id);
-      importRowsToList(result.words, listId, scope.listName, { enable: true });
-      setWkSummary(result);
-      setMsg(
-        `Imported ${result.words.length} WaniKani word${
-          result.words.length === 1 ? '' : 's'
-        } into ${scope.listName} and enabled it for drills.`,
-      );
-    } catch (e) {
-      if (e?.name === 'AbortError') {
-        setMsg('WaniKani import canceled.');
-      } else {
-        setWkErr(e.message || 'WaniKani import failed.');
-      }
-    } finally {
-      if (wkAbortRef.current === controller) wkAbortRef.current = null;
-      setWkLoading(false);
-    }
   }
 
   async function generateAIList() {
@@ -521,40 +234,6 @@ export default function ListsViewSub({
       `Added ${aiRows.length} AI word${aiRows.length === 1 ? '' : 's'} to ${listName} and enabled it for drills.`,
     );
     setAiRows([]);
-  }
-
-  function exportVocabulary() {
-    if (!active || !activeWords.length) {
-      setMsg('Choose a list with words before exporting.');
-      return;
-    }
-    downloadTextFile(
-      `katachiya-${sanitizeExportName(active.name)}-vocab.csv`,
-      buildVocabularyCsv(active, words),
-      'text/csv;charset=utf-8',
-    );
-    setMsg(
-      `Exported ${activeWords.length} vocab row${activeWords.length === 1 ? '' : 's'} from ${active.name}.`,
-    );
-  }
-
-  function exportAnki() {
-    if (!active || !activeWords.length) {
-      setMsg('Choose a list with words before exporting.');
-      return;
-    }
-    const cardCount = activeWords.reduce(
-      (sum, w) => sum + compatibleTypes(w).filter((t) => !!conjugateItem(w, t.id)).length,
-      0,
-    );
-    downloadTextFile(
-      `katachiya-${sanitizeExportName(active.name)}-anki.txt`,
-      buildConjugationAnkiTsv(active, words),
-      'text/plain;charset=utf-8',
-    );
-    setMsg(
-      `Exported ${cardCount} Anki drill row${cardCount === 1 ? '' : 's'} from ${active.name}.`,
-    );
   }
 
   return (
@@ -701,91 +380,6 @@ export default function ListsViewSub({
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <h3 className="font-medium flex items-center gap-2 text-stone-800 dark:text-stone-200">
-                <IconCloud className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-                WaniKani import
-              </h3>
-              <p className="text-xs text-stone-500">
-                Bring over conjugatable verbs and adjectives from your WaniKani progress.
-              </p>
-            </div>
-            <button
-              onClick={importWaniKani}
-              disabled={!wkLoading && !wkToken.trim()}
-              aria-label="Import WaniKani words"
-              className="px-3 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-xl font-medium text-sm"
-            >
-              {wkLoading ? 'Cancel' : 'Import'}
-            </button>
-          </div>
-          <div className="grid md:grid-cols-[1fr_180px] gap-3">
-            <div>
-              <label className="text-xs text-stone-500 block mb-1">API token</label>
-              <input
-                type="password"
-                value={wkToken}
-                onChange={(e) => {
-                  setWkToken(e.target.value);
-                  setWkErr('');
-                  setWkSummary(null);
-                }}
-                placeholder="WaniKani v2 token"
-                aria-label="WaniKani API token"
-                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-sky-500 focus:outline-none"
-                autoCorrect="off"
-                spellCheck="false"
-              />
-              <div className="mt-1 text-[11px] text-stone-400">Held only in this tab.</div>
-            </div>
-            <div>
-              <label className="text-xs text-stone-500 block mb-1">Scope</label>
-              <select
-                value={wkScope}
-                onChange={(e) => {
-                  setWkScope(e.target.value);
-                  setWkErr('');
-                  setWkSummary(null);
-                }}
-                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-sky-500 focus:outline-none"
-              >
-                {WANIKANI_IMPORT_SCOPES.map((scope) => (
-                  <option key={scope.id} value={scope.id}>
-                    {scope.label}
-                  </option>
-                ))}
-              </select>
-              <div className="mt-1 text-[11px] text-stone-400">
-                {getWanikaniScope(wkScope).description}
-              </div>
-            </div>
-          </div>
-          {wkErr && <div className="mt-2 text-sm text-rose-600">{wkErr}</div>}
-          {wkSummary && (
-            <div className="mt-3 grid sm:grid-cols-3 gap-2 text-xs">
-              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2">
-                <div className="text-stone-400">Matched</div>
-                <div className="font-medium text-stone-800 dark:text-stone-200">
-                  {wkSummary.assignments}
-                </div>
-              </div>
-              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2">
-                <div className="text-stone-400">Imported</div>
-                <div className="font-medium text-stone-800 dark:text-stone-200">
-                  {wkSummary.words.length}
-                </div>
-              </div>
-              <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2">
-                <div className="text-stone-400">Skipped</div>
-                <div className="font-medium text-stone-800 dark:text-stone-200">
-                  {wkSummary.skipped}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <h3 className="font-medium flex items-center gap-2 text-stone-800 dark:text-stone-200">
                 <IconSpark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 AI list builder
               </h3>
@@ -907,6 +501,9 @@ export default function ListsViewSub({
               </button>
             )}
           </div>
+          <div role="status" aria-live="polite">
+            {msg && <div className="mt-2 text-sm text-stone-605 dark:text-stone-350">{msg}</div>}
+          </div>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -942,65 +539,6 @@ export default function ListsViewSub({
               </button>
             ))}
           </div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <h3 className="font-medium text-stone-800 dark:text-stone-200">Export active list</h3>
-              <p className="text-xs text-stone-500">
-                {active
-                  ? `${activeWords.length} resolved word${activeWords.length === 1 ? '' : 's'}`
-                  : 'No list selected'}
-              </p>
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-2">
-            <button
-              onClick={exportAnki}
-              disabled={!activeWords.length}
-              className="px-3 py-2 bg-stone-800 dark:bg-stone-700 hover:bg-stone-900 disabled:opacity-40 text-white rounded-xl font-medium text-sm"
-            >
-              Anki TSV
-            </button>
-            <button
-              onClick={exportVocabulary}
-              disabled={!activeWords.length}
-              className="px-3 py-2 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-950 disabled:opacity-40 rounded-xl font-medium text-sm"
-            >
-              Vocab CSV
-            </button>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-          <h3 className="font-medium mb-1 text-stone-800 dark:text-stone-200">
-            Bulk import into list
-          </h3>
-          <p className="text-xs text-stone-500 mb-3">
-            Paste CSV/TSV rows: dictionary, reading, meaning, group, optional JLPT, Genki lesson,
-            Minna lesson.
-          </p>
-          <textarea
-            value={importText}
-            onChange={(e) => {
-              setImportText(e.target.value);
-              setMsg('');
-            }}
-            placeholder={'始める,はじめる,to begin,ichidan\n有名,ゆうめい,famous,na-adjective'}
-            aria-label="Paste CSV or TSV rows to bulk import"
-            className="w-full h-28 px-3 py-2 text-sm font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
-            autoCorrect="off"
-            spellCheck="false"
-          />
-          <div role="status" aria-live="polite">
-            {msg && <div className="mt-2 text-sm text-stone-605 dark:text-stone-350">{msg}</div>}
-          </div>
-          <button
-            onClick={importRows}
-            disabled={!active || !importText.trim()}
-            className="w-full mt-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium"
-          >
-            Import rows
-          </button>
         </div>
       </div>
     </div>
