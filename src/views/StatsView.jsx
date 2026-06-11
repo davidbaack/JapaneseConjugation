@@ -112,12 +112,11 @@ export function StatsDashboard({
   onOpenGuide,
 }) {
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
-  const dueDone = srsQueue?.completedDueRuleIds?.length || 0;
-  const dashboardDue = todayPlan?.sourceCounts?.due || dueTotal;
   const practiceTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
   const recommendations = state.reviewScope?.recommendations || [];
   const mistakeHistoryCount = (state.mistakes || []).length;
   const strengthRows = formFamilyStrengthRows(state);
+  const totalPracticed = strengthRows.reduce((sum, row) => sum + (row.attempted || 0), 0);
   const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
   const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
   const readinessById = new Map(readinessFamilies.map((row) => [row.id, row]));
@@ -200,7 +199,7 @@ export function StatsDashboard({
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               {[
-                ['Ready now', dashboardDue],
+                ['Practiced', totalPracticed],
                 ['Today', `${daily.count || 0} cards`],
                 ['Recent misses', weakCount],
               ].map(([label, value]) => statTile(label, value))}
@@ -211,12 +210,6 @@ export function StatsDashboard({
               Practice scope
             </div>
             <div className="mt-2 grid gap-2 text-sm text-stone-700 dark:text-stone-200">
-              <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 dark:border-indigo-900/60 dark:bg-stone-950/30">
-                <span>Ready cards practiced</span>
-                <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                  {dueDone}/{dueTotal || dashboardDue || 0}
-                </span>
-              </div>
               <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 dark:border-indigo-900/60 dark:bg-stone-950/30">
                 <span>Form types selected</span>
                 <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
