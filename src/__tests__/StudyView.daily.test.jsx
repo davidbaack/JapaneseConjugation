@@ -8,6 +8,7 @@ import { conjugateItem, wordKey } from '../utils/conjugator.js';
 import { englishForForm } from '../utils/display.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
 import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
+import { buildReadinessFamilyRows } from '../utils/readiness.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
 let originalScrollIntoView;
@@ -137,7 +138,7 @@ function todayListFor(word) {
   };
 }
 
-function persistStudyCard(word, type) {
+function persistStudyCard(word, type, options = {}) {
   sessionStorage.setItem(
     'jp-study-current',
     JSON.stringify({
@@ -146,6 +147,7 @@ function persistStudyCard(word, type) {
       meaning: word.meaning,
       group: word.group,
       type,
+      sourceType: options.sourceType || null,
       word,
     }),
   );
@@ -805,6 +807,63 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.queryByRole('status', { name: 'Kana preview' })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Live kana help' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
+  });
+
+  it('credits reading practice to the source form without changing the dictionary SRS card', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const sourceType = 'plain-past';
+    const dictionaryCardId = cardIdFor(target, 'dictionary');
+    const sourceCardId = cardIdFor(target, sourceType);
+    persistStudyCard(target, 'dictionary', { sourceType });
+
+    mockedApp.value = makeApp({
+      setState,
+      state: { ...defaultState(), enabledTypes: [sourceType] },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        reviewStyle: 'reading',
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(
+      /Type dictionary form/i,
+      {},
+      { timeout: 5000 },
+    );
+    fireEvent.change(input, { target: { value: target.reading } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+
+    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    const nextState = setState.mock.calls
+      .map(([arg]) => arg)
+      .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
+
+    expect(nextState).toBeTruthy();
+    expect(nextState.daily.count).toBe(1);
+    expect(nextState.cards[dictionaryCardId]).toMatchObject({
+      correct: 1,
+      incorrect: 0,
+      sourceTypeStats: {
+        [sourceType]: { correct: 1, incorrect: 0 },
+      },
+    });
+    expect(nextState.cards[sourceCardId]).toBeUndefined();
+    expect(nextState.readiness.byRule[sourceCardId].recognition).toMatchObject({
+      attempted: 1,
+      correct: 1,
+    });
+    expect(nextState.weakness.byLane[`${sourceType}|ichidan`]).toMatchObject({
+      attempted: 1,
+      correct: 1,
+    });
+
+    const readinessRows = buildReadinessFamilyRows(nextState);
+    const sourceFamily = readinessRows.find((row) => (row.typeIds || []).includes(sourceType));
+    expect(sourceFamily.cells.recognition.attempted).toBe(1);
   });
 
   it('keeps continuous Practice status even when old Today drill prefs are present', async () => {
