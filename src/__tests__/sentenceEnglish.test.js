@@ -29,6 +29,13 @@ describe('sentenceEnglish', () => {
     expect(sentenceEnglish(VERB, 'plain-negative')).toBe('I also do not buy today.');
   });
 
+  it('conjugates the head verb of phrasal and irregular meanings', () => {
+    const kaeru = { dict: '帰る', reading: 'かえる', meaning: 'to return home', group: 'godan' };
+    const taoreru = { dict: '倒れる', reading: 'たおれる', meaning: 'to fall', group: 'ichidan' };
+    expect(sentenceEnglish(kaeru, 'plain-past')).toBe('I also returned home today.');
+    expect(sentenceEnglish(taoreru, 'plain-past')).toBe('I also fell today.');
+  });
+
   it('writes natural English for advanced verb templates', () => {
     expect(sentenceEnglish(VERB, 'potential')).toBe('I can also buy today.');
     expect(sentenceEnglish(VERB, 'passive-past')).toBe('It was bought by a friend today.');

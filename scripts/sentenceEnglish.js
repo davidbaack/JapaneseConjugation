@@ -7,90 +7,15 @@ import { join } from 'node:path';
 import { inflateVerbRows, mergeBuiltInWords } from '../src/data/verbLexicon.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../src/data/starterWords.js';
 import { isAdjective, wordKey } from '../src/utils/conjugator.js';
-import { cleanEnglishAction, gerund, pastParticiple, thirdPerson } from '../src/utils/display.js';
+import {
+  cleanEnglishAction,
+  gerund,
+  pastParticiple,
+  simplePast,
+  thirdPerson,
+} from '../src/utils/display.js';
 
 const LEXICON_PATH = join('public', 'data', 'verb-lexicon.json');
-
-const SIMPLE_PAST = {
-  be: 'was',
-  become: 'became',
-  begin: 'began',
-  break: 'broke',
-  build: 'built',
-  buy: 'bought',
-  catch: 'caught',
-  choose: 'chose',
-  come: 'came',
-  cut: 'cut',
-  do: 'did',
-  drink: 'drank',
-  drive: 'drove',
-  eat: 'ate',
-  fall: 'fell',
-  feel: 'felt',
-  find: 'found',
-  forget: 'forgot',
-  get: 'got',
-  'get off': 'got off',
-  go: 'went',
-  have: 'had',
-  hold: 'held',
-  hurt: 'hurt',
-  keep: 'kept',
-  leave: 'left',
-  lend: 'lent',
-  let: 'let',
-  lose: 'lost',
-  make: 'made',
-  meet: 'met',
-  pay: 'paid',
-  put: 'put',
-  read: 'read',
-  ride: 'rode',
-  rise: 'rose',
-  run: 'ran',
-  say: 'said',
-  see: 'saw',
-  send: 'sent',
-  sell: 'sold',
-  set: 'set',
-  sing: 'sang',
-  sit: 'sat',
-  sleep: 'slept',
-  speak: 'spoke',
-  spread: 'spread',
-  stand: 'stood',
-  swear: 'swore',
-  swim: 'swam',
-  take: 'took',
-  teach: 'taught',
-  tell: 'told',
-  think: 'thought',
-  understand: 'understood',
-  wear: 'wore',
-  win: 'won',
-  write: 'wrote',
-};
-
-const PAST_PARTICIPLE = {
-  become: 'become',
-  build: 'built',
-  catch: 'caught',
-  cut: 'cut',
-  feel: 'felt',
-  find: 'found',
-  hurt: 'hurt',
-  keep: 'kept',
-  let: 'let',
-  pay: 'paid',
-  put: 'put',
-  sell: 'sold',
-  set: 'set',
-  spread: 'spread',
-  swear: 'sworn',
-  tell: 'told',
-  think: 'thought',
-};
 
 const ACTION_OVERRIDES = {
   'be relieved': 'feel relieved',
@@ -196,13 +121,6 @@ export function adjectivePhrase(word) {
   return picked || 'that way';
 }
 
-function verbHead(action) {
-  const [head = '', ...rest] = String(action || '')
-    .split(/\s+/)
-    .filter(Boolean);
-  return { head, rest: rest.join(' ') };
-}
-
 function isBePhrase(action) {
   return action === 'be' || action.startsWith('be ');
 }
@@ -215,39 +133,27 @@ function isStativeAction(action) {
   return STATIVE_ACTIONS.has(action) || isBePhrase(action);
 }
 
-function inflectHead(action, inflect) {
-  const { head, rest } = verbHead(action);
-  if (!head) return action;
-  const inflected = inflect(head);
-  return rest ? `${inflected} ${rest}` : inflected;
-}
-
-function simplePastWord(action) {
-  return SIMPLE_PAST[action] || pastParticiple(action);
-}
-
-function pastParticipleWord(action) {
-  return PAST_PARTICIPLE[action] || pastParticiple(action);
-}
-
+// The English conjugators in display.js inflect the head verb of a phrase and
+// preserve the remainder (e.g. "return home" → "returned home"), so delegate to
+// them and only special-case the copula here.
 function simplePastPhrase(action) {
   if (isBePhrase(action)) return `was ${beComplement(action)}`;
-  return inflectHead(action, simplePastWord);
+  return simplePast(action);
 }
 
 function pastParticiplePhrase(action) {
   if (isBePhrase(action)) return `been ${beComplement(action)}`;
-  return inflectHead(action, pastParticipleWord);
+  return pastParticiple(action);
 }
 
 function gerundPhrase(action) {
   if (isBePhrase(action)) return `being ${beComplement(action)}`;
-  return inflectHead(action, gerund);
+  return gerund(action);
 }
 
 function thirdPersonPhrase(action) {
   if (isBePhrase(action)) return `is ${beComplement(action)}`;
-  return inflectHead(action, thirdPerson);
+  return thirdPerson(action);
 }
 
 function present(action) {
