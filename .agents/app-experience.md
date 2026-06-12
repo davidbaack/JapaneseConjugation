@@ -48,14 +48,14 @@ confirms the new direction, update this document in the same change.
 - Main Practice prompts from the dictionary form only for forward production
   cards. Form-to-form transformations belong in Drills, not the main Practice
   loop.
-- Sentence mode remains an active-card presentation toggle. It uses the bundled
-  offline sentence corpus first, then the shared Supabase sentence table, then
-  deterministic local templates for custom or missing words. Forward production
-  cards show a cued cloze with a blank, reverse cards show the source form in a
-  sentence context while the learner recovers the dictionary form, and listening
-  Sentence cards play the filled sentence as a recognition prompt with text
-  hidden until the learner reveals it. Minimal-pair cards keep their normal
-  prompt.
+- Sentence mode remains an active-card presentation toggle. It uses bundled
+  sentence chunks first when available or cached, then the shared Supabase
+  sentence table, then deterministic local templates for custom, missing, or
+  cold-offline rows. Forward production cards show a cued cloze with a blank,
+  reverse cards show the source form in a sentence context while the learner
+  recovers the dictionary form, and listening Sentence cards play the filled
+  sentence as a recognition prompt with text hidden until the learner reveals
+  it. Minimal-pair cards keep their normal prompt.
 - A targeted "Practice this" launch (a word from Check/Library, a reference
   drill, or a form family) routes straight into the focused cards. It never
   shows the completion summary on arrival, leads with a prominent title banner

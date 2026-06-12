@@ -41,8 +41,8 @@ Active cards support typed answers, multiple choice, self-check, and spoken
 answers; forward production, reading/reverse practice, and automatic mixing;
 inline romaji-to-kana conversion in the text field; live kana help with
 hide/show behavior and Reveal next kana controls; deterministic hints; optional
-sentence-mode context prompts backed by an offline all-form corpus; speech
-playback; and optional Gemini clue/chat support.
+sentence-mode context prompts backed by a bundled all-form corpus with local
+offline fallbacks; speech playback; and optional Gemini clue/chat support.
 
 ### Guide
 
@@ -251,7 +251,9 @@ To self-host cloud sync:
 
 The app is configured for the `/JapaneseConjugation/` base path and uses
 `VitePWA` in `vite.config.js` for install prompts, update prompts, offline asset
-caching, app icons, iOS touch icon support, and navigation fallback.
+caching, app icons, iOS touch icon support, and navigation fallback. Large
+sentence-corpus chunks are runtime-cached on first use instead of precached
+during install.
 Service-worker behavior is configured through VitePWA; do not edit generated
 `dist/` output.
 

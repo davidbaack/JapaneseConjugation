@@ -3,7 +3,7 @@
 // offline Practice sentence prompts. This script is read-only against Supabase.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { join } from 'node:path';
+import { basename, dirname, join, parse, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 
@@ -125,9 +125,22 @@ function manifestJson(chunks, stats) {
   })}\n`;
 }
 
+export function resolveCorpusOutputDir(outDir = DEFAULT_CORPUS_DIR) {
+  const resolved = resolve(outDir);
+  const root = parse(resolved).root;
+  const parent = dirname(resolved);
+  if (resolved === root || parent === root || basename(resolved).toLowerCase() !== 'sentences') {
+    throw new Error(
+      `Unsafe sentence corpus output directory: ${outDir}. The output directory must end with a nested "sentences" folder.`,
+    );
+  }
+  return resolved;
+}
+
 export function writeCorpusFiles(chunks, outDir = DEFAULT_CORPUS_DIR) {
-  const byTypeDir = join(outDir, 'by-type');
-  rmSync(outDir, { recursive: true, force: true });
+  const safeOutDir = resolveCorpusOutputDir(outDir);
+  const byTypeDir = join(safeOutDir, 'by-type');
+  rmSync(safeOutDir, { recursive: true, force: true });
   mkdirSync(byTypeDir, { recursive: true });
 
   let rawBytes = 0;
@@ -141,7 +154,7 @@ export function writeCorpusFiles(chunks, outDir = DEFAULT_CORPUS_DIR) {
 
   const totalRows = chunks.reduce((sum, chunk) => sum + chunk.rows.length, 0);
   const manifest = manifestJson(chunks, { totalRows, rawBytes, gzipBytes });
-  writeFileSync(join(outDir, 'manifest.json'), manifest);
+  writeFileSync(join(safeOutDir, 'manifest.json'), manifest);
   rawBytes += Buffer.byteLength(manifest);
   gzipBytes += gzipSync(manifest).length;
 

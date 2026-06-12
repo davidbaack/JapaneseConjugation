@@ -532,6 +532,7 @@ export default function StudyView({ mode = 'practice' }) {
   const speechRecognitionRef = useRef(null);
   const speechSubmittedRef = useRef(false);
   const speechAutoStartKeyRef = useRef('');
+  const listeningPromptSpokenKeyRef = useRef('');
   const answerComposingRef = useRef(false);
   const minimalPairSetIdRef = useRef(practicePrefs.minimalPairSetId || '');
   const recentCardIdsRef = useRef([]);
@@ -944,6 +945,13 @@ export default function StudyView({ mode = 'practice' }) {
     if (!synth) return;
 
     if (current && phase === 'answering' && listeningPrompt && promptAudioText) {
+      const promptKey =
+        current.id ||
+        `${current.verb?.dict || ''}|${current.verb?.group || ''}|${current.type || ''}|${
+          current.sourceType || ''
+        }`;
+      if (listeningPromptSpokenKeyRef.current === promptKey) return;
+      listeningPromptSpokenKeyRef.current = promptKey;
       speakJapaneseLocal(promptAudioText, 0.85);
     }
     // current?.id used intentionally instead of current to avoid re-triggering on unrelated state changes

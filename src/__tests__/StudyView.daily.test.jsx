@@ -12,11 +12,20 @@ import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js
 import { buildReadinessFamilyRows } from '../utils/readiness.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
+const mockedSpeech = vi.hoisted(() => ({ playPronunciation: vi.fn() }));
 let originalScrollIntoView;
 
 vi.mock('../state/AppStateContext.jsx', () => ({
   useApp: () => mockedApp.value,
 }));
+
+vi.mock('../utils/speech.js', async () => {
+  const actual = await vi.importActual('../utils/speech.js');
+  return {
+    ...actual,
+    playPronunciation: mockedSpeech.playPronunciation,
+  };
+});
 
 import StudyView, { reviewFeedbackActionForRecord } from '../views/StudyView.jsx';
 
@@ -844,6 +853,11 @@ describe('StudyView continuous Practice startup', () => {
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
     const surface = surfaceFormFor(target, type);
+    vi.stubGlobal('speechSynthesis', {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+      speak: vi.fn(),
+    });
     const fetchMock = vi.fn(() =>
       Promise.resolve({
         ok: true,
@@ -880,6 +894,7 @@ describe('StudyView continuous Practice startup', () => {
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(screen.getByText('Sentence listening prompt')).toBeTruthy();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1));
     expect(document.body.textContent).not.toContain(`昼に${surface}。`);
 
     fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
@@ -890,6 +905,7 @@ describe('StudyView continuous Practice startup', () => {
       expect(sentenceCard.textContent).toContain('昼');
       expect(sentenceCard.textContent).toContain(surface);
     });
+    expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1);
   });
 
   it('credits reading practice to the source form without changing the dictionary SRS card', async () => {
