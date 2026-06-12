@@ -627,6 +627,7 @@ export function buildOfflineCuedCloze(word, type) {
 
   return {
     sentence,
+    jaTemplate: sentence.replace(BLANK, '{w}'),
     cue: cueFor(word, type),
     note: rendered.note,
     variantId,
