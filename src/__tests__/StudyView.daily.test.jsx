@@ -1175,6 +1175,36 @@ describe('StudyView continuous Practice startup', () => {
     });
   });
 
+  it('shows prompt pitch while answering and target pitch only after review', async () => {
+    const target = {
+      ...STARTER_VERBS[0],
+      pitchAccent: { accents: [2], source: 'kanjium' },
+    };
+    const type = 'plain-negative';
+    mockedApp.value = makeApp({
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await waitForPracticeCard();
+    expect(screen.getByRole('img', { name: /Pitch accent for \u305f\u3079\u308b/ })).toBeTruthy();
+    expect(
+      screen.queryByRole('img', { name: /Pitch accent for \u305f\u3079\u306a\u3044/ }),
+    ).toBeNull();
+
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    expect(
+      screen.getByRole('img', { name: /Pitch accent for \u305f\u3079\u306a\u3044/ }),
+    ).toBeTruthy();
+  });
+
   it('counts Reveal as missed and resets the current streak', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];

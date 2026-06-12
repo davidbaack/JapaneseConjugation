@@ -272,6 +272,11 @@ part-of-speech/commonness data to avoid guessing whether a row is a supported
 practice word. JLPT vocabulary levels are learner-study estimates; the JLPT
 organizers do not publish a complete official vocabulary list.
 
+Pitch accent data in the generated lexicon uses Kanjium's `accents.txt`, which
+is licensed under Creative Commons Attribution-ShareAlike 4.0 International.
+Kanjium requests attribution for Uros O.'s pitch accent notation and other
+additions to EDICT, KANJIDIC, and KRADFILE.
+
 ## Project Structure
 
 ```text

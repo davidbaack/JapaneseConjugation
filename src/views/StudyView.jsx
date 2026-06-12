@@ -18,6 +18,7 @@ import {
 } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
+import PitchAccentDisplay from '../components/PitchAccentDisplay.jsx';
 import { lessonForType } from '../data/lessonContent.js';
 import { ChatPanel } from '../components/ChatPanel.jsx';
 import { toHiragana, toHiraganaProgress, toKanaInputValue } from '../utils/romaji.js';
@@ -65,6 +66,7 @@ import {
   kanaMatchDisplayForPrefs,
   spokenAnswerResult,
 } from '../utils/display.js';
+import { accentForForm } from '../utils/pitchAccent.js';
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
 import { fetchTailoredSentence } from '../utils/sentenceLibrary.js';
 import {
@@ -395,6 +397,7 @@ function snapshotStudyWord(word) {
     ...(word.lessons ? { lessons: word.lessons } : {}),
     ...(word.minnaLesson ? { minnaLesson: word.minnaLesson } : {}),
     ...(word.minnaLessons ? { minnaLessons: word.minnaLessons } : {}),
+    ...(word.pitchAccent ? { pitchAccent: word.pitchAccent } : {}),
   };
 }
 
@@ -1222,6 +1225,10 @@ export default function StudyView({ mode = 'practice' }) {
       : 0;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishMeaning = englishHintsHidden && phase === 'answering';
+  const promptPitchAccent =
+    phase === 'answering' && !hidePromptText
+      ? accentForForm(current.verb, sourceTypeId, promptSourceForm)
+      : null;
   // Guided kana is now an in-box "reveal next" action, not a separate mode.
   const guidedKana = false;
   const liveKana = typedAnswerMode && !reverseDrill && liveKanaHelpEnabled;
@@ -1390,6 +1397,8 @@ export default function StudyView({ mode = 'practice' }) {
       word: { ...current.verb },
       cardType: current.type,
       practicedType,
+      promptType: sourceTypeId,
+      promptForm: promptSourceForm,
       typeLabel: typeInfo.label || sessionOutcomeLabel(current),
       reverseDrill,
       expected,
@@ -3013,11 +3022,16 @@ export default function StudyView({ mode = 'practice' }) {
                 </div>
               </div>
             ) : (
-              <ScriptDisplay
-                view={promptView}
-                className="text-4xl sm:text-5xl font-medium mb-2 text-stone-900 dark:text-stone-100"
-                subClassName="text-base text-stone-500"
-              />
+              <>
+                <ScriptDisplay
+                  view={promptView}
+                  className="text-4xl sm:text-5xl font-medium mb-2 text-stone-900 dark:text-stone-100"
+                  subClassName="text-base text-stone-500"
+                />
+                {promptPitchAccent && (
+                  <PitchAccentDisplay accent={promptPitchAccent} className="mb-2" />
+                )}
+              </>
             )}
             {noChangePrompt && !hidePromptText && (
               <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium">

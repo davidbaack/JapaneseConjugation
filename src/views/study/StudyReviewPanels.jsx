@@ -9,6 +9,7 @@ import {
   IconX,
 } from '../../components/Icons.jsx';
 import ScriptDisplay from '../../components/ScriptDisplay.jsx';
+import PitchAccentDisplay from '../../components/PitchAccentDisplay.jsx';
 import { ConjugationBreakdown } from '../../components/ConjugationBreakdown.jsx';
 import { ChatPanel } from '../../components/ChatPanel.jsx';
 import { lessonForType } from '../../data/lessonContent.js';
@@ -18,6 +19,7 @@ import { toHiragana } from '../../utils/romaji.js';
 import { getConjugationDebugInfo } from '../../utils/conjugatorExplain.js';
 import { labRouteForMistakePattern } from '../../utils/mistakeDiagnosis.js';
 import { kanaCoachCells } from '../../utils/kanaCoach.js';
+import { accentForForm } from '../../utils/pitchAccent.js';
 
 function ReviewDisclosure({
   tone = 'stone',
@@ -277,6 +279,22 @@ function ReviewFeedbackAction({ action, buttonRef, onClick }) {
   );
 }
 
+function PitchAccentReviewBlock({ promptAccent, targetAccent, tone = 'emerald' }) {
+  if (!targetAccent) return null;
+  const hasShift =
+    promptAccent &&
+    (promptAccent.reading !== targetAccent.reading || promptAccent.accent !== targetAccent.accent);
+  if (!hasShift) {
+    return <PitchAccentDisplay accent={targetAccent} tone={tone} className="mt-2" />;
+  }
+  return (
+    <div className="mt-2 grid gap-2 rounded-xl border border-stone-200 bg-white/70 p-2 dark:border-stone-800 dark:bg-stone-950/40 sm:grid-cols-2">
+      <PitchAccentDisplay accent={promptAccent} label="Prompt" className="w-full" />
+      <PitchAccentDisplay accent={targetAccent} label="Answer" tone={tone} className="w-full" />
+    </div>
+  );
+}
+
 function RunAnswerReveal({
   record,
   geminiKey,
@@ -315,6 +333,14 @@ function RunAnswerReveal({
   const expectedView = record.reverseDrill
     ? promptDisplay(record.word, null, prefs)
     : formDisplay(record.expected, prefs, record.word, record.cardType);
+  const promptAccent = record.promptForm
+    ? accentForForm(record.word, record.promptType, record.promptForm)
+    : null;
+  const targetAccent = accentForForm(
+    record.word,
+    record.practicedType || record.cardType,
+    record.expected,
+  );
   const reviewTypeId = record.practicedType || record.cardType;
   const targetEnglish = record.reverseDrill
     ? englishForForm(record.word, null)
@@ -460,6 +486,7 @@ function RunAnswerReveal({
               <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
                 {targetEnglish}
               </div>
+              <PitchAccentReviewBlock promptAccent={promptAccent} targetAccent={targetAccent} />
               {autoAdvanceHint && (
                 <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-100/80 px-3 py-2 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
                   <span className="relative flex h-5 w-5">
@@ -508,6 +535,10 @@ function RunAnswerReveal({
                     <div className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
                       {targetEnglish}
                     </div>
+                    <PitchAccentReviewBlock
+                      promptAccent={promptAccent}
+                      targetAccent={targetAccent}
+                    />
                   </section>
 
                   <section className={`rounded-xl border p-3 shadow-sm ${missedAnswerPanelClass}`}>
@@ -619,6 +650,7 @@ function RunAnswerReveal({
                   >
                     {record.expected}
                   </div>
+                  <PitchAccentReviewBlock promptAccent={promptAccent} targetAccent={targetAccent} />
                 </div>
                 <div className="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 dark:border-rose-900/60 dark:bg-rose-950/20">
                   <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
