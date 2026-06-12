@@ -27,7 +27,9 @@ const ASSET_DIR = 'dist/assets';
 // measured Supabase-enabled build at ~298 KB gzipped.
 // Bumped 300->310: focused Guide/Learn/Practice follow-up routing and
 // family-introduction surfaces put the measured build at ~305 KB gzipped.
-const TOTAL_GZIP_KB = 310;
+// Bumped 310->315: componentized StudyView practice surfaces put the
+// measured build at ~307 KB gzipped.
+const TOTAL_GZIP_KB = 315;
 const MAX_CHUNK_GZIP_KB = 70;
 
 const KB = 1024;
