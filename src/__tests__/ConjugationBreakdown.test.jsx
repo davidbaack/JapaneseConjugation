@@ -43,15 +43,9 @@ describe('ConjugationBreakdown', () => {
     expect(screen.getByText('Visual Rule Path')).toBeTruthy();
     expect(screen.getByText('1. What category is this and why?')).toBeTruthy();
     expect(screen.getByText('godan / u-verb')).toBeTruthy();
-    expect(screen.getByText(/final dictionary kana く is the moving part/)).toBeTruthy();
-    expect(
-      screen.getByText(/く can move to か \/ き \/ け \/ こ, giving 書かない \/ 書きます/),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        /Te\/past check: 書く uses the く sound-change group, giving 書いて \/ 書いた/,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText(/its final kana く row-shifts/)).toBeTruthy();
+    expect(screen.getByText(/く → か \/ き \/ け \/ こ/)).toBeTruthy();
+    expect(screen.getByText(/書きます shows き, 書かない shows か/)).toBeTruthy();
     expect(screen.getByText(/Watch for る-ending godan verbs too/)).toBeTruthy();
     expect(screen.getByText('2. Step-by-step conjugation rules')).toBeTruthy();
     expect(screen.getByText('From dictionary/plain form')).toBeTruthy();
@@ -87,13 +81,12 @@ describe('ConjugationBreakdown', () => {
     render(<ConjugationBreakdown word={TABERU} type="plain-past" />);
 
     expect(screen.getByText('ichidan / ru-verb')).toBeTruthy();
-    expect(screen.getByText(/final る drops and the stem 食べ stays stable/)).toBeTruthy();
-    expect(screen.getByText(/Masu check: 食べる -> 食べます/)).toBeTruthy();
     expect(
-      screen.getByText(/Negative check: drop る and attach ない, giving 食べない/),
+      screen.getByText(/final る simply drops, and the stem 食べ stays the same/),
     ).toBeTruthy();
+    expect(screen.getByText(/Tell-tale sign: 食べます and 食べない just drop る/)).toBeTruthy();
     expect(
-      screen.getByText(/Te\/past check: attach directly to the same stem, giving 食べて \/ 食べた/),
+      screen.getByText(/Contrast: a る-ending godan verb \(帰る, 入る, 走る\) row-shifts/),
     ).toBeTruthy();
     expect(screen.getByText('食べます -> 食べ -> 食べた')).toBeTruthy();
   });
@@ -102,74 +95,68 @@ describe('ConjugationBreakdown', () => {
     render(<ConjugationBreakdown word={KAERU} type="plain-past" />);
 
     expect(screen.getByText('godan / u-verb')).toBeTruthy();
-    expect(screen.getByText(/帰る ends in る, but it is godan \/ u-verb/)).toBeTruthy();
-    expect(screen.getByText(/final る changes rows instead of disappearing/)).toBeTruthy();
-    expect(screen.getByText(/forms with ら \/ り \/ れ \/ ろ/)).toBeTruthy();
     expect(
-      screen.getByText(
-        /Te\/past check: 帰る uses the う\/つ\/る sound-change group, giving 帰って \/ 帰った/,
-      ),
+      screen.getByText(/帰る ends in る, so it looks like an ichidan \(ru-verb\)/),
     ).toBeTruthy();
-    expect(screen.getByText(/Trap check: final る alone is not enough/)).toBeTruthy();
-    expect(screen.getByText(/帰ります and 帰らない show り \/ ら/)).toBeTruthy();
+    expect(screen.getByText(/the final る does not just drop/)).toBeTruthy();
+    expect(
+      screen.getByText(/shifts to the other sounds in its row \(ら \/ り \/ れ \/ ろ\)/),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/Tell-tale sign: 帰ります and 帰らない keep a り \/ ら sound/),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/Common る-trap verbs to memorize: 帰る, 入る, 走る, and 切る/),
+    ).toBeTruthy();
   });
 
   it('keeps suru and kuru style verbs in one learner-facing irregular bucket', () => {
     render(<ConjugationBreakdown word={BENKYOU} type="plain-past" />);
 
     expect(screen.getByText('irregular')).toBeTruthy();
-    expect(screen.getByText(/belongs in the irregular bucket/)).toBeTruthy();
-    expect(screen.getByText(/does not follow the normal godan or ichidan pattern/)).toBeTruthy();
-    expect(screen.getByText(/勉強する is treated as 勉強 \+ する/)).toBeTruthy();
     expect(
-      screen.getByText(/Common anchors: 勉強しない \/ 勉強します \/ 勉強して \/ 勉強できる/),
+      screen.getByText(/勉強する is in the irregular bucket: it is 勉強 \+ する/),
     ).toBeTruthy();
+    expect(screen.getByText(/the する part does not follow godan or ichidan rules/)).toBeTruthy();
+    expect(screen.getByText(/Recognize it by the する ending/)).toBeTruthy();
+    expect(screen.getByText(/The 勉強 part never changes; only する does/)).toBeTruthy();
 
     cleanup();
     render(<ConjugationBreakdown word={KURU} type="plain-past" />);
 
     expect(screen.getByText('irregular')).toBeTruthy();
-    expect(screen.getByText(/来る changes its root sound by form/)).toBeTruthy();
-    expect(screen.getByText(/same word can use き, こ, or く/)).toBeTruthy();
-    expect(screen.getByText(/Common anchors: 来ます \/ 来ない \/ 来て \/ 来た/)).toBeTruthy();
+    expect(screen.getByText(/its root sound changes \(き \/ こ \/ く\)/)).toBeTruthy();
+    expect(
+      screen.getByText(/Recognize 来る as its own pattern and memorize its forms/),
+    ).toBeTruthy();
   });
 
   it('explains adjective category mechanics with the same concise pattern', () => {
     render(<ConjugationBreakdown word={TAKAI} type="adj-plain-past" />);
 
     expect(screen.getByText('い-adjective')).toBeTruthy();
-    expect(screen.getByText(/高い is an い-adjective/)).toBeTruthy();
-    expect(screen.getByText(/final い is the part that changes/)).toBeTruthy();
+    expect(screen.getByText(/高い is an い-adjective, not a verb/)).toBeTruthy();
+    expect(screen.getByText(/The final い is the part that changes/)).toBeTruthy();
+    expect(screen.getByText(/Tell-tale sign: it ends in い and describes a thing/)).toBeTruthy();
     expect(
-      screen.getByText(
-        /Ending check: い changes into adjective endings, giving 高くない \/ 高かった \/ 高くて/,
-      ),
+      screen.getByText(/Before a noun, the dictionary form stays as-is: 高い \+ noun/),
     ).toBeTruthy();
 
     cleanup();
     render(<ConjugationBreakdown word={SHIZUKA} type="adj-polite-present" />);
 
     expect(screen.getByText('な-adjective')).toBeTruthy();
-    expect(screen.getByText(/base stays mostly unchanged/)).toBeTruthy();
-    expect(
-      screen.getByText(/Predicate check: attach です or だ-style endings, giving 静かです/),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/Negative check: use a copula-style negative, giving 静かではない/),
-    ).toBeTruthy();
-    expect(screen.getByText(/Before a noun, add な: 静かな \+ noun/)).toBeTruthy();
+    expect(screen.getByText(/静か is a な-adjective: the base stays the same/)).toBeTruthy();
+    expect(screen.getByText(/Tell-tale sign: it does not end in a changing い/)).toBeTruthy();
+    expect(screen.getByText(/It takes な before a noun \(静かな \+ noun\)/)).toBeTruthy();
   });
 
   it('explains irregular adjectives and noun category boundaries', () => {
     render(<ConjugationBreakdown word={II} type="adj-plain-negative" />);
 
     expect(screen.getByText('irregular')).toBeTruthy();
-    expect(
-      screen.getByText(/visible いい form is not the stem used by most conjugations/),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/Stem check: use よ before endings, giving よくない \/ よかった \/ よくて/),
-    ).toBeTruthy();
+    expect(screen.getByText(/the visible いい is not the stem most forms use/)).toBeTruthy();
+    expect(screen.getByText(/Recognize いい \(and かっこいい\) as exceptions/)).toBeTruthy();
 
     const nounCategory = getConjugationDebugInfo(GAKUSEI, 'adj-polite-present').category;
 
