@@ -1,9 +1,9 @@
 // @ts-check
 // Validation & sanitization for custom vocabulary input (improvement #16).
 //
-// Custom word fields flow into localStorage, cloud sync, TSV export, and — most
-// importantly — interpolated AI prompts. Unbounded or control-character input
-// could bloat storage, corrupt TSV rows (tabs/newlines), or distort prompts.
+// Custom word fields flow into localStorage, cloud sync, and — most importantly —
+// interpolated AI prompts. Unbounded or control-character input could bloat
+// storage or distort prompts.
 // This module trims, strips control/format characters, enforces length caps,
 // and validates the shape before a word is ever stored.
 
@@ -22,8 +22,8 @@ export const VALID_GROUPS = new Set([
 ]);
 
 // Control chars (C0 + DEL + C1) and zero-width / BOM format characters. These
-// would break TSV export and inject stray content into AI prompts. Built from
-// escape sequences so no raw control bytes live in the source.
+// would inject stray content into AI prompts. Built from escape sequences so no
+// raw control bytes live in the source.
 // eslint-disable-next-line no-control-regex
 const UNSAFE_CHARS = new RegExp('[\\u0000-\\u001F\\u007F-\\u009F\\u200B-\\u200D\\uFEFF]', 'g');
 

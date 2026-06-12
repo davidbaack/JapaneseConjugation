@@ -96,8 +96,11 @@ test.describe('Tab navigation', () => {
     await expect(page.getByRole('button', { name: /Add verb/ })).toBeVisible();
 
     await page.getByRole('tab', { name: /^Lists/ }).click();
+    await expect(page.getByText('Built-in packs')).toBeVisible();
     await expect(page.getByText('AI list builder')).toBeVisible();
-    await expect(page.getByText('WaniKani import')).toBeVisible();
+    await expect(page.getByText('WaniKani import')).toHaveCount(0);
+    await expect(page.getByText('Bulk import into list')).toHaveCount(0);
+    await expect(page.getByText('Export active list')).toHaveCount(0);
   });
 
   test('drills exposes ending, group, and rush exercises', async ({ page }) => {

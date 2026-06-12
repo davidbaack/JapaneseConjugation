@@ -178,7 +178,7 @@ export default function CustomDictionaryViewSub({
   function addManual() {
     setMErr('');
     // Sanitize and validate before storing — fields end up in localStorage,
-    // cloud sync, TSV export, and AI prompts (improvement #16).
+    // cloud sync, and AI prompts (improvement #16).
     const { ok, errors, word } = validateWord(mf);
     if (!ok) {
       setMErr(errors[0]);
