@@ -34,11 +34,7 @@ import {
   surfaceFormFor,
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
-import {
-  explainItem,
-  getOfflineTemplateSentence,
-  stepCoachHint,
-} from '../utils/conjugatorExplain.js';
+import { explainItem, stepCoachHint } from '../utils/conjugatorExplain.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 import {
   selectNext,
@@ -68,7 +64,9 @@ import {
 } from '../utils/display.js';
 import { accentForForm } from '../utils/pitchAccent.js';
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
+import { fetchBundledSentence } from '../utils/sentenceCorpus.js';
 import { fetchTailoredSentence } from '../utils/sentenceLibrary.js';
+import { buildOfflineSentenceEntry, buildSentencePromptModel } from '../utils/sentencePrompt.js';
 import {
   bumpSessionMistakePattern,
   labRouteForMistakePattern,
@@ -132,19 +130,6 @@ const ANSWER_STYLE_OPTIONS = [
   { id: 'self-check', label: 'Self-check' },
   { id: 'speak', label: 'Speak' },
 ];
-
-// Blank shown where the conjugated word goes in a cloze sentence.
-const CLOZE_BLANK = '[______]';
-
-// Convert the database's per-token furigana segments into the { text, ruby }
-// parts that sentenceDisplay/ScriptDisplay render. The placeholder token
-// ({ w: true }) becomes the blank.
-function partsFromSegments(segments) {
-  if (!Array.isArray(segments)) return null;
-  return segments.map((seg) =>
-    seg && seg.w ? { text: CLOZE_BLANK, ruby: '' } : { text: seg?.t || '', ruby: seg?.r || '' },
-  );
-}
 
 function focusWithoutScroll(element) {
   if (!element || typeof window === 'undefined') return;
@@ -657,7 +642,7 @@ export default function StudyView({ mode = 'practice' }) {
         ? conjugateItem(current.verb, promptType)
         : current.verb.reading
     : '';
-  const promptAudioText = current ? promptSourceForm : '';
+  const basePromptAudioText = current ? promptSourceForm : '';
 
   const sessionMistakePatterns = useMemo(
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
@@ -689,60 +674,62 @@ export default function StudyView({ mode = 'practice' }) {
     [bonusMode, wordLists, specialLaunchActive],
   );
   const minimalPairSetForCurrent = activeMinimalPairSet;
-  // Cued cloze: when Sentence mode is on, wrap a normal forward production card
-  // in an example sentence with a blank. Only the Japanese frame + grammar cue
-  // are shown (never the "Fill in: word (reading)" prefix, which would leak the
-  // reading regardless of script settings). Null for reverse/listening/minimal
-  // -pair cards, which keep their normal prompt.
-  const offlineClozePrompt = useMemo(() => {
-    if (!current || !sentenceMode) return null;
-    if (reverseDrill || listeningPrompt || minimalPairSetForCurrent) return null;
+  const sentenceType = current ? (reverseDrill ? sourceTypeForReading : current.type) : '';
+  const sentencePromptEligible =
+    !!current && sentenceMode && !transformationMode && !minimalPairSetForCurrent;
+  // Sentence mode renders immediately from deterministic local templates, then
+  // upgrades to the bundled offline corpus or Supabase row when available.
+  const offlineSentencePrompt = useMemo(() => {
+    if (!sentencePromptEligible) return null;
     try {
-      const built = getOfflineTemplateSentence(current.verb, current.type);
-      return built?.sentence
-        ? { sentence: built.sentence, cue: built.cue, note: built.note, parts: null }
-        : null;
+      const entry = buildOfflineSentenceEntry(current.verb, sentenceType);
+      return buildSentencePromptModel({
+        entry,
+        word: current.verb,
+        type: sentenceType,
+        reverseDrill,
+        listeningPrompt,
+      });
     } catch {
       return null;
     }
-  }, [current, sentenceMode, reverseDrill, listeningPrompt, minimalPairSetForCurrent]);
-  // The offline frame renders instantly; a tailored per-word sentence from the
-  // database (when present) swaps in once it resolves for the current card.
-  const [tailoredCloze, setTailoredCloze] = useState(null);
+  }, [current, sentencePromptEligible, sentenceType, reverseDrill, listeningPrompt]);
+  const [resolvedSentencePrompt, setResolvedSentencePrompt] = useState(null);
   useEffect(() => {
-    setTailoredCloze(null);
-    if (!current || !sentenceMode) return undefined;
-    if (reverseDrill || listeningPrompt || minimalPairSetForCurrent) return undefined;
+    setResolvedSentencePrompt(null);
+    if (!sentencePromptEligible) return undefined;
     let ignore = false;
-    const cue = offlineClozePrompt?.cue || '';
-    fetchTailoredSentence(current.verb, current.type)
-      .then((res) => {
-        if (ignore || !res?.jaTemplate) return;
-        setTailoredCloze({
-          sentence: res.jaTemplate.replace('{w}', CLOZE_BLANK),
-          cue,
-          note: res.en,
-          parts: partsFromSegments(res.segments),
-        });
+    const word = current.verb;
+    const type = sentenceType;
+    fetchBundledSentence(word, type)
+      .then((res) => res || fetchTailoredSentence(word, type))
+      .then((entry) => {
+        if (ignore || !entry?.jaTemplate) return;
+        setResolvedSentencePrompt(
+          buildSentencePromptModel({
+            entry,
+            word,
+            type,
+            reverseDrill,
+            listeningPrompt,
+          }),
+        );
       })
       .catch(() => {});
     return () => {
       ignore = true;
     };
-  }, [
-    current,
-    sentenceMode,
-    reverseDrill,
-    listeningPrompt,
-    minimalPairSetForCurrent,
-    offlineClozePrompt,
-  ]);
-  const clozePrompt = tailoredCloze || offlineClozePrompt;
-  const clozePromptView = useMemo(
+  }, [current, sentencePromptEligible, sentenceType, reverseDrill, listeningPrompt]);
+  const sentencePrompt = resolvedSentencePrompt || offlineSentencePrompt;
+  const sentencePromptView = useMemo(
     () =>
-      clozePrompt ? sentenceDisplay(clozePrompt.sentence, practicePrefs, clozePrompt.parts) : null,
-    [clozePrompt, practicePrefs],
+      sentencePrompt
+        ? sentenceDisplay(sentencePrompt.sentence, practicePrefs, sentencePrompt.parts)
+        : null,
+    [sentencePrompt, practicePrefs],
   );
+  const promptAudioText =
+    listeningPrompt && sentencePrompt?.audioText ? sentencePrompt.audioText : basePromptAudioText;
 
   useLayoutEffect(() => {
     if (!hydrated) return;
@@ -2985,17 +2972,25 @@ export default function StudyView({ mode = 'practice' }) {
                 </span>
               )}
             </div>
-            {clozePrompt && (
-              <div className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
+            {sentencePrompt && !hidePromptText && (
+              <div
+                className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20"
+                data-sentence-mode={sentencePrompt.mode}
+              >
                 <ScriptDisplay
-                  view={clozePromptView}
+                  view={sentencePromptView}
                   className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
                   subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
                   colorHighlight={false}
                 />
-                {!hideEnglishMeaning && clozePrompt.note && (
+                {sentencePrompt.cue && (
+                  <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
+                    {sentencePrompt.cue}
+                  </div>
+                )}
+                {!hideEnglishMeaning && sentencePrompt.note && (
                   <div className="mt-1.5 text-[11px] italic leading-snug text-stone-500 dark:text-stone-400">
-                    {clozePrompt.note}
+                    {sentencePrompt.note}
                   </div>
                 )}
               </div>
@@ -3003,7 +2998,9 @@ export default function StudyView({ mode = 'practice' }) {
             {hidePromptText ? (
               <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
                 <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-3">
-                  Listening prompt
+                  {sentencePrompt?.mode === 'listening-recognition'
+                    ? 'Sentence listening prompt'
+                    : 'Listening prompt'}
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   <button

@@ -41,8 +41,8 @@ Active cards support typed answers, multiple choice, self-check, and spoken
 answers; forward production, reading/reverse practice, and automatic mixing;
 inline romaji-to-kana conversion in the text field; live kana help with
 hide/show behavior and Reveal next kana controls; deterministic hints; optional
-sentence-mode cloze prompts; speech playback; and optional Gemini clue/chat
-support.
+sentence-mode context prompts backed by an offline all-form corpus; speech
+playback; and optional Gemini clue/chat support.
 
 ### Guide
 
@@ -122,8 +122,8 @@ than in global Settings.
 ## Practice Scope And Data
 
 - Starter data: 30 verbs and 25 adjectives.
-- Generated lexicon: 2,161 practiceable words in `public/data/verb-lexicon.json`
-  as of the current tracked build, including 1,374 verbs and 787 adjectives.
+- Generated lexicon: 2,162 practiceable words in `public/data/verb-lexicon.json`
+  as of the current tracked build, including 1,374 verbs and 788 adjectives.
 - Word filters: JLPT N5-N1, 23 Genki lessons, 50 Minna no Nihongo lessons, word
   types, word groups, and custom study lists.
 - Card coverage: 126 selectable card types across 13 form families.
@@ -186,6 +186,7 @@ The deterministic dev page listens at
 | `npm run sentences:batches` | Emit batch files of pending `(word, conjugation)` pairs for the tailored sentence library. See [docs/sentence-library.md](docs/sentence-library.md). |
 | `npm run sentences:english` | Rewrite legacy generated sentence-library outputs with natural English glosses. See [docs/sentence-library.md](docs/sentence-library.md). |
 | `npm run sentences:import` | Validate generated sentences and upsert them to Supabase. See [docs/sentence-library.md](docs/sentence-library.md). |
+| `npm run sentences:export-corpus` | Export the validated Supabase sentence table into chunked offline JSON under `public/data/sentences`. |
 | `npm run size` | Check bundle budget after a build. |
 | `npm run ci:fast` | Run format check, lint, typecheck, and unit tests. |
 | `npm run ci` | Run the full local pipeline: fast CI, E2E, build, and size check. |

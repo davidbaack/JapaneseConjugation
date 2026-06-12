@@ -4,9 +4,10 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
-import { conjugateItem, wordKey } from '../utils/conjugator.js';
+import { conjugateItem, surfaceFormFor, wordKey } from '../utils/conjugator.js';
 import { englishForForm } from '../utils/display.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
+import { clearSentenceCorpusCache } from '../utils/sentenceCorpus.js';
 import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 import { buildReadinessFamilyRows } from '../utils/readiness.js';
 
@@ -216,6 +217,8 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   sessionStorage.clear();
+  clearSentenceCorpusCache();
+  vi.unstubAllGlobals();
   vi.clearAllMocks();
   if (originalScrollIntoView) {
     window.Element.prototype.scrollIntoView = originalScrollIntoView;
@@ -807,6 +810,86 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.queryByRole('status', { name: 'Kana preview' })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Live kana help' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
+  });
+
+  it('shows sentence context for reverse reading practice when Sentence mode is on', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: false })),
+    );
+    const target = STARTER_VERBS[0];
+    const sourceType = 'plain-past';
+    persistStudyCard(target, 'dictionary', { sourceType });
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [sourceType] },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        reviewStyle: 'reading',
+        sentenceMode: true,
+      },
+    });
+
+    render(<StudyView />);
+
+    await screen.findByPlaceholderText(/Type dictionary form/i, {}, { timeout: 5000 });
+    const sentenceCard = document.querySelector('[data-sentence-mode="reverse-context"]');
+    expect(sentenceCard).toBeTruthy();
+    expect(sentenceCard.textContent).toContain(surfaceFormFor(target, sourceType));
+    expect(sentenceCard.textContent).not.toContain('[______]');
+    expect(screen.getByText('Answer with the dictionary form.')).toBeTruthy();
+  });
+
+  it('uses a bundled filled sentence for listening Sentence mode after Show text', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const surface = surfaceFormFor(target, type);
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            schema: 1,
+            type,
+            rows: [
+              [
+                wordKey(target),
+                `昼に{w}。`,
+                'I ate at noon.',
+                [{ t: '昼', r: 'ひる' }, { t: 'に', r: '' }, { w: true }, { t: '。', r: '' }],
+              ],
+            ],
+          }),
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    mockedApp.value = makeApp({
+      studyFocus: {
+        word: target,
+        type,
+      },
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        sentenceMode: true,
+        listeningPrompt: true,
+      },
+    });
+
+    render(<StudyView />);
+
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    expect(screen.getByText('Sentence listening prompt')).toBeTruthy();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(document.body.textContent).not.toContain(`昼に${surface}。`);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
+
+    await waitFor(() => {
+      const sentenceCard = document.querySelector('[data-sentence-mode="listening-recognition"]');
+      expect(sentenceCard).toBeTruthy();
+      expect(sentenceCard.textContent).toContain('昼');
+      expect(sentenceCard.textContent).toContain(surface);
+    });
   });
 
   it('credits reading practice to the source form without changing the dictionary SRS card', async () => {

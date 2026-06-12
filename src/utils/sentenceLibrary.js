@@ -7,9 +7,10 @@
 // recomputed locally from the engine so it stays aligned with what the learner
 // is actually being asked to produce.
 import { supabase } from './supabase.js';
-import { conjugateItem, surfaceFormFor, wordKey } from './conjugator.js';
+import { wordKey } from './conjugator.js';
 import { getAICache, setAICache } from './storage.js';
 import { retryWithBackoff } from './retry.js';
+import { hydrateSentenceValue } from './sentencePrompt.js';
 
 const CACHE_STORE = 'katachiya_ai_sentence_cache';
 
@@ -17,35 +18,12 @@ function cacheKey(word, type) {
   return `${wordKey(word)}|${type}`;
 }
 
-function hydrate(value, word, type) {
-  let surface = '';
-  let kanaSurface = '';
-  try {
-    surface = surfaceFormFor(word, type) || '';
-  } catch {
-    surface = '';
-  }
-  try {
-    kanaSurface = conjugateItem(word, type) || '';
-  } catch {
-    kanaSurface = '';
-  }
-  return {
-    jaTemplate: value.jaTemplate,
-    segments: value.segments,
-    en: value.en,
-    surface,
-    kanaSurface,
-    source: 'db',
-  };
-}
-
 export async function fetchTailoredSentence(word, type) {
   if (!supabase || !word?.dict || !type) return null;
 
   const key = cacheKey(word, type);
   const cached = getAICache(CACHE_STORE, key);
-  if (cached && typeof cached === 'object') return hydrate(cached, word, type);
+  if (cached && typeof cached === 'object') return hydrateSentenceValue(cached, word, type, 'db');
 
   let row;
   try {
@@ -71,5 +49,5 @@ export async function fetchTailoredSentence(word, type) {
 
   const value = { jaTemplate: row.ja_template, segments: row.segments, en: row.en || '' };
   setAICache(CACHE_STORE, key, value);
-  return hydrate(value, word, type);
+  return hydrateSentenceValue(value, word, type, 'db');
 }
