@@ -28,7 +28,7 @@
     "prepare": "node -e \"try{require('child_process').execSync('git config core.hooksPath .githooks')}catch(e){}\""
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.107.0",
+    "@supabase/supabase-js": "^2.108.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
@@ -37,7 +37,7 @@
     "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.0.0",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^25.9.1",
+    "@types/node": "^25.9.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -47,7 +47,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^29.1.1",
     "kuromoji": "^0.1.2",
-    "prettier": "^3.8.3",
+    "prettier": "^3.8.4",
     "tailwindcss": "^4.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
