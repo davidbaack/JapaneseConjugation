@@ -141,4 +141,28 @@ describe('commitLearnerResetPayload', () => {
     expect(saveLocal).not.toHaveBeenCalled();
     expect(applyLocal).not.toHaveBeenCalled();
   });
+
+  it('does not apply local state when a signed-in reset becomes stale after the cloud write', async () => {
+    const payload = buildLearnerResetPayload(populatedParts(), 'factory');
+    const writeCloud = vi.fn(() => Promise.resolve());
+    const shouldCommit = vi.fn(() => false);
+    const saveLocal = vi.fn();
+    const applyLocal = vi.fn();
+
+    const result = await commitLearnerResetPayload({
+      payload,
+      session: { user: { id: 'user-1' } },
+      writeCloud,
+      shouldCommit,
+      saveLocal,
+      applyLocal,
+      now: () => 12345,
+    });
+
+    expect(writeCloud).toHaveBeenCalledWith(payload);
+    expect(shouldCommit).toHaveBeenCalled();
+    expect(saveLocal).not.toHaveBeenCalled();
+    expect(applyLocal).not.toHaveBeenCalled();
+    expect(result).toEqual({ cloud: true, at: null, stale: true });
+  });
 });

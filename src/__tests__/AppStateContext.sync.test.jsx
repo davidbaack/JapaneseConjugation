@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, act } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-library/react';
 
 const { mockSupabase, authCallbacks, cloudFetch, cloudUpsert, loadAll, saveAll, pruneAICache } =
   vi.hoisted(() => ({
@@ -26,6 +26,7 @@ vi.mock('../utils/storage.js', async () => {
 });
 
 import { AppStateProvider, useApp } from '../state/AppStateContext.jsx';
+import { defaultState } from '../utils/storage.js';
 
 const SESSION_A = { user: { id: 'user-a', email: 'a@example.com' } };
 const SESSION_B = { user: { id: 'user-b', email: 'b@example.com' } };
@@ -48,11 +49,14 @@ function cloudRow(cardKey) {
 }
 
 function Probe() {
-  const { state, syncStatus } = useApp();
+  const { state, syncStatus, resetLearnerData } = useApp();
   return (
     <div>
       <output data-testid="cards">{Object.keys(state.cards || {}).join(',')}</output>
       <output data-testid="sync">{syncStatus.message}</output>
+      <button type="button" onClick={() => void resetLearnerData('factory')}>
+        Reset learner
+      </button>
     </div>
   );
 }
@@ -131,5 +135,52 @@ describe('AppStateProvider cloud session races', () => {
     });
 
     await waitFor(() => expect(screen.getByTestId('cards').textContent).toBe('active-b-card'));
+  });
+
+  it('ignores a learner reset that resolves after sign-out', async () => {
+    const initialState = {
+      ...defaultState(),
+      cards: { 'local-card': { reps: 3, correct: 2, incorrect: 1 } },
+    };
+    loadAll.mockReturnValueOnce({
+      state: initialState,
+      customVerbs: [],
+      customAdjectives: [],
+      wordLists: [],
+      practicePrefs: null,
+      lastSyncedAt: 0,
+    });
+    cloudFetch.mockResolvedValue(null);
+    cloudUpsert.mockResolvedValue(undefined);
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('cards').textContent).toBe('local-card'));
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(cloudFetch).toHaveBeenCalledWith('user-a'));
+    await waitFor(() => expect(cloudUpsert).toHaveBeenCalledWith(expect.any(Object), 'user-a'));
+
+    const pendingReset = deferred();
+    cloudUpsert.mockClear();
+    saveAll.mockClear();
+    cloudUpsert.mockReturnValueOnce(pendingReset.promise);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset learner' }));
+    await waitFor(() => expect(cloudUpsert).toHaveBeenCalledWith(expect.any(Object), 'user-a'));
+
+    await act(async () => {
+      authCallbacks[0]('SIGNED_OUT', null);
+    });
+    await act(async () => {
+      pendingReset.resolve();
+      await pendingReset.promise;
+    });
+
+    expect(screen.getByTestId('cards').textContent).toBe('local-card');
+    expect(screen.getByTestId('sync').textContent).toBe('');
+    expect(
+      saveAll.mock.calls.some(([savedState]) => Object.keys(savedState.cards || {}).length === 0),
+    ).toBe(false);
   });
 });

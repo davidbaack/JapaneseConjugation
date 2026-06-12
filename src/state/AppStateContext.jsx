@@ -420,6 +420,7 @@ function useAppController() {
     );
     const writesCloud = !!(session?.user && supabase);
     const resetUserId = writesCloud ? session.user.id : '';
+    const resetStillCurrent = () => !writesCloud || activeAuthUserIdRef.current === resetUserId;
     if (writesCloud) {
       setSyncStatus({ kind: 'syncing', message: 'Saving reset to cloud...', at: null });
     }
@@ -429,14 +430,17 @@ function useAppController() {
         payload,
         session: writesCloud ? session : null,
         writeCloud: writesCloud ? (nextPayload) => cloudUpsert(nextPayload, resetUserId) : null,
+        shouldCommit: resetStillCurrent,
         saveLocal: saveResetPayload,
         applyLocal: applyLearnerResetPayload,
       });
+      if (result.stale || !resetStillCurrent()) return { ...result, stale: true };
       if (writesCloud) {
         setSyncStatus({ kind: 'ok', message: 'Reset saved to cloud', at: result.at });
       }
       return result;
     } catch (e) {
+      if (writesCloud && !resetStillCurrent()) return { cloud: true, at: null, stale: true };
       setSyncStatus({ kind: 'error', message: e.message || 'Reset failed', at: null });
       throw e;
     }

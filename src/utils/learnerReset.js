@@ -63,6 +63,7 @@ export function buildLearnerResetPayload(parts = {}, kind) {
  *   payload?: any,
  *   session?: any,
  *   writeCloud?: ((payload: any) => Promise<any>) | null,
+ *   shouldCommit?: (() => boolean) | null,
  *   applyLocal?: ((payload: any, syncedAt: number | null) => void) | null,
  *   saveLocal?: ((payload: any, syncedAt: number | null) => void) | null,
  *   now?: () => number,
@@ -72,6 +73,7 @@ export async function commitLearnerResetPayload({
   payload,
   session,
   writeCloud,
+  shouldCommit,
   applyLocal,
   saveLocal,
   now = Date.now,
@@ -82,6 +84,7 @@ export async function commitLearnerResetPayload({
   let syncedAt = null;
   if (writesCloud) {
     await writeCloud(payload);
+    if (shouldCommit && !shouldCommit()) return { cloud: true, at: null, stale: true };
     syncedAt = now();
   }
 
