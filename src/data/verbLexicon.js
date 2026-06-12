@@ -1,5 +1,6 @@
 import { STARTER_ADJECTIVES, STARTER_VERBS } from './starterWords.js';
 import { isLexiconArtifactRow, normalizeLexiconRow } from '../utils/lexiconArtifacts.js';
+import { inflatePitchAccent } from '../utils/pitchAccent.js';
 
 const BASE_URL = /** @type {any} */ (import.meta).env?.BASE_URL || '/';
 
@@ -16,11 +17,22 @@ export function isGeneratedPracticeArtifactRow(row = []) {
 export function inflateVerbRow(row) {
   const cleanRow = normalizeLexiconRow(row);
   if (!cleanRow) return null;
-  const [dict, reading, meaning, group, jlpt, genkiLessons, minnaLessons, common, transitive] =
-    cleanRow;
+  const [
+    dict,
+    reading,
+    meaning,
+    group,
+    jlpt,
+    genkiLessons,
+    minnaLessons,
+    common,
+    transitive,
+    pitchAccent,
+  ] = cleanRow;
   if (!dict || !reading || !group) return null;
   const cleanGenki = Array.isArray(genkiLessons) ? genkiLessons : [];
   const cleanMinna = Array.isArray(minnaLessons) ? minnaLessons : [];
+  const cleanPitchAccent = inflatePitchAccent(pitchAccent);
   return {
     dict,
     reading,
@@ -31,6 +43,7 @@ export function inflateVerbRow(row) {
     ...(cleanMinna.length ? { minnaLessons: cleanMinna, minnaLesson: cleanMinna[0] } : {}),
     ...(common ? { common: true } : {}),
     ...(transitive ? { transitive: TRANSITIVITY_BY_CODE[transitive] || undefined } : {}),
+    ...(cleanPitchAccent ? { pitchAccent: cleanPitchAccent } : {}),
   };
 }
 

@@ -3,11 +3,14 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { isLexiconArtifactWord, normalizeLexiconWord } from '../src/utils/lexiconArtifacts.js';
+import { compactPitchAccentForWord, parseKanjiumAccentRows } from '../src/utils/pitchAccent.js';
 
 const JLPT_GENKI_URL = 'https://raw.githubusercontent.com/elzup/jlpt-word-list/master/out/all.csv';
 const MINNA_URL = 'https://www.astr.tohoku.ac.jp/~akhlaghi/blog/JapaneseVocab/MNNvocab.csv';
 const JMDICT_RELEASE_URL =
   'https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest';
+const KANJIUM_ACCENTS_URL =
+  'https://raw.githubusercontent.com/mifunetoshiro/kanjium/master/data/source_files/raw/accents.txt';
 const OUT_PATH = join('public', 'data', 'verb-lexicon.json');
 
 const LEVEL_RANK = { N5: 0, N4: 1, N3: 2, N2: 3, N1: 4 };
@@ -440,8 +443,25 @@ function dictFromPolite(row, lookup) {
   return null;
 }
 
-function rowFromVerb(word) {
-  return [
+/**
+ * @param {{
+ *   dict: string,
+ *   reading: string,
+ *   meaning: string,
+ *   group: string,
+ *   jlpt: string,
+ *   genkiLessons: number[],
+ *   minnaLessons: number[],
+ *   common?: boolean,
+ *   transitive?: string,
+ * }} word
+ * @param {Map<string, { accents: number[] }> | null} [accentRows]
+ * @returns {[string, string, string, string, string, number[], number[], boolean, string] | [string, string, string, string, string, number[], number[], boolean, string, number[]]}
+ */
+function rowFromVerb(word, accentRows = null) {
+  const pitchAccent = compactPitchAccentForWord(word, accentRows);
+  /** @type {[string, string, string, string, string, number[], number[], boolean, string] | [string, string, string, string, string, number[], number[], boolean, string, number[]]} */
+  const row = [
     word.dict,
     word.reading,
     word.meaning,
@@ -452,6 +472,8 @@ function rowFromVerb(word) {
     Boolean(word.common),
     word.transitive || '',
   ];
+  if (pitchAccent?.length) row.push(pitchAccent);
+  return row;
 }
 
 function hasLessonCoverage(word) {
@@ -503,11 +525,13 @@ async function fetchJmdict() {
 }
 
 async function main() {
-  const [jlptGenkiCsv, minnaCsv, jmdict] = await Promise.all([
+  const [jlptGenkiCsv, minnaCsv, jmdict, kanjiumAccents] = await Promise.all([
     fetchText(JLPT_GENKI_URL),
     fetchText(MINNA_URL),
     fetchJmdict(),
+    fetchText(KANJIUM_ACCENTS_URL),
   ]);
+  const accentRows = parseKanjiumAccentRows(kanjiumAccents);
   const jmdictIndex = buildJmdictIndex(jmdict);
   const words = new Map();
   const jlptBySurface = new Map();
@@ -580,7 +604,7 @@ async function main() {
         levelDiff || a.reading.localeCompare(b.reading, 'ja') || a.dict.localeCompare(b.dict, 'ja')
       );
     })
-    .map(rowFromVerb);
+    .map((word) => rowFromVerb(word, accentRows));
   const verbs = rows.filter((row) => ['ichidan', 'godan', 'suru', 'kuru'].includes(row[3]));
   const adjectives = rows.filter((row) => ['i-adjective', 'na-adjective'].includes(row[3]));
   const trimmedLowUse = {
@@ -626,6 +650,12 @@ async function main() {
         license: 'JMdict/EDRDG license; used for part-of-speech and commonness signals',
         use: 'Verb/adjective classification and common priority markers',
       },
+      {
+        name: 'Kanjium pitch accent data',
+        url: KANJIUM_ACCENTS_URL,
+        license: 'CC BY-SA 4.0; attribution requested for Uros O. additions',
+        use: 'Dictionary-form pitch accent numbers for generated practice words',
+      },
     ],
     trimPolicy: {
       appliesTo: 'JLPT-tagged verbs/adjectives and known generated artifact rows',
@@ -647,6 +677,8 @@ async function main() {
       'genkiLessons',
       'minnaLessons',
       'common',
+      'transitive',
+      'pitchAccent',
     ],
     verbs,
     adjectives,

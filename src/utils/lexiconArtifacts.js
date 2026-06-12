@@ -11,6 +11,7 @@ export const GENERATED_ARTIFACT_MEANING = /\bmath operator\b/i;
  * @property {number[]} [minnaLessons]
  * @property {boolean} [common]
  * @property {string} [transitive]
+ * @property {{ accents?: number[], source?: string }} [pitchAccent]
  */
 
 const BLOCKED_ROW_KEYS = new Set(['godan:ある:ある:A certain ~, One ~']);
