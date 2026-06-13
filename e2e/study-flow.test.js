@@ -2,9 +2,10 @@ import { test, expect } from '@playwright/test';
 
 // Exercises the core practice loop on the default Practice tab with the default
 // answer mode ("input"): a card is shown, the learner submits an answer,
-// feedback appears, and the reveal ends with one concrete next action.
+// feedback appears, and the reveal ends with one primary next action plus a
+// focused Guide link for walking through the same form.
 test.describe('Study flow', () => {
-  test('answering a card shows feedback with one next action', async ({ page }) => {
+  test('answering a card shows feedback with a next action and Guide link', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -22,16 +23,19 @@ test.describe('Study flow', () => {
     await expect(checkBtn).toBeEnabled();
     await checkBtn.click();
 
-    // Review phase: verdict + exactly one concrete next action.
+    // Review phase: verdict + exactly one concrete next action, with Guide as
+    // an explicit focused repair link for the same form.
     await expect(page.getByText('Not quite.').last()).toBeVisible();
-    const nextAction = page.getByRole('button', {
-      name: /^(Try another|Open Guide for this rule|Drill the trap|Review lesson)$/,
+    await expect(page.getByText('Walk through this form in Guide')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open Guide for this rule' })).toBeVisible();
+    const primaryNextAction = page.getByRole('button', {
+      name: /^(Try another|Drill the trap|Review lesson)$/,
     });
-    await expect(nextAction).toHaveCount(1);
-    await expect(nextAction.first()).toBeVisible();
+    await expect(primaryNextAction).toHaveCount(1);
+    await expect(primaryNextAction.first()).toBeVisible();
   });
 
-  test('Reveal exposes the answer and shows one next action', async ({ page }) => {
+  test('Reveal exposes the answer and shows a next action and Guide link', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
@@ -40,10 +44,12 @@ test.describe('Study flow', () => {
     await page.getByRole('button', { name: 'Reveal', exact: true }).click();
 
     // Revealing grades the card as missed and drops into the review phase.
-    const nextAction = page.getByRole('button', {
-      name: /^(Try another|Open Guide for this rule|Drill the trap|Review lesson)$/,
+    await expect(page.getByText('Walk through this form in Guide')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open Guide for this rule' })).toBeVisible();
+    const primaryNextAction = page.getByRole('button', {
+      name: /^(Try another|Drill the trap|Review lesson)$/,
     });
-    await expect(nextAction).toHaveCount(1);
-    await expect(nextAction.first()).toBeVisible();
+    await expect(primaryNextAction).toHaveCount(1);
+    await expect(primaryNextAction.first()).toBeVisible();
   });
 });

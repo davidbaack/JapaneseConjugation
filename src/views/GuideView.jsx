@@ -301,7 +301,9 @@ export default function GuideView() {
                   'This form'}
               </h2>
               <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
-                Step through the same form from the Learn lesson.
+                {activeGuideFocus.source === 'practice-result'
+                  ? 'Step through the same form from your Practice answer.'
+                  : 'Step through the same form from the Learn lesson.'}
                 {activeGuideFocus.word?.dict ? (
                   <>
                     {' '}

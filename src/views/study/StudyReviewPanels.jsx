@@ -279,6 +279,30 @@ function ReviewFeedbackAction({ action, buttonRef, onClick }) {
   );
 }
 
+function GuideReviewPrompt({ buttonRef = null, onClick }) {
+  if (!onClick) return null;
+
+  return (
+    <div className="mt-4 border-t border-stone-200/60 pt-3 text-left dark:border-stone-800/60">
+      <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+        Walk through this form in Guide
+      </div>
+      <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+        Drills this same word and target form: plain form, word group, final answer.
+      </div>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={onClick}
+        className="mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
+      >
+        <IconList className="h-4 w-4" />
+        Open Guide for this rule
+      </button>
+    </div>
+  );
+}
+
 function PitchAccentReviewBlock({ promptAccent, targetAccent, tone = 'emerald' }) {
   if (!targetAccent) return null;
   const hasShift =
@@ -365,6 +389,8 @@ function RunAnswerReveal({
     relatedLesson,
     reviewSubmittedAnswer,
   });
+  const canOpenGuidePrompt =
+    !!onOpenGuide && !!record.word && !!reviewTypeId && !record.reverseDrill;
   const canOpenRuleLesson = !!relatedLesson && !!(onOpenLearn || onOpenLearnFocus);
   const ruleLessonLabel = record.correct ? 'Teach me this rule' : 'I forgot this';
   const openRuleLesson = () => {
@@ -386,6 +412,9 @@ function RunAnswerReveal({
       return;
     }
     onTryAnother?.();
+  };
+  const openGuidePrompt = () => {
+    onOpenGuide?.(record.word, reviewTypeId);
   };
   const panelClass = record.correct
     ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
@@ -761,11 +790,19 @@ function RunAnswerReveal({
           </div>
         </div>
       )}
-      <ReviewFeedbackAction
-        action={reviewAction}
-        buttonRef={actionButtonRef}
-        onClick={runReviewAction}
-      />
+      {canOpenGuidePrompt && (
+        <GuideReviewPrompt
+          buttonRef={reviewAction.kind === 'guide' ? actionButtonRef : null}
+          onClick={openGuidePrompt}
+        />
+      )}
+      {reviewAction.kind !== 'guide' && (
+        <ReviewFeedbackAction
+          action={reviewAction}
+          buttonRef={actionButtonRef}
+          onClick={runReviewAction}
+        />
+      )}
     </div>
   );
 }

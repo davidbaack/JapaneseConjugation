@@ -1471,6 +1471,11 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByText('Answer #1'));
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
     expect(screen.getByText('Answer breakdown')).toBeTruthy();
+    expect(within(reviewRegion).getByText('Walk through this form in Guide')).toBeTruthy();
+    expect(within(reviewRegion).getByText(/Drills this same word and target form/)).toBeTruthy();
+    expect(
+      within(reviewRegion).getByRole('button', { name: 'Open Guide for this rule' }),
+    ).toBeTruthy();
     expect(within(reviewRegion).getByRole('button', { name: 'Try another' })).toBeTruthy();
     expect(within(reviewRegion).queryByText('New')).toBeNull();
 
@@ -1509,6 +1514,8 @@ describe('StudyView continuous Practice startup', () => {
     expect(within(fullBreakdown).queryByText('More')).toBeNull();
     expect(within(fullBreakdown).getByText('Visual Rule Path')).toBeTruthy();
     expect(within(fullBreakdown).getByText('1. What category is this and why?')).toBeTruthy();
+    expect(within(reviewRegion).getByText('Walk through this form in Guide')).toBeTruthy();
+    expect(within(reviewRegion).getByText(/Drills this same word and target form/)).toBeTruthy();
     expect(
       within(reviewRegion).getByRole('button', { name: 'Open Guide for this rule' }),
     ).toBeTruthy();

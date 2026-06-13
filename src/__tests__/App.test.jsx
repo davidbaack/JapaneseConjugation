@@ -320,6 +320,8 @@ describe('App shell', () => {
     const verdictStatus = await screen.findAllByText('Not quite.', {}, { timeout: 5000 });
     expect(verdictStatus).toHaveLength(1);
     expect(screen.getByText('Review this form.')).toBeTruthy();
+    expect(screen.getByText('Walk through this form in Guide')).toBeTruthy();
+    expect(screen.getByText(/Drills this same word and target form/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Open Guide for this rule' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Next (Enter)' })).toBeNull();
     // Typed misses show the consolidated rich top (kanji + coach diff), not the
@@ -386,6 +388,7 @@ describe('App shell', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Guide for this rule' }));
     expect(await screen.findByText('Focused Guide')).toBeTruthy();
+    expect(screen.getByText(/Step through the same form from your Practice answer/)).toBeTruthy();
     expect(screen.getAllByText('Plain Negative').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/\u8a71\u3059/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Exit focus' })).toBeTruthy();
@@ -501,7 +504,14 @@ describe('App shell', () => {
     expect(screen.getByText('Visual Rule Path')).toBeTruthy();
     expect(screen.getByText('From polite/masu stem')).toBeTruthy();
     expect(screen.queryByText('More')).toBeNull();
+    expect(screen.getByText('Walk through this form in Guide')).toBeTruthy();
+    expect(screen.getByText(/Drills this same word and target form/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Try another' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Guide for this rule' }));
+    expect(await screen.findByText('Focused Guide')).toBeTruthy();
+    expect(screen.getByText(/Step through the same form from your Practice answer/)).toBeTruthy();
+    expect(screen.getAllByText('Plain Past').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\u8a71\u3059/).length).toBeGreaterThan(0);
   }, 15000);
 
   it('mounts every tab without hitting the error boundary', async () => {
