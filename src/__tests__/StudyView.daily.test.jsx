@@ -1281,7 +1281,7 @@ describe('StudyView continuous Practice startup', () => {
     });
   });
 
-  it('shows prompt pitch while answering and target pitch only after review', async () => {
+  it('does not show Practice pitch cues while answering or reviewing', async () => {
     const target = {
       ...STARTER_VERBS[0],
       pitchAccent: { accents: [2], source: 'kanjium' },
@@ -1298,17 +1298,15 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     const input = await waitForPracticeCard();
-    expect(screen.getByRole('img', { name: /Pitch accent for \u305f\u3079\u308b/ })).toBeTruthy();
     expect(
-      screen.queryByRole('img', { name: /Pitch accent for \u305f\u3079\u306a\u3044/ }),
+      screen.queryByRole('img', { name: /Pitch accent for \u305f\u3079\u308b/ }),
     ).toBeNull();
+    expect(screen.queryByRole('img', { name: /Pitch accent for/ })).toBeNull();
 
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 
     await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
-    expect(
-      screen.getByRole('img', { name: /Pitch accent for \u305f\u3079\u306a\u3044/ }),
-    ).toBeTruthy();
+    expect(screen.queryByRole('img', { name: /Pitch accent for/ })).toBeNull();
   });
 
   it('counts Reveal as missed and resets the current streak', async () => {
@@ -1490,7 +1488,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByText('Practice run')).toBeTruthy();
   });
 
-  it('opens missed run review answers with the full breakdown collapsed', async () => {
+  it('opens missed run review answers with the full breakdown inline', async () => {
     const target = STARTER_VERBS.find((word) => word.group === 'godan');
     expect(target).toBeTruthy();
     const type = 'plain-negative';
@@ -1515,9 +1513,9 @@ describe('StudyView continuous Practice startup', () => {
 
     expect(within(reviewRegion).getByText('Review this form.')).toBeTruthy();
     expect(within(reviewRegion).getByText(/Rule:/)).toBeTruthy();
-    const fullBreakdown = within(reviewRegion).getByText('Show full breakdown').closest('details');
+    const fullBreakdown = within(reviewRegion).getByText('Full breakdown').closest('section');
     expect(fullBreakdown).toBeTruthy();
-    expect(fullBreakdown.open).toBe(false);
+    expect(fullBreakdown.tagName.toLowerCase()).toBe('section');
     expect(within(fullBreakdown).queryByText('More')).toBeNull();
     expect(within(fullBreakdown).getByText('Visual Rule Path')).toBeTruthy();
     expect(within(fullBreakdown).getByText('1. What category is this and why?')).toBeTruthy();

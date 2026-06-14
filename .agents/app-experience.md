@@ -115,8 +115,9 @@ confirms the new direction, update this document in the same change.
 - Hide English meaning until answer or reveal by default.
 - Keep adaptive hints that respond to the answer typed so far.
 - Keep live kana feedback with green/red behavior.
-- Verified pitch-accent cues may accompany Practice and review audio, but should
-  stay hidden when accent data is missing or uncertain.
+- Practice answer and review cards should not show inline pitch-accent diagrams.
+  Pitch data may remain available for non-Practice pronunciation or reference
+  surfaces.
 - Do not show a full count of empty kana slots before the learner has typed or
   requested a hint.
 - Preserve inline AI continuation for hints, missed-answer explanations, and

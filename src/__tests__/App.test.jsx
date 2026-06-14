@@ -280,7 +280,7 @@ describe('App shell', () => {
     expect(screen.queryByText(/did not want to speak/i)).toBeNull();
   }, 15000);
 
-  it('keeps deep answer teaching collapsed after an incorrect miss', async () => {
+  it('keeps deep answer teaching inline after an incorrect miss', async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -338,13 +338,12 @@ describe('App shell', () => {
     expect(screen.getAllByText('Correct Answer').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Your Answer').length).toBeGreaterThan(0);
     expect(screen.getByText(/Rule:/)).toBeTruthy();
-    const fullBreakdown = screen.getByText('Show full breakdown').closest('details');
+    const fullBreakdown = screen.getByText('Full breakdown').closest('section');
     expect(fullBreakdown).toBeTruthy();
-    expect(fullBreakdown.open).toBe(false);
+    expect(fullBreakdown.tagName.toLowerCase()).toBe('section');
     expect(within(fullBreakdown).queryByText('More')).toBeNull();
-    expect(screen.getByText('1. What category is this and why?').closest('details')).toBe(
-      fullBreakdown,
-    );
+    expect(screen.getByText('1. What category is this and why?').closest('summary')).toBeNull();
+    expect(within(fullBreakdown).getByText('Visual Rule Path')).toBeTruthy();
     expect(screen.queryByText('Answer breakdown')).toBeNull();
     expect(screen.queryByText('Gemini is not configured for AI chat.')).toBeNull();
   }, 15000);

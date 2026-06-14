@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import {
   IconVolume,
   IconChat,
@@ -18,7 +18,6 @@ import {
 } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
-import PitchAccentDisplay from '../components/PitchAccentDisplay.jsx';
 import { lessonForType } from '../data/lessonContent.js';
 import { ChatPanel } from '../components/ChatPanel.jsx';
 import { toHiragana, toHiraganaProgress, toKanaInputValue } from '../utils/romaji.js';
@@ -32,6 +31,7 @@ import {
   isRedundantPracticeType,
   practiceTypesForItem,
   surfaceFormFor,
+  wordKey,
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { explainItem, stepCoachHint } from '../utils/conjugatorExplain.js';
@@ -62,7 +62,6 @@ import {
   kanaMatchDisplayForPrefs,
   spokenAnswerResult,
 } from '../utils/display.js';
-import { accentForForm } from '../utils/pitchAccent.js';
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
 import { fetchBundledSentence } from '../utils/sentenceCorpus.js';
 import { fetchTailoredSentence } from '../utils/sentenceLibrary.js';
@@ -123,6 +122,7 @@ const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint:
 const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation', FAMILY_INTRO_REVIEW_LIMIT_SOURCE]);
 const REVIEW_SESSION_HISTORY_SIZE = 4;
 const CORRECT_AUTO_ADVANCE_MS = 850;
+const SENTENCE_PROMPT_GRACE_MS = 250;
 const SESSION_RECENT_OUTCOME_LIMIT = 6;
 const ANSWER_STYLE_OPTIONS = [
   { id: 'input', label: 'Type' },
@@ -145,6 +145,10 @@ function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
   const limit = Number(prefs.reviewLimit || 0);
   return Number.isFinite(limit) && limit > 0 ? limit : 0;
+}
+
+function sentenceEntryKey(word, type) {
+  return word?.dict && type ? `${wordKey(word)}|${type}` : '';
 }
 
 function transformationRouteText(sourceInfo, targetInfo) {
@@ -536,6 +540,9 @@ export default function StudyView({ mode = 'practice' }) {
   const answerComposingRef = useRef(false);
   const minimalPairSetIdRef = useRef(practicePrefs.minimalPairSetId || '');
   const recentCardIdsRef = useRef([]);
+  const sentenceEntryCacheRef = useRef(new Map());
+  const sentenceEntryInFlightRef = useRef(new Map());
+  const preparedNextCardRef = useRef(null);
   // Snapshots the typed answer the moment a kana mistake first occurs, so the
   // review panel can show what was actually entered when it went wrong rather
   // than the live (possibly self-corrected) input.
@@ -674,12 +681,53 @@ export default function StudyView({ mode = 'practice' }) {
     }),
     [bonusMode, wordLists, specialLaunchActive],
   );
+  const loadSentenceEntry = useCallback((word, type) => {
+    const key = sentenceEntryKey(word, type);
+    if (!key) return Promise.resolve(null);
+    if (sentenceEntryCacheRef.current.has(key)) {
+      return Promise.resolve(sentenceEntryCacheRef.current.get(key));
+    }
+    const existing = sentenceEntryInFlightRef.current.get(key);
+    if (existing) return existing;
+
+    let request;
+    request = fetchBundledSentence(word, type)
+      .then((res) => res || fetchTailoredSentence(word, type))
+      .then((entry) => {
+        if (entry?.jaTemplate) {
+          sentenceEntryCacheRef.current.set(key, entry);
+          return entry;
+        }
+        return null;
+      })
+      .catch(() => null)
+      .finally(() => {
+        if (sentenceEntryInFlightRef.current.get(key) === request) {
+          sentenceEntryInFlightRef.current.delete(key);
+        }
+      });
+    sentenceEntryInFlightRef.current.set(key, request);
+    return request;
+  }, []);
   const minimalPairSetForCurrent = activeMinimalPairSet;
+  const preloadSentenceForCard = useCallback(
+    (card) => {
+      if (!card || !sentenceMode || transformationMode || activeMinimalPairSet) return;
+      const type = card.type === DICTIONARY_TYPE_ID ? card.sourceType || 'plain-past' : card.type;
+      loadSentenceEntry(card.verb, type);
+    },
+    [activeMinimalPairSet, loadSentenceEntry, sentenceMode, transformationMode],
+  );
   const sentenceType = current ? (reverseDrill ? sourceTypeForReading : current.type) : '';
   const sentencePromptEligible =
     !!current && sentenceMode && !transformationMode && !minimalPairSetForCurrent;
-  // Sentence mode renders immediately from deterministic local templates, then
-  // upgrades to the bundled offline corpus or Supabase row when available.
+  const sentenceWord = sentencePromptEligible ? current.verb : null;
+  const sentencePromptEntryKey = sentenceEntryKey(sentenceWord, sentenceType);
+  const sentencePromptStateKey = sentencePromptEligible
+    ? `${sentencePromptEntryKey}|${reverseDrill ? 'reverse' : 'forward'}|${
+        listeningPrompt ? 'listening' : 'visible'
+      }`
+    : '';
   const offlineSentencePrompt = useMemo(() => {
     if (!sentencePromptEligible) return null;
     try {
@@ -695,33 +743,71 @@ export default function StudyView({ mode = 'practice' }) {
       return null;
     }
   }, [current, sentencePromptEligible, sentenceType, reverseDrill, listeningPrompt]);
-  const [resolvedSentencePrompt, setResolvedSentencePrompt] = useState(null);
+  const [finalizedSentencePrompt, setFinalizedSentencePrompt] = useState(null);
   useEffect(() => {
-    setResolvedSentencePrompt(null);
-    if (!sentencePromptEligible) return undefined;
+    if (
+      !sentencePromptEligible ||
+      !sentenceWord ||
+      !sentencePromptEntryKey ||
+      !sentencePromptStateKey ||
+      !offlineSentencePrompt
+    ) {
+      setFinalizedSentencePrompt(null);
+      return undefined;
+    }
+
     let ignore = false;
-    const word = current.verb;
+    let finalized = false;
+    const word = sentenceWord;
     const type = sentenceType;
-    fetchBundledSentence(word, type)
-      .then((res) => res || fetchTailoredSentence(word, type))
-      .then((entry) => {
-        if (ignore || !entry?.jaTemplate) return;
-        setResolvedSentencePrompt(
-          buildSentencePromptModel({
+    const buildPrompt = (entry) =>
+      entry?.jaTemplate
+        ? buildSentencePromptModel({
             entry,
             word,
             type,
             reverseDrill,
             listeningPrompt,
-          }),
-        );
-      })
-      .catch(() => {});
+          })
+        : null;
+    const finalizePrompt = (entry) => {
+      if (ignore || finalized) return;
+      finalized = true;
+      const prompt = buildPrompt(entry) || offlineSentencePrompt;
+      setFinalizedSentencePrompt({ key: sentencePromptStateKey, prompt });
+    };
+    const cached = sentenceEntryCacheRef.current.get(sentencePromptEntryKey);
+    if (cached?.jaTemplate) {
+      finalizePrompt(cached);
+      return undefined;
+    }
+
+    setFinalizedSentencePrompt((prev) =>
+      prev?.key === sentencePromptStateKey ? prev : null,
+    );
+    const fallbackTimer = setTimeout(() => finalizePrompt(null), SENTENCE_PROMPT_GRACE_MS);
+    loadSentenceEntry(word, type).then((entry) => {
+      if (finalized || ignore) return;
+      clearTimeout(fallbackTimer);
+      finalizePrompt(entry);
+    });
     return () => {
       ignore = true;
+      clearTimeout(fallbackTimer);
     };
-  }, [current, sentencePromptEligible, sentenceType, reverseDrill, listeningPrompt]);
-  const sentencePrompt = resolvedSentencePrompt || offlineSentencePrompt;
+  }, [
+    loadSentenceEntry,
+    listeningPrompt,
+    offlineSentencePrompt,
+    reverseDrill,
+    sentencePromptEligible,
+    sentencePromptEntryKey,
+    sentencePromptStateKey,
+    sentenceType,
+    sentenceWord,
+  ]);
+  const sentencePrompt =
+    finalizedSentencePrompt?.key === sentencePromptStateKey ? finalizedSentencePrompt.prompt : null;
   const sentencePromptView = useMemo(
     () =>
       sentencePrompt
@@ -729,8 +815,24 @@ export default function StudyView({ mode = 'practice' }) {
         : null,
     [sentencePrompt, practicePrefs],
   );
-  const promptAudioText =
-    listeningPrompt && sentencePrompt?.audioText ? sentencePrompt.audioText : basePromptAudioText;
+  const promptAudioText = listeningPrompt
+    ? sentencePromptEligible
+      ? sentencePrompt?.audioText || ''
+      : basePromptAudioText
+    : basePromptAudioText;
+
+  useEffect(() => {
+    preparedNextCardRef.current = null;
+  }, [
+    activeMinimalPairSet?.id,
+    bonusMode,
+    current?.id,
+    sentenceMode,
+    sessionFilterFormGroupId,
+    sessionFilterWord?.dict,
+    sessionFilterWord?.group,
+    transformationMode,
+  ]);
 
   useLayoutEffect(() => {
     if (!hydrated) return;
@@ -1223,10 +1325,6 @@ export default function StudyView({ mode = 'practice' }) {
       : 0;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishMeaning = englishHintsHidden && phase === 'answering';
-  const promptPitchAccent =
-    phase === 'answering' && !hidePromptText
-      ? accentForForm(current.verb, sourceTypeId, promptSourceForm)
-      : null;
   // Guided kana is now an in-box "reveal next" action, not a separate mode.
   const guidedKana = false;
   const liveKana = typedAnswerMode && !reverseDrill && liveKanaHelpEnabled;
@@ -1535,6 +1633,28 @@ export default function StudyView({ mode = 'practice' }) {
     );
   }
 
+  function prepareLikelyNextCard(nextState, lastCardId, sweepStep = null, optionOverrides = {}) {
+    if (sweepStep?.nextCard) {
+      preparedNextCardRef.current = null;
+      preloadSentenceForCard(sweepStep.nextCard);
+      return sweepStep.nextCard;
+    }
+    const nextCard = selectNextReviewCard(nextState, lastCardId, optionOverrides);
+    if (nextCard) {
+      preparedNextCardRef.current = { lastCardId, card: nextCard };
+      preloadSentenceForCard(nextCard);
+    } else {
+      preparedNextCardRef.current = null;
+    }
+    return nextCard;
+  }
+
+  function consumePreparedNextCard(lastCardId) {
+    const prepared = preparedNextCardRef.current;
+    preparedNextCardRef.current = null;
+    return prepared?.lastCardId === lastCardId ? prepared.card : null;
+  }
+
   function nextWordSweepStep(sweep, nextState, typeId, correct, { holdNext = false } = {}) {
     if (!sweep?.word || !typeId) return { sweep, nextCard: null };
     const completed = new Set(sweep.completedTypeIds || []);
@@ -1592,6 +1712,7 @@ export default function StudyView({ mode = 'practice' }) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
+    preparedNextCardRef.current = null;
     stopSpeechRecognition();
     recentCardIdsRef.current = [];
     setAnswer('');
@@ -1746,7 +1867,8 @@ export default function StudyView({ mode = 'practice' }) {
       setPhase('answering');
       if (!reviewSetComplete && !reviewComplete) {
         const sweepCard = consumeHeldWordSweepCard(state);
-        setCurrent(sweepCard || selectNextReviewCard(state, current.id));
+        const preparedCard = sweepCard ? null : consumePreparedNextCard(current.id);
+        setCurrent(sweepCard || preparedCard || selectNextReviewCard(state, current.id));
       }
       return;
     }
@@ -1819,6 +1941,9 @@ export default function StudyView({ mode = 'practice' }) {
     const reviewWillComplete =
       sweepStep?.sweep?.complete ||
       (reviewLimit > 0 && !recommendationFocus && reviewsDone + 1 >= reviewLimit);
+    const likelyNextCard = reviewWillComplete
+      ? null
+      : prepareLikelyNextCard(nextState, current.id, sweepStep);
     if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
@@ -1842,7 +1967,7 @@ export default function StudyView({ mode = 'practice' }) {
               : currentSweep,
           );
         }
-        setCurrent(sweepStep?.nextCard || selectNextReviewCard(nextState, current.id));
+        setCurrent(likelyNextCard || selectNextReviewCard(nextState, current.id));
       }, CORRECT_AUTO_ADVANCE_MS);
     }
   }
@@ -1862,6 +1987,7 @@ export default function StudyView({ mode = 'practice' }) {
       ? nextWordSweepStep(wordSweep, nextState, current.type, false)
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
+    const likelyNextCard = prepareLikelyNextCard(nextState, current.id, sweepStep);
     setState(nextState);
     setAnswer('');
     setCoachRevealed(0);
@@ -1876,7 +2002,7 @@ export default function StudyView({ mode = 'practice' }) {
     setWasCorrected(false);
     setPhase('answering');
     setWasCorrect(false);
-    setCurrent(sweepStep?.nextCard || selectNextReviewCard(nextState, current.id));
+    setCurrent(likelyNextCard || selectNextReviewCard(nextState, current.id));
   }
 
   function removeCurrentWordFromReviews() {
@@ -1957,6 +2083,9 @@ export default function StudyView({ mode = 'practice' }) {
     const reviewWillComplete =
       sweepStep?.sweep?.complete ||
       (reviewLimit > 0 && !recommendationFocus && reviewsDone + 1 >= reviewLimit);
+    const likelyNextCard = reviewWillComplete
+      ? null
+      : prepareLikelyNextCard(nextState, current.id, sweepStep);
     if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
@@ -1980,7 +2109,7 @@ export default function StudyView({ mode = 'practice' }) {
               : currentSweep,
           );
         }
-        setCurrent(sweepStep?.nextCard || selectNextReviewCard(nextState, current.id));
+        setCurrent(likelyNextCard || selectNextReviewCard(nextState, current.id));
       }, CORRECT_AUTO_ADVANCE_MS);
     }
   }
@@ -2026,6 +2155,10 @@ export default function StudyView({ mode = 'practice' }) {
       ? nextWordSweepStep(wordSweep, nextState, current.type, false, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
+    const reviewWillComplete =
+      sweepStep?.sweep?.complete ||
+      (reviewLimit > 0 && !recommendationFocus && reviewsDone + 1 >= reviewLimit);
+    if (!reviewWillComplete) prepareLikelyNextCard(nextState, current.id, sweepStep);
     const runRecord = buildRunAnswerRecord({
       correct: false,
       submittedAnswer: '',
@@ -3041,9 +3174,6 @@ export default function StudyView({ mode = 'practice' }) {
                   className="text-4xl sm:text-5xl font-medium mb-2 text-stone-900 dark:text-stone-100"
                   subClassName="text-base text-stone-500"
                 />
-                {promptPitchAccent && (
-                  <PitchAccentDisplay accent={promptPitchAccent} className="mb-2" />
-                )}
               </>
             )}
             {noChangePrompt && !hidePromptText && (
