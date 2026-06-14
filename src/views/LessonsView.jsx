@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { IconBook, IconList, IconRefresh, IconSpark } from '../components/Icons.jsx';
 import { getTypeInfo } from '../data/conjugationTypes.js';
 import {
@@ -235,6 +235,7 @@ export default function LessonsView() {
   const [query, setQuery] = useState('');
   const [showFormationKeys, setShowFormationKeys] = useState(false);
   const [openLessonIds, setOpenLessonIds] = useState(() => new Set());
+  const lessonRefs = useRef(new Map());
   const coverage = useMemo(() => getLessonCoverage(), []);
   const lessonMap = useMemo(
     () => new Map(LESSON_SECTIONS.map((lesson) => [lesson.groupId, lesson])),
@@ -271,10 +272,31 @@ export default function LessonsView() {
     return () => window.removeEventListener('hashchange', openFromHash);
   }, []);
 
+  const focusedLessonGroupId = learnFocus?.lessonGroupId || '';
+
   useEffect(() => {
-    if (!learnFocus?.lessonGroupId) return;
-    setOpenLessonIds((prev) => new Set(prev).add(learnFocus.lessonGroupId));
-  }, [learnFocus]);
+    if (!focusedLessonGroupId) return;
+    setOpenLessonIds((prev) => new Set(prev).add(focusedLessonGroupId));
+  }, [focusedLessonGroupId]);
+
+  useEffect(() => {
+    if (!focusedLessonGroupId) return;
+    if (!searchActive && !openLessonIds.has(focusedLessonGroupId)) return;
+
+    const lesson = lessonRefs.current.get(focusedLessonGroupId);
+    if (!lesson) return;
+
+    const timer = window.setTimeout(() => {
+      lesson.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try {
+        lesson.focus({ preventScroll: true });
+      } catch {
+        lesson.focus();
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [focusedLessonGroupId, openLessonIds, searchActive, filteredLessons]);
 
   function sendLessonRecommendation(lesson, options = {}) {
     const recommendation = buildLessonReviewRecommendation(lesson, allWords, options);
@@ -670,6 +692,14 @@ export default function LessonsView() {
               <article
                 id={`lesson-${lesson.groupId}`}
                 key={lesson.groupId}
+                ref={(node) => {
+                  if (node) {
+                    lessonRefs.current.set(lesson.groupId, node);
+                  } else {
+                    lessonRefs.current.delete(lesson.groupId);
+                  }
+                }}
+                tabIndex={focusedLessonGroupId === lesson.groupId ? -1 : undefined}
                 className="scroll-mt-4 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850"
               >
                 <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between">

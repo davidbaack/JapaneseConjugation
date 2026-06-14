@@ -459,6 +459,77 @@ describe('App shell', () => {
     expect(screen.getByText(/Locked Practice set/)).toBeTruthy();
   }, 15000);
 
+  it('opens the exact Learn lesson from Teach me this rule and focuses it', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          enabledTypes: ['imperative'],
+          daily: {
+            date: localDateKey(),
+            count: DEFAULT_PREFS.dailyGoal,
+            goalHit: true,
+            goalStreak: 1,
+            bestGoalStreak: 1,
+            currentAnswerStreak: 0,
+            bestAnswerStreak: 0,
+          },
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: '\u8a71\u3059',
+        group: 'godan',
+        type: 'imperative',
+        word: {
+          dict: '\u8a71\u3059',
+          reading: '\u306f\u306a\u3059',
+          meaning: 'to speak',
+          group: 'godan',
+        },
+      }),
+    );
+    globalThis.HTMLElement.prototype.scrollIntoView.mockClear();
+
+    render(<App />);
+
+    const input = await waitForPracticeCard();
+    fireEvent.change(input, { target: { value: 'hanase' } });
+    const checkButton = screen.queryByRole('button', { name: 'Check (Enter)' });
+    if (checkButton) fireEvent.click(checkButton);
+    await screen.findAllByText('Correct!', {}, { timeout: 5000 });
+
+    globalThis.HTMLElement.prototype.scrollIntoView.mockClear();
+    fireEvent.click(await screen.findByRole('button', { name: 'Teach me this rule' }));
+
+    expect(await screen.findByText('From your Practice card')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Learn', selected: true })).toBeTruthy();
+    expect(
+      screen.getByRole('heading', {
+        name: 'Commands, Requests, Permission, Obligation',
+      }),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Guide this form' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Practice this form' })).toBeTruthy();
+
+    const lesson = document.getElementById('lesson-commands-requests');
+    expect(lesson).toBeTruthy();
+    await waitFor(() => {
+      expect(globalThis.HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({
+        behavior: 'smooth',
+        block: 'start',
+      });
+      expect(document.activeElement).toBe(lesson);
+    });
+  }, 15000);
+
   it('shows correct-answer rationale expanded without a More toggle', async () => {
     localStorage.setItem(
       STORAGE_KEY,
