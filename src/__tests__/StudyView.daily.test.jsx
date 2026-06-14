@@ -167,6 +167,31 @@ async function waitForPracticeCard() {
   return screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
 }
 
+function sentenceResponse(payload, ok = true) {
+  return {
+    ok,
+    json: () => Promise.resolve(payload),
+  };
+}
+
+function sentenceManifestPayload(types) {
+  return {
+    schema: 1,
+    totalRows: types.length,
+    rawBytes: 100,
+    gzipBytes: 50,
+    types: types.map((type) => ({ type, rows: 1 })),
+  };
+}
+
+function sentenceChunkPayload(type, rows) {
+  return {
+    schema: 1,
+    type,
+    rows,
+  };
+}
+
 function expectElementBefore(first, second) {
   expect(
     Boolean(first.compareDocumentPosition(second) & window.Node.DOCUMENT_POSITION_FOLLOWING),
@@ -842,11 +867,209 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     await screen.findByPlaceholderText(/Type dictionary form/i, {}, { timeout: 5000 });
-    const sentenceCard = document.querySelector('[data-sentence-mode="reverse-context"]');
-    expect(sentenceCard).toBeTruthy();
-    expect(sentenceCard.textContent).toContain(surfaceFormFor(target, sourceType));
-    expect(sentenceCard.textContent).not.toContain('[______]');
+    await waitFor(() => {
+      const sentenceCard = document.querySelector('[data-sentence-mode="reverse-context"]');
+      expect(sentenceCard).toBeTruthy();
+      expect(sentenceCard.textContent).toContain(surfaceFormFor(target, sourceType));
+      expect(sentenceCard.textContent).not.toContain('[______]');
+    });
     expect(screen.getByText('Answer with the dictionary form.')).toBeTruthy();
+  });
+
+  it('waits briefly and shows the bundled sentence without flashing the offline fallback', async () => {
+    vi.useFakeTimers();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const row = [
+      wordKey(target),
+      '\u663c\u306b{w}\u3002',
+      'I ate at noon.',
+      [
+        { t: '\u663c', r: '\u3072\u308b' },
+        { t: '\u306b', r: '' },
+        { w: true },
+        { t: '\u3002', r: '' },
+      ],
+    ];
+    const fetchMock = vi.fn((url) => {
+      const text = String(url);
+      if (text.endsWith('/manifest.json')) {
+        return Promise.resolve(sentenceResponse(sentenceManifestPayload([type])));
+      }
+      if (text.includes(`/by-type/${type}.json`)) {
+        return new Promise((resolve) => {
+          setTimeout(() => resolve(sentenceResponse(sentenceChunkPayload(type, [row]))), 100);
+        });
+      }
+      return Promise.resolve(sentenceResponse({}, false));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    mockedApp.value = makeApp({
+      studyFocus: {
+        word: target,
+        type,
+      },
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        sentenceMode: true,
+      },
+    });
+
+    render(<StudyView />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
+    expect(document.querySelector('[data-sentence-mode="forward-cloze"]')).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
+    expect(sentenceCard).toBeTruthy();
+    expect(sentenceCard.textContent).toContain('\u663c');
+  });
+
+  it('freezes the offline sentence when the bundled sentence arrives after the grace window', async () => {
+    vi.useFakeTimers();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    let resolveChunk;
+    const row = [
+      wordKey(target),
+      '\u663c\u306b{w}\u3002',
+      'I ate at noon.',
+      [
+        { t: '\u663c', r: '\u3072\u308b' },
+        { t: '\u306b', r: '' },
+        { w: true },
+        { t: '\u3002', r: '' },
+      ],
+    ];
+    const fetchMock = vi.fn((url) => {
+      const text = String(url);
+      if (text.endsWith('/manifest.json')) {
+        return Promise.resolve(sentenceResponse(sentenceManifestPayload([type])));
+      }
+      if (text.includes(`/by-type/${type}.json`)) {
+        return new Promise((resolve) => {
+          resolveChunk = resolve;
+        });
+      }
+      return Promise.resolve(sentenceResponse({}, false));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    mockedApp.value = makeApp({
+      studyFocus: {
+        word: target,
+        type,
+      },
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        sentenceMode: true,
+      },
+    });
+
+    render(<StudyView />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(document.querySelector('[data-sentence-mode="forward-cloze"]')).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+
+    const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
+    expect(sentenceCard).toBeTruthy();
+    const frozenText = sentenceCard.textContent;
+    expect(frozenText).not.toContain('\u663c');
+
+    await act(async () => {
+      resolveChunk(sentenceResponse(sentenceChunkPayload(type, [row])));
+      await Promise.resolve();
+    });
+
+    expect(sentenceCard.textContent).toBe(frozenText);
+    expect(sentenceCard.textContent).not.toContain('\u663c');
+  });
+
+  it('preloads the likely next word-sweep sentence during review', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const nextType = 'plain-negative';
+    const fetchMock = vi.fn((url) => {
+      const text = String(url);
+      if (text.endsWith('/manifest.json')) {
+        return Promise.resolve(sentenceResponse(sentenceManifestPayload([type, nextType])));
+      }
+      if (text.includes(`/by-type/${type}.json`)) {
+        return Promise.resolve(
+          sentenceResponse(
+            sentenceChunkPayload(type, [
+              [
+                wordKey(target),
+                '\u304d\u3087\u3046{w}\u3002',
+                'I did it today.',
+                [{ t: '\u304d\u3087\u3046', r: '' }, { w: true }, { t: '\u3002', r: '' }],
+              ],
+            ]),
+          ),
+        );
+      }
+      if (text.includes(`/by-type/${nextType}.json`)) {
+        return Promise.resolve(
+          sentenceResponse(
+            sentenceChunkPayload(nextType, [
+              [
+                wordKey(target),
+                '\u3042\u3057\u305f{w}\u3002',
+                'I will not do it tomorrow.',
+                [{ t: '\u3042\u3057\u305f', r: '' }, { w: true }, { t: '\u3002', r: '' }],
+              ],
+            ]),
+          ),
+        );
+      }
+      return Promise.resolve(sentenceResponse({}, false));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [type, nextType] },
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+        launchMode: 'word-sweep',
+      },
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        sentenceMode: true,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining(`/data/sentences/by-type/${nextType}.json`),
+        { cache: 'force-cache' },
+      ),
+    );
+
+    await clickTopReviewNext();
+
+    await waitFor(() => {
+      const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
+      expect(sentenceCard).toBeTruthy();
+      expect(sentenceCard.textContent).toContain('\u3042\u3057\u305f');
+    });
   });
 
   it('uses a bundled filled sentence for listening Sentence mode after Show text', async () => {
@@ -1298,9 +1521,7 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     const input = await waitForPracticeCard();
-    expect(
-      screen.queryByRole('img', { name: /Pitch accent for \u305f\u3079\u308b/ }),
-    ).toBeNull();
+    expect(screen.queryByRole('img', { name: /Pitch accent for \u305f\u3079\u308b/ })).toBeNull();
     expect(screen.queryByRole('img', { name: /Pitch accent for/ })).toBeNull();
 
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });

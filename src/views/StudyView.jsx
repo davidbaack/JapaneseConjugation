@@ -782,9 +782,7 @@ export default function StudyView({ mode = 'practice' }) {
       return undefined;
     }
 
-    setFinalizedSentencePrompt((prev) =>
-      prev?.key === sentencePromptStateKey ? prev : null,
-    );
+    setFinalizedSentencePrompt((prev) => (prev?.key === sentencePromptStateKey ? prev : null));
     const fallbackTimer = setTimeout(() => finalizePrompt(null), SENTENCE_PROMPT_GRACE_MS);
     loadSentenceEntry(word, type).then((entry) => {
       if (finalized || ignore) return;
