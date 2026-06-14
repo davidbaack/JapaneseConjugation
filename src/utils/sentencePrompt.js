@@ -1,4 +1,3 @@
-import { getTypeInfo } from '../data/conjugationTypes.js';
 import { conjugateItem, surfaceFormFor } from './conjugator.js';
 import { buildOfflineCuedCloze } from './clozeSentences.js';
 
@@ -86,7 +85,6 @@ export function buildSentencePromptModel({
 } = {}) {
   if (!entry?.jaTemplate || !word || !type) return null;
 
-  const typeLabel = getTypeInfo(type).label || type;
   const surface = entry.surface || safeForm(() => surfaceFormFor(word, type));
   const kanaSurface = entry.kanaSurface || safeForm(() => conjugateItem(word, type));
   if (!surface) return null;
@@ -110,11 +108,7 @@ export function buildSentencePromptModel({
     sentence,
     parts,
     audioText,
-    cue:
-      entry.cue ||
-      (reverseDrill
-        ? `Recover the dictionary form from this ${typeLabel} sentence.`
-        : `Use the ${typeLabel} form in this sentence.`),
+    cue: '',
     note: entry.en || '',
     source: entry.source || '',
     surface,

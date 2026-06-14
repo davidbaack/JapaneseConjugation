@@ -25,6 +25,7 @@ describe('sentence prompt model', () => {
       mode: 'forward-cloze',
       sentence: '昼に[______]。',
       audioText: '昼に買った。',
+      cue: '',
       note: 'I bought it at noon.',
       source: 'bundled',
     });
@@ -41,6 +42,7 @@ describe('sentence prompt model', () => {
 
     expect(prompt.mode).toBe('reverse-context');
     expect(prompt.sentence).toBe('昼に買った。');
+    expect(prompt.cue).toBe('');
     expect(prompt.parts[2]).toEqual({ text: '買った', ruby: 'かった' });
   });
 
@@ -55,6 +57,7 @@ describe('sentence prompt model', () => {
     expect(prompt.mode).toBe('listening-recognition');
     expect(prompt.sentence).toBe('昼に買った。');
     expect(prompt.audioText).toBe('昼に買った。');
+    expect(prompt.cue).toBe('');
   });
 
   it('keeps custom words offline-safe with deterministic template entries', () => {
@@ -64,6 +67,7 @@ describe('sentence prompt model', () => {
     expect(prompt.mode).toBe('forward-cloze');
     expect(prompt.sentence).toContain('[______]');
     expect(prompt.audioText).toContain('買った');
+    expect(prompt.cue).toBe('');
     expect(prompt.source).toBe('offline');
   });
 });
