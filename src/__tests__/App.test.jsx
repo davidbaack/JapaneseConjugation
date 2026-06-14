@@ -9,7 +9,8 @@ globalThis.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 import App from '../App.jsx';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
-import { defaultState, localDateKey } from '../utils/storage.js';
+import { STARTER_VERBS } from '../data/starterWords.js';
+import { cardIdFor, defaultState, localDateKey } from '../utils/storage.js';
 import { recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
 
 afterEach(() => {
@@ -45,7 +46,7 @@ describe('App shell', () => {
     expect(screen.queryByText('No reps yet')).toBeNull();
     expect(screen.queryByText('Untested')).toBeNull();
     expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
+    expect(screen.getByText('0 cards · 0 right / 0 wrong · 0 streak')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
     expect(screen.queryByText('Next workout')).toBeNull();
     expect(screen.queryByText('Form families')).toBeNull();
@@ -59,6 +60,10 @@ describe('App shell', () => {
       JSON.stringify({
         state: {
           ...defaultState(),
+          cards: {
+            [cardIdFor(STARTER_VERBS[0], 'plain-past')]: { correct: 7, incorrect: 3 },
+            [cardIdFor(STARTER_VERBS[1], 'plain-negative')]: { correct: 2, incorrect: 1 },
+          },
           daily: {
             date: localDateKey(),
             count: 5,
@@ -82,6 +87,9 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Stats', exact: true }));
     expect(await screen.findByRole('region', { name: 'Stats dashboard' })).toBeTruthy();
     expect(screen.getByText('Practice pulse.')).toBeTruthy();
+    expect(screen.getByText('Accuracy')).toBeTruthy();
+    expect(screen.getByText('69%')).toBeTruthy();
+    expect(screen.getByText('9 right / 4 wrong lifetime')).toBeTruthy();
     expect(screen.getByText('Upcoming reviews')).toBeTruthy();
     expect(screen.getByText('Form families')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();

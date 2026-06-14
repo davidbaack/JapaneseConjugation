@@ -1185,9 +1185,12 @@ export default function StudyView({ mode = 'practice' }) {
   const introReviewActive = reviewLimitSource === FAMILY_INTRO_REVIEW_LIMIT_SOURCE;
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const runStats = sessionRunStats(state.session, runBase);
+  const runAccuracy = runStats.reviewed
+    ? Math.round((runStats.correct / runStats.reviewed) * 100)
+    : 0;
   const runStatsLabel = `${runStats.reviewed} ${runStats.reviewed === 1 ? 'card' : 'cards'} · ${
-    runStats.missed
-  } missed · ${runStats.streak} streak`;
+    runStats.correct
+  } right / ${runStats.missed} wrong · ${runStats.streak} streak`;
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit && !recommendationFocus;
   const wordSweepComplete = !!wordSweep?.complete;
   const reviewComplete = wordSweepComplete;
@@ -2868,6 +2871,11 @@ export default function StudyView({ mode = 'practice' }) {
                 <IconList className="h-3.5 w-3.5" />
                 Review answers
               </button>
+              {runStats.reviewed > 0 && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-300">
+                  {runAccuracy}% right
+                </div>
+              )}
               <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
                 {runStatsLabel}
               </div>

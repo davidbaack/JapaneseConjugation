@@ -289,7 +289,7 @@ describe('StudyView continuous Practice startup', () => {
 
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
+    expect(screen.getByText('0 cards · 0 right / 0 wrong · 0 streak')).toBeTruthy();
     expect(screen.getByText('New enabled form.')).toBeTruthy();
     expect(screen.queryByRole('progressbar', { name: 'Session cards' })).toBeNull();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
@@ -305,7 +305,7 @@ describe('StudyView continuous Practice startup', () => {
 
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
+    expect(screen.getByText('0 cards · 0 right / 0 wrong · 0 streak')).toBeTruthy();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
@@ -985,7 +985,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitForPracticeCard();
     expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getByText('0 cards · 0 missed · 0 streak')).toBeTruthy();
+    expect(screen.getByText('0 cards · 0 right / 0 wrong · 0 streak')).toBeTruthy();
     expect(screen.queryByText('0/1 ready')).toBeNull();
     expect(screen.getByRole('button', { name: 'Practice run settings' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
@@ -1235,7 +1235,8 @@ describe('StudyView continuous Practice startup', () => {
     await waitFor(() => expect(setState).toHaveBeenCalled());
     rerender(<StudyView />);
 
-    expect(screen.getByText('1 card · 0 missed · 1 streak')).toBeTruthy();
+    expect(screen.getByText('1 card · 1 right / 0 wrong · 1 streak')).toBeTruthy();
+    expect(screen.getByText('100% right')).toBeTruthy();
     expect(screen.getByText('Focused practice: 食べる. Clean run so far.')).toBeTruthy();
   });
 

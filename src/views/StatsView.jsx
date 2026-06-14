@@ -49,6 +49,26 @@ function statTile(label, value) {
   );
 }
 
+function cleanAnswerCount(value) {
+  return Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0;
+}
+
+function answerStatsFromCards(cards = {}) {
+  let correct = 0;
+  let incorrect = 0;
+  for (const card of Object.values(cards || {})) {
+    correct += cleanAnswerCount(card?.correct);
+    incorrect += cleanAnswerCount(card?.incorrect);
+  }
+  const answered = correct + incorrect;
+  return {
+    correct,
+    incorrect,
+    answered,
+    accuracy: answered ? Math.round((correct / answered) * 100) : 0,
+  };
+}
+
 export function StatsDashboard({
   daily,
   srsQueue,
@@ -73,6 +93,7 @@ export function StatsDashboard({
   const recommendations = state.reviewScope?.recommendations || [];
   const mistakeHistoryCount = (state.mistakes || []).length;
   const { rows: strengthRows, totalPracticed } = buildFormFamilyProgress(state);
+  const answerStats = answerStatsFromCards(state.cards);
   const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
   const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
   const readinessById = new Map(readinessFamilies.map((row) => [row.id, row]));
@@ -131,6 +152,7 @@ export function StatsDashboard({
               : null;
   const weakCount = strengthRows.filter((row) => row.status === 'weak').length;
   const hasHistory =
+    answerStats.answered > 0 ||
     strengthRows.some((row) => row.attempted > 0) ||
     (daily.count || 0) > 0 ||
     dueTotal > 0 ||
@@ -156,6 +178,9 @@ export function StatsDashboard({
             <div className="mt-4 flex flex-wrap gap-2">
               {[
                 ['Practiced', totalPracticed],
+                ['Accuracy', answerStats.answered ? `${answerStats.accuracy}%` : 'new'],
+                ['Right', answerStats.correct],
+                ['Wrong', answerStats.incorrect],
                 ['Today', `${daily.count || 0} cards`],
                 ['Recent misses', weakCount],
               ].map(([label, value]) => statTile(label, value))}
@@ -177,6 +202,32 @@ export function StatsDashboard({
                 <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
                   Continuous
                 </span>
+              </div>
+              <div className="rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-2 dark:border-indigo-900/60 dark:bg-stone-950/30">
+                <div className="flex items-center justify-between gap-3">
+                  <span>Answer balance</span>
+                  <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
+                    {answerStats.answered ? `${answerStats.accuracy}% right` : 'New'}
+                  </span>
+                </div>
+                <div
+                  role="meter"
+                  aria-label="Lifetime right answer rate"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={answerStats.accuracy}
+                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-rose-200/80 dark:bg-rose-950/60"
+                >
+                  <span
+                    className="block h-full rounded-full bg-emerald-500 dark:bg-emerald-400"
+                    style={{ width: `${answerStats.answered ? answerStats.accuracy : 0}%` }}
+                  />
+                </div>
+                <div className="mt-1 text-[11px] text-stone-500 dark:text-stone-400">
+                  {answerStats.answered
+                    ? `${answerStats.correct} right / ${answerStats.incorrect} wrong lifetime`
+                    : 'Answer a few cards to see right/wrong rate.'}
+                </div>
               </div>
             </div>
             {!hasHistory && (
