@@ -29,7 +29,7 @@ test.describe('Study flow', () => {
     await expect(page.getByText('Walk through this form in Guide')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Open Guide for this rule' })).toBeVisible();
     const primaryNextAction = page.getByRole('button', {
-      name: /^(Try another|Drill the trap|Review lesson)$/,
+      name: /^(Next card|Drill the trap|Review lesson)$/,
     });
     await expect(primaryNextAction).toHaveCount(1);
     await expect(primaryNextAction.first()).toBeVisible();
@@ -47,7 +47,7 @@ test.describe('Study flow', () => {
     await expect(page.getByText('Walk through this form in Guide')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Open Guide for this rule' })).toBeVisible();
     const primaryNextAction = page.getByRole('button', {
-      name: /^(Try another|Drill the trap|Review lesson)$/,
+      name: /^(Next card|Drill the trap|Review lesson)$/,
     });
     await expect(primaryNextAction).toHaveCount(1);
     await expect(primaryNextAction.first()).toBeVisible();

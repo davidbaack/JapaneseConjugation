@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  IconArrowRight,
   IconBook,
   IconChat,
   IconCheck,
@@ -226,7 +227,7 @@ export function reviewFeedbackActionForRecord(
   } = {},
 ) {
   if (!record || record.correct || record.wasCorrected || preferTryAnother) {
-    return { kind: 'try', label: 'Try another' };
+    return { kind: 'try', label: 'Next card' };
   }
 
   const debug = debugInfoForReviewRecord(record, reviewSubmittedAnswer);
@@ -244,7 +245,7 @@ export function reviewFeedbackActionForRecord(
     return { kind: 'lesson', label: 'Review lesson', lesson: relatedLesson };
   }
 
-  return { kind: 'try', label: 'Try another' };
+  return { kind: 'try', label: 'Next card' };
 }
 
 function ReviewFeedbackAction({ action, buttonRef, onClick }) {
@@ -256,7 +257,7 @@ function ReviewFeedbackAction({ action, buttonRef, onClick }) {
         ? IconSpark
         : action.kind === 'guide'
           ? IconList
-          : IconRefresh;
+          : IconArrowRight;
   const toneClass =
     action.kind === 'try'
       ? 'border-stone-800 bg-stone-850 text-white hover:bg-stone-700 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150'

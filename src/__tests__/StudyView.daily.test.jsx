@@ -204,7 +204,7 @@ function openPracticeRunSettings() {
 }
 
 async function clickTopReviewNext() {
-  fireEvent.click(await screen.findByRole('button', { name: 'Try another' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Next card' }));
 }
 
 class FakeSpeechRecognition {
@@ -271,7 +271,7 @@ describe('reviewFeedbackActionForRecord', () => {
     expect(godan).toBeTruthy();
     expect(ichidan).toBeTruthy();
 
-    expect(reviewFeedbackActionForRecord({ correct: true }).label).toBe('Try another');
+    expect(reviewFeedbackActionForRecord({ correct: true }).label).toBe('Next card');
     expect(
       reviewFeedbackActionForRecord({
         correct: false,
@@ -1707,7 +1707,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(
       within(reviewRegion).getByRole('button', { name: 'Open Guide for this rule' }),
     ).toBeTruthy();
-    expect(within(reviewRegion).getByRole('button', { name: 'Try another' })).toBeTruthy();
+    expect(within(reviewRegion).getByRole('button', { name: 'Next card' })).toBeTruthy();
     expect(within(reviewRegion).queryByText('New')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to Practice' }));

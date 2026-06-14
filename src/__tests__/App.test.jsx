@@ -585,7 +585,7 @@ describe('App shell', () => {
     expect(screen.queryByText('More')).toBeNull();
     expect(screen.getByText('Walk through this form in Guide')).toBeTruthy();
     expect(screen.getByText(/Drills this same word and target form/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Try another' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Next card' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Open Guide for this rule' }));
     expect(await screen.findByText('Focused Guide')).toBeTruthy();
     expect(screen.getByText(/Step through the same form from your Practice answer/)).toBeTruthy();
