@@ -27,6 +27,33 @@ export const LESSON_BY_GROUP_ID = new Map(
 );
 export const CARD_TYPE_BY_ID = new Map(ALL_CARD_TYPES.map((type) => [type.id, type]));
 
+function isPolitePracticeType(type) {
+  return (
+    String(type?.id || '').includes('polite') ||
+    /\bPolite\b/.test(type?.label || '') ||
+    type?.id === 'request-kudasai' ||
+    type?.id === 'negative-request'
+  );
+}
+
+const POLITE_TYPE_IDS = ALL_CARD_TYPES.filter(isPolitePracticeType).map((type) => type.id);
+const PLAIN_TYPE_IDS = ALL_CARD_TYPES.filter((type) => !isPolitePracticeType(type)).map(
+  (type) => type.id,
+);
+
+export const PRACTICE_REGISTER_FILTERS = [
+  {
+    id: 'plain',
+    label: 'Plain forms',
+    typeIds: PLAIN_TYPE_IDS,
+  },
+  {
+    id: 'polite',
+    label: 'Polite forms',
+    typeIds: POLITE_TYPE_IDS,
+  },
+];
+
 export function familyIntroTypeIds(family) {
   return (family?.typeIds || [])
     .filter((typeId) => CARD_TYPE_BY_ID.has(typeId))
@@ -48,11 +75,13 @@ export function familyIntroFocusFromLaunch(focus) {
 export function PracticeScopeSidebar({
   state,
   weaknessFamilies = [],
+  sessionFamilyStats = {},
   openFamilyIds,
   onToggleFamilyOpen,
   onToggleFamily,
   onIntroduceFamily,
   onToggleType,
+  onToggleTypeSet,
   className = '',
 }) {
   const enabled = new Set(state.enabledTypes || []);
@@ -64,32 +93,78 @@ export function PracticeScopeSidebar({
       className={`space-y-3 lg:sticky lg:top-4 lg:self-start ${className}`}
       aria-label="Practice map"
     >
-      <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
-        <div className="flex items-start justify-between gap-3">
+      <section className="space-y-3">
+        <div className="flex items-start justify-between gap-3 px-1">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
               Practice map
             </div>
             <h2 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
-              Category progress
+              Practice categories
             </h2>
-            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              Toggle categories for continuous Practice.
-            </p>
           </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-            <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
-              Not introduced
-            </span>
-            <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
-              {activeCount} saved forms
-            </span>
-          </div>
+          <span className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">
+            {activeCount} forms on
+          </span>
         </div>
-        <div className="mt-3 space-y-2">
+
+        <div className="grid gap-2">
+          {PRACTICE_REGISTER_FILTERS.map((filter) => {
+            const enabledInFilter = filter.typeIds.filter((typeId) => enabled.has(typeId));
+            const allEnabled = enabledInFilter.length === filter.typeIds.length;
+            const someEnabled = enabledInFilter.length > 0;
+            const statusLabel = allEnabled ? 'On' : someEnabled ? 'Partial' : 'Off';
+            const pressed = allEnabled ? true : someEnabled ? 'mixed' : false;
+            return (
+              <button
+                key={filter.id}
+                type="button"
+                aria-pressed={pressed}
+                aria-label={`Turn ${filter.label} ${allEnabled ? 'off' : 'on'}`}
+                onClick={() => onToggleTypeSet?.(filter.typeIds)}
+                className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left transition ${
+                  allEnabled
+                    ? 'border-indigo-200 bg-indigo-50/70 text-indigo-950 dark:border-indigo-900/70 dark:bg-indigo-950/20 dark:text-indigo-100'
+                    : someEnabled
+                      ? 'border-amber-200 bg-amber-50/70 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-100'
+                      : 'border-stone-200 bg-white text-stone-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300'
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold leading-tight">{filter.label}</span>
+                  <span className="mt-0.5 block text-[11px] tabular-nums opacity-70">
+                    {enabledInFilter.length}/{filter.typeIds.length} forms on
+                  </span>
+                </span>
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold ${
+                    allEnabled
+                      ? 'border-indigo-300 bg-white text-indigo-700 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300'
+                      : someEnabled
+                        ? 'border-amber-300 bg-white text-amber-800 dark:border-amber-700 dark:bg-stone-950 dark:text-amber-300'
+                        : 'border-stone-200 bg-stone-50 text-stone-600 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300'
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      allEnabled ? 'bg-emerald-500' : someEnabled ? 'bg-amber-500' : 'bg-stone-400'
+                    }`}
+                  />
+                  {statusLabel}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="space-y-3">
           {FORM_GROUPS.map((family) => {
+            const lesson = LESSON_BY_GROUP_ID.get(family.id);
             const enabledInFamily = family.typeIds.filter((typeId) => enabled.has(typeId));
             const allEnabled = enabledInFamily.length === family.typeIds.length;
+            const someEnabled = enabledInFamily.length > 0;
+            const statusLabel = allEnabled ? 'On' : someEnabled ? 'Partial' : 'Off';
+            const pressed = allEnabled ? true : someEnabled ? 'mixed' : false;
             const progress = weaknessByFamily.get(family.id) || {};
             const weaknessRows = progress.rows || [];
             const attempted = progress.attempted || 0;
@@ -107,6 +182,7 @@ export function PracticeScopeSidebar({
               : skillStatus === 'untested'
                 ? skillLabel
                 : `${skillScore}% skill - ${skillLabel}`;
+            const skillAriaText = skillText || skillLabel;
             const learnerState = progress.learnerState || {
               id: introduced ? 'learning' : 'not-introduced',
               label: introduced ? 'Learning' : 'Not introduced',
@@ -114,15 +190,30 @@ export function PracticeScopeSidebar({
             const repsText = !introduced
               ? 'Not introduced'
               : attempted
-                ? `${correct} right / ${incorrect} wrong`
+                ? `${correct} right / ${incorrect} wrong lifetime`
                 : 'No reps yet';
+            const sessionStats = sessionFamilyStats[family.id] || {};
+            const sessionCorrect = sessionStats.correct || 0;
+            const sessionIncorrect = sessionStats.incorrect || 0;
+            const sessionTotal = sessionCorrect + sessionIncorrect;
+            const sessionCorrectPct = sessionTotal ? (sessionCorrect / sessionTotal) * 100 : 0;
+            const sessionIncorrectPct = sessionTotal ? (sessionIncorrect / sessionTotal) * 100 : 0;
             const open = openFamilyIds.has(family.id);
             const contentId = `practice-map-family-${family.id}`;
-            const introEligible = enabledInFamily.length === 0 || !introduced;
+            const introEligible = enabledInFamily.length === 0 || (!introduced && !allEnabled);
+            const title = lesson?.title || family.label;
+            const titleId = `practice-map-title-${family.id}`;
             return (
-              <div
+              <article
                 key={family.id}
-                className="rounded-xl border border-stone-200 bg-stone-50/80 dark:border-stone-800 dark:bg-stone-950/70"
+                aria-labelledby={titleId}
+                className={`rounded-2xl border p-3 transition ${
+                  allEnabled
+                    ? 'border-indigo-200 bg-indigo-50/70 dark:border-indigo-900/70 dark:bg-indigo-950/20'
+                    : someEnabled
+                      ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/70 dark:bg-amber-950/20'
+                      : 'border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900'
+                }`}
               >
                 <div className="flex items-start justify-between gap-3 px-3 py-3">
                   <button
@@ -133,10 +224,23 @@ export function PracticeScopeSidebar({
                     aria-label={`${family.label} category details`}
                     className="min-w-0 flex-1 cursor-pointer rounded-lg bg-transparent p-0 text-left"
                   >
-                    <span className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="min-w-0 truncate text-sm font-semibold text-stone-900 dark:text-stone-100">
-                        {family.label}
+                    <span className="block min-w-0">
+                      {lesson?.kana && (
+                        <span
+                          lang="ja"
+                          className="block text-sm font-semibold leading-tight text-indigo-600 dark:text-indigo-300"
+                        >
+                          {lesson.kana}
+                        </span>
+                      )}
+                      <span
+                        id={titleId}
+                        className="mt-1 block text-sm font-semibold leading-tight text-stone-950 dark:text-stone-50"
+                      >
+                        {title}
                       </span>
+                    </span>
+                    <span className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
                       <span
                         className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold leading-none ${
                           LEARNER_STATE_TONE[learnerState.id] || LEARNER_STATE_TONE.learning
@@ -144,11 +248,14 @@ export function PracticeScopeSidebar({
                       >
                         {learnerState.label}
                       </span>
+                      <span className="text-[11px] font-medium text-stone-500 dark:text-stone-400">
+                        {enabledInFamily.length}/{family.typeIds.length} forms on
+                      </span>
                     </span>
-                    <span className="mt-0.5 block text-xs text-stone-500">
-                      {enabledInFamily.length}/{family.typeIds.length} saved
+                    <span className="mt-2 block text-xs leading-relaxed text-stone-600 dark:text-stone-300">
+                      {lesson?.summary || 'Practice the forms in this category.'}
                     </span>
-                    <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-stone-500">
+                    <span className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-stone-500 dark:text-stone-400">
                       <span>{repsText}</span>
                       {skillText && (
                         <span className="font-semibold text-stone-700 dark:text-stone-300">
@@ -159,7 +266,7 @@ export function PracticeScopeSidebar({
                     <span className="mt-2 block">
                       <span
                         className="block h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
-                        aria-label={`${family.label} skill`}
+                        aria-label={`${family.label} skill: ${skillAriaText}`}
                       >
                         <span
                           className={`block h-full ${
@@ -171,8 +278,62 @@ export function PracticeScopeSidebar({
                         />
                       </span>
                     </span>
+                    <span className="mt-3 block">
+                      <span className="mb-1 flex items-center justify-between gap-2 text-[11px] font-medium text-stone-500 dark:text-stone-400">
+                        <span>This session</span>
+                        <span className="tabular-nums">
+                          {sessionTotal
+                            ? `${sessionCorrect} right / ${sessionIncorrect} wrong`
+                            : 'No reps'}
+                        </span>
+                      </span>
+                      <span
+                        className="flex h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
+                        role="img"
+                        aria-label={`${family.label} this session: ${sessionCorrect} right / ${sessionIncorrect} wrong`}
+                      >
+                        {sessionTotal ? (
+                          <>
+                            <span
+                              className="block h-full bg-emerald-500"
+                              style={{ width: `${sessionCorrectPct}%` }}
+                            />
+                            <span
+                              className="block h-full bg-rose-500"
+                              style={{ width: `${sessionIncorrectPct}%` }}
+                            />
+                          </>
+                        ) : (
+                          <span className="block h-full w-2 bg-stone-300 dark:bg-stone-700" />
+                        )}
+                      </span>
+                    </span>
                   </button>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <button
+                      type="button"
+                      aria-pressed={pressed}
+                      aria-label={`Turn ${title} focus ${allEnabled ? 'off' : 'on'}`}
+                      onClick={() => onToggleFamily(family)}
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold transition ${
+                        allEnabled
+                          ? 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/50'
+                          : someEnabled
+                            ? 'border-amber-300 bg-white text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-stone-950 dark:text-amber-300 dark:hover:bg-amber-950/50'
+                            : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300'
+                      }`}
+                    >
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          allEnabled
+                            ? 'bg-emerald-500'
+                            : someEnabled
+                              ? 'bg-amber-500'
+                              : 'bg-stone-400'
+                        }`}
+                      />
+                      {statusLabel}
+                    </button>
                     {introEligible && onIntroduceFamily && (
                       <button
                         type="button"
@@ -181,20 +342,6 @@ export function PracticeScopeSidebar({
                         aria-label={`Introduce ${family.label} family`}
                       >
                         Introduce this family
-                      </button>
-                    )}
-                    {(!introEligible || allEnabled) && (
-                      <button
-                        type="button"
-                        onClick={() => onToggleFamily(family)}
-                        className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-                          allEnabled
-                            ? 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400'
-                        }`}
-                        aria-label={`${allEnabled ? 'Disable' : 'Enable'} all ${family.label} forms`}
-                      >
-                        {allEnabled ? 'Disable all' : 'Enable all'}
                       </button>
                     )}
                   </div>
@@ -270,7 +417,7 @@ export function PracticeScopeSidebar({
                     </div>
                   </div>
                 )}
-              </div>
+              </article>
             );
           })}
         </div>

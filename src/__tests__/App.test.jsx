@@ -39,10 +39,10 @@ describe('App shell', () => {
     render(<App />);
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
-    expect(screen.getByRole('complementary', { name: 'Focus map' })).toBeTruthy();
-    expect(screen.getByText('Category progress')).toBeTruthy();
+    expect(screen.queryByRole('complementary', { name: 'Focus map' })).toBeNull();
     expect(screen.getByText('Practice categories')).toBeTruthy();
-    expect(screen.getByText('Toggle categories for continuous Practice.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Turn Plain forms on' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Turn Polite forms on' })).toBeTruthy();
     expect(screen.getAllByText('Not introduced').length).toBeGreaterThan(0);
     expect(screen.queryByText('No reps yet')).toBeNull();
     expect(screen.queryByText('Untested')).toBeNull();
@@ -141,20 +141,20 @@ describe('App shell', () => {
     fireEvent.click(teTaDetailsButton());
     expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
 
-    expect(within(practiceMap()).getByText('2/2 saved')).toBeTruthy();
+    expect(within(practiceMap()).getByText('2/2 forms on')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
-    expect(within(practiceMap()).getByText('0 right / 2 wrong')).toBeTruthy();
+    expect(within(practiceMap()).getByText('0 right / 2 wrong lifetime')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
     expect(within(practiceMap()).getByText('Gathering data')).toBeTruthy();
     expect(
-      within(practiceMap()).getByRole('button', { name: 'Disable all Te/Ta Sound Changes forms' }),
+      within(practiceMap()).getByRole('button', { name: 'Turn Te/Ta Sound Changes focus off' }),
     ).toBeTruthy();
     expect(within(practiceMap()).getByText('Recent weak spots')).toBeTruthy();
     expect(within(practiceMap()).getByText('Te-form - Godan ku sound changes')).toBeTruthy();
     expect(within(practiceMap()).getByText('0/2')).toBeTruthy();
 
     fireEvent.click(within(practiceMap()).getByRole('button', { name: /^Te-form/i }));
-    await waitFor(() => expect(within(practiceMap()).getByText('1/2 saved')).toBeTruthy());
+    await waitFor(() => expect(within(practiceMap()).getByText('1/2 forms on')).toBeTruthy());
     expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
     expect(within(practiceMap()).getByText('Recent weak spots')).toBeTruthy();
   });
@@ -175,7 +175,7 @@ describe('App shell', () => {
     expect(await screen.findByText('Family primer')).toBeTruthy();
     expect(screen.getByText('4-card guided set')).toBeTruthy();
     expect(screen.getByRole('progressbar', { name: 'Intro progress' })).toBeTruthy();
-    expect(within(practiceMap()).getByText('4/10 saved')).toBeTruthy();
+    expect(within(practiceMap()).getByText('4/10 forms on')).toBeTruthy();
 
     const primer = screen.getByRole('region', { name: 'Passive primer' });
     expect(within(primer).getByText('Passive Polite Negative')).toBeTruthy();
@@ -223,8 +223,8 @@ describe('App shell', () => {
     expect(settingsButton).toBeTruthy();
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
-    expect(screen.getByRole('complementary', { name: 'Focus map' })).toBeTruthy();
-    expect(screen.getByText('52 saved forms')).toBeTruthy();
+    expect(screen.queryByRole('complementary', { name: 'Focus map' })).toBeNull();
+    expect(screen.getByText('52 forms on')).toBeTruthy();
     // "Sentence" is now the cued-cloze presentation toggle: a valid review
     // control, not a legacy study-mode button.
     expect(screen.queryByRole('button', { name: 'Sentence off', exact: true })).toBeNull();

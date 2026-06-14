@@ -103,7 +103,6 @@ import { StudyFocusBar } from './study/StudyFocusBar.jsx';
 import {
   CARD_TYPE_BY_ID,
   FAMILY_INTRO_REVIEW_LIMIT_SOURCE,
-  FocusCategoryMap,
   LESSON_BY_GROUP_ID,
   PracticeScopeSidebar,
   familyIntroFocusFromLaunch,
@@ -263,6 +262,27 @@ function sessionRunStats(session = {}, base = {}) {
     skipped,
     streak: session.currentStreak || 0,
   };
+}
+
+function sessionFamilyStatsFromHistory(history = []) {
+  const familyByTypeId = new Map();
+  for (const family of FORM_GROUPS) {
+    for (const typeId of family.typeIds || []) {
+      familyByTypeId.set(typeId, family.id);
+    }
+  }
+
+  return history.reduce((stats, record) => {
+    const typeId = record?.practicedType || record?.cardType;
+    const familyId = familyByTypeId.get(typeId);
+    if (!familyId) return stats;
+    const current = stats[familyId] || { correct: 0, incorrect: 0 };
+    stats[familyId] = {
+      correct: current.correct + (record.correct ? 1 : 0),
+      incorrect: current.incorrect + (record.correct ? 0 : 1),
+    };
+    return stats;
+  }, {});
 }
 
 function sessionOutcomeLabel(card) {
@@ -659,6 +679,10 @@ export default function StudyView({ mode = 'practice' }) {
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const weaknessFamilies = useMemo(() => buildWeaknessFamilyRows(state), [state.weakness]);
+  const sessionFamilyStats = useMemo(
+    () => sessionFamilyStatsFromHistory(runAnswerHistory),
+    [runAnswerHistory],
+  );
   const daily = state.daily || {};
   const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const boundedReviewLaunchActive = activeReviewLimitFromPrefs(practicePrefs) > 0;
@@ -1774,6 +1798,23 @@ export default function StudyView({ mode = 'practice' }) {
     setCurrent(null);
   }
 
+  function togglePracticeTypeSet(typeIds = []) {
+    const targetTypeIds = [...new Set(typeIds.filter((typeId) => CARD_TYPE_BY_ID.has(typeId)))];
+    if (!targetTypeIds.length) return;
+    setState((prev) => {
+      const currentTypes = new Set(prev.enabledTypes || []);
+      const allEnabled = targetTypeIds.every((typeId) => currentTypes.has(typeId));
+      if (allEnabled) {
+        for (const typeId of targetTypeIds) currentTypes.delete(typeId);
+        if (!currentTypes.size) return prev;
+      } else {
+        for (const typeId of targetTypeIds) currentTypes.add(typeId);
+      }
+      return { ...prev, enabledTypes: [...currentTypes] };
+    });
+    setCurrent(null);
+  }
+
   function togglePracticeFamily(family) {
     if (!family?.typeIds?.length) return;
     setState((prev) => {
@@ -2724,8 +2765,8 @@ export default function StudyView({ mode = 'practice' }) {
       ? `${currentSelectionReason}. Clean run so far.`
       : `${currentSelectionReason}.`;
   return (
-    <div className="grid gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] xl:justify-center xl:grid-cols-[minmax(0,17rem)_minmax(0,42rem)_minmax(0,17rem)]">
-      <div className="order-1 min-w-0 space-y-4 lg:order-2 xl:w-full">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] xl:justify-center xl:grid-cols-[minmax(0,42rem)_minmax(0,20rem)]">
+      <div className="order-1 min-w-0 space-y-4 xl:w-full">
         {focusBanner && (
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 px-5 py-4 dark:border-indigo-800 dark:bg-indigo-950/20">
             <div className="flex items-start justify-between gap-3">
@@ -3283,19 +3324,16 @@ export default function StudyView({ mode = 'practice' }) {
         </div>
       </div>
       <PracticeScopeSidebar
-        className="order-2 lg:order-1"
+        className="order-2"
         state={state}
         weaknessFamilies={weaknessFamilies}
+        sessionFamilyStats={sessionFamilyStats}
         openFamilyIds={openPracticeMapFamilyIds}
         onToggleFamilyOpen={togglePracticeMapFamilyOpen}
         onToggleFamily={togglePracticeFamily}
         onIntroduceFamily={introducePracticeFamily}
         onToggleType={togglePracticeType}
-      />
-      <FocusCategoryMap
-        className="order-3 lg:col-span-2 xl:col-span-1"
-        state={state}
-        onToggleFamily={togglePracticeFamily}
+        onToggleTypeSet={togglePracticeTypeSet}
       />
     </div>
   );

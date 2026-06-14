@@ -1259,6 +1259,11 @@ describe('StudyView continuous Practice startup', () => {
       label: 'Plain Past',
     });
     expect(nextState.cards[dueCardId].correct).toBe(1);
+    expect(
+      screen.getByRole('img', {
+        name: 'Te/Ta Sound Changes this session: 1 right / 0 wrong',
+      }),
+    ).toBeTruthy();
     expect(nextState.daily.count).toBe(1);
     expect(nextState.transformation.attempted).toBe(0);
     expect(markSrsQueueCompleted).not.toHaveBeenCalled();
