@@ -21,7 +21,9 @@ template generator for custom words or any missing row.
 3. `npm run sentences:import <output.jsonl>` validates each sentence against the
    conjugation engine, derives per-token furigana with **kuromoji**, and upserts
    to Supabase. Rejected lines go to `<output>.rejects.jsonl`.
-4. `npm run sentences:export-corpus` reads Supabase and writes chunked JSON to
+4. `npm run sentences:check-corpus` compares the checked-in offline corpus to
+   Supabase without writing files.
+5. `npm run sentences:export-corpus` reads Supabase and writes chunked JSON to
    `public/data/sentences`, one file per type under `by-type/`, plus a manifest.
 
 The conjugated form is recomputed from the engine and must appear verbatim in the
@@ -156,21 +158,26 @@ select type, count(*) from public.sentences group by type order by 2 desc;
 ```
 
 Imported sentences appear in Practice → Sentence mode automatically for the
-covered words. Run `npm run sentences:export-corpus` after imports when those
-sentences should ship as static app data; the exporter fails if any current
-built-in word/form pair is missing from Supabase. Full lexicon × all forms is
-~150k–270k sentences, so expect a long run; Supabase value lands continuously as
-batches import, while bundled static value lands with the next app deploy.
+covered words. Run `npm run sentences:check-corpus` to prove whether the
+checked-in static corpus already matches Supabase exactly. If it reports drift,
+run `npm run sentences:export-corpus` so those sentences ship as static app
+data; the exporter fails if any current built-in word/form pair is missing from
+Supabase. Full lexicon × all forms is ~150k–270k sentences, so expect a long
+run; Supabase value lands continuously as batches import, while bundled static
+value lands with the next app deploy.
 
 ## Exporting the offline corpus
 
 ```bash
+npm run sentences:check-corpus
 npm run sentences:export-corpus
 ```
 
-The exporter requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, reads only
-from `public.sentences`, filters out stale rows that no longer match the current
-lexicon/form matrix, and writes:
+Both commands require `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, read only
+from `public.sentences`, and filter out stale rows that no longer match the
+current lexicon/form matrix. The check command compares exact generated file
+contents against `public/data/sentences` and performs no writes or deletes. The
+export command writes:
 
 - `public/data/sentences/manifest.json`
 - `public/data/sentences/by-type/<type>.json`

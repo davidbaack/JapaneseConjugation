@@ -1,9 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildCorpusChunks,
+  checkCorpusFiles,
   expectedSentencePairs,
   resolveCorpusOutputDir,
   writeCorpusFiles,
@@ -11,6 +12,25 @@ import {
 
 const WORD = { dict: '買う', reading: 'かう', meaning: 'to buy', group: 'godan' };
 const tempRoots = [];
+
+function makeCorpusOutDir() {
+  const root = mkdtempSync(join(tmpdir(), 'katachiya-corpus-'));
+  tempRoots.push(root);
+  return join(root, 'data', 'sentences');
+}
+
+function sampleChunks() {
+  return [
+    {
+      type: 'plain-past',
+      rows: [['godan:a', 'today {w}.', 'I did it today.', [{ w: true }]]],
+    },
+    {
+      type: 'plain-negative',
+      rows: [['godan:a', 'tomorrow {w}.', 'I will not do it tomorrow.', [{ w: true }]]],
+    },
+  ];
+}
 
 afterEach(() => {
   for (const root of tempRoots.splice(0)) {
@@ -98,9 +118,7 @@ describe('sentence corpus exporter helpers', () => {
   });
 
   it('writes corpus files only under a nested sentences directory', () => {
-    const root = mkdtempSync(join(tmpdir(), 'katachiya-corpus-'));
-    tempRoots.push(root);
-    const outDir = join(root, 'data', 'sentences');
+    const outDir = makeCorpusOutDir();
 
     const stats = writeCorpusFiles(
       [
@@ -118,6 +136,85 @@ describe('sentence corpus exporter helpers', () => {
       schema: 1,
       type: 'plain-past',
       rows: [['godan:買う', '昼に{w}。', 'I bought it at noon.', [{ w: true }]]],
+    });
+  });
+
+  it('reports an exact checked-in corpus match', () => {
+    const chunks = sampleChunks();
+    const outDir = makeCorpusOutDir();
+    writeCorpusFiles(chunks, outDir);
+
+    expect(checkCorpusFiles(chunks, outDir)).toMatchObject({
+      ok: true,
+      totalRows: 2,
+      typeCount: 2,
+      missingFiles: [],
+      extraFiles: [],
+      changedFiles: [],
+    });
+  });
+
+  it('reports changed chunk content', () => {
+    const chunks = sampleChunks();
+    const outDir = makeCorpusOutDir();
+    writeCorpusFiles(chunks, outDir);
+    writeFileSync(
+      join(outDir, 'by-type', 'plain-past.json'),
+      `${JSON.stringify({
+        schema: 1,
+        type: 'plain-past',
+        rows: [['godan:a', 'changed {w}.', 'Changed.', [{ w: true }]]],
+      })}\n`,
+    );
+
+    expect(checkCorpusFiles(chunks, outDir)).toMatchObject({
+      ok: false,
+      missingFiles: [],
+      extraFiles: [],
+      changedFiles: ['by-type/plain-past.json'],
+    });
+  });
+
+  it('reports missing chunk files', () => {
+    const chunks = sampleChunks();
+    const outDir = makeCorpusOutDir();
+    writeCorpusFiles(chunks, outDir);
+    rmSync(join(outDir, 'by-type', 'plain-negative.json'));
+
+    expect(checkCorpusFiles(chunks, outDir)).toMatchObject({
+      ok: false,
+      missingFiles: ['by-type/plain-negative.json'],
+      extraFiles: [],
+      changedFiles: [],
+    });
+  });
+
+  it('reports extra exported files', () => {
+    const chunks = sampleChunks();
+    const outDir = makeCorpusOutDir();
+    writeCorpusFiles(chunks, outDir);
+    mkdirSync(join(outDir, 'by-type'), { recursive: true });
+    writeFileSync(join(outDir, 'by-type', 'obsolete.json'), '{}\n');
+
+    expect(checkCorpusFiles(chunks, outDir)).toMatchObject({
+      ok: false,
+      missingFiles: [],
+      extraFiles: ['by-type/obsolete.json'],
+      changedFiles: [],
+    });
+  });
+
+  it('reports manifest mismatch separately from chunk matches', () => {
+    const chunks = sampleChunks();
+    const outDir = makeCorpusOutDir();
+    writeCorpusFiles(chunks, outDir);
+    writeFileSync(join(outDir, 'manifest.json'), '{}\n');
+
+    expect(checkCorpusFiles(chunks, outDir)).toMatchObject({
+      ok: false,
+      missingFiles: [],
+      extraFiles: [],
+      changedFiles: ['manifest.json'],
     });
   });
 });

@@ -186,6 +186,7 @@ The deterministic dev page listens at
 | `npm run sentences:batches` | Emit batch files of pending `(word, conjugation)` pairs for the tailored sentence library. See [docs/sentence-library.md](docs/sentence-library.md). |
 | `npm run sentences:english` | Rewrite legacy generated sentence-library outputs with natural English glosses. See [docs/sentence-library.md](docs/sentence-library.md). |
 | `npm run sentences:import` | Validate generated sentences and upsert them to Supabase. See [docs/sentence-library.md](docs/sentence-library.md). |
+| `npm run sentences:check-corpus` | Verify the checked-in offline sentence corpus exactly matches the validated Supabase table. |
 | `npm run sentences:export-corpus` | Export the validated Supabase sentence table into chunked offline JSON under `public/data/sentences`. |
 | `npm run size` | Check bundle budget after a build. |
 | `npm run ci:fast` | Run format check, lint, typecheck, and unit tests. |

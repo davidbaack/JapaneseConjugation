@@ -22,6 +22,7 @@
     "sentences:batches": "node scripts/build-sentence-batches.js",
     "sentences:english": "node scripts/rewrite-sentence-english.js",
     "sentences:import": "node scripts/import-sentence-library.js",
+    "sentences:check-corpus": "node scripts/export-sentence-corpus.js --check",
     "sentences:export-corpus": "node scripts/export-sentence-corpus.js",
     "size": "node scripts/check-bundle-size.js",
     "ci:fast": "npm run format:check && npm run lint && npm run typecheck && npm run test",
