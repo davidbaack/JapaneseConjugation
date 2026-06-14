@@ -187,4 +187,28 @@ describe('ConjugationBreakdown', () => {
     fireEvent.click(screen.getByRole('button', { name: 'See Learn table' }));
     expect(openLearn).toHaveBeenCalledTimes(1);
   });
+
+  it('sends row-shift visual data to the Formation keys opener', () => {
+    const openFormationKeys = vi.fn();
+    const openLearn = vi.fn();
+    render(
+      <ConjugationBreakdown
+        word={YOMU}
+        type="plain-negative"
+        userAnswer="よむない"
+        onOpenFormationKeys={openFormationKeys}
+        onOpenLearn={openLearn}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'See Learn table' }));
+
+    expect(openLearn).not.toHaveBeenCalled();
+    expect(openFormationKeys).toHaveBeenCalledTimes(1);
+    expect(openFormationKeys.mock.calls[0][0]).toMatchObject({
+      ending: 'む',
+      targetRow: 'a-row',
+      shiftedKana: 'ま',
+    });
+  });
 });

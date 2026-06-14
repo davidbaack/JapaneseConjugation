@@ -64,8 +64,17 @@ function RoutePanel({ route, accent = 'indigo', romajiFor }) {
   );
 }
 
-function RowShiftVisual({ visual, onOpenLearn }) {
+function RowShiftVisual({ visual, onOpenFormationKeys, onOpenLearn }) {
   if (!visual) return null;
+  const canOpenTable = !!(onOpenFormationKeys || onOpenLearn);
+  const openTable = () => {
+    if (onOpenFormationKeys) {
+      onOpenFormationKeys(visual);
+      return;
+    }
+    onOpenLearn?.();
+  };
+
   return (
     <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50/55 px-3 py-2.5 dark:border-indigo-900/60 dark:bg-indigo-950/20">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -77,10 +86,10 @@ function RowShiftVisual({ visual, onOpenLearn }) {
             Final <span lang="ja">{visual.ending}</span> moves to the {visual.targetRow}.
           </div>
         </div>
-        {onOpenLearn && (
+        {canOpenTable && (
           <button
             type="button"
-            onClick={() => onOpenLearn()}
+            onClick={openTable}
             className="text-xs font-semibold text-indigo-650 underline decoration-indigo-300 underline-offset-4 transition hover:text-indigo-800 dark:text-indigo-300 dark:decoration-indigo-700 dark:hover:text-indigo-100"
           >
             See Learn table
@@ -190,6 +199,7 @@ export function ConjugationBreakdown({
   type,
   userAnswer = '',
   practicePrefs = DEFAULT_PREFS,
+  onOpenFormationKeys,
   onOpenLearn,
 }) {
   const debug = useMemo(
@@ -268,7 +278,11 @@ export function ConjugationBreakdown({
           {debug.soundChangeVisual ? (
             <SoundChangeVisual visual={debug.soundChangeVisual} onOpenLearn={onOpenLearn} />
           ) : (
-            <RowShiftVisual visual={debug.rowShiftVisual} onOpenLearn={onOpenLearn} />
+            <RowShiftVisual
+              visual={debug.rowShiftVisual}
+              onOpenFormationKeys={onOpenFormationKeys}
+              onOpenLearn={onOpenLearn}
+            />
           )}
           {debug.groupConnection && (
             <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/70 px-2.5 py-2 text-xs leading-relaxed text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/25 dark:text-indigo-100">

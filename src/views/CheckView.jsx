@@ -9,6 +9,7 @@ import { getTypeInfo, getWordMeta } from '../utils/conjugator.js';
 import { explainItem, GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { formRows } from './ReferenceViewSub.jsx';
 import { formDisplay, englishForForm } from '../utils/display.js';
+import { buildFormationKeysHash } from '../utils/formationKeys.js';
 import { toKanaInputValue } from '../utils/romaji.js';
 import { useApp } from '../state/AppStateContext.jsx';
 
@@ -606,6 +607,10 @@ export default function CheckView() {
                         window.location.hash = 'formation-keys';
                         setTab('learn');
                       }}
+                      onOpenFormationKeys={(visual) => {
+                        window.location.hash = buildFormationKeysHash(visual);
+                        setTab('learn');
+                      }}
                     />
                   )}
                 </div>
@@ -718,6 +723,10 @@ export default function CheckView() {
                       practicePrefs={practicePrefs}
                       onOpenLearn={() => {
                         window.location.hash = 'formation-keys';
+                        setTab('learn');
+                      }}
+                      onOpenFormationKeys={(visual) => {
+                        window.location.hash = buildFormationKeysHash(visual);
                         setTab('learn');
                       }}
                     />

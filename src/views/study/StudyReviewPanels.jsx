@@ -367,6 +367,11 @@ function RunAnswerReveal({
     !!onOpenGuide && !!record.word && !!reviewTypeId && !record.reverseDrill;
   const canOpenRuleLesson = !!relatedLesson && !!(onOpenLearn || onOpenLearnFocus);
   const ruleLessonLabel = record.correct ? 'Teach me this rule' : 'I forgot this';
+  const openFormationKeys = onOpenLearn
+    ? (visual) => {
+        onOpenLearn(null, visual);
+      }
+    : undefined;
   const openRuleLesson = () => {
     const handled = onOpenLearnFocus?.(record);
     if (!handled) onOpenLearn?.(relatedLesson.groupId);
@@ -606,6 +611,7 @@ function RunAnswerReveal({
               word={record.word}
               type={record.practicedType}
               practicePrefs={prefs}
+              onOpenFormationKeys={openFormationKeys}
               onOpenLearn={onOpenLearn}
             />
           </ReviewDisclosure>
@@ -696,6 +702,7 @@ function RunAnswerReveal({
               type={record.practicedType}
               userAnswer={record.revealedMiss ? '' : reviewSubmittedAnswer}
               practicePrefs={prefs}
+              onOpenFormationKeys={openFormationKeys}
               onOpenLearn={onOpenLearn}
             />
             {minimalPairFeedback && (

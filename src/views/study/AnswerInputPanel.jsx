@@ -3,6 +3,7 @@ import { IconMic, IconSpark } from '../../components/Icons.jsx';
 import ScriptDisplay from '../../components/ScriptDisplay.jsx';
 import StickyAction from '../../components/StickyAction.jsx';
 import { formDisplay, promptDisplay } from '../../utils/display.js';
+import { buildFormationKeysHash } from '../../utils/formationKeys.js';
 import { clearMinimalPairPrefs, minimalPairReturnEnabledTypes } from '../../utils/minimalPairs.js';
 import { RunAnswerReveal } from './StudyReviewPanels.jsx';
 
@@ -669,8 +670,10 @@ export function AnswerInputPanel({
         onOpenLearn={
           wordSweep
             ? null
-            : (groupId) => {
-                window.location.hash = groupId ? `lesson-${groupId}` : 'formation-keys';
+            : (groupId, rowShiftVisual) => {
+                window.location.hash = groupId
+                  ? `lesson-${groupId}`
+                  : buildFormationKeysHash(rowShiftVisual);
                 setTab('learn');
               }
         }

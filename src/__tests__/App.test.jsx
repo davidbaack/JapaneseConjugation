@@ -17,6 +17,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   sessionStorage.clear();
+  window.location.hash = '';
 });
 
 async function waitForPracticeCard() {
@@ -602,6 +603,22 @@ describe('App shell', () => {
       await waitFor(() => expect(screen.queryByText('Something went wrong')).toBeNull());
       expect(screen.getByRole('tab', { name: label, exact: true })).toBeTruthy();
     }
+  });
+
+  it('opens Formation keys with a highlighted godan row-map cell from the hash', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Learn', exact: true }));
+    expect(
+      await screen.findByRole('heading', { name: /Conjugation formation guide/ }),
+    ).toBeTruthy();
+
+    window.location.hash = 'formation-keys?ending=%E3%82%80&row=a-row';
+    window.dispatchEvent(new Event('hashchange'));
+
+    expect(await screen.findByRole('table', { name: 'Godan row map' })).toBeTruthy();
+    expect(screen.getByText(/Highlighted shift:/).textContent).toContain('む -> ま');
+    expect(screen.getByTestId('godan-row-む-a-row').getAttribute('aria-current')).toBe('true');
   });
 
   it('opens Guide and submits a completed assisted guide card', async () => {

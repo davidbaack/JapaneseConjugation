@@ -35,6 +35,7 @@ import {
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { explainItem, stepCoachHint } from '../utils/conjugatorExplain.js';
+import { buildFormationKeysHash } from '../utils/formationKeys.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 import {
   selectNext,
@@ -2286,8 +2287,10 @@ export default function StudyView({ mode = 'practice' }) {
         geminiKey={geminiKey}
         onOpenGuide={openGuideForReviewRule}
         onOpenLab={openLabForReviewRoute}
-        onOpenLearn={(groupId) => {
-          window.location.hash = groupId ? `lesson-${groupId}` : 'formation-keys';
+        onOpenLearn={(groupId, rowShiftVisual) => {
+          window.location.hash = groupId
+            ? `lesson-${groupId}`
+            : buildFormationKeysHash(rowShiftVisual);
           setTab('learn');
         }}
         onOpenLearnFocus={openLearnForRuleRecord}

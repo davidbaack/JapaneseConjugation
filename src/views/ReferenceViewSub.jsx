@@ -15,6 +15,7 @@ import { isAdjective } from '../utils/conjugator.js';
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { normalizeReferenceState } from '../utils/storage.js';
 import { formDisplay, promptDisplay } from '../utils/display.js';
+import { buildFormationKeysHash } from '../utils/formationKeys.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
@@ -1007,6 +1008,14 @@ export default function ReferenceViewSub({
                                 setTab
                                   ? () => {
                                       window.location.hash = 'formation-keys';
+                                      setTab('learn');
+                                    }
+                                  : undefined
+                              }
+                              onOpenFormationKeys={
+                                setTab
+                                  ? (visual) => {
+                                      window.location.hash = buildFormationKeysHash(visual);
                                       setTab('learn');
                                     }
                                   : undefined

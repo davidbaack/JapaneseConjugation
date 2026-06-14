@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { GodanRowChart } from '../components/GodanRowChart.jsx';
 import { IconBook, IconList, IconRefresh, IconSpark } from '../components/Icons.jsx';
 import { getTypeInfo } from '../data/conjugationTypes.js';
 import {
   FOUNDATION_CARDS,
-  GODAN_ROW_KEYS,
   LESSON_SECTIONS,
   LESSON_TRACKS,
   ONBIN_ROWS,
@@ -15,6 +15,7 @@ import {
   buildLessonReviewRecommendation,
   buildRuleReviewRecommendation,
 } from '../utils/reviewRecommendations.js';
+import { parseFormationKeysHash } from '../utils/formationKeys.js';
 
 function LessonStat({ label, value }) {
   return (
@@ -234,6 +235,7 @@ export default function LessonsView() {
   } = useApp();
   const [query, setQuery] = useState('');
   const [showFormationKeys, setShowFormationKeys] = useState(false);
+  const [formationKeyHighlight, setFormationKeyHighlight] = useState({ ending: '', row: '' });
   const [openLessonIds, setOpenLessonIds] = useState(() => new Set());
   const lessonRefs = useRef(new Map());
   const coverage = useMemo(() => getLessonCoverage(), []);
@@ -258,8 +260,10 @@ export default function LessonsView() {
   useEffect(() => {
     function openFromHash() {
       const hash = window.location.hash;
-      if (hash === '#formation-keys') {
+      const formationKeys = parseFormationKeysHash(hash);
+      if (formationKeys) {
         setShowFormationKeys(true);
+        setFormationKeyHighlight(formationKeys);
         return;
       }
       const lessonMatch = hash.match(/^#lesson-(.+)$/);
@@ -445,6 +449,10 @@ export default function LessonsView() {
             <nav className="mt-3 space-y-1" aria-label="Lesson list">
               <a
                 href="#formation-keys"
+                onClick={() => {
+                  setShowFormationKeys(true);
+                  setFormationKeyHighlight({ ending: '', row: '' });
+                }}
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-stone-850"
               >
                 <IconList className="w-4 h-4 text-indigo-500" />
@@ -542,28 +550,11 @@ export default function LessonsView() {
                 </div>
 
                 <div className="mt-4 grid gap-3 xl:grid-cols-2">
-                  <div className="rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden">
-                    <div className="bg-stone-50 dark:bg-stone-950 px-4 py-2 text-sm font-semibold text-stone-800 dark:text-stone-200">
-                      Godan row shifts
-                    </div>
-                    <div className="divide-y divide-stone-100 dark:divide-stone-850">
-                      {GODAN_ROW_KEYS.map((row) => (
-                        <div
-                          key={row.row}
-                          className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[5rem_1fr]"
-                        >
-                          <div className="font-semibold text-stone-900 dark:text-stone-100">
-                            {row.row}
-                          </div>
-                          <div>
-                            <div className="text-stone-600 dark:text-stone-300">{row.use}</div>
-                            <div lang="ja" className="mt-1 text-stone-500">
-                              {row.example}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="xl:col-span-2">
+                    <GodanRowChart
+                      highlightEnding={formationKeyHighlight.ending}
+                      highlightRow={formationKeyHighlight.row}
+                    />
                   </div>
 
                   <div className="rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden">
