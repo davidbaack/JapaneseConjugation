@@ -5,7 +5,6 @@ import {
   IconChat,
   IconCheck,
   IconList,
-  IconRefresh,
   IconSpark,
   IconX,
 } from '../../components/Icons.jsx';
