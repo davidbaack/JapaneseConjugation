@@ -1313,9 +1313,36 @@ export default function StudyView({ mode = 'practice' }) {
   const runAccuracy = runStats.reviewed
     ? Math.round((runStats.correct / runStats.reviewed) * 100)
     : 0;
-  const runStatsLabel = `${runStats.reviewed} ${runStats.reviewed === 1 ? 'card' : 'cards'} · ${
-    runStats.correct
-  } right / ${runStats.missed} wrong · ${runStats.streak} streak`;
+  const runCardsLabel = `${runStats.reviewed} ${runStats.reviewed === 1 ? 'card' : 'cards'}`;
+  const runStatsLabel = `${runCardsLabel} · ${runStats.correct} right / ${runStats.missed} wrong · ${runStats.streak} streak`;
+  const runSummaryMetrics = [
+    {
+      label: 'Cards',
+      value: runCardsLabel,
+      valueClass: 'text-stone-950 dark:text-stone-50',
+    },
+    {
+      label: 'Right',
+      value: `${runStats.correct} right`,
+      valueClass: runStats.correct
+        ? 'text-emerald-700 dark:text-emerald-300'
+        : 'text-stone-700 dark:text-stone-300',
+    },
+    {
+      label: 'Wrong',
+      value: `${runStats.missed} wrong`,
+      valueClass: runStats.missed
+        ? 'text-rose-700 dark:text-rose-300'
+        : 'text-stone-700 dark:text-stone-300',
+    },
+    {
+      label: 'Streak',
+      value: `${runStats.streak} streak`,
+      valueClass: runStats.streak
+        ? 'text-amber-700 dark:text-amber-300'
+        : 'text-stone-700 dark:text-stone-300',
+    },
+  ];
   const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit && !recommendationFocus;
   const wordSweepComplete = !!wordSweep?.complete;
   const reviewComplete = wordSweepComplete;
@@ -2868,16 +2895,29 @@ export default function StudyView({ mode = 'practice' }) {
             </div>
           </div>
         )}
-        <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-wider text-stone-500">
-                Practice run
+        <section
+          aria-labelledby="practice-run-heading"
+          className="rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-950/5 dark:border-stone-800 dark:bg-stone-900 dark:shadow-black/20"
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2
+                  id="practice-run-heading"
+                  className="text-xs font-semibold uppercase tracking-wider text-stone-500"
+                >
+                  Practice run
+                </h2>
+                {runStats.reviewed > 0 && (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/70">
+                    {runAccuracy}% right
+                  </span>
+                )}
               </div>
               <div
                 role="status"
                 aria-live="polite"
-                className="mt-1 text-sm leading-snug text-stone-600 dark:text-stone-300"
+                className="mt-1 max-w-2xl text-sm leading-snug text-stone-600 dark:text-stone-300"
               >
                 {coachSentence}
               </div>
@@ -2908,7 +2948,7 @@ export default function StudyView({ mode = 'practice' }) {
                     event.preventDefault();
                     setPracticeSettingsOpen((open) => !open);
                   }}
-                  className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg border border-stone-200 text-stone-500 transition hover:bg-stone-50 hover:text-stone-800 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                  className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-stone-200 text-stone-500 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
                 >
                   <IconSettings className="h-3.5 w-3.5" />
                 </summary>
@@ -3041,21 +3081,30 @@ export default function StudyView({ mode = 'practice' }) {
                 type="button"
                 onClick={() => setRunReviewOpen(true)}
                 disabled={!runAnswerHistory.length}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-45 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-stone-200 px-3 text-xs font-semibold text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
               >
                 <IconList className="h-3.5 w-3.5" />
                 Review answers
               </button>
-              {runStats.reviewed > 0 && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-300">
-                  {runAccuracy}% right
-                </div>
-              )}
-              <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
-                {runStatsLabel}
-              </div>
             </div>
           </div>
+          <dl
+            aria-label={`Practice run summary: ${runStatsLabel}`}
+            className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-stone-100 pt-3 text-xs dark:border-stone-800 sm:grid-cols-4"
+          >
+            {runSummaryMetrics.map((metric) => (
+              <div key={metric.label} className="min-w-0">
+                <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400 dark:text-stone-500">
+                  {metric.label}
+                </dt>
+                <dd
+                  className={`mt-0.5 truncate text-sm font-semibold tabular-nums ${metric.valueClass}`}
+                >
+                  {metric.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
           {!workoutProgress.continuous && (
             <div className="mt-3 space-y-1.5">
               <div className="flex items-center justify-between gap-3 text-xs text-stone-500 dark:text-stone-400">
@@ -3137,7 +3186,7 @@ export default function StudyView({ mode = 'practice' }) {
               </div>
             </div>
           </details>
-        </div>
+        </section>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
           <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">
             <div className="absolute top-4 left-4 rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-500 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70 sm:top-8 sm:left-6">

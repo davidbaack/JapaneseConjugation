@@ -47,7 +47,10 @@ describe('App shell', () => {
     expect(screen.queryByText('No reps yet')).toBeNull();
     expect(screen.queryByText('Untested')).toBeNull();
     expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getByText('0 cards · 0 right / 0 wrong · 0 streak')).toBeTruthy();
+    expect(screen.getByText('0 cards')).toBeTruthy();
+    expect(screen.getByText('0 right')).toBeTruthy();
+    expect(screen.getByText('0 wrong')).toBeTruthy();
+    expect(screen.getByText('0 streak')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
     expect(screen.queryByText('Next workout')).toBeNull();
     expect(screen.queryByText('Form families')).toBeNull();
