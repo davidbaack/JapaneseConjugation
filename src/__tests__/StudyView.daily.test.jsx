@@ -893,7 +893,13 @@ describe('StudyView continuous Practice startup', () => {
 
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     expect(screen.getByText('Sentence listening prompt')).toBeTruthy();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/data/sentences/manifest.json', {
+      cache: 'no-cache',
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/data/sentences/by-type/plain-past.json', {
+      cache: 'force-cache',
+    });
     await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1));
     expect(document.body.textContent).not.toContain(`昼に${surface}。`);
 

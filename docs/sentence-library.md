@@ -184,8 +184,11 @@ Each type file has this compact shape:
 Do not hand-edit the exported files. Regenerate them from the validated
 Supabase table.
 
-The service worker does not precache every `by-type/*.json` chunk during app
-install because the full corpus is large. Chunks use a cache-first runtime
-strategy after the first successful fetch; if a learner is offline before a
-chunk has been cached, Sentence mode falls back to deterministic local
-templates.
+The service worker does not precache the manifest or every `by-type/*.json`
+chunk during app install because the full corpus is large. Runtime checks the
+small manifest with a network-first strategy, builds a version fingerprint from
+that manifest, and adds it as a query string when loading each type chunk. Type
+chunks still use a cache-first strategy once loaded, but a regenerated corpus
+gets fresh chunk URLs so corrected sentences reach returning learners. If the
+manifest or a chunk is unavailable offline before it has been cached, Sentence
+mode falls back to deterministic local templates.

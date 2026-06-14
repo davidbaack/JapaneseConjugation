@@ -18,12 +18,28 @@ export default defineConfig({
       includeAssets: ['apple-touch-icon.png'],
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,json}'],
-        globIgnores: ['**/data/sentences/by-type/*.json'],
+        globIgnores: ['**/data/sentences/manifest.json', '**/data/sentences/by-type/*.json'],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         navigateFallback: '/JapaneseConjugation/index.html',
         navigateFallbackDenylist: [/\.[^/?]+$/],
         runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.origin === globalThis.location.origin &&
+              url.pathname === '/JapaneseConjugation/data/sentences/manifest.json',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'sentence-corpus-manifest-v1',
+              expiration: {
+                maxEntries: 1,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
           {
             urlPattern: ({ url }) =>
               url.origin === globalThis.location.origin &&

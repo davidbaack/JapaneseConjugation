@@ -93,7 +93,11 @@ describe('static coverage configuration', () => {
   it('runtime-caches the sentence corpus without precaching every chunk', () => {
     const config = readRepoText('vite.config.js');
 
-    expect(config).toContain("globIgnores: ['**/data/sentences/by-type/*.json']");
+    expect(config).toContain(
+      "globIgnores: ['**/data/sentences/manifest.json', '**/data/sentences/by-type/*.json']",
+    );
+    expect(config).toContain("cacheName: 'sentence-corpus-manifest-v1'");
+    expect(config).toContain("handler: 'NetworkFirst'");
     expect(config).toContain("cacheName: 'sentence-corpus-v1'");
     expect(config).toContain("handler: 'CacheFirst'");
   });

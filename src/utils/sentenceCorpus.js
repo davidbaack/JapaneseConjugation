@@ -2,10 +2,13 @@ import { wordKey } from './conjugator.js';
 import { hydrateSentenceValue } from './sentencePrompt.js';
 
 const BASE_URL = /** @type {any} */ (import.meta).env?.BASE_URL || '/';
-const SENTENCE_CORPUS_BASE_URL = `${BASE_URL}data/sentences/by-type/`;
+const SENTENCE_CORPUS_BASE_URL = `${BASE_URL}data/sentences/`;
+const SENTENCE_CORPUS_BY_TYPE_URL = `${SENTENCE_CORPUS_BASE_URL}by-type/`;
 const SCHEMA_VERSION = 1;
+const FALLBACK_VERSION = 'unversioned';
 
 const typeCache = new Map();
+let manifestPromise = null;
 
 function validTypeId(type) {
   return /^[a-z0-9-]+$/.test(String(type || ''));
@@ -25,11 +28,55 @@ function rowValue(row) {
   };
 }
 
+function validManifest(manifest) {
+  return (
+    manifest?.schema === SCHEMA_VERSION &&
+    Number.isFinite(manifest.totalRows) &&
+    Number.isFinite(manifest.rawBytes) &&
+    Number.isFinite(manifest.gzipBytes) &&
+    Array.isArray(manifest.types)
+  );
+}
+
+function manifestVersion(manifest) {
+  if (!validManifest(manifest)) return FALLBACK_VERSION;
+  return [
+    manifest.schema,
+    manifest.totalRows,
+    manifest.rawBytes,
+    manifest.gzipBytes,
+    manifest.types.length,
+  ].join('-');
+}
+
+async function loadManifest() {
+  if (manifestPromise) return manifestPromise;
+
+  manifestPromise = fetch(`${SENTENCE_CORPUS_BASE_URL}manifest.json`, { cache: 'no-cache' })
+    .then(async (response) => {
+      if (!response.ok) return null;
+      const manifest = await response.json();
+      return validManifest(manifest) ? manifest : null;
+    })
+    .catch(() => null);
+
+  const manifest = await manifestPromise;
+  if (!manifest) manifestPromise = null;
+  return manifest;
+}
+
+function chunkUrl(type, version) {
+  const suffix = version && version !== FALLBACK_VERSION ? `?v=${encodeURIComponent(version)}` : '';
+  return `${SENTENCE_CORPUS_BY_TYPE_URL}${type}.json${suffix}`;
+}
+
 async function loadTypeCorpus(type) {
   if (!validTypeId(type) || typeof fetch !== 'function') return null;
-  if (typeCache.has(type)) return typeCache.get(type);
+  const version = manifestVersion(await loadManifest());
+  const cacheKey = `${type}|${version}`;
+  if (typeCache.has(cacheKey)) return typeCache.get(cacheKey);
 
-  const promise = fetch(`${SENTENCE_CORPUS_BASE_URL}${type}.json`, { cache: 'force-cache' })
+  const promise = fetch(chunkUrl(type, version), { cache: 'force-cache' })
     .then(async (response) => {
       if (!response.ok) return null;
       const data = await response.json();
@@ -45,9 +92,9 @@ async function loadTypeCorpus(type) {
     })
     .catch(() => null);
 
-  typeCache.set(type, promise);
+  typeCache.set(cacheKey, promise);
   const rows = await promise;
-  if (!rows) typeCache.delete(type);
+  if (!rows) typeCache.delete(cacheKey);
   return rows;
 }
 
@@ -60,4 +107,5 @@ export async function fetchBundledSentence(word, type) {
 
 export function clearSentenceCorpusCache() {
   typeCache.clear();
+  manifestPromise = null;
 }
