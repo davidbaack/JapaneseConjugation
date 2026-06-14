@@ -638,6 +638,9 @@ function groupRuleConnection(item, type, parts, expected) {
   }
 
   if (item.group === 'godan') {
+    if ((type === 'te-form' || type === 'plain-past') && replacement && type !== 'plain-present') {
+      return `Because this is ${label}, ${item.dict}'s final ${ending} uses the ${replacement} sound change here: ${surface}.`;
+    }
     if (parts.change) {
       return `Because this is ${label}, ${item.dict} uses the ${parts.change} row for ${target}: ${surface}.`;
     }
@@ -722,6 +725,14 @@ const ROW_SHIFT_LABELS = [
   ['o-row', O_ROW],
 ];
 
+const SOUND_CHANGE_CLUSTERS = [
+  { label: 'く', endings: ['く'] },
+  { label: 'ぐ', endings: ['ぐ'] },
+  { label: 'す', endings: ['す'] },
+  { label: 'う/つ/る', endings: ['う', 'つ', 'る'] },
+  { label: 'む/ぶ/ぬ', endings: ['む', 'ぶ', 'ぬ'] },
+];
+
 function buildGodanRowShiftVisual(item, parts, expected) {
   if (!item || item.group !== 'godan' || !parts?.change) return null;
   const ending = originalEndingFor(item);
@@ -742,6 +753,39 @@ function buildGodanRowShiftVisual(item, parts, expected) {
     suffix: parts.suffix || '',
     result: expected,
     formula: `${stem} + ${parts.change}${parts.suffix ? ` + ${parts.suffix}` : ''} = ${expected}`,
+  };
+}
+
+function buildGodanSoundChangeVisual(item, type, parts, expected) {
+  if (!item || item.group !== 'godan' || (type !== 'te-form' && type !== 'plain-past')) {
+    return null;
+  }
+  const ending = originalEndingFor(item);
+  const stem = parts.stem || fallbackStem(item, ending);
+  const replacement = replacementFromParts(parts, expected, stem);
+  const targetMap = type === 'te-form' ? TE_END : PAST_END;
+  const reading = item.reading || '';
+  const isIkuException = reading === 'いく' || reading.endsWith('いく');
+  if (!ending || !stem || !replacement || !targetMap[ending]) return null;
+
+  const rows = SOUND_CHANGE_CLUSTERS.map((cluster) => {
+    const active = cluster.endings.includes(ending);
+    const representative = cluster.endings[0];
+    return {
+      label: cluster.label,
+      kana: active && isIkuException ? replacement : targetMap[representative] || '',
+      active,
+    };
+  }).filter((row) => row.kana);
+  const activeCluster = rows.find((row) => row.active);
+  if (!activeCluster) return null;
+
+  return {
+    kind: 'sound-change',
+    ending,
+    targetLabel: isIkuException ? `${replacement} (行く exception)` : replacement,
+    rows,
+    formula: `${stem} + ${replacement} = ${expected}`,
   };
 }
 
@@ -891,6 +935,7 @@ export function getConjugationDebugInfo(word, type, userAnswer = '') {
     result: ans,
     formula,
     rule,
+    soundChangeVisual: buildGodanSoundChangeVisual(word, type, parts, ans),
     rowShiftVisual: buildGodanRowShiftVisual(word, parts, ans),
     routes: {
       plain: {

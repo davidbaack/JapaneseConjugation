@@ -478,6 +478,46 @@ describe('visual conjugation debugger metadata', () => {
     expect(debug.formula.expression).toBe('か + いて = かいて');
     expect(debug.rule.family).toBe('godan sound change');
     expect(debug.rule.short).toContain('く -> いて');
+    expect(debug.rowShiftVisual).toBeNull();
+    expect(debug.soundChangeVisual).toMatchObject({
+      kind: 'sound-change',
+      ending: 'く',
+      targetLabel: 'いて',
+      formula: 'か + いて = かいて',
+    });
+    expect(debug.soundChangeVisual.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: 'く', kana: 'いて', active: true }),
+        expect.objectContaining({ label: 'う/つ/る', kana: 'って', active: false }),
+      ]),
+    );
+
+    const past = getConjugationDebugInfo(KAKU, 'plain-past');
+    expect(past.soundChangeVisual).toMatchObject({
+      kind: 'sound-change',
+      ending: 'く',
+      targetLabel: 'いた',
+      formula: 'か + いた = かいた',
+    });
+  });
+
+  it('keeps rule visuals scoped to their matching godan patterns', () => {
+    const rowShift = getConjugationDebugInfo(YOMU, 'plain-negative');
+    expect(rowShift.soundChangeVisual).toBeNull();
+    expect(rowShift.rowShiftVisual).toMatchObject({
+      ending: 'む',
+      targetRow: 'a-row',
+      formula: 'よ + ま + ない = よまない',
+    });
+
+    for (const debug of [
+      getConjugationDebugInfo(TABERU, 'plain-past'),
+      getConjugationDebugInfo(TAKAI, 'adj-plain-past'),
+      getConjugationDebugInfo(SURU, 'plain-past'),
+    ]) {
+      expect(debug.soundChangeVisual).toBeNull();
+      expect(debug.rowShiftVisual).toBeNull();
+    }
   });
 
   it('shows common adjective and irregular transformations as structured rules', () => {

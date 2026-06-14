@@ -124,6 +124,67 @@ function RowShiftVisual({ visual, onOpenLearn }) {
   );
 }
 
+function SoundChangeVisual({ visual, onOpenLearn }) {
+  if (!visual) return null;
+  return (
+    <div className="mt-3 rounded-lg border border-cyan-100 bg-cyan-50/55 px-3 py-2.5 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
+            Sound-change visual
+          </div>
+          <div className="mt-0.5 text-xs leading-relaxed text-cyan-950 dark:text-cyan-100">
+            Final <span lang="ja">{visual.ending}</span> takes the{' '}
+            <span lang="ja">{visual.targetLabel}</span> sound-change ending.
+          </div>
+        </div>
+        {onOpenLearn && (
+          <button
+            type="button"
+            onClick={() => onOpenLearn()}
+            className="text-xs font-semibold text-cyan-700 underline decoration-cyan-300 underline-offset-4 transition hover:text-cyan-900 dark:text-cyan-300 dark:decoration-cyan-700 dark:hover:text-cyan-100"
+          >
+            See Learn table
+          </button>
+        )}
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(4.5rem,0.65fr)_minmax(0,4fr)] sm:items-center">
+        <div className="rounded-lg border border-white/80 bg-white/85 px-2.5 py-2 text-center dark:border-stone-800 dark:bg-stone-950/60">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+            Final
+          </div>
+          <div className="mt-0.5 text-xl font-bold text-stone-950 dark:text-stone-100" lang="ja">
+            {visual.ending}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+          {visual.rows.map((row) => (
+            <div
+              key={row.label}
+              className={`rounded-lg border px-2 py-2 text-center ${
+                row.active
+                  ? 'border-amber-300 bg-amber-50 text-amber-900 shadow-sm dark:border-amber-700 dark:bg-amber-950/35 dark:text-amber-100'
+                  : 'border-stone-200 bg-white/70 text-stone-600 dark:border-stone-800 dark:bg-stone-950/45 dark:text-stone-300'
+              }`}
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider">{row.label}</div>
+              <div className="mt-0.5 text-lg font-bold" lang="ja">
+                {row.kana}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div
+        className="mt-2 rounded-lg border border-white/80 bg-white/85 px-2 py-1.5 text-center font-mono text-sm text-stone-900 dark:border-stone-800 dark:bg-stone-900/80 dark:text-stone-100"
+        lang="ja"
+      >
+        {visual.formula}
+      </div>
+    </div>
+  );
+}
+
 export function ConjugationBreakdown({
   word,
   type,
@@ -204,7 +265,11 @@ export function ConjugationBreakdown({
           <div className="mt-0.5 text-xs leading-relaxed text-stone-600 dark:text-stone-350">
             {debug.rule.detail}
           </div>
-          <RowShiftVisual visual={debug.rowShiftVisual} onOpenLearn={onOpenLearn} />
+          {debug.soundChangeVisual ? (
+            <SoundChangeVisual visual={debug.soundChangeVisual} onOpenLearn={onOpenLearn} />
+          ) : (
+            <RowShiftVisual visual={debug.rowShiftVisual} onOpenLearn={onOpenLearn} />
+          )}
           {debug.groupConnection && (
             <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/70 px-2.5 py-2 text-xs leading-relaxed text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/25 dark:text-indigo-100">
               {debug.groupConnection}

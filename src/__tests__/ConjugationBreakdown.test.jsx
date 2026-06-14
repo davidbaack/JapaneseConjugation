@@ -31,12 +31,14 @@ const GAKUSEI = { dict: '学生', reading: 'がくせい', meaning: 'student', g
 
 describe('ConjugationBreakdown', () => {
   it('renders a mobile-readable visual rule path and inferred wrong pattern', () => {
+    const openLearn = vi.fn();
     render(
       <ConjugationBreakdown
         word={KAKU}
         type="te-form"
         userAnswer="かって"
         practicePrefs={{ displayScripts: { kanji: true, kana: true, romaji: true } }}
+        onOpenLearn={openLearn}
       />,
     );
 
@@ -54,12 +56,20 @@ describe('ConjugationBreakdown', () => {
     expect(screen.getByText('Ending')).toBeTruthy();
     expect(screen.getByText('Replace')).toBeTruthy();
     expect(screen.getAllByText('Result').length).toBeGreaterThan(1);
-    expect(screen.getByText('か + いて = かいて')).toBeTruthy();
+    expect(screen.getAllByText('か + いて = かいて').length).toBeGreaterThan(1);
     expect(screen.getByText('書きます -> 書き -> 書いて')).toBeTruthy();
     expect(screen.getByText(/う\/つ\/る -> って/)).toBeTruthy();
     expect(screen.getAllByText(/く -> いて/).length).toBeGreaterThan(0);
     expect(screen.getByText(/kaku -> kaite/)).toBeTruthy();
+    expect(screen.getByText('Sound-change visual')).toBeTruthy();
+    expect(
+      screen.getByText(
+        (_, node) => node?.textContent === 'Final く takes the いて sound-change ending.',
+      ),
+    ).toBeTruthy();
     expect(screen.queryByText('Row visual')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'See Learn table' }));
+    expect(openLearn).toHaveBeenCalledTimes(1);
     expect(screen.getByText('What went wrong')).toBeTruthy();
     expect(screen.getByText('What should have happened')).toBeTruthy();
   });
