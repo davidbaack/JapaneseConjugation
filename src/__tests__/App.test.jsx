@@ -630,6 +630,54 @@ describe('App shell', () => {
     expect(await screen.findByText('Correct conjugation')).toBeTruthy();
   }, 15000);
 
+  it('shows secondary right Check matches without expanding close matches', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: defaultState(),
+        customVerbs: [
+          {
+            dict: '\u67b6\u304f',
+            reading: '\u304b\u304f',
+            meaning: 'fixture bridge',
+            group: 'godan',
+          },
+          {
+            dict: '\u61f8\u304f',
+            reading: '\u304b\u304f',
+            meaning: 'fixture hang',
+            group: 'godan',
+          },
+        ],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Check/i }));
+    fireEvent.change(screen.getByPlaceholderText(/tabeta/i), {
+      target: { value: '\u304b\u304b\u306a\u3044' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
+
+    expect(await screen.findByText('Correct conjugation')).toBeTruthy();
+    const rightHeading = await screen.findByText('Other right answers');
+    const rightSection = rightHeading.closest('section');
+    expect(rightSection).toBeTruthy();
+    expect(rightSection.closest('details')).toBeNull();
+    expect(within(rightSection).getAllByText('Right').length).toBeGreaterThanOrEqual(2);
+    expect(within(rightSection).getByText('fixture bridge')).toBeTruthy();
+    expect(within(rightSection).getByText('fixture hang')).toBeTruthy();
+
+    const closeMatches = screen.getByText('Other close matches').closest('details');
+    expect(closeMatches).toBeTruthy();
+    expect(closeMatches.open).toBe(false);
+    expect(within(closeMatches).getAllByText('Wrong').length).toBeGreaterThan(0);
+  }, 15000);
+
   it('exposes practice exercises in the Drills tab', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Drills', exact: true }));

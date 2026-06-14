@@ -123,6 +123,99 @@ function sameMatch(left, right) {
   );
 }
 
+function CandidateMatchRows({ matches, practicePrefs, onSpeak }) {
+  return (
+    <ul className="divide-y divide-stone-200 dark:divide-stone-800">
+      {matches.map((match) => {
+        const correct = match.matchStatus === 'correct';
+        const info = getTypeInfo(match.type);
+        const statusClass = correct
+          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-800'
+          : 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-800';
+
+        return (
+          <li key={matchKey(match)} className="px-3 py-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ${statusClass}`}
+                  >
+                    {correct ? <IconCheck className="h-3 w-3" /> : <IconX className="h-3 w-3" />}
+                    {correct ? 'Right' : 'Wrong'}
+                  </span>
+                  <span className="font-semibold text-stone-900 dark:text-stone-100" lang="ja">
+                    {match.word.dict}
+                  </span>
+                  <span className="text-sm text-stone-500 dark:text-stone-400" lang="ja">
+                    （{match.word.reading}）
+                  </span>
+                  <span className="text-sm text-stone-500 dark:text-stone-400">
+                    {match.word.meaning}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                  <span className="font-medium text-stone-800 dark:text-stone-200">
+                    {info.label}
+                  </span>
+                  <span className="text-stone-400">{englishForForm(match.word, match.type)}</span>
+                </div>
+                {!correct && match.diff?.summary && (
+                  <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                    {match.diff.summary}.
+                  </div>
+                )}
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+                <div className="text-left sm:text-right">
+                  <div className="text-[11px] uppercase tracking-wide text-stone-400">
+                    {correct ? 'Entered form' : 'Correct answer'}
+                  </div>
+                  <ScriptDisplay
+                    view={formDisplay(match.kana, practicePrefs, match.word, match.type)}
+                    word={match.word}
+                    type={match.type}
+                    className="text-base text-stone-900 dark:text-stone-100"
+                    subClassName="text-[11px] text-stone-500 dark:text-stone-400 leading-tight"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onSpeak(match.kana)}
+                  className="shrink-0 rounded-lg p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-indigo-600 dark:hover:bg-stone-800 dark:hover:text-indigo-400"
+                  title="Play audio"
+                  aria-label={`Play ${correct ? 'correct' : 'suggested'} match`}
+                >
+                  <IconVolume className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function RightMatchList({ matches, practicePrefs, onSpeak }) {
+  if (matches.length === 0) return null;
+
+  return (
+    <section className="mt-4 overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-950/70">
+        <div className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+          Other right answers
+        </div>
+        <div className="text-xs text-stone-400">
+          {matches.length} {matches.length === 1 ? 'match' : 'matches'}
+        </div>
+      </div>
+      <CandidateMatchRows matches={matches} practicePrefs={practicePrefs} onSpeak={onSpeak} />
+    </section>
+  );
+}
+
 function CandidateMatchList({ matches, practicePrefs, onSpeak }) {
   if (matches.length === 0) return null;
 
@@ -136,76 +229,7 @@ function CandidateMatchList({ matches, practicePrefs, onSpeak }) {
           {matches.length} {matches.length === 1 ? 'match' : 'matches'}
         </div>
       </summary>
-      <ul className="divide-y divide-stone-200 dark:divide-stone-800">
-        {matches.map((match) => {
-          const correct = match.matchStatus === 'correct';
-          const info = getTypeInfo(match.type);
-          const statusClass = correct
-            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-800'
-            : 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-800';
-
-          return (
-            <li key={matchKey(match)} className="px-3 py-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ${statusClass}`}
-                    >
-                      {correct ? <IconCheck className="h-3 w-3" /> : <IconX className="h-3 w-3" />}
-                      {correct ? 'Right' : 'Wrong'}
-                    </span>
-                    <span className="font-semibold text-stone-900 dark:text-stone-100" lang="ja">
-                      {match.word.dict}
-                    </span>
-                    <span className="text-sm text-stone-500 dark:text-stone-400" lang="ja">
-                      （{match.word.reading}）
-                    </span>
-                    <span className="text-sm text-stone-500 dark:text-stone-400">
-                      {match.word.meaning}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                    <span className="font-medium text-stone-800 dark:text-stone-200">
-                      {info.label}
-                    </span>
-                    <span className="text-stone-400">{englishForForm(match.word, match.type)}</span>
-                  </div>
-                  {!correct && match.diff?.summary && (
-                    <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-                      {match.diff.summary}.
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2 sm:justify-end">
-                  <div className="text-left sm:text-right">
-                    <div className="text-[11px] uppercase tracking-wide text-stone-400">
-                      {correct ? 'Entered form' : 'Correct answer'}
-                    </div>
-                    <ScriptDisplay
-                      view={formDisplay(match.kana, practicePrefs, match.word, match.type)}
-                      word={match.word}
-                      type={match.type}
-                      className="text-base text-stone-900 dark:text-stone-100"
-                      subClassName="text-[11px] text-stone-500 dark:text-stone-400 leading-tight"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onSpeak(match.kana)}
-                    className="shrink-0 rounded-lg p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-indigo-600 dark:hover:bg-stone-800 dark:hover:text-indigo-400"
-                    title="Play audio"
-                    aria-label={`Play ${correct ? 'correct' : 'suggested'} match`}
-                  >
-                    <IconVolume className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <CandidateMatchRows matches={matches} practicePrefs={practicePrefs} onSpeak={onSpeak} />
     </details>
   );
 }
@@ -333,17 +357,18 @@ export default function CheckView() {
   // or the intended form when it's a near-miss.
   const headForm =
     result?.status === 'exact' ? exactForms[0] : result?.status === 'near' ? result.near[0] : null;
-  const secondaryMatchRows = result
-    ? [
-        ...exactForms
-          .filter((match) => !sameMatch(match, headForm))
-          .map((match) => ({ ...match, matchStatus: 'correct' })),
-        ...(result.near ?? [])
-          .filter((match) => !sameMatch(match, headForm))
-          .map((match) => ({ ...match, matchStatus: 'wrong' })),
-      ]
+  const rightMatchRows = result
+    ? exactForms
+        .filter((match) => !sameMatch(match, headForm))
+        .map((match) => ({ ...match, matchStatus: 'correct' }))
     : [];
-  const showMatchRows = secondaryMatchRows.length > 0;
+  const wrongMatchRows = result
+    ? (result.near ?? [])
+        .filter((match) => !sameMatch(match, headForm))
+        .map((match) => ({ ...match, matchStatus: 'wrong' }))
+    : [];
+  const showRightMatchRows = rightMatchRows.length > 0;
+  const showWrongMatchRows = wrongMatchRows.length > 0;
   const nearExplanation =
     result?.status === 'near' && result.near?.[0]
       ? explainItem(result.near[0].word, result.near[0].type)
@@ -544,9 +569,17 @@ export default function CheckView() {
                 )}
               </div>
 
-              {showMatchRows && (
+              {showRightMatchRows && (
+                <RightMatchList
+                  matches={rightMatchRows}
+                  practicePrefs={practicePrefs}
+                  onSpeak={speak}
+                />
+              )}
+
+              {showWrongMatchRows && (
                 <CandidateMatchList
-                  matches={secondaryMatchRows}
+                  matches={wrongMatchRows}
                   practicePrefs={practicePrefs}
                   onSpeak={speak}
                 />
@@ -639,9 +672,17 @@ export default function CheckView() {
                 </div>
               </div>
 
-              {showMatchRows && (
+              {showRightMatchRows && (
+                <RightMatchList
+                  matches={rightMatchRows}
+                  practicePrefs={practicePrefs}
+                  onSpeak={speak}
+                />
+              )}
+
+              {showWrongMatchRows && (
                 <CandidateMatchList
-                  matches={secondaryMatchRows}
+                  matches={wrongMatchRows}
                   practicePrefs={practicePrefs}
                   onSpeak={speak}
                 />
