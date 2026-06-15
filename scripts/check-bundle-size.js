@@ -29,7 +29,9 @@ const ASSET_DIR = 'dist/assets';
 // family-introduction surfaces put the measured build at ~305 KB gzipped.
 // Bumped 310->315: componentized StudyView practice surfaces put the
 // measured build at ~307 KB gzipped.
-const TOTAL_GZIP_KB = 315;
+// Bumped 315->325: godan row map, sound changes, and Learn handoffs put the
+// measured build at ~310 KB gzipped locally, close to the previous cap.
+const TOTAL_GZIP_KB = 325;
 const MAX_CHUNK_GZIP_KB = 70;
 
 const KB = 1024;
