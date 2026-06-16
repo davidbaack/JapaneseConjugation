@@ -351,8 +351,16 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    const nudge = screen.getByRole('button', { name: /You know the ending/i });
-    expect(nudge.textContent).toMatch(/misclassifying godan verbs/);
+    const nudge = screen.getByRole('button', {
+      name: /Guide: word group.*You know the ending.*final-answer step land/i,
+    });
+    expect(nudge.textContent).toMatch(/Guide: word group/);
+    expect(nudge.textContent).not.toMatch(/misclassifying godan verbs/);
+
+    fireEvent.click(screen.getByText('Run details'));
+    expect(screen.getByText('Guide insight')).toBeTruthy();
+    expect(screen.getByText(/misclassifying godan verbs/)).toBeTruthy();
+    expect(screen.getByText(/Guide is seeing the final-answer step land/)).toBeTruthy();
 
     fireEvent.click(nudge);
     expect(setTab).toHaveBeenCalledWith('guide');

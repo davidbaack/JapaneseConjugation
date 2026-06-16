@@ -124,12 +124,21 @@ const REVIEW_SESSION_HISTORY_SIZE = 4;
 const CORRECT_AUTO_ADVANCE_MS = 850;
 const SENTENCE_PROMPT_GRACE_MS = 250;
 const SESSION_RECENT_OUTCOME_LIMIT = 6;
+const GUIDE_INSIGHT_CHIP_LABELS = {
+  base: 'plain form',
+  group: 'word group',
+  answer: 'final ending',
+};
 const ANSWER_STYLE_OPTIONS = [
   { id: 'input', label: 'Type' },
   { id: 'choice', label: 'Choose' },
   { id: 'self-check', label: 'Self-check' },
   { id: 'speak', label: 'Speak' },
 ];
+
+function guideInsightChipLabel(insight) {
+  return GUIDE_INSIGHT_CHIP_LABELS[insight?.stepId] || 'weak step';
+}
 
 function focusWithoutScroll(element) {
   if (!element || typeof window === 'undefined') return;
@@ -2770,6 +2779,10 @@ export default function StudyView({ mode = 'practice' }) {
   const topSessionMistake = sessionMistakePatterns[0] || null;
   const guideInsight =
     mode === 'practice' ? buildGuideDiagnosticInsight(state.guide, { minAttempts: 2 }) : null;
+  const guideInsightLabel = guideInsight ? `Guide: ${guideInsightChipLabel(guideInsight)}` : '';
+  const guideInsightAriaLabel = guideInsight
+    ? `${guideInsightLabel}. ${[guideInsight.message, guideInsight.detail].filter(Boolean).join(' ')}`
+    : '';
   const currentSelectionReason = wordSweep?.repeatPass
     ? 'Repeating missed forms'
     : focusBanner
@@ -2913,6 +2926,18 @@ export default function StudyView({ mode = 'practice' }) {
                     {runAccuracy}% right
                   </span>
                 )}
+                {guideInsight && (
+                  <button
+                    type="button"
+                    onClick={() => setTab('guide')}
+                    aria-label={guideInsightAriaLabel}
+                    title={guideInsight.message}
+                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 active:scale-[0.97] dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/40"
+                  >
+                    <IconBook className="h-3 w-3" />
+                    <span>{guideInsightLabel}</span>
+                  </button>
+                )}
               </div>
               <div
                 role="status"
@@ -2921,21 +2946,6 @@ export default function StudyView({ mode = 'practice' }) {
               >
                 {coachSentence}
               </div>
-              {guideInsight && (
-                <button
-                  type="button"
-                  onClick={() => setTab('guide')}
-                  className="mt-2 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs text-amber-900 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/40"
-                >
-                  <span>
-                    <span className="font-semibold">{guideInsight.message}</span>
-                    {guideInsight.detail && (
-                      <span className="mt-0.5 block font-normal">{guideInsight.detail}</span>
-                    )}
-                  </span>
-                  <span className="shrink-0 font-semibold">{guideInsight.actionLabel} -&gt;</span>
-                </button>
-              )}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <details className="relative" open={practiceSettingsOpen}>
@@ -3184,6 +3194,21 @@ export default function StudyView({ mode = 'practice' }) {
                   <div className="mt-1 text-[11px] text-stone-400">{runStats.skipped} skipped</div>
                 )}
               </div>
+              {guideInsight && (
+                <div className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-950/20 dark:text-amber-200 sm:col-span-3">
+                  <div className="font-semibold text-amber-950 dark:text-amber-100">
+                    Guide insight
+                  </div>
+                  <div className="mt-1 leading-snug">
+                    <span>{guideInsight.message}</span>
+                    {guideInsight.detail && (
+                      <span className="block text-amber-800 dark:text-amber-200/90">
+                        {guideInsight.detail}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </details>
         </section>
