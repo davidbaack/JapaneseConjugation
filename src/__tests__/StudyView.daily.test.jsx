@@ -1734,6 +1734,40 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByText('Practice run')).toBeTruthy();
   });
 
+  it('shows recent misses as one compact current-card source chip', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const retryCardId = cardIdFor(target, type);
+    const state = {
+      ...defaultState(),
+      enabledTypes: [type],
+      retryQueue: [retryCardId],
+      cards: {
+        [retryCardId]: {
+          ease: 2.3,
+          interval: 0,
+          reps: 0,
+          nextReview: Date.now() + 24 * 60 * 60 * 1000,
+          correct: 0,
+          incorrect: 1,
+          lastSeen: 1,
+        },
+      },
+    };
+    mockedApp.value = makeApp({
+      state,
+      allWords: [target],
+    });
+
+    render(<StudyView />);
+
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    const cardSource = screen.getByLabelText('Current card source');
+    expect(within(cardSource).getByText('Recent miss')).toBeTruthy();
+    expect(within(cardSource).queryByText('Returning after a miss')).toBeNull();
+    expect(screen.queryByText('Returning after a miss')).toBeNull();
+  });
+
   it('opens missed run review answers with the full breakdown inline', async () => {
     const target = STARTER_VERBS.find((word) => word.group === 'godan');
     expect(target).toBeTruthy();

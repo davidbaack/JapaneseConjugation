@@ -1062,7 +1062,7 @@ describe('word-form SRS selection', () => {
     expect(card.id).toBe(retryCardId);
     expect(card.verb).toBe(TABERU);
     expect(card.selectionOrigin).toBe('missed');
-    expect(card.selectionReason).toBe('Recent miss returning');
+    expect(card.selectionReason).toBe('Recent miss');
   });
 
   it('uses dictionary target cards for reading practice without adding dictionary to core', () => {

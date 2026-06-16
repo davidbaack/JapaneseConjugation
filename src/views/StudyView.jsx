@@ -2790,12 +2790,16 @@ export default function StudyView({ mode = 'practice' }) {
       : current.selectionReason || 'Varied practice from enabled categories';
   const currentOrigin = cardOriginForStudyCard(current);
   const currentOriginMeta = cardOriginMeta(currentOrigin);
-  const currentOriginBadgeLabel =
-    currentOrigin === 'missed' && currentSelectionReason
+  const currentSourceChipLabel =
+    currentOrigin === 'missed' ||
+    currentSelectionReason === 'Due review' ||
+    currentSelectionReason === 'Repeating missed forms' ||
+    currentSelectionReason.startsWith('Introducing ') ||
+    currentSelectionReason.startsWith('Strengthening ')
       ? currentSelectionReason
       : currentOriginMeta.label;
-  const currentOriginDetail =
-    currentOrigin === 'missed' ? currentOriginMeta.detail : currentSelectionReason;
+  const currentSourceDetail =
+    currentSourceChipLabel === currentSelectionReason ? '' : currentSelectionReason;
   const recentOutcomes = Array.isArray(state.session?.recentOutcomes)
     ? state.session.recentOutcomes
     : [];
@@ -3151,11 +3155,9 @@ export default function StudyView({ mode = 'practice' }) {
                   <span
                     className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${currentOriginMeta.chipClass}`}
                   >
-                    {currentOriginBadgeLabel}
+                    {currentSourceChipLabel}
                   </span>
-                  {currentOriginDetail && currentOriginDetail !== currentOriginBadgeLabel && (
-                    <span>{currentOriginDetail}</span>
-                  )}
+                  {currentSourceDetail && <span>{currentSourceDetail}</span>}
                 </div>
               </div>
               <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
@@ -3213,29 +3215,26 @@ export default function StudyView({ mode = 'practice' }) {
           </details>
         </section>
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-          <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">
-            <div className="absolute top-4 left-4 rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-500 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70 sm:top-8 sm:left-6">
-              JLPT {currentWordMeta.jlpt}
-            </div>
-            {lessonMetaText && (
-              <div className="absolute top-4 right-4 rounded-full bg-white/85 px-1.5 py-0.5 text-right text-[9px] text-stone-500 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70 sm:top-8 sm:right-6">
-                {lessonMetaText}
-              </div>
-            )}
-            <div
-              aria-label="Current card source"
-              className="mx-auto mb-3 flex max-w-full flex-wrap items-center justify-center gap-1.5 pt-9 sm:pt-6"
-            >
-              <span
-                className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${currentOriginMeta.chipClass}`}
-              >
-                {currentOriginBadgeLabel}
+          <div className="relative px-4 pb-4 pt-12 text-center sm:px-6 sm:pb-8 sm:pt-16">
+            <div className="absolute left-4 right-4 top-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 sm:left-6 sm:right-6 sm:top-8">
+              <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-500 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
+                JLPT {currentWordMeta.jlpt}
               </span>
-              {currentOriginDetail && currentOriginDetail !== currentOriginBadgeLabel && (
-                <span className={`text-[11px] font-medium ${currentOriginMeta.detailClass}`}>
-                  {currentOriginDetail}
+              <span aria-label="Current card source" className="min-w-0 justify-self-center">
+                <span
+                  title={currentSourceChipLabel}
+                  className={`block max-w-[48vw] truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold ${currentOriginMeta.chipClass} sm:max-w-[18rem]`}
+                >
+                  {currentSourceChipLabel}
                 </span>
-              )}
+              </span>
+              <span className="min-w-0 justify-self-end text-right">
+                {lessonMetaText && (
+                  <span className="inline-block max-w-full truncate rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-500 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
+                    {lessonMetaText}
+                  </span>
+                )}
+              </span>
             </div>
             {sentencePrompt && !hidePromptText && (
               <div

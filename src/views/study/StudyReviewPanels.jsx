@@ -115,7 +115,7 @@ const CARD_ORIGIN_META = {
   },
   missed: {
     label: 'Previously missed',
-    detail: 'Returning after a miss',
+    detail: 'Recent miss',
     chipClass:
       'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-300',
     detailClass: 'text-amber-700 dark:text-amber-300',
