@@ -1,6 +1,26 @@
 import React from 'react';
 import { getConjugationParts } from '../utils/conjugator.js';
 
+const KANJI_RE = /[\u3400-\u9fff]/u;
+
+function readableRuby(text, ruby) {
+  const base = String(text || '');
+  const reading = String(ruby || '');
+  if (!base || !reading || base === reading || !KANJI_RE.test(base)) return '';
+  return reading;
+}
+
+function RubySegment({ text, ruby, className = '', rtClassName = '' }) {
+  const reading = readableRuby(text, ruby);
+  if (!reading) return <span className={className}>{text}</span>;
+  return (
+    <ruby className={className}>
+      {text}
+      <rt className={rtClassName}>{reading}</rt>
+    </ruby>
+  );
+}
+
 export default function ScriptDisplay({
   view,
   word = null,
@@ -16,18 +36,19 @@ export default function ScriptDisplay({
     return (
       <>
         <div className={className} lang={view.lang}>
-          {view.parts.map((part, index) =>
-            part.ruby ? (
+          {view.parts.map((part, index) => {
+            const reading = readableRuby(part.text, part.ruby);
+            return reading ? (
               <ruby key={`${part.text}:${index}`}>
                 {part.text}
                 <rt className="text-[10px] font-medium text-stone-500 dark:text-stone-300">
-                  {part.ruby}
+                  {reading}
                 </rt>
               </ruby>
             ) : (
               <React.Fragment key={`${part.text}:${index}`}>{part.text}</React.Fragment>
-            ),
-          )}
+            );
+          })}
         </div>
         {view.sub && <div className={subClassName}>{view.sub}</div>}
       </>
@@ -46,12 +67,12 @@ export default function ScriptDisplay({
         >
           {mainParts.stem &&
             (rubyParts && rubyParts.stem ? (
-              <ruby className="text-indigo-600 dark:text-indigo-400 font-semibold">
-                {mainParts.stem}
-                <rt className="text-indigo-500 dark:text-indigo-400 font-medium text-[10px]">
-                  {rubyParts.stem}
-                </rt>
-              </ruby>
+              <RubySegment
+                text={mainParts.stem}
+                ruby={rubyParts.stem}
+                className="text-indigo-600 dark:text-indigo-400 font-semibold"
+                rtClassName="text-indigo-500 dark:text-indigo-400 font-medium text-[10px]"
+              />
             ) : (
               <span className="text-indigo-600 dark:text-indigo-400 font-semibold">
                 {mainParts.stem}
@@ -59,12 +80,12 @@ export default function ScriptDisplay({
             ))}
           {mainParts.change &&
             (rubyParts && rubyParts.change ? (
-              <ruby className="text-amber-600 dark:text-amber-400 font-semibold">
-                {mainParts.change}
-                <rt className="text-amber-500 dark:text-amber-400 font-medium text-[10px]">
-                  {rubyParts.change}
-                </rt>
-              </ruby>
+              <RubySegment
+                text={mainParts.change}
+                ruby={rubyParts.change}
+                className="text-amber-600 dark:text-amber-400 font-semibold"
+                rtClassName="text-amber-500 dark:text-amber-400 font-medium text-[10px]"
+              />
             ) : (
               <span className="text-amber-600 dark:text-amber-400 font-semibold">
                 {mainParts.change}
@@ -72,12 +93,12 @@ export default function ScriptDisplay({
             ))}
           {mainParts.suffix &&
             (rubyParts && rubyParts.suffix ? (
-              <ruby className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                {mainParts.suffix}
-                <rt className="text-emerald-500 dark:text-emerald-400 font-medium text-[10px]">
-                  {rubyParts.suffix}
-                </rt>
-              </ruby>
+              <RubySegment
+                text={mainParts.suffix}
+                ruby={rubyParts.suffix}
+                className="text-emerald-600 dark:text-emerald-400 font-semibold"
+                rtClassName="text-emerald-500 dark:text-emerald-400 font-medium text-[10px]"
+              />
             ) : (
               <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                 {mainParts.suffix}
@@ -92,10 +113,10 @@ export default function ScriptDisplay({
   return (
     <>
       <div className={className} lang={view.lang}>
-        {view.ruby ? (
+        {readableRuby(view.main, view.ruby) ? (
           <ruby>
             {view.main}
-            <rt>{view.ruby}</rt>
+            <rt>{readableRuby(view.main, view.ruby)}</rt>
           </ruby>
         ) : (
           view.main

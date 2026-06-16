@@ -50,6 +50,35 @@ import {
   weakReferencePracticeTarget,
 } from '../utils/referenceHelpers.js';
 
+function lookupMatchKey(match) {
+  return match
+    ? `${wordKeyLocal(match.word)}|${match.type.id}|${match.matchKind}|${match.answer}|${
+        match.surface || ''
+      }`
+    : '';
+}
+
+function lookupMatchDisplay(match, practicePrefs) {
+  if (!match) return null;
+  if (match.matchKind === 'variant') {
+    return {
+      main: match.surface || match.answer,
+      sub: match.canonicalSurface ? `Standard: ${match.canonicalSurface}` : '',
+      lang: 'ja',
+    };
+  }
+  return formDisplay(match.answer, practicePrefs, match.word, match.type.id);
+}
+
+function isDictionaryLookupQuery(query, word) {
+  const raw = String(query || '').trim();
+  if (!raw || !word) return false;
+  const lower = raw.toLowerCase();
+  return (
+    raw === word.dict || raw === word.reading || lower === kanaToRomaji(word.reading).toLowerCase()
+  );
+}
+
 export default function ReferenceViewSub({
   state,
   setState,
@@ -72,6 +101,7 @@ export default function ReferenceViewSub({
   const [lookupAiLoading, setLookupAiLoading] = useState(false);
   const [lookupAiErr, setLookupAiErr] = useState('');
   const [favoriteMsg, setFavoriteMsg] = useState('');
+  const [activeLookupMatchKey, setActiveLookupMatchKey] = useState('');
   const lookupAbortRef = useRef(null);
   const lookupAutoSelectKeyRef = useRef('');
 
@@ -85,6 +115,15 @@ export default function ReferenceViewSub({
     : null;
   const matches = useMemo(() => searchWords(query, words), [query, words]);
   const lookupMatches = useMemo(() => formLookupCandidates(query, words), [query, words]);
+  const reverseLookupFocused =
+    lookupMatches.length > 0 && !isDictionaryLookupQuery(query, lookupMatches[0]?.word);
+  const activeLookupMatch = useMemo(() => {
+    if (!query.trim() || !reverseLookupFocused) return null;
+    return (
+      lookupMatches.find((match) => lookupMatchKey(match) === activeLookupMatchKey) ||
+      lookupMatches[0]
+    );
+  }, [activeLookupMatchKey, lookupMatches, query, reverseLookupFocused]);
   const scratchCandidates = useMemo(() => adHocReferenceCandidates(query), [query]);
   const scratchCandidate =
     scratchCandidates[Math.min(scratchIndex, Math.max(0, scratchCandidates.length - 1))] || null;
@@ -114,7 +153,17 @@ export default function ReferenceViewSub({
     const trimmedQuery = query.trim();
     if (!trimmedQuery || !lookupMatches.length) {
       lookupAutoSelectKeyRef.current = '';
+      setActiveLookupMatchKey('');
       return;
+    }
+    if (isDictionaryLookupQuery(trimmedQuery, lookupMatches[0]?.word)) {
+      setActiveLookupMatchKey('');
+    } else {
+      setActiveLookupMatchKey((current) =>
+        current && lookupMatches.some((match) => lookupMatchKey(match) === current)
+          ? current
+          : lookupMatchKey(lookupMatches[0]),
+      );
     }
     const topWord = lookupMatches[0]?.word || null;
     if (!topWord) return;
@@ -141,10 +190,17 @@ export default function ReferenceViewSub({
     !queryActive ||
     matches.some((word) => wordKeyLocal(word) === selectedKey) ||
     lookupMatches.some((match) => wordKeyLocal(match.word) === selectedKey);
-  const detailWord = selectedMatchesQuery ? selected : null;
+  const detailWord = selectedMatchesQuery && !activeLookupMatch ? selected : null;
   const rows = detailWord ? referenceRows(detailWord, state) : [];
   const selectedView = detailWord ? promptDisplay(detailWord, null, practicePrefs) : null;
   const selectedMasuDiagnostic = detailWord ? ruMasuDiagnostic(detailWord) : null;
+  const activeLookupRows = activeLookupMatch ? referenceRows(activeLookupMatch.word, state) : [];
+  const activeLookupView = activeLookupMatch
+    ? lookupMatchDisplay(activeLookupMatch, practicePrefs)
+    : null;
+  const activeLookupWordView = activeLookupMatch
+    ? promptDisplay(activeLookupMatch.word, null, practicePrefs)
+    : null;
   const masteredRows = rows.filter((r) => r.progress.status === 'mastered').length;
   const dueRows = rows.filter((r) => r.progress.status === 'due').length;
   const favoritesList = findFavoritesList(wordLists);
@@ -261,21 +317,26 @@ export default function ReferenceViewSub({
     });
   }
 
-  function drillReferenceRow(row) {
-    if (!selected || !row) return;
-    const target = referenceRuleTarget(selected, row.type);
-    applyReferencePracticeTarget(target);
-    setFavoriteMsg(`Drilling ${target?.label || row.type.label}.`);
+  function practiceReferenceForm(word, type) {
+    if (!word || !type) return;
+    const target = referenceRuleTarget(word, type);
+    applyReferencePracticeTarget(target, word);
+    setFavoriteMsg(`Drilling ${target?.label || type.label}.`);
     if (practiceWord) {
-      practiceWord(selected, row.type.id, {
+      practiceWord(word, type.id, {
         source: 'reference',
         launchMode: 'drill',
         returnTo: 'reference',
-        referenceLabel: target?.label || row.type.label,
+        referenceLabel: target?.label || type.label,
       });
     } else if (setTab) {
       setTab('practice');
     }
+  }
+
+  function drillReferenceRow(row) {
+    if (!selected || !row) return;
+    practiceReferenceForm(selected, row.type);
   }
 
   function compareReferenceRow(row) {
@@ -568,6 +629,7 @@ export default function ReferenceViewSub({
               {lookupMatches.length > 0 ? (
                 <div className="mt-2 space-y-1.5">
                   {lookupMatches.slice(0, 5).map((m) => {
+                    const active = lookupMatchKey(m) === lookupMatchKey(activeLookupMatch);
                     const av =
                       m.matchKind === 'variant'
                         ? {
@@ -580,9 +642,12 @@ export default function ReferenceViewSub({
                     return (
                       <button
                         key={`${wordKeyLocal(m.word)}-${m.type.id}-${m.matchKind}`}
-                        onClick={() => chooseReferenceWord(m.word)}
+                        onClick={() => {
+                          setActiveLookupMatchKey(lookupMatchKey(m));
+                          rememberSearch(query);
+                        }}
                         className={`w-full text-left px-2 py-2 rounded-lg border transition ${
-                          isSelectedWord(m.word)
+                          active
                             ? 'border-indigo-200 bg-indigo-50 dark:bg-indigo-950/20'
                             : 'border-stone-100 dark:border-stone-850 hover:border-stone-200 dark:hover:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800/40'
                         }`}
@@ -788,6 +853,147 @@ export default function ReferenceViewSub({
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {activeLookupMatch && (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 overflow-hidden">
+            <div className="p-5 text-left">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-xs uppercase tracking-wider text-indigo-650 dark:text-indigo-350 font-semibold">
+                    Focused lookup hit
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <ScriptDisplay
+                      view={activeLookupView}
+                      word={activeLookupMatch.word}
+                      type={activeLookupMatch.type.id}
+                      colorHighlight={practicePrefs.colorCodeConjugations !== false}
+                      className="text-3xl font-semibold text-stone-950 dark:text-stone-50"
+                      subClassName="text-sm text-stone-500 mt-1"
+                    />
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                        activeLookupMatch.matchKind === 'exact'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-300'
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-950/35 dark:text-amber-300'
+                      }`}
+                    >
+                      {activeLookupMatch.matchKind}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-sm text-stone-500 dark:text-stone-400">
+                      {activeLookupMatch.type.label} of
+                    </span>
+                    <ScriptDisplay
+                      view={activeLookupWordView}
+                      className="text-xl font-semibold text-stone-900 dark:text-stone-100"
+                      subClassName="text-xs text-stone-500"
+                    />
+                    <span className="text-sm text-stone-500 dark:text-stone-400">
+                      {activeLookupMatch.word.meaning}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                    {groupDisplayLabel(activeLookupMatch.word.group)}
+                    {groupAliasText(activeLookupMatch.word.group)
+                      ? ` - ${groupAliasText(activeLookupMatch.word.group)}`
+                      : ''}
+                  </div>
+                  <p className="mt-3 max-w-2xl text-sm leading-relaxed text-stone-650 dark:text-stone-300">
+                    {activeLookupMatch.variantNote || activeLookupMatch.explanation.rule}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      practiceReferenceForm(activeLookupMatch.word, activeLookupMatch.type)
+                    }
+                    disabled={!practiceWord && !setTab}
+                    className="px-3 py-2 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 disabled:opacity-40 text-white dark:text-stone-900 rounded-lg text-sm inline-flex items-center gap-1.5 transition"
+                  >
+                    <IconRefresh className="w-4 h-4" />
+                    Practice this form
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => speakJapaneseLocal(activeLookupMatch.answer)}
+                    className="p-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-stone-500"
+                    title="Speak matched form"
+                    aria-label="Speak matched form"
+                  >
+                    <IconVolume className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <details className="mt-4 overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800">
+                <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 dark:bg-stone-950/60 dark:text-stone-200 [&::-webkit-details-marker]:hidden">
+                  <span>Show full word reference</span>
+                  <span className="text-xs font-normal text-stone-400">
+                    {activeLookupRows.length} forms
+                  </span>
+                </summary>
+                <div className="max-h-96 overflow-y-auto border-t border-stone-200 dark:border-stone-800">
+                  <table className="w-full text-sm">
+                    <thead className="bg-stone-50 dark:bg-stone-950 text-stone-500 dark:text-stone-400 text-xs uppercase tracking-wider">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-medium">Form</th>
+                        <th className="px-4 py-2 text-left font-medium">Answer</th>
+                        <th className="px-4 py-2 text-left font-medium hidden md:table-cell">
+                          Rule
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
+                      {activeLookupRows.map((r) => {
+                        const rv = formDisplay(
+                          r.answer,
+                          practicePrefs,
+                          activeLookupMatch.word,
+                          r.type.id,
+                        );
+                        const current = r.type.id === activeLookupMatch.type.id;
+                        return (
+                          <tr
+                            key={r.type.id}
+                            className={
+                              current
+                                ? 'bg-indigo-50/60 dark:bg-indigo-950/20'
+                                : 'bg-white dark:bg-stone-900'
+                            }
+                          >
+                            <td className="px-4 py-2 text-left">
+                              <div className="font-semibold text-stone-850 dark:text-stone-200">
+                                {r.type.label}
+                              </div>
+                              <div className="text-xs text-stone-400">{r.type.hint}</div>
+                            </td>
+                            <td className="px-4 py-2 text-left">
+                              <ScriptDisplay
+                                view={rv}
+                                word={activeLookupMatch.word}
+                                type={r.type.id}
+                                colorHighlight={practicePrefs.colorCodeConjugations !== false}
+                                className="text-lg text-stone-900 dark:text-stone-100"
+                                subClassName="text-xs text-stone-450"
+                              />
+                            </td>
+                            <td className="px-4 py-2 text-xs text-stone-550 hidden md:table-cell text-left">
+                              {r.explanation.rule}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
             </div>
           </div>
         )}

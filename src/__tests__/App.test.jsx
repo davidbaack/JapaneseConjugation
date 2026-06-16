@@ -708,7 +708,7 @@ describe('App shell', () => {
     const drillWord = await screen.findByRole('button', { name: 'Drill word' });
     expect(drillWord).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
-      target: { value: 'tabeta' },
+      target: { value: 'taberu' },
     });
     expect(await screen.findByRole('button', { name: 'AI disambiguate' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Favorite', exact: true })).toBeTruthy();
@@ -815,9 +815,9 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
     fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));
     fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
-      target: { value: 'tabeta' },
+      target: { value: 'taberu' },
     });
-    expect(await screen.findByText('1 hit')).toBeTruthy();
+    expect(await screen.findAllByText('to eat')).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: 'Drill word' }));
 
     expect(await screen.findByText('Reference drill')).toBeTruthy();
@@ -833,9 +833,9 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
     fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));
     fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
-      target: { value: 'tabeta' },
+      target: { value: 'taberu' },
     });
-    expect(await screen.findByText('1 hit')).toBeTruthy();
+    expect(await screen.findAllByText('to eat')).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: 'Drill enabled forms' }));
 
     expect(await screen.findByText('Word form sweep')).toBeTruthy();
@@ -874,8 +874,11 @@ describe('App shell', () => {
 
     expect(await screen.findByText('Correct conjugation')).toBeTruthy();
     expect(
-      screen.getByText(/Recognized 食べれる as conversational ら-dropping potential/),
-    ).toBeTruthy();
+      screen.getAllByText(/Recognized 食べれる as conversational ら-dropping potential/).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Practice this form' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Show full word reference' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Hide full word reference' })).toBeNull();
     expect(screen.queryByText(/滑る/)).toBeNull();
     expect(screen.queryByText('Not quite')).toBeNull();
     expect(screen.queryByText('Something went wrong')).toBeNull();
@@ -891,12 +894,39 @@ describe('App shell', () => {
     });
 
     expect(await screen.findByText('1 hit')).toBeTruthy();
-    expect(screen.getByText('variant')).toBeTruthy();
+    expect(screen.getAllByText('Focused lookup hit').length).toBe(1);
+    expect(screen.getAllByText('variant').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Practice this form' })).toBeTruthy();
+    const referenceDetails = screen.getByText('Show full word reference').closest('details');
+    expect(referenceDetails).toBeTruthy();
+    expect(referenceDetails.open).toBe(false);
     expect(
-      screen.getByText(/Recognized 食べれる as conversational ら-dropping potential/),
-    ).toBeTruthy();
+      screen.getAllByText(/Recognized 食べれる as conversational ら-dropping potential/).length,
+    ).toBeGreaterThan(0);
     expect(screen.queryByText('Scratch conjugator')).toBeNull();
     expect(screen.queryByText(/お食べれ/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Drill enabled forms' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Copy table' })).toBeNull();
+  }, 15000);
+
+  it('shows a focused Lookup hit for polite past before the full reference table', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));
+    fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
+      target: { value: '\u98df\u3079\u307e\u3057\u305f' },
+    });
+
+    expect(await screen.findByText('1 hit')).toBeTruthy();
+    expect(screen.getAllByText('Focused lookup hit').length).toBe(1);
+    expect(screen.getAllByText('Polite Past').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Practice this form' })).toBeTruthy();
+    const referenceDetails = screen.getByText('Show full word reference').closest('details');
+    expect(referenceDetails).toBeTruthy();
+    expect(referenceDetails.open).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Drill enabled forms' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Copy table' })).toBeNull();
   }, 15000);
 
   it('keeps Tools reverse lookup details aligned with the confirmed hit', async () => {
@@ -931,7 +961,7 @@ describe('App shell', () => {
     expect((await screen.findAllByText('to write')).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
-      target: { value: '食べました' },
+      target: { value: '\u98df\u3079\u307e\u3057\u305f' },
     });
 
     expect(await screen.findByText('1 hit')).toBeTruthy();

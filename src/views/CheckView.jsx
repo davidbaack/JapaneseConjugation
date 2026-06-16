@@ -58,8 +58,8 @@ function DiffForm({ correct, firstDiff }) {
   );
 }
 
-// Post-result extras shared by the correct and near-miss branches: a full
-// conjugation table for the recognised word, and a jump into Study to drill it.
+// Post-result extras shared by the correct and near-miss branches: a secondary
+// word reference table, and a jump into Study to drill the recognised form.
 function WordExtras({ word, type, showForms, onToggleForms, onPracticeWord }) {
   const rows = useMemo(() => (showForms ? formRows(word) : []), [showForms, word]);
   return (
@@ -70,14 +70,14 @@ function WordExtras({ word, type, showForms, onToggleForms, onPracticeWord }) {
           aria-expanded={showForms}
           className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
         >
-          {showForms ? 'Hide all forms' : `Show all forms of ${word.dict}`}
+          {showForms ? 'Hide full word reference' : 'Show full word reference'}
         </button>
         {onPracticeWord && (
           <button
             onClick={() => onPracticeWord(word, type)}
             className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
           >
-            Practice this word →
+            Practice this form
           </button>
         )}
       </div>
