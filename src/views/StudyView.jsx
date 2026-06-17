@@ -108,6 +108,8 @@ import {
   familyIntroFocusFromLaunch,
   familyIntroTypeIds,
   togglePracticeDimensionEnabledTypes,
+  togglePracticeFamilyEnabledTypes,
+  togglePracticeTypeEnabledTypes,
 } from './study/PracticeMaps.jsx';
 import { MistakeRouteHint, ReviewsDashboard } from './study/ReviewsDashboard.jsx';
 import { AnswerInputPanel } from './study/AnswerInputPanel.jsx';
@@ -1833,6 +1835,26 @@ export default function StudyView({ mode = 'practice' }) {
     setCurrent(null);
   }
 
+  function togglePracticeFamily(family) {
+    if (!family?.typeIds?.length) return;
+    setState((prev) => {
+      const nextEnabledTypes = togglePracticeFamilyEnabledTypes(prev.enabledTypes || [], family);
+      if (nextEnabledTypes === prev.enabledTypes) return prev;
+      return { ...prev, enabledTypes: nextEnabledTypes };
+    });
+    setCurrent(null);
+  }
+
+  function togglePracticeType(typeId) {
+    if (!typeId) return;
+    setState((prev) => {
+      const nextEnabledTypes = togglePracticeTypeEnabledTypes(prev.enabledTypes || [], typeId);
+      if (nextEnabledTypes === prev.enabledTypes) return prev;
+      return { ...prev, enabledTypes: nextEnabledTypes };
+    });
+    setCurrent(null);
+  }
+
   function togglePracticeMapFamilyOpen(familyId) {
     setOpenPracticeMapFamilyIds((current) => {
       const next = new Set(current);
@@ -3369,7 +3391,9 @@ export default function StudyView({ mode = 'practice' }) {
         sessionFamilyStats={sessionFamilyStats}
         openFamilyIds={openPracticeMapFamilyIds}
         onToggleFamilyOpen={togglePracticeMapFamilyOpen}
+        onToggleFamily={togglePracticeFamily}
         onIntroduceFamily={introducePracticeFamily}
+        onToggleType={togglePracticeType}
         onToggleDimension={togglePracticeDimension}
       />
     </div>

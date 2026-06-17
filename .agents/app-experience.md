@@ -40,11 +40,12 @@ confirms the new direction, update this document in the same change.
 - The persistent Practice map shows all form families, including disabled and
   untried families, in Focus-map-style category cards. The map uses global
   Plain, Polite, Affirmative, Negative, Past, and Non-past toggles for active
-  Practice scope; those toggles apply across every form family. Each family card
-  shows active-form counts, lifetime right/wrong counts, this-session
-  right/wrong balance, and an overall skill visualization. Expanded families
-  show read-only active-form chips plus subgroup weakness rows once there is
-  data; exact form toggles are intentionally not exposed in the map.
+  Practice scope; those toggles apply across every form family. Family cards
+  can also be toggled on or off as categories, and expanded families expose
+  exact form toggles for learner-controlled exceptions. Each family card shows
+  active-form counts, lifetime right/wrong counts, this-session right/wrong
+  balance, and an overall skill visualization. Expanded families also show
+  subgroup weakness rows once there is data.
 - Form scope persists through `state.enabledTypes`. The default and reset scope
   is Everyday.
 - The active card may remove the current word from automatic Practice with an

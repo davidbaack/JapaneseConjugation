@@ -9,11 +9,15 @@ globalThis.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 import App from '../App.jsx';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
-import { EVERYDAY_TYPE_IDS } from '../data/conjugationTypes.js';
+import { EVERYDAY_TYPE_IDS, FORM_GROUPS } from '../data/conjugationTypes.js';
 import { STARTER_VERBS } from '../data/starterWords.js';
 import { cardIdFor, defaultState, localDateKey } from '../utils/storage.js';
 import { recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
-import { togglePracticeDimensionEnabledTypes } from '../views/study/PracticeMaps.jsx';
+import {
+  togglePracticeDimensionEnabledTypes,
+  togglePracticeFamilyEnabledTypes,
+  togglePracticeTypeEnabledTypes,
+} from '../views/study/PracticeMaps.jsx';
 
 afterEach(() => {
   cleanup();
@@ -27,7 +31,7 @@ async function waitForPracticeCard() {
 }
 
 describe('App shell', () => {
-  it('keeps global form toggles within the active family scope', () => {
+  it('keeps Practice scope toggles within the active family scope', () => {
     const noPast = togglePracticeDimensionEnabledTypes(EVERYDAY_TYPE_IDS, 'past');
 
     expect(noPast).not.toContain('plain-past');
@@ -38,6 +42,21 @@ describe('App shell', () => {
 
     expect(restored).toContain('plain-past');
     expect(restored).not.toContain('passive');
+
+    const typeGuarded = togglePracticeTypeEnabledTypes(['plain-past'], 'plain-past');
+    expect(typeGuarded).toEqual(['plain-past']);
+
+    const teTaFamily = FORM_GROUPS.find((group) => group.id === 'te-ta-sound-changes');
+    if (!teTaFamily) throw new Error('Missing Te/Ta Sound Changes family');
+    const noTeTa = togglePracticeFamilyEnabledTypes(EVERYDAY_TYPE_IDS, teTaFamily);
+
+    expect(noTeTa).not.toContain('plain-past');
+    expect(noTeTa).not.toContain('te-form');
+
+    const restoredTeTa = togglePracticeFamilyEnabledTypes(noTeTa, teTaFamily);
+
+    expect(restoredTeTa).toContain('plain-past');
+    expect(restoredTeTa).toContain('te-form');
   });
 
   it('renders the header, subtitle, and restored nav', async () => {
@@ -165,15 +184,23 @@ describe('App shell', () => {
     expect(within(practiceMap()).getByText('0 right / 2 wrong lifetime')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
     expect(within(practiceMap()).getByText('Gathering data')).toBeTruthy();
-    expect(within(practiceMap()).getByText('Active forms')).toBeTruthy();
+    expect(within(practiceMap()).getByText('Forms in this category')).toBeTruthy();
     expect(within(practiceMap()).getByText('Recent weak spots')).toBeTruthy();
     expect(within(practiceMap()).getByText('Te-form - Godan ku sound changes')).toBeTruthy();
     expect(within(practiceMap()).getByText('0/2')).toBeTruthy();
 
-    expect(within(practiceMap()).queryByRole('button', { name: /^Te-form/i })).toBeNull();
-    fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Turn Past off' }));
+    expect(within(practiceMap()).getByRole('button', { name: 'Turn Te-form off' })).toBeTruthy();
+    expect(within(practiceMap()).getByRole('button', { name: 'Turn Plain Past off' })).toBeTruthy();
+    fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Turn Te-form off' }));
     await waitFor(() => expect(within(practiceMap()).getByText('1/2 forms on')).toBeTruthy());
-    expect(within(practiceMap()).getByRole('button', { name: 'Turn Past on' })).toBeTruthy();
+    expect(within(practiceMap()).getByRole('button', { name: 'Turn Te-form on' })).toBeTruthy();
+    fireEvent.click(
+      within(practiceMap()).getByRole('button', { name: 'Turn Te/Ta Sound Changes off' }),
+    );
+    await waitFor(() => expect(within(practiceMap()).getByText('0/2 forms on')).toBeTruthy());
+    expect(
+      within(practiceMap()).getByRole('button', { name: 'Turn Te/Ta Sound Changes on' }),
+    ).toBeTruthy();
     expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
     expect(within(practiceMap()).getByText('Recent weak spots')).toBeTruthy();
   });

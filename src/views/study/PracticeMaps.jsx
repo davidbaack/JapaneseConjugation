@@ -203,6 +203,36 @@ export function togglePracticeDimensionEnabledTypes(enabledTypeIds = [], optionI
   return next.length ? next : enabledTypeIds;
 }
 
+export function togglePracticeTypeEnabledTypes(enabledTypeIds = [], typeId) {
+  if (!CARD_TYPE_BY_ID.has(typeId)) return enabledTypeIds;
+  const currentTypeIds = [
+    ...new Set(enabledTypeIds.filter((enabledTypeId) => CARD_TYPE_BY_ID.has(enabledTypeId))),
+  ];
+  const current = new Set(currentTypeIds);
+  if (current.has(typeId)) {
+    if (current.size <= 1) return enabledTypeIds;
+    current.delete(typeId);
+  } else {
+    current.add(typeId);
+  }
+  return [...current];
+}
+
+export function togglePracticeFamilyEnabledTypes(enabledTypeIds = [], family) {
+  const familyTypeIds = (family?.typeIds || []).filter((typeId) => CARD_TYPE_BY_ID.has(typeId));
+  if (!familyTypeIds.length) return enabledTypeIds;
+  const currentTypeIds = [
+    ...new Set(enabledTypeIds.filter((enabledTypeId) => CARD_TYPE_BY_ID.has(enabledTypeId))),
+  ];
+  const current = new Set(currentTypeIds);
+  const enabledInFamily = familyTypeIds.filter((typeId) => current.has(typeId));
+  if (enabledInFamily.length) {
+    const next = currentTypeIds.filter((typeId) => !familyTypeIds.includes(typeId));
+    return next.length ? next : enabledTypeIds;
+  }
+  return [...new Set([...currentTypeIds, ...familyTypeIds])];
+}
+
 function practiceDimensionOptionState(option, enabled) {
   const enabledTypeIds = option.typeIds.filter((typeId) => enabled.has(typeId));
   return {
@@ -242,7 +272,9 @@ export function PracticeScopeSidebar({
   sessionFamilyStats = {},
   openFamilyIds,
   onToggleFamilyOpen,
+  onToggleFamily,
   onIntroduceFamily,
+  onToggleType,
   onToggleDimension,
   className = '',
 }) {
@@ -335,9 +367,10 @@ export function PracticeScopeSidebar({
             const allEnabled = enabledInFamily.length === family.typeIds.length;
             const someEnabled = enabledInFamily.length > 0;
             const statusLabel = someEnabled ? 'Active' : 'Off';
-            const activeTypes = enabledInFamily
+            const familyTypes = family.typeIds
               .map((typeId) => CARD_TYPE_BY_ID.get(typeId))
               .filter(Boolean);
+            const familyToggleDisabled = someEnabled && enabled.size <= enabledInFamily.length;
             const progress = weaknessByFamily.get(family.id) || {};
             const weaknessRows = progress.rows || [];
             const attempted = progress.attempted || 0;
@@ -483,18 +516,23 @@ export function PracticeScopeSidebar({
                     </span>
                   </button>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <span
+                    <button
+                      type="button"
+                      aria-pressed={someEnabled}
+                      aria-label={`Turn ${title} ${someEnabled ? 'off' : 'on'}`}
+                      onClick={() => onToggleFamily?.(family)}
+                      disabled={familyToggleDisabled}
                       className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold transition ${
                         someEnabled
                           ? 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/50'
                           : 'border-stone-200 bg-stone-50 text-stone-600 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300'
-                      }`}
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
                     >
                       <span
                         className={`h-2 w-2 rounded-full ${someEnabled ? 'bg-emerald-500' : 'bg-stone-400'}`}
                       />
                       {statusLabel}
-                    </span>
+                    </button>
                     {introEligible && onIntroduceFamily && (
                       <button
                         type="button"
@@ -542,22 +580,49 @@ export function PracticeScopeSidebar({
                     )}
                     <div className="space-y-1.5">
                       <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
-                        Active forms
+                        Forms in this category
                       </div>
-                      {activeTypes.length ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {activeTypes.map((type) => (
-                            <span
-                              key={type.id}
-                              className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200"
-                            >
-                              {type.label}
-                            </span>
-                          ))}
+                      {familyTypes.length ? (
+                        <div className="grid gap-1.5">
+                          {familyTypes.map((type) => {
+                            const checked = enabled.has(type.id);
+                            const disabled = checked && enabled.size <= 1;
+                            return (
+                              <button
+                                key={type.id}
+                                type="button"
+                                aria-pressed={checked}
+                                aria-label={`Turn ${type.label} ${checked ? 'off' : 'on'}`}
+                                onClick={() => onToggleType?.(type.id)}
+                                disabled={disabled}
+                                className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
+                                  checked
+                                    ? 'border-indigo-200 bg-indigo-50 text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100'
+                                    : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800'
+                                } disabled:cursor-not-allowed disabled:opacity-60`}
+                              >
+                                <span
+                                  className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded border ${
+                                    checked
+                                      ? 'border-indigo-600 bg-indigo-600 dark:border-indigo-400 dark:bg-indigo-400'
+                                      : 'border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-950'
+                                  }`}
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-xs font-semibold">{type.label}</span>
+                                  {type.sub && (
+                                    <span className="block truncate text-[11px] opacity-70">
+                                      {type.sub}
+                                    </span>
+                                  )}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-2 text-xs text-stone-500 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-400">
-                          No active forms
+                          No forms in this category
                         </div>
                       )}
                     </div>
