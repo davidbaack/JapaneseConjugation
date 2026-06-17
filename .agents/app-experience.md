@@ -38,11 +38,13 @@ confirms the new direction, update this document in the same change.
   strip details limited to the selection reason, top session miss pattern, and
   recent answer trail.
 - The persistent Practice map shows all form families, including disabled and
-  untried families, in Focus-map-style category cards. The map has clear
-  Plain forms and Polite forms super filters, and each family card shows an
-  on/off/partial toggle, lifetime right/wrong counts, this-session right/wrong
-  balance, and an overall skill visualization. Expanded families show exact-form
-  toggles plus subgroup weakness rows once there is data.
+  untried families, in Focus-map-style category cards. The map uses global
+  Plain, Polite, Affirmative, Negative, Past, and Non-past toggles for active
+  Practice scope; those toggles apply across every form family. Each family card
+  shows active-form counts, lifetime right/wrong counts, this-session
+  right/wrong balance, and an overall skill visualization. Expanded families
+  show read-only active-form chips plus subgroup weakness rows once there is
+  data; exact form toggles are intentionally not exposed in the map.
 - Form scope persists through `state.enabledTypes`. The default and reset scope
   is Everyday.
 - The active card may remove the current word from automatic Practice with an

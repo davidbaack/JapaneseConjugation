@@ -107,6 +107,7 @@ import {
   PracticeScopeSidebar,
   familyIntroFocusFromLaunch,
   familyIntroTypeIds,
+  togglePracticeDimensionEnabledTypes,
 } from './study/PracticeMaps.jsx';
 import { MistakeRouteHint, ReviewsDashboard } from './study/ReviewsDashboard.jsx';
 import { AnswerInputPanel } from './study/AnswerInputPanel.jsx';
@@ -1819,50 +1820,15 @@ export default function StudyView({ mode = 'practice' }) {
     setCurrent(null);
   }
 
-  function togglePracticeType(typeId) {
-    if (!typeId) return;
+  function togglePracticeDimension(optionId) {
+    if (!optionId) return;
     setState((prev) => {
-      const currentTypes = new Set(prev.enabledTypes || []);
-      if (currentTypes.has(typeId)) {
-        if (currentTypes.size <= 1) return prev;
-        currentTypes.delete(typeId);
-      } else {
-        currentTypes.add(typeId);
-      }
-      return { ...prev, enabledTypes: [...currentTypes] };
-    });
-    setCurrent(null);
-  }
-
-  function togglePracticeTypeSet(typeIds = []) {
-    const targetTypeIds = [...new Set(typeIds.filter((typeId) => CARD_TYPE_BY_ID.has(typeId)))];
-    if (!targetTypeIds.length) return;
-    setState((prev) => {
-      const currentTypes = new Set(prev.enabledTypes || []);
-      const allEnabled = targetTypeIds.every((typeId) => currentTypes.has(typeId));
-      if (allEnabled) {
-        for (const typeId of targetTypeIds) currentTypes.delete(typeId);
-        if (!currentTypes.size) return prev;
-      } else {
-        for (const typeId of targetTypeIds) currentTypes.add(typeId);
-      }
-      return { ...prev, enabledTypes: [...currentTypes] };
-    });
-    setCurrent(null);
-  }
-
-  function togglePracticeFamily(family) {
-    if (!family?.typeIds?.length) return;
-    setState((prev) => {
-      const currentTypes = new Set(prev.enabledTypes || []);
-      const allEnabled = family.typeIds.every((typeId) => currentTypes.has(typeId));
-      if (allEnabled) {
-        for (const typeId of family.typeIds) currentTypes.delete(typeId);
-        if (!currentTypes.size) return prev;
-      } else {
-        for (const typeId of family.typeIds) currentTypes.add(typeId);
-      }
-      return { ...prev, enabledTypes: [...currentTypes] };
+      const nextEnabledTypes = togglePracticeDimensionEnabledTypes(
+        prev.enabledTypes || [],
+        optionId,
+      );
+      if (nextEnabledTypes === prev.enabledTypes) return prev;
+      return { ...prev, enabledTypes: nextEnabledTypes };
     });
     setCurrent(null);
   }
@@ -2663,7 +2629,7 @@ export default function StudyView({ mode = 'practice' }) {
   }
 
   function introducePracticeFamily(family) {
-    const typeIds = familyIntroTypeIds(family);
+    const typeIds = familyIntroTypeIds(family, state.enabledTypes);
     if (!family?.id || !typeIds.length) return;
     setState((prev) => {
       const restored = includeFormFamilyInReviewState(prev, family.id);
@@ -3403,10 +3369,8 @@ export default function StudyView({ mode = 'practice' }) {
         sessionFamilyStats={sessionFamilyStats}
         openFamilyIds={openPracticeMapFamilyIds}
         onToggleFamilyOpen={togglePracticeMapFamilyOpen}
-        onToggleFamily={togglePracticeFamily}
         onIntroduceFamily={introducePracticeFamily}
-        onToggleType={togglePracticeType}
-        onToggleTypeSet={togglePracticeTypeSet}
+        onToggleDimension={togglePracticeDimension}
       />
     </div>
   );

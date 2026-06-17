@@ -36,28 +36,192 @@ function isPolitePracticeType(type) {
   );
 }
 
+function isNegativePracticeType(type) {
+  return (
+    String(type?.id || '').includes('negative') ||
+    /\bNegative\b/.test(type?.label || '') ||
+    type?.id === 'prohibition'
+  );
+}
+
+function isPastPracticeType(type) {
+  return String(type?.id || '').includes('past') || /\bPast\b/.test(type?.label || '');
+}
+
 const POLITE_TYPE_IDS = ALL_CARD_TYPES.filter(isPolitePracticeType).map((type) => type.id);
 const PLAIN_TYPE_IDS = ALL_CARD_TYPES.filter((type) => !isPolitePracticeType(type)).map(
   (type) => type.id,
 );
+const NEGATIVE_TYPE_IDS = ALL_CARD_TYPES.filter(isNegativePracticeType).map((type) => type.id);
+const AFFIRMATIVE_TYPE_IDS = ALL_CARD_TYPES.filter((type) => !isNegativePracticeType(type)).map(
+  (type) => type.id,
+);
+const PAST_TYPE_IDS = ALL_CARD_TYPES.filter(isPastPracticeType).map((type) => type.id);
+const NON_PAST_TYPE_IDS = ALL_CARD_TYPES.filter((type) => !isPastPracticeType(type)).map(
+  (type) => type.id,
+);
 
-export const PRACTICE_REGISTER_FILTERS = [
+export const PRACTICE_FORM_FILTER_GROUPS = [
   {
-    id: 'plain',
-    label: 'Plain forms',
-    typeIds: PLAIN_TYPE_IDS,
+    id: 'register',
+    label: 'Register',
+    options: [
+      {
+        id: 'plain',
+        label: 'Plain',
+        typeIds: PLAIN_TYPE_IDS,
+      },
+      {
+        id: 'polite',
+        label: 'Polite',
+        typeIds: POLITE_TYPE_IDS,
+      },
+    ],
   },
   {
-    id: 'polite',
-    label: 'Polite forms',
-    typeIds: POLITE_TYPE_IDS,
+    id: 'polarity',
+    label: 'Polarity',
+    options: [
+      {
+        id: 'affirmative',
+        label: 'Affirmative',
+        typeIds: AFFIRMATIVE_TYPE_IDS,
+      },
+      {
+        id: 'negative',
+        label: 'Negative',
+        typeIds: NEGATIVE_TYPE_IDS,
+      },
+    ],
+  },
+  {
+    id: 'tense',
+    label: 'Time',
+    options: [
+      {
+        id: 'past',
+        label: 'Past',
+        typeIds: PAST_TYPE_IDS,
+      },
+      {
+        id: 'non-past',
+        label: 'Non-past',
+        typeIds: NON_PAST_TYPE_IDS,
+      },
+    ],
   },
 ];
 
-export function familyIntroTypeIds(family) {
-  return (family?.typeIds || [])
-    .filter((typeId) => CARD_TYPE_BY_ID.has(typeId))
-    .slice(0, FAMILY_INTRO_TYPE_LIMIT);
+const PRACTICE_FORM_FILTERS = PRACTICE_FORM_FILTER_GROUPS.flatMap((group) =>
+  group.options.map((option) => ({ ...option, groupId: group.id })),
+);
+const PRACTICE_FORM_FILTER_BY_ID = new Map(
+  PRACTICE_FORM_FILTERS.map((option) => [option.id, option]),
+);
+
+function optionMatchesType(optionId, type) {
+  switch (optionId) {
+    case 'plain':
+      return !isPolitePracticeType(type);
+    case 'polite':
+      return isPolitePracticeType(type);
+    case 'affirmative':
+      return !isNegativePracticeType(type);
+    case 'negative':
+      return isNegativePracticeType(type);
+    case 'past':
+      return isPastPracticeType(type);
+    case 'non-past':
+      return !isPastPracticeType(type);
+    default:
+      return false;
+  }
+}
+
+function selectedPracticeDimensions(enabledTypeIds = []) {
+  const enabled = new Set((enabledTypeIds || []).filter((typeId) => CARD_TYPE_BY_ID.has(typeId)));
+  return new Map(
+    PRACTICE_FORM_FILTER_GROUPS.map((group) => {
+      const selected = group.options
+        .filter((option) => option.typeIds.some((typeId) => enabled.has(typeId)))
+        .map((option) => option.id);
+      return [group.id, selected.length ? selected : group.options.map((option) => option.id)];
+    }),
+  );
+}
+
+function typeMatchesDimensionSelection(type, selections) {
+  return PRACTICE_FORM_FILTER_GROUPS.every((group) => {
+    const selected = selections.get(group.id) || group.options.map((option) => option.id);
+    return selected.some((optionId) => optionMatchesType(optionId, type));
+  });
+}
+
+function typeIdsForDimensionSelection(
+  selections,
+  sourceTypeIds = ALL_CARD_TYPES.map((type) => type.id),
+) {
+  return sourceTypeIds.filter((typeId) => {
+    const type = CARD_TYPE_BY_ID.get(typeId);
+    return type && typeMatchesDimensionSelection(type, selections);
+  });
+}
+
+function activeFamilyTypeIdsFor(enabledTypeIds = []) {
+  const enabled = new Set((enabledTypeIds || []).filter((typeId) => CARD_TYPE_BY_ID.has(typeId)));
+  const familyTypeIds = FORM_GROUPS.filter((family) =>
+    (family.typeIds || []).some((typeId) => enabled.has(typeId)),
+  ).flatMap((family) => family.typeIds || []);
+  const source = familyTypeIds.length ? familyTypeIds : enabledTypeIds;
+  return [...new Set(source)].filter((typeId) => CARD_TYPE_BY_ID.has(typeId));
+}
+
+export function togglePracticeDimensionEnabledTypes(enabledTypeIds = [], optionId) {
+  const option = PRACTICE_FORM_FILTER_BY_ID.get(optionId);
+  if (!option) return enabledTypeIds;
+  const currentTypeIds = [
+    ...new Set(enabledTypeIds.filter((typeId) => CARD_TYPE_BY_ID.has(typeId))),
+  ];
+  const current = new Set(currentTypeIds);
+  const selections = selectedPracticeDimensions(enabledTypeIds);
+  const selectedInGroup = new Set(selections.get(option.groupId) || []);
+  if (selectedInGroup.has(option.id)) {
+    if (selectedInGroup.size <= 1) return enabledTypeIds;
+    const next = currentTypeIds.filter((typeId) => {
+      const type = CARD_TYPE_BY_ID.get(typeId);
+      return type && !optionMatchesType(option.id, type);
+    });
+    return next.length ? next : enabledTypeIds;
+  }
+  selectedInGroup.add(option.id);
+  selections.set(option.groupId, [...selectedInGroup]);
+  const restoredTypeIds = typeIdsForDimensionSelection(
+    selections,
+    activeFamilyTypeIdsFor(currentTypeIds),
+  );
+  const next = [...new Set([...current, ...restoredTypeIds])];
+  return next.length ? next : enabledTypeIds;
+}
+
+function practiceDimensionOptionState(option, enabled) {
+  const enabledTypeIds = option.typeIds.filter((typeId) => enabled.has(typeId));
+  return {
+    ...option,
+    active: enabledTypeIds.length > 0,
+    activeCount: enabledTypeIds.length,
+  };
+}
+
+export function familyIntroTypeIds(family, enabledTypeIds = null) {
+  const familyTypeIds = (family?.typeIds || []).filter((typeId) => CARD_TYPE_BY_ID.has(typeId));
+  if (!familyTypeIds.length) return [];
+  if (!Array.isArray(enabledTypeIds)) return familyTypeIds.slice(0, FAMILY_INTRO_TYPE_LIMIT);
+  const selections = selectedPracticeDimensions(enabledTypeIds);
+  const matchingTypeIds = typeIdsForDimensionSelection(selections, familyTypeIds);
+  return (matchingTypeIds.length ? matchingTypeIds : familyTypeIds).slice(
+    0,
+    FAMILY_INTRO_TYPE_LIMIT,
+  );
 }
 
 export function familyIntroFocusFromLaunch(focus) {
@@ -78,10 +242,8 @@ export function PracticeScopeSidebar({
   sessionFamilyStats = {},
   openFamilyIds,
   onToggleFamilyOpen,
-  onToggleFamily,
   onIntroduceFamily,
-  onToggleType,
-  onToggleTypeSet,
+  onToggleDimension,
   className = '',
 }) {
   const enabled = new Set(state.enabledTypes || []);
@@ -108,53 +270,62 @@ export function PracticeScopeSidebar({
           </span>
         </div>
 
-        <div className="grid gap-2">
-          {PRACTICE_REGISTER_FILTERS.map((filter) => {
-            const enabledInFilter = filter.typeIds.filter((typeId) => enabled.has(typeId));
-            const allEnabled = enabledInFilter.length === filter.typeIds.length;
-            const someEnabled = enabledInFilter.length > 0;
-            const statusLabel = allEnabled ? 'On' : someEnabled ? 'Partial' : 'Off';
-            const pressed = allEnabled ? true : someEnabled ? 'mixed' : false;
-            return (
-              <button
-                key={filter.id}
-                type="button"
-                aria-pressed={pressed}
-                aria-label={`Turn ${filter.label} ${allEnabled ? 'off' : 'on'}`}
-                onClick={() => onToggleTypeSet?.(filter.typeIds)}
-                className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left transition ${
-                  allEnabled
-                    ? 'border-indigo-200 bg-indigo-50/70 text-indigo-950 dark:border-indigo-900/70 dark:bg-indigo-950/20 dark:text-indigo-100'
-                    : someEnabled
-                      ? 'border-amber-200 bg-amber-50/70 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-100'
-                      : 'border-stone-200 bg-white text-stone-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300'
-                }`}
-              >
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold leading-tight">{filter.label}</span>
-                  <span className="mt-0.5 block text-[11px] tabular-nums opacity-70">
-                    {enabledInFilter.length}/{filter.typeIds.length} forms on
-                  </span>
-                </span>
-                <span
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold ${
-                    allEnabled
-                      ? 'border-indigo-300 bg-white text-indigo-700 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300'
-                      : someEnabled
-                        ? 'border-amber-300 bg-white text-amber-800 dark:border-amber-700 dark:bg-stone-950 dark:text-amber-300'
-                        : 'border-stone-200 bg-stone-50 text-stone-600 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300'
-                  }`}
-                >
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      allEnabled ? 'bg-emerald-500' : someEnabled ? 'bg-amber-500' : 'bg-stone-400'
-                    }`}
-                  />
-                  {statusLabel}
-                </span>
-              </button>
-            );
-          })}
+        <div className="space-y-2">
+          {PRACTICE_FORM_FILTER_GROUPS.map((group) => (
+            <div
+              key={group.id}
+              role="group"
+              aria-label={`${group.label} filters`}
+              className="rounded-xl border border-stone-200 bg-white p-2 dark:border-stone-800 dark:bg-stone-900"
+            >
+              <div className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                {group.label}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {group.options.map((option) => {
+                  const optionState = practiceDimensionOptionState(option, enabled);
+                  const active = optionState.active;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      aria-pressed={active}
+                      aria-label={`Turn ${option.label} ${active ? 'off' : 'on'}`}
+                      onClick={() => onToggleDimension?.(option.id)}
+                      className={`flex min-h-14 items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
+                        active
+                          ? 'border-indigo-200 bg-indigo-50/70 text-indigo-950 dark:border-indigo-900/70 dark:bg-indigo-950/20 dark:text-indigo-100'
+                          : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300'
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold leading-tight">
+                          {option.label}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] tabular-nums opacity-70">
+                          {optionState.activeCount} active
+                        </span>
+                      </span>
+                      <span
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold ${
+                          active
+                            ? 'border-indigo-300 bg-white text-indigo-700 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300'
+                            : 'border-stone-200 bg-white text-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400'
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            active ? 'bg-emerald-500' : 'bg-stone-400'
+                          }`}
+                        />
+                        {active ? 'On' : 'Off'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="space-y-3">
@@ -163,8 +334,10 @@ export function PracticeScopeSidebar({
             const enabledInFamily = family.typeIds.filter((typeId) => enabled.has(typeId));
             const allEnabled = enabledInFamily.length === family.typeIds.length;
             const someEnabled = enabledInFamily.length > 0;
-            const statusLabel = allEnabled ? 'On' : someEnabled ? 'Partial' : 'Off';
-            const pressed = allEnabled ? true : someEnabled ? 'mixed' : false;
+            const statusLabel = someEnabled ? 'Active' : 'Off';
+            const activeTypes = enabledInFamily
+              .map((typeId) => CARD_TYPE_BY_ID.get(typeId))
+              .filter(Boolean);
             const progress = weaknessByFamily.get(family.id) || {};
             const weaknessRows = progress.rows || [];
             const attempted = progress.attempted || 0;
@@ -310,30 +483,18 @@ export function PracticeScopeSidebar({
                     </span>
                   </button>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <button
-                      type="button"
-                      aria-pressed={pressed}
-                      aria-label={`Turn ${title} focus ${allEnabled ? 'off' : 'on'}`}
-                      onClick={() => onToggleFamily(family)}
+                    <span
                       className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold transition ${
-                        allEnabled
+                        someEnabled
                           ? 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/50'
-                          : someEnabled
-                            ? 'border-amber-300 bg-white text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-stone-950 dark:text-amber-300 dark:hover:bg-amber-950/50'
-                            : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300'
+                          : 'border-stone-200 bg-stone-50 text-stone-600 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300'
                       }`}
                     >
                       <span
-                        className={`h-2 w-2 rounded-full ${
-                          allEnabled
-                            ? 'bg-emerald-500'
-                            : someEnabled
-                              ? 'bg-amber-500'
-                              : 'bg-stone-400'
-                        }`}
+                        className={`h-2 w-2 rounded-full ${someEnabled ? 'bg-emerald-500' : 'bg-stone-400'}`}
                       />
                       {statusLabel}
-                    </button>
+                    </span>
                     {introEligible && onIntroduceFamily && (
                       <button
                         type="button"
@@ -379,41 +540,26 @@ export function PracticeScopeSidebar({
                         ))}
                       </div>
                     )}
-                    <div className="grid gap-1.5">
-                      {family.typeIds.map((typeId) => {
-                        const type = CARD_TYPE_BY_ID.get(typeId);
-                        if (!type) return null;
-                        const checked = enabled.has(typeId);
-                        return (
-                          <button
-                            key={typeId}
-                            type="button"
-                            aria-pressed={checked}
-                            onClick={() => onToggleType(typeId)}
-                            className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
-                              checked
-                                ? 'border-indigo-200 bg-indigo-50 text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100'
-                                : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800'
-                            }`}
-                          >
+                    <div className="space-y-1.5">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+                        Active forms
+                      </div>
+                      {activeTypes.length ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeTypes.map((type) => (
                             <span
-                              className={`mt-0.5 h-3.5 w-3.5 rounded border ${
-                                checked
-                                  ? 'border-indigo-600 bg-indigo-600 dark:border-indigo-400 dark:bg-indigo-400'
-                                  : 'border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-950'
-                              }`}
-                            />
-                            <span className="min-w-0">
-                              <span className="block text-xs font-semibold">{type.label}</span>
-                              {type.sub && (
-                                <span className="block truncate text-[11px] opacity-70">
-                                  {type.sub}
-                                </span>
-                              )}
+                              key={type.id}
+                              className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200"
+                            >
+                              {type.label}
                             </span>
-                          </button>
-                        );
-                      })}
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-2 text-xs text-stone-500 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-400">
+                          No active forms
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

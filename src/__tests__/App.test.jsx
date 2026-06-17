@@ -9,9 +9,11 @@ globalThis.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 import App from '../App.jsx';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
+import { EVERYDAY_TYPE_IDS } from '../data/conjugationTypes.js';
 import { STARTER_VERBS } from '../data/starterWords.js';
 import { cardIdFor, defaultState, localDateKey } from '../utils/storage.js';
 import { recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
+import { togglePracticeDimensionEnabledTypes } from '../views/study/PracticeMaps.jsx';
 
 afterEach(() => {
   cleanup();
@@ -25,6 +27,19 @@ async function waitForPracticeCard() {
 }
 
 describe('App shell', () => {
+  it('keeps global form toggles within the active family scope', () => {
+    const noPast = togglePracticeDimensionEnabledTypes(EVERYDAY_TYPE_IDS, 'past');
+
+    expect(noPast).not.toContain('plain-past');
+    expect(noPast).toContain('te-form');
+    expect(noPast).not.toContain('passive');
+
+    const restored = togglePracticeDimensionEnabledTypes(noPast, 'past');
+
+    expect(restored).toContain('plain-past');
+    expect(restored).not.toContain('passive');
+  });
+
   it('renders the header, subtitle, and restored nav', async () => {
     render(<App />);
     expect(screen.getByRole('heading', { name: /Katachiya/ })).toBeTruthy();
@@ -41,8 +56,9 @@ describe('App shell', () => {
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
     expect(screen.queryByRole('complementary', { name: 'Focus map' })).toBeNull();
     expect(screen.getByText('Practice categories')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Turn Plain forms on' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Turn Polite forms on' })).toBeTruthy();
+    for (const label of ['Plain', 'Polite', 'Affirmative', 'Negative', 'Past', 'Non-past']) {
+      expect(screen.getByRole('button', { name: `Turn ${label} off` })).toBeTruthy();
+    }
     expect(screen.getAllByText('Not introduced').length).toBeGreaterThan(0);
     expect(screen.queryByText('No reps yet')).toBeNull();
     expect(screen.queryByText('Untested')).toBeNull();
@@ -149,15 +165,15 @@ describe('App shell', () => {
     expect(within(practiceMap()).getByText('0 right / 2 wrong lifetime')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
     expect(within(practiceMap()).getByText('Gathering data')).toBeTruthy();
-    expect(
-      within(practiceMap()).getByRole('button', { name: 'Turn Te/Ta Sound Changes focus off' }),
-    ).toBeTruthy();
+    expect(within(practiceMap()).getByText('Active forms')).toBeTruthy();
     expect(within(practiceMap()).getByText('Recent weak spots')).toBeTruthy();
     expect(within(practiceMap()).getByText('Te-form - Godan ku sound changes')).toBeTruthy();
     expect(within(practiceMap()).getByText('0/2')).toBeTruthy();
 
-    fireEvent.click(within(practiceMap()).getByRole('button', { name: /^Te-form/i }));
+    expect(within(practiceMap()).queryByRole('button', { name: /^Te-form/i })).toBeNull();
+    fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Turn Past off' }));
     await waitFor(() => expect(within(practiceMap()).getByText('1/2 forms on')).toBeTruthy());
+    expect(within(practiceMap()).getByRole('button', { name: 'Turn Past on' })).toBeTruthy();
     expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
     expect(within(practiceMap()).getByText('Recent weak spots')).toBeTruthy();
   });
