@@ -17,6 +17,10 @@ body.theme-dark {
   color-scheme: dark;
 }
 
+rt[data-reading]::before {
+  content: attr(data-reading);
+}
+
 .theme-dark .bg-stone-50 {
   background: #11100f !important;
 }

@@ -14,9 +14,9 @@ function RubySegment({ text, ruby, className = '', rtClassName = '' }) {
   const reading = readableRuby(text, ruby);
   if (!reading) return <span className={className}>{text}</span>;
   return (
-    <ruby className={className}>
+    <ruby className={className} aria-label={text}>
       {text}
-      <rt className={rtClassName}>{reading}</rt>
+      <rt className={rtClassName} aria-hidden="true" data-reading={reading} />
     </ruby>
   );
 }
@@ -39,12 +39,12 @@ export default function ScriptDisplay({
           {view.parts.map((part, index) => {
             const reading = readableRuby(part.text, part.ruby);
             return reading ? (
-              <ruby key={`${part.text}:${index}`}>
-                {part.text}
-                <rt className="text-[10px] font-medium text-stone-500 dark:text-stone-300">
-                  {reading}
-                </rt>
-              </ruby>
+              <RubySegment
+                key={`${part.text}:${index}`}
+                text={part.text}
+                ruby={part.ruby}
+                rtClassName="text-[10px] font-medium text-stone-500 dark:text-stone-300"
+              />
             ) : (
               <React.Fragment key={`${part.text}:${index}`}>{part.text}</React.Fragment>
             );
@@ -114,10 +114,7 @@ export default function ScriptDisplay({
     <>
       <div className={className} lang={view.lang}>
         {readableRuby(view.main, view.ruby) ? (
-          <ruby>
-            {view.main}
-            <rt>{readableRuby(view.main, view.ruby)}</rt>
-          </ruby>
+          <RubySegment text={view.main} ruby={view.ruby} />
         ) : (
           view.main
         )}
