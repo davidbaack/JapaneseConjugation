@@ -1129,7 +1129,9 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    expect(screen.getByText('Sentence listening prompt')).toBeTruthy();
+    expect(
+      await screen.findByText('Sentence listening prompt', {}, { timeout: 5000 }),
+    ).toBeTruthy();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/data/sentences/manifest.json', {
       cache: 'no-cache',
