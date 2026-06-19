@@ -1427,7 +1427,7 @@ describe('StudyView continuous Practice startup', () => {
     });
     expect(nextState.cards[cardId].incorrect).toBe(1);
     expect(screen.getAllByText('Assisted correction.').length).toBeGreaterThan(0);
-    expect(screen.getByText(/after self-correction or a hint/)).toBeTruthy();
+    expect(screen.getByText(/marked as a miss/)).toBeTruthy();
   });
 
   it('counts a near-miss answer submitted with Enter as wrong', async () => {

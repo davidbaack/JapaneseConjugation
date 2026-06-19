@@ -452,8 +452,8 @@ function RunAnswerReveal({
           </h3>
           {record.wasCorrected && (
             <div className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
-              You reached the right answer after self-correction or a hint, so this still counts for
-              review.
+              You reached the right answer after self-correction or a hint. This is marked as a miss
+              so it can come back for practice.
             </div>
           )}
 
