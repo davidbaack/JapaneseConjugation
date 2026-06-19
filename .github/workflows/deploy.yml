@@ -30,11 +30,9 @@ jobs:
 
       - run: npm ci
 
-      # Non-blocking dependency vulnerability scan — surfaces high/critical
-      # advisories in the job log without failing the deploy.
+      # Dependency vulnerability scan. High/critical advisories fail deploy.
       - name: Audit dependencies
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       - run: npm test
 
