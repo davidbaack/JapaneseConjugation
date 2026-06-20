@@ -16,6 +16,7 @@ export function KanaCoachStrip({
   expected,
   reverseDrill,
   showStepHint,
+  stepHintButtonLabel = 'Hint',
   hintDisclosure,
 }) {
   return (
@@ -66,7 +67,7 @@ export function KanaCoachStrip({
             className="inline-flex items-center gap-1 text-xs text-indigo-500 transition hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
           >
             <IconSpark className="h-3 w-3" />
-            Hint
+            {stepHintButtonLabel}
           </button>
           {hintDisclosure}
         </div>
@@ -122,6 +123,7 @@ export function AnswerInputPanel({
   coachPreview,
   expected,
   showStepHint,
+  stepHintButtonLabel,
   hintDisclosure,
   answerComposingRef,
   updateAnswerFromInput,
@@ -464,6 +466,7 @@ export function AnswerInputPanel({
             expected={expected}
             reverseDrill={reverseDrill}
             showStepHint={showStepHint}
+            stepHintButtonLabel={stepHintButtonLabel}
             hintDisclosure={hintDisclosure}
           />
           <div className="flex items-center gap-2">
@@ -636,7 +639,7 @@ export function AnswerInputPanel({
                 onClick={showStepHint}
                 className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
               >
-                Hint
+                {stepHintButtonLabel}
               </button>
             )}
             <button

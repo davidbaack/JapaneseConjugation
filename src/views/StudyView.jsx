@@ -580,9 +580,9 @@ export default function StudyView({ mode = 'practice' }) {
   // review panel can show what was actually entered when it went wrong rather
   // than the live (possibly self-corrected) input.
   const wrongSnapshotRef = useRef(null);
-  // Learner-requested hint help keeps a later exact answer in the assisted
-  // bucket instead of counting it fully correct.
-  const usedHintRef = useRef(false);
+  // Answer-revealing help keeps a later exact answer in the assisted bucket
+  // instead of counting it fully correct. Coaching-only hints are free.
+  const usedAnswerHelpRef = useRef(false);
   const typingHintRef = useRef(null);
 
   const enabledTypes = useMemo(() => {
@@ -1111,7 +1111,7 @@ export default function StudyView({ mode = 'practice' }) {
   }, [current?.id, answerMode]);
 
   useEffect(() => {
-    usedHintRef.current = false;
+    usedAnswerHelpRef.current = false;
   }, [current?.id]);
 
   // Remember how many leading kana have turned green so they stay green through
@@ -1788,7 +1788,7 @@ export default function StudyView({ mode = 'practice' }) {
     setCoachChatOpen(false);
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
-    usedHintRef.current = false;
+    usedAnswerHelpRef.current = false;
     setWasCorrected(false);
     setWasCorrect(false);
     setCurrent(null);
@@ -1868,8 +1868,8 @@ export default function StudyView({ mode = 'practice' }) {
   // are masked on the first click; a second click reveals the spelled-out steps.
   function showStepHint() {
     if (!current) return;
-    usedHintRef.current = true;
     const reveal = hintRevealed || (!!stepHint && hintMasked);
+    if (reveal) usedAnswerHelpRef.current = true;
     const baseHint = stepCoachHint(current.verb, current.type, answer, reveal);
     const nextHint = transformationMode
       ? transformationHintFromBase(baseHint, {
@@ -1887,7 +1887,7 @@ export default function StudyView({ mode = 'practice' }) {
     if (!current || reverseDrill || phase !== 'answering') return;
     const expectedChars = Array.from(expected);
     if (!expectedChars.length) return;
-    usedHintRef.current = true;
+    usedAnswerHelpRef.current = true;
     const typedCount = Array.from(toHiraganaProgress(answer)).length;
     const nextCount = Math.min(expectedChars.length, Math.max(coachRevealed, typedCount) + 1);
     setCoachRevealed(nextCount);
@@ -1898,7 +1898,7 @@ export default function StudyView({ mode = 'practice' }) {
 
   function revealKanaHint() {
     if (!current || reverseDrill || phase !== 'answering') return;
-    usedHintRef.current = true;
+    usedAnswerHelpRef.current = true;
     setCoachRevealed(Math.min(expectedKanaCount, Math.max(coachRevealed, coachTypedCount) + 1));
   }
 
@@ -1926,7 +1926,7 @@ export default function StudyView({ mode = 'practice' }) {
       setCoachChatOpen(false);
       hadKanaMistakeRef.current = false;
       wrongSnapshotRef.current = null;
-      usedHintRef.current = false;
+      usedAnswerHelpRef.current = false;
       setWasCorrected(false);
       setPhase('answering');
       if (!reviewSetComplete && !reviewComplete) {
@@ -1948,7 +1948,7 @@ export default function StudyView({ mode = 'practice' }) {
       : spoken
         ? spokenAnswerResult(spokenAnswerTargets, raw).ok
         : normalized === expected;
-    const ok = finalOk && (spoken || (!hadKanaMistakeRef.current && !usedHintRef.current));
+    const ok = finalOk && (spoken || (!hadKanaMistakeRef.current && !usedAnswerHelpRef.current));
     if (choiceValue !== undefined) setAnswer(raw);
     const dict = current.verb.dict,
       rid = current.id;
@@ -2020,7 +2020,7 @@ export default function StudyView({ mode = 'practice' }) {
         setCoachChatOpen(false);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
-        usedHintRef.current = false;
+        usedAnswerHelpRef.current = false;
         refocusAfterAutoAdvanceRef.current = true;
         setWasCorrected(false);
         setPhase('answering');
@@ -2062,7 +2062,7 @@ export default function StudyView({ mode = 'practice' }) {
     setCoachChatOpen(false);
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
-    usedHintRef.current = false;
+    usedAnswerHelpRef.current = false;
     setWasCorrected(false);
     setPhase('answering');
     setWasCorrect(false);
@@ -2162,7 +2162,7 @@ export default function StudyView({ mode = 'practice' }) {
         setCoachChatOpen(false);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
-        usedHintRef.current = false;
+        usedAnswerHelpRef.current = false;
         refocusAfterAutoAdvanceRef.current = true;
         setWasCorrected(false);
         setPhase('answering');
@@ -2550,8 +2550,9 @@ export default function StudyView({ mode = 'practice' }) {
 
   // Shared hint disclosure for both answer modes: the deterministic step-coach
   // text, an optional "Discuss further" AI chat trigger, and the chat itself.
-  // Each mode supplies its own "Hint" button (styled to fit its layout) that
+  // Each mode supplies its own step-coach button (styled to fit its layout) that
   // calls showStepHint().
+  const stepHintButtonLabel = hintMasked || hintRevealed ? 'Reveal steps' : 'Hint';
   const hintDisclosure =
     !reverseDrill && (stepHint || (geminiKey && (stepHint || coachChatOpen))) ? (
       <div className="mt-2 flex flex-col items-center gap-1">
@@ -3348,6 +3349,7 @@ export default function StudyView({ mode = 'practice' }) {
                 coachPreview={coachPreview}
                 expected={expected}
                 showStepHint={showStepHint}
+                stepHintButtonLabel={stepHintButtonLabel}
                 hintDisclosure={hintDisclosure}
                 answerComposingRef={answerComposingRef}
                 updateAnswerFromInput={updateAnswerFromInput}

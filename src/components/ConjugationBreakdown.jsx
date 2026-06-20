@@ -201,10 +201,16 @@ export function ConjugationBreakdown({
   practicePrefs = DEFAULT_PREFS,
   onOpenFormationKeys,
   onOpenLearn,
+  suppressRuleSummary = false,
 }) {
   const debug = useMemo(
     () => getConjugationDebugInfo(word, type, userAnswer),
     [word, type, userAnswer],
+  );
+  const hasRuleExtras = !!(
+    debug.soundChangeVisual ||
+    debug.rowShiftVisual ||
+    debug.groupConnection
   );
   const showRomaji =
     practicePrefs?.displayScripts?.romaji ||
@@ -265,31 +271,37 @@ export function ConjugationBreakdown({
           <RoutePanel route={debug.routes.plain} accent="indigo" romajiFor={romajiFor} />
           <RoutePanel route={debug.routes.polite} accent="emerald" romajiFor={romajiFor} />
         </div>
-        <div className="rounded-lg border border-indigo-100 bg-white/80 px-3 py-2 dark:border-indigo-900/50 dark:bg-stone-950/55">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-350">
-            Rule
+        {(!suppressRuleSummary || hasRuleExtras) && (
+          <div className="rounded-lg border border-indigo-100 bg-white/80 px-3 py-2 dark:border-indigo-900/50 dark:bg-stone-950/55">
+            {!suppressRuleSummary && (
+              <>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-350">
+                  Rule
+                </div>
+                <div className="mt-0.5 text-sm font-semibold text-indigo-900 dark:text-indigo-100">
+                  {debug.rule.short}
+                </div>
+                <div className="mt-0.5 text-xs leading-relaxed text-stone-600 dark:text-stone-350">
+                  {debug.rule.detail}
+                </div>
+              </>
+            )}
+            {debug.soundChangeVisual ? (
+              <SoundChangeVisual visual={debug.soundChangeVisual} onOpenLearn={onOpenLearn} />
+            ) : (
+              <RowShiftVisual
+                visual={debug.rowShiftVisual}
+                onOpenFormationKeys={onOpenFormationKeys}
+                onOpenLearn={onOpenLearn}
+              />
+            )}
+            {debug.groupConnection && (
+              <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/70 px-2.5 py-2 text-xs leading-relaxed text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/25 dark:text-indigo-100">
+                {debug.groupConnection}
+              </div>
+            )}
           </div>
-          <div className="mt-0.5 text-sm font-semibold text-indigo-900 dark:text-indigo-100">
-            {debug.rule.short}
-          </div>
-          <div className="mt-0.5 text-xs leading-relaxed text-stone-600 dark:text-stone-350">
-            {debug.rule.detail}
-          </div>
-          {debug.soundChangeVisual ? (
-            <SoundChangeVisual visual={debug.soundChangeVisual} onOpenLearn={onOpenLearn} />
-          ) : (
-            <RowShiftVisual
-              visual={debug.rowShiftVisual}
-              onOpenFormationKeys={onOpenFormationKeys}
-              onOpenLearn={onOpenLearn}
-            />
-          )}
-          {debug.groupConnection && (
-            <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/70 px-2.5 py-2 text-xs leading-relaxed text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/25 dark:text-indigo-100">
-              {debug.groupConnection}
-            </div>
-          )}
-        </div>
+        )}
       </section>
 
       {debug.mistake ? (

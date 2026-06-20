@@ -145,13 +145,39 @@ function withCardOrigin(card, origin) {
   return { ...card, selectionOrigin: origin || cardOriginForStudyCard(card) };
 }
 
-function buildMissedContrast({
-  record,
-  minimalPairFeedback,
-  diagnostic,
-  reviewSubmittedAnswer,
-  missedComparisonValue,
-}) {
+function PromotedRuleCard({ debug }) {
+  if (!debug?.rule?.short) return null;
+  const formula =
+    debug.formula?.expression && debug.formula.expression !== debug.result
+      ? debug.formula.expression
+      : '';
+
+  return (
+    <section className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-2.5 shadow-sm dark:border-indigo-900/60 dark:bg-indigo-950/20">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+        Rule to apply
+      </div>
+      <div className="mt-1 text-lg font-semibold text-indigo-950 dark:text-indigo-100" lang="ja">
+        {debug.rule.short}
+      </div>
+      {debug.rule.detail && (
+        <div className="mt-1 text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+          {debug.rule.detail}
+        </div>
+      )}
+      {formula && (
+        <div
+          className="mt-2 rounded-lg border border-white/70 bg-white/75 px-2 py-1.5 text-center font-mono text-sm text-stone-900 dark:border-stone-800 dark:bg-stone-900/75 dark:text-stone-100"
+          lang="ja"
+        >
+          {formula}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function buildMissedContrast({ record, minimalPairFeedback, diagnostic, debug }) {
   if (!record || record.correct) return null;
 
   if (minimalPairFeedback) {
@@ -172,27 +198,16 @@ function buildMissedContrast({
   }
 
   if (!record.revealedMiss) {
-    try {
-      const mistake = getConjugationDebugInfo(
-        record.word,
-        record.practicedType,
-        reviewSubmittedAnswer,
-      ).mistake;
-      if (mistake) {
-        return {
-          title: 'Contrast',
-          body: `${mistake.userRule} vs ${mistake.expectedRule}. ${mistake.detail}`,
-        };
-      }
-    } catch {}
+    const mistake = debug?.mistake;
+    if (mistake) {
+      return {
+        title: 'Contrast',
+        body: `${mistake.userRule} vs ${mistake.expectedRule}. ${mistake.detail}`,
+      };
+    }
   }
 
-  return {
-    title: 'Contrast',
-    body: `${record.expected} is the target; ${missedComparisonValue} does not match the requested ${
-      record.typeLabel || 'form'
-    }.`,
-  };
+  return null;
 }
 
 function debugInfoForReviewRecord(record, reviewSubmittedAnswer) {
@@ -346,14 +361,17 @@ function RunAnswerReveal({
   const explanation = record.explanation;
   const relatedLesson = lessonForType(reviewTypeId);
   const minimalPairFeedback = record.minimalPairFeedback;
+  const reviewDebug = !record.correct
+    ? debugInfoForReviewRecord(record, reviewSubmittedAnswer)
+    : null;
+  const promotedRuleDebug = reviewDebug?.rule ? reviewDebug : null;
   const diagnostic =
     !record.correct && !record.revealedMiss ? record.diagnosis?.feedback || '' : '';
   const missedContrast = buildMissedContrast({
     record,
     minimalPairFeedback,
     diagnostic,
-    reviewSubmittedAnswer,
-    missedComparisonValue,
+    debug: reviewDebug,
   });
   const reviewAction = reviewFeedbackActionForRecord(record, {
     canOpenGuide: !!onOpenGuide,
@@ -452,10 +470,11 @@ function RunAnswerReveal({
           </h3>
           {record.wasCorrected && (
             <div className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
-              You reached the right answer after self-correction or a hint. This is marked as a miss
-              so it can come back for practice.
+              You reached the right answer after self-correction or revealed answer help. This is
+              marked as a miss so it can come back for practice.
             </div>
           )}
+          {!record.correct && <PromotedRuleCard debug={promotedRuleDebug} />}
 
           {record.correct ? (
             <>
@@ -669,7 +688,7 @@ function RunAnswerReveal({
               </div>
             </>
           )}
-          {explanation.rule && (
+          {!promotedRuleDebug && explanation.rule && (
             <div className="rounded-lg bg-white/70 px-3 py-2 text-sm leading-relaxed text-stone-700 dark:bg-stone-900/70 dark:text-stone-300">
               <span className="font-semibold text-stone-900 dark:text-stone-100">Rule: </span>
               {explanation.rule}
@@ -683,7 +702,7 @@ function RunAnswerReveal({
               {missedContrast.body}
             </div>
           )}
-          <ReviewDisclosure tone="rose" summary="Full breakdown" alwaysOpen>
+          <ReviewDisclosure tone="rose" summary="Full breakdown">
             {!minimalPairFeedback && (
               <div className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
                 {explanation.intro}
@@ -704,6 +723,7 @@ function RunAnswerReveal({
               practicePrefs={prefs}
               onOpenFormationKeys={openFormationKeys}
               onOpenLearn={onOpenLearn}
+              suppressRuleSummary={!!promotedRuleDebug}
             />
             {minimalPairFeedback && (
               <section className="space-y-2">

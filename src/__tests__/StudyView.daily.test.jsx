@@ -1395,7 +1395,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
   });
 
-  it('counts a hinted exact answer as an assisted miss', async () => {
+  it('counts a coaching-hinted exact answer as correct', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
@@ -1419,6 +1419,50 @@ describe('StudyView continuous Practice startup', () => {
 
     const nextState = setState.mock.calls[0][0];
     expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
+    expect(nextState.session.currentStreak).toBe(1);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'correct',
+      label: 'Plain Past',
+    });
+    expect(nextState.cards[cardId].correct).toBe(1);
+    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/marked as a miss/)).toBeNull();
+  });
+
+  it('counts revealed kana followed by an exact answer as an assisted miss', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'off',
+      },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    const expected = conjugateItem(target, type);
+    const firstKana = Array.from(expected)[0];
+    fireEvent.click(await screen.findByRole('button', { name: 'Reveal next kana' }));
+    await waitFor(() => expect(input.value).toBe(firstKana));
+
+    fireEvent.change(input, { target: { value: expected } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
     expect(nextState.session.recentOutcomes[0]).toMatchObject({
@@ -1427,7 +1471,82 @@ describe('StudyView continuous Practice startup', () => {
     });
     expect(nextState.cards[cardId].incorrect).toBe(1);
     expect(screen.getAllByText('Assisted correction.').length).toBeGreaterThan(0);
-    expect(screen.getByText(/marked as a miss/)).toBeTruthy();
+    expect(screen.getByText(/revealed answer help/)).toBeTruthy();
+    expect(screen.getByText('Rule to apply')).toBeTruthy();
+    expect(screen.queryByText(/does not match the requested/)).toBeNull();
+  });
+
+  it('keeps the first masked irregular step hint non-penalizing', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS.find((word) => word.group === 'suru');
+    expect(target).toBeTruthy();
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Hint' }));
+    expect(await screen.findByRole('button', { name: 'Reveal steps' })).toBeTruthy();
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'correct',
+      label: 'Plain Past',
+    });
+    expect(nextState.cards[cardId].correct).toBe(1);
+    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/marked as a miss/)).toBeNull();
+  });
+
+  it('counts revealed irregular steps followed by an exact answer as assisted', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS.find((word) => word.group === 'suru');
+    expect(target).toBeTruthy();
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Hint' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Reveal steps' }));
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = setState.mock.calls[0][0];
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.currentStreak).toBe(0);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Past',
+    });
+    expect(nextState.cards[cardId].incorrect).toBe(1);
+    expect(screen.getAllByText('Assisted correction.').length).toBeGreaterThan(0);
+    expect(screen.getByText(/revealed answer help/)).toBeTruthy();
   });
 
   it('counts a near-miss answer submitted with Enter as wrong', async () => {
@@ -1770,7 +1889,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.queryByText('Returning after a miss')).toBeNull();
   });
 
-  it('opens missed run review answers with the full breakdown inline', async () => {
+  it('opens missed run review answers with the rule first and details collapsed', async () => {
     const target = STARTER_VERBS.find((word) => word.group === 'godan');
     expect(target).toBeTruthy();
     const type = 'plain-negative';
@@ -1785,7 +1904,7 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.change(input, { target: { value: 'tabeta' } });
+    fireEvent.change(input, { target: { value: `${target.reading}\u306a\u3044` } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     await waitFor(() => expect(screen.getByText('Review this form.')).toBeTruthy());
 
@@ -1794,13 +1913,32 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByText('Answer #1'));
 
     expect(within(reviewRegion).getByText('Review this form.')).toBeTruthy();
-    expect(within(reviewRegion).getByText(/Rule:/)).toBeTruthy();
-    const fullBreakdown = within(reviewRegion).getByText('Full breakdown').closest('section');
+    const ruleCard = within(reviewRegion).getByText('Rule to apply').closest('section');
+    const correctAnswer = within(reviewRegion).getByText('Correct Answer').closest('section');
+    expect(ruleCard).toBeTruthy();
+    expect(correctAnswer).toBeTruthy();
+    expect(
+      ruleCard.compareDocumentPosition(correctAnswer) & window.Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(ruleCard).getByText(/Shift the final/)).toBeTruthy();
+    expect(
+      Array.from(ruleCard.querySelectorAll('[lang="ja"]')).some((node) =>
+        node.textContent?.includes(' = '),
+      ),
+    ).toBe(true);
+    const contrastRow = within(reviewRegion).getByText('Contrast:').closest('div');
+    expect(contrastRow.textContent).toMatch(/Kept dictionary ending/);
+    expect(within(reviewRegion).queryByText(/does not match the requested/)).toBeNull();
+    const fullBreakdown = within(reviewRegion).getByText('Full breakdown').closest('details');
     expect(fullBreakdown).toBeTruthy();
-    expect(fullBreakdown.tagName.toLowerCase()).toBe('section');
-    expect(within(fullBreakdown).queryByText('More')).toBeNull();
+    expect(fullBreakdown.tagName.toLowerCase()).toBe('details');
+    expect(fullBreakdown.open).toBe(false);
+    expect(within(fullBreakdown).getByText('More')).toBeTruthy();
+    fireEvent.click(within(fullBreakdown).getByText('Full breakdown'));
+    expect(fullBreakdown.open).toBe(true);
     expect(within(fullBreakdown).getByText('Visual Rule Path')).toBeTruthy();
     expect(within(fullBreakdown).getByText('1. What category is this and why?')).toBeTruthy();
+    expect(within(fullBreakdown).queryByText('Rule')).toBeNull();
     expect(within(reviewRegion).getByText('Walk through this form in Guide')).toBeTruthy();
     expect(within(reviewRegion).getByText(/Drills this same word and target form/)).toBeTruthy();
     expect(
