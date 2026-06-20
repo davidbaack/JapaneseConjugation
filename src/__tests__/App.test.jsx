@@ -494,7 +494,7 @@ describe('App shell', () => {
     expect(await screen.findByText('Review this form.')).toBeTruthy();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'I forgot this' }, { timeout: 5000 }),
+      await screen.findByRole('button', { name: 'Review grammar' }, { timeout: 5000 }),
     );
     expect(await screen.findByText('From your Practice card')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Guide this form' })).toBeTruthy();

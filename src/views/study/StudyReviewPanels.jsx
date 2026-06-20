@@ -366,7 +366,7 @@ function RunAnswerReveal({
   const canOpenGuidePrompt =
     !!onOpenGuide && !!record.word && !!reviewTypeId && !record.reverseDrill;
   const canOpenRuleLesson = !!relatedLesson && !!(onOpenLearn || onOpenLearnFocus);
-  const ruleLessonLabel = record.correct ? 'Teach me this rule' : 'I forgot this';
+  const ruleLessonLabel = record.correct ? 'Teach me this rule' : 'Review grammar';
   const openFormationKeys = onOpenLearn
     ? (visual) => {
         onOpenLearn(null, visual);
