@@ -44,6 +44,8 @@ describe('static coverage configuration', () => {
     expect(appStrict.include).toEqual(
       expect.arrayContaining([
         'src/data/defaults.js',
+        'src/hooks/useFocusTrap.js',
+        'src/hooks/useVirtualRows.js',
         'src/i18n/**/*.js',
         'src/utils/rateLimiter.js',
         'src/utils/retry.js',
