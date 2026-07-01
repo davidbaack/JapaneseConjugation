@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { englishQualityIssue } from '../../scripts/sentencePipeline.js';
-import { sentenceEnglish } from '../../scripts/sentenceEnglish.js';
+import { adjectivePhrase, sentenceEnglish } from '../../scripts/sentenceEnglish.js';
 
 const VERB = {
   dict: 'sample',
@@ -50,5 +50,14 @@ describe('sentenceEnglish', () => {
     expect(sentenceEnglish(ADJECTIVE, 'adj-te-form')).toBe('Today it is quiet, so I feel good.');
     expect(sentenceEnglish(ADJECTIVE, 'adj-sou')).toBe('The sky looks quiet.');
     expectGood(sentenceEnglish(ADJECTIVE, 'adj-sou'), 'adj-sou');
+  });
+
+  it('repairs nounish adjective glosses before sentence rewrites', () => {
+    expect(adjectivePhrase({ meaning: 'counter for letters' })).toBe('knowledgeable');
+    expect(adjectivePhrase({ meaning: 'must not do, bad, wrong' })).toBe('unacceptable');
+    expect(adjectivePhrase({ meaning: 'stability, equilibrium' })).toBe('stable');
+    expect(adjectivePhrase({ meaning: "there isn't, doesn't have" })).toBe('missing');
+    expect(adjectivePhrase({ meaning: 'hey' })).toBe('many');
+    expect(adjectivePhrase({ meaning: 'abundantly, innumerably' })).toBe('abundant');
   });
 });

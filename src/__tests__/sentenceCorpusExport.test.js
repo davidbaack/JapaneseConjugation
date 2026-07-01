@@ -109,6 +109,26 @@ describe('sentence corpus exporter helpers', () => {
     expect(result.missing).toEqual(['godan:買う|plain-past', 'godan:書く|plain-past']);
   });
 
+  it('rejects exported rows with generic adjective conditional English', () => {
+    const result = buildCorpusChunks(
+      [{ word_key: 'i-adjective:いい', type: 'adj-conditional' }],
+      [
+        {
+          word_key: 'i-adjective:いい',
+          type: 'adj-conditional',
+          ja_template: 'この部屋が{w}、助かる。',
+          en: 'If the room is good, I will use it.',
+          segments: [{ w: true }],
+        },
+      ],
+    );
+
+    expect(result.invalid).toEqual([
+      { key: 'i-adjective:いい|adj-conditional', reason: 'en-generic-adjective-result' },
+    ]);
+    expect(result.missing).toEqual(['i-adjective:いい|adj-conditional']);
+  });
+
   it('refuses unsafe corpus output directories before recursive deletion', () => {
     expect(() => resolveCorpusOutputDir('.')).toThrow(/Unsafe sentence corpus output directory/);
     expect(() => resolveCorpusOutputDir('public')).toThrow(

@@ -11,7 +11,7 @@ import { inflateVerbRows, mergeBuiltInWords } from '../src/data/verbLexicon.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../src/data/starterWords.js';
 import { ALL_CARD_TYPES } from '../src/data/conjugationTypes.js';
 import { practiceTypesForItem } from '../src/utils/conjugator.js';
-import { buildPair } from './sentencePipeline.js';
+import { buildPair, englishQualityIssue } from './sentencePipeline.js';
 
 export const CORPUS_SCHEMA_VERSION = 1;
 export const DEFAULT_CORPUS_DIR = join('public', 'data', 'sentences');
@@ -83,6 +83,11 @@ export function buildCorpusChunks(expectedPairs, dbRows) {
     }
     if (!row.ja_template || !Array.isArray(row.segments)) {
       invalid.push({ key, reason: !row.ja_template ? 'missing-template' : 'missing-segments' });
+      continue;
+    }
+    const enIssue = englishQualityIssue(row.en, row.type);
+    if (enIssue) {
+      invalid.push({ key, reason: enIssue });
       continue;
     }
     if (!byType.has(row.type)) byType.set(row.type, []);

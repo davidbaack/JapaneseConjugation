@@ -117,6 +117,11 @@ function fail(reason) {
 
 // Any kana or CJK ideograph — a real English translation should contain none.
 const JP_RE = /[぀-ヿ一-鿿豈-﫿]/;
+const GENERIC_ADJECTIVE_CONDITIONAL_RE = /^if\b.+,\s*i will use it\.$/i;
+
+function isAdjectiveConditionalType(type) {
+  return type === 'adj-conditional' || type === 'adj-tara';
+}
 
 /**
  * Return a reason string when `en` doesn't look like a genuine English
@@ -133,6 +138,9 @@ export function englishQualityIssue(en, type) {
   if (!/[A-Za-z]/.test(text)) return 'en-not-english';
   if (/practice sentence/i.test(text) || /\bin the\b[^.]*\bform\b/i.test(text)) {
     return 'en-boilerplate';
+  }
+  if (isAdjectiveConditionalType(type) && GENERIC_ADJECTIVE_CONDITIONAL_RE.test(text)) {
+    return 'en-generic-adjective-result';
   }
   const label = String(getTypeInfo(type)?.label || '').trim();
   if (label && text.toLowerCase().includes(label.toLowerCase())) return 'en-echoes-form';

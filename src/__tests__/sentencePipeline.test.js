@@ -188,6 +188,21 @@ describe('englishQualityIssue', () => {
     );
   });
 
+  it('rejects generic adjective conditional results', () => {
+    expect(englishQualityIssue('If the room is good, I will use it.', 'adj-conditional')).toBe(
+      'en-generic-adjective-result',
+    );
+    expect(englishQualityIssue('If the explanation is good, I will use it.', 'adj-tara')).toBe(
+      'en-generic-adjective-result',
+    );
+    expect(
+      englishQualityIssue(
+        "If this temperature feels just right, let's rest here for a bit.",
+        'adj-conditional',
+      ),
+    ).toBe('');
+  });
+
   it('rejects empty or letterless text', () => {
     expect(englishQualityIssue('', 'plain-past')).toBe('no-en');
     expect(englishQualityIssue('!!! ???', 'plain-past')).toBe('en-not-english');
