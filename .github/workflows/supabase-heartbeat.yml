@@ -42,11 +42,11 @@ jobs:
               --header "Authorization: Bearer $SUPABASE_ANON_KEY"
           )"
 
-          node -e "
-            const fs = require('fs');
-            const rows = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+          node -e '
+            const fs = require("fs");
+            const rows = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
             if (!Array.isArray(rows)) {
-              throw new Error('Expected Supabase REST response to be an array.');
+              throw new Error("Expected Supabase REST response to be an array.");
             }
-            console.log(\`Supabase heartbeat succeeded with HTTP ${process.argv[2]} and ${rows.length} row(s).\`);
-          " "$response" "$status"
+            console.log("Supabase heartbeat succeeded with HTTP " + process.argv[2] + " and " + rows.length + " row(s).");
+          ' "$response" "$status"
