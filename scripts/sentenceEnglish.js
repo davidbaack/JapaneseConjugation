@@ -19,6 +19,7 @@ const LEXICON_PATH = join('public', 'data', 'verb-lexicon.json');
 
 const ACTION_OVERRIDES = {
   'be relieved': 'feel relieved',
+  congradulations: 'celebrate',
   'do shopping': 'shop',
   driving: 'drive',
   'entry to school': 'enter school',
@@ -27,6 +28,10 @@ const ACTION_OVERRIDES = {
   'extra-modest expression for する': 'do',
   'honorific expression for': 'do',
   'incline toward': 'lean toward',
+  'close the eyes': 'close my eyes',
+  'fuss over': 'focus on details',
+  'get into': 'get involved',
+  'give a treat': 'treat someone',
   'look after': 'look after someone',
   'looking after': 'look after someone',
   moving: 'move',
@@ -79,6 +84,7 @@ const ADJECTIVE_OVERRIDES = {
   immediately: 'immediate',
   'it is not worth ~': 'unavoidable',
   "it can't be helped": 'unavoidable',
+  'quick tempered': 'quick-tempered',
   'looks like ~': 'similar',
   mystery: 'mysterious',
   normalcy: 'normal',
@@ -120,9 +126,38 @@ const ADJECTIVE_OVERRIDES = {
   'shut mouth': 'at a loss',
   "there isn't": 'missing',
   bone: 'difficult',
+  'slow tempered': 'patient',
+  'strong willed': 'strong-willed',
+};
+
+const ADJECTIVE_SUBJECT_OVERRIDES = {
+  clever: 'the student',
+  'in bad shape': 'the equipment',
+  missing: 'the item',
+  nervous: 'the student',
+  overwhelming: 'the task',
+  patient: 'the student',
+  'quick-tempered': 'the student',
+  skillful: 'the student',
+  smart: 'the student',
+  'strong-willed': 'the student',
+  timid: 'the student',
+  unavoidable: 'the situation',
+};
+
+const ADJECTIVE_ATTRIBUTIVE_NOUNS = {
+  clever: 'student',
+  nervous: 'student',
+  patient: 'student',
+  'quick-tempered': 'student',
+  skillful: 'student',
+  smart: 'student',
+  'strong-willed': 'student',
+  timid: 'student',
 };
 
 const STATIVE_ACTIONS = new Set(['be', 'exist', 'live', 'remain', 'stay']);
+const OBJECT_NEEDING_PREPOSITION_RE = /\b(?:with|to|for|from|over|into|at|on|in|about|of|after)$/;
 const JP_RE = /[ぁ-ヿ一-鿿豈-﫿]/;
 
 function stripParentheticals(value) {
@@ -164,7 +199,8 @@ export function actionPhrase(word) {
   const lower = raw.toLowerCase();
   if (ACTION_OVERRIDES[lower]) return ACTION_OVERRIDES[lower];
   const cleaned = cleanEnglishAction(raw).toLowerCase().trim();
-  if (JP_RE.test(cleaned) || /expression for/.test(cleaned)) return 'do';
+  if (JP_RE.test(cleaned) || /expression for/.test(cleaned)) return 'do it';
+  if (cleaned === 'do' || cleaned === 'be able to') return 'do it';
   return ACTION_OVERRIDES[cleaned] || cleaned || 'do it';
 }
 
@@ -189,6 +225,12 @@ function beComplement(action) {
 
 function isStativeAction(action) {
   return STATIVE_ACTIONS.has(action) || isBePhrase(action);
+}
+
+function completeActiveAction(action) {
+  if (isBePhrase(action)) return action;
+  if (OBJECT_NEEDING_PREPOSITION_RE.test(action)) return `${action} it`;
+  return action;
 }
 
 // The English conjugators in display.js inflect the head verb of a phrase and
@@ -251,23 +293,24 @@ function passiveSentence(action, type) {
 }
 
 function actionForType(action, type) {
+  const activeAction = completeActiveAction(action);
   if (type.includes('potential')) {
-    if (type.includes('past-negative')) return `was not able to ${action}`;
-    if (type.includes('negative')) return `cannot ${action}`;
-    if (type.includes('past')) return `was able to ${action}`;
-    return `can ${action}`;
+    if (type.includes('past-negative')) return `was not able to ${activeAction}`;
+    if (type.includes('negative')) return `cannot ${activeAction}`;
+    if (type.includes('past')) return `was able to ${activeAction}`;
+    return `can ${activeAction}`;
   }
   if (type.includes('desiderative')) {
-    if (type.includes('past-negative')) return `did not want to ${action}`;
-    if (type.includes('negative')) return `do not want to ${action}`;
-    if (type.includes('past')) return `wanted to ${action}`;
-    return `want to ${action}`;
+    if (type.includes('past-negative')) return `did not want to ${activeAction}`;
+    if (type.includes('negative')) return `do not want to ${activeAction}`;
+    if (type.includes('past')) return `wanted to ${activeAction}`;
+    return `want to ${activeAction}`;
   }
   if (type.includes('progressive')) {
-    if (type.includes('past-negative')) return `had not been ${gerundPhrase(action)}`;
-    if (type.includes('negative')) return `am not ${gerundPhrase(action)}`;
-    if (type.includes('past')) return `was ${gerundPhrase(action)}`;
-    return `am ${gerundPhrase(action)}`;
+    if (type.includes('past-negative')) return `had not been ${gerundPhrase(activeAction)}`;
+    if (type.includes('negative')) return `am not ${gerundPhrase(activeAction)}`;
+    if (type.includes('past')) return `was ${gerundPhrase(activeAction)}`;
+    return `am ${gerundPhrase(activeAction)}`;
   }
   if (type.includes('passive')) {
     if (type.includes('past-negative')) return passivePhrase(action, 'past-negative');
@@ -276,7 +319,7 @@ function actionForType(action, type) {
     return passivePhrase(action);
   }
   if (type.includes('causative')) {
-    const caused = isBePhrase(action) ? beComplement(action) : action;
+    const caused = isBePhrase(action) ? beComplement(action) : activeAction;
     if (type.includes('past-negative')) return `did not make me ${caused}`;
     if (type.includes('negative')) return `does not make me ${caused}`;
     if (type.includes('past')) return `made me ${caused}`;
@@ -285,55 +328,72 @@ function actionForType(action, type) {
   switch (type) {
     case 'plain-past':
     case 'polite-past':
-      return simplePastPhrase(action);
+      return simplePastPhrase(activeAction);
     case 'plain-negative':
     case 'polite-negative':
-      return negativePresent(action);
+      return negativePresent(activeAction);
     case 'plain-past-negative':
     case 'polite-past-negative':
-      return negativePast(action);
+      return negativePast(activeAction);
     default:
-      return present(action);
+      return present(activeAction);
   }
 }
 
 function conditionalAction(action, type) {
+  const activeAction = completeActiveAction(action);
   if (type.includes('potential')) {
-    return type.includes('negative') ? `cannot ${action}` : `can ${action}`;
+    return type.includes('negative') ? `I cannot ${activeAction}` : `I can ${activeAction}`;
+  }
+  if (type.includes('causative-passive')) {
+    return type.includes('negative')
+      ? `I am not made to ${activeAction}`
+      : `I am made to ${activeAction}`;
   }
   if (type.includes('passive')) {
-    return passivePhrase(action, type.includes('negative') ? 'negative' : 'present');
+    const phrase = passivePhrase(action, type.includes('negative') ? 'negative' : 'present');
+    if (phrase.startsWith('am not ')) return `I am not ${phrase.slice(7)}`;
+    if (phrase.startsWith('am ')) return `I am ${phrase.slice(3)}`;
+    return `I ${phrase}`;
   }
   if (type.includes('causative')) {
     return type.includes('negative')
-      ? `the teacher does not make me ${action}`
-      : `the teacher makes me ${action}`;
+      ? `the teacher does not make me ${activeAction}`
+      : `the teacher makes me ${activeAction}`;
   }
-  if (type.includes('negative')) return negativePresent(action);
-  return present(action);
+  if (type.includes('negative')) return `I ${negativePresent(activeAction)}`;
+  return `I ${present(activeAction)}`;
+}
+
+function conditionalOutcome(type) {
+  if (type.includes('negative')) return 'I will adjust the plan';
+  if (type.includes('potential')) return 'we can move forward';
+  if (type.includes('causative') || type.includes('passive')) return 'it will be easier to check';
+  return 'I can plan around it';
 }
 
 function verbEnglish(word, type) {
   const action = actionPhrase(word);
-  if (type === 'te-form') return `Today, I ${present(action)} with a friend and talk.`;
+  const activeAction = completeActiveAction(action);
+  if (type === 'te-form') return `Today, I ${present(activeAction)} with a friend and talk.`;
   if (type === 'negative-te' || type === 'negative-te-connective' || type === 'negative-zuni') {
-    return `Today, I went home without ${gerundPhrase(action)}.`;
+    return `Today, I went home without ${gerundPhrase(activeAction)}.`;
   }
-  if (type === 'request-kudasai') return `Please ${action} here.`;
-  if (type === 'negative-request') return `Please do not ${action} here.`;
-  if (type === 'permission') return `I may ${action} today.`;
-  if (type === 'obligation') return `I have to ${action} today.`;
-  if (type === 'prohibition') return `Do not ${action} here.`;
-  if (type === 'imperative' || type === 'command-nasai') return `${capitalize(action)} now.`;
+  if (type === 'request-kudasai') return `Please ${activeAction} here.`;
+  if (type === 'negative-request') return `Please do not ${activeAction} here.`;
+  if (type === 'permission') return `I may ${activeAction} today.`;
+  if (type === 'obligation') return `I have to ${activeAction} today.`;
+  if (type === 'prohibition') return `Do not ${activeAction} here.`;
+  if (type === 'imperative' || type === 'command-nasai') return `${capitalize(activeAction)} now.`;
   if (type === 'polite-volitional' || type === 'volitional') {
-    return `Let's ${action} together tomorrow.`;
+    return `Let's ${activeAction} together tomorrow.`;
   }
   if (type.includes('conditional') || type.endsWith('-ba')) {
-    return `If I ${conditionalAction(action, type)} tomorrow, I will feel relieved.`;
+    return `If ${conditionalAction(action, type)} tomorrow, ${conditionalOutcome(type)}.`;
   }
-  if (type === 'conjectural') return `I am sure I will ${action} tomorrow.`;
-  if (type.startsWith('honorific')) return `The teacher ${thirdPersonPhrase(action)} today.`;
-  if (type.startsWith('humble')) return `I ${present(action)} today.`;
+  if (type === 'conjectural') return `I am sure I will ${activeAction} tomorrow.`;
+  if (type.startsWith('honorific')) return `The teacher ${thirdPersonPhrase(activeAction)} today.`;
+  if (type.startsWith('humble')) return `I ${present(activeAction)} today.`;
   if (type.includes('progressive')) {
     const phrase = actionForType(action, type).replace(/^am /, 'is ').replace(/^was /, 'was ');
     return `A friend ${phrase} now.`;
@@ -351,26 +411,55 @@ function verbEnglish(word, type) {
 
 function adjectiveEnglish(word, type) {
   const adj = adjectivePhrase(word);
-  if (type === 'adj-te-form') return `Today it is ${adj}, so I feel good.`;
-  if (type === 'adj-negative-te-form') return `Today it is not ${adj}, so I am having trouble.`;
+  const presentSubject = adjectiveSubject(adj, 'today');
+  const conditionalSubject = adjectiveSubject(adj, 'tomorrow');
+  const roomSubject = adjectiveSubject(adj, 'the room');
+  const skySubject = adjectiveSubject(adj, 'the sky');
+  if (type === 'adj-te-form') {
+    return ADJECTIVE_SUBJECT_OVERRIDES[adj]
+      ? `${adjectiveClause(presentSubject, 'is', adj)}, so I feel good.`
+      : `Today it is ${adj}, so I feel good.`;
+  }
+  if (type === 'adj-negative-te-form') {
+    return ADJECTIVE_SUBJECT_OVERRIDES[adj]
+      ? `${adjectiveClause(presentSubject, 'is not', adj)}, so I am having trouble.`
+      : `Today it is not ${adj}, so I am having trouble.`;
+  }
   if (type === 'adj-adverb') return `The teacher speaks in a ${adj} way.`;
-  if (type === 'adj-attributive') return `Today is a ${adj} day.`;
-  if (type === 'adj-conditional') return `If tomorrow is ${adj}, I want to go.`;
-  if (type === 'adj-negative-conditional') return `If tomorrow is not ${adj}, I want to go.`;
-  if (type === 'adj-tara') return `If tomorrow is ${adj}, I will stay home.`;
-  if (type === 'adj-negative-tara') return `If tomorrow is not ${adj}, I will stay home.`;
-  if (type === 'adj-sou') return `The sky looks ${adj}.`;
-  if (type === 'adj-sugiru') return `This room is too ${adj}.`;
-  if (type === 'adj-naru') return `The room gets ${adj}.`;
-  if (type.includes('past-negative')) return `Today was not ${adj}.`;
-  if (type.includes('negative')) return `Today is not ${adj}.`;
-  if (type.includes('past')) return `Today was ${adj}.`;
-  return `Today is ${adj}.`;
+  if (type === 'adj-attributive') {
+    const noun = ADJECTIVE_ATTRIBUTIVE_NOUNS[adj];
+    return noun ? `I met a ${adj} ${noun} today.` : `Today is a ${adj} day.`;
+  }
+  if (type === 'adj-conditional') {
+    return `If ${conditionalSubject} is ${adj}, I want to go.`;
+  }
+  if (type === 'adj-negative-conditional') {
+    return `If ${conditionalSubject} is not ${adj}, I want to go.`;
+  }
+  if (type === 'adj-tara') return `If ${conditionalSubject} is ${adj}, I will stay home.`;
+  if (type === 'adj-negative-tara') {
+    return `If ${conditionalSubject} is not ${adj}, I will stay home.`;
+  }
+  if (type === 'adj-sou') return `${adjectiveClause(skySubject, 'looks', adj)}.`;
+  if (type === 'adj-sugiru') return `${adjectiveClause(roomSubject, 'is too', adj)}.`;
+  if (type === 'adj-naru') return `${adjectiveClause(roomSubject, 'gets', adj)}.`;
+  if (type.includes('past-negative')) return `${adjectiveClause(presentSubject, 'was not', adj)}.`;
+  if (type.includes('negative')) return `${adjectiveClause(presentSubject, 'is not', adj)}.`;
+  if (type.includes('past')) return `${adjectiveClause(presentSubject, 'was', adj)}.`;
+  return `${adjectiveClause(presentSubject, 'is', adj)}.`;
 }
 
 function capitalize(value) {
   const text = String(value || '');
   return text ? text[0].toUpperCase() + text.slice(1) : text;
+}
+
+function adjectiveSubject(adj, fallback) {
+  return ADJECTIVE_SUBJECT_OVERRIDES[adj] || fallback;
+}
+
+function adjectiveClause(subject, verb, adj) {
+  return `${capitalize(subject)} ${verb} ${adj}`;
 }
 
 export function sentenceEnglish(word, type) {

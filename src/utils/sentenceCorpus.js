@@ -1,6 +1,6 @@
 import { wordKey } from './conjugator.js';
 import { hydrateSentenceValue } from './sentencePrompt.js';
-import { sentenceSemanticQualityIssue } from './sentenceQuality.js';
+import { sentenceRowQualityIssue } from './sentenceQuality.js';
 
 const BASE_URL = /** @type {any} */ (import.meta).env?.BASE_URL || '/';
 const SENTENCE_CORPUS_BASE_URL = `${BASE_URL}data/sentences/`;
@@ -19,7 +19,7 @@ function rowValue(row, type) {
   if (!Array.isArray(row) || row.length < 4) return null;
   const [key, jaTemplate, en, segments] = row;
   if (!key || !jaTemplate || !Array.isArray(segments)) return null;
-  if (sentenceSemanticQualityIssue({ en, type })) return null;
+  if (sentenceRowQualityIssue({ en, type, jaTemplate })) return null;
   return {
     key: String(key),
     value: {

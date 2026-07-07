@@ -11,7 +11,7 @@ import { wordKey } from './conjugator.js';
 import { getAICache, setAICache } from './storage.js';
 import { retryWithBackoff } from './retry.js';
 import { hydrateSentenceValue } from './sentencePrompt.js';
-import { sentenceSemanticQualityIssue } from './sentenceQuality.js';
+import { sentenceRowQualityIssue } from './sentenceQuality.js';
 
 const CACHE_STORE = 'katachiya_ai_sentence_cache';
 
@@ -25,7 +25,7 @@ export async function fetchTailoredSentence(word, type) {
   const key = cacheKey(word, type);
   const cached = getAICache(CACHE_STORE, key);
   if (cached && typeof cached === 'object') {
-    if (!sentenceSemanticQualityIssue({ en: cached.en, type })) {
+    if (!sentenceRowQualityIssue({ en: cached.en, type, jaTemplate: cached.jaTemplate })) {
       return hydrateSentenceValue(cached, word, type, 'db');
     }
   }
@@ -51,7 +51,7 @@ export async function fetchTailoredSentence(word, type) {
   if (!row?.ja_template || !Array.isArray(row.segments)) {
     return null;
   }
-  if (sentenceSemanticQualityIssue({ en: row.en, type })) {
+  if (sentenceRowQualityIssue({ en: row.en, type, jaTemplate: row.ja_template })) {
     return null;
   }
 

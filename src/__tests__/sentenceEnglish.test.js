@@ -45,6 +45,34 @@ describe('sentenceEnglish', () => {
     expectGood(sentenceEnglish(VERB, 'causative-negative'), 'causative-negative');
   });
 
+  it('writes conditional verb fallbacks with subjects and non-generic outcomes', () => {
+    expect(sentenceEnglish(VERB, 'conditional-tara')).toBe(
+      'If I buy tomorrow, I can plan around it.',
+    );
+    expect(sentenceEnglish(VERB, 'potential-conditional-ba')).toBe(
+      'If I can buy tomorrow, we can move forward.',
+    );
+    expect(sentenceEnglish(VERB, 'causative-passive-conditional-ba')).toBe(
+      'If I am made to buy tomorrow, it will be easier to check.',
+    );
+  });
+
+  it('completes active phrasal actions before time phrases', () => {
+    const sympathize = {
+      dict: 'sample',
+      reading: 'sample',
+      meaning: 'to sympathize with',
+      group: 'godan',
+    };
+    const doVerb = { dict: 'sample', reading: 'sample', meaning: 'to do', group: 'godan' };
+    expect(sentenceEnglish(sympathize, 'conditional-tara')).toBe(
+      'If I sympathize with it tomorrow, I can plan around it.',
+    );
+    expect(sentenceEnglish(doVerb, 'conditional-tara')).toBe(
+      'If I do it tomorrow, I can plan around it.',
+    );
+  });
+
   it('writes natural English for adjective templates', () => {
     expect(sentenceEnglish(ADJECTIVE, 'adj-plain-present')).toBe('Today is quiet.');
     expect(sentenceEnglish(ADJECTIVE, 'adj-te-form')).toBe('Today it is quiet, so I feel good.');
@@ -59,5 +87,32 @@ describe('sentenceEnglish', () => {
     expect(adjectivePhrase({ meaning: "there isn't, doesn't have" })).toBe('missing');
     expect(adjectivePhrase({ meaning: 'hey' })).toBe('many');
     expect(adjectivePhrase({ meaning: 'abundantly, innumerably' })).toBe('abundant');
+  });
+
+  it('uses compatible subjects for special adjective glosses', () => {
+    expect(
+      sentenceEnglish({ ...ADJECTIVE, meaning: 'be good at, skillful' }, 'adj-plain-negative'),
+    ).toBe('The student is not skillful.');
+    expect(
+      sentenceEnglish({ ...ADJECTIVE, meaning: "there isn't, doesn't have" }, 'adj-negative-tara'),
+    ).toBe('If the item is not missing, I will stay home.');
+    expect(
+      sentenceEnglish(
+        { ...ADJECTIVE, meaning: "be beyond one's power, be unable" },
+        'adj-negative-te-form',
+      ),
+    ).toBe('The task is not overwhelming, so I am having trouble.');
+  });
+
+  it('uses person-compatible wording for human-trait adjectives', () => {
+    expect(
+      sentenceEnglish({ ...ADJECTIVE, meaning: 'Quick tempered' }, 'adj-negative-conditional'),
+    ).toBe('If the student is not quick-tempered, I want to go.');
+    expect(sentenceEnglish({ ...ADJECTIVE, meaning: 'Slow tempered' }, 'adj-attributive')).toBe(
+      'I met a patient student today.',
+    );
+    expect(sentenceEnglish({ ...ADJECTIVE, meaning: 'Nervous' }, 'adj-naru')).toBe(
+      'The student gets nervous.',
+    );
   });
 });

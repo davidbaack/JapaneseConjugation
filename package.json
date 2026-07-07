@@ -24,6 +24,7 @@
     "sentences:import": "node scripts/import-sentence-library.js",
     "sentences:check-corpus": "node scripts/export-sentence-corpus.js --check",
     "sentences:export-corpus": "node scripts/export-sentence-corpus.js",
+    "sentences:quality-report": "node scripts/report-sentence-corpus-quality.js",
     "size": "node scripts/check-bundle-size.js",
     "ci:fast": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "ci": "npm run ci:fast && npm run test:e2e && npm run build && npm run size",

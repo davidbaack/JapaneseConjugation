@@ -10,7 +10,10 @@
 import { conjugateItem, surfaceFormFor, wordKey } from '../src/utils/conjugator.js';
 import { getTypeInfo } from '../src/data/conjugationTypes.js';
 import { resolveTransitivity } from '../src/utils/clozeSentences.js';
-import { sentenceSemanticQualityIssue } from '../src/utils/sentenceQuality.js';
+import {
+  sentenceRowQualityIssue,
+  sentenceSemanticQualityIssue,
+} from '../src/utils/sentenceQuality.js';
 
 // Hiragana (U+3040–309F), katakana (U+30A0–30FF, incl. the long-vowel mark),
 // and ASCII whitespace.
@@ -225,6 +228,8 @@ export function validateGenerated(word, type, out) {
     seg && seg.w ? { w: true } : { t: String(seg?.t ?? ''), r: String(seg?.r ?? '') },
   );
   const jaTemplate = cleanSegments.map((seg) => (seg.w ? '{w}' : seg.t)).join('');
+  const rowIssue = sentenceRowQualityIssue({ en, type, jaTemplate });
+  if (rowIssue) return fail(rowIssue);
 
   return {
     ok: true,
