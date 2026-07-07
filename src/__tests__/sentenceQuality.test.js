@@ -77,6 +77,39 @@ describe('sentence row quality checks', () => {
         en: 'The teacher does not make me congradulations today.',
       }),
     ).toBe('en-misspelled-congratulations');
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'honorific',
+        en: 'The teacher congradulationses today.',
+      }),
+    ).toBe('en-misspelled-congratulations');
+  });
+
+  it('rejects stale verb English artifacts from older generated rows', () => {
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'negative-te',
+        en: 'I go home after class without runing out.',
+      }),
+    ).toBe('en-bad-gerund');
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'honorific',
+        en: 'The teacher sympathizes with before leaving.',
+      }),
+    ).toBe('en-dangling-preposition-time');
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'causative-passive-negative-conditional-ba',
+        en: "If I am not forced to deliver the documents, I can focus on today's work.",
+      }),
+    ).toBe('');
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'negative-zuni',
+        en: 'I go home today without checking.',
+      }),
+    ).toBe('en-negative-te-stale-go-home');
   });
 
   it('rejects human-trait adjectives on inanimate subjects', () => {
@@ -98,6 +131,18 @@ describe('sentence row quality checks', () => {
         en: 'I make the screen timid.',
       }),
     ).toBe('en-adjective-human-trait-context-mismatch');
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'adj-plain-present',
+        en: 'The proposal is hungry.',
+      }),
+    ).toBe('en-adjective-human-trait-context-mismatch');
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'adj-te-form',
+        en: 'The proposal is impolite, so I will check first.',
+      }),
+    ).toBe('en-adjective-human-trait-context-mismatch');
   });
 
   it('allows human-trait adjectives on people', () => {
@@ -107,5 +152,46 @@ describe('sentence row quality checks', () => {
         en: 'If the student is clever, I will prepare another explanation.',
       }),
     ).toBe('');
+  });
+
+  it('rejects noun-like adjective gloss fragments', () => {
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'adj-conditional',
+        en: 'If this discussion is how, I will wait a little.',
+      }),
+    ).toBe('en-adjective-bad-gloss-fragment');
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'adj-naru',
+        en: 'The room gets have a headache.',
+      }),
+    ).toBe('en-adjective-bad-gloss-fragment');
+  });
+
+  it('rejects physical or personal adjectives on abstract subjects', () => {
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'adj-conditional',
+        en: 'If this discussion is square, I will wait a little.',
+      }),
+    ).toBe('en-adjective-abstract-context-mismatch');
+    expect(
+      sentenceSemanticQualityIssue({
+        type: 'adj-naru',
+        en: 'The plan gets smoky.',
+      }),
+    ).toBe('en-adjective-abstract-context-mismatch');
+  });
+
+  it('rejects adjective rows whose Japanese subject conflicts with English', () => {
+    expect(
+      sentenceRowQualityIssue({
+        type: 'adj-conditional',
+        jaTemplate:
+          '\u3082\u3057\u4eca\u65e5\u306e\u4e88\u5b9a\u304c{w}\u3001\u65e9\u3081\u306b\u8abf\u6574\u3059\u308b\u3002',
+        en: 'If the student is strong-willed, I want to go.',
+      }),
+    ).toBe('ja-en-adjective-subject-mismatch');
   });
 });

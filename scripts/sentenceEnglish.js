@@ -19,11 +19,38 @@ const LEXICON_PATH = join('public', 'data', 'verb-lexicon.json');
 
 const ACTION_OVERRIDES = {
   'be relieved': 'feel relieved',
+  'be based on': 'base it on the facts',
+  'be blessed with': 'have good conditions',
+  'be enthusiastic about': 'feel enthusiastic about it',
+  'be furnished with': 'have the right equipment',
+  'be grounded on': 'base it on the facts',
+  'be in time for': 'arrive in time',
+  'be inconsistent with': 'contradict it',
+  'be intimate with': 'become friendly with someone',
+  'be kind to': 'treat someone kindly',
+  'be looking forward to': 'look forward to it',
+  'be on good terms with': 'get along with someone',
+  'be rich in': 'have plenty',
+  'act as an agent for': 'represent someone',
+  'ask after': 'ask about it',
+  'boast of': 'boast about it',
+  'call out to': 'call out to someone',
+  'carry on': 'continue',
+  'come from': 'come from there',
+  'come near to': 'approach it',
+  'conform to': 'conform to it',
+  'consult with': 'consult someone',
+  'consist of': 'include it',
   congradulations: 'celebrate',
+  'devote oneself to': 'focus on it',
   'do shopping': 'shop',
+  'drift about': 'drift',
   driving: 'drive',
+  'escape from': 'escape from it',
   'entry to school': 'enter school',
   exercise: 'exercise',
+  'face on': 'face it',
+  'fall in love with': 'fall in love with someone',
   'extra-modest expression for': 'do',
   'extra-modest expression for する': 'do',
   'honorific expression for': 'do',
@@ -32,14 +59,26 @@ const ACTION_OVERRIDES = {
   'fuss over': 'focus on details',
   'get into': 'get involved',
   'give a treat': 'treat someone',
+  'give board to': 'provide meals for someone',
   'look after': 'look after someone',
+  'look anxiously for': 'look for it',
+  'look out on': 'look out at it',
+  'look out over': 'look out over it',
   'looking after': 'look after someone',
   moving: 'move',
   phone: 'call',
+  'push into': 'push it inside',
   practice: 'practice',
   request: 'ask',
+  'report to': 'report to someone',
+  'run counter to': 'oppose it',
+  'settle into': 'settle into it',
+  'speak ill of': 'criticize someone',
+  'sympathize with': 'sympathize with someone',
   study: 'study',
   'take a walk': 'take a walk',
+  'take the name of': 'use its name',
+  'turn over': 'flip it',
   'wash clothes': 'wash clothes',
 };
 
@@ -55,6 +94,7 @@ const ADJECTIVE_OVERRIDES = {
   beauty: 'beautiful',
   'bother to do': 'troublesome',
   bravery: 'brave',
+  burly: 'strong',
   cash: 'practical',
   centimeter: 'sentimental',
   certainty: 'reliable',
@@ -81,22 +121,36 @@ const ADJECTIVE_OVERRIDES = {
   fun: 'fun',
   happiness: 'happy',
   'hard to do ~': 'tough',
+  'have a headache': 'sore',
+  'here and there': 'scattered',
+  how: 'appropriate',
   immediately: 'immediate',
+  injustice: 'unfair',
   'it is not worth ~': 'unavoidable',
   "it can't be helped": 'unavoidable',
+  kindness: 'kind',
+  'looking forward to': 'eager',
   'quick tempered': 'quick-tempered',
   'looks like ~': 'similar',
+  manner: 'presentable',
   mystery: 'mysterious',
+  neglect: 'careless',
   normalcy: 'normal',
   normality: 'normal',
+  overcoat: 'excessive',
   poverty: 'poor',
   reality: 'real',
   safety: 'safe',
   simplicity: 'simple',
+  seriousness: 'serious',
   suitability: 'appropriate',
   'too much': 'excessive',
+  trick: 'mischievous',
   truth: 'true',
   very: 'intense',
+  'very hard': 'diligent',
+  'very like-able': 'likable',
+  'very much': 'excessive',
   '~ish': 'like that',
   '~ run': 'managed',
   '~increase': 'increased',
@@ -111,6 +165,7 @@ const ADJECTIVE_OVERRIDES = {
   discontent: 'dissatisfied',
   disorder: 'abnormal',
   'difficult to do ~': 'difficult',
+  disadvantage: 'disadvantageous',
   ease: 'easy',
   egoism: 'selfish',
   'filial piety': 'devoted to family',
@@ -118,42 +173,104 @@ const ADJECTIVE_OVERRIDES = {
   harmony: 'harmonious',
   'high class': 'first-rate',
   'high price': 'expensive',
+  fat: 'thick',
   hey: 'many',
   'idle complaint': 'grumbly',
   'must not do': 'unacceptable',
   order: 'orderly',
   season: 'cheerful',
   'shut mouth': 'at a loss',
+  sorry: 'apologetic',
   "there isn't": 'missing',
   bone: 'difficult',
+  competetive: 'competitive',
+  fawn: 'hungry',
   'slow tempered': 'patient',
   'strong willed': 'strong-willed',
+  unpleasent: 'unpleasant',
 };
 
 const ADJECTIVE_SUBJECT_OVERRIDES = {
+  apologetic: 'the student',
+  careful: 'the student',
   clever: 'the student',
+  competitive: 'the student',
+  diligent: 'the student',
+  eager: 'the student',
+  envious: 'the student',
+  familiar: 'the student',
+  grateful: 'the student',
+  greedy: 'the student',
+  happy: 'the student',
+  hungry: 'the student',
+  impolite: 'the student',
+  impudent: 'the student',
   'in bad shape': 'the equipment',
+  intimate: 'the student',
+  kind: 'the student',
+  likable: 'the student',
+  lonely: 'the student',
+  mischievous: 'the student',
+  miserable: 'the student',
   missing: 'the item',
   nervous: 'the student',
+  obedient: 'the student',
   overwhelming: 'the task',
   patient: 'the student',
+  polite: 'the student',
   'quick-tempered': 'the student',
+  sad: 'the student',
+  serious: 'the student',
   skillful: 'the student',
+  sleepy: 'the student',
   smart: 'the student',
+  sore: 'the student',
   'strong-willed': 'the student',
+  'tender-hearted': 'the student',
   timid: 'the student',
   unavoidable: 'the situation',
+  unfair: 'the situation',
+  young: 'the student',
+  youthful: 'the student',
 };
 
 const ADJECTIVE_ATTRIBUTIVE_NOUNS = {
+  apologetic: 'student',
+  careful: 'student',
   clever: 'student',
+  competitive: 'student',
+  diligent: 'student',
+  eager: 'student',
+  envious: 'student',
+  familiar: 'student',
+  grateful: 'student',
+  greedy: 'student',
+  happy: 'student',
+  hungry: 'student',
+  impolite: 'student',
+  impudent: 'student',
+  intimate: 'student',
+  kind: 'student',
+  likable: 'student',
+  lonely: 'student',
+  mischievous: 'student',
+  miserable: 'student',
   nervous: 'student',
+  obedient: 'student',
   patient: 'student',
+  polite: 'student',
   'quick-tempered': 'student',
+  sad: 'student',
+  serious: 'student',
   skillful: 'student',
+  sleepy: 'student',
   smart: 'student',
+  sore: 'student',
   'strong-willed': 'student',
+  'tender-hearted': 'student',
   timid: 'student',
+  young: 'student',
+  youthful: 'student',
 };
 
 const STATIVE_ACTIONS = new Set(['be', 'exist', 'live', 'remain', 'stay']);
@@ -201,6 +318,7 @@ export function actionPhrase(word) {
   const cleaned = cleanEnglishAction(raw).toLowerCase().trim();
   if (JP_RE.test(cleaned) || /expression for/.test(cleaned)) return 'do it';
   if (cleaned === 'do' || cleaned === 'be able to') return 'do it';
+  if (cleaned === 'to') return 'notice it';
   return ACTION_OVERRIDES[cleaned] || cleaned || 'do it';
 }
 
@@ -312,6 +430,12 @@ function actionForType(action, type) {
     if (type.includes('past')) return `was ${gerundPhrase(activeAction)}`;
     return `am ${gerundPhrase(activeAction)}`;
   }
+  if (type.includes('causative-passive')) {
+    if (type.includes('past-negative')) return `was not made to ${activeAction}`;
+    if (type.includes('negative')) return `am not made to ${activeAction}`;
+    if (type.includes('past')) return `was made to ${activeAction}`;
+    return `am made to ${activeAction}`;
+  }
   if (type.includes('passive')) {
     if (type.includes('past-negative')) return passivePhrase(action, 'past-negative');
     if (type.includes('negative')) return passivePhrase(action, 'negative');
@@ -398,13 +522,14 @@ function verbEnglish(word, type) {
     const phrase = actionForType(action, type).replace(/^am /, 'is ').replace(/^was /, 'was ');
     return `A friend ${phrase} now.`;
   }
+  if (type.includes('causative-passive')) return `I ${actionForType(action, type)} today.`;
   if (type.includes('passive')) return passiveSentence(action, type);
   if (type.includes('causative')) return `The teacher ${actionForType(action, type)} today.`;
   if (type.includes('potential')) {
-    if (type.includes('past-negative')) return `I was not able to ${action} today either.`;
-    if (type.includes('negative')) return `I cannot ${action} today either.`;
-    if (type.includes('past')) return `I was also able to ${action} today.`;
-    return `I can also ${action} today.`;
+    if (type.includes('past-negative')) return `I was not able to ${activeAction} today either.`;
+    if (type.includes('negative')) return `I cannot ${activeAction} today either.`;
+    if (type.includes('past')) return `I was also able to ${activeAction} today.`;
+    return `I can also ${activeAction} today.`;
   }
   return `I also ${actionForType(action, type)} today.`;
 }

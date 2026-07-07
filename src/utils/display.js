@@ -520,6 +520,7 @@ const GERUND_WORDS = {
   lie: 'lying',
   make: 'making',
   ride: 'riding',
+  run: 'running',
   take: 'taking',
   tie: 'tying',
   use: 'using',
