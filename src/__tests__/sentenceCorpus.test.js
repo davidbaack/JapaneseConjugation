@@ -137,4 +137,36 @@ describe('fetchBundledSentence', () => {
 
     expect(await fetchBundledSentence(WORD, 'plain-past')).toBeNull();
   });
+
+  it('ignores bundled adjective rows with incompatible English contexts', async () => {
+    const adjective = {
+      dict: '\u304b\u3086\u3044',
+      reading: '\u304b\u3086\u3044',
+      meaning: 'itchy',
+      group: 'i-adjective',
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url) => {
+        if (String(url).endsWith('/manifest.json')) {
+          return Promise.resolve(response(manifestPayload('adj-tara')));
+        }
+        return Promise.resolve(
+          response(
+            chunkPayload('adj-tara', [
+              [
+                wordKey(adjective),
+                'if {w}.',
+                'If this task is itchy, I will add a break.',
+                [{ w: true }],
+              ],
+            ]),
+          ),
+        );
+      }),
+    );
+    const { fetchBundledSentence } = await loadCorpus();
+
+    expect(await fetchBundledSentence(adjective, 'adj-tara')).toBeNull();
+  });
 });

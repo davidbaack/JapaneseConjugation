@@ -1,5 +1,6 @@
 import { wordKey } from './conjugator.js';
 import { hydrateSentenceValue } from './sentencePrompt.js';
+import { sentenceSemanticQualityIssue } from './sentenceQuality.js';
 
 const BASE_URL = /** @type {any} */ (import.meta).env?.BASE_URL || '/';
 const SENTENCE_CORPUS_BASE_URL = `${BASE_URL}data/sentences/`;
@@ -14,10 +15,11 @@ function validTypeId(type) {
   return /^[a-z0-9-]+$/.test(String(type || ''));
 }
 
-function rowValue(row) {
+function rowValue(row, type) {
   if (!Array.isArray(row) || row.length < 4) return null;
   const [key, jaTemplate, en, segments] = row;
   if (!key || !jaTemplate || !Array.isArray(segments)) return null;
+  if (sentenceSemanticQualityIssue({ en, type })) return null;
   return {
     key: String(key),
     value: {
@@ -85,7 +87,7 @@ async function loadTypeCorpus(type) {
       }
       const rows = new Map();
       for (const rawRow of data.rows) {
-        const parsed = rowValue(rawRow);
+        const parsed = rowValue(rawRow, type);
         if (parsed) rows.set(parsed.key, parsed.value);
       }
       return rows;

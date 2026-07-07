@@ -3,6 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const WORD = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
 
+const ADJECTIVE = {
+  dict: '\u304b\u3086\u3044',
+  reading: '\u304b\u3086\u3044',
+  meaning: 'itchy',
+  group: 'i-adjective',
+};
+
 // Mirror the chainable Supabase query builder: from().select().eq().eq().maybeSingle().
 function selectChain(result) {
   const maybeSingle = vi.fn(() => Promise.resolve(result));
@@ -83,6 +90,61 @@ describe('fetchTailoredSentence', () => {
     const res = await fetchTailoredSentence(WORD, 'plain-negative');
     expect(res).toMatchObject({ jaTemplate: 'later {w}', source: 'db' });
     expect(chain.maybeSingle).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache semantically awkward adjective rows', async () => {
+    const chain = selectChain({
+      data: {
+        ja_template: 'if {w}.',
+        segments: [{ w: true }],
+        en: 'If this task is itchy, I will add a break.',
+      },
+      error: null,
+    });
+    const { fetchTailoredSentence } = await load(chain);
+
+    expect(await fetchTailoredSentence(ADJECTIVE, 'adj-tara')).toBeNull();
+    chain.maybeSingle.mockResolvedValueOnce({
+      data: {
+        ja_template: 'if {w}.',
+        segments: [{ w: true }],
+        en: 'If my skin is itchy, I will rest for a bit.',
+      },
+      error: null,
+    });
+
+    const res = await fetchTailoredSentence(ADJECTIVE, 'adj-tara');
+    expect(res).toMatchObject({ jaTemplate: 'if {w}.', source: 'db' });
+    expect(chain.maybeSingle).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores semantically awkward cached adjective rows and retries the table', async () => {
+    localStorage.setItem(
+      'katachiya_ai_sentence_cache',
+      JSON.stringify({
+        ['i-adjective:\u304b\u3086\u3044|adj-tara']: {
+          ts: Date.now(),
+          v: {
+            jaTemplate: 'if {w}.',
+            segments: [{ w: true }],
+            en: 'If this task is itchy, I will add a break.',
+          },
+        },
+      }),
+    );
+    const chain = selectChain({
+      data: {
+        ja_template: 'if {w}.',
+        segments: [{ w: true }],
+        en: 'If my skin is itchy, I will rest for a bit.',
+      },
+      error: null,
+    });
+    const { fetchTailoredSentence } = await load(chain);
+
+    const res = await fetchTailoredSentence(ADJECTIVE, 'adj-tara');
+    expect(res).toMatchObject({ jaTemplate: 'if {w}.', source: 'db' });
+    expect(chain.maybeSingle).toHaveBeenCalledTimes(1);
   });
 
   it('returns null on a query error without caching the miss', async () => {

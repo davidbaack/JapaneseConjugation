@@ -10,6 +10,7 @@
 import { conjugateItem, surfaceFormFor, wordKey } from '../src/utils/conjugator.js';
 import { getTypeInfo } from '../src/data/conjugationTypes.js';
 import { resolveTransitivity } from '../src/utils/clozeSentences.js';
+import { sentenceSemanticQualityIssue } from '../src/utils/sentenceQuality.js';
 
 // Hiragana (U+3040–309F), katakana (U+30A0–30FF, incl. the long-vowel mark),
 // and ASCII whitespace.
@@ -142,6 +143,8 @@ export function englishQualityIssue(en, type) {
   if (isAdjectiveConditionalType(type) && GENERIC_ADJECTIVE_CONDITIONAL_RE.test(text)) {
     return 'en-generic-adjective-result';
   }
+  const semanticIssue = sentenceSemanticQualityIssue({ en: text, type });
+  if (semanticIssue) return semanticIssue;
   const label = String(getTypeInfo(type)?.label || '').trim();
   if (label && text.toLowerCase().includes(label.toLowerCase())) return 'en-echoes-form';
   const words = text.split(/\s+/).filter(Boolean);

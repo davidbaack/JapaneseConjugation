@@ -203,6 +203,16 @@ describe('englishQualityIssue', () => {
     ).toBe('');
   });
 
+  it('rejects adjective contexts whose subject does not fit the adjective', () => {
+    expect(englishQualityIssue('If this task is itchy, I will add a break.', 'adj-tara')).toBe(
+      'en-adjective-body-context-mismatch',
+    );
+    expect(
+      englishQualityIssue("If today's mood is ticklish, I will lighten the plan.", 'adj-tara'),
+    ).toBe('en-adjective-body-context-mismatch');
+    expect(englishQualityIssue('If my skin is itchy, I will rest for a bit.', 'adj-tara')).toBe('');
+  });
+
   it('rejects empty or letterless text', () => {
     expect(englishQualityIssue('', 'plain-past')).toBe('no-en');
     expect(englishQualityIssue('!!! ???', 'plain-past')).toBe('en-not-english');

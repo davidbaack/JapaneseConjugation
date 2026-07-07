@@ -129,6 +129,26 @@ describe('sentence corpus exporter helpers', () => {
     expect(result.missing).toEqual(['i-adjective:いい|adj-conditional']);
   });
 
+  it('rejects exported adjective rows with incompatible English contexts', () => {
+    const result = buildCorpusChunks(
+      [{ word_key: 'i-adjective:itchy', type: 'adj-tara' }],
+      [
+        {
+          word_key: 'i-adjective:itchy',
+          type: 'adj-tara',
+          ja_template: 'if {w}.',
+          en: 'If this task is itchy, I will add a break.',
+          segments: [{ w: true }],
+        },
+      ],
+    );
+
+    expect(result.invalid).toEqual([
+      { key: 'i-adjective:itchy|adj-tara', reason: 'en-adjective-body-context-mismatch' },
+    ]);
+    expect(result.missing).toEqual(['i-adjective:itchy|adj-tara']);
+  });
+
   it('refuses unsafe corpus output directories before recursive deletion', () => {
     expect(() => resolveCorpusOutputDir('.')).toThrow(/Unsafe sentence corpus output directory/);
     expect(() => resolveCorpusOutputDir('public')).toThrow(
