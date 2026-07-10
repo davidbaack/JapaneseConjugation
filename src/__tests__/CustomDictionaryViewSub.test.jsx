@@ -35,6 +35,17 @@ afterEach(() => {
 });
 
 describe('CustomDictionaryViewSub suggestions', () => {
+  it('labels manual word fields and the word group control', () => {
+    renderDictionary({ geminiKey: '' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add verb' }));
+
+    expect(screen.getByLabelText('Dictionary form')).toBeTruthy();
+    expect(screen.getByLabelText('Reading (kana/romaji)')).toBeTruthy();
+    expect(screen.getByLabelText('Meaning')).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Group' })).toBeTruthy();
+  });
+
   it('waits for an explicit suggestion request on entry', () => {
     renderDictionary();
 

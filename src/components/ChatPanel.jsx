@@ -290,7 +290,7 @@ export function ChatPanel({
         className="space-y-2 max-h-96 overflow-y-auto pb-1"
       >
         {loading && !display.length && (
-          <div className="text-sm text-stone-400 italic px-3 py-2 animate-pulse">
+          <div className="text-sm text-stone-400 italic px-3 py-2 motion-safe:animate-pulse">
             Gemini is thinking…
           </div>
         )}
@@ -303,7 +303,7 @@ export function ChatPanel({
           </div>
         ))}
         {loading && display.length > 0 && (
-          <div className="text-sm text-stone-400 italic px-3 animate-pulse">
+          <div className="text-sm text-stone-400 italic px-3 motion-safe:animate-pulse">
             Gemini is thinking…
           </div>
         )}

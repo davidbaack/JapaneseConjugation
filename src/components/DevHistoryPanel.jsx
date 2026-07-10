@@ -107,7 +107,7 @@ export default function DevHistoryPanel({ apiBase = API_BASE }) {
             onClick={() => setOpen(false)}
             className="absolute inset-0 cursor-default bg-stone-950/20"
           />
-          <aside className="absolute right-0 top-0 flex h-screen w-[min(27rem,calc(100vw-1rem))] flex-col border-l border-stone-250 bg-stone-50 text-stone-900 shadow-2xl dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100">
+          <aside className="absolute right-0 top-0 flex h-screen w-[min(27rem,calc(100vw-1rem))] flex-col border-l border-stone-200 bg-stone-50 text-stone-900 shadow-2xl dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100">
             <div className="border-b border-stone-200 px-4 py-3 dark:border-stone-800">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -122,22 +122,24 @@ export default function DevHistoryPanel({ apiBase = API_BASE }) {
                     onClick={loadHistory}
                     title="Refresh commits"
                     disabled={loading}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-stone-250 bg-white text-stone-700 transition hover:bg-stone-100 disabled:opacity-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-700 transition hover:bg-stone-100 disabled:opacity-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
                   >
-                    <IconRefresh className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    <IconRefresh
+                      className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`}
+                    />
                   </button>
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
                     title="Close"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-stone-250 bg-white text-stone-700 transition hover:bg-stone-100 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-700 transition hover:bg-stone-100 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
                   >
                     <IconX className="h-4 w-4" />
                   </button>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-stone-600 dark:text-stone-400">
-                <span className="rounded-md border border-stone-250 bg-white px-2 py-1 font-medium dark:border-stone-800 dark:bg-stone-900">
+                <span className="rounded-md border border-stone-200 bg-white px-2 py-1 font-medium dark:border-stone-800 dark:bg-stone-900">
                   {currentRevision?.shortSha || history.headSha?.slice(0, 7) || 'no HEAD'}
                 </span>
                 {history.dirty && (

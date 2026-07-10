@@ -407,7 +407,7 @@ export default function ReferenceViewSub({
             e.stopPropagation();
             drillReferenceRow(row);
           }}
-          className={`${buttonBase} bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 border-stone-850 dark:border-stone-200`}
+          className={`${buttonBase} bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-100 text-white dark:text-stone-900 border-stone-800 dark:border-stone-200`}
           title={`Drill ${row.type.label}`}
           aria-label={`Drill ${row.type.label}`}
         >
@@ -435,7 +435,7 @@ export default function ReferenceViewSub({
           }}
           className={`${buttonBase} ${
             added
-              ? 'bg-amber-50 border-amber-250 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-300'
+              ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-300'
               : quiet
           }`}
           title={`Add ${row.type.label} to weak forms`}
@@ -533,10 +533,10 @@ export default function ReferenceViewSub({
 
   return (
     <div className="grid lg:grid-cols-[280px_1fr] gap-4 text-left">
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 overflow-hidden flex flex-col">
-        <div className="p-3 border-b border-stone-105 dark:border-stone-800">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden flex flex-col">
+        <div className="p-3 border-b border-stone-100 dark:border-stone-800">
           <div className="relative">
-            <IconList className="w-4 h-4 absolute left-3 top-2.5 text-stone-400" />
+            <IconList className="w-4 h-4 absolute left-3 top-2.5 text-stone-600" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -554,11 +554,11 @@ export default function ReferenceViewSub({
             <div className="mt-3 border-t border-stone-100 dark:border-stone-800 pt-3 space-y-3">
               {reference.recentSearches.length > 0 && (
                 <div>
-                  <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-wider text-stone-500">
+                  <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-wider text-stone-600">
                     <span>Recent searches</span>
                     <button
                       onClick={clearReferenceMemory}
-                      className="normal-case tracking-normal text-stone-400 hover:text-stone-700"
+                      className="normal-case tracking-normal text-stone-600 hover:text-stone-700"
                     >
                       Clear
                     </button>
@@ -578,7 +578,7 @@ export default function ReferenceViewSub({
               )}
               {historyWords.length > 0 && (
                 <div>
-                  <div className="text-xs uppercase tracking-wider text-stone-500 mb-2">
+                  <div className="text-xs uppercase tracking-wider text-stone-600 mb-2">
                     Lookup history
                   </div>
                   <div className="space-y-1.5">
@@ -591,7 +591,7 @@ export default function ReferenceViewSub({
                           className={`w-full text-left px-2 py-2 rounded-lg border transition ${
                             isSelectedWord(w)
                               ? 'border-indigo-200 bg-indigo-50 dark:bg-indigo-950/20'
-                              : 'border-stone-100 dark:border-stone-850 hover:border-stone-200 dark:hover:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800/40'
+                              : 'border-stone-100 dark:border-stone-800 hover:border-stone-200 dark:hover:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800/40'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -599,11 +599,11 @@ export default function ReferenceViewSub({
                               <ScriptDisplay
                                 view={wv}
                                 className="text-sm font-medium truncate text-stone-900 dark:text-stone-100"
-                                subClassName="text-[11px] text-stone-450 truncate"
+                                subClassName="text-[11px] text-stone-600 truncate"
                               />
-                              <div className="text-xs text-stone-500 truncate">{w.meaning}</div>
+                              <div className="text-xs text-stone-600 truncate">{w.meaning}</div>
                             </div>
-                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 flex-shrink-0">
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 flex-shrink-0">
                               x{w.count || 1}
                             </span>
                           </div>
@@ -617,8 +617,8 @@ export default function ReferenceViewSub({
           ) : null}
 
           {query.trim() && (
-            <div className="mt-3 border-t border-stone-105 dark:border-stone-800 pt-3">
-              <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-wider text-stone-500">
+            <div className="mt-3 border-t border-stone-100 dark:border-stone-800 pt-3">
+              <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-wider text-stone-600">
                 <span>Reverse lookup</span>
                 <span>
                   {lookupMatches.length
@@ -649,7 +649,7 @@ export default function ReferenceViewSub({
                         className={`w-full text-left px-2 py-2 rounded-lg border transition ${
                           active
                             ? 'border-indigo-200 bg-indigo-50 dark:bg-indigo-950/20'
-                            : 'border-stone-100 dark:border-stone-850 hover:border-stone-200 dark:hover:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800/40'
+                            : 'border-stone-100 dark:border-stone-800 hover:border-stone-200 dark:hover:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800/40'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -657,9 +657,9 @@ export default function ReferenceViewSub({
                             <ScriptDisplay
                               view={av}
                               className="text-sm font-medium text-stone-900 dark:text-stone-50"
-                              subClassName="text-[11px] text-stone-450"
+                              subClassName="text-[11px] text-stone-600"
                             />
-                            <div className="text-[11px] text-stone-500 mt-0.5">{m.type.label}</div>
+                            <div className="text-[11px] text-stone-600 mt-0.5">{m.type.label}</div>
                           </div>
                           <span
                             className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${m.matchKind === 'exact' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}
@@ -667,17 +667,17 @@ export default function ReferenceViewSub({
                             {m.matchKind}
                           </span>
                         </div>
-                        <div className="mt-1 text-xs text-stone-500 truncate">
+                        <div className="mt-1 text-xs text-stone-600 truncate">
                           <span
-                            className="font-semibold text-stone-850 dark:text-stone-205"
+                            className="font-semibold text-stone-800 dark:text-stone-200"
                             lang={bv.lang}
                           >
                             {bv.main}
                           </span>
-                          {bv.sub && <span className="text-stone-400"> ({bv.sub})</span>} ·{' '}
+                          {bv.sub && <span className="text-stone-600"> ({bv.sub})</span>} ·{' '}
                           {m.word.meaning}
                         </div>
-                        <div className="mt-1 text-[11px] text-stone-400 leading-tight">
+                        <div className="mt-1 text-[11px] text-stone-600 leading-tight">
                           {m.variantNote || m.explanation.rule}
                         </div>
                       </button>
@@ -685,7 +685,7 @@ export default function ReferenceViewSub({
                   })}
                 </div>
               ) : (
-                <div className="mt-2 text-xs text-stone-400">
+                <div className="mt-2 text-xs text-stone-600">
                   No local form match yet. Try a dictionary form or romaji.
                 </div>
               )}
@@ -698,7 +698,7 @@ export default function ReferenceViewSub({
                 {lookupAiLoading ? 'Cancel' : 'AI disambiguate'}
               </button>
               {!geminiKey && (
-                <div className="mt-1 text-[11px] text-stone-400 text-center">
+                <div className="mt-1 text-[11px] text-stone-600 text-center">
                   Gemini is not configured for contextual ranking.
                 </div>
               )}
@@ -709,9 +709,9 @@ export default function ReferenceViewSub({
                 </div>
               )}
               {showScratch && (
-                <div className="mt-3 rounded-xl border border-indigo-150 bg-indigo-50/60 dark:bg-indigo-950/20 p-3">
+                <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/60 dark:bg-indigo-950/20 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs uppercase tracking-wider text-indigo-750 font-medium">
+                    <div className="text-xs uppercase tracking-wider text-indigo-700 font-medium">
                       Scratch conjugator
                     </div>
                     <span className="text-xs rounded-full bg-white dark:bg-stone-800 px-2 py-0.5 text-indigo-700 dark:text-indigo-300">
@@ -726,8 +726,8 @@ export default function ReferenceViewSub({
                     . {scratchCandidate.sourceNote}
                   </div>
                   {scratchMasuDiagnostic && (
-                    <div className="mt-2 border-l-2 border-indigo-300 dark:border-indigo-700 pl-3 text-xs text-stone-600 dark:text-stone-350">
-                      <span className="font-semibold text-indigo-750 dark:text-indigo-300">
+                    <div className="mt-2 border-l-2 border-indigo-300 dark:border-indigo-700 pl-3 text-xs text-stone-600 dark:text-stone-300">
+                      <span className="font-semibold text-indigo-700 dark:text-indigo-300">
                         Masu check:{' '}
                       </span>
                       <span lang="ja" className="font-semibold text-stone-800 dark:text-stone-100">
@@ -760,7 +760,7 @@ export default function ReferenceViewSub({
             </div>
           )}
         </div>
-        <div className="flex-1 overflow-y-auto max-h-[560px] divide-y divide-stone-50 dark:divide-stone-850">
+        <div className="flex-1 overflow-y-auto max-h-[560px] divide-y divide-stone-50 dark:divide-stone-800">
           {matches.map((w) => {
             const wv = promptDisplay(w, null, practicePrefs);
             return (
@@ -774,17 +774,17 @@ export default function ReferenceViewSub({
                 }`}
               >
                 <div className="flex items-baseline justify-between gap-2">
-                  <div className="font-medium text-stone-850 dark:text-stone-150">
-                    <ScriptDisplay view={wv} className="" subClassName="text-xs text-stone-500" />
+                  <div className="font-medium text-stone-800 dark:text-stone-100">
+                    <ScriptDisplay view={wv} className="" subClassName="text-xs text-stone-600" />
                   </div>
-                  <span className="text-[11px] text-stone-400 inline-flex items-center gap-1 font-semibold">
+                  <span className="text-[11px] text-stone-600 inline-flex items-center gap-1 font-semibold">
                     {favoriteListHasWord(wordLists, w) && (
                       <IconStar className="w-3 h-3 text-amber-500" />
                     )}
                     {isAdjective(w) ? 'adj' : 'verb'}
                   </span>
                 </div>
-                <div className="text-xs text-stone-450 truncate">{w.meaning}</div>
+                <div className="text-xs text-stone-600 truncate">{w.meaning}</div>
               </button>
             );
           })}
@@ -805,7 +805,7 @@ export default function ReferenceViewSub({
                   >
                     {scratchCandidate.dict}
                   </div>
-                  <div className="text-sm text-stone-500 mt-1">
+                  <div className="text-sm text-stone-600 mt-1">
                     {groupDisplayLabel(scratchCandidate.group)} · {scratchCandidate.sourceNote}
                   </div>
                 </div>
@@ -813,27 +813,27 @@ export default function ReferenceViewSub({
             </div>
             <div className="max-h-80 overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-stone-50 dark:bg-stone-950 text-stone-500 dark:text-stone-400 text-xs uppercase tracking-wider">
+                <thead className="bg-stone-50 dark:bg-stone-950 text-stone-600 dark:text-stone-400 text-xs uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium">Form</th>
                     <th className="px-4 py-2 text-left font-medium">Answer</th>
                     <th className="px-4 py-2 text-left font-medium hidden md:table-cell">Rule</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
+                <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
                   {scratchRows.map((r) => {
                     const answer = surfaceFormForLocal(scratchCandidate, r.type.id) || r.answer;
                     const rv = formDisplay(answer, practicePrefs, scratchCandidate, r.type.id);
                     return (
                       <tr
                         key={r.type.id}
-                        className="border-t border-stone-100 dark:border-stone-850"
+                        className="border-t border-stone-100 dark:border-stone-800"
                       >
                         <td className="px-4 py-2 text-left">
                           <div className="font-semibold text-stone-800 dark:text-stone-200">
                             {r.type.label}
                           </div>
-                          <div className="text-xs text-stone-400">{r.type.hint}</div>
+                          <div className="text-xs text-stone-600">{r.type.hint}</div>
                         </td>
                         <td className="px-4 py-2 text-left">
                           <ScriptDisplay
@@ -842,10 +842,10 @@ export default function ReferenceViewSub({
                             type={r.type.id}
                             colorHighlight={practicePrefs.colorCodeConjugations !== false}
                             className="text-lg text-stone-900 dark:text-stone-100"
-                            subClassName="text-xs text-stone-450"
+                            subClassName="text-xs text-stone-600"
                           />
                         </td>
-                        <td className="px-4 py-2 text-xs text-stone-500 hidden md:table-cell text-left">
+                        <td className="px-4 py-2 text-xs text-stone-600 hidden md:table-cell text-left">
                           {r.explanation.rule}
                         </td>
                       </tr>
@@ -858,11 +858,11 @@ export default function ReferenceViewSub({
         )}
 
         {activeLookupMatch && (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 overflow-hidden">
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
             <div className="p-5 text-left">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <div className="text-xs uppercase tracking-wider text-indigo-650 dark:text-indigo-350 font-semibold">
+                  <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
                     Focused lookup hit
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -872,7 +872,7 @@ export default function ReferenceViewSub({
                       type={activeLookupMatch.type.id}
                       colorHighlight={practicePrefs.colorCodeConjugations !== false}
                       className="text-3xl font-semibold text-stone-950 dark:text-stone-50"
-                      subClassName="text-sm text-stone-500 mt-1"
+                      subClassName="text-sm text-stone-600 mt-1"
                     />
                     <span
                       className={`rounded-full px-2 py-1 text-xs font-semibold ${
@@ -885,25 +885,25 @@ export default function ReferenceViewSub({
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <span className="text-sm text-stone-500 dark:text-stone-400">
+                    <span className="text-sm text-stone-600 dark:text-stone-400">
                       {activeLookupMatch.type.label} of
                     </span>
                     <ScriptDisplay
                       view={activeLookupWordView}
                       className="text-xl font-semibold text-stone-900 dark:text-stone-100"
-                      subClassName="text-xs text-stone-500"
+                      subClassName="text-xs text-stone-600"
                     />
-                    <span className="text-sm text-stone-500 dark:text-stone-400">
+                    <span className="text-sm text-stone-600 dark:text-stone-400">
                       {activeLookupMatch.word.meaning}
                     </span>
                   </div>
-                  <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                  <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
                     {groupDisplayLabel(activeLookupMatch.word.group)}
                     {groupAliasText(activeLookupMatch.word.group)
                       ? ` - ${groupAliasText(activeLookupMatch.word.group)}`
                       : ''}
                   </div>
-                  <p className="mt-3 max-w-2xl text-sm leading-relaxed text-stone-650 dark:text-stone-300">
+                  <p className="mt-3 max-w-2xl text-sm leading-relaxed text-stone-600 dark:text-stone-300">
                     {activeLookupMatch.variantNote || activeLookupMatch.explanation.rule}
                   </p>
                 </div>
@@ -915,7 +915,7 @@ export default function ReferenceViewSub({
                       practiceReferenceForm(activeLookupMatch.word, activeLookupMatch.type)
                     }
                     disabled={!practiceWord && !setTab}
-                    className="px-3 py-2 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 disabled:opacity-40 text-white dark:text-stone-900 rounded-lg text-sm inline-flex items-center gap-1.5 transition"
+                    className="px-3 py-2 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-100 disabled:opacity-40 text-white dark:text-stone-900 rounded-lg text-sm inline-flex items-center gap-1.5 transition"
                   >
                     <IconRefresh className="w-4 h-4" />
                     Practice this form
@@ -923,7 +923,7 @@ export default function ReferenceViewSub({
                   <button
                     type="button"
                     onClick={() => speakJapaneseLocal(activeLookupMatch.answer)}
-                    className="p-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-stone-500"
+                    className="p-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-600"
                     title="Speak matched form"
                     aria-label="Speak matched form"
                   >
@@ -935,13 +935,13 @@ export default function ReferenceViewSub({
               <details className="mt-4 overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800">
                 <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 dark:bg-stone-950/60 dark:text-stone-200 [&::-webkit-details-marker]:hidden">
                   <span>Show full word reference</span>
-                  <span className="text-xs font-normal text-stone-400">
+                  <span className="text-xs font-normal text-stone-600">
                     {activeLookupRows.length} forms
                   </span>
                 </summary>
                 <div className="max-h-96 overflow-y-auto border-t border-stone-200 dark:border-stone-800">
                   <table className="w-full text-sm">
-                    <thead className="bg-stone-50 dark:bg-stone-950 text-stone-500 dark:text-stone-400 text-xs uppercase tracking-wider">
+                    <thead className="bg-stone-50 dark:bg-stone-950 text-stone-600 dark:text-stone-400 text-xs uppercase tracking-wider">
                       <tr>
                         <th className="px-4 py-2 text-left font-medium">Form</th>
                         <th className="px-4 py-2 text-left font-medium">Answer</th>
@@ -950,7 +950,7 @@ export default function ReferenceViewSub({
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
+                    <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
                       {activeLookupRows.map((r) => {
                         const rv = formDisplay(
                           r.answer,
@@ -969,10 +969,10 @@ export default function ReferenceViewSub({
                             }
                           >
                             <td className="px-4 py-2 text-left">
-                              <div className="font-semibold text-stone-850 dark:text-stone-200">
+                              <div className="font-semibold text-stone-800 dark:text-stone-200">
                                 {r.type.label}
                               </div>
-                              <div className="text-xs text-stone-400">{r.type.hint}</div>
+                              <div className="text-xs text-stone-600">{r.type.hint}</div>
                             </td>
                             <td className="px-4 py-2 text-left">
                               <ScriptDisplay
@@ -981,10 +981,10 @@ export default function ReferenceViewSub({
                                 type={r.type.id}
                                 colorHighlight={practicePrefs.colorCodeConjugations !== false}
                                 className="text-lg text-stone-900 dark:text-stone-100"
-                                subClassName="text-xs text-stone-450"
+                                subClassName="text-xs text-stone-600"
                               />
                             </td>
-                            <td className="px-4 py-2 text-xs text-stone-550 hidden md:table-cell text-left">
+                            <td className="px-4 py-2 text-xs text-stone-600 hidden md:table-cell text-left">
                               {r.explanation.rule}
                             </td>
                           </tr>
@@ -999,26 +999,26 @@ export default function ReferenceViewSub({
         )}
 
         {detailWord && (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5 text-left">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-stone-105 dark:border-stone-800 pb-4">
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5 text-left">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-stone-100 dark:border-stone-800 pb-4">
               <div className="min-w-0">
                 <ScriptDisplay
                   view={selectedView}
                   className="text-4xl font-semibold text-stone-950 dark:text-stone-50"
-                  subClassName="text-stone-500 mt-1"
+                  subClassName="text-stone-600 mt-1"
                 />
-                <div className="text-sm text-stone-605 italic mt-2">{detailWord.meaning}</div>
-                <div className="text-xs text-stone-500 dark:text-stone-400 mt-1">
+                <div className="text-sm text-stone-600 italic mt-2">{detailWord.meaning}</div>
+                <div className="text-xs text-stone-600 dark:text-stone-400 mt-1">
                   {groupDisplayLabel(detailWord.group)}
                 </div>
                 {groupAliasText(detailWord.group) && (
-                  <div className="text-[11px] text-stone-400 mt-0.5">
+                  <div className="text-[11px] text-stone-600 mt-0.5">
                     {groupAliasText(detailWord.group)}
                   </div>
                 )}
                 {selectedMasuDiagnostic && (
-                  <div className="mt-3 border-l-2 border-indigo-300 dark:border-indigo-700 pl-3 text-xs leading-relaxed text-stone-600 dark:text-stone-350">
-                    <div className="font-semibold uppercase tracking-wide text-indigo-650 dark:text-indigo-300">
+                  <div className="mt-3 border-l-2 border-indigo-300 dark:border-indigo-700 pl-3 text-xs leading-relaxed text-stone-600 dark:text-stone-300">
+                    <div className="font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
                       Masu check
                     </div>
                     <div className="mt-0.5">
@@ -1029,7 +1029,7 @@ export default function ReferenceViewSub({
                       </span>
                       <span className="ml-2">{selectedMasuDiagnostic.clue}</span>
                     </div>
-                    <div className="mt-0.5 text-stone-500 dark:text-stone-400">
+                    <div className="mt-0.5 text-stone-600 dark:text-stone-400">
                       {selectedMasuDiagnostic.contrast}
                     </div>
                   </div>
@@ -1039,7 +1039,7 @@ export default function ReferenceViewSub({
                 <button
                   onClick={drillSelectedWord}
                   disabled={!detailWord || !setWordLists || !setPracticePrefs}
-                  className="px-3 py-2 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 disabled:opacity-40 text-white dark:text-stone-900 rounded-lg text-sm inline-flex items-center gap-1.5 transition"
+                  className="px-3 py-2 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-100 disabled:opacity-40 text-white dark:text-stone-900 rounded-lg text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconRefresh className="w-4 h-4" />
                   Drill word
@@ -1056,8 +1056,8 @@ export default function ReferenceViewSub({
                   onClick={toggleFavorite}
                   className={`px-3 py-2 border rounded-lg text-sm inline-flex items-center gap-1.5 transition ${
                     selectedFavorited
-                      ? 'bg-amber-50 border-amber-250 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900'
-                      : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 text-stone-600 dark:text-stone-300'
+                      ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900'
+                      : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300'
                   }`}
                 >
                   <IconStar className="w-4 h-4" />
@@ -1066,7 +1066,7 @@ export default function ReferenceViewSub({
                 <button
                   onClick={useFavoritesForDrill}
                   disabled={!favoriteCount && !detailWord}
-                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 disabled:opacity-40 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
+                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 disabled:opacity-40 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconList className="w-4 h-4" />
                   Drill favorites
@@ -1074,30 +1074,30 @@ export default function ReferenceViewSub({
                 <button
                   onClick={drillWeakReferenceRules}
                   disabled={!weakRuleCount || !setPracticePrefs}
-                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 disabled:opacity-40 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
+                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 disabled:opacity-40 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconStar className="w-4 h-4" />
                   Drill weak forms
                 </button>
                 <button
                   onClick={copyTable}
-                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
+                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconList className="w-4 h-4" />
                   {copyTableOk ? 'Copied' : 'Copy table'}
                 </button>
                 <button
                   onClick={() => speakJapaneseLocal(detailWord.reading)}
-                  className="p-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-stone-500"
+                  className="p-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-600"
                   title="Speak"
                 >
                   <IconVolume className="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-stone-550">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-stone-600">
               <span
-                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 ${selectedFavorited ? 'bg-amber-50 text-amber-700' : 'bg-stone-50 text-stone-500'}`}
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 ${selectedFavorited ? 'bg-amber-50 text-amber-700' : 'bg-stone-50 text-stone-600'}`}
               >
                 <IconStar className="w-3.5 h-3.5" />
                 {favoriteCount} favorite{favoriteCount === 1 ? '' : 's'}
@@ -1107,27 +1107,27 @@ export default function ReferenceViewSub({
                 {masteredRows}/{rows.length} forms mastered
               </span>
               {!!weakRuleCount && (
-                <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-amber-50 text-amber-750">
+                <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-amber-50 text-amber-700">
                   <IconStar className="w-3.5 h-3.5" />
                   {weakRuleCount} weak form{weakRuleCount === 1 ? '' : 's'}
                 </span>
               )}
               {!!dueRows && (
-                <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-amber-50 text-amber-750">
+                <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-amber-50 text-amber-700">
                   {dueRows} due
                 </span>
               )}
               {favoriteMsg && (
-                <span className="text-emerald-650 dark:text-emerald-450">{favoriteMsg}</span>
+                <span className="text-emerald-700 dark:text-emerald-400">{favoriteMsg}</span>
               )}
             </div>
           </div>
         )}
 
         {detailWord && (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 overflow-hidden">
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-stone-50 dark:bg-stone-950 text-stone-500 dark:text-stone-400 text-xs uppercase tracking-wider">
+              <thead className="bg-stone-50 dark:bg-stone-950 text-stone-600 dark:text-stone-400 text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">Form</th>
                   <th className="px-4 py-2 text-left font-medium">Answer</th>
@@ -1136,7 +1136,7 @@ export default function ReferenceViewSub({
                   <th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
+              <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
                 {rows.map((r) => {
                   const rv = formDisplay(r.answer, practicePrefs, detailWord, r.type.id);
                   const expanded = expandedRow === r.type.id;
@@ -1144,13 +1144,13 @@ export default function ReferenceViewSub({
                     <React.Fragment key={r.type.id}>
                       <tr
                         onClick={() => setExpandedRow(expanded ? null : r.type.id)}
-                        className={`border-t border-stone-100 dark:border-stone-850 cursor-pointer transition ${expanded ? 'bg-indigo-50/20 dark:bg-indigo-950/10' : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'}`}
+                        className={`border-t border-stone-100 dark:border-stone-800 cursor-pointer transition ${expanded ? 'bg-indigo-50/20 dark:bg-indigo-950/10' : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'}`}
                       >
                         <td className="px-4 py-2 text-left">
-                          <div className="font-semibold text-stone-850 dark:text-stone-200">
+                          <div className="font-semibold text-stone-800 dark:text-stone-200">
                             {r.type.label}
                           </div>
-                          <div className="text-xs text-stone-400">{r.type.hint}</div>
+                          <div className="text-xs text-stone-600">{r.type.hint}</div>
                         </td>
                         <td className="px-4 py-2 text-left">
                           <div className="flex items-center gap-2">
@@ -1160,14 +1160,14 @@ export default function ReferenceViewSub({
                               type={r.type.id}
                               colorHighlight={practicePrefs.colorCodeConjugations !== false}
                               className="text-lg text-stone-900 dark:text-stone-100"
-                              subClassName="text-xs text-stone-450"
+                              subClassName="text-xs text-stone-600"
                             />
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 speakJapaneseLocal(r.answer);
                               }}
-                              className="p-1.5 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-500 flex-shrink-0"
+                              className="p-1.5 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-600 flex-shrink-0"
                               title={`Speak ${r.type.label}`}
                             >
                               <IconVolume className="w-3.5 h-3.5" />
@@ -1187,11 +1187,11 @@ export default function ReferenceViewSub({
                             )}
                             <span>{r.progress.label}</span>
                           </div>
-                          <div className="mt-1 text-[11px] text-stone-400 hidden sm:block">
+                          <div className="mt-1 text-[11px] text-stone-600 hidden sm:block">
                             {r.progress.detail}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-xs text-stone-550 hidden md:table-cell text-left">
+                        <td className="px-4 py-2 text-xs text-stone-600 hidden md:table-cell text-left">
                           {r.explanation.rule}
                         </td>
                         <td className="px-4 py-2 hidden sm:table-cell">

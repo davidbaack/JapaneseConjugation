@@ -24,6 +24,9 @@ describe('SettingsView controls', () => {
 
     await screen.findByText('Display & audio', {}, { timeout: 5000 });
 
+    expect(screen.getByRole('heading', { name: 'Settings', level: 2 })).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'Japanese voice' })).toBeTruthy();
+
     for (const oldControl of [
       'Practice session',
       'Answer mode',

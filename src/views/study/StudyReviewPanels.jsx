@@ -48,7 +48,7 @@ function ReviewDisclosure({
         <span className="inline-flex items-center gap-2">
           <span>{summary}</span>
           {hintLabel && (
-            <span className="text-xs font-medium text-stone-500 dark:text-stone-400">
+            <span className="text-xs font-medium text-stone-600 dark:text-stone-400">
               {hintLabel}
             </span>
           )}
@@ -68,7 +68,7 @@ function ReviewChatSection({ tone = 'stone', chatOpen, onOpen, children }) {
         : 'border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-950/50';
   const buttonClass =
     tone === 'rose'
-      ? 'border-rose-200 text-rose-700 hover:bg-rose-100/50 dark:border-rose-900 dark:text-rose-450 dark:hover:bg-rose-950/50'
+      ? 'border-rose-200 text-rose-700 hover:bg-rose-100/50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/50'
       : tone === 'emerald'
         ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-100/50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950/50'
         : 'border-stone-200 text-stone-700 hover:bg-stone-100/50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-900/60';
@@ -274,8 +274,8 @@ function ReviewFeedbackAction({ action, buttonRef, onClick }) {
           : IconArrowRight;
   const toneClass =
     action.kind === 'try'
-      ? 'border-stone-800 bg-stone-850 text-white hover:bg-stone-700 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150'
-      : 'border-indigo-200 bg-white text-indigo-750 hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-200 dark:hover:bg-indigo-950/30';
+      ? 'border-stone-800 bg-stone-800 text-white hover:bg-stone-700 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-100'
+      : 'border-indigo-200 bg-white text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-200 dark:hover:bg-indigo-950/30';
 
   return (
     <div className="mt-4 border-t border-stone-200/70 pt-3 text-left dark:border-stone-800/70">
@@ -300,7 +300,7 @@ function GuideReviewPrompt({ buttonRef = null, onClick }) {
       <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
         Walk through this form in Guide
       </div>
-      <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+      <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
         Drills this same word and target form: plain form, word group, final answer.
       </div>
       <button
@@ -444,9 +444,9 @@ function RunAnswerReveal({
         <div
           className={`mt-0.5 flex-shrink-0 ${
             record.correct
-              ? 'text-emerald-600'
+              ? 'text-emerald-700'
               : record.wasCorrected
-                ? 'text-amber-600'
+                ? 'text-amber-700'
                 : 'text-rose-600'
           }`}
         >
@@ -484,9 +484,9 @@ function RunAnswerReveal({
                     {reviewKanaCells.map((cell, i) => {
                       const cls =
                         cell.state === 'correct'
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
                           : cell.state === 'wrong' || cell.state === 'extra'
-                            ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
+                            ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
                             : cell.state === 'hint'
                               ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
                               : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
@@ -508,7 +508,7 @@ function RunAnswerReveal({
                 type={record.practicedType}
                 colorHighlight={prefs.colorCodeConjugations !== false}
                 className="mt-2 text-xl text-emerald-900 dark:text-emerald-100"
-                subClassName="mt-1 text-xs text-stone-500"
+                subClassName="mt-1 text-xs text-stone-600"
               />
               <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
                 {targetEnglish}
@@ -516,7 +516,7 @@ function RunAnswerReveal({
               {autoAdvanceHint && (
                 <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-100/80 px-3 py-2 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
                   <span className="relative flex h-5 w-5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                    <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400 opacity-60" />
                     <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
                       <IconCheck className="h-3 w-3" />
                     </span>
@@ -588,7 +588,7 @@ function RunAnswerReveal({
                                 ? 'border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-600 dark:bg-rose-950/40 dark:text-rose-100'
                                 : cell.state === 'hint'
                                   ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500 dark:bg-amber-950/40 dark:text-amber-100'
-                                  : 'border-stone-300 bg-stone-100 text-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400';
+                                  : 'border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400';
                           return (
                             <div
                               key={i}
@@ -780,7 +780,7 @@ function RunAnswerReveal({
             <IconBook className="h-4 w-4" />
             {ruleLessonLabel}
           </button>
-          <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+          <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
             Opens {relatedLesson.title}, then returns to this form.
           </div>
         </div>
@@ -827,15 +827,15 @@ function RunAnswerReviewItem({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-stone-600">
                 Answer #{record.number}
               </span>
               <span lang="ja" className="text-base font-semibold text-stone-900 dark:text-stone-50">
                 {record.word?.dict}
               </span>
-              <span className="text-xs text-stone-500 dark:text-stone-400">{record.typeLabel}</span>
+              <span className="text-xs text-stone-600 dark:text-stone-400">{record.typeLabel}</span>
             </div>
-            <div className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">
+            <div className="mt-1 truncate text-xs text-stone-600 dark:text-stone-400">
               Your answer: <span lang="ja">{answerText}</span>
             </div>
           </div>
@@ -845,8 +845,8 @@ function RunAnswerReviewItem({
             >
               {statusLabel}
             </span>
-            <span className="text-xs font-semibold text-stone-400 group-open:hidden">Expand</span>
-            <span className="hidden text-xs font-semibold text-stone-400 group-open:inline">
+            <span className="text-xs font-semibold text-stone-600 group-open:hidden">Expand</span>
+            <span className="hidden text-xs font-semibold text-stone-600 group-open:inline">
               Collapse
             </span>
           </div>
@@ -888,7 +888,7 @@ function PracticeRunReviewPage({
             <h2 className="mt-0.5 text-xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
               Answers from this run
             </h2>
-            <div className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+            <div className="mt-1 text-sm text-stone-600 dark:text-stone-400">
               {answers.length
                 ? `${answers.length} answer${answers.length === 1 ? '' : 's'} captured - ${runStatsLabel}`
                 : 'No answers captured yet.'}
@@ -919,7 +919,7 @@ function PracticeRunReviewPage({
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-stone-300 bg-white px-4 py-8 text-center text-sm text-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400">
+        <div className="rounded-xl border border-dashed border-stone-300 bg-white px-4 py-8 text-center text-sm text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400">
           Answer a card, then come back here to expand the reveal details.
         </div>
       )}

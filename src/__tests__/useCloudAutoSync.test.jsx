@@ -41,6 +41,7 @@ function props(overrides = {}) {
   return {
     hydrated: true,
     session: SESSION,
+    cloudPushEnabled: true,
     state: { v: 1 },
     customVerbs: [],
     customAdjectives: [],
@@ -95,14 +96,18 @@ describe('useCloudAutoSync', () => {
   });
 
   it('normalizes legacy kana answer preferences before cloud upsert', async () => {
-    renderHook((p) => useCloudAutoSync(p), {
-      initialProps: props({
+    const { rerender } = renderHook((p) => useCloudAutoSync(p), {
+      initialProps: props(),
+    });
+    rerender(
+      props({
+        state: { v: 2 },
         practicePrefs: {
           answerMode: 'guided',
           kanaMatchDisplay: 'none',
         },
       }),
-    });
+    );
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
@@ -116,7 +121,8 @@ describe('useCloudAutoSync', () => {
   });
 
   it('does not push before the debounce window elapses', async () => {
-    renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
+    const { rerender } = renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
+    rerender(props({ state: { v: 2 } }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS - 1);
     });
@@ -128,7 +134,8 @@ describe('useCloudAutoSync', () => {
       initialProps: props({ state: { v: 1 } }),
     });
 
-    rerender(props({ session: null, state: { v: 2 } }));
+    rerender(props({ state: { v: 2 } }));
+    rerender(props({ session: null, cloudPushEnabled: false, state: { v: 2 } }));
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
@@ -137,12 +144,19 @@ describe('useCloudAutoSync', () => {
     expect(cloudUpsert).not.toHaveBeenCalled();
   });
 
-  it('cancels the old timer and pushes under the new account after an account switch', async () => {
+  it('establishes a fresh baseline before pushing under a switched account', async () => {
     const { rerender } = renderHook((p) => useCloudAutoSync(p), {
       initialProps: props({ state: { user: 'old' } }),
     });
 
-    rerender(props({ session: OTHER_SESSION, state: { user: 'new' } }));
+    rerender(props({ session: OTHER_SESSION, state: { user: 'new-baseline' } }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+    expect(cloudUpsert).not.toHaveBeenCalled();
+
+    rerender(props({ session: OTHER_SESSION, state: { user: 'new-change' } }));
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
@@ -150,7 +164,7 @@ describe('useCloudAutoSync', () => {
 
     expect(cloudUpsert).toHaveBeenCalledTimes(1);
     expect(cloudUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({ state: { user: 'new' } }),
+      expect.objectContaining({ state: { user: 'new-change' } }),
       'user-456',
     );
   });
@@ -159,13 +173,14 @@ describe('useCloudAutoSync', () => {
     const pending = deferred();
     cloudUpsert.mockReturnValueOnce(pending.promise);
     const { rerender } = renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
+    rerender(props({ state: { v: 2 } }));
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
     });
     expect(cloudUpsert).toHaveBeenCalledTimes(1);
 
-    rerender(props({ session: null }));
+    rerender(props({ session: null, cloudPushEnabled: false }));
 
     await act(async () => {
       pending.resolve();
@@ -179,7 +194,8 @@ describe('useCloudAutoSync', () => {
   });
 
   it('records the sync time and an ok status after a successful push', async () => {
-    renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
+    const { rerender } = renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
+    rerender(props({ state: { v: 2 } }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
     });
@@ -188,7 +204,7 @@ describe('useCloudAutoSync', () => {
     expect(cloudUpsert.mock.calls[0][1]).toBe('user-123');
     expect(lastSyncedAtRef.current).toBeGreaterThan(0);
     // Persisted again with the new sync time after the push.
-    expect(saveAll).toHaveBeenCalledTimes(2);
+    expect(saveAll).toHaveBeenCalledTimes(3);
     expect(setSyncStatus).toHaveBeenLastCalledWith(
       expect.objectContaining({ kind: 'ok', message: 'Saved to cloud' }),
     );
@@ -196,7 +212,8 @@ describe('useCloudAutoSync', () => {
 
   it('surfaces a push failure as an error status without crashing', async () => {
     cloudUpsert.mockRejectedValueOnce(new Error('network down'));
-    renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
+    const { rerender } = renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
+    rerender(props({ state: { v: 2 } }));
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
@@ -210,7 +227,9 @@ describe('useCloudAutoSync', () => {
   });
 
   it('saves locally but never pushes when signed out', async () => {
-    renderHook((p) => useCloudAutoSync(p), { initialProps: props({ session: null }) });
+    renderHook((p) => useCloudAutoSync(p), {
+      initialProps: props({ session: null, cloudPushEnabled: false }),
+    });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
     });
@@ -225,5 +244,41 @@ describe('useCloudAutoSync', () => {
     });
     expect(saveAll).not.toHaveBeenCalled();
     expect(cloudUpsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps local saves active while cloud hydration has the push gate closed', async () => {
+    const { rerender } = renderHook((p) => useCloudAutoSync(p), {
+      initialProps: props({ cloudPushEnabled: false }),
+    });
+    rerender(props({ cloudPushEnabled: false, state: { v: 2 } }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+
+    expect(saveAll).toHaveBeenCalledTimes(2);
+    expect(cloudUpsert).not.toHaveBeenCalled();
+  });
+
+  it('uses the first payload after hydration as a baseline instead of pushing it', async () => {
+    const { rerender } = renderHook((p) => useCloudAutoSync(p), {
+      initialProps: props({ cloudPushEnabled: false }),
+    });
+    rerender(props({ cloudPushEnabled: true, state: { v: 2 } }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+    expect(cloudUpsert).not.toHaveBeenCalled();
+
+    rerender(props({ cloudPushEnabled: true, state: { v: 3 } }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+
+    expect(cloudUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ state: { v: 3 } }),
+      'user-123',
+    );
   });
 });

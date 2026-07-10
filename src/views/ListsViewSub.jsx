@@ -240,7 +240,7 @@ export default function ListsViewSub({
     <div className="grid lg:grid-cols-[280px_1fr] gap-4">
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
         <div className="p-4 border-b border-stone-100 dark:border-stone-800">
-          <h3 className="font-medium mb-3 text-stone-805 dark:text-stone-200">Study lists</h3>
+          <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Study lists</h3>
           <div className="flex gap-2">
             <input
               value={name}
@@ -260,7 +260,7 @@ export default function ListsViewSub({
             </button>
           </div>
         </div>
-        <div className="divide-y divide-stone-50 dark:divide-stone-850">
+        <div className="divide-y divide-stone-50 dark:divide-stone-800">
           {wordLists.length === 0 ? (
             <div className="p-6 text-sm text-stone-500">
               Create a list to scope drills or collect textbook vocabulary.
@@ -272,7 +272,7 @@ export default function ListsViewSub({
                 className={`p-3 ${active?.id === l.id ? 'bg-indigo-50 dark:bg-indigo-950/20' : 'bg-white dark:bg-stone-900'}`}
               >
                 <button onClick={() => setActiveId(l.id)} className="w-full text-left">
-                  <div className="font-medium text-stone-805 dark:text-stone-200">{l.name}</div>
+                  <div className="font-medium text-stone-800 dark:text-stone-200">{l.name}</div>
                   <div className="text-xs text-stone-500">
                     {resolvedListCounts.get(l.id) || 0} words
                   </div>
@@ -283,7 +283,7 @@ export default function ListsViewSub({
                     className={`flex-1 px-2 py-1.5 rounded-lg text-xs border ${
                       selectedIds.includes(l.id)
                         ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                        : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850'
+                        : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
                     }`}
                   >
                     {selectedIds.includes(l.id) ? 'In drill' : 'Use in drill'}
@@ -329,7 +329,7 @@ export default function ListsViewSub({
                       className={`px-2.5 py-1 rounded-lg text-xs border ${
                         allActive
                           ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                          : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850'
+                          : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
                       }`}
                     >
                       {allActive ? 'Disable all' : 'Enable all'}
@@ -396,13 +396,15 @@ export default function ListsViewSub({
             </button>
           </div>
           <div className="grid sm:grid-cols-[1fr_auto] gap-3">
-            <div>
-              <label className="text-xs text-stone-500 block mb-1">Target</label>
+            <fieldset>
+              <legend className="text-xs text-stone-500 block mb-1">Target</legend>
               <div className="flex flex-wrap gap-1.5">
                 {AI_LIST_TARGETS.map((target) => (
                   <button
+                    type="button"
                     key={target}
                     onClick={() => setAiTarget(target)}
+                    aria-pressed={aiTarget === target}
                     className={`px-2.5 py-1.5 rounded-lg border text-xs transition ${
                       aiTarget === target
                         ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
@@ -413,10 +415,13 @@ export default function ListsViewSub({
                   </button>
                 ))}
               </div>
-            </div>
+            </fieldset>
             <div>
-              <label className="text-xs text-stone-500 block mb-1">Words</label>
+              <label htmlFor="ai-list-word-count" className="text-xs text-stone-500 block mb-1">
+                Words
+              </label>
               <input
+                id="ai-list-word-count"
                 type="number"
                 min="5"
                 max="24"
@@ -427,8 +432,11 @@ export default function ListsViewSub({
             </div>
           </div>
           <div className="mt-3">
-            <label className="text-xs text-stone-500 block mb-1">Topic</label>
+            <label htmlFor="ai-list-topic" className="text-xs text-stone-500 block mb-1">
+              Topic
+            </label>
             <input
+              id="ai-list-topic"
               value={aiTopic}
               onChange={(e) => setAiTopic(e.target.value)}
               placeholder="daily life, travel, restaurant, Genki lesson 7..."
@@ -502,9 +510,10 @@ export default function ListsViewSub({
             )}
           </div>
           <div role="status" aria-live="polite">
-            {msg && <div className="mt-2 text-sm text-stone-605 dark:text-stone-350">{msg}</div>}
+            {msg && <div className="mt-2 text-sm text-stone-600 dark:text-stone-300">{msg}</div>}
           </div>
           <input
+            aria-label="Search words for active list"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search words or conjugated forms"

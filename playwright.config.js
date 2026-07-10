@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
+const usePrebuilt = process.env.PW_USE_PREBUILT === '1';
 const workers = process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : isCI ? 1 : 4;
 
 export default defineConfig({
@@ -23,7 +24,9 @@ export default defineConfig({
   ].filter((p) => !process.env.PW_PROJECT || p.name === process.env.PW_PROJECT),
   // Start the vite preview server before running e2e tests
   webServer: {
-    command: 'npm run build && npm run preview',
+    command: usePrebuilt
+      ? 'npm run preview -- --host 127.0.0.1'
+      : 'npm run build && npm run preview',
     url: 'http://localhost:4173',
     timeout: 60000,
     reuseExistingServer: false,

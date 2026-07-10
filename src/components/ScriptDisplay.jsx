@@ -26,7 +26,7 @@ export default function ScriptDisplay({
   word = null,
   type = null,
   className = '',
-  subClassName = 'text-sm text-stone-500 mt-1',
+  subClassName = 'text-sm text-stone-600 mt-1',
   colorHighlight = true,
 }) {
   if (!view) return null;
@@ -43,7 +43,7 @@ export default function ScriptDisplay({
                 key={`${part.text}:${index}`}
                 text={part.text}
                 ruby={part.ruby}
-                rtClassName="text-[10px] font-medium text-stone-500 dark:text-stone-300"
+                rtClassName="text-[10px] font-medium text-stone-600 dark:text-stone-300"
               />
             ) : (
               <React.Fragment key={`${part.text}:${index}`}>{part.text}</React.Fragment>
@@ -71,7 +71,7 @@ export default function ScriptDisplay({
                 text={mainParts.stem}
                 ruby={rubyParts.stem}
                 className="text-indigo-600 dark:text-indigo-400 font-semibold"
-                rtClassName="text-indigo-500 dark:text-indigo-400 font-medium text-[10px]"
+                rtClassName="text-indigo-600 dark:text-indigo-400 font-medium text-[10px]"
               />
             ) : (
               <span className="text-indigo-600 dark:text-indigo-400 font-semibold">
@@ -83,11 +83,11 @@ export default function ScriptDisplay({
               <RubySegment
                 text={mainParts.change}
                 ruby={rubyParts.change}
-                className="text-amber-600 dark:text-amber-400 font-semibold"
+                className="text-amber-700 dark:text-amber-400 font-semibold"
                 rtClassName="text-amber-500 dark:text-amber-400 font-medium text-[10px]"
               />
             ) : (
-              <span className="text-amber-600 dark:text-amber-400 font-semibold">
+              <span className="text-amber-700 dark:text-amber-400 font-semibold">
                 {mainParts.change}
               </span>
             ))}
@@ -96,11 +96,11 @@ export default function ScriptDisplay({
               <RubySegment
                 text={mainParts.suffix}
                 ruby={rubyParts.suffix}
-                className="text-emerald-600 dark:text-emerald-400 font-semibold"
+                className="text-emerald-700 dark:text-emerald-400 font-semibold"
                 rtClassName="text-emerald-500 dark:text-emerald-400 font-medium text-[10px]"
               />
             ) : (
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+              <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
                 {mainParts.suffix}
               </span>
             ))}

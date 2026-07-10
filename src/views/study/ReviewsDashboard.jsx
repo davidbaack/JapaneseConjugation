@@ -417,7 +417,7 @@ export function MistakeRouteHint({ route }) {
       <div className="font-semibold text-indigo-800 dark:text-indigo-200">
         {route.triggerLabel} -&gt; {route.toolLabel}
       </div>
-      <div className="mt-0.5 text-stone-600 dark:text-stone-350">{route.detail}</div>
+      <div className="mt-0.5 text-stone-600 dark:text-stone-300">{route.detail}</div>
     </div>
   );
 }

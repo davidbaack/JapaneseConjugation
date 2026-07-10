@@ -237,7 +237,7 @@ export default function GuideView() {
 
   if (!guideWords.length) {
     return (
-      <section className="rounded-xl border border-stone-200 bg-white p-6 text-center text-stone-600 dark:border-stone-850 dark:bg-stone-900 dark:text-stone-300">
+      <section className="rounded-xl border border-stone-200 bg-white p-6 text-center text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">
         No words or forms are active in the Practice map right now.
       </section>
     );
@@ -245,7 +245,7 @@ export default function GuideView() {
 
   if (sessionDone) {
     return (
-      <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 dark:border-stone-850 dark:bg-stone-900">
+      <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 dark:border-stone-800 dark:bg-stone-900">
         <div>
           <div className="text-xs uppercase tracking-wider text-stone-500 dark:text-stone-400">
             Guide
@@ -275,7 +275,7 @@ export default function GuideView() {
         <button
           type="button"
           onClick={startNewSession}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-stone-850 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700 dark:bg-indigo-700 dark:hover:bg-indigo-600"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-stone-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700 dark:bg-indigo-700 dark:hover:bg-indigo-600"
         >
           <IconRefresh className="h-4 w-4" />
           Start new guided set
@@ -326,7 +326,7 @@ export default function GuideView() {
           </div>
         </section>
       )}
-      <section className="rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-850 dark:bg-stone-900 sm:p-5">
+      <section className="rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-xs uppercase tracking-wider text-stone-500 dark:text-stone-400">
@@ -349,7 +349,7 @@ export default function GuideView() {
 
       <form
         onSubmit={submit}
-        className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm dark:border-stone-850 dark:bg-stone-900 sm:p-5"
+        className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm dark:border-stone-800 dark:bg-stone-900 sm:p-5"
       >
         <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
           <div className="text-xs uppercase tracking-wider text-stone-500 dark:text-stone-400">
@@ -366,7 +366,7 @@ export default function GuideView() {
                   .join(' · ')}
               </div>
             </div>
-            <div className="text-sm font-semibold text-stone-700 dark:text-stone-250">
+            <div className="text-sm font-semibold text-stone-700 dark:text-stone-200">
               Make: {card.targetLabel}
             </div>
           </div>
@@ -385,7 +385,7 @@ export default function GuideView() {
                   disabled={!!result}
                   aria-label="Plain form"
                   placeholder="Dictionary/plain form"
-                  className="mt-2 w-full rounded-xl border border-stone-250 bg-white px-3 py-2 text-lg text-stone-950 outline-none transition focus:border-indigo-400 dark:border-stone-750 dark:bg-stone-950 dark:text-stone-50"
+                  className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-lg text-stone-950 outline-none transition focus:border-indigo-400 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50"
                 />
               </label>
               <div className="flex gap-2 sm:pt-7">
@@ -393,7 +393,7 @@ export default function GuideView() {
                   type="button"
                   onClick={() => revealHint('base')}
                   disabled={!!result}
-                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-650 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850"
+                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
                 >
                   Hint
                 </button>
@@ -401,7 +401,7 @@ export default function GuideView() {
                   type="button"
                   onClick={() => skipStep('base')}
                   disabled={!!result}
-                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-650 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850"
+                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
                 >
                   Skip
                 </button>
@@ -428,7 +428,7 @@ export default function GuideView() {
                   className={`min-h-10 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
                     answers.group === option.id
                       ? 'border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100'
-                      : 'border-stone-200 text-stone-650 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850'
+                      : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800'
                   }`}
                 >
                   {option.label}
@@ -440,7 +440,7 @@ export default function GuideView() {
                 type="button"
                 onClick={() => revealHint('group')}
                 disabled={!!result}
-                className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-650 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850"
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
               >
                 Hint
               </button>
@@ -448,7 +448,7 @@ export default function GuideView() {
                 type="button"
                 onClick={() => skipStep('group')}
                 disabled={!!result}
-                className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-650 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850"
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
               >
                 Skip
               </button>
@@ -472,7 +472,7 @@ export default function GuideView() {
                   disabled={!!result}
                   aria-label="Final conjugation"
                   placeholder="Target conjugation"
-                  className="mt-2 w-full rounded-xl border border-stone-250 bg-white px-3 py-2 text-lg text-stone-950 outline-none transition focus:border-indigo-400 dark:border-stone-750 dark:bg-stone-950 dark:text-stone-50"
+                  className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-lg text-stone-950 outline-none transition focus:border-indigo-400 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50"
                 />
               </label>
               <div className="flex gap-2 sm:pt-7">
@@ -480,7 +480,7 @@ export default function GuideView() {
                   type="button"
                   onClick={() => revealHint('answer')}
                   disabled={!!result}
-                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-650 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850"
+                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
                 >
                   Hint
                 </button>
@@ -488,7 +488,7 @@ export default function GuideView() {
                   type="button"
                   onClick={() => skipStep('answer')}
                   disabled={!!result}
-                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-650 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850"
+                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
                 >
                   Skip
                 </button>
@@ -509,7 +509,7 @@ export default function GuideView() {
                 <StepResult key={step.id} step={step} />
               ))}
             </div>
-            <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm text-stone-700 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-250">
+            <div className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm text-stone-700 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-200">
               <span className="font-semibold">Path:</span> {card.expectedBase} {' -> '}{' '}
               {result.steps.group.expectedLabel} {' -> '} {card.expectedAnswer}
               {result.assisted ? ' · assisted' : ''}
@@ -525,7 +525,7 @@ export default function GuideView() {
             <button
               type="button"
               onClick={nextCard}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-stone-850 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700 dark:bg-indigo-700 dark:hover:bg-indigo-600"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-stone-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700 dark:bg-indigo-700 dark:hover:bg-indigo-600"
             >
               <IconSpark className="h-4 w-4" />
               Next card
@@ -534,7 +534,7 @@ export default function GuideView() {
             <button
               type="submit"
               disabled={!allFilled}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-stone-850 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-indigo-700 dark:hover:bg-indigo-600"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-stone-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-indigo-700 dark:hover:bg-indigo-600"
             >
               <IconCheck className="h-4 w-4" />
               Submit guide card

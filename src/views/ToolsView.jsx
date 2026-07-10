@@ -64,10 +64,10 @@ export default function ToolsView() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-850 dark:bg-stone-900 sm:p-5">
+      <section className="rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900 sm:p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-xs uppercase tracking-wider text-stone-500 dark:text-stone-400">
+            <div className="text-xs uppercase tracking-wider text-stone-600 dark:text-stone-400">
               Tools
             </div>
             <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
@@ -97,7 +97,7 @@ export default function ToolsView() {
                     className={`mt-0.5 rounded-lg border p-2 ${
                       activeTool
                         ? 'border-indigo-200 bg-white text-indigo-600 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
-                        : 'border-stone-200 bg-stone-50 text-stone-500 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-400'
+                        : 'border-stone-200 bg-stone-50 text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-400'
                     }`}
                   >
                     <ToolIcon className="h-4 w-4" />

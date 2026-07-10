@@ -26,6 +26,7 @@ vi.mock('../utils/storage.js', async () => {
 });
 
 import { AppStateProvider, useApp } from '../state/AppStateContext.jsx';
+import { PUSH_DEBOUNCE_MS } from '../hooks/useCloudAutoSync.js';
 import { defaultState } from '../utils/storage.js';
 
 const SESSION_A = { user: { id: 'user-a', email: 'a@example.com' } };
@@ -49,13 +50,27 @@ function cloudRow(cardKey) {
 }
 
 function Probe() {
-  const { state, syncStatus, resetLearnerData } = useApp();
+  const { state, setState, syncStatus, syncNow, resetLearnerData } = useApp();
   return (
     <div>
       <output data-testid="cards">{Object.keys(state.cards || {}).join(',')}</output>
       <output data-testid="sync">{syncStatus.message}</output>
       <button type="button" onClick={() => void resetLearnerData('factory')}>
         Reset learner
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          setState((current) => ({
+            ...current,
+            cards: { ...current.cards, 'local-change': { reps: 1 } },
+          }))
+        }
+      >
+        Change learner data
+      </button>
+      <button type="button" onClick={() => void syncNow()}>
+        Sync now
       </button>
     </div>
   );
@@ -80,10 +95,77 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
 });
 
 describe('AppStateProvider cloud session races', () => {
+  it('does not auto-push while the initial cloud restore is pending', async () => {
+    vi.useFakeTimers();
+    const pending = deferred();
+    cloudFetch.mockReturnValueOnce(pending.promise);
+    renderProvider();
+
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+      await Promise.resolve();
+    });
+    expect(cloudFetch).toHaveBeenCalledWith('user-a');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+    expect(cloudUpsert).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pending.resolve(cloudRow('cloud-card'));
+      await pending.promise;
+      await Promise.resolve();
+    });
+    cloudUpsert.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change learner data' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+
+    expect(cloudUpsert).toHaveBeenCalledWith(expect.any(Object), 'user-a');
+  });
+
+  it('keeps autosync closed after restore failure until manual retry succeeds', async () => {
+    vi.useFakeTimers();
+    cloudFetch.mockRejectedValueOnce(new Error('cloud unavailable'));
+    renderProvider();
+
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('sync').textContent).toBe('cloud unavailable');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change learner data' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+    expect(cloudUpsert).not.toHaveBeenCalled();
+
+    cloudFetch.mockResolvedValueOnce(null);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(cloudUpsert).toHaveBeenCalledWith(expect.any(Object), 'user-a');
+    cloudUpsert.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change learner data' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+    expect(cloudUpsert).toHaveBeenCalledWith(expect.any(Object), 'user-a');
+  });
+
   it('ignores a pending login restore when the user signs out before it resolves', async () => {
     const pendingA = deferred();
     cloudFetch.mockReturnValueOnce(pendingA.promise);

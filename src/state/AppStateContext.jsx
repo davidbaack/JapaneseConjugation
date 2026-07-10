@@ -91,6 +91,7 @@ function useAppController() {
   const [labFocus, setLabFocus] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
+  const [cloudReadyUserId, setCloudReadyUserId] = useState('');
   const [srsQueue, setSrsQueue] = useState(() => ({
     date: localDateKey(),
     dueRuleIds: [],
@@ -244,6 +245,7 @@ function useAppController() {
       let cancelled = false;
       const syncUserId = session.user.id;
       const syncStillCurrent = () => !cancelled && activeAuthUserIdRef.current === syncUserId;
+      setCloudReadyUserId('');
       setSyncStatus({ kind: 'syncing', message: 'Checking cloud…', at: null });
       cloudFetch(syncUserId)
         .then((cloud) => {
@@ -263,6 +265,7 @@ function useAppController() {
                 if (!syncStillCurrent()) return;
                 const now = Date.now();
                 lastSyncedAtRef.current = now;
+                setCloudReadyUserId(syncUserId);
                 setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: cloudAt });
               })
               .catch((e) => {
@@ -277,8 +280,10 @@ function useAppController() {
             const cloudAt = cloudTimestamp(cloud);
             applySyncPayload(cloud.data);
             lastSyncedAtRef.current = cloudAt;
+            setCloudReadyUserId(syncUserId);
             setSyncStatus({ kind: 'ok', message: 'Restored from cloud', at: cloudAt });
           } else if (action === 'noop') {
+            setCloudReadyUserId(syncUserId);
             setSyncStatus({ kind: 'ok', message: 'Up to date', at: lastSyncedAtRef.current });
           } else {
             const hadCloud = !!(cloud && cloud.data);
@@ -294,6 +299,7 @@ function useAppController() {
                 if (!syncStillCurrent()) return;
                 const now = Date.now();
                 lastSyncedAtRef.current = now;
+                setCloudReadyUserId(syncUserId);
                 setSyncStatus({
                   kind: 'ok',
                   message: hadCloud ? 'Uploaded local progress' : 'Synced to cloud',
@@ -318,6 +324,7 @@ function useAppController() {
         cancelled = true;
       };
     } else {
+      setCloudReadyUserId('');
       setSyncStatus({ kind: 'idle', message: '', at: null });
     }
     // Triggered by login, not data changes.
@@ -328,6 +335,7 @@ function useAppController() {
   useCloudAutoSync({
     hydrated,
     session,
+    cloudPushEnabled: !!session?.user?.id && cloudReadyUserId === session.user.id,
     state,
     customVerbs,
     customAdjectives,
@@ -407,6 +415,7 @@ function useAppController() {
         lastSyncedAtRef.current = now;
         setSyncStatus({ kind: 'ok', message: 'Pushed to cloud', at: now });
       }
+      setCloudReadyUserId(syncUserId);
     } catch (e) {
       if (!syncStillCurrent()) return;
       setSyncStatus({ kind: 'error', message: e.message || 'Sync failed', at: null });

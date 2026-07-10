@@ -15,6 +15,7 @@ export const PUSH_DEBOUNCE_MS = 2000;
 export function useCloudAutoSync({
   hydrated,
   session,
+  cloudPushEnabled,
   state,
   customVerbs,
   customAdjectives,
@@ -24,6 +25,7 @@ export function useCloudAutoSync({
   setSyncStatus,
 }) {
   const pushTimer = useRef(null);
+  const baselineUserIdRef = useRef('');
 
   useEffect(() => {
     if (!hydrated) return;
@@ -47,7 +49,15 @@ export function useCloudAutoSync({
       syncPayload.practicePrefs,
     );
 
-    if (sessionUserId && supabase) {
+    const canPush = !!(cloudPushEnabled && sessionUserId && supabase);
+    if (!canPush) {
+      baselineUserIdRef.current = '';
+    } else if (baselineUserIdRef.current !== sessionUserId) {
+      // Opening the gate establishes the post-hydration payload as the cloud
+      // baseline. The restore path already resolved or uploaded that payload,
+      // so only later learner changes should schedule an automatic write.
+      baselineUserIdRef.current = sessionUserId;
+    } else {
       if (pushTimer.current) clearTimeout(pushTimer.current);
       pushTimer.current = setTimeout(async () => {
         pushTimer.current = null;
@@ -89,6 +99,7 @@ export function useCloudAutoSync({
     customAdjectives,
     wordLists,
     session,
+    cloudPushEnabled,
     practicePrefs,
     hydrated,
     lastSyncedAtRef,

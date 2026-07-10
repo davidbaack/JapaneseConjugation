@@ -1188,7 +1188,7 @@ export default function StudyView({ mode = 'practice' }) {
 
   if (!hydrated) {
     return (
-      <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-8 text-center text-sm text-stone-500 dark:text-stone-400">
+      <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-8 text-center text-sm text-stone-600 dark:text-stone-400">
         Loading Practice...
       </div>
     );
@@ -1211,7 +1211,7 @@ export default function StudyView({ mode = 'practice' }) {
           {hasSessionFilter ? (
             <>
               <p className="text-stone-600 dark:text-stone-300 mb-2">No cards for this focus</p>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
+              <p className="text-xs text-stone-600 dark:text-stone-500 mb-4">
                 Try a different word or form type.
               </p>
               <button
@@ -1227,7 +1227,7 @@ export default function StudyView({ mode = 'practice' }) {
           ) : (
             <>
               <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
+              <p className="text-xs text-stone-600 dark:text-stone-500 mb-4">
                 No words or forms are active in the Practice map right now. Turn on forms in the
                 map, or restore words from Tools.
               </p>
@@ -1434,14 +1434,14 @@ export default function StudyView({ mode = 'practice' }) {
       ? 'border-rose-400 dark:border-rose-700 focus:border-rose-500 dark:focus:border-rose-600'
       : liveAnswerTone === 'correct'
         ? 'border-emerald-400 dark:border-emerald-700 focus:border-emerald-500 dark:focus:border-emerald-600'
-        : 'border-stone-200 dark:border-stone-805 focus:border-indigo-500';
-  const answerInputClassName = `flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 ${answerInputBorderClass} rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 caret-stone-850 dark:caret-stone-150 focus:outline-none transition`;
+        : 'border-stone-200 dark:border-stone-800 focus:border-indigo-500';
+  const answerInputClassName = `flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 ${answerInputBorderClass} rounded-xl bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-100 caret-stone-800 dark:caret-stone-100 focus:outline-none transition`;
   const answerFeedbackClassName =
     liveAnswerTone === 'wrong'
       ? 'text-rose-700 dark:text-rose-400'
       : liveAnswerTone === 'correct'
         ? 'text-emerald-700 dark:text-emerald-400'
-        : 'text-stone-500 dark:text-stone-400';
+        : 'text-stone-600 dark:text-stone-400';
 
   function nextMinimalPairProgress(correct) {
     return recordMinimalPairResult(
@@ -2380,9 +2380,9 @@ export default function StudyView({ mode = 'practice' }) {
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-1">
           {sessionReviewed}
         </div>
-        <div className="text-sm text-stone-400 mb-3">cards practiced</div>
+        <div className="text-sm text-stone-600 mb-3">cards practiced</div>
         <div className="flex justify-center gap-2 mb-2">
-          <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
             {sessionCorrect} correct
           </span>
           <span className="text-stone-300 dark:text-stone-600">·</span>
@@ -2392,13 +2392,13 @@ export default function StudyView({ mode = 'practice' }) {
           {sessionSkipped > 0 && (
             <>
               <span className="text-stone-300 dark:text-stone-600">·</span>
-              <span className="text-sm text-stone-500">{sessionSkipped} skipped</span>
+              <span className="text-sm text-stone-600">{sessionSkipped} skipped</span>
             </>
           )}
         </div>
-        <div className="text-sm text-stone-500 mb-1">{sessionAccuracy}% accuracy</div>
+        <div className="text-sm text-stone-600 mb-1">{sessionAccuracy}% accuracy</div>
         {(daily.bestAnswerStreak || 0) >= 5 && (
-          <div className="text-xs text-stone-400 mb-1">
+          <div className="text-xs text-stone-600 mb-1">
             Best streak: {daily.bestAnswerStreak} in a row
           </div>
         )}
@@ -2439,7 +2439,7 @@ export default function StudyView({ mode = 'practice' }) {
         ) : (
           sessionWrong === 0 &&
           sessionReviewed > 0 && (
-            <div className="text-xs text-emerald-600 dark:text-emerald-400 mb-4">
+            <div className="text-xs text-emerald-700 dark:text-emerald-400 mb-4">
               No missed answers in this drill.
             </div>
           )
@@ -2474,7 +2474,7 @@ export default function StudyView({ mode = 'practice' }) {
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
           {state.session.correct}/{state.session.reviewed}
         </div>
-        <div className="text-sm text-stone-500 mb-1">
+        <div className="text-sm text-stone-600 mb-1">
           {introReviewActive ? 'Intro accuracy:' : 'Drill accuracy:'}{' '}
           {state.session.reviewed
             ? Math.round((state.session.correct / state.session.reviewed) * 100)
@@ -2482,7 +2482,7 @@ export default function StudyView({ mode = 'practice' }) {
           %
         </div>
         {reviewLimit > 0 && (
-          <div className="text-xs text-stone-400 mb-5">
+          <div className="text-xs text-stone-600 mb-5">
             {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this{' '}
             {introReviewActive ? 'intro' : 'drill'}
           </div>
@@ -2569,7 +2569,7 @@ export default function StudyView({ mode = 'practice' }) {
           <button
             onClick={openCoachChat}
             aria-expanded={coachChatOpen}
-            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
+            className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
           >
             <IconChat className="w-3 h-3" />
             Discuss further
@@ -2852,7 +2852,7 @@ export default function StudyView({ mode = 'practice' }) {
                 <h3 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
                   {familyIntroLesson?.title || focusBannerGroup.label}
                 </h3>
-                <p className="mt-1 text-sm leading-relaxed text-stone-650 dark:text-stone-300">
+                <p className="mt-1 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
                   {familyIntroLesson?.summary || 'Start with the core forms in this family.'}
                 </p>
                 {familyIntroLesson?.build && (
@@ -2910,7 +2910,7 @@ export default function StudyView({ mode = 'practice' }) {
               <div className="flex flex-wrap items-center gap-2">
                 <h2
                   id="practice-run-heading"
-                  className="text-xs font-semibold uppercase tracking-wider text-stone-500"
+                  className="text-xs font-semibold uppercase tracking-wider text-stone-600"
                 >
                   Practice run
                 </h2>
@@ -2951,7 +2951,7 @@ export default function StudyView({ mode = 'practice' }) {
                     event.preventDefault();
                     setPracticeSettingsOpen((open) => !open);
                   }}
-                  className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-stone-200 text-stone-500 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                  className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-stone-200 text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
                 >
                   <IconSettings className="h-3.5 w-3.5" />
                 </summary>
@@ -2962,10 +2962,10 @@ export default function StudyView({ mode = 'practice' }) {
                     className="absolute left-0 right-auto z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-stone-200 bg-white p-3 text-left shadow-xl dark:border-stone-800 dark:bg-stone-900 sm:left-auto sm:right-0 sm:max-w-[calc(100vw-2rem)]"
                   >
                     <div className="mb-3 flex items-center justify-between gap-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
                         Practice settings
                       </div>
-                      <div className="text-[11px] font-medium text-stone-400">
+                      <div className="text-[11px] font-medium text-stone-600">
                         {reverseDrill ? 'Reading' : 'Form'}
                       </div>
                     </div>
@@ -2974,7 +2974,7 @@ export default function StudyView({ mode = 'practice' }) {
                       aria-label="Answer style"
                       className="mb-3 inline-flex w-full flex-wrap items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
                     >
-                      <span className="px-1.5 text-xs font-medium text-stone-400">Answer</span>
+                      <span className="px-1.5 text-xs font-medium text-stone-600">Answer</span>
                       {ANSWER_STYLE_OPTIONS.map((option) => {
                         const active = answerMode === option.id;
                         return (
@@ -2986,7 +2986,7 @@ export default function StudyView({ mode = 'practice' }) {
                             className={`rounded-md px-2 py-1 text-xs font-medium transition ${
                               active
                                 ? 'bg-stone-800 text-white dark:bg-indigo-600'
-                                : 'text-stone-500 hover:bg-white hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200'
+                                : 'text-stone-600 hover:bg-white hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200'
                             }`}
                           >
                             {option.label}
@@ -3005,7 +3005,7 @@ export default function StudyView({ mode = 'practice' }) {
                           className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
                             liveKanaHelpEnabled
                               ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                              : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+                              : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
                           }`}
                         >
                           <span className="inline-flex items-center gap-1.5">
@@ -3028,7 +3028,7 @@ export default function StudyView({ mode = 'practice' }) {
                         className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
                           autoAdvanceCorrect
                             ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                            : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+                            : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
                         }`}
                       >
                         <span className="inline-flex items-center gap-1.5">
@@ -3051,7 +3051,7 @@ export default function StudyView({ mode = 'practice' }) {
                         className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
                           sentenceMode
                             ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                            : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+                            : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
                         }`}
                       >
                         <span>Sentence</span>
@@ -3059,10 +3059,10 @@ export default function StudyView({ mode = 'practice' }) {
                       </button>
                     </div>
                     <div className="mt-3 border-t border-stone-200 pt-3 dark:border-stone-800">
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
                         Adjust scope
                       </div>
-                      <p className="mb-2 text-[11px] leading-snug text-stone-500 dark:text-stone-400">
+                      <p className="mb-2 text-[11px] leading-snug text-stone-600 dark:text-stone-400">
                         Removes this word from automatic Practice. Restore words from Tools. To move
                         on without changing scope, use Skip.
                       </p>
@@ -3097,7 +3097,7 @@ export default function StudyView({ mode = 'practice' }) {
           >
             {runSummaryMetrics.map((metric) => (
               <div key={metric.label} className="min-w-0">
-                <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400 dark:text-stone-500">
+                <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-600 dark:text-stone-500">
                   {metric.label}
                 </dt>
                 <dd
@@ -3110,7 +3110,7 @@ export default function StudyView({ mode = 'practice' }) {
           </dl>
           {!workoutProgress.continuous && (
             <div className="mt-3 space-y-1.5">
-              <div className="flex items-center justify-between gap-3 text-xs text-stone-500 dark:text-stone-400">
+              <div className="flex items-center justify-between gap-3 text-xs text-stone-600 dark:text-stone-400">
                 <span className="font-semibold">{workoutProgress.label}</span>
                 <span className="tabular-nums">
                   {workoutProgress.now}/{workoutProgress.max}
@@ -3132,10 +3132,10 @@ export default function StudyView({ mode = 'practice' }) {
             </div>
           )}
           <details className="mt-3">
-            <summary className="cursor-pointer list-none text-xs font-semibold text-stone-500 transition hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200">
+            <summary className="cursor-pointer list-none text-xs font-semibold text-stone-600 transition hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200">
               Run details
             </summary>
-            <div className="mt-2 grid gap-2 text-xs text-stone-500 dark:text-stone-400 sm:grid-cols-3">
+            <div className="mt-2 grid gap-2 text-xs text-stone-600 dark:text-stone-400 sm:grid-cols-3">
               <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
                 <div className="font-semibold text-stone-700 dark:text-stone-200">
                   Why this card
@@ -3170,7 +3170,7 @@ export default function StudyView({ mode = 'practice' }) {
                           outcome.kind === 'correct'
                             ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
                             : outcome.kind === 'skipped'
-                              ? 'border-stone-200 text-stone-500 dark:border-stone-800 dark:text-stone-400'
+                              ? 'border-stone-200 text-stone-600 dark:border-stone-800 dark:text-stone-400'
                               : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-300'
                         }`}
                       >
@@ -3182,7 +3182,7 @@ export default function StudyView({ mode = 'practice' }) {
                   <div className="mt-1 leading-snug">No answers yet</div>
                 )}
                 {runStats.skipped > 0 && (
-                  <div className="mt-1 text-[11px] text-stone-400">{runStats.skipped} skipped</div>
+                  <div className="mt-1 text-[11px] text-stone-600">{runStats.skipped} skipped</div>
                 )}
               </div>
               {guideInsight && (
@@ -3206,7 +3206,7 @@ export default function StudyView({ mode = 'practice' }) {
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
           <div className="relative px-4 pb-4 pt-12 text-center sm:px-6 sm:pb-8 sm:pt-16">
             <div className="absolute left-4 right-4 top-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 sm:left-6 sm:right-6 sm:top-8">
-              <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-500 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
+              <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
                 JLPT {currentWordMeta.jlpt}
               </span>
               <span aria-label="Current card source" className="min-w-0 justify-self-center">
@@ -3219,7 +3219,7 @@ export default function StudyView({ mode = 'practice' }) {
               </span>
               <span className="min-w-0 justify-self-end text-right">
                 {lessonMetaText && (
-                  <span className="inline-block max-w-full truncate rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-500 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
+                  <span className="inline-block max-w-full truncate rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
                     {lessonMetaText}
                   </span>
                 )}
@@ -3233,7 +3233,7 @@ export default function StudyView({ mode = 'practice' }) {
                 <ScriptDisplay
                   view={sentencePromptView}
                   className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
-                  subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
+                  subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
                   colorHighlight={false}
                 />
                 {sentencePrompt.cue && (
@@ -3242,7 +3242,7 @@ export default function StudyView({ mode = 'practice' }) {
                   </div>
                 )}
                 {!hideEnglishMeaning && sentencePrompt.note && (
-                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-500 dark:text-stone-400">
+                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
                     {sentencePrompt.note}
                   </div>
                 )}
@@ -3265,7 +3265,7 @@ export default function StudyView({ mode = 'practice' }) {
                   </button>
                   <button
                     onClick={() => setShowPromptText(true)}
-                    className="px-3 py-2 border border-indigo-250 bg-white/70 hover:bg-white text-indigo-700 rounded-lg text-sm dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300"
+                    className="px-3 py-2 border border-indigo-200 bg-white/70 hover:bg-white text-indigo-700 rounded-lg text-sm dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300"
                   >
                     Show text
                   </button>
@@ -3276,7 +3276,7 @@ export default function StudyView({ mode = 'practice' }) {
                 <ScriptDisplay
                   view={promptView}
                   className="text-4xl sm:text-5xl font-medium mb-2 text-stone-900 dark:text-stone-100"
-                  subClassName="text-base text-stone-500"
+                  subClassName="text-base text-stone-600"
                 />
               </>
             )}
@@ -3286,15 +3286,15 @@ export default function StudyView({ mode = 'practice' }) {
               </div>
             )}
             {reverseDrill && !hidePromptText && (
-              <div className="text-xs text-stone-400">Answer with the dictionary form.</div>
+              <div className="text-xs text-stone-600">Answer with the dictionary form.</div>
             )}
 
             {!hideEnglishMeaning && (
-              <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
+              <div className="text-sm text-stone-600 mt-2 italic">{promptEnglish}</div>
             )}
 
             {phase === 'reviewing' && practicePrefs.showWordCategory && (
-              <div className="text-xs text-stone-400 mt-1">
+              <div className="text-xs text-stone-600 mt-1">
                 {groupDisplayLabel(current.verb.group)} · {wordType}
                 {groupAliasText(current.verb.group)
                   ? ` · ${groupAliasText(current.verb.group)}`
@@ -3378,9 +3378,9 @@ export default function StudyView({ mode = 'practice' }) {
             </div>
           </div>
         </div>
-        <div className="text-center text-xs text-stone-400">
-          Tip: type romaji like <span className="font-mono text-stone-500">tabeta</span>, use kana{' '}
-          <span lang="ja" className="text-stone-550 dark:text-stone-450">
+        <div className="text-center text-xs text-stone-600">
+          Tip: type romaji like <span className="font-mono text-stone-600">tabeta</span>, use kana{' '}
+          <span lang="ja" className="text-stone-600 dark:text-stone-400">
             たべた
           </span>
           , or press Esc to skip without penalty.

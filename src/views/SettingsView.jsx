@@ -147,12 +147,12 @@ export default function SettingsView() {
 
   const statusColor =
     syncStatus.kind === 'error'
-      ? 'text-rose-700 bg-rose-50 border-rose-250 dark:bg-rose-955/20 dark:border-rose-900'
+      ? 'text-rose-700 bg-rose-50 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900'
       : syncStatus.kind === 'syncing'
-        ? 'text-amber-700 bg-amber-50 border-amber-250 dark:bg-amber-955/20 dark:border-amber-900'
+        ? 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900'
         : syncStatus.kind === 'ok'
-          ? 'text-emerald-700 bg-emerald-50 border-emerald-250 dark:bg-emerald-955/20 dark:border-emerald-900'
-          : 'text-stone-600 bg-stone-50 border-stone-250 dark:bg-stone-950 dark:border-stone-850';
+          ? 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900'
+          : 'text-stone-600 bg-stone-50 border-stone-200 dark:bg-stone-950 dark:border-stone-800';
 
   const displayScripts = resolveDisplayScripts(practicePrefs);
   const theme = practicePrefs.theme || DEFAULT_PREFS.theme;
@@ -165,12 +165,13 @@ export default function SettingsView() {
 
   return (
     <div className="space-y-4 text-left">
+      <h2 className="sr-only">Settings</h2>
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
         <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Display & audio</h3>
         <div className="grid sm:grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Theme</label>
-            <div role="group" aria-label="Theme" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <fieldset>
+            <legend className="text-xs text-stone-600 block mb-1">Theme</legend>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { id: 'light', label: 'Light' },
                 { id: 'dark', label: 'Dark' },
@@ -190,10 +191,10 @@ export default function SettingsView() {
                 </button>
               ))}
             </div>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Display scripts</label>
-            <div role="group" aria-label="Display scripts" className="grid grid-cols-3 gap-2">
+          </fieldset>
+          <fieldset>
+            <legend className="text-xs text-stone-600 block mb-1">Display scripts</legend>
+            <div className="grid grid-cols-3 gap-2">
               {[
                 { id: 'kanji', label: 'Kanji' },
                 { id: 'kana', label: 'Kana' },
@@ -227,10 +228,10 @@ export default function SettingsView() {
             >
               Furigana {practicePrefs.furigana !== false ? 'on' : 'off'}
             </button>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">English meaning</label>
-            <div role="group" aria-label="English meaning" className="grid grid-cols-2 gap-2">
+          </fieldset>
+          <fieldset>
+            <legend className="text-xs text-stone-600 block mb-1">English meaning</legend>
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { id: 'show', label: 'Show' },
                 { id: 'hidden', label: 'Hide' },
@@ -249,14 +250,14 @@ export default function SettingsView() {
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-stone-400 mt-1">
+            <p className="text-[11px] text-stone-600 mt-1">
               Hidden mode hides the English meaning while answering. AI clues can still avoid the
               answer.
             </p>
-          </div>
-          <div>
-            <label className="text-xs text-stone-500 block mb-1">Word category label</label>
-            <div role="group" aria-label="Word category label" className="grid grid-cols-2 gap-2">
+          </fieldset>
+          <fieldset>
+            <legend className="text-xs text-stone-600 block mb-1">Word category label</legend>
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { id: true, label: 'Show' },
                 { id: false, label: 'Hide' },
@@ -275,11 +276,11 @@ export default function SettingsView() {
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-stone-400 mt-1">
+            <p className="text-[11px] text-stone-600 mt-1">
               Hides group labels during practice so identifying drop-ru, row-shift, irregular, or
               adjective category stays part of the training.
             </p>
-          </div>
+          </fieldset>
           <div className="flex items-end">
             <button
               onClick={() =>
@@ -316,12 +317,15 @@ export default function SettingsView() {
             </button>
           </div>
           <div className="sm:col-span-2">
-            <label className="text-xs text-stone-500 block mb-1">Japanese voice</label>
+            <label htmlFor="settings-japanese-voice" className="text-xs text-stone-600 block mb-1">
+              Japanese voice
+            </label>
             <div className="flex gap-2">
               <select
+                id="settings-japanese-voice"
                 value={practicePrefs.voiceURI || ''}
                 onChange={(e) => setPracticePrefs({ ...practicePrefs, voiceURI: e.target.value })}
-                className="flex-1 min-w-0 px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+                className="flex-1 min-w-0 px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
               >
                 <option value="">Auto Japanese voice</option>
                 {!selectedVoiceAvailable && (
@@ -336,14 +340,14 @@ export default function SettingsView() {
               </select>
               <button
                 onClick={() => speakJapanese('食べてください', 0.85, practicePrefs.voiceURI)}
-                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm flex items-center gap-1.5"
+                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-sm flex items-center gap-1.5"
               >
                 <IconVolume className="w-4 h-4" />
                 Test
               </button>
             </div>
             {speechVoices.length === 0 && (
-              <p className="text-[11px] text-stone-400 mt-1">
+              <p className="text-[11px] text-stone-600 mt-1">
                 Japanese voices appear after the browser loads speech voices.
               </p>
             )}
@@ -352,21 +356,21 @@ export default function SettingsView() {
       </div>
 
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-        <h3 className="font-medium mb-1 flex items-center gap-2 text-stone-850 dark:text-stone-200">
+        <h3 className="font-medium mb-1 flex items-center gap-2 text-stone-800 dark:text-stone-200">
           <IconCloud className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           Cloud Sync
         </h3>
         {!supabase ? (
-          <div className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-955/20 border border-amber-200 dark:border-amber-900 rounded-xl p-4">
+          <div className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-xl p-4">
             <p className="font-medium">Cloud sync is not configured</p>
-            <p className="text-xs text-stone-500 mt-1">
+            <p className="text-xs text-stone-600 mt-1">
               Please set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> in
               your environment variables to enable user logins and cloud sync.
             </p>
           </div>
         ) : !session ? (
           <div className="space-y-3">
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-stone-600">
               Sync your progress, custom vocabulary, and word lists across all devices.
             </p>
             <button
@@ -378,7 +382,7 @@ export default function SettingsView() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-stone-50 dark:bg-stone-955 rounded-xl border border-stone-200 dark:border-stone-850">
+            <div className="flex items-center gap-3 p-3 bg-stone-50 dark:bg-stone-950 rounded-xl border border-stone-200 dark:border-stone-800">
               <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-semibold text-base uppercase">
                 {session.user.email ? session.user.email.charAt(0) : 'U'}
               </div>
@@ -386,7 +390,7 @@ export default function SettingsView() {
                 <div className="text-sm font-medium text-stone-800 dark:text-stone-200 truncate">
                   {session.user.email}
                 </div>
-                <div className="text-xs text-stone-500">
+                <div className="text-xs text-stone-600">
                   Logged in via{' '}
                   {session.user.app_metadata?.provider === 'google' ? 'Google' : 'Email'}
                 </div>
@@ -405,11 +409,11 @@ export default function SettingsView() {
                 onClick={syncNow}
                 className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition"
               >
-                Sync Now
+                {syncStatus.kind === 'error' ? 'Retry Sync' : 'Sync Now'}
               </button>
               {confirmSignOut ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-stone-500">Local progress is preserved.</span>
+                  <span className="text-xs text-stone-600">Local progress is preserved.</span>
                   <button
                     onClick={async () => {
                       setConfirmSignOut(false);
@@ -421,7 +425,7 @@ export default function SettingsView() {
                   </button>
                   <button
                     onClick={() => setConfirmSignOut(false)}
-                    className="px-3 py-1.5 border border-stone-250 dark:border-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-xs font-medium transition"
+                    className="px-3 py-1.5 border border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-xs font-medium transition"
                   >
                     Cancel
                   </button>
@@ -429,7 +433,7 @@ export default function SettingsView() {
               ) : (
                 <button
                   onClick={() => setConfirmSignOut(true)}
-                  className="px-4 py-2 border border-stone-250 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm font-medium transition"
+                  className="px-4 py-2 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-sm font-medium transition"
                 >
                   Sign Out
                 </button>
@@ -440,11 +444,11 @@ export default function SettingsView() {
       </div>
 
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-        <h3 className="font-medium mb-1 text-stone-850 dark:text-stone-200">Backup & restore</h3>
-        <p className="text-xs text-stone-500 mb-3">Manual JSON transfer without cloud sync.</p>
+        <h3 className="font-medium mb-1 text-stone-800 dark:text-stone-200">Backup & restore</h3>
+        <p className="text-xs text-stone-600 mb-3">Manual JSON transfer without cloud sync.</p>
         <div role="status" aria-live="polite">
           {msg && (
-            <div className="mb-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-250 rounded-lg px-3 py-2">
+            <div className="mb-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
               {msg}
             </div>
           )}
@@ -459,7 +463,7 @@ export default function SettingsView() {
             className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
               exportOpen
                 ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850'
+                : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
             }`}
           >
             Export
@@ -474,7 +478,7 @@ export default function SettingsView() {
             className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
               importOpen
                 ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850'
+                : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
             }`}
           >
             Import
@@ -483,6 +487,7 @@ export default function SettingsView() {
         {exportOpen && (
           <div className="mt-3 space-y-2">
             <textarea
+              aria-label="Backup export JSON"
               readOnly
               value={exportData}
               onFocus={(e) => e.target.select()}
@@ -506,7 +511,7 @@ export default function SettingsView() {
               }}
               placeholder="Paste backup JSON..."
               aria-label="Paste backup JSON to restore"
-              className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-250 rounded-lg focus:border-indigo-500 focus:outline-none"
+              className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck="false"
@@ -529,18 +534,18 @@ export default function SettingsView() {
       </div>
 
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-        <h3 className="font-medium mb-1 text-stone-850 dark:text-stone-200">Reset & cleanup</h3>
-        <p className="text-xs text-stone-500 mb-4">
+        <h3 className="font-medium mb-1 text-stone-800 dark:text-stone-200">Reset & cleanup</h3>
+        <p className="text-xs text-stone-600 mb-4">
           Signed-in resets update this browser and your cloud account. Signed-out resets are local.
         </p>
         <div role="status" aria-live="polite">
           {resetErr && (
-            <div className="mb-3 text-sm text-rose-700 bg-rose-50 border border-rose-250 rounded-lg px-3 py-2">
+            <div className="mb-3 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
               {resetErr}
             </div>
           )}
         </div>
-        <div className="divide-y divide-stone-100 dark:divide-stone-850 border-y border-stone-100 dark:border-stone-850">
+        <div className="divide-y divide-stone-100 dark:divide-stone-800 border-y border-stone-100 dark:border-stone-800">
           {RESET_ACTIONS.map((action) => {
             const active = pendingReset === action.id;
             const busy = resetBusy === action.id;
@@ -553,14 +558,14 @@ export default function SettingsView() {
                       <IconRefresh
                         className={`w-4 h-4 ${action.danger ? 'text-rose-600' : 'text-indigo-600 dark:text-indigo-400'}`}
                       />
-                      <div className="text-sm font-medium text-stone-850 dark:text-stone-200">
+                      <div className="text-sm font-medium text-stone-800 dark:text-stone-200">
                         {action.title}
                       </div>
                     </div>
-                    <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                    <p className="mt-1 text-xs text-stone-600 dark:text-stone-400">
                       {action.description}
                     </p>
-                    <div className="mt-2 grid gap-1 text-[11px] text-stone-500 dark:text-stone-400">
+                    <div className="mt-2 grid gap-1 text-[11px] text-stone-600 dark:text-stone-400">
                       <div>
                         <span className="font-semibold text-stone-600 dark:text-stone-300">
                           Clears:
@@ -587,7 +592,7 @@ export default function SettingsView() {
                       className={`w-full sm:w-auto px-3 py-1.5 rounded-lg text-sm font-medium border transition disabled:opacity-50 ${
                         action.danger
                           ? 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/20'
-                          : 'border-stone-200 text-stone-700 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850'
+                          : 'border-stone-200 text-stone-700 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800'
                       }`}
                     >
                       {action.confirm}
@@ -614,7 +619,7 @@ export default function SettingsView() {
                             onChange={(e) => setFactoryConfirm(e.target.value)}
                             aria-label="Type RESET to confirm factory reset"
                             placeholder="Type RESET"
-                            className="flex-1 px-3 py-1.5 border border-rose-200 dark:border-rose-900 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg text-sm focus:border-rose-500 focus:outline-none"
+                            className="flex-1 px-3 py-1.5 border border-rose-200 dark:border-rose-900 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-rose-500 focus:outline-none"
                           />
                         </div>
                         <div className="flex flex-col sm:flex-row gap-2">
@@ -645,7 +650,7 @@ export default function SettingsView() {
                           type="button"
                           onClick={() => runReset(action)}
                           disabled={!!resetBusy}
-                          className="px-3 py-1.5 bg-stone-850 hover:bg-stone-950 dark:bg-indigo-600 dark:hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
+                          className="px-3 py-1.5 bg-stone-800 hover:bg-stone-950 dark:bg-indigo-600 dark:hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
                         >
                           {busy ? 'Resetting...' : `Yes, ${action.confirm.toLowerCase()}`}
                         </button>
@@ -666,7 +671,7 @@ export default function SettingsView() {
           })}
         </div>
       </div>
-      <div className="text-xs text-stone-400 text-center pt-2">
+      <div className="text-xs text-stone-600 text-center pt-2">
         Progress saves automatically to your browser.
       </div>
     </div>

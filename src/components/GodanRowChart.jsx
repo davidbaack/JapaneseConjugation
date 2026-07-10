@@ -82,17 +82,17 @@ export function GodanRowChart({ highlightEnding = '', highlightRow = '' }) {
           <div>
             <h4
               id="godan-row-chart-heading"
-              className="text-sm font-semibold text-stone-850 dark:text-stone-100"
+              className="text-sm font-semibold text-stone-800 dark:text-stone-100"
             >
               Godan row shifts
             </h4>
-            <p className="mt-1 text-xs leading-relaxed text-stone-550 dark:text-stone-400">
+            <p className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
               Keep the stem, move the final kana into the needed vowel row, then attach the ending.
             </p>
           </div>
           {activeKana && (
             <div
-              className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-indigo-750 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-200"
+              className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-indigo-700 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-200"
               aria-live="polite"
             >
               Highlighted shift:{' '}
@@ -172,17 +172,17 @@ export function GodanRowChart({ highlightEnding = '', highlightRow = '' }) {
         </table>
       </div>
 
-      <div className="border-t border-stone-100 bg-white px-4 py-3 text-xs leading-relaxed text-stone-550 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-400">
+      <div className="border-t border-stone-100 bg-white px-4 py-3 text-xs leading-relaxed text-stone-500 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-400">
         Special case:{' '}
-        <span className="font-semibold text-stone-850 dark:text-stone-100" lang="ja">
+        <span className="font-semibold text-stone-800 dark:text-stone-100" lang="ja">
           う
         </span>{' '}
         uses{' '}
-        <span className="font-semibold text-stone-850 dark:text-stone-100" lang="ja">
+        <span className="font-semibold text-stone-800 dark:text-stone-100" lang="ja">
           わ
         </span>{' '}
         before negative endings, as in{' '}
-        <span className="font-semibold text-stone-850 dark:text-stone-100" lang="ja">
+        <span className="font-semibold text-stone-800 dark:text-stone-100" lang="ja">
           買う -&gt; 買わない
         </span>
         .

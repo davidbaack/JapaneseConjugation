@@ -107,10 +107,10 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
         aria-modal="true"
         aria-labelledby="auth-modal-title"
         tabIndex={-1}
-        className="relative w-full max-w-md bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-850 rounded-2xl shadow-xl overflow-hidden z-10 flex flex-col transition-colors duration-200 focus:outline-none"
+        className="relative w-full max-w-md bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl shadow-xl overflow-hidden z-10 flex flex-col transition-colors duration-200 focus:outline-none"
       >
         {/* Header */}
-        <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-stone-200 dark:border-stone-850">
+        <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-stone-200 dark:border-stone-800">
           <h2
             id="auth-modal-title"
             className="text-base font-semibold text-stone-900 dark:text-stone-100"
@@ -137,12 +137,12 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
         <div className="p-5 space-y-4">
           <div role="status" aria-live="polite">
             {errorMsg && (
-              <div className="p-3 text-xs bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-350 rounded-xl">
+              <div className="p-3 text-xs bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300 rounded-xl">
                 {errorMsg}
               </div>
             )}
             {successMsg && (
-              <div className="p-3 text-xs bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900 text-emerald-800 dark:text-emerald-350 rounded-xl">
+              <div className="p-3 text-xs bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300 rounded-xl">
                 {successMsg}
               </div>
             )}
@@ -153,7 +153,7 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
             type="button"
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white dark:bg-stone-950 border border-stone-250 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-900 rounded-xl text-sm font-medium text-stone-700 dark:text-stone-300 transition duration-150 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white dark:bg-stone-950 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-900 rounded-xl text-sm font-medium text-stone-700 dark:text-stone-300 transition duration-150 disabled:opacity-50"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -178,7 +178,7 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
 
           <div className="flex items-center gap-3">
             <div className="flex-1 border-t border-stone-200 dark:border-stone-800" />
-            <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">
+            <span className="text-[10px] font-semibold text-stone-600 dark:text-stone-400 uppercase tracking-wider">
               or
             </span>
             <div className="flex-1 border-t border-stone-200 dark:border-stone-800" />
@@ -187,38 +187,53 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
           {/* Email/Password Form */}
           <form onSubmit={handleEmailAuth} className="space-y-3.5">
             <div>
-              <label className="text-xs text-stone-500 block mb-1">Email address</label>
+              <label htmlFor="auth-email" className="text-xs text-stone-500 block mb-1">
+                Email address
+              </label>
               <input
+                id="auth-email"
                 type="email"
+                autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-xs text-stone-500 block mb-1">Password</label>
+              <label htmlFor="auth-password" className="text-xs text-stone-500 block mb-1">
+                Password
+              </label>
               <input
+                id="auth-password"
                 type="password"
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
               />
             </div>
 
             {isSignUp && (
               <div>
-                <label className="text-xs text-stone-500 block mb-1">Confirm Password</label>
+                <label
+                  htmlFor="auth-confirm-password"
+                  className="text-xs text-stone-500 block mb-1"
+                >
+                  Confirm Password
+                </label>
                 <input
+                  id="auth-confirm-password"
                   type="password"
+                  autoComplete="new-password"
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                  className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
                 />
               </div>
             )}
@@ -230,7 +245,11 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                  <svg
+                    className="motion-safe:animate-spin h-4 w-4 text-white"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -256,7 +275,7 @@ export default function AuthModal({ isOpen, onClose, supabase }) {
           </form>
 
           {/* Toggle Tab Footer */}
-          <div className="pt-2 text-center text-xs text-stone-500 border-t border-stone-200/60 dark:border-stone-850/60">
+          <div className="pt-2 text-center text-xs text-stone-500 border-t border-stone-200/60 dark:border-stone-800/60">
             {isSignUp ? (
               <span>
                 Already have an account?{' '}

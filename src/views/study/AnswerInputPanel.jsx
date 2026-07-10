@@ -35,7 +35,7 @@ export function KanaCoachStrip({
                   : cell.state === 'pending'
                     ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
                     : cell.state === 'hint'
-                      ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-805 dark:text-amber-300'
+                      ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300'
                       : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
           return (
             <div
@@ -54,7 +54,7 @@ export function KanaCoachStrip({
               ? 'text-rose-700'
               : coachPreview === expected
                 ? 'text-emerald-700'
-                : 'text-stone-500'
+                : 'text-stone-600'
           }`}
         >
           {coachStatus}
@@ -64,7 +64,7 @@ export function KanaCoachStrip({
         <div className="mt-2 flex flex-col items-center gap-1">
           <button
             onClick={showStepHint}
-            className="inline-flex items-center gap-1 text-xs text-indigo-500 transition hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+            className="inline-flex items-center gap-1 text-xs text-indigo-600 transition hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
           >
             <IconSpark className="h-3 w-3" />
             {stepHintButtonLabel}
@@ -154,7 +154,7 @@ export function AnswerInputPanel({
       <div className="flex justify-center mb-4">
         {transformationMode ? (
           <div className="max-w-full px-2 text-center">
-            <div className="text-[10px] font-semibold uppercase text-indigo-500 dark:text-indigo-300">
+            <div className="text-[10px] font-semibold uppercase text-indigo-600 dark:text-indigo-300">
               {transformationActionLabel}
             </div>
             <div className="mt-1 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl bg-indigo-600 px-5 py-3 text-white shadow-lg shadow-indigo-950/20 dark:bg-indigo-500/95">
@@ -170,9 +170,9 @@ export function AnswerInputPanel({
                 </span>
               )}
             </div>
-            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-stone-600 dark:text-stone-400">
               <span>From {sourceTypeInfo.label}</span>
-              <span aria-hidden="true" className="text-indigo-400">
+              <span aria-hidden="true" className="text-indigo-600">
                 -&gt;
               </span>
               <span>{transformationSupportText}</span>
@@ -184,17 +184,17 @@ export function AnswerInputPanel({
               {taskLabel}
             </span>
             {answerTaskDetails.sub && (
-              <span className="text-sm text-indigo-500 dark:text-indigo-400 font-medium" lang="ja">
+              <span className="text-sm text-indigo-600 dark:text-indigo-400 font-medium" lang="ja">
                 {answerTaskDetails.sub}
               </span>
             )}
             {answerTaskDetails.supportText ? (
-              <span className="text-xs text-indigo-400 dark:text-indigo-500">
+              <span className="text-xs text-indigo-600 dark:text-indigo-500">
                 · {answerTaskDetails.supportText}
               </span>
             ) : null}
             {current.ruleLabel && practicePrefs.showWordCategory && (
-              <span className="text-xs text-indigo-400 dark:text-indigo-500">
+              <span className="text-xs text-indigo-600 dark:text-indigo-500">
                 · {current.ruleLabel}
               </span>
             )}
@@ -203,7 +203,7 @@ export function AnswerInputPanel({
         <div className="sr-only">{transformationMode ? transformationRoute : taskLabel}</div>
       </div>
       {minimalPairSetForCurrent && (
-        <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-250">
+        <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-200">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold uppercase tracking-wider">
               {activeMinimalPairSet ? 'Minimal pair' : 'Today contrast'}
@@ -250,7 +250,7 @@ export function AnswerInputPanel({
                 </button>
                 <button
                   onClick={skipCurrent}
-                  className="py-2.5 border border-stone-250 bg-white hover:bg-stone-50 text-stone-600 rounded-xl font-medium dark:bg-stone-900 dark:border-stone-800 dark:text-stone-300 transition"
+                  className="py-2.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 rounded-xl font-medium dark:bg-stone-900 dark:border-stone-800 dark:text-stone-300 transition"
                 >
                   Skip without penalty
                 </button>
@@ -258,8 +258,8 @@ export function AnswerInputPanel({
             </>
           ) : (
             <>
-              <div className="rounded-xl bg-white dark:bg-stone-900 border border-stone-205 dark:border-stone-800 px-3 py-3">
-                <div className="text-[11px] uppercase tracking-wider text-stone-400 mb-1">
+              <div className="rounded-xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 px-3 py-3">
+                <div className="text-[11px] uppercase tracking-wider text-stone-600 mb-1">
                   Answer
                 </div>
                 <ScriptDisplay
@@ -268,9 +268,9 @@ export function AnswerInputPanel({
                   type={practicedType}
                   colorHighlight={practicePrefs.colorCodeConjugations !== false}
                   className="text-2xl font-semibold text-stone-900 dark:text-stone-100"
-                  subClassName="text-xs text-stone-500 mt-1"
+                  subClassName="text-xs text-stone-600 mt-1"
                 />
-                <div className="text-xs text-stone-500 mt-2">{targetEnglish}</div>
+                <div className="text-xs text-stone-600 mt-2">{targetEnglish}</div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3">
                 <button
@@ -317,7 +317,7 @@ export function AnswerInputPanel({
                   }}
                   placeholder="Heard Japanese answer..."
                   aria-label="Heard spoken answer"
-                  className="w-full min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
+                  className="w-full min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-800 rounded-xl bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-100 focus:border-indigo-500 focus:outline-none transition"
                   lang="ja"
                   autoComplete="off"
                   autoCapitalize="none"
@@ -336,7 +336,7 @@ export function AnswerInputPanel({
                     className={
                       speechMatch.ok
                         ? 'text-emerald-700 dark:text-emerald-400'
-                        : 'text-stone-500 dark:text-stone-400'
+                        : 'text-stone-600 dark:text-stone-400'
                     }
                   >
                     {speechMatch.ok
@@ -346,7 +346,7 @@ export function AnswerInputPanel({
                         : ''}
                   </span>
                 ) : speechRecognitionAvailable ? (
-                  <span className="text-stone-500 dark:text-stone-400">Microphone ready.</span>
+                  <span className="text-stone-600 dark:text-stone-400">Microphone ready.</span>
                 ) : (
                   <span className="text-amber-700 dark:text-amber-400">
                     Speech input is not available in this browser.
@@ -415,10 +415,10 @@ export function AnswerInputPanel({
                       <ScriptDisplay
                         view={cv}
                         className="text-xl"
-                        subClassName="text-xs text-stone-400 mt-1"
+                        subClassName="text-xs text-stone-600 mt-1"
                       />
                       {!hideEnglishMeaning && (
-                        <div className="mt-1 text-xs text-stone-500">{w.meaning}</div>
+                        <div className="mt-1 text-xs text-stone-600">{w.meaning}</div>
                       )}
                     </button>
                   );
@@ -434,7 +434,7 @@ export function AnswerInputPanel({
                       <ScriptDisplay
                         view={cv}
                         className="text-xl"
-                        subClassName="text-xs text-stone-400 mt-1"
+                        subClassName="text-xs text-stone-600 mt-1"
                       />
                     </button>
                   );
@@ -543,7 +543,7 @@ export function AnswerInputPanel({
             <button
               onClick={revealKanaHint}
               disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
-              className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
+              className="py-2.5 border border-stone-200 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
             >
               Hint
             </button>
@@ -555,7 +555,7 @@ export function AnswerInputPanel({
             </button>
             <button
               onClick={skipCurrent}
-              className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 rounded-xl text-sm"
+              className="py-2.5 border border-stone-200 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl text-sm"
             >
               Skip
             </button>
@@ -644,13 +644,13 @@ export function AnswerInputPanel({
             )}
             <button
               onClick={revealAnswer}
-              className="py-2.5 border border-amber-205 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
+              className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
             >
               Reveal
             </button>
             <button
               onClick={skipCurrent}
-              className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-105 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
+              className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
             >
               Skip
             </button>

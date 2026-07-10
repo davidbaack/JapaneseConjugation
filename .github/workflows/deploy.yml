@@ -44,14 +44,18 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Run E2E tests
+      - name: Run E2E tests against configured build
         run: npm run test:e2e
-
-      - run: npm run build
         env:
+          PW_USE_PREBUILT: '1'
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 

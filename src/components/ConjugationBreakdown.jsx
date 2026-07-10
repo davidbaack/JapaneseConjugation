@@ -3,7 +3,7 @@ import { getConjugationDebugInfo } from '../utils/conjugatorExplain.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { kanaToRomaji } from '../utils/romaji.js';
 
-function ValueCell({ label, value, tone = 'text-stone-850 dark:text-stone-100', romajiFor }) {
+function ValueCell({ label, value, tone = 'text-stone-800 dark:text-stone-100', romajiFor }) {
   const romaji = romajiFor(value);
   return (
     <div className="min-w-0 rounded-lg border border-stone-200 bg-white/80 px-2.5 py-2 dark:border-stone-800 dark:bg-stone-950/60">
@@ -14,7 +14,7 @@ function ValueCell({ label, value, tone = 'text-stone-850 dark:text-stone-100', 
         {value}
       </div>
       {romaji && (
-        <div className="mt-0.5 break-words text-[10px] italic text-stone-450">{romaji}</div>
+        <div className="mt-0.5 break-words text-[10px] italic text-stone-400">{romaji}</div>
       )}
     </div>
   );
@@ -35,7 +35,7 @@ function RoutePanel({ route, accent = 'indigo', romajiFor }) {
     <div className={`rounded-xl border ${accentClass} p-3`}>
       <div className={`text-sm font-semibold ${headingClass}`}>{route.title}</div>
       {route.detail && (
-        <div className="mt-1 text-xs leading-relaxed text-stone-600 dark:text-stone-350">
+        <div className="mt-1 text-xs leading-relaxed text-stone-600 dark:text-stone-300">
           {route.detail}
         </div>
       )}
@@ -48,7 +48,7 @@ function RoutePanel({ route, accent = 'indigo', romajiFor }) {
             tone={
               cell.label === 'Result'
                 ? 'text-emerald-700 dark:text-emerald-300'
-                : 'text-stone-850 dark:text-stone-100'
+                : 'text-stone-800 dark:text-stone-100'
             }
             romajiFor={romajiFor}
           />
@@ -79,7 +79,7 @@ function RowShiftVisual({ visual, onOpenFormationKeys, onOpenLearn }) {
     <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50/55 px-3 py-2.5 dark:border-indigo-900/60 dark:bg-indigo-950/20">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-350">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-300">
             Row visual
           </div>
           <div className="mt-0.5 text-xs leading-relaxed text-indigo-900 dark:text-indigo-100">
@@ -90,7 +90,7 @@ function RowShiftVisual({ visual, onOpenFormationKeys, onOpenLearn }) {
           <button
             type="button"
             onClick={openTable}
-            className="text-xs font-semibold text-indigo-650 underline decoration-indigo-300 underline-offset-4 transition hover:text-indigo-800 dark:text-indigo-300 dark:decoration-indigo-700 dark:hover:text-indigo-100"
+            className="text-xs font-semibold text-indigo-600 underline decoration-indigo-300 underline-offset-4 transition hover:text-indigo-800 dark:text-indigo-300 dark:decoration-indigo-700 dark:hover:text-indigo-100"
           >
             See Learn table
           </button>
@@ -231,15 +231,15 @@ export function ConjugationBreakdown({
           <span className="text-sm font-semibold text-stone-900 dark:text-stone-100" lang="ja">
             {debug.source}
           </span>
-          <span className="text-stone-350 dark:text-stone-600">-&gt;</span>
+          <span className="text-stone-300 dark:text-stone-600">-&gt;</span>
           <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300" lang="ja">
             {debug.result}
           </span>
-          <span className="text-[11px] text-stone-450">{debug.targetLabel}</span>
+          <span className="text-[11px] text-stone-400">{debug.targetLabel}</span>
         </div>
       </div>
       {romajiFor(debug.source) && (
-        <div className="text-right text-[11px] italic text-stone-450">
+        <div className="text-right text-[11px] italic text-stone-400">
           {romajiFor(debug.source)} -&gt; {romajiFor(debug.result)}
         </div>
       )}
@@ -251,11 +251,11 @@ export function ConjugationBreakdown({
         <div className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
           {debug.category.label}
         </div>
-        <div className="mt-1 text-sm leading-relaxed text-stone-650 dark:text-stone-300">
+        <div className="mt-1 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
           {debug.category.why}
         </div>
         {Array.isArray(debug.category.checks) && debug.category.checks.length > 0 && (
-          <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs leading-relaxed text-stone-600 dark:text-stone-350">
+          <ul className="mt-2 list-disc space-y-1.5 pl-4 text-xs leading-relaxed text-stone-600 dark:text-stone-300">
             {debug.category.checks.map((check) => (
               <li key={check}>{check}</li>
             ))}
@@ -275,13 +275,13 @@ export function ConjugationBreakdown({
           <div className="rounded-lg border border-indigo-100 bg-white/80 px-3 py-2 dark:border-indigo-900/50 dark:bg-stone-950/55">
             {!suppressRuleSummary && (
               <>
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-350">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-300">
                   Rule
                 </div>
                 <div className="mt-0.5 text-sm font-semibold text-indigo-900 dark:text-indigo-100">
                   {debug.rule.short}
                 </div>
-                <div className="mt-0.5 text-xs leading-relaxed text-stone-600 dark:text-stone-350">
+                <div className="mt-0.5 text-xs leading-relaxed text-stone-600 dark:text-stone-300">
                   {debug.rule.detail}
                 </div>
               </>
@@ -307,7 +307,7 @@ export function ConjugationBreakdown({
       {debug.mistake ? (
         <div className="grid gap-2 rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 dark:border-rose-900/50 dark:bg-rose-950/15 sm:grid-cols-2">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-350">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-300">
               What went wrong
             </div>
             <div className="mt-1 text-sm font-semibold text-rose-900 dark:text-rose-200">
@@ -318,7 +318,7 @@ export function ConjugationBreakdown({
             </div>
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-650 dark:text-emerald-350">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-300">
               What should have happened
             </div>
             <div className="mt-1 text-sm font-semibold text-emerald-900 dark:text-emerald-200">
@@ -328,14 +328,14 @@ export function ConjugationBreakdown({
               {debug.mistake.expectedResult}
             </div>
           </div>
-          <div className="text-xs leading-relaxed text-stone-600 dark:text-stone-350 sm:col-span-2">
+          <div className="text-xs leading-relaxed text-stone-600 dark:text-stone-300 sm:col-span-2">
             {debug.mistake.detail}
           </div>
         </div>
       ) : userAnswer && userAnswer !== debug.result ? (
         <div className="grid gap-2 rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 dark:border-rose-900/50 dark:bg-rose-950/15 sm:grid-cols-2">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-350">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-300">
               Your answer
             </div>
             <div className="mt-1 text-sm font-semibold text-rose-900 dark:text-rose-200" lang="ja">
@@ -348,7 +348,7 @@ export function ConjugationBreakdown({
             )}
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-650 dark:text-emerald-350">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-300">
               Correct answer
             </div>
             <div

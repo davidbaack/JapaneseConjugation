@@ -64,7 +64,7 @@ export default function PracticeLabView() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm dark:border-stone-850 dark:bg-stone-900">
+      <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm dark:border-stone-800 dark:bg-stone-900">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-xs uppercase tracking-wider text-stone-500 dark:text-stone-400">
@@ -100,8 +100,8 @@ export default function PracticeLabView() {
                   onClick={() => setActive(tab.id)}
                   className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
                     active === tab.id
-                      ? 'bg-stone-850 font-semibold text-white dark:bg-indigo-700'
-                      : 'text-stone-600 hover:bg-white dark:text-stone-350 dark:hover:bg-stone-900'
+                      ? 'bg-stone-800 font-semibold text-white dark:bg-indigo-700'
+                      : 'text-stone-600 hover:bg-white dark:text-stone-300 dark:hover:bg-stone-900'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -124,7 +124,7 @@ export default function PracticeLabView() {
                   {recommendation.label}
                 </div>
                 {recommendation.detail && (
-                  <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-350">
+                  <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-300">
                     {recommendation.detail}
                   </div>
                 )}

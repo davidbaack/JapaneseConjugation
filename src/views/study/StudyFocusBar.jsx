@@ -38,7 +38,7 @@ export function StudyFocusBar({
   return (
     <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+        <span className="mr-1 text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
           Focus practice
         </span>
         {sessionFilterWord && (
@@ -51,7 +51,7 @@ export function StudyFocusBar({
                 onWordChange(null);
                 setWordQuery('');
               }}
-              className="ml-0.5 text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-200"
+              className="ml-0.5 text-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-200"
               aria-label="Remove word filter"
             >
               <IconX className="w-3 h-3" />
@@ -76,7 +76,7 @@ export function StudyFocusBar({
             className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition ${
               mode === 'word'
                 ? 'border-indigo-300 bg-indigo-50 text-indigo-600 dark:border-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300'
-                : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-700 dark:hover:text-indigo-300'
+                : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-700 dark:hover:text-indigo-300'
             }`}
           >
             <IconPlus className="h-3 w-3" />
@@ -89,7 +89,7 @@ export function StudyFocusBar({
             className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition ${
               mode === 'form'
                 ? 'border-violet-300 bg-violet-50 text-violet-600 dark:border-violet-700 dark:bg-violet-950/30 dark:text-violet-300'
-                : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-violet-300 hover:text-violet-600 dark:hover:border-violet-700 dark:hover:text-violet-300'
+                : 'border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 hover:border-violet-300 hover:text-violet-600 dark:hover:border-violet-700 dark:hover:text-violet-300'
             }`}
           >
             <IconPlus className="h-3 w-3" />
@@ -104,7 +104,7 @@ export function StudyFocusBar({
               setMode(null);
               setWordQuery('');
             }}
-            className="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition ml-auto"
+            className="text-xs text-stone-600 hover:text-stone-600 dark:hover:text-stone-300 transition ml-auto"
           >
             Clear all
           </button>
@@ -112,7 +112,7 @@ export function StudyFocusBar({
         {!hasFilter && mode !== null && (
           <button
             onClick={() => setMode(null)}
-            className="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition ml-auto"
+            className="text-xs text-stone-600 hover:text-stone-600 dark:hover:text-stone-300 transition ml-auto"
           >
             Cancel
           </button>
@@ -144,10 +144,10 @@ export function StudyFocusBar({
                   <span lang="ja" className="font-medium text-stone-900 dark:text-stone-100">
                     {word.dict}
                   </span>
-                  <span className="text-stone-400 text-xs" lang="ja">
+                  <span className="text-stone-600 text-xs" lang="ja">
                     {word.reading}
                   </span>
-                  <span className="text-stone-500 text-xs ml-auto truncate max-w-[120px]">
+                  <span className="text-stone-600 text-xs ml-auto truncate max-w-[120px]">
                     {word.meaning}
                   </span>
                 </button>
@@ -155,7 +155,7 @@ export function StudyFocusBar({
             </div>
           )}
           {wordQuery.trim() && !searchResults.length && (
-            <div className="mt-1 text-xs text-stone-400 px-1">No matches</div>
+            <div className="mt-1 text-xs text-stone-600 px-1">No matches</div>
           )}
         </div>
       )}

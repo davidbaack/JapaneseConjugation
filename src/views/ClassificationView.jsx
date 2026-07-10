@@ -215,7 +215,7 @@ export default function ClassificationView() {
 
   if (!filtered.length) {
     return (
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-8 text-center text-stone-500">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center text-stone-500">
         <p className="mb-4">No words match the current filters.</p>
         <button
           onClick={() => setTab('settings')}
@@ -322,7 +322,7 @@ export default function ClassificationView() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5 text-left">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5 text-left">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-medium text-stone-950 dark:text-stone-50">Classification drill</h3>
@@ -355,16 +355,16 @@ export default function ClassificationView() {
           <div className="text-sm text-stone-400 italic mt-2">{current.meaning}</div>
         </div>
         <div className="mb-4 rounded-xl border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/55 dark:bg-indigo-950/20 px-3 py-3">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-350">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
             Group decoder
           </div>
           <div className="mt-2 grid gap-2 sm:grid-cols-3">
             {GROUP_DECODER_ROWS.map((row) => (
               <div key={row.id} className="min-w-0">
-                <div className="text-xs font-semibold text-stone-850 dark:text-stone-150">
+                <div className="text-xs font-semibold text-stone-800 dark:text-stone-100">
                   {row.label}
                 </div>
-                <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-350">
+                <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-300">
                   {row.decoder}
                 </div>
               </div>
@@ -379,10 +379,10 @@ export default function ClassificationView() {
               disabled={!!result}
               className={`px-3 py-3 rounded-xl border text-sm font-medium transition ${
                 result && o.id === correctCategory
-                  ? 'bg-emerald-50 border-emerald-305 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-850 dark:text-emerald-300'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-800 dark:text-emerald-300'
                   : result && o.id === result.chosen && !result.ok
-                    ? 'bg-rose-50 border-rose-305 text-rose-800 dark:bg-rose-950/20 dark:border-rose-850 dark:text-rose-300'
-                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 text-stone-750 dark:text-stone-250'
+                    ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/20 dark:border-rose-800 dark:text-rose-300'
+                    : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 text-stone-700 dark:text-stone-200'
               }`}
             >
               <span className="block">{o.label}</span>
@@ -399,8 +399,8 @@ export default function ClassificationView() {
             <div
               className={`mt-4 rounded-xl border p-4 ${
                 result.ok
-                  ? 'bg-emerald-50 dark:bg-emerald-950/15 border-emerald-250 dark:border-emerald-900/50'
-                  : 'bg-rose-50 dark:bg-rose-950/15 border-rose-250 dark:border-rose-900/50'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/15 border-emerald-200 dark:border-emerald-900/50'
+                  : 'bg-rose-50 dark:bg-rose-950/15 border-rose-200 dark:border-rose-900/50'
               }`}
             >
               <span role="status" aria-live="polite" className="sr-only">
@@ -420,16 +420,16 @@ export default function ClassificationView() {
                   {teaching.aliasText}
                 </div>
               )}
-              <div className="mt-3 grid gap-2 text-sm text-stone-705 dark:text-stone-300">
+              <div className="mt-3 grid gap-2 text-sm text-stone-700 dark:text-stone-300">
                 <div>
-                  <span className="font-semibold text-stone-850 dark:text-stone-150">
+                  <span className="font-semibold text-stone-800 dark:text-stone-100">
                     Recognition clue:{' '}
                   </span>
                   {teaching?.clue || classifyHint(current)}
                 </div>
                 {teaching?.example && (
                   <div>
-                    <span className="font-semibold text-stone-850 dark:text-stone-150">
+                    <span className="font-semibold text-stone-800 dark:text-stone-100">
                       Example:{' '}
                     </span>
                     <span lang="ja">{teaching.example}</span>
@@ -437,13 +437,13 @@ export default function ClassificationView() {
                 )}
                 {teaching?.trap && (
                   <div>
-                    <span className="font-semibold text-stone-850 dark:text-stone-150">Trap: </span>
+                    <span className="font-semibold text-stone-800 dark:text-stone-100">Trap: </span>
                     {teaching.trap}
                   </div>
                 )}
                 {teaching?.masuDiagnostic && (
                   <div className="border-l-2 border-indigo-300 dark:border-indigo-700 pl-3">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-indigo-650 dark:text-indigo-350">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
                       Masu check
                     </div>
                     <div className="mt-1">
@@ -467,7 +467,7 @@ export default function ClassificationView() {
               )}
               {aiErr && <div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
               {aiText && (
-                <div className="mt-3 rounded-xl border border-indigo-100 bg-white/70 dark:bg-stone-905 px-3 py-2 text-sm text-stone-700 dark:text-stone-300 leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto">
+                <div className="mt-3 rounded-xl border border-indigo-100 bg-white/70 dark:bg-stone-900 px-3 py-2 text-sm text-stone-700 dark:text-stone-300 leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto">
                   {aiText}
                 </div>
               )}
@@ -485,7 +485,7 @@ export default function ClassificationView() {
                 <button
                   onClick={next}
                   autoFocus
-                  className="py-2 px-3 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl text-sm font-medium transition"
+                  className="py-2 px-3 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-100 text-white dark:text-stone-900 rounded-xl text-sm font-medium transition"
                 >
                   Next
                 </button>
@@ -494,7 +494,7 @@ export default function ClassificationView() {
           </>
         )}
       </div>
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5 text-left">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5 text-left">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="font-medium text-stone-950 dark:text-stone-50">Group progress</h3>
@@ -510,7 +510,7 @@ export default function ClassificationView() {
           {groupRows.map((row) => (
             <div
               key={row.id}
-              className="rounded-xl border border-stone-200 dark:border-stone-800 p-3 bg-stone-50 dark:bg-stone-955"
+              className="rounded-xl border border-stone-200 dark:border-stone-800 p-3 bg-stone-50 dark:bg-stone-950"
             >
               <div className="flex items-center justify-between gap-2">
                 <div>

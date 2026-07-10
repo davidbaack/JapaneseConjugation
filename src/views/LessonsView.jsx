@@ -23,7 +23,7 @@ function LessonStat({ label, value }) {
       <div className="text-lg font-semibold tabular-nums text-stone-950 dark:text-stone-50">
         {value}
       </div>
-      <div className="text-[11px] uppercase tracking-wide text-stone-500">{label}</div>
+      <div className="text-[11px] uppercase tracking-wide text-stone-600">{label}</div>
     </div>
   );
 }
@@ -33,7 +33,7 @@ function TypeChip({ id }) {
   return (
     <span
       title={type.hint}
-      className="inline-flex items-center rounded-md border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 px-2 py-1 text-[11px] font-medium text-stone-650 dark:text-stone-300"
+      className="inline-flex items-center rounded-md border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 px-2 py-1 text-[11px] font-medium text-stone-600 dark:text-stone-300"
     >
       {type.label}
     </span>
@@ -54,7 +54,7 @@ function PracticeCardReturnPanel({ focus, onGuide, onPractice, onDismiss }) {
           <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
             From your Practice card
           </div>
-          <p className="mt-1 text-sm text-stone-700 dark:text-stone-250">
+          <p className="mt-1 text-sm text-stone-700 dark:text-stone-200">
             {word.dict ? (
               <>
                 {typeLabel} for{' '}
@@ -62,7 +62,7 @@ function PracticeCardReturnPanel({ focus, onGuide, onPractice, onDismiss }) {
                   {word.dict}
                 </span>
                 {word.reading && word.reading !== word.dict ? (
-                  <span lang="ja" className="text-stone-500 dark:text-stone-350">
+                  <span lang="ja" className="text-stone-600 dark:text-stone-300">
                     {' '}
                     ({word.reading})
                   </span>
@@ -93,7 +93,7 @@ function PracticeCardReturnPanel({ focus, onGuide, onPractice, onDismiss }) {
           <button
             type="button"
             onClick={onDismiss}
-            className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-stone-850"
+            className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-stone-800"
           >
             Dismiss
           </button>
@@ -143,10 +143,10 @@ function TrackCard({ track, lessons, onLearnLesson, onPracticeLesson, onPractice
       <h3 className="mt-1 text-lg font-semibold text-stone-950 dark:text-stone-50">
         {track.title}
       </h3>
-      <p className="mt-2 text-sm leading-relaxed text-stone-650 dark:text-stone-300">
+      <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
         {track.summary}
       </p>
-      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-stone-500 dark:text-stone-400">
+      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-stone-600 dark:text-stone-400">
         <span>{lessons.length} lessons</span>
         <span>{formCount} forms</span>
       </div>
@@ -175,14 +175,14 @@ function TrackCard({ track, lessons, onLearnLesson, onPracticeLesson, onPractice
                 <div className="font-semibold text-stone-900 dark:text-stone-100">
                   {lesson.title}
                 </div>
-                <p className="mt-1 text-xs leading-relaxed text-stone-550 dark:text-stone-400">
+                <p className="mt-1 text-xs leading-relaxed text-stone-600 dark:text-stone-400">
                   Learn the rule, then practice the forms while they are fresh.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <a
                     href={`#lesson-${lesson.groupId}`}
                     onClick={() => onLearnLesson(lesson.groupId)}
-                    className="inline-flex items-center rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-850"
+                    className="inline-flex items-center rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
                   >
                     Learn this
                   </a>
@@ -368,7 +368,7 @@ export default function LessonsView() {
 
   return (
     <div className="space-y-4">
-      <section className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+      <section className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
         <div className="max-w-2xl">
           <div className="flex items-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
             <IconBook className="w-4 h-4" />
@@ -436,11 +436,15 @@ export default function LessonsView() {
 
       <div className="grid gap-4 lg:grid-cols-[15rem_1fr]">
         <aside className="lg:sticky lg:top-4 lg:self-start">
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-3">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-stone-500">
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-3">
+            <label
+              htmlFor="lesson-search"
+              className="block text-xs font-semibold uppercase tracking-wide text-stone-600"
+            >
               Find a rule
             </label>
             <input
+              id="lesson-search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="potential, て, passive..."
@@ -453,29 +457,29 @@ export default function LessonsView() {
                   setShowFormationKeys(true);
                   setFormationKeyHighlight({ ending: '', row: '' });
                 }}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-stone-850"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-stone-800"
               >
-                <IconList className="w-4 h-4 text-indigo-500" />
+                <IconList className="w-4 h-4 text-indigo-600" />
                 Formation keys
               </a>
               {LESSON_TRACKS.map((track) => (
                 <a
                   key={track.id}
                   href={`#track-${track.id}`}
-                  className="block rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-50 hover:text-stone-950 dark:text-stone-400 dark:hover:bg-stone-850 dark:hover:text-stone-100"
+                  className="block rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-50 hover:text-stone-950 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
                 >
                   <span className="block font-medium">{track.level} track</span>
-                  <span className="block text-[11px] text-stone-400">
+                  <span className="block text-[11px] text-stone-600">
                     {track.lessonGroupIds.length} lessons
                   </span>
                 </a>
               ))}
             </nav>
             <nav
-              className="mt-3 border-t border-stone-100 pt-3 dark:border-stone-850"
+              className="mt-3 border-t border-stone-100 pt-3 dark:border-stone-800"
               aria-label="All lessons"
             >
-              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-stone-400">
+              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-stone-600">
                 All lessons
               </div>
               {LESSON_SECTIONS.map((lesson) => (
@@ -483,10 +487,10 @@ export default function LessonsView() {
                   key={lesson.groupId}
                   href={`#lesson-${lesson.groupId}`}
                   onClick={() => openLesson(lesson.groupId)}
-                  className="block rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-50 hover:text-stone-950 dark:text-stone-400 dark:hover:bg-stone-850 dark:hover:text-stone-100"
+                  className="block rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-50 hover:text-stone-950 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
                 >
                   <span className="block font-medium">{lesson.title}</span>
-                  <span className="block text-[11px] text-stone-400">
+                  <span className="block text-[11px] text-stone-600">
                     {lesson.typeIds.length} forms
                   </span>
                 </a>
@@ -498,7 +502,7 @@ export default function LessonsView() {
         <main className="space-y-4">
           <section
             id="formation-keys"
-            className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5"
+            className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
@@ -509,7 +513,7 @@ export default function LessonsView() {
                 type="button"
                 aria-expanded={showFormationKeys}
                 onClick={() => setShowFormationKeys((current) => !current)}
-                className="inline-flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-750 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-indigo-950/25"
+                className="inline-flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-indigo-950/25"
               >
                 {showFormationKeys ? 'Hide keys' : 'Open keys'}
               </button>
@@ -535,7 +539,7 @@ export default function LessonsView() {
                           {card.badge}
                         </span>
                       </div>
-                      <p className="mt-2 text-sm leading-relaxed text-stone-650 dark:text-stone-300">
+                      <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
                         {card.pattern}
                       </p>
                       <div
@@ -544,7 +548,7 @@ export default function LessonsView() {
                       >
                         {card.example}
                       </div>
-                      <p className="mt-2 text-xs leading-relaxed text-stone-500">{card.note}</p>
+                      <p className="mt-2 text-xs leading-relaxed text-stone-600">{card.note}</p>
                     </div>
                   ))}
                 </div>
@@ -563,7 +567,7 @@ export default function LessonsView() {
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[28rem] text-sm">
-                        <thead className="text-left text-xs uppercase tracking-wide text-stone-500">
+                        <thead className="text-left text-xs uppercase tracking-wide text-stone-600">
                           <tr>
                             <th className="px-4 py-2 font-medium">ending</th>
                             <th className="px-4 py-2 font-medium">て</th>
@@ -571,28 +575,28 @@ export default function LessonsView() {
                             <th className="px-4 py-2 font-medium">example</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
+                        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
                           {ONBIN_ROWS.map((row) => (
                             <tr key={row.ending}>
                               <td
                                 lang="ja"
-                                className="px-4 py-2 font-semibold text-stone-850 dark:text-stone-100"
+                                className="px-4 py-2 font-semibold text-stone-800 dark:text-stone-100"
                               >
                                 {row.ending}
                               </td>
                               <td
                                 lang="ja"
-                                className="px-4 py-2 text-stone-650 dark:text-stone-300"
+                                className="px-4 py-2 text-stone-600 dark:text-stone-300"
                               >
                                 {row.te}
                               </td>
                               <td
                                 lang="ja"
-                                className="px-4 py-2 text-stone-650 dark:text-stone-300"
+                                className="px-4 py-2 text-stone-600 dark:text-stone-300"
                               >
                                 {row.ta}
                               </td>
-                              <td lang="ja" className="px-4 py-2 text-stone-500">
+                              <td lang="ja" className="px-4 py-2 text-stone-600">
                                 {row.example}
                               </td>
                             </tr>
@@ -608,22 +612,22 @@ export default function LessonsView() {
                     る-verb traps: masu check
                   </div>
                   <div className="grid gap-4 p-4 lg:grid-cols-[16rem_1fr]">
-                    <div className="text-sm leading-relaxed text-stone-650 dark:text-stone-300">
+                    <div className="text-sm leading-relaxed text-stone-600 dark:text-stone-300">
                       <p>
-                        <span className="font-semibold text-stone-850 dark:text-stone-100">
+                        <span className="font-semibold text-stone-800 dark:text-stone-100">
                           -いる/-える is a clue, not a guarantee.
                         </span>{' '}
                         If the polite form keeps the same stem before ます, it behaves as ichidan.
                         If final る becomes り before ます, it is godan.
                       </p>
-                      <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
+                      <p className="mt-2 text-xs text-stone-600 dark:text-stone-400">
                         Kanji and okurigana help, but pairs like 切る and 着る still need the
                         dictionary group or a known polite form.
                       </p>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[34rem] text-sm">
-                        <thead className="text-left text-xs uppercase tracking-wide text-stone-500">
+                        <thead className="text-left text-xs uppercase tracking-wide text-stone-600">
                           <tr>
                             <th className="px-3 py-2 font-medium">dictionary</th>
                             <th className="px-3 py-2 font-medium">ます form</th>
@@ -631,18 +635,18 @@ export default function LessonsView() {
                             <th className="px-3 py-2 font-medium">why</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
+                        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
                           {RU_MASU_DIAGNOSTIC_ROWS.map((row) => (
                             <tr key={`${row.dict}-${row.group}`}>
                               <td
                                 lang="ja"
-                                className="px-3 py-2 font-semibold text-stone-850 dark:text-stone-100"
+                                className="px-3 py-2 font-semibold text-stone-800 dark:text-stone-100"
                               >
                                 {row.dict}
                               </td>
                               <td
                                 lang="ja"
-                                className="px-3 py-2 text-stone-700 dark:text-stone-250"
+                                className="px-3 py-2 text-stone-700 dark:text-stone-200"
                               >
                                 {row.polite}
                               </td>
@@ -657,7 +661,7 @@ export default function LessonsView() {
                                   {row.group}
                                 </span>
                               </td>
-                              <td className="px-3 py-2 text-stone-550 dark:text-stone-350">
+                              <td className="px-3 py-2 text-stone-600 dark:text-stone-300">
                                 {row.clue}
                               </td>
                             </tr>
@@ -691,7 +695,7 @@ export default function LessonsView() {
                   }
                 }}
                 tabIndex={focusedLessonGroupId === lesson.groupId ? -1 : undefined}
-                className="scroll-mt-4 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850"
+                className="scroll-mt-4 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800"
               >
                 <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -714,7 +718,7 @@ export default function LessonsView() {
                     aria-controls={`lesson-panel-${lesson.groupId}`}
                     disabled={searchActive}
                     onClick={() => toggleLesson(lesson.groupId)}
-                    className="inline-flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-750 transition hover:border-indigo-300 hover:bg-indigo-50 disabled:cursor-default disabled:opacity-70 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-indigo-950/25"
+                    className="inline-flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:border-indigo-300 hover:bg-indigo-50 disabled:cursor-default disabled:opacity-70 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-indigo-950/25"
                   >
                     {toggleLabel}
                   </button>
@@ -722,7 +726,7 @@ export default function LessonsView() {
                 {isOpen && (
                   <div
                     id={`lesson-panel-${lesson.groupId}`}
-                    className="border-t border-stone-100 p-5 pt-4 dark:border-stone-850"
+                    className="border-t border-stone-100 p-5 pt-4 dark:border-stone-800"
                   >
                     <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 dark:border-indigo-950 dark:bg-indigo-950/20">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -748,7 +752,7 @@ export default function LessonsView() {
 
                     <div className="mt-4 grid gap-3 md:grid-cols-3">
                       <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-stone-600">
                           Build
                         </div>
                         <p className="mt-2 text-sm leading-relaxed text-stone-700 dark:text-stone-300">
@@ -756,7 +760,7 @@ export default function LessonsView() {
                         </p>
                       </div>
                       <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-stone-600">
                           Variants
                         </div>
                         <p className="mt-2 text-sm leading-relaxed text-stone-700 dark:text-stone-300">
@@ -764,7 +768,7 @@ export default function LessonsView() {
                         </p>
                       </div>
                       <div className="rounded-xl border border-stone-200 dark:border-stone-800 p-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-stone-600">
                           Watch
                         </div>
                         <p className="mt-2 text-sm leading-relaxed text-stone-700 dark:text-stone-300">
@@ -775,14 +779,14 @@ export default function LessonsView() {
 
                     <div className="mt-4 overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800">
                       <table className="w-full text-sm">
-                        <thead className="bg-stone-50 dark:bg-stone-950 text-left text-xs uppercase tracking-wide text-stone-500">
+                        <thead className="bg-stone-50 dark:bg-stone-950 text-left text-xs uppercase tracking-wide text-stone-600">
                           <tr>
                             <th className="px-4 py-2 font-medium">base</th>
                             <th className="px-4 py-2 font-medium">forms</th>
                             <th className="px-4 py-2 font-medium hidden sm:table-cell">why</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-stone-100 dark:divide-stone-850">
+                        <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
                           {lesson.examples.map(([base, forms, why]) => (
                             <tr key={`${lesson.groupId}-${base}`}>
                               <td
@@ -797,7 +801,7 @@ export default function LessonsView() {
                               >
                                 {forms}
                               </td>
-                              <td className="px-4 py-2 text-stone-500 hidden sm:table-cell">
+                              <td className="px-4 py-2 text-stone-600 hidden sm:table-cell">
                                 {why}
                               </td>
                             </tr>
@@ -808,10 +812,10 @@ export default function LessonsView() {
 
                     <div className="mt-4">
                       <div className="mb-2 flex items-center justify-between gap-2">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-stone-600">
                           Forms covered
                         </div>
-                        <div className="text-xs text-stone-400">{lesson.typeIds.length} total</div>
+                        <div className="text-xs text-stone-600">{lesson.typeIds.length} total</div>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {lesson.typeIds.map((id) => (
@@ -826,13 +830,13 @@ export default function LessonsView() {
           })}
 
           {filteredLessons.length === 0 && (
-            <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-8 text-center">
+            <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
               <div className="text-sm font-medium text-stone-800 dark:text-stone-200">
                 No lesson matched that search.
               </div>
               <button
                 onClick={() => setQuery('')}
-                className="mt-3 rounded-lg border border-stone-200 px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-850"
+                className="mt-3 rounded-lg border border-stone-200 px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
               >
                 Clear search
               </button>

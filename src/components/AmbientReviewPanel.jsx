@@ -173,7 +173,7 @@ export default function AmbientReviewPanel({
 
   if (!deck.length) {
     return (
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5 text-center text-stone-500">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5 text-center text-stone-500">
         No ambient review items match the current filters.
       </div>
     );
@@ -183,7 +183,7 @@ export default function AmbientReviewPanel({
   const formView = current ? formDisplay(current.form, practicePrefs) : null;
 
   return (
-    <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+    <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h3 className="font-medium flex items-center gap-2 text-stone-800 dark:text-stone-200">
@@ -199,13 +199,13 @@ export default function AmbientReviewPanel({
           className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
             playing
               ? 'bg-rose-600 hover:bg-rose-700 text-white'
-              : 'bg-stone-800 hover:bg-stone-900 text-white dark:bg-stone-200 dark:hover:bg-stone-150 dark:text-stone-900'
+              : 'bg-stone-800 hover:bg-stone-900 text-white dark:bg-stone-200 dark:hover:bg-stone-100 dark:text-stone-900'
           }`}
         >
           {playing ? 'Stop' : 'Play'}
         </button>
       </div>
-      <div className="rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-850 p-5 text-center">
+      <div className="rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 p-5 text-center">
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
           {current.ruleLabel} · {TYPE_LABEL[current.type]}
         </div>
@@ -215,7 +215,7 @@ export default function AmbientReviewPanel({
           subClassName="text-sm text-stone-500 mt-1"
         />
         <div className="mt-3 text-sm text-stone-500 italic">{current.item.meaning}</div>
-        <div className="my-4 h-px bg-stone-250 dark:bg-stone-800" />
+        <div className="my-4 h-px bg-stone-200 dark:bg-stone-800" />
         <ScriptDisplay
           view={formView}
           className="text-2xl font-semibold"
@@ -228,10 +228,11 @@ export default function AmbientReviewPanel({
       </div>
       <div className="grid sm:grid-cols-[1fr_auto] gap-3 mt-4 items-center">
         <div>
-          <label className="text-xs text-stone-500 block mb-1">
+          <label htmlFor="ambient-review-speed" className="text-xs text-stone-500 block mb-1">
             Playlist speed · {rate.toFixed(2)}x
           </label>
           <input
+            id="ambient-review-speed"
             type="range"
             min="0.55"
             max="1.1"
@@ -248,8 +249,10 @@ export default function AmbientReviewPanel({
               { id: 'all', label: 'All' },
             ].map((o) => (
               <button
+                type="button"
                 key={o.id}
                 onClick={() => setMode(o.id)}
+                aria-pressed={mode === o.id}
                 className={`px-2 py-1.5 rounded-md text-xs font-medium transition ${
                   mode === o.id
                     ? 'bg-white dark:bg-stone-600 text-indigo-700 dark:text-white shadow-sm'
@@ -262,19 +265,19 @@ export default function AmbientReviewPanel({
           </div>
           <button
             onClick={() => playPronunciation(current.example.ja, rate, practicePrefs.voiceURI)}
-            className="px-3 py-2 rounded-lg text-sm border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-350"
+            className="px-3 py-2 rounded-lg text-sm border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300"
           >
             Speak
           </button>
           <button
             onClick={() => setShowEnglish(!showEnglish)}
-            className="px-3 py-2 rounded-lg text-sm border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-350"
+            className="px-3 py-2 rounded-lg text-sm border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300"
           >
             {showEnglish ? 'Hide EN' : 'Show EN'}
           </button>
           <button
             onClick={next}
-            className="px-3 py-2 rounded-lg text-sm border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-350"
+            className="px-3 py-2 rounded-lg text-sm border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300"
           >
             Next
           </button>

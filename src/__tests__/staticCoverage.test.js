@@ -103,4 +103,17 @@ describe('static coverage configuration', () => {
     expect(config).toContain("cacheName: 'sentence-corpus-v1'");
     expect(config).toContain("handler: 'CacheFirst'");
   });
+
+  it('runs browser tests against the configured deploy artifact', () => {
+    const deploy = readRepoText('.github/workflows/deploy.yml');
+    const playwright = readRepoText('playwright.config.js');
+    const buildIndex = deploy.indexOf('- run: npm run build');
+    const e2eIndex = deploy.indexOf('- name: Run E2E tests against configured build');
+
+    expect(buildIndex).toBeGreaterThan(-1);
+    expect(e2eIndex).toBeGreaterThan(buildIndex);
+    expect(deploy).toContain("PW_USE_PREBUILT: '1'");
+    expect(playwright).toContain("process.env.PW_USE_PREBUILT === '1'");
+    expect(playwright).toContain("'npm run preview -- --host 127.0.0.1'");
+  });
 });
