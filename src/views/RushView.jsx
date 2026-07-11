@@ -22,6 +22,7 @@ import {
   rushWaveForCleared,
 } from '../utils/rush.js';
 import { useApp } from '../state/AppStateContext.jsx';
+import { ANSWER_OUTCOME, answerResultCopy } from '../utils/answerFeedbackCopy.js';
 
 export default function RushView() {
   const {
@@ -227,10 +228,18 @@ export default function RushView() {
       advanceRef.current = setTimeout(() => active && launchRound(nextCleared), 520);
     } else {
       setCombo(0);
+      const resultCopy = answerResultCopy({
+        outcome: reason === 'timeout' ? ANSWER_OUTCOME.timeout : ANSWER_OUTCOME.missed,
+        submitted: normalizeRushAnswer(raw),
+        expected: current.expected,
+      });
       setFeedback({
         kind: 'bad',
-        title: reason === 'timeout' ? 'Time' : 'Miss',
-        detail: `${current.expected} · ${current.type.label}`,
+        title: resultCopy.headline,
+        detail:
+          reason === 'timeout'
+            ? `${resultCopy.expected}: ${resultCopy.expectedValue} · ${current.type.label}`
+            : `${resultCopy.submitted}: ${resultCopy.submittedValue} · ${resultCopy.expected}: ${resultCopy.expectedValue}`,
       });
       setRecent((r) =>
         [
@@ -504,14 +513,14 @@ export default function RushView() {
                     <span
                       className={`text-xs font-semibold ${r.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}
                     >
-                      {r.ok ? 'OK' : 'MISS'}
+                      {r.ok ? 'Correct' : 'Not quite'}
                     </span>
                   </div>
                   <div className="mt-1 text-sm" lang="ja">
                     {r.prompt} → {r.expected}
                   </div>
                   <div className="text-xs text-stone-500 mt-1">
-                    You: <span lang="ja">{r.answer}</span>
+                    Your answer: <span lang="ja">{r.answer}</span>
                   </div>
                 </div>
               ))}

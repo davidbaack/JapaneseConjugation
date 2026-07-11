@@ -18,6 +18,11 @@ import { toHiragana } from '../../utils/romaji.js';
 import { getConjugationDebugInfo } from '../../utils/conjugatorExplain.js';
 import { labRouteForMistakePattern } from '../../utils/mistakeDiagnosis.js';
 import { kanaCoachCells } from '../../utils/kanaCoach.js';
+import {
+  ANSWER_OUTCOME,
+  answerOutcomeCopy,
+  buildMistakeExplanation,
+} from '../../utils/answerFeedbackCopy.js';
 
 function ReviewDisclosure({
   tone = 'stone',
@@ -177,34 +182,23 @@ function PromotedRuleCard({ debug }) {
   );
 }
 
-function buildMissedContrast({ record, minimalPairFeedback, diagnostic, debug }) {
+function buildMissedExplanation({ record, minimalPairFeedback, diagnostic, debug }) {
   if (!record || record.correct) return null;
 
   if (minimalPairFeedback) {
     const masu = minimalPairFeedback.masuDiagnostic;
     return {
-      title: 'Contrast check',
+      title: 'Why it missed',
       body: masu
         ? `${minimalPairFeedback.label}. ${masu.dict} -> ${masu.politeSurface}. ${masu.contrast}`
         : `${minimalPairFeedback.label}. ${minimalPairFeedback.intro}`,
     };
   }
 
-  if (diagnostic) {
-    return {
-      title: 'Contrast',
-      body: `${record.diagnosis?.label ? `${record.diagnosis.label}. ` : ''}${diagnostic}`,
-    };
-  }
-
   if (!record.revealedMiss) {
     const mistake = debug?.mistake;
-    if (mistake) {
-      return {
-        title: 'Contrast',
-        body: `${mistake.userRule} vs ${mistake.expectedRule}. ${mistake.detail}`,
-      };
-    }
+    const explanation = buildMistakeExplanation({ diagnostic, mistake });
+    if (explanation) return explanation;
   }
 
   return null;
@@ -367,7 +361,7 @@ function RunAnswerReveal({
   const promotedRuleDebug = reviewDebug?.rule ? reviewDebug : null;
   const diagnostic =
     !record.correct && !record.revealedMiss ? record.diagnosis?.feedback || '' : '';
-  const missedContrast = buildMissedContrast({
+  const missedExplanation = buildMissedExplanation({
     record,
     minimalPairFeedback,
     diagnostic,
@@ -463,10 +457,10 @@ function RunAnswerReveal({
             }`}
           >
             {record.correct
-              ? 'Correct!'
+              ? answerOutcomeCopy(ANSWER_OUTCOME.correct)
               : record.wasCorrected
-                ? 'Assisted correction.'
-                : 'Review this form.'}
+                ? answerOutcomeCopy(ANSWER_OUTCOME.assisted)
+                : answerOutcomeCopy(ANSWER_OUTCOME.missed)}
           </h3>
           {record.wasCorrected && (
             <div className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
@@ -608,7 +602,7 @@ function RunAnswerReveal({
                     ? `You chose: ${record.reviewChoiceLabel}`
                     : record.revealedMiss
                       ? "You chose: I don't know"
-                      : 'You wrote:'}{' '}
+                      : 'Your answer:'}{' '}
                   {!record.revealedMiss && !record.reviewChoiceLabel && (
                     <span lang="ja" className="font-semibold">
                       {record.reverseDrill
@@ -694,12 +688,12 @@ function RunAnswerReveal({
               {explanation.rule}
             </div>
           )}
-          {missedContrast && (
+          {missedExplanation && (
             <div className="rounded-lg bg-white/70 px-3 py-2 text-sm leading-relaxed text-stone-700 dark:bg-stone-900/70 dark:text-stone-300">
               <span className="font-semibold text-stone-900 dark:text-stone-100">
-                {missedContrast.title}:{' '}
+                {missedExplanation.title}:{' '}
               </span>
-              {missedContrast.body}
+              {missedExplanation.body}
             </div>
           )}
           <ReviewDisclosure tone="rose" summary="Answer breakdown" alwaysOpen>
@@ -819,7 +813,7 @@ function RunAnswerReviewItem({
     : record.wasCorrected
       ? 'border-amber-200 text-amber-700 dark:border-amber-900 dark:text-amber-300'
       : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-300';
-  const statusLabel = record.correct ? 'Correct' : record.wasCorrected ? 'Assisted' : 'Missed';
+  const statusLabel = record.correct ? 'Correct' : record.wasCorrected ? 'Assisted' : 'Not quite';
 
   return (
     <details className="group rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">

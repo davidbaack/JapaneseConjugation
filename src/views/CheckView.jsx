@@ -12,9 +12,11 @@ import { formDisplay, englishForForm } from '../utils/display.js';
 import { buildFormationKeysHash } from '../utils/formationKeys.js';
 import { toKanaInputValue } from '../utils/romaji.js';
 import { useApp } from '../state/AppStateContext.jsx';
+import { answerComparisonLabels, lookupResultHeadline } from '../utils/answerFeedbackCopy.js';
 
 const MAX_HISTORY = 6;
 const HISTORY_KEY = 'katachiya_check_history';
+const LOOKUP_COMPARISON_LABELS = answerComparisonLabels('lookup');
 
 // Recent checks should survive tab switches and reloads like the rest of the
 // app's state — CheckView unmounts whenever you leave the tab.
@@ -171,7 +173,7 @@ function CandidateMatchRows({ matches, practicePrefs, onSpeak }) {
               <div className="flex shrink-0 items-center gap-2 sm:justify-end">
                 <div className="text-left sm:text-right">
                   <div className="text-[11px] uppercase tracking-wide text-stone-400">
-                    {correct ? 'Entered form' : 'Correct answer'}
+                    {correct ? 'Entered form' : LOOKUP_COMPARISON_LABELS.expected}
                   </div>
                   <ScriptDisplay
                     view={formDisplay(match.kana, practicePrefs, match.word, match.type)}
@@ -492,17 +494,13 @@ export default function CheckView() {
               whole card) keeps screen readers from re-announcing the breakdown,
               forms table, etc. each time the user expands a disclosure. */}
           <span role="status" aria-live="polite" className="sr-only">
-            {result.status === 'exact'
-              ? 'Correct conjugation.'
-              : result.status === 'near'
-                ? 'Not quite.'
-                : "Couldn't identify that."}
+            {lookupResultHeadline(result.status)}
           </span>
           {result.status === 'exact' && (
             <div>
               <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold mb-4">
                 <IconCheck className="w-5 h-5" />
-                Correct conjugation
+                Recognized form
               </div>
 
               {/* The dictionary word is the headline — that's what the learner
@@ -632,10 +630,10 @@ export default function CheckView() {
             <div>
               <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-semibold mb-3">
                 <IconX className="w-5 h-5" />
-                Not quite
+                Closest match
               </div>
               <p className="text-stone-700 dark:text-stone-300">
-                It looks like you were going for the{' '}
+                The closest valid form is the{' '}
                 <span className="font-semibold">{getTypeInfo(result.near[0].type).label}</span> of{' '}
                 <span className="font-semibold" lang="ja">
                   {result.near[0].word.dict}
@@ -647,13 +645,13 @@ export default function CheckView() {
               </p>
               <div className="mt-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
                 <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-stone-400">You wrote</span>
+                  <span className="text-stone-400">{LOOKUP_COMPARISON_LABELS.submitted}</span>
                   <span className="font-medium text-rose-600 dark:text-rose-400" lang="ja">
                     {result.normalized}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm mt-2">
-                  <span className="text-stone-400">Correct answer</span>
+                  <span className="text-stone-400">{LOOKUP_COMPARISON_LABELS.expected}</span>
                   <span className="flex items-center gap-1.5">
                     <span className="text-emerald-700 dark:text-emerald-300 text-lg">
                       <DiffForm

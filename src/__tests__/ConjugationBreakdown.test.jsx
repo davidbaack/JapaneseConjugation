@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
 import { getConjugationDebugInfo } from '../utils/conjugatorExplain.js';
 
@@ -58,7 +58,7 @@ describe('ConjugationBreakdown', () => {
     expect(screen.getAllByText('Result').length).toBeGreaterThan(1);
     expect(screen.getAllByText('か + いて = かいて').length).toBeGreaterThan(1);
     expect(screen.getByText('書きます -> 書き -> 書いて')).toBeTruthy();
-    expect(screen.getByText(/う\/つ\/る -> って/)).toBeTruthy();
+    expect(screen.getAllByText(/う\/つ\/る -> って/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/く -> いて/).length).toBeGreaterThan(0);
     expect(screen.getByText(/kaku -> kaite/)).toBeTruthy();
     expect(screen.getByText('Sound-change visual')).toBeTruthy();
@@ -68,23 +68,36 @@ describe('ConjugationBreakdown', () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByText('Row visual')).toBeNull();
+    expect(screen.queryByText('Full godan row table')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'See Learn table' }));
     expect(openLearn).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('What went wrong')).toBeTruthy();
-    expect(screen.getByText('What should have happened')).toBeTruthy();
+    expect(screen.getByText('Pattern you used')).toBeTruthy();
+    expect(screen.getByText('Pattern to use')).toBeTruthy();
   });
 
   it('explains a godan row-shift miss as the learner action versus the target action', () => {
     render(<ConjugationBreakdown word={YOMU} type="plain-negative" userAnswer="よむない" />);
 
-    expect(screen.getByText('What went wrong')).toBeTruthy();
+    expect(screen.getByText('Pattern you used')).toBeTruthy();
     expect(screen.getByText('Kept dictionary ending む + ない')).toBeTruthy();
-    expect(screen.getByText('What should have happened')).toBeTruthy();
+    expect(screen.getByText('Pattern to use')).toBeTruthy();
     expect(screen.getAllByText('む -> ま + ない').length).toBeGreaterThan(0);
     expect(screen.getByText(/change む to ま first, then add ない: よまない/)).toBeTruthy();
     expect(screen.getByText('Row visual')).toBeTruthy();
     expect(screen.getByText(/moves to the a-row/)).toBeTruthy();
     expect(screen.getByText('よ + ま + ない = よまない')).toBeTruthy();
+
+    const inlineTable = screen.getByText('Full godan row table').closest('details');
+    expect(inlineTable).toBeTruthy();
+    expect(inlineTable.open).toBe(false);
+    expect(within(inlineTable).getByRole('table', { name: 'Godan row map' })).toBeTruthy();
+    expect(within(inlineTable).getByTestId('godan-row-む-a-row').getAttribute('aria-current')).toBe(
+      'true',
+    );
+
+    fireEvent.click(inlineTable.querySelector('summary'));
+    expect(inlineTable.open).toBe(true);
+    expect(within(inlineTable).getByText('Hide')).toBeTruthy();
   });
 
   it('labels ichidan as ichidan / ru-verb and bridges ta-form from masu stem', () => {
@@ -96,7 +109,7 @@ describe('ConjugationBreakdown', () => {
     ).toBeTruthy();
     expect(screen.getByText(/Tell-tale sign: 食べます and 食べない just drop る/)).toBeTruthy();
     expect(
-      screen.getByText(/Contrast: a る-ending godan verb \(帰る, 入る, 走る\) row-shifts/),
+      screen.getByText(/Compare: a る-ending godan verb \(帰る, 入る, 走る\) row-shifts/),
     ).toBeTruthy();
     expect(screen.getByText('食べます -> 食べ -> 食べた')).toBeTruthy();
   });

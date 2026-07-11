@@ -27,11 +27,18 @@ import {
   groupTrapText,
 } from '../utils/groupDisplay.js';
 import { ruMasuDiagnostic } from '../utils/ruVerbDiagnostics.js';
+import {
+  ANSWER_OUTCOME,
+  answerComparisonLabels,
+  answerOutcomeCopy,
+  answerResultCopy,
+} from '../utils/answerFeedbackCopy.js';
 
 const IRREGULAR_CLASSIFY_GROUP_IDS = new Set(['suru', 'kuru', 'irregular-adjective']);
 const REGULAR_VERB_CLASSIFY_IDS = VERB_GROUP_IDS.filter(
   (id) => !IRREGULAR_CLASSIFY_GROUP_IDS.has(id),
 );
+const GROUP_COMPARISON_LABELS = answerComparisonLabels('group');
 
 const VERB_CLASSIFY_OPTIONS = REGULAR_VERB_CLASSIFY_IDS.map((id) => {
   const meta = getGroupDisplay(id);
@@ -319,6 +326,14 @@ export default function ClassificationView() {
   const realAcc = stats.attempted ? Math.round((stats.correct / stats.attempted) * 100) : 0;
   const currentView = promptDisplay(current, null, practicePrefs);
   const teaching = result ? classificationTeachingMoment(current) : null;
+  const resultCopy = result
+    ? answerResultCopy({
+        outcome: result.ok ? ANSWER_OUTCOME.correct : ANSWER_OUTCOME.missed,
+        context: 'group',
+        submitted: classifyOptionLabel(result.chosen),
+        expected: teaching?.label || classifyOptionLabel(correctCategory),
+      })
+    : null;
 
   return (
     <div className="space-y-4">
@@ -404,15 +419,27 @@ export default function ClassificationView() {
               }`}
             >
               <span role="status" aria-live="polite" className="sr-only">
-                {result.ok ? 'Correct.' : 'Not quite.'} It is{' '}
-                {teaching?.label || classifyOptionLabel(correctCategory)}.
+                {resultCopy.announcement}
               </span>
               <div
                 className={`font-medium text-sm ${result.ok ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}
               >
-                {result.ok ? 'Correct.' : 'Not quite.'}{' '}
+                {result.ok
+                  ? answerOutcomeCopy(ANSWER_OUTCOME.correct)
+                  : answerOutcomeCopy(ANSWER_OUTCOME.missed)}{' '}
                 <span className="font-normal">
-                  It is {teaching?.label || classifyOptionLabel(correctCategory)}.
+                  {result.ok ? (
+                    <>
+                      {GROUP_COMPARISON_LABELS.expected}:{' '}
+                      {teaching?.label || classifyOptionLabel(correctCategory)}.
+                    </>
+                  ) : (
+                    <>
+                      {GROUP_COMPARISON_LABELS.submitted}: {classifyOptionLabel(result.chosen)}.{' '}
+                      {GROUP_COMPARISON_LABELS.expected}:{' '}
+                      {teaching?.label || classifyOptionLabel(correctCategory)}.
+                    </>
+                  )}
                 </span>
               </div>
               {teaching?.aliasText && (

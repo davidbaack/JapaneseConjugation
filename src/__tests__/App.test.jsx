@@ -373,8 +373,7 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
 
     const verdictStatus = await screen.findAllByText('Not quite.', {}, { timeout: 5000 });
-    expect(verdictStatus).toHaveLength(1);
-    expect(screen.getByText('Review this form.')).toBeTruthy();
+    expect(verdictStatus.length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('Walk through this form in Guide')).toBeTruthy();
     expect(screen.getByText(/Drills this same word and target form/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Open Guide for this rule' })).toBeTruthy();
@@ -447,7 +446,7 @@ describe('App shell', () => {
     const input = await waitForPracticeCard();
     fireEvent.change(input, { target: { value: 'zzz' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
-    expect(await screen.findByText('Review this form.')).toBeTruthy();
+    expect((await screen.findAllByText('Not quite.')).length).toBeGreaterThan(0);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open Guide for this rule' }));
     expect(await screen.findByText('Focused Guide')).toBeTruthy();
@@ -500,7 +499,7 @@ describe('App shell', () => {
     const input = await waitForPracticeCard();
     fireEvent.change(input, { target: { value: 'zzz' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
-    expect(await screen.findByText('Review this form.')).toBeTruthy();
+    expect((await screen.findAllByText('Not quite.')).length).toBeGreaterThan(0);
 
     fireEvent.click(
       await screen.findByRole('button', { name: 'Review grammar' }, { timeout: 5000 }),
@@ -560,7 +559,7 @@ describe('App shell', () => {
     fireEvent.change(input, { target: { value: 'hanase' } });
     const checkButton = screen.queryByRole('button', { name: 'Check (Enter)' });
     if (checkButton) fireEvent.click(checkButton);
-    await screen.findAllByText('Correct!', {}, { timeout: 5000 });
+    await screen.findAllByText('Correct.', {}, { timeout: 5000 });
 
     globalThis.HTMLElement.prototype.scrollIntoView.mockClear();
     fireEvent.click(await screen.findByRole('button', { name: 'Teach me this rule' }));
@@ -632,7 +631,7 @@ describe('App shell', () => {
     const checkButton = screen.queryByRole('button', { name: 'Check (Enter)' });
     if (checkButton) fireEvent.click(checkButton);
 
-    await screen.findAllByText('Correct!', {}, { timeout: 5000 });
+    await screen.findAllByText('Correct.', {}, { timeout: 5000 });
     const rationale = screen.getByText('Answer breakdown');
     expect(rationale.closest('details')).toBeNull();
     expect(screen.getByText('Visual Rule Path')).toBeTruthy();
@@ -770,7 +769,7 @@ describe('App shell', () => {
     expect(await screen.findByText('Check a conjugation')).toBeTruthy();
     fireEvent.change(screen.getByPlaceholderText(/tabeta/i), { target: { value: 'tabeta' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
-    expect(await screen.findByText('Correct conjugation')).toBeTruthy();
+    expect(await screen.findByText('Recognized form')).toBeTruthy();
   }, 15000);
 
   it('shows secondary right Check matches without expanding close matches', async () => {
@@ -806,7 +805,7 @@ describe('App shell', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
 
-    expect(await screen.findByText('Correct conjugation')).toBeTruthy();
+    expect(await screen.findByText('Recognized form')).toBeTruthy();
     const rightHeading = await screen.findByText('Other right answers');
     const rightSection = rightHeading.closest('section');
     expect(rightSection).toBeTruthy();
@@ -924,7 +923,7 @@ describe('App shell', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
 
-    expect(await screen.findByText('Correct conjugation')).toBeTruthy();
+    expect(await screen.findByText('Recognized form')).toBeTruthy();
     expect(
       screen.getAllByText(/Recognized 食べれる as conversational ら-dropping potential/).length,
     ).toBeGreaterThan(0);

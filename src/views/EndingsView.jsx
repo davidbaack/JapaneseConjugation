@@ -17,6 +17,12 @@ import { promptDisplay, formDisplay, shuffled } from '../utils/display.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { playPronunciation } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
+import {
+  ANSWER_OUTCOME,
+  answerComparisonLabels,
+  answerOutcomeCopy,
+  answerResultCopy,
+} from '../utils/answerFeedbackCopy.js';
 
 const REGISTER_PAIRS = [
   { plain: 'plain-present', polite: 'polite-present', label: 'present' },
@@ -25,6 +31,7 @@ const REGISTER_PAIRS = [
   { plain: 'plain-past-negative', polite: 'polite-past-negative', label: 'past-negative' },
 ];
 const REGISTER_SUB_MODES = ['te-form', 'plain-past', 'masu', 'plain-register'];
+const ANSWER_COMPARISON_LABELS = answerComparisonLabels();
 
 const MODE_BUTTONS = [
   { id: 'te-form', label: 'て', lang: 'ja' },
@@ -185,6 +192,13 @@ export default function EndingsView() {
     : null;
   const expectedFormView = isRegisterMode
     ? formDisplay(expectedForm, practicePrefs, current, targetType)
+    : null;
+  const resultCopy = result
+    ? answerResultCopy({
+        outcome: result.ok ? ANSWER_OUTCOME.correct : ANSWER_OUTCOME.missed,
+        submitted: result.chosen || 'Revealed answer',
+        expected: isRegisterMode ? expectedForm : expectedTail,
+      })
     : null;
   const registerPatternStats = isRegisterMode
     ? registerStats.byPattern?.[activePair.label] || { attempted: 0, correct: 0 }
@@ -542,25 +556,28 @@ export default function EndingsView() {
               }`}
             >
               <span role="status" aria-live="polite" className="sr-only">
-                {result.ok
-                  ? isRegisterMode
-                    ? 'Correct.'
-                    : 'Clean sound change.'
-                  : isRegisterMode
-                    ? 'Wrong form.'
-                    : 'Different ending pattern.'}
+                {resultCopy.announcement}
               </span>
               <div
                 className={`text-sm font-medium ${result.ok ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}
               >
                 {result.ok
-                  ? isRegisterMode
-                    ? 'Correct.'
-                    : 'Clean sound change.'
-                  : isRegisterMode
-                    ? 'Wrong form.'
-                    : 'Different ending pattern.'}
+                  ? answerOutcomeCopy(ANSWER_OUTCOME.correct)
+                  : answerOutcomeCopy(ANSWER_OUTCOME.missed)}
               </div>
+
+              {!result.ok && (
+                <div className="mt-2 grid gap-1 text-sm text-stone-700 dark:text-stone-300">
+                  <div>
+                    <span className="font-semibold">{ANSWER_COMPARISON_LABELS.submitted}:</span>{' '}
+                    <span lang="ja">{result.chosen || 'Revealed answer'}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold">{ANSWER_COMPARISON_LABELS.expected}:</span>{' '}
+                    <span lang="ja">{isRegisterMode ? expectedForm : expectedTail}</span>
+                  </div>
+                </div>
+              )}
 
               {isRegisterMode ? (
                 <>

@@ -644,7 +644,7 @@ describe('StudyView continuous Practice startup', () => {
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 
-    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     expect(screen.getByText(englishForForm(target, type))).toBeTruthy();
   });
 
@@ -792,7 +792,7 @@ describe('StudyView continuous Practice startup', () => {
       kind: 'correct',
       label: 'Plain Past',
     });
-    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
   });
 
   it('reveals kana directly into the Study answer box', async () => {
@@ -1181,7 +1181,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.change(input, { target: { value: target.reading } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
 
-    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
       .map(([arg]) => arg)
       .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
@@ -1266,7 +1266,7 @@ describe('StudyView continuous Practice startup', () => {
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 
-    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
       .map(([arg]) => arg)
       .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
@@ -1308,7 +1308,7 @@ describe('StudyView continuous Practice startup', () => {
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 
-    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
       .map(([arg]) => arg)
       .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
@@ -1348,7 +1348,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.change(input, { target: { value: 'tabeta' } });
     expect(input.value).toBe('\u305f\u3079\u305f');
     expect(setState).not.toHaveBeenCalled();
-    expect(screen.queryByText('Correct!')).toBeNull();
+    expect(screen.queryByText('Correct.')).toBeNull();
 
     fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => expect(setState).toHaveBeenCalled());
@@ -1363,7 +1363,7 @@ describe('StudyView continuous Practice startup', () => {
       label: 'Plain Past',
     });
     expect(nextState.cards[cardId].correct).toBe(1);
-    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
   });
 
   it('auto-submits an exact answer when kana help is on', async () => {
@@ -1392,7 +1392,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(nextState.session.correct).toBe(1);
     expect(nextState.cards[cardId].correct).toBe(1);
     expect(screen.queryByText('Complete match. Press Enter.')).toBeNull();
-    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
   });
 
   it('counts a coaching-hinted exact answer as correct', async () => {
@@ -1426,7 +1426,7 @@ describe('StudyView continuous Practice startup', () => {
       label: 'Plain Past',
     });
     expect(nextState.cards[cardId].correct).toBe(1);
-    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
     expect(screen.queryByText(/marked as a miss/)).toBeNull();
   });
 
@@ -1508,7 +1508,7 @@ describe('StudyView continuous Practice startup', () => {
       label: 'Plain Past',
     });
     expect(nextState.cards[cardId].correct).toBe(1);
-    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
     expect(screen.queryByText(/marked as a miss/)).toBeNull();
   });
 
@@ -1672,7 +1672,7 @@ describe('StudyView continuous Practice startup', () => {
 
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 
-    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     expect(screen.queryByRole('img', { name: /Pitch accent for/ })).toBeNull();
   });
 
@@ -1827,7 +1827,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByRole('button', { name: 'Review answers' }).disabled).toBe(true);
 
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
-    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
 
     const reviewButton = screen.getByRole('button', { name: 'Review answers' });
     expect(reviewButton.disabled).toBe(false);
@@ -1841,7 +1841,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(within(reviewRegion).queryByText('New')).toBeNull();
 
     fireEvent.click(screen.getByText('Answer #1'));
-    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
     expect(screen.getByText('Answer breakdown')).toBeTruthy();
     expect(within(reviewRegion).getByText('Walk through this form in Guide')).toBeTruthy();
     expect(within(reviewRegion).getByText(/Drills this same word and target form/)).toBeTruthy();
@@ -1927,13 +1927,13 @@ describe('StudyView continuous Practice startup', () => {
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: `${target.reading}\u306a\u3044` } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
-    await waitFor(() => expect(screen.getByText('Review this form.')).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText('Not quite.').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByRole('button', { name: 'Review answers' }));
     const reviewRegion = screen.getByRole('region', { name: 'Practice run review' });
     fireEvent.click(screen.getByText('Answer #1'));
 
-    expect(within(reviewRegion).getByText('Review this form.')).toBeTruthy();
+    expect(within(reviewRegion).getAllByText('Not quite.').length).toBeGreaterThan(0);
     const ruleCard = within(reviewRegion).getByText('Rule to apply').closest('section');
     const correctAnswer = within(reviewRegion).getByText('Correct Answer').closest('section');
     expect(ruleCard).toBeTruthy();
@@ -1947,8 +1947,8 @@ describe('StudyView continuous Practice startup', () => {
         node.textContent?.includes(' = '),
       ),
     ).toBe(true);
-    const contrastRow = within(reviewRegion).getByText('Contrast:').closest('div');
-    expect(contrastRow.textContent).toMatch(/Kept dictionary ending/);
+    const explanationRow = within(reviewRegion).getByText('Why it missed:').closest('div');
+    expect(explanationRow.textContent).toMatch(/You added/);
     expect(within(reviewRegion).queryByText(/does not match the requested/)).toBeNull();
     const answerBreakdown = within(reviewRegion).getByText('Answer breakdown').closest('section');
     expect(answerBreakdown).toBeTruthy();
@@ -2037,7 +2037,7 @@ describe('StudyView continuous Practice startup', () => {
 
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 
-    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
     expect(screen.getByText('Next card coming up...')).toBeTruthy();
 
     act(() => {
@@ -2045,7 +2045,7 @@ describe('StudyView continuous Practice startup', () => {
     });
     vi.useRealTimers();
 
-    await waitFor(() => expect(screen.queryByText('Correct!')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('Correct.')).toBeNull());
     const nextInput = screen.getByPlaceholderText(/Type romaji or kana/i);
     expect(document.activeElement).toBe(nextInput);
   });
@@ -2065,7 +2065,7 @@ describe('StudyView continuous Practice startup', () => {
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 
-    expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
     expect(screen.queryByText('Next card coming up...')).toBeNull();
   });
 
@@ -2099,7 +2099,7 @@ describe('StudyView continuous Practice startup', () => {
     });
     vi.useRealTimers();
 
-    await waitFor(() => expect(screen.queryByText('Correct!')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('Correct.')).toBeNull());
     const nextInput = screen.getByPlaceholderText(/Type romaji or kana/i);
     expect(document.activeElement).toBe(nextInput);
   });
@@ -2120,7 +2120,7 @@ describe('StudyView continuous Practice startup', () => {
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 
-    await waitFor(() => expect(screen.getAllByText('Correct!').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     expect(screen.getAllByText('Chat about this').length).toBeGreaterThan(0);
     expect(screen.queryByText('Gemini is thinking…')).toBeNull();
   });
@@ -2212,7 +2212,7 @@ describe('StudyView continuous Practice startup', () => {
       fireEvent.change(input, { target: { value: 'tanako' } });
       fireEvent.keyDown(input, { key: 'Enter' });
 
-      await waitFor(() => expect(screen.getByText('Review this form.')).toBeTruthy());
+      await waitFor(() => expect(screen.getAllByText('Not quite.').length).toBeGreaterThan(0));
       expect(screen.getAllByText('Your Answer').length).toBeGreaterThan(0);
       expect(screen.getAllByText('\u305f').length).toBeGreaterThan(0);
       expect(screen.getAllByText('\u306a').length).toBeGreaterThan(0);

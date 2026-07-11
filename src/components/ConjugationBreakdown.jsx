@@ -2,19 +2,22 @@ import React, { useMemo } from 'react';
 import { getConjugationDebugInfo } from '../utils/conjugatorExplain.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { kanaToRomaji } from '../utils/romaji.js';
+import { GodanRowChart } from './GodanRowChart.jsx';
 
 function ValueCell({ label, value, tone = 'text-stone-800 dark:text-stone-100', romajiFor }) {
   const romaji = romajiFor(value);
   return (
     <div className="min-w-0 rounded-lg border border-stone-200 bg-white/80 px-2.5 py-2 dark:border-stone-800 dark:bg-stone-950/60">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
         {label}
       </div>
       <div className={`mt-0.5 break-words text-base font-semibold ${tone}`} lang="ja">
         {value}
       </div>
       {romaji && (
-        <div className="mt-0.5 break-words text-[10px] italic text-stone-400">{romaji}</div>
+        <div className="mt-0.5 break-words text-[10px] italic text-stone-500 dark:text-stone-400">
+          {romaji}
+        </div>
       )}
     </div>
   );
@@ -98,7 +101,7 @@ function RowShiftVisual({ visual, onOpenFormationKeys, onOpenLearn }) {
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(4.5rem,0.7fr)_minmax(0,3fr)] sm:items-center">
         <div className="rounded-lg border border-white/80 bg-white/85 px-2.5 py-2 text-center dark:border-stone-800 dark:bg-stone-950/60">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
             Final
           </div>
           <div className="mt-0.5 text-xl font-bold text-stone-950 dark:text-stone-100" lang="ja">
@@ -129,6 +132,27 @@ function RowShiftVisual({ visual, onOpenFormationKeys, onOpenLearn }) {
       >
         {visual.formula}
       </div>
+      <details className="group mt-3 overflow-hidden rounded-xl border border-indigo-100 bg-white/70 dark:border-indigo-900/60 dark:bg-stone-950/45">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:hover:bg-indigo-950/30 [&::-webkit-details-marker]:hidden">
+          <span>
+            <span className="block text-xs font-semibold text-indigo-900 dark:text-indigo-100">
+              Full godan row table
+            </span>
+            <span className="mt-0.5 block text-[11px] text-stone-500 dark:text-stone-400">
+              All five vowel rows, with this shift highlighted
+            </span>
+          </span>
+          <span className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 group-open:hidden dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
+            Show
+          </span>
+          <span className="hidden rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 group-open:inline dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
+            Hide
+          </span>
+        </summary>
+        <div className="border-t border-indigo-100 p-2 dark:border-indigo-900/60 sm:p-3">
+          <GodanRowChart highlightEnding={visual.ending} highlightRow={visual.targetRow} />
+        </div>
+      </details>
     </div>
   );
 }
@@ -159,7 +183,7 @@ function SoundChangeVisual({ visual, onOpenLearn }) {
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(4.5rem,0.65fr)_minmax(0,4fr)] sm:items-center">
         <div className="rounded-lg border border-white/80 bg-white/85 px-2.5 py-2 text-center dark:border-stone-800 dark:bg-stone-950/60">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
             Final
           </div>
           <div className="mt-0.5 text-xl font-bold text-stone-950 dark:text-stone-100" lang="ja">
@@ -235,11 +259,13 @@ export function ConjugationBreakdown({
           <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300" lang="ja">
             {debug.result}
           </span>
-          <span className="text-[11px] text-stone-400">{debug.targetLabel}</span>
+          <span className="text-[11px] text-stone-500 dark:text-stone-400">
+            {debug.targetLabel}
+          </span>
         </div>
       </div>
       {romajiFor(debug.source) && (
-        <div className="text-right text-[11px] italic text-stone-400">
+        <div className="text-right text-[11px] italic text-stone-500 dark:text-stone-400">
           {romajiFor(debug.source)} -&gt; {romajiFor(debug.result)}
         </div>
       )}
@@ -307,8 +333,8 @@ export function ConjugationBreakdown({
       {debug.mistake ? (
         <div className="grid gap-2 rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 dark:border-rose-900/50 dark:bg-rose-950/15 sm:grid-cols-2">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-300">
-              What went wrong
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+              Pattern you used
             </div>
             <div className="mt-1 text-sm font-semibold text-rose-900 dark:text-rose-200">
               {debug.mistake.userRule}
@@ -318,8 +344,8 @@ export function ConjugationBreakdown({
             </div>
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-300">
-              What should have happened
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+              Pattern to use
             </div>
             <div className="mt-1 text-sm font-semibold text-emerald-900 dark:text-emerald-200">
               {debug.mistake.expectedRule}
@@ -335,20 +361,20 @@ export function ConjugationBreakdown({
       ) : userAnswer && userAnswer !== debug.result ? (
         <div className="grid gap-2 rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 dark:border-rose-900/50 dark:bg-rose-950/15 sm:grid-cols-2">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-300">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
               Your answer
             </div>
             <div className="mt-1 text-sm font-semibold text-rose-900 dark:text-rose-200" lang="ja">
               {userAnswer}
             </div>
             {romajiFor(userAnswer) && (
-              <div className="mt-0.5 text-xs italic text-rose-600/70" lang="ja">
+              <div className="mt-0.5 text-xs italic text-rose-700 dark:text-rose-300" lang="ja">
                 {romajiFor(userAnswer)}
               </div>
             )}
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-300">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
               Correct answer
             </div>
             <div
@@ -358,7 +384,10 @@ export function ConjugationBreakdown({
               {debug.result}
             </div>
             {romajiFor(debug.result) && (
-              <div className="mt-0.5 text-xs italic text-emerald-600/70" lang="ja">
+              <div
+                className="mt-0.5 text-xs italic text-emerald-700 dark:text-emerald-300"
+                lang="ja"
+              >
                 {romajiFor(debug.result)}
               </div>
             )}

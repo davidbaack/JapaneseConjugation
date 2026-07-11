@@ -6,6 +6,7 @@ import { formDisplay, promptDisplay } from '../../utils/display.js';
 import { buildFormationKeysHash } from '../../utils/formationKeys.js';
 import { clearMinimalPairPrefs, minimalPairReturnEnabledTypes } from '../../utils/minimalPairs.js';
 import { RunAnswerReveal } from './StudyReviewPanels.jsx';
+import { ANSWER_OUTCOME, answerOutcomeCopy } from '../../utils/answerFeedbackCopy.js';
 
 export function KanaCoachStrip({
   visibleCoachCells,
@@ -662,7 +663,11 @@ export function AnswerInputPanel({
   ) : (
     <>
       <span role="status" aria-live="polite" className="sr-only">
-        {wasCorrect ? 'Correct!' : wasCorrected ? 'Assisted correction.' : 'Not quite.'}
+        {wasCorrect
+          ? answerOutcomeCopy(ANSWER_OUTCOME.correct)
+          : wasCorrected
+            ? answerOutcomeCopy(ANSWER_OUTCOME.assisted)
+            : answerOutcomeCopy(ANSWER_OUTCOME.missed)}
       </span>
       <RunAnswerReveal
         record={reviewRecord}

@@ -1,7 +1,7 @@
 import { ALL_CARD_TYPES, getTypeInfo } from '../data/conjugationTypes.js';
 import { compatibleTypes, conjugateItem, isAdjective, wordKey } from './conjugator.js';
 import { toHiragana } from './romaji.js';
-import { groupDisplayLabel } from './groupDisplay.js';
+import { groupConfusionFeedback } from './answerFeedbackCopy.js';
 
 const K = {
   U: '\u3046',
@@ -167,7 +167,7 @@ function sourceFormDiagnosis(item, type, promptType, got) {
     category: 'source-form-repeated',
     patternId: patternKey('source-form-repeated', type),
     label: `Source form repeated: ${getTypeInfo(type).label}`,
-    feedback: `You kept the ${sourceLabel}, but the prompt asked for ${targetLabel}.`,
+    feedback: `You kept the ${sourceLabel} ${got}, but the prompt asked for ${targetLabel}: ${safeConjugate(item, type)}.`,
     item,
     type,
     guessedType: promptType || 'dictionary',
@@ -196,7 +196,7 @@ function exactWrongTypeDiagnosis(item, type, got) {
       category,
       patternId: patternKey(category, type),
       label: `${CATEGORY_LABELS[category]}: ${targetInfo.label}`,
-      feedback: `You made ${guessedInfo.label.toLowerCase()}, but the prompt asked for ${targetInfo.label.toLowerCase()}.`,
+      feedback: `You made ${guessedInfo.label.toLowerCase()} ${got}, but the prompt asked for ${targetInfo.label.toLowerCase()}: ${safeConjugate(item, type)}.`,
       item,
       type,
       guessedType: t.id,
@@ -216,7 +216,13 @@ function alternateGroupDiagnosis(item, type, got) {
         category: 'adjective-type-confusion',
         patternId: `adjective-type:${item.group}:${type}`,
         label: `${CATEGORY_LABELS['adjective-type-confusion']}: ${getTypeInfo(type).label}`,
-        feedback: `You used the ${groupDisplayLabel(otherGroup)} pattern, but this word is ${groupDisplayLabel(item.group)}.`,
+        feedback: groupConfusionFeedback({
+          usedGroup: otherGroup,
+          expectedGroup: item.group,
+          word: item.dict || item.reading,
+          userResult: got,
+          expectedResult: safeConjugate(item, type),
+        }),
         item,
         type,
         repairTypeIds: [type],
@@ -233,7 +239,13 @@ function alternateGroupDiagnosis(item, type, got) {
       category: 'verb-group-confusion',
       patternId: `verb-group:${item.group}:${type}`,
       label: `${CATEGORY_LABELS['verb-group-confusion']}: ${getTypeInfo(type).label}`,
-      feedback: `You conjugated this as ${groupDisplayLabel(otherGroup)}, but this word is ${groupDisplayLabel(item.group)}.`,
+      feedback: groupConfusionFeedback({
+        usedGroup: otherGroup,
+        expectedGroup: item.group,
+        word: item.dict || item.reading,
+        userResult: got,
+        expectedResult: safeConjugate(item, type),
+      }),
       item,
       type,
       repairTypeIds: [type],
@@ -293,7 +305,7 @@ function onbinDiagnosis(item, type, got) {
       feedback:
         actualPattern === 'iku'
           ? 'This is the iku exception, so the regular ku pattern does not apply.'
-          : `You used the ${usedLabel} ${getTypeInfo(type).label.toLowerCase()} pattern, but this verb belongs to the ${actualLabel} pattern.`,
+          : `You used the ${usedLabel} ${getTypeInfo(type).label.toLowerCase()} pattern, which produced ${got}. This verb uses the ${actualLabel} pattern: ${safeConjugate(item, type)}.`,
       item,
       type,
       repairTypeIds: ['te-form', 'plain-past'],

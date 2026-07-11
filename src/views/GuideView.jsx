@@ -14,13 +14,20 @@ import {
 } from '../utils/guidePractice.js';
 import { formDisplay } from '../utils/display.js';
 import { wordKey } from '../utils/conjugator.js';
+import { ANSWER_OUTCOME, answerOutcomeCopy } from '../utils/answerFeedbackCopy.js';
+import { groupDisplayLabel } from '../utils/groupDisplay.js';
 
 function pct(correct, attempted) {
   return attempted ? Math.round((correct / attempted) * 100) : 0;
 }
 
-function StepResult({ step }) {
+export function StepResult({ step }) {
   const ok = step.correct;
+  const submitted =
+    step.id === 'group'
+      ? groupDisplayLabel(step.submitted)
+      : String(step.submitted || '').trim() || 'No answer';
+  const expected = step.expectedLabel || step.expected;
   return (
     <div
       className={`rounded-lg border px-3 py-2 ${
@@ -33,9 +40,15 @@ function StepResult({ step }) {
         {ok ? <IconCheck className="mt-0.5 h-4 w-4" /> : <IconX className="mt-0.5 h-4 w-4" />}
         <div className="min-w-0">
           <div className="text-sm font-semibold">{step.label}</div>
-          <div className="mt-0.5 text-xs opacity-85">
-            {ok ? 'Correct' : `Expected ${step.expectedLabel || step.expected}`}
-            {step.assisted ? ' · assisted' : ''}
+          <div className="mt-0.5 space-y-0.5 text-xs opacity-85">
+            {ok && !step.assisted && <div>{answerOutcomeCopy(ANSWER_OUTCOME.correct)}</div>}
+            {ok && step.assisted && <div>Completed with help.</div>}
+            {!ok && (
+              <>
+                <div>Your answer: {submitted}</div>
+                <div>Correct answer: {expected}</div>
+              </>
+            )}
           </div>
         </div>
       </div>
