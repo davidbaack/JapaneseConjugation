@@ -1855,7 +1855,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByText('Practice run')).toBeTruthy();
   });
 
-  it('shows recent misses as one compact current-card source chip', async () => {
+  it('separates a previously missed card from a clean current run', async () => {
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
     const retryCardId = cardIdFor(target, type);
@@ -1875,18 +1875,39 @@ describe('StudyView continuous Practice startup', () => {
         },
       },
     };
-    mockedApp.value = makeApp({
+    let app;
+    const setState = vi.fn((nextState) => {
+      app = { ...app, state: nextState };
+      mockedApp.value = app;
+    });
+    app = makeApp({
       state,
+      setState,
       allWords: [target],
     });
+    mockedApp.value = app;
 
-    render(<StudyView />);
+    const { rerender } = render(<StudyView />);
 
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     const cardSource = screen.getByLabelText('Current card source');
-    expect(within(cardSource).getByText('Recent miss')).toBeTruthy();
+    expect(within(cardSource).getByText('Previously missed')).toBeTruthy();
+    expect(screen.queryByText('Recent miss')).toBeNull();
     expect(within(cardSource).queryByText('Returning after a miss')).toBeNull();
     expect(screen.queryByText('Returning after a miss')).toBeNull();
+    fireEvent.click(screen.getByText('Run details'));
+    const whyThisCard = screen.getByText('Why this card').parentElement;
+    expect(within(whyThisCard).getByText('Previously missed')).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    rerender(<StudyView />);
+
+    expect(screen.getByText('100% right')).toBeTruthy();
+    expect(screen.getByText('0 wrong')).toBeTruthy();
+    expect(
+      screen.getByText('Clean run so far. This card was missed in an earlier practice run.'),
+    ).toBeTruthy();
   });
 
   it('opens missed run review answers with the rule first and details collapsed', async () => {

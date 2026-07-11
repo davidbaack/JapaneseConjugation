@@ -1535,7 +1535,7 @@ function candidateFamilyId(candidate) {
 
 function selectionReasonFor(candidate, bucket) {
   if (bucket === 'due') return 'Due review';
-  if (bucket === 'retry') return 'Recent miss';
+  if (bucket === 'retry') return 'Previously missed';
   if (bucket === 'skill') {
     const familyLabel = formFamilyForType(candidate?.type || '')?.label;
     // A never-attempted family enters skill selection at neutral score; frame it as

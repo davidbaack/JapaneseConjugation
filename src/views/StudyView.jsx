@@ -2772,12 +2772,14 @@ export default function StudyView({ mode = 'practice' }) {
   const guideInsightAriaLabel = guideInsight
     ? `${guideInsightLabel}. ${[guideInsight.message, guideInsight.detail].filter(Boolean).join(' ')}`
     : '';
+  const currentOrigin = cardOriginForStudyCard(current);
   const currentSelectionReason = wordSweep?.repeatPass
     ? 'Repeating missed forms'
     : focusBanner
       ? `${focusBanner.kicker}: ${focusBanner.title}`
-      : current.selectionReason || 'Varied practice from enabled categories';
-  const currentOrigin = cardOriginForStudyCard(current);
+      : currentOrigin === 'missed'
+        ? 'Previously missed'
+        : current.selectionReason || 'Varied practice from enabled categories';
   const currentOriginMeta = cardOriginMeta(currentOrigin);
   const currentSourceChipLabel =
     currentOrigin === 'missed' ||
@@ -2792,11 +2794,20 @@ export default function StudyView({ mode = 'practice' }) {
   const recentOutcomes = Array.isArray(state.session?.recentOutcomes)
     ? state.session.recentOutcomes
     : [];
+  const previousMissCoachSentence =
+    currentOrigin === 'missed'
+      ? runStats.reviewed > 0 && runStats.missed === 0
+        ? 'Clean run so far. This card was missed in an earlier practice run.'
+        : 'This card was missed earlier.'
+      : '';
   const coachSentence = topSessionMistake
-    ? `${currentSelectionReason}. Watch ${topSessionMistake.label}.`
-    : runStats.reviewed > 0 && runStats.missed === 0
-      ? `${currentSelectionReason}. Clean run so far.`
-      : `${currentSelectionReason}.`;
+    ? previousMissCoachSentence
+      ? `${previousMissCoachSentence} Watch ${topSessionMistake.label}.`
+      : `${currentSelectionReason}. Watch ${topSessionMistake.label}.`
+    : previousMissCoachSentence ||
+      (runStats.reviewed > 0 && runStats.missed === 0
+        ? `${currentSelectionReason}. Clean run so far.`
+        : `${currentSelectionReason}.`);
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] xl:justify-center xl:grid-cols-[minmax(0,42rem)_minmax(0,20rem)]">
       <div className="order-1 min-w-0 space-y-4 xl:w-full">
