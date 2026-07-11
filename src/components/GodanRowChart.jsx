@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { A_ROW, E_ROW, I_ROW, O_ROW } from '../utils/conjugator.js';
 import { normalizeRowLabel } from '../utils/formationKeys.js';
 
@@ -66,6 +66,7 @@ function cellPositionClass(index) {
 }
 
 export function GodanRowChart({ highlightEnding = '', highlightRow = '' }) {
+  const headingId = useId();
   const activeEnding = GODAN_ROW_CHART_ENDINGS.includes(highlightEnding) ? highlightEnding : '';
   const activeRow = normalizeRowLabel(highlightRow);
   const activeColumn = ROW_COLUMNS.find((column) => column.id === activeRow);
@@ -75,15 +76,12 @@ export function GodanRowChart({ highlightEnding = '', highlightRow = '' }) {
   return (
     <section
       className="overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800"
-      aria-labelledby="godan-row-chart-heading"
+      aria-labelledby={headingId}
     >
       <div className="bg-stone-50 px-4 py-3 dark:bg-stone-950">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h4
-              id="godan-row-chart-heading"
-              className="text-sm font-semibold text-stone-800 dark:text-stone-100"
-            >
+            <h4 id={headingId} className="text-sm font-semibold text-stone-800 dark:text-stone-100">
               Godan row shifts
             </h4>
             <p className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">

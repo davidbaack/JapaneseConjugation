@@ -90,7 +90,9 @@ describe('ConjugationBreakdown', () => {
     const inlineTable = screen.getByText('Full godan row table').closest('details');
     expect(inlineTable).toBeTruthy();
     expect(inlineTable.open).toBe(false);
-    expect(within(inlineTable).getByRole('table', { name: 'Godan row map' })).toBeTruthy();
+    const rowMap = within(inlineTable).getByRole('table', { name: 'Godan row map' });
+    expect(rowMap.parentElement.className).toContain('overflow-x-auto');
+    expect(rowMap.className).toContain('min-w-[38rem]');
     expect(within(inlineTable).getByTestId('godan-row-む-a-row').getAttribute('aria-current')).toBe(
       'true',
     );
