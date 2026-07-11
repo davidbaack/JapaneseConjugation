@@ -393,17 +393,14 @@ describe('App shell', () => {
     ).toBeTruthy();
     expect(within(ruleCard).getByText(/Shift the final/)).toBeTruthy();
     expect(screen.queryByText(/does not match the requested/)).toBeNull();
-    const fullBreakdown = screen.getByText('Full breakdown').closest('details');
-    expect(fullBreakdown).toBeTruthy();
-    expect(fullBreakdown.tagName.toLowerCase()).toBe('details');
-    expect(fullBreakdown.open).toBe(false);
-    expect(within(fullBreakdown).getByText('More')).toBeTruthy();
-    fireEvent.click(within(fullBreakdown).getByText('Full breakdown'));
-    expect(fullBreakdown.open).toBe(true);
+    const answerBreakdown = screen.getByText('Answer breakdown').closest('section');
+    expect(answerBreakdown).toBeTruthy();
+    expect(answerBreakdown.tagName.toLowerCase()).toBe('section');
+    expect(within(answerBreakdown).queryByText('More')).toBeNull();
     expect(screen.getByText('1. What category is this and why?').closest('summary')).toBeNull();
-    expect(within(fullBreakdown).getByText('Visual Rule Path')).toBeTruthy();
-    expect(within(fullBreakdown).queryByText('Rule')).toBeNull();
-    expect(screen.queryByText('Answer breakdown')).toBeNull();
+    expect(within(answerBreakdown).getByText('Visual Rule Path')).toBeTruthy();
+    expect(within(answerBreakdown).getByText('Row visual')).toBeTruthy();
+    expect(within(answerBreakdown).queryByText('Rule')).toBeNull();
     expect(screen.queryByText('Gemini is not configured for AI chat.')).toBeNull();
   }, 15000);
 

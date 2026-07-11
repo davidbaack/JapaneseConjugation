@@ -702,7 +702,7 @@ function RunAnswerReveal({
               {missedContrast.body}
             </div>
           )}
-          <ReviewDisclosure tone="rose" summary="Full breakdown">
+          <ReviewDisclosure tone="rose" summary="Answer breakdown" alwaysOpen>
             {!minimalPairFeedback && (
               <div className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
                 {explanation.intro}

@@ -1910,7 +1910,7 @@ describe('StudyView continuous Practice startup', () => {
     ).toBeTruthy();
   });
 
-  it('opens missed run review answers with the rule first and details collapsed', async () => {
+  it('opens missed run review answers with the rule first and breakdown inline', async () => {
     const target = STARTER_VERBS.find((word) => word.group === 'godan');
     expect(target).toBeTruthy();
     const type = 'plain-negative';
@@ -1950,22 +1950,19 @@ describe('StudyView continuous Practice startup', () => {
     const contrastRow = within(reviewRegion).getByText('Contrast:').closest('div');
     expect(contrastRow.textContent).toMatch(/Kept dictionary ending/);
     expect(within(reviewRegion).queryByText(/does not match the requested/)).toBeNull();
-    const fullBreakdown = within(reviewRegion).getByText('Full breakdown').closest('details');
-    expect(fullBreakdown).toBeTruthy();
-    expect(fullBreakdown.tagName.toLowerCase()).toBe('details');
-    expect(fullBreakdown.open).toBe(false);
-    expect(within(fullBreakdown).getByText('More')).toBeTruthy();
-    fireEvent.click(within(fullBreakdown).getByText('Full breakdown'));
-    expect(fullBreakdown.open).toBe(true);
-    expect(within(fullBreakdown).getByText('Visual Rule Path')).toBeTruthy();
-    expect(within(fullBreakdown).getByText('1. What category is this and why?')).toBeTruthy();
-    expect(within(fullBreakdown).queryByText('Rule')).toBeNull();
+    const answerBreakdown = within(reviewRegion).getByText('Answer breakdown').closest('section');
+    expect(answerBreakdown).toBeTruthy();
+    expect(answerBreakdown.tagName.toLowerCase()).toBe('section');
+    expect(within(answerBreakdown).queryByText('More')).toBeNull();
+    expect(within(answerBreakdown).getByText('Visual Rule Path')).toBeTruthy();
+    expect(within(answerBreakdown).getByText('Row visual')).toBeTruthy();
+    expect(within(answerBreakdown).getByText('1. What category is this and why?')).toBeTruthy();
+    expect(within(answerBreakdown).queryByText('Rule')).toBeNull();
     expect(within(reviewRegion).getByText('Walk through this form in Guide')).toBeTruthy();
     expect(within(reviewRegion).getByText(/Drills this same word and target form/)).toBeTruthy();
     expect(
       within(reviewRegion).getByRole('button', { name: 'Open Guide for this rule' }),
     ).toBeTruthy();
-    expect(within(reviewRegion).queryByText('Answer breakdown')).toBeNull();
   });
 
   it('walks a word form sweep in order and repeats missed forms before completion', async () => {
