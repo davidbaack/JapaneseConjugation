@@ -31,6 +31,7 @@ import {
   searchWords,
   surfaceFormForLocal,
   formLookupCandidates,
+  hasAmbiguousExactLookup,
   adHocReferenceCandidates,
   formRows,
   referenceRows,
@@ -101,29 +102,41 @@ export default function ReferenceViewSub({
   const [lookupAiLoading, setLookupAiLoading] = useState(false);
   const [lookupAiErr, setLookupAiErr] = useState('');
   const [favoriteMsg, setFavoriteMsg] = useState('');
-  const [activeLookupMatchKey, setActiveLookupMatchKey] = useState('');
+  const [confirmedLookupSelection, setConfirmedLookupSelection] = useState(null);
   const lookupAbortRef = useRef(null);
-  const lookupAutoSelectKeyRef = useRef('');
 
   const words = useMemo(() => [...verbs, ...adjectives], [verbs, adjectives]);
-  const reference = normalizeReferenceState(state.reference);
+  const wordByKey = useMemo(
+    () => new Map(words.map((word) => [wordKeyLocal(word), word])),
+    [words],
+  );
+  const reference = useMemo(() => normalizeReferenceState(state.reference), [state.reference]);
   const historyWords = reference.history.map(
-    (h) => words.find((w) => wordKeyLocal(w) === wordKeyLocal(h)) || h,
+    (historyWord) => wordByKey.get(wordKeyLocal(historyWord)) || historyWord,
   );
   const referenceSelectedWord = reference.selected
-    ? words.find((w) => wordKeyLocal(w) === wordKeyLocal(reference.selected)) || null
+    ? wordByKey.get(wordKeyLocal(reference.selected)) || null
     : null;
   const matches = useMemo(() => searchWords(query, words), [query, words]);
-  const lookupMatches = useMemo(() => formLookupCandidates(query, words), [query, words]);
+  const lookupMatches = useMemo(
+    () => formLookupCandidates(query, words, { history: reference.history }),
+    [query, reference.history, words],
+  );
+  const ambiguousExactLookup = hasAmbiguousExactLookup(lookupMatches);
   const reverseLookupFocused =
-    lookupMatches.length > 0 && !isDictionaryLookupQuery(query, lookupMatches[0]?.word);
+    lookupMatches.length > 0 &&
+    (ambiguousExactLookup || !isDictionaryLookupQuery(query, lookupMatches[0]?.word));
+  const confirmedLookupMatchKey =
+    confirmedLookupSelection?.query === query.trim() ? confirmedLookupSelection.key : '';
   const activeLookupMatch = useMemo(() => {
     if (!query.trim() || !reverseLookupFocused) return null;
-    return (
-      lookupMatches.find((match) => lookupMatchKey(match) === activeLookupMatchKey) ||
-      lookupMatches[0]
-    );
-  }, [activeLookupMatchKey, lookupMatches, query, reverseLookupFocused]);
+    if (ambiguousExactLookup) {
+      return (
+        lookupMatches.find((match) => lookupMatchKey(match) === confirmedLookupMatchKey) || null
+      );
+    }
+    return lookupMatches[0] || null;
+  }, [ambiguousExactLookup, confirmedLookupMatchKey, lookupMatches, query, reverseLookupFocused]);
   const scratchCandidates = useMemo(() => adHocReferenceCandidates(query), [query]);
   const scratchCandidate =
     scratchCandidates[Math.min(scratchIndex, Math.max(0, scratchCandidates.length - 1))] || null;
@@ -152,29 +165,13 @@ export default function ReferenceViewSub({
 
   useEffect(() => {
     const trimmedQuery = query.trim();
-    if (!trimmedQuery || !lookupMatches.length) {
-      lookupAutoSelectKeyRef.current = '';
-      setActiveLookupMatchKey('');
-      return;
-    }
-    if (isDictionaryLookupQuery(trimmedQuery, lookupMatches[0]?.word)) {
-      setActiveLookupMatchKey('');
-    } else {
-      setActiveLookupMatchKey((current) =>
-        current && lookupMatches.some((match) => lookupMatchKey(match) === current)
-          ? current
-          : lookupMatchKey(lookupMatches[0]),
-      );
-    }
+    if (!trimmedQuery || !lookupMatches.length || ambiguousExactLookup) return;
     const topWord = lookupMatches[0]?.word || null;
     if (!topWord) return;
-    const autoSelectKey = `${trimmedQuery}:${wordKeyLocal(topWord)}`;
-    if (lookupAutoSelectKeyRef.current === autoSelectKey) return;
-    lookupAutoSelectKeyRef.current = autoSelectKey;
     setSelected((current) =>
       current && wordKeyLocal(current) === wordKeyLocal(topWord) ? current : topWord,
     );
-  }, [lookupMatches, query]);
+  }, [ambiguousExactLookup, lookupMatches, query]);
 
   useEffect(() => {
     setLookupAiText('');
@@ -191,7 +188,10 @@ export default function ReferenceViewSub({
     !queryActive ||
     matches.some((word) => wordKeyLocal(word) === selectedKey) ||
     lookupMatches.some((match) => wordKeyLocal(match.word) === selectedKey);
-  const detailWord = queryActive && selectedMatchesQuery && !activeLookupMatch ? selected : null;
+  const detailWord =
+    queryActive && selectedMatchesQuery && !activeLookupMatch && !ambiguousExactLookup
+      ? selected
+      : null;
   const rows = detailWord ? referenceRows(detailWord, state) : [];
   const selectedView = detailWord ? promptDisplay(detailWord, null, practicePrefs) : null;
   const selectedMasuDiagnostic = detailWord ? ruMasuDiagnostic(detailWord) : null;
@@ -229,11 +229,21 @@ export default function ReferenceViewSub({
     updateReference((ref) => referenceWithSearch(ref, q));
   }
 
+  function changeQuery(nextQuery) {
+    setQuery(nextQuery);
+    setConfirmedLookupSelection(null);
+  }
+
   function chooseReferenceWord(word, q = query) {
-    if (!String(q || '').trim()) setQuery(word.dict);
+    if (!String(q || '').trim()) changeQuery(word.dict);
     setSelected(word);
     if (String(q || '').trim()) rememberSearch(q);
     updateReference((ref) => referenceWithSelected(referenceWithHistory(ref, word), word));
+  }
+
+  function confirmLookupMatch(match) {
+    setConfirmedLookupSelection({ query: query.trim(), key: lookupMatchKey(match) });
+    chooseReferenceWord(match.word);
   }
 
   function clearReferenceMemory() {
@@ -541,7 +551,7 @@ export default function ReferenceViewSub({
             <IconList className="w-4 h-4 absolute left-3 top-2.5 text-stone-600" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => changeQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && query.trim()) rememberSearch(query);
               }}
@@ -569,7 +579,7 @@ export default function ReferenceViewSub({
                     {reference.recentSearches.map((s) => (
                       <button
                         key={s}
-                        onClick={() => setQuery(s)}
+                        onClick={() => changeQuery(s)}
                         className="px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-xs text-stone-600 dark:text-stone-300 truncate max-w-full"
                       >
                         {s}
@@ -621,16 +631,22 @@ export default function ReferenceViewSub({
           {query.trim() && (
             <div className="mt-3 border-t border-stone-100 dark:border-stone-800 pt-3">
               <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-wider text-stone-600">
-                <span>Reverse lookup</span>
+                <span>{ambiguousExactLookup ? 'Ambiguous exact match' : 'Reverse lookup'}</span>
                 <span>
                   {lookupMatches.length
                     ? `${lookupMatches.length} hit${lookupMatches.length === 1 ? '' : 's'}`
                     : 'no exact hit'}
                 </span>
               </div>
+              {ambiguousExactLookup ? (
+                <p className="mt-1 text-xs leading-relaxed text-stone-600 dark:text-stone-400">
+                  Ranked by spelling, your lookup choices, and learner level. Choose the intended
+                  word and form.
+                </p>
+              ) : null}
               {lookupMatches.length > 0 ? (
                 <div className="mt-2 space-y-1.5">
-                  {lookupMatches.slice(0, 5).map((m) => {
+                  {lookupMatches.slice(0, ambiguousExactLookup ? 12 : 5).map((m) => {
                     const active = lookupMatchKey(m) === lookupMatchKey(activeLookupMatch);
                     const av =
                       m.matchKind === 'variant'
@@ -644,10 +660,7 @@ export default function ReferenceViewSub({
                     return (
                       <button
                         key={`${wordKeyLocal(m.word)}-${m.type.id}-${m.matchKind}`}
-                        onClick={() => {
-                          setActiveLookupMatchKey(lookupMatchKey(m));
-                          rememberSearch(query);
-                        }}
+                        onClick={() => confirmLookupMatch(m)}
                         className={`w-full text-left px-2 py-2 rounded-lg border transition ${
                           active
                             ? 'border-indigo-200 bg-indigo-50 dark:bg-indigo-950/20'
