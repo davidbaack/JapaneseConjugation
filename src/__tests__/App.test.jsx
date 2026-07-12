@@ -78,13 +78,12 @@ describe('App shell', () => {
     for (const label of ['Plain', 'Polite', 'Affirmative', 'Negative', 'Past', 'Non-past']) {
       expect(screen.getByRole('button', { name: `Turn ${label} off` })).toBeTruthy();
     }
-    expect(screen.getAllByText('Not introduced').length).toBeGreaterThan(0);
-    expect(screen.queryByText('No reps yet')).toBeNull();
+    expect(screen.getAllByText('New').length).toBeGreaterThan(0);
+    expect(screen.queryByText('No attempts yet')).toBeNull();
     expect(screen.queryByText('Untested')).toBeNull();
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByText('0 cards')).toBeTruthy();
-    expect(screen.getByText('0 right')).toBeTruthy();
-    expect(screen.getByText('0 wrong')).toBeTruthy();
+    expect(screen.getByText('0 missed')).toBeTruthy();
     expect(screen.getByText('0 streak')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
     expect(screen.queryByText('Next workout')).toBeNull();
@@ -126,10 +125,10 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Stats', exact: true }));
     expect(await screen.findByRole('region', { name: 'Stats dashboard' })).toBeTruthy();
     expect(screen.getByText('Practice pulse.')).toBeTruthy();
-    expect(screen.getByText('Accuracy')).toBeTruthy();
-    expect(screen.getByText('69%')).toBeTruthy();
-    expect(screen.getByText('9 right / 4 wrong lifetime')).toBeTruthy();
+    expect(screen.getByText('Answer balance')).toBeTruthy();
+    expect(screen.getByText('9 right / 4 wrong')).toBeTruthy();
     expect(screen.getByText('Upcoming reviews')).toBeTruthy();
+    expect(screen.getByText('No reviews scheduled.')).toBeTruthy();
     expect(screen.getByText('Form families')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
   });
@@ -680,8 +679,9 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Guide', exact: true }));
 
     expect(await screen.findByText('Build the conjugation step by step.')).toBeTruthy();
-    const skipButtons = await screen.findAllByRole('button', { name: 'Skip' });
-    for (const button of skipButtons) fireEvent.click(button);
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip plain form step' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip word group step' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Skip final answer step' }));
     fireEvent.click(screen.getByRole('button', { name: 'Submit guide card' }));
 
     expect(await screen.findAllByText(/assisted/i)).toBeTruthy();
@@ -754,22 +754,33 @@ describe('App shell', () => {
     expect(screen.queryByRole('tab', { name: /^Groups/i })).toBeNull();
     expect(screen.queryByRole('tab', { name: /^Rush/i })).toBeNull();
     fireEvent.click(screen.getByRole('tab', { name: /^Words/i }));
-    expect(await screen.findAllByRole('button', { name: 'Practice now' })).toBeTruthy();
+    expect(await screen.findAllByRole('button', { name: 'Practice this' })).toHaveLength(30);
+    fireEvent.click(screen.getByRole('button', { name: 'Load 30 more' }));
+    expect(
+      (await screen.findAllByRole('button', { name: 'Practice this' })).length,
+    ).toBeGreaterThan(30);
     fireEvent.click(screen.getByRole('tab', { name: /^Lookup/i }));
-    const drillWord = await screen.findByRole('button', { name: 'Drill word' });
-    expect(drillWord).toBeTruthy();
+    expect(await screen.findByText(/Search a dictionary word or any conjugated form/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Practice this' })).toBeNull();
     fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
       target: { value: 'taberu' },
     });
+    expect(await screen.findByRole('button', { name: 'Practice this' })).toBeTruthy();
     expect(await screen.findByRole('button', { name: 'AI disambiguate' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Favorite', exact: true })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Drill favorites' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Practice favorites' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Copy table' })).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /^Check/i }));
     expect(await screen.findByText('Check a conjugation')).toBeTruthy();
     fireEvent.change(screen.getByPlaceholderText(/tabeta/i), { target: { value: 'tabeta' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
     expect(await screen.findByText('Recognized form')).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /^Lists/i }));
+    const builtInPacks = (await screen.findByText('Built-in packs')).closest('details');
+    const aiBuilder = screen.getByText('AI list builder').closest('details');
+    expect(builtInPacks?.open).toBe(false);
+    expect(aiBuilder?.open).toBe(false);
+    expect(screen.getByText('Create or select a list to edit its words.')).toBeTruthy();
   }, 15000);
 
   it('shows secondary right Check matches without expanding close matches', async () => {
@@ -824,11 +835,7 @@ describe('App shell', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Drills', exact: true }));
 
-    await screen.findByText(
-      'Focused exercises for endings, transformations, groups, and speed.',
-      {},
-      { timeout: 5000 },
-    );
+    await screen.findByText('Pick a drill and start.', {}, { timeout: 5000 });
     expect(screen.getByRole('tab', { name: /^Ending Lab/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Transform/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /^Groups/i })).toBeTruthy();
@@ -838,6 +845,8 @@ describe('App shell', () => {
     expect(await screen.findByRole('heading', { name: 'Ending Lab' })).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /^Transform/i }));
     expect(await screen.findByText(/Conjugate to/i)).toBeTruthy();
+    expect(screen.queryByText('Practice run')).toBeNull();
+    expect(screen.queryByRole('complementary', { name: 'Practice map' })).toBeNull();
     fireEvent.click(screen.getByRole('tab', { name: /^Groups/i }));
     expect(await screen.findByText('Classification drill')).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /^Rush/i }));
@@ -859,7 +868,7 @@ describe('App shell', () => {
     expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
   }, 15000);
 
-  it('starts Lookup Drill word as focused word Practice', async () => {
+  it('starts Lookup Practice this as focused word Practice', async () => {
     render(<App />);
     expect(await waitForPracticeCard()).toBeTruthy();
 
@@ -869,7 +878,7 @@ describe('App shell', () => {
       target: { value: 'taberu' },
     });
     expect(await screen.findAllByText('to eat')).toBeTruthy();
-    fireEvent.click(await screen.findByRole('button', { name: 'Drill word' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Practice this' }));
 
     expect(await screen.findByText('Reference drill')).toBeTruthy();
     expect(screen.getByText(/Word focus/)).toBeTruthy();
@@ -877,7 +886,7 @@ describe('App shell', () => {
     expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
   }, 15000);
 
-  it('starts Lookup Drill enabled forms as a word form sweep', async () => {
+  it('starts Lookup Practice enabled forms as a word form sweep', async () => {
     render(<App />);
     expect(await waitForPracticeCard()).toBeTruthy();
 
@@ -887,7 +896,7 @@ describe('App shell', () => {
       target: { value: 'taberu' },
     });
     expect(await screen.findAllByText('to eat')).toBeTruthy();
-    fireEvent.click(await screen.findByRole('button', { name: 'Drill enabled forms' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Practice enabled forms' }));
 
     expect(await screen.findByText('Word form sweep')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /食べる/ })).toBeTruthy();
@@ -896,7 +905,7 @@ describe('App shell', () => {
     expect(screen.getByRole('button', { name: 'Back to reference' })).toBeTruthy();
   }, 15000);
 
-  it('does not offer Drill enabled forms for unmatched scratch lookup words', async () => {
+  it('does not offer Practice enabled forms for unmatched scratch lookup words', async () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
@@ -910,7 +919,7 @@ describe('App shell', () => {
       screen.getByText('No local form match yet. Try a dictionary form or romaji.'),
     ).toBeTruthy();
     expect(screen.queryByText(/Scanner/i)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Drill enabled forms' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Practice enabled forms' })).toBeNull();
   }, 15000);
 
   it('recognizes conversational 食べれる in Check without guessing 滑る', async () => {
@@ -956,7 +965,7 @@ describe('App shell', () => {
     ).toBeGreaterThan(0);
     expect(screen.queryByText('Scratch conjugator')).toBeNull();
     expect(screen.queryByText(/お食べれ/)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Drill enabled forms' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Practice enabled forms' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Copy table' })).toBeNull();
   }, 15000);
 
@@ -976,7 +985,7 @@ describe('App shell', () => {
     const referenceDetails = screen.getByText('Show full word reference').closest('details');
     expect(referenceDetails).toBeTruthy();
     expect(referenceDetails.open).toBe(false);
-    expect(screen.queryByRole('button', { name: 'Drill enabled forms' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Practice enabled forms' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Copy table' })).toBeNull();
   }, 15000);
 
@@ -1009,7 +1018,8 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
 
     fireEvent.click(await screen.findByRole('tab', { name: /^Lookup/i }));
-    expect((await screen.findAllByText('to write')).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/Search a dictionary word or any conjugated form/)).toBeTruthy();
+    expect(screen.queryByText('to write')).toBeNull();
 
     fireEvent.change(screen.getByLabelText('Search for a word or conjugation form'), {
       target: { value: '\u98df\u3079\u307e\u3057\u305f' },

@@ -55,10 +55,12 @@ export default function CustomDictionaryViewSub({
   // tablist's keyboard activation so the two paths behave identically.
   const selectDictTab = (id) => {
     setDictTab(id);
+    setShowBuiltIns(false);
     resetAdd();
   };
   const { tabProps, panelProps } = useTablist(['verbs', 'adjectives'], dictTab, selectDictTab);
   const [showAdd, setShowAdd] = useState(false);
+  const [showBuiltIns, setShowBuiltIns] = useState(false);
   const [query, setQuery] = useState('');
   const [addPhase, setAddPhase] = useState('idle');
   const [suggestion, setSuggestion] = useState(null);
@@ -77,23 +79,24 @@ export default function CustomDictionaryViewSub({
   const starterWords = isAdj ? STARTER_ADJECTIVES : STARTER_VERBS;
   const customWords = isAdj ? customAdjectives : customVerbs;
   const setCustomWords = isAdj ? setCustomAdjectives : setCustomVerbs;
-  const allWords = useMemo(() => [...starterWords, ...customWords], [customWords, starterWords]);
+  const corpusWords = useMemo(() => [...starterWords, ...customWords], [customWords, starterWords]);
+  const displayedWords = showBuiltIns ? corpusWords : customWords;
 
   // Window the table once the list gets long so a large dictionary stays smooth
   // (improvement #12). Below the threshold we render everything (no windowing).
-  const virtualize = allWords.length > VIRTUAL_THRESHOLD;
+  const virtualize = displayedWords.length > VIRTUAL_THRESHOLD;
   const { start, end, padTop, padBottom, onScroll } = useVirtualRows({
-    count: allWords.length,
+    count: displayedWords.length,
     rowHeight: ROW_HEIGHT,
     viewportHeight: LIST_VIEWPORT,
     enabled: virtualize,
   });
-  const visibleWords = virtualize ? allWords.slice(start, end) : allWords;
+  const visibleWords = virtualize ? displayedWords.slice(start, end) : displayedWords;
 
   async function fetchSugg(wordsList) {
     if (!geminiAvailable) return;
     const gen = ++suggGen.current;
-    const wlist = wordsList || allWords;
+    const wlist = wordsList || corpusWords;
     setSuggLoading(true);
     setSuggErr('');
     setSugg(null);
@@ -161,7 +164,7 @@ export default function CustomDictionaryViewSub({
       reading: sanitizeField(rawWord.reading, FIELD_LIMITS.reading),
       meaning: sanitizeField(rawWord.meaning, FIELD_LIMITS.meaning),
     };
-    if (allWords.some((v) => v.dict === word.dict)) {
+    if (corpusWords.some((v) => v.dict === word.dict)) {
       setAddError(`${word.dict} is already in your list`);
       setAddPhase('error');
       return;
@@ -234,16 +237,26 @@ export default function CustomDictionaryViewSub({
       <div {...panelProps(dictTab)} className="space-y-4">
         <div className="flex justify-between items-center">
           <div className="text-sm text-stone-600 dark:text-stone-400">
-            {starterWords.length} starter + {customWords.length} custom ={' '}
-            {starterWords.length + customWords.length} {isAdj ? 'adjectives' : 'verbs'}
+            {customWords.length} custom {isAdj ? 'adjective' : 'verb'}
+            {customWords.length === 1 ? '' : 's'}
           </div>
-          <button
-            onClick={() => setShowAdd(!showAdd)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition"
-          >
-            <IconPlus className="w-4 h-4" />
-            Add {isAdj ? 'adjective' : 'verb'}
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowBuiltIns((current) => !current)}
+              aria-pressed={showBuiltIns}
+              className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-200 dark:hover:bg-stone-800"
+            >
+              {showBuiltIns ? 'Hide built-ins' : `Show ${starterWords.length} built-ins`}
+            </button>
+            <button
+              onClick={() => setShowAdd(!showAdd)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition"
+            >
+              <IconPlus className="w-4 h-4" />
+              Add {isAdj ? 'adjective' : 'verb'}
+            </button>
+          </div>
         </div>
 
         {geminiAvailable && (
@@ -510,13 +523,19 @@ export default function CustomDictionaryViewSub({
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+                {displayedWords.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-stone-500">
+                      No custom {isAdj ? 'adjectives' : 'verbs'} yet. Add one or show the built-ins.
+                    </td>
+                  </tr>
+                )}
                 {virtualize && padTop > 0 && (
                   <tr aria-hidden="true" style={{ height: padTop }}>
                     <td colSpan={5} className="p-0" />
                   </tr>
                 )}
-                {visibleWords.map((v, localI) => {
-                  const i = virtualize ? start + localI : localI;
+                {visibleWords.map((v) => {
                   const vvs = state?.verbStats?.[v.dict] || {};
                   const totalSeen = Object.values(vvs).reduce((s, x) => s + x.seen, 0);
                   const totalIncorrect = Object.values(vvs).reduce((s, x) => s + x.incorrect, 0);
@@ -554,7 +573,7 @@ export default function CustomDictionaryViewSub({
                         )}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {i >= starterWords.length &&
+                        {customWords.some((customWord) => customWord.dict === v.dict) &&
                           (confirmDelete === v.dict ? (
                             <span className="flex items-center gap-1 justify-end">
                               <button

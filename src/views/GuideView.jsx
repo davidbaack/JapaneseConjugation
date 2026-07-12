@@ -97,6 +97,7 @@ export default function GuideView() {
   const [assistedSteps, setAssistedSteps] = useState({});
   const [hintedSteps, setHintedSteps] = useState({});
   const [result, setResult] = useState(null);
+  const [activeStep, setActiveStep] = useState('base');
   const [completed, setCompleted] = useState(0);
   const [correct, setCorrect] = useState(0);
   const startedAtRef = useRef(0);
@@ -121,6 +122,7 @@ export default function GuideView() {
     setAssistedSteps({});
     setHintedSteps({});
     setResult(null);
+    setActiveStep('base');
     startedAtRef.current = Date.now();
   }
 
@@ -191,6 +193,13 @@ export default function GuideView() {
             ? card.expectedGroup
             : card.expectedAnswer,
     }));
+    if (stepId === 'base') setActiveStep('group');
+    if (stepId === 'group') setActiveStep('answer');
+  }
+
+  function continueFromBase() {
+    if (!answers.base.trim()) return;
+    setActiveStep('group');
   }
 
   function submit(e) {
@@ -385,134 +394,203 @@ export default function GuideView() {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3">
-          <section className="rounded-lg border border-stone-200 p-3 dark:border-stone-800">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <label className="min-w-0 flex-1">
-                <span className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-                  1. Find plain form
+        <div className="mt-4 grid grid-cols-3 gap-2" aria-label="Guide steps">
+          {[
+            ['base', '1', 'Plain form'],
+            ['group', '2', 'Group'],
+            ['answer', '3', 'Answer'],
+          ].map(([id, number, label]) => {
+            const enabled =
+              id === 'base' ||
+              (id === 'group' && !!answers.base.trim()) ||
+              (id === 'answer' && !!answers.base.trim() && !!answers.group);
+            return (
+              <button
+                key={id}
+                type="button"
+                disabled={!enabled || !!result}
+                aria-current={activeStep === id ? 'step' : undefined}
+                onClick={() => setActiveStep(id)}
+                className={`rounded-lg border px-2 py-2 text-left text-xs transition ${
+                  activeStep === id
+                    ? 'border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100'
+                    : enabled
+                      ? 'border-stone-200 text-stone-700 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800'
+                      : 'border-stone-200 text-stone-400 opacity-60 dark:border-stone-800 dark:text-stone-600'
+                }`}
+              >
+                <span className="block font-semibold">
+                  {number}. {label}
                 </span>
-                <input
-                  value={answers.base}
-                  onChange={(e) => setAnswers((prev) => ({ ...prev, base: e.target.value }))}
-                  disabled={!!result}
-                  aria-label="Plain form"
-                  placeholder="Dictionary/plain form"
-                  className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-lg text-stone-950 outline-none transition focus:border-indigo-400 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50"
-                />
-              </label>
-              <div className="flex gap-2 sm:pt-7">
+                {id === 'base' && answers.base && (
+                  <span className="mt-0.5 block truncate">{answers.base}</span>
+                )}
+                {id === 'group' && answers.group && (
+                  <span className="mt-0.5 block truncate">
+                    {groupOptions.find((option) => option.id === answers.group)?.label}
+                  </span>
+                )}
+                {id === 'answer' && answers.answer && (
+                  <span className="mt-0.5 block truncate">{answers.answer}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 grid gap-3">
+          {(activeStep === 'base' || result) && (
+            <section className="rounded-lg border border-stone-200 p-3 dark:border-stone-800">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <label className="min-w-0 flex-1">
+                  <span className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                    1. Find plain form
+                  </span>
+                  <input
+                    value={answers.base}
+                    onChange={(e) => setAnswers((prev) => ({ ...prev, base: e.target.value }))}
+                    disabled={!!result}
+                    aria-label="Plain form"
+                    placeholder="Dictionary/plain form"
+                    className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-lg text-stone-950 outline-none transition focus:border-indigo-400 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50"
+                  />
+                </label>
+                <div className="flex gap-2 sm:pt-7">
+                  <button
+                    type="button"
+                    onClick={() => revealHint('base')}
+                    disabled={!!result}
+                    aria-label="Hint for plain form step"
+                    className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
+                  >
+                    Hint
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => skipStep('base')}
+                    disabled={!!result}
+                    aria-label="Skip plain form step"
+                    className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
+                  >
+                    Skip
+                  </button>
+                </div>
+              </div>
+              {hintedSteps.base && (
+                <div className="mt-2 text-xs text-stone-500">
+                  <HintText stepId="base" card={card} />
+                </div>
+              )}
+              {!result && (
                 <button
                   type="button"
-                  onClick={() => revealHint('base')}
+                  onClick={continueFromBase}
+                  disabled={!answers.base.trim()}
+                  className="mt-3 w-full rounded-lg bg-stone-800 px-3 py-2 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-indigo-700 dark:hover:bg-indigo-600"
+                >
+                  Next: choose the group
+                </button>
+              )}
+            </section>
+          )}
+
+          {(activeStep === 'group' || result) && (
+            <section className="rounded-lg border border-stone-200 p-3 dark:border-stone-800">
+              <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                2. Choose the group
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3" role="group" aria-label="Word group">
+                {groupOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      setAnswers((prev) => ({ ...prev, group: option.id }));
+                      setActiveStep('answer');
+                    }}
+                    disabled={!!result}
+                    className={`min-h-10 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                      answers.group === option.id
+                        ? 'border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100'
+                        : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => revealHint('group')}
                   disabled={!!result}
+                  aria-label="Hint for word group step"
                   className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
                 >
                   Hint
                 </button>
                 <button
                   type="button"
-                  onClick={() => skipStep('base')}
+                  onClick={() => skipStep('group')}
                   disabled={!!result}
+                  aria-label="Skip word group step"
                   className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
                 >
                   Skip
                 </button>
               </div>
-            </div>
-            {hintedSteps.base && (
-              <div className="mt-2 text-xs text-stone-500">
-                <HintText stepId="base" card={card} />
-              </div>
-            )}
-          </section>
+              {hintedSteps.group && (
+                <div className="mt-2 text-xs text-stone-500">
+                  <HintText stepId="group" card={card} />
+                </div>
+              )}
+            </section>
+          )}
 
-          <section className="rounded-lg border border-stone-200 p-3 dark:border-stone-800">
-            <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-              2. Choose the group
-            </div>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3" role="group" aria-label="Word group">
-              {groupOptions.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setAnswers((prev) => ({ ...prev, group: option.id }))}
-                  disabled={!!result}
-                  className={`min-h-10 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
-                    answers.group === option.id
-                      ? 'border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100'
-                      : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={() => revealHint('group')}
-                disabled={!!result}
-                className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
-              >
-                Hint
-              </button>
-              <button
-                type="button"
-                onClick={() => skipStep('group')}
-                disabled={!!result}
-                className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
-              >
-                Skip
-              </button>
-            </div>
-            {hintedSteps.group && (
-              <div className="mt-2 text-xs text-stone-500">
-                <HintText stepId="group" card={card} />
+          {(activeStep === 'answer' || result) && (
+            <section className="rounded-lg border border-stone-200 p-3 dark:border-stone-800">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <label className="min-w-0 flex-1">
+                  <span className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                    3. Build the answer
+                  </span>
+                  <input
+                    value={answers.answer}
+                    onChange={(e) => setAnswers((prev) => ({ ...prev, answer: e.target.value }))}
+                    disabled={!!result}
+                    aria-label="Final conjugation"
+                    placeholder="Target conjugation"
+                    className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-lg text-stone-950 outline-none transition focus:border-indigo-400 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50"
+                  />
+                </label>
+                <div className="flex gap-2 sm:pt-7">
+                  <button
+                    type="button"
+                    onClick={() => revealHint('answer')}
+                    disabled={!!result}
+                    aria-label="Hint for final answer step"
+                    className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
+                  >
+                    Hint
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => skipStep('answer')}
+                    disabled={!!result}
+                    aria-label="Skip final answer step"
+                    className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
+                  >
+                    Skip
+                  </button>
+                </div>
               </div>
-            )}
-          </section>
-
-          <section className="rounded-lg border border-stone-200 p-3 dark:border-stone-800">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <label className="min-w-0 flex-1">
-                <span className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-                  3. Build the answer
-                </span>
-                <input
-                  value={answers.answer}
-                  onChange={(e) => setAnswers((prev) => ({ ...prev, answer: e.target.value }))}
-                  disabled={!!result}
-                  aria-label="Final conjugation"
-                  placeholder="Target conjugation"
-                  className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-lg text-stone-950 outline-none transition focus:border-indigo-400 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-50"
-                />
-              </label>
-              <div className="flex gap-2 sm:pt-7">
-                <button
-                  type="button"
-                  onClick={() => revealHint('answer')}
-                  disabled={!!result}
-                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
-                >
-                  Hint
-                </button>
-                <button
-                  type="button"
-                  onClick={() => skipStep('answer')}
-                  disabled={!!result}
-                  className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
-                >
-                  Skip
-                </button>
-              </div>
-            </div>
-            {hintedSteps.answer && (
-              <div className="mt-2 text-xs text-stone-500">
-                <HintText stepId="answer" card={card} />
-              </div>
-            )}
-          </section>
+              {hintedSteps.answer && (
+                <div className="mt-2 text-xs text-stone-500">
+                  <HintText stepId="answer" card={card} />
+                </div>
+              )}
+            </section>
+          )}
         </div>
 
         {result && (

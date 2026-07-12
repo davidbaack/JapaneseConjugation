@@ -65,30 +65,19 @@ export default function PracticeLabView() {
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm dark:border-stone-800 dark:bg-stone-900">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="text-xs uppercase tracking-wider text-stone-500 dark:text-stone-400">
-              Drills
-            </div>
-            <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
-              Focused exercises for endings, transformations, groups, and speed.
-            </h2>
+        <div>
+          <div className="text-xs uppercase tracking-wider text-stone-500 dark:text-stone-400">
+            Drills
           </div>
-          <button
-            type="button"
-            onClick={() => sendRecommendation()}
-            disabled={!canRecommend}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
-          >
-            <IconRefresh className="h-4 w-4" />
-            Send to Practice
-          </button>
+          <h2 className="mt-1 text-lg font-semibold text-stone-950 dark:text-stone-50">
+            Pick a drill and start.
+          </h2>
         </div>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-3">
           <div
             role="tablist"
             aria-label="Drills"
-            className="flex flex-wrap gap-1 rounded-xl border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
+            className="flex flex-nowrap gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
           >
             {LAB_TABS.map((tab) => {
               const Icon = tab.icon;
@@ -98,7 +87,7 @@ export default function PracticeLabView() {
                   type="button"
                   {...tabProps(tab.id)}
                   onClick={() => setActive(tab.id)}
-                  className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
+                  className={`inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
                     active === tab.id
                       ? 'bg-stone-800 font-semibold text-white dark:bg-indigo-700'
                       : 'text-stone-600 hover:bg-white dark:text-stone-300 dark:hover:bg-stone-900'
@@ -111,14 +100,28 @@ export default function PracticeLabView() {
             })}
           </div>
         </div>
-        {recommendations.length > 0 && (
+      </section>
+
+      <section {...panelProps(active)}>
+        {active === 'endings' && <EndingsView />}
+        {active === 'transform' && <StudyView mode="transform" />}
+        {active === 'classify' && <ClassificationView />}
+        {active === 'games' && <GamesView />}
+      </section>
+
+      {canRecommend && (
+        <details className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+          <summary className="cursor-pointer list-none text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+            Practice what this drill found
+          </summary>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             {recommendations.map((recommendation) => (
               <button
                 key={recommendation.id}
                 type="button"
+                aria-label={`Practice ${recommendation.label}`}
                 onClick={() => sendRecommendation(recommendation)}
-                className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-left transition hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35"
+                className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-left transition hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-stone-950 dark:hover:bg-emerald-950/30"
               >
                 <div className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
                   {recommendation.label}
@@ -128,18 +131,14 @@ export default function PracticeLabView() {
                     {recommendation.detail}
                   </div>
                 )}
+                <div className="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  Practice this
+                </div>
               </button>
             ))}
           </div>
-        )}
-      </section>
-
-      <section {...panelProps(active)}>
-        {active === 'endings' && <EndingsView />}
-        {active === 'transform' && <StudyView mode="transform" />}
-        {active === 'classify' && <ClassificationView />}
-        {active === 'games' && <GamesView />}
-      </section>
+        </details>
+      )}
     </div>
   );
 }

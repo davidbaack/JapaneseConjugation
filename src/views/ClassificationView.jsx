@@ -369,23 +369,6 @@ export default function ClassificationView() {
           />
           <div className="text-sm text-stone-400 italic mt-2">{current.meaning}</div>
         </div>
-        <div className="mb-4 rounded-xl border border-indigo-100 dark:border-indigo-900/60 bg-indigo-50/55 dark:bg-indigo-950/20 px-3 py-3">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-            Group decoder
-          </div>
-          <div className="mt-2 grid gap-2 sm:grid-cols-3">
-            {GROUP_DECODER_ROWS.map((row) => (
-              <div key={row.id} className="min-w-0">
-                <div className="text-xs font-semibold text-stone-800 dark:text-stone-100">
-                  {row.label}
-                </div>
-                <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-300">
-                  {row.decoder}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
         <div className="grid sm:grid-cols-3 gap-2">
           {allowed.map((o) => (
             <button
@@ -409,6 +392,23 @@ export default function ClassificationView() {
             </button>
           ))}
         </div>
+        <details className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/55 dark:border-indigo-900/60 dark:bg-indigo-950/20">
+          <summary className="cursor-pointer px-3 py-3 text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+            Group decoder
+          </summary>
+          <div className="grid gap-2 border-t border-indigo-100 px-3 py-3 dark:border-indigo-900/60 sm:grid-cols-3">
+            {GROUP_DECODER_ROWS.map((row) => (
+              <div key={row.id} className="min-w-0">
+                <div className="text-xs font-semibold text-stone-800 dark:text-stone-100">
+                  {row.label}
+                </div>
+                <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-300">
+                  {row.decoder}
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
         {result && (
           <>
             <div

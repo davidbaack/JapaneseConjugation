@@ -144,10 +144,11 @@ export default function ReferenceViewSub({
   const scratchRows = showScratch ? formRows(scratchCandidate) : [];
   const scratchMasuDiagnostic = showScratch ? ruMasuDiagnostic(scratchCandidate) : null;
   useEffect(() => {
+    if (!query.trim()) return;
     if (!selected || !words.some((w) => w.dict === selected.dict)) {
-      setSelected(referenceSelectedWord || matches[0] || words[0] || null);
+      setSelected(matches[0] || referenceSelectedWord || null);
     }
-  }, [matches, words, selected, referenceSelectedWord]);
+  }, [matches, query, words, selected, referenceSelectedWord]);
 
   useEffect(() => {
     const trimmedQuery = query.trim();
@@ -190,7 +191,7 @@ export default function ReferenceViewSub({
     !queryActive ||
     matches.some((word) => wordKeyLocal(word) === selectedKey) ||
     lookupMatches.some((match) => wordKeyLocal(match.word) === selectedKey);
-  const detailWord = selectedMatchesQuery && !activeLookupMatch ? selected : null;
+  const detailWord = queryActive && selectedMatchesQuery && !activeLookupMatch ? selected : null;
   const rows = detailWord ? referenceRows(detailWord, state) : [];
   const selectedView = detailWord ? promptDisplay(detailWord, null, practicePrefs) : null;
   const selectedMasuDiagnostic = detailWord ? ruMasuDiagnostic(detailWord) : null;
@@ -229,6 +230,7 @@ export default function ReferenceViewSub({
   }
 
   function chooseReferenceWord(word, q = query) {
+    if (!String(q || '').trim()) setQuery(word.dict);
     setSelected(word);
     if (String(q || '').trim()) rememberSearch(q);
     updateReference((ref) => referenceWithSelected(referenceWithHistory(ref, word), word));
@@ -532,7 +534,7 @@ export default function ReferenceViewSub({
   }
 
   return (
-    <div className="grid lg:grid-cols-[280px_1fr] gap-4 text-left">
+    <div className="grid grid-cols-1 gap-4 text-left lg:grid-cols-[280px_1fr]">
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden flex flex-col">
         <div className="p-3 border-b border-stone-100 dark:border-stone-800">
           <div className="relative">
@@ -761,33 +763,40 @@ export default function ReferenceViewSub({
           )}
         </div>
         <div className="flex-1 overflow-y-auto max-h-[560px] divide-y divide-stone-50 dark:divide-stone-800">
-          {matches.map((w) => {
-            const wv = promptDisplay(w, null, practicePrefs);
-            return (
-              <button
-                key={`${w.group}:${w.dict}`}
-                onClick={() => chooseReferenceWord(w)}
-                className={`w-full text-left px-4 py-3 transition ${
-                  isSelectedWord(w)
-                    ? 'bg-indigo-50 dark:bg-indigo-950/20'
-                    : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'
-                }`}
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <div className="font-medium text-stone-800 dark:text-stone-100">
-                    <ScriptDisplay view={wv} className="" subClassName="text-xs text-stone-600" />
+          {!queryActive && (
+            <div className="p-4 text-sm leading-relaxed text-stone-600 dark:text-stone-400">
+              Search a dictionary word or any conjugated form. Recent lookups stay above for quick
+              access.
+            </div>
+          )}
+          {queryActive &&
+            matches.slice(0, 30).map((w) => {
+              const wv = promptDisplay(w, null, practicePrefs);
+              return (
+                <button
+                  key={`${w.group}:${w.dict}`}
+                  onClick={() => chooseReferenceWord(w)}
+                  className={`w-full text-left px-4 py-3 transition ${
+                    isSelectedWord(w)
+                      ? 'bg-indigo-50 dark:bg-indigo-950/20'
+                      : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'
+                  }`}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="font-medium text-stone-800 dark:text-stone-100">
+                      <ScriptDisplay view={wv} className="" subClassName="text-xs text-stone-600" />
+                    </div>
+                    <span className="text-[11px] text-stone-600 inline-flex items-center gap-1 font-semibold">
+                      {favoriteListHasWord(wordLists, w) && (
+                        <IconStar className="w-3 h-3 text-amber-500" />
+                      )}
+                      {isAdjective(w) ? 'adj' : 'verb'}
+                    </span>
                   </div>
-                  <span className="text-[11px] text-stone-600 inline-flex items-center gap-1 font-semibold">
-                    {favoriteListHasWord(wordLists, w) && (
-                      <IconStar className="w-3 h-3 text-amber-500" />
-                    )}
-                    {isAdjective(w) ? 'adj' : 'verb'}
-                  </span>
-                </div>
-                <div className="text-xs text-stone-600 truncate">{w.meaning}</div>
-              </button>
-            );
-          })}
+                  <div className="text-xs text-stone-600 truncate">{w.meaning}</div>
+                </button>
+              );
+            })}
         </div>
       </div>
       <div className="space-y-4">
@@ -1042,7 +1051,7 @@ export default function ReferenceViewSub({
                   className="px-3 py-2 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-100 disabled:opacity-40 text-white dark:text-stone-900 rounded-lg text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconRefresh className="w-4 h-4" />
-                  Drill word
+                  Practice this
                 </button>
                 <button
                   onClick={drillSelectedWordSweep}
@@ -1050,7 +1059,7 @@ export default function ReferenceViewSub({
                   className="px-3 py-2 border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 disabled:opacity-40 dark:border-indigo-900/60 dark:bg-indigo-950/25 dark:text-indigo-300 dark:hover:bg-indigo-950/40 rounded-lg text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconList className="w-4 h-4" />
-                  Drill enabled forms
+                  Practice enabled forms
                 </button>
                 <button
                   onClick={toggleFavorite}
@@ -1069,7 +1078,7 @@ export default function ReferenceViewSub({
                   className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 disabled:opacity-40 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconList className="w-4 h-4" />
-                  Drill favorites
+                  Practice favorites
                 </button>
                 <button
                   onClick={drillWeakReferenceRules}
@@ -1077,7 +1086,7 @@ export default function ReferenceViewSub({
                   className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 disabled:opacity-40 rounded-lg text-stone-600 dark:text-stone-300 text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconStar className="w-4 h-4" />
-                  Drill weak forms
+                  Practice weak forms
                 </button>
                 <button
                   onClick={copyTable}
@@ -1125,117 +1134,125 @@ export default function ReferenceViewSub({
         )}
 
         {detailWord && (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-stone-50 dark:bg-stone-950 text-stone-600 dark:text-stone-400 text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">Form</th>
-                  <th className="px-4 py-2 text-left font-medium">Answer</th>
-                  <th className="px-4 py-2 text-left font-medium">Progress</th>
-                  <th className="px-4 py-2 text-left font-medium hidden md:table-cell">Rule</th>
-                  <th className="px-4 py-2 text-left font-medium hidden sm:table-cell">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
-                {rows.map((r) => {
-                  const rv = formDisplay(r.answer, practicePrefs, detailWord, r.type.id);
-                  const expanded = expandedRow === r.type.id;
-                  return (
-                    <React.Fragment key={r.type.id}>
-                      <tr
-                        onClick={() => setExpandedRow(expanded ? null : r.type.id)}
-                        className={`border-t border-stone-100 dark:border-stone-800 cursor-pointer transition ${expanded ? 'bg-indigo-50/20 dark:bg-indigo-950/10' : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'}`}
-                      >
-                        <td className="px-4 py-2 text-left">
-                          <div className="font-semibold text-stone-800 dark:text-stone-200">
-                            {r.type.label}
-                          </div>
-                          <div className="text-xs text-stone-600">{r.type.hint}</div>
-                        </td>
-                        <td className="px-4 py-2 text-left">
-                          <div className="flex items-center gap-2">
-                            <ScriptDisplay
-                              view={rv}
-                              word={detailWord}
-                              type={r.type.id}
-                              colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                              className="text-lg text-stone-900 dark:text-stone-100"
-                              subClassName="text-xs text-stone-600"
-                            />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                speakJapaneseLocal(r.answer);
-                              }}
-                              className="p-1.5 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-600 flex-shrink-0"
-                              title={`Speak ${r.type.label}`}
-                            >
-                              <IconVolume className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-left">
-                          <div
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-semibold ${r.progress.tone}`}
-                          >
-                            {r.progress.status === 'mastered' ? (
-                              <IconCheck className="w-3.5 h-3.5" />
-                            ) : (
-                              <span
-                                className={`w-2 h-2 rounded-full ${r.progress.levelInfo.dot}`}
+          <details className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
+            <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-stone-700 dark:text-stone-200">
+              <span>Show full conjugation table</span>
+              <span className="text-xs font-normal text-stone-500">{rows.length} forms</span>
+            </summary>
+            <div className="overflow-x-auto border-t border-stone-200 dark:border-stone-800">
+              <table className="w-full text-sm">
+                <thead className="bg-stone-50 dark:bg-stone-950 text-stone-600 dark:text-stone-400 text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium">Form</th>
+                    <th className="px-4 py-2 text-left font-medium">Answer</th>
+                    <th className="px-4 py-2 text-left font-medium">Progress</th>
+                    <th className="px-4 py-2 text-left font-medium hidden md:table-cell">Rule</th>
+                    <th className="px-4 py-2 text-left font-medium hidden sm:table-cell">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+                  {rows.map((r) => {
+                    const rv = formDisplay(r.answer, practicePrefs, detailWord, r.type.id);
+                    const expanded = expandedRow === r.type.id;
+                    return (
+                      <React.Fragment key={r.type.id}>
+                        <tr
+                          onClick={() => setExpandedRow(expanded ? null : r.type.id)}
+                          className={`border-t border-stone-100 dark:border-stone-800 cursor-pointer transition ${expanded ? 'bg-indigo-50/20 dark:bg-indigo-950/10' : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'}`}
+                        >
+                          <td className="px-4 py-2 text-left">
+                            <div className="font-semibold text-stone-800 dark:text-stone-200">
+                              {r.type.label}
+                            </div>
+                            <div className="text-xs text-stone-600">{r.type.hint}</div>
+                          </td>
+                          <td className="px-4 py-2 text-left">
+                            <div className="flex items-center gap-2">
+                              <ScriptDisplay
+                                view={rv}
+                                word={detailWord}
+                                type={r.type.id}
+                                colorHighlight={practicePrefs.colorCodeConjugations !== false}
+                                className="text-lg text-stone-900 dark:text-stone-100"
+                                subClassName="text-xs text-stone-600"
                               />
-                            )}
-                            <span>{r.progress.label}</span>
-                          </div>
-                          <div className="mt-1 text-[11px] text-stone-600 hidden sm:block">
-                            {r.progress.detail}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-xs text-stone-600 hidden md:table-cell text-left">
-                          {r.explanation.rule}
-                        </td>
-                        <td className="px-4 py-2 hidden sm:table-cell">
-                          {renderReferenceRowActions(r)}
-                        </td>
-                      </tr>
-                      {expanded && (
-                        <tr className="bg-stone-50/50 dark:bg-stone-950/20">
-                          <td
-                            colSpan="5"
-                            className="px-5 py-4 border-t border-stone-100 dark:border-stone-800 space-y-2.5"
-                          >
-                            <div className="sm:hidden">{renderReferenceRowActions(r, true)}</div>
-                            <ConjugationBreakdown
-                              word={detailWord}
-                              type={r.type.id}
-                              geminiKey={geminiKey}
-                              practicePrefs={practicePrefs}
-                              onOpenLearn={
-                                setTab
-                                  ? () => {
-                                      window.location.hash = 'formation-keys';
-                                      setTab('learn');
-                                    }
-                                  : undefined
-                              }
-                              onOpenFormationKeys={
-                                setTab
-                                  ? (visual) => {
-                                      window.location.hash = buildFormationKeysHash(visual);
-                                      setTab('learn');
-                                    }
-                                  : undefined
-                              }
-                            />
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  speakJapaneseLocal(r.answer);
+                                }}
+                                className="p-1.5 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-stone-600 flex-shrink-0"
+                                title={`Speak ${r.type.label}`}
+                              >
+                                <IconVolume className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-left">
+                            <div
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-semibold ${r.progress.tone}`}
+                            >
+                              {r.progress.status === 'mastered' ? (
+                                <IconCheck className="w-3.5 h-3.5" />
+                              ) : (
+                                <span
+                                  className={`w-2 h-2 rounded-full ${r.progress.levelInfo.dot}`}
+                                />
+                              )}
+                              <span>{r.progress.label}</span>
+                            </div>
+                            <div className="mt-1 text-[11px] text-stone-600 hidden sm:block">
+                              {r.progress.detail}
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-xs text-stone-600 hidden md:table-cell text-left">
+                            {r.explanation.rule}
+                          </td>
+                          <td className="px-4 py-2 hidden sm:table-cell">
+                            {renderReferenceRowActions(r)}
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        {expanded && (
+                          <tr className="bg-stone-50/50 dark:bg-stone-950/20">
+                            <td
+                              colSpan="5"
+                              className="px-5 py-4 border-t border-stone-100 dark:border-stone-800 space-y-2.5"
+                            >
+                              <div className="sm:hidden">{renderReferenceRowActions(r, true)}</div>
+                              <ConjugationBreakdown
+                                word={detailWord}
+                                type={r.type.id}
+                                geminiKey={geminiKey}
+                                practicePrefs={practicePrefs}
+                                onOpenLearn={
+                                  setTab
+                                    ? () => {
+                                        window.location.hash = 'formation-keys';
+                                        setTab('learn');
+                                      }
+                                    : undefined
+                                }
+                                onOpenFormationKeys={
+                                  setTab
+                                    ? (visual) => {
+                                        window.location.hash = buildFormationKeysHash(visual);
+                                        setTab('learn');
+                                      }
+                                    : undefined
+                                }
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </details>
         )}
       </div>
     </div>

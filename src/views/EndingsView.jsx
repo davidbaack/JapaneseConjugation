@@ -347,39 +347,7 @@ export default function EndingsView() {
 
   return (
     <div className="space-y-4">
-      {/* Stats header */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
-            {displayStats.correct || 0}/{displayStats.attempted || 0}
-          </div>
-          <div className="text-xs text-stone-500">Accuracy</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
-            {displayAcc}%
-          </div>
-          <div className="text-xs text-stone-500">Overall</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
-            {displayStats.streak || 0}
-          </div>
-          <div className="text-xs text-stone-500">Streak</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50 text-ellipsis overflow-hidden whitespace-nowrap">
-            {displayPatternStats
-              ? `${displayPatternStats.correct || 0}/${displayPatternStats.attempted || 0}`
-              : '—'}
-          </div>
-          <div className="text-xs text-stone-500 text-ellipsis overflow-hidden whitespace-nowrap">
-            {displayPatternLabel}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-[1fr_280px] gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px]">
         {/* Main card */}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
           {/* Header + mode buttons */}
@@ -702,6 +670,37 @@ export default function EndingsView() {
               </div>
             </>
           )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Ending Lab results">
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+            {displayStats.correct || 0}/{displayStats.attempted || 0}
+          </div>
+          <div className="text-xs text-stone-500">Accuracy</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+            {displayAcc}%
+          </div>
+          <div className="text-xs text-stone-500">Overall</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+            {displayStats.streak || 0}
+          </div>
+          <div className="text-xs text-stone-500">Streak</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50 text-ellipsis overflow-hidden whitespace-nowrap">
+            {displayPatternStats
+              ? `${displayPatternStats.correct || 0}/${displayPatternStats.attempted || 0}`
+              : '—'}
+          </div>
+          <div className="text-xs text-stone-500 text-ellipsis overflow-hidden whitespace-nowrap">
+            {displayPatternLabel}
+          </div>
         </div>
       </div>
     </div>

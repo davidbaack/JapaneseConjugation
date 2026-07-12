@@ -315,8 +315,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByText('0 cards')).toBeTruthy();
-    expect(screen.getByText('0 right')).toBeTruthy();
-    expect(screen.getByText('0 wrong')).toBeTruthy();
+    expect(screen.getByText('0 missed')).toBeTruthy();
     expect(screen.getByText('0 streak')).toBeTruthy();
     expect(screen.getByText('New enabled form.')).toBeTruthy();
     expect(screen.queryByRole('progressbar', { name: 'Session cards' })).toBeNull();
@@ -334,8 +333,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByText('0 cards')).toBeTruthy();
-    expect(screen.getByText('0 right')).toBeTruthy();
-    expect(screen.getByText('0 wrong')).toBeTruthy();
+    expect(screen.getByText('0 missed')).toBeTruthy();
     expect(screen.getByText('0 streak')).toBeTruthy();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
@@ -1231,8 +1229,7 @@ describe('StudyView continuous Practice startup', () => {
     await waitForPracticeCard();
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByText('0 cards')).toBeTruthy();
-    expect(screen.getByText('0 right')).toBeTruthy();
-    expect(screen.getByText('0 wrong')).toBeTruthy();
+    expect(screen.getByText('0 missed')).toBeTruthy();
     expect(screen.getByText('0 streak')).toBeTruthy();
     expect(screen.queryByText('0/1 ready')).toBeNull();
     expect(screen.getByRole('button', { name: 'Practice run settings' })).toBeTruthy();
@@ -1278,6 +1275,12 @@ describe('StudyView continuous Practice startup', () => {
       label: 'Plain Past',
     });
     expect(nextState.cards[dueCardId].correct).toBe(1);
+    expect(
+      screen.queryByRole('img', {
+        name: 'Te/Ta Sound Changes this session: 1 right / 0 wrong',
+      }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Te/Ta Sound Changes category details' }));
     expect(
       screen.getByRole('img', {
         name: 'Te/Ta Sound Changes this session: 1 right / 0 wrong',
@@ -1608,8 +1611,7 @@ describe('StudyView continuous Practice startup', () => {
     rerender(<StudyView />);
 
     expect(screen.getByText('1 card')).toBeTruthy();
-    expect(screen.getByText('1 right')).toBeTruthy();
-    expect(screen.getByText('0 wrong')).toBeTruthy();
+    expect(screen.getByText('0 missed')).toBeTruthy();
     expect(screen.getByText('1 streak')).toBeTruthy();
     expect(screen.getByText('100% right')).toBeTruthy();
     expect(screen.getByText('Focused practice: 食べる. Clean run so far.')).toBeTruthy();
@@ -1904,7 +1906,7 @@ describe('StudyView continuous Practice startup', () => {
     rerender(<StudyView />);
 
     expect(screen.getByText('100% right')).toBeTruthy();
-    expect(screen.getByText('0 wrong')).toBeTruthy();
+    expect(screen.getByText('0 missed')).toBeTruthy();
     expect(
       screen.getByText('Clean run so far. This card was missed in an earlier practice run.'),
     ).toBeTruthy();

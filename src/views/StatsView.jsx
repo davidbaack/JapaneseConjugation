@@ -89,7 +89,6 @@ export function StatsDashboard({
   onOpenGuide,
 }) {
   const dueTotal = srsQueue?.dueRuleIds?.length || 0;
-  const practiceTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
   const recommendations = state.reviewScope?.recommendations || [];
   const mistakeHistoryCount = (state.mistakes || []).length;
   const { rows: strengthRows, totalPracticed } = buildFormFamilyProgress(state);
@@ -178,57 +177,32 @@ export function StatsDashboard({
             <div className="mt-4 flex flex-wrap gap-2">
               {[
                 ['Practiced', totalPracticed],
-                ['Accuracy', answerStats.answered ? `${answerStats.accuracy}%` : 'new'],
-                ['Right', answerStats.correct],
-                ['Wrong', answerStats.incorrect],
-                ['Today', `${daily.count || 0} cards`],
+                ['Answer balance', answerStats.answered ? `${answerStats.accuracy}% right` : 'new'],
                 ['Recent misses', weakCount],
               ].map(([label, value]) => statTile(label, value))}
             </div>
           </div>
           <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/20">
-            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-              Practice scope
+            <div className="flex items-center justify-between gap-3 text-sm text-stone-700 dark:text-stone-200">
+              <span>Lifetime answer balance</span>
+              <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
+                {answerStats.answered
+                  ? `${answerStats.correct} right / ${answerStats.incorrect} wrong`
+                  : 'New'}
+              </span>
             </div>
-            <div className="mt-2 grid gap-2 text-sm text-stone-700 dark:text-stone-200">
-              <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 dark:border-indigo-900/60 dark:bg-stone-950/30">
-                <span>Form types selected</span>
-                <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                  {practiceTypeCount}
-                </span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 dark:border-indigo-900/60 dark:bg-stone-950/30">
-                <span>Mode</span>
-                <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                  Continuous
-                </span>
-              </div>
-              <div className="rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-2 dark:border-indigo-900/60 dark:bg-stone-950/30">
-                <div className="flex items-center justify-between gap-3">
-                  <span>Answer balance</span>
-                  <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                    {answerStats.answered ? `${answerStats.accuracy}% right` : 'New'}
-                  </span>
-                </div>
-                <div
-                  role="meter"
-                  aria-label="Lifetime right answer rate"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={answerStats.accuracy}
-                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-rose-200/80 dark:bg-rose-950/60"
-                >
-                  <span
-                    className="block h-full rounded-full bg-emerald-500 dark:bg-emerald-400"
-                    style={{ width: `${answerStats.answered ? answerStats.accuracy : 0}%` }}
-                  />
-                </div>
-                <div className="mt-1 text-[11px] text-stone-500 dark:text-stone-400">
-                  {answerStats.answered
-                    ? `${answerStats.correct} right / ${answerStats.incorrect} wrong lifetime`
-                    : 'Answer a few cards to see right/wrong rate.'}
-                </div>
-              </div>
+            <div
+              role="meter"
+              aria-label="Lifetime right answer rate"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={answerStats.accuracy}
+              className="mt-3 h-2 overflow-hidden rounded-full bg-rose-200/80 dark:bg-rose-950/60"
+            >
+              <span
+                className="block h-full rounded-full bg-emerald-500 dark:bg-emerald-400"
+                style={{ width: `${answerStats.answered ? answerStats.accuracy : 0}%` }}
+              />
             </div>
             {!hasHistory && (
               <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
@@ -252,7 +226,7 @@ export function StatsDashboard({
             </div>
           </div>
           <div className="grid gap-2">
-            {recommendations.map((rec) => (
+            {recommendations.slice(0, 1).map((rec) => (
               <button
                 key={rec.id}
                 type="button"
@@ -278,7 +252,7 @@ export function StatsDashboard({
                     )}
                   </div>
                   <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                    Start
+                    Practice this
                   </span>
                 </div>
               </button>
@@ -304,21 +278,28 @@ export function StatsDashboard({
           <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
             Upcoming reviews
           </div>
-          <div className="grid grid-cols-5 gap-2">
-            {reviewForecastRows(todayPlan.upcomingForecast).map(([label, value]) => (
-              <div
-                key={label}
-                className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-center dark:border-stone-800 dark:bg-stone-950"
-              >
-                <div className="text-base font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-                  {value}
+          {dueTotal === 0 &&
+          reviewForecastRows(todayPlan.upcomingForecast).every(([, value]) => value === 0) ? (
+            <div className="rounded-xl border border-dashed border-stone-300 px-4 py-6 text-center text-sm text-stone-500 dark:border-stone-700">
+              No reviews scheduled.
+            </div>
+          ) : (
+            <div className="grid grid-cols-5 gap-2">
+              {reviewForecastRows(todayPlan.upcomingForecast).map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-center dark:border-stone-800 dark:bg-stone-950"
+                >
+                  <div className="text-base font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+                    {value}
+                  </div>
+                  <div className="mt-0.5 text-[10px] uppercase tracking-wider text-stone-500">
+                    {label}
+                  </div>
                 </div>
-                <div className="mt-0.5 text-[10px] uppercase tracking-wider text-stone-500">
-                  {label}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
         <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
           <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">

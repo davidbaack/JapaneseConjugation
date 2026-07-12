@@ -47,14 +47,14 @@ function AppShell() {
         <nav
           role="tablist"
           aria-label="App sections"
-          className="mb-3 flex flex-wrap gap-1 rounded-xl border border-stone-200 bg-white p-1 dark:border-stone-800 dark:bg-stone-900"
+          className="mb-3 flex flex-nowrap gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-white p-1 [scrollbar-width:thin] dark:border-stone-800 dark:bg-stone-900"
         >
           {TABS.map((id) => (
             <button
               key={id}
               {...tabProps(id)}
               onClick={() => setTab(id)}
-              className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition ${
+              className={`min-w-[5.25rem] shrink-0 px-3 py-2 text-sm transition sm:flex-1 rounded-lg ${
                 tab === id
                   ? 'bg-stone-800 dark:bg-indigo-700 text-white font-semibold'
                   : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'

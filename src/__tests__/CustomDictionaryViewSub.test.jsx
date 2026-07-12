@@ -14,6 +14,7 @@ vi.mock('../utils/gemini.js', () => ({
 }));
 
 import CustomDictionaryViewSub from '../views/CustomDictionaryViewSub.jsx';
+import { STARTER_VERBS } from '../data/starterWords.js';
 
 function renderDictionary(overrides = {}) {
   const props = {
@@ -35,6 +36,18 @@ afterEach(() => {
 });
 
 describe('CustomDictionaryViewSub suggestions', () => {
+  it('shows learner-added entries first and discloses built-ins on request', () => {
+    renderDictionary({ geminiKey: '' });
+
+    expect(screen.getByText('No custom verbs yet. Add one or show the built-ins.')).toBeTruthy();
+    expect(screen.queryByText(STARTER_VERBS[0].dict)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /Show \d+ built-ins/ }));
+
+    expect(screen.getByText(STARTER_VERBS[0].dict)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Hide built-ins' })).toBeTruthy();
+  });
+
   it('labels manual word fields and the word group control', () => {
     renderDictionary({ geminiKey: '' });
 

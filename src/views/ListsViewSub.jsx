@@ -33,6 +33,7 @@ export default function ListsViewSub({
   const [name, setName] = useState('');
   const [activeId, setActiveId] = useState(wordLists[0]?.id || '');
   const [query, setQuery] = useState('');
+  const [visibleLimit, setVisibleLimit] = useState(30);
   const [msg, setMsg] = useState('');
   const [aiTarget, setAiTarget] = useState('N5');
   const [aiTopic, setAiTopic] = useState('daily life');
@@ -56,11 +57,16 @@ export default function ListsViewSub({
 
   const activeKeys = new Set(active?.wordKeys || []);
   const matches = useMemo(() => searchWords(query, words).slice(0, 120), [query, words]);
+  const visibleMatches = matches.slice(0, visibleLimit);
   const resolvedListCounts = useMemo(
     () => new Map(wordLists.map((list) => [list.id, wordsForList(list, words).length])),
     [wordLists, words],
   );
   const selectedIds = practicePrefs.wordListIds || [];
+
+  useEffect(() => {
+    setVisibleLimit(30);
+  }, [query, activeId]);
 
   const packGroups = useMemo(() => {
     const map = new Map();
@@ -237,10 +243,10 @@ export default function ListsViewSub({
   }
 
   return (
-    <div className="grid lg:grid-cols-[280px_1fr] gap-4">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden">
         <div className="p-4 border-b border-stone-100 dark:border-stone-800">
-          <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">Study lists</h3>
+          <h3 className="font-medium mb-3 text-stone-800 dark:text-stone-200">My lists</h3>
           <div className="flex gap-2">
             <input
               value={name}
@@ -286,7 +292,7 @@ export default function ListsViewSub({
                         : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
                     }`}
                   >
-                    {selectedIds.includes(l.id) ? 'In drill' : 'Use in drill'}
+                    {selectedIds.includes(l.id) ? 'In Practice' : 'Use for Practice'}
                   </button>
                   <button
                     onClick={() => deleteList(l.id)}
@@ -301,254 +307,280 @@ export default function ListsViewSub({
         </div>
       </div>
       <div className="space-y-4">
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-          <h3 className="font-medium mb-1 text-stone-800 dark:text-stone-200">Built-in packs</h3>
-          <p className="text-xs text-stone-500 mb-3">
-            Seed drills with curated JLPT-style packs, then edit them as normal lists. Enable or
-            disable a whole level at once.
-          </p>
-          <div className="space-y-4">
-            {packGroups.map(([level, packs]) => {
-              const activeCount = packs.filter((p) => selectedIds.includes('pack-' + p.id)).length;
-              const allActive = activeCount === packs.length;
-              return (
-                <div key={level}>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-stone-700 dark:text-stone-300">
-                        JLPT {level}
-                      </span>
-                      <span className="text-[11px] text-stone-400">
-                        {activeCount}/{packs.length} in drills
-                      </span>
+        <details className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
+          <summary className="cursor-pointer px-5 py-4 font-medium text-stone-800 dark:text-stone-200">
+            Built-in packs
+          </summary>
+          <div className="border-t border-stone-100 p-5 dark:border-stone-800">
+            <p className="text-xs text-stone-500 mb-3">
+              Seed drills with curated JLPT-style packs, then edit them as normal lists. Enable or
+              disable a whole level at once.
+            </p>
+            <div className="space-y-4">
+              {packGroups.map(([level, packs]) => {
+                const activeCount = packs.filter((p) =>
+                  selectedIds.includes('pack-' + p.id),
+                ).length;
+                const allActive = activeCount === packs.length;
+                return (
+                  <div key={level}>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm text-stone-700 dark:text-stone-300">
+                          JLPT {level}
+                        </span>
+                        <span className="text-[11px] text-stone-400">
+                          {activeCount}/{packs.length} in drills
+                        </span>
+                      </div>
+                      <button
+                        onClick={() =>
+                          allActive ? disableGroup(level, packs) : enableGroup(level, packs)
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-xs border ${
+                          allActive
+                            ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
+                            : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
+                        }`}
+                      >
+                        {allActive ? 'Disable all' : 'Enable all'}
+                      </button>
                     </div>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {packs.map((pack) => {
+                        const inDrill = selectedIds.includes('pack-' + pack.id);
+                        return (
+                          <div
+                            key={pack.id}
+                            className="border border-stone-200 dark:border-stone-800 rounded-xl p-3 bg-white dark:bg-stone-950"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="font-medium text-sm text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
+                                  {pack.name}
+                                  {inDrill && (
+                                    <span
+                                      className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"
+                                      aria-label="In drill"
+                                      title="In drill"
+                                    />
+                                  )}
+                                </div>
+                                <div className="text-xs text-stone-500 mt-0.5">{pack.desc}</div>
+                                <div className="text-[11px] text-stone-400 mt-1">
+                                  {pack.words.length} words{inDrill ? ' · in drill' : ''}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => importPack(pack)}
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs"
+                              >
+                                Import
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </details>
+        <details className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
+          <summary className="cursor-pointer px-5 py-4 font-medium text-stone-800 dark:text-stone-200">
+            AI list builder
+          </summary>
+          <div className="border-t border-stone-100 p-5 dark:border-stone-800">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="font-medium flex items-center gap-2 text-stone-800 dark:text-stone-200">
+                  <IconSpark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  Build a focused pack
+                </h3>
+                <p className="text-xs text-stone-500">
+                  Generate a focused drill pack by level, textbook lane, or real-life situation.
+                </p>
+              </div>
+              <button
+                onClick={generateAIList}
+                disabled={!geminiKey}
+                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium text-sm"
+              >
+                {aiLoading ? 'Cancel' : 'Build pack'}
+              </button>
+            </div>
+            <div className="grid sm:grid-cols-[1fr_auto] gap-3">
+              <fieldset>
+                <legend className="text-xs text-stone-500 block mb-1">Target</legend>
+                <div className="flex flex-wrap gap-1.5">
+                  {AI_LIST_TARGETS.map((target) => (
                     <button
-                      onClick={() =>
-                        allActive ? disableGroup(level, packs) : enableGroup(level, packs)
-                      }
-                      className={`px-2.5 py-1 rounded-lg text-xs border ${
-                        allActive
+                      type="button"
+                      key={target}
+                      onClick={() => setAiTarget(target)}
+                      aria-pressed={aiTarget === target}
+                      className={`px-2.5 py-1.5 rounded-lg border text-xs transition ${
+                        aiTarget === target
                           ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                          : 'border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800'
+                          : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
                       }`}
                     >
-                      {allActive ? 'Disable all' : 'Enable all'}
+                      {target}
                     </button>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-2">
-                    {packs.map((pack) => {
-                      const inDrill = selectedIds.includes('pack-' + pack.id);
-                      return (
-                        <div
-                          key={pack.id}
-                          className="border border-stone-200 dark:border-stone-800 rounded-xl p-3 bg-white dark:bg-stone-950"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="font-medium text-sm text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
-                                {pack.name}
-                                {inDrill && (
-                                  <span
-                                    className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"
-                                    aria-label="In drill"
-                                    title="In drill"
-                                  />
-                                )}
-                              </div>
-                              <div className="text-xs text-stone-500 mt-0.5">{pack.desc}</div>
-                              <div className="text-[11px] text-stone-400 mt-1">
-                                {pack.words.length} words{inDrill ? ' · in drill' : ''}
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => importPack(pack)}
-                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs"
-                            >
-                              Import
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <h3 className="font-medium flex items-center gap-2 text-stone-800 dark:text-stone-200">
-                <IconSpark className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                AI list builder
-              </h3>
-              <p className="text-xs text-stone-500">
-                Generate a focused drill pack by level, textbook lane, or real-life situation.
-              </p>
-            </div>
-            <button
-              onClick={generateAIList}
-              disabled={!geminiKey}
-              className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl font-medium text-sm"
-            >
-              {aiLoading ? 'Cancel' : 'Build pack'}
-            </button>
-          </div>
-          <div className="grid sm:grid-cols-[1fr_auto] gap-3">
-            <fieldset>
-              <legend className="text-xs text-stone-500 block mb-1">Target</legend>
-              <div className="flex flex-wrap gap-1.5">
-                {AI_LIST_TARGETS.map((target) => (
-                  <button
-                    type="button"
-                    key={target}
-                    onClick={() => setAiTarget(target)}
-                    aria-pressed={aiTarget === target}
-                    className={`px-2.5 py-1.5 rounded-lg border text-xs transition ${
-                      aiTarget === target
-                        ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
-                        : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300'
-                    }`}
-                  >
-                    {target}
-                  </button>
-                ))}
+              </fieldset>
+              <div>
+                <label htmlFor="ai-list-word-count" className="text-xs text-stone-500 block mb-1">
+                  Words
+                </label>
+                <input
+                  id="ai-list-word-count"
+                  type="number"
+                  min="5"
+                  max="24"
+                  value={aiCount}
+                  onChange={(e) => setAiCount(e.target.value)}
+                  className="w-24 px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                />
               </div>
-            </fieldset>
-            <div>
-              <label htmlFor="ai-list-word-count" className="text-xs text-stone-500 block mb-1">
-                Words
+            </div>
+            <div className="mt-3">
+              <label htmlFor="ai-list-topic" className="text-xs text-stone-500 block mb-1">
+                Topic
               </label>
               <input
-                id="ai-list-word-count"
-                type="number"
-                min="5"
-                max="24"
-                value={aiCount}
-                onChange={(e) => setAiCount(e.target.value)}
-                className="w-24 px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                id="ai-list-topic"
+                value={aiTopic}
+                onChange={(e) => setAiTopic(e.target.value)}
+                placeholder="daily life, travel, restaurant, Genki lesson 7..."
+                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+                autoCorrect="off"
+                spellCheck="false"
               />
             </div>
+            {!geminiKey && (
+              <div className="mt-2 text-xs text-stone-400">
+                Gemini is not configured for custom drill packs.
+              </div>
+            )}
+            {aiErr && <div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
+            {!!aiRows.length && (
+              <div className="mt-3 rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden">
+                <div className="flex items-center justify-between gap-2 px-3 py-2 bg-stone-50 dark:bg-stone-950 border-b border-stone-200 dark:border-stone-800">
+                  <div className="text-xs uppercase tracking-wider text-stone-500">
+                    {aiRows.length} generated words
+                  </div>
+                  <button
+                    onClick={addAIRowsToList}
+                    className="px-3 py-1.5 bg-stone-800 dark:bg-stone-700 hover:bg-stone-900 text-white rounded-lg text-xs font-medium"
+                  >
+                    Add to {active?.name || 'new list'}
+                  </button>
+                </div>
+                <div className="max-h-56 overflow-y-auto divide-y divide-stone-100 dark:divide-stone-800 bg-white dark:bg-stone-950">
+                  {aiRows.map((row) => (
+                    <div
+                      key={wordKey(row)}
+                      className="px-3 py-2 grid sm:grid-cols-[1fr_auto] gap-1.5 text-sm"
+                    >
+                      <div>
+                        <span className="font-medium text-stone-800 dark:text-stone-200" lang="ja">
+                          {row.dict}
+                        </span>
+                        {row.dict !== row.reading && (
+                          <span className="ml-2 text-stone-500" lang="ja">
+                            {row.reading}
+                          </span>
+                        )}
+                        <div className="text-xs text-stone-500">{row.meaning}</div>
+                      </div>
+                      <div className="text-xs text-stone-400 sm:text-right">
+                        {GROUP_NAMES[row.group] || row.group}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <div className="mt-3">
-            <label htmlFor="ai-list-topic" className="text-xs text-stone-500 block mb-1">
-              Topic
-            </label>
+        </details>
+        {active ? (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="font-medium text-stone-800 dark:text-stone-200">
+                  {active ? active.name : 'No list selected'}
+                </h3>
+                <p className="text-xs text-stone-500">
+                  Add starter/custom words, then enable lists as drill scopes.
+                </p>
+              </div>
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={() => setPracticePrefs({ ...practicePrefs, wordListIds: [] })}
+                  className="text-xs text-stone-400 hover:text-stone-700"
+                >
+                  Clear list filter
+                </button>
+              )}
+            </div>
+            <div role="status" aria-live="polite">
+              {msg && <div className="mt-2 text-sm text-stone-600 dark:text-stone-300">{msg}</div>}
+            </div>
             <input
-              id="ai-list-topic"
-              value={aiTopic}
-              onChange={(e) => setAiTopic(e.target.value)}
-              placeholder="daily life, travel, restaurant, Genki lesson 7..."
-              className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg text-sm focus:border-indigo-500 focus:outline-none"
+              aria-label="Search words for active list"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search words or conjugated forms"
+              className="w-full px-3 py-2 text-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
               autoCorrect="off"
               spellCheck="false"
             />
-          </div>
-          {!geminiKey && (
-            <div className="mt-2 text-xs text-stone-400">
-              Gemini is not configured for custom drill packs.
-            </div>
-          )}
-          {aiErr && <div className="mt-2 text-sm text-rose-600">{aiErr}</div>}
-          {!!aiRows.length && (
-            <div className="mt-3 rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden">
-              <div className="flex items-center justify-between gap-2 px-3 py-2 bg-stone-50 dark:bg-stone-950 border-b border-stone-200 dark:border-stone-800">
-                <div className="text-xs uppercase tracking-wider text-stone-500">
-                  {aiRows.length} generated words
-                </div>
+            <div className="mt-3 max-h-72 overflow-y-auto grid sm:grid-cols-2 gap-2">
+              {visibleMatches.map((w) => (
                 <button
-                  onClick={addAIRowsToList}
-                  className="px-3 py-1.5 bg-stone-800 dark:bg-stone-700 hover:bg-stone-900 text-white rounded-lg text-xs font-medium"
+                  key={wordKey(w)}
+                  disabled={!active}
+                  onClick={() => toggleWord(w)}
+                  className={`text-left px-3 py-2 rounded-xl border transition ${
+                    activeKeys.has(wordKey(w))
+                      ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900 text-stone-800 dark:text-stone-200'
+                      : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 hover:border-indigo-300 dark:hover:border-indigo-900 text-stone-800 dark:text-stone-200'
+                  }`}
                 >
-                  Add to {active?.name || 'new list'}
-                </button>
-              </div>
-              <div className="max-h-56 overflow-y-auto divide-y divide-stone-100 dark:divide-stone-800 bg-white dark:bg-stone-950">
-                {aiRows.map((row) => (
-                  <div
-                    key={wordKey(row)}
-                    className="px-3 py-2 grid sm:grid-cols-[1fr_auto] gap-1.5 text-sm"
-                  >
-                    <div>
-                      <span className="font-medium text-stone-800 dark:text-stone-200" lang="ja">
-                        {row.dict}
-                      </span>
-                      {row.dict !== row.reading && (
-                        <span className="ml-2 text-stone-500" lang="ja">
-                          {row.reading}
-                        </span>
-                      )}
-                      <div className="text-xs text-stone-500">{row.meaning}</div>
-                    </div>
-                    <div className="text-xs text-stone-400 sm:text-right">
-                      {GROUP_NAMES[row.group] || row.group}
-                    </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium" lang="ja">
+                      {w.dict}
+                    </span>
+                    <span className="text-[11px] text-stone-400">
+                      {isAdjective(w) ? 'adj' : 'verb'}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  <div className="text-xs text-stone-500" lang="ja">
+                    {w.reading}
+                  </div>
+                  <div className="text-xs text-stone-400 truncate">{w.meaning}</div>
+                </button>
+              ))}
             </div>
-          )}
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <h3 className="font-medium text-stone-800 dark:text-stone-200">
-                {active ? active.name : 'No list selected'}
-              </h3>
-              <p className="text-xs text-stone-500">
-                Add starter/custom words, then enable lists as drill scopes.
-              </p>
-            </div>
-            {selectedIds.length > 0 && (
+            {visibleLimit < matches.length && (
               <button
-                onClick={() => setPracticePrefs({ ...practicePrefs, wordListIds: [] })}
-                className="text-xs text-stone-400 hover:text-stone-700"
+                type="button"
+                onClick={() => setVisibleLimit((current) => current + 30)}
+                className="mt-3 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-200 dark:hover:bg-stone-800"
               >
-                Clear list filter
+                Load 30 more
               </button>
             )}
           </div>
-          <div role="status" aria-live="polite">
-            {msg && <div className="mt-2 text-sm text-stone-600 dark:text-stone-300">{msg}</div>}
+        ) : (
+          <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-6 text-center text-sm text-stone-500 dark:border-stone-700 dark:bg-stone-900">
+            Create or select a list to edit its words.
           </div>
-          <input
-            aria-label="Search words for active list"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search words or conjugated forms"
-            className="w-full px-3 py-2 text-sm border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
-            autoCorrect="off"
-            spellCheck="false"
-          />
-          <div className="mt-3 max-h-72 overflow-y-auto grid sm:grid-cols-2 gap-2">
-            {matches.map((w) => (
-              <button
-                key={wordKey(w)}
-                disabled={!active}
-                onClick={() => toggleWord(w)}
-                className={`text-left px-3 py-2 rounded-xl border transition ${
-                  activeKeys.has(wordKey(w))
-                    ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900 text-stone-800 dark:text-stone-200'
-                    : 'bg-white dark:bg-stone-950 border-stone-200 dark:border-stone-800 hover:border-indigo-300 dark:hover:border-indigo-900 text-stone-800 dark:text-stone-200'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium" lang="ja">
-                    {w.dict}
-                  </span>
-                  <span className="text-[11px] text-stone-400">
-                    {isAdjective(w) ? 'adj' : 'verb'}
-                  </span>
-                </div>
-                <div className="text-xs text-stone-500" lang="ja">
-                  {w.reading}
-                </div>
-                <div className="text-xs text-stone-400 truncate">{w.meaning}</div>
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

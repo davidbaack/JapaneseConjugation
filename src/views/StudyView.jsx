@@ -1334,15 +1334,8 @@ export default function StudyView({ mode = 'practice' }) {
       valueClass: 'text-stone-950 dark:text-stone-50',
     },
     {
-      label: 'Right',
-      value: `${runStats.correct} right`,
-      valueClass: runStats.correct
-        ? 'text-emerald-700 dark:text-emerald-300'
-        : 'text-stone-700 dark:text-stone-300',
-    },
-    {
-      label: 'Wrong',
-      value: `${runStats.missed} wrong`,
+      label: 'Missed',
+      value: `${runStats.missed} missed`,
       valueClass: runStats.missed
         ? 'text-rose-700 dark:text-rose-300'
         : 'text-stone-700 dark:text-stone-300',
@@ -1385,6 +1378,8 @@ export default function StudyView({ mode = 'practice' }) {
     workoutProgress.max && !workoutProgress.continuous
       ? Math.min(100, Math.round((workoutProgress.now / workoutProgress.max) * 100))
       : 0;
+  const showBoundedProgress =
+    !!wordSweep || !!recommendationFocus || !!familyIntroFocus || !!focus?.recommendation;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishMeaning = englishHintsHidden && phase === 'answering';
   // Guided kana is now an in-box "reveal next" action, not a separate mode.
@@ -2809,7 +2804,13 @@ export default function StudyView({ mode = 'practice' }) {
         ? `${currentSelectionReason}. Clean run so far.`
         : `${currentSelectionReason}.`);
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] xl:justify-center xl:grid-cols-[minmax(0,42rem)_minmax(0,20rem)]">
+    <div
+      className={
+        transformationMode
+          ? 'mx-auto max-w-3xl'
+          : 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] xl:justify-center xl:grid-cols-[minmax(0,42rem)_minmax(0,20rem)]'
+      }
+    >
       <div className="order-1 min-w-0 space-y-4 xl:w-full">
         {focusBanner && (
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 px-5 py-4 dark:border-indigo-800 dark:bg-indigo-950/20">
@@ -2912,308 +2913,312 @@ export default function StudyView({ mode = 'practice' }) {
             </div>
           </div>
         )}
-        <section
-          aria-labelledby="practice-run-heading"
-          className="rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-950/5 dark:border-stone-800 dark:bg-stone-900 dark:shadow-black/20"
-        >
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2
-                  id="practice-run-heading"
-                  className="text-xs font-semibold uppercase tracking-wider text-stone-600"
-                >
-                  Practice run
-                </h2>
-                {runStats.reviewed > 0 && (
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/70">
-                    {runAccuracy}% right
-                  </span>
-                )}
-                {guideInsight && (
-                  <button
-                    type="button"
-                    onClick={() => setTab('guide')}
-                    aria-label={guideInsightAriaLabel}
-                    title={guideInsight.message}
-                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 active:scale-[0.97] dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/40"
+        {!transformationMode && (
+          <section
+            aria-labelledby="practice-run-heading"
+            className="rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-950/5 dark:border-stone-800 dark:bg-stone-900 dark:shadow-black/20"
+          >
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2
+                    id="practice-run-heading"
+                    className="text-xs font-semibold uppercase tracking-wider text-stone-600"
                   >
-                    <IconBook className="h-3 w-3" />
-                    <span>{guideInsightLabel}</span>
-                  </button>
-                )}
-              </div>
-              <div
-                role="status"
-                aria-live="polite"
-                className="mt-1 max-w-2xl text-sm leading-snug text-stone-600 dark:text-stone-300"
-              >
-                {coachSentence}
-              </div>
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <details className="relative" open={practiceSettingsOpen}>
-                <summary
-                  role="button"
-                  aria-label="Practice run settings"
-                  aria-expanded={practiceSettingsOpen}
-                  title="Practice run settings"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    setPracticeSettingsOpen((open) => !open);
-                  }}
-                  className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-stone-200 text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                    Practice run
+                  </h2>
+                  {runStats.reviewed > 0 && (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/70">
+                      {runAccuracy}% right
+                    </span>
+                  )}
+                  {guideInsight && (
+                    <button
+                      type="button"
+                      onClick={() => setTab('guide')}
+                      aria-label={guideInsightAriaLabel}
+                      title={guideInsight.message}
+                      className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 active:scale-[0.97] dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/40"
+                    >
+                      <IconBook className="h-3 w-3" />
+                      <span>{guideInsightLabel}</span>
+                    </button>
+                  )}
+                </div>
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="mt-1 max-w-2xl text-sm leading-snug text-stone-600 dark:text-stone-300"
                 >
-                  <IconSettings className="h-3.5 w-3.5" />
-                </summary>
-                {practiceSettingsOpen && (
-                  <div
-                    role="group"
+                  {coachSentence}
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <details className="relative" open={practiceSettingsOpen}>
+                  <summary
+                    role="button"
                     aria-label="Practice run settings"
-                    className="absolute left-0 right-auto z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-stone-200 bg-white p-3 text-left shadow-xl dark:border-stone-800 dark:bg-stone-900 sm:left-auto sm:right-0 sm:max-w-[calc(100vw-2rem)]"
+                    aria-expanded={practiceSettingsOpen}
+                    title="Practice run settings"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setPracticeSettingsOpen((open) => !open);
+                    }}
+                    className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-stone-200 text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
                   >
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
-                        Practice settings
-                      </div>
-                      <div className="text-[11px] font-medium text-stone-600">
-                        {reverseDrill ? 'Reading' : 'Form'}
-                      </div>
-                    </div>
+                    <IconSettings className="h-3.5 w-3.5" />
+                  </summary>
+                  {practiceSettingsOpen && (
                     <div
                       role="group"
-                      aria-label="Answer style"
-                      className="mb-3 inline-flex w-full flex-wrap items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
+                      aria-label="Practice run settings"
+                      className="absolute left-0 right-auto z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-stone-200 bg-white p-3 text-left shadow-xl dark:border-stone-800 dark:bg-stone-900 sm:left-auto sm:right-0 sm:max-w-[calc(100vw-2rem)]"
                     >
-                      <span className="px-1.5 text-xs font-medium text-stone-600">Answer</span>
-                      {ANSWER_STYLE_OPTIONS.map((option) => {
-                        const active = answerMode === option.id;
-                        return (
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+                          Practice settings
+                        </div>
+                        <div className="text-[11px] font-medium text-stone-600">
+                          {reverseDrill ? 'Reading' : 'Form'}
+                        </div>
+                      </div>
+                      <div
+                        role="group"
+                        aria-label="Answer style"
+                        className="mb-3 inline-flex w-full flex-wrap items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
+                      >
+                        <span className="px-1.5 text-xs font-medium text-stone-600">Answer</span>
+                        {ANSWER_STYLE_OPTIONS.map((option) => {
+                          const active = answerMode === option.id;
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              onClick={() => setAnswerStyle(option.id)}
+                              aria-pressed={active}
+                              className={`rounded-md px-2 py-1 text-xs font-medium transition ${
+                                active
+                                  ? 'bg-stone-800 text-white dark:bg-indigo-600'
+                                  : 'text-stone-600 hover:bg-white hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200'
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="space-y-2">
+                        {typedAnswerMode && !reverseDrill && (
                           <button
-                            key={option.id}
                             type="button"
-                            onClick={() => setAnswerStyle(option.id)}
-                            aria-pressed={active}
-                            className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-                              active
-                                ? 'bg-stone-800 text-white dark:bg-indigo-600'
-                                : 'text-stone-600 hover:bg-white hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200'
+                            onClick={toggleKanaHelp}
+                            aria-pressed={liveKanaHelpEnabled}
+                            aria-label={`Kana help ${liveKanaHelpEnabled ? 'on' : 'off'}`}
+                            title={liveKanaHelpEnabled ? 'Turn kana help off' : 'Turn kana help on'}
+                            className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
+                              liveKanaHelpEnabled
+                                ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                                : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
                             }`}
                           >
-                            {option.label}
+                            <span className="inline-flex items-center gap-1.5">
+                              {liveKanaHelpEnabled ? (
+                                <IconEye className="h-3.5 w-3.5" />
+                              ) : (
+                                <IconEyeOff className="h-3.5 w-3.5" />
+                              )}
+                              Kana help
+                            </span>
+                            <span>{liveKanaHelpEnabled ? 'on' : 'off'}</span>
                           </button>
-                        );
-                      })}
-                    </div>
-                    <div className="space-y-2">
-                      {typedAnswerMode && !reverseDrill && (
+                        )}
                         <button
                           type="button"
-                          onClick={toggleKanaHelp}
-                          aria-pressed={liveKanaHelpEnabled}
-                          aria-label={`Kana help ${liveKanaHelpEnabled ? 'on' : 'off'}`}
-                          title={liveKanaHelpEnabled ? 'Turn kana help off' : 'Turn kana help on'}
+                          onClick={toggleAutoNext}
+                          aria-pressed={autoAdvanceCorrect}
+                          aria-label={`Auto next ${autoAdvanceCorrect ? 'on' : 'off'}`}
+                          title={`Auto next for ${autoAdvanceFormKey}`}
                           className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
-                            liveKanaHelpEnabled
+                            autoAdvanceCorrect
                               ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
                               : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
                           }`}
                         >
                           <span className="inline-flex items-center gap-1.5">
-                            {liveKanaHelpEnabled ? (
-                              <IconEye className="h-3.5 w-3.5" />
-                            ) : (
-                              <IconEyeOff className="h-3.5 w-3.5" />
-                            )}
-                            Kana help
+                            <IconRefresh className="h-3.5 w-3.5" />
+                            Auto next
                           </span>
-                          <span>{liveKanaHelpEnabled ? 'on' : 'off'}</span>
+                          <span>{autoAdvanceCorrect ? 'on' : 'off'}</span>
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={toggleAutoNext}
-                        aria-pressed={autoAdvanceCorrect}
-                        aria-label={`Auto next ${autoAdvanceCorrect ? 'on' : 'off'}`}
-                        title={`Auto next for ${autoAdvanceFormKey}`}
-                        className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
-                          autoAdvanceCorrect
-                            ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                            : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-                        }`}
-                      >
-                        <span className="inline-flex items-center gap-1.5">
-                          <IconRefresh className="h-3.5 w-3.5" />
-                          Auto next
-                        </span>
-                        <span>{autoAdvanceCorrect ? 'on' : 'off'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPracticePrefs((prev) => ({
-                            ...prev,
-                            sentenceMode: !prev.sentenceMode,
-                          }))
-                        }
-                        aria-pressed={sentenceMode}
-                        aria-label={`Sentence ${sentenceMode ? 'on' : 'off'}`}
-                        title="Show each prompt inside an example sentence (stays on until you turn it off)"
-                        className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
-                          sentenceMode
-                            ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                            : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-                        }`}
-                      >
-                        <span>Sentence</span>
-                        <span>{sentenceMode ? 'on' : 'off'}</span>
-                      </button>
-                    </div>
-                    <div className="mt-3 border-t border-stone-200 pt-3 dark:border-stone-800">
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
-                        Adjust scope
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPracticePrefs((prev) => ({
+                              ...prev,
+                              sentenceMode: !prev.sentenceMode,
+                            }))
+                          }
+                          aria-pressed={sentenceMode}
+                          aria-label={`Sentence ${sentenceMode ? 'on' : 'off'}`}
+                          title="Show each prompt inside an example sentence (stays on until you turn it off)"
+                          className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
+                            sentenceMode
+                              ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                              : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
+                          }`}
+                        >
+                          <span>Sentence</span>
+                          <span>{sentenceMode ? 'on' : 'off'}</span>
+                        </button>
                       </div>
-                      <p className="mb-2 text-[11px] leading-snug text-stone-600 dark:text-stone-400">
-                        Removes this word from automatic Practice. Restore words from Tools. To move
-                        on without changing scope, use Skip.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          removeCurrentWordFromReviews();
-                          setPracticeSettingsOpen(false);
-                        }}
-                        className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-stone-700 transition hover:bg-rose-50 hover:text-rose-700 dark:text-stone-200 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
-                      >
-                        Remove this word from Practice
-                      </button>
+                      <div className="mt-3 border-t border-stone-200 pt-3 dark:border-stone-800">
+                        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+                          Adjust scope
+                        </div>
+                        <p className="mb-2 text-[11px] leading-snug text-stone-600 dark:text-stone-400">
+                          Removes this word from automatic Practice. Restore words from Tools. To
+                          move on without changing scope, use Skip.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            removeCurrentWordFromReviews();
+                            setPracticeSettingsOpen(false);
+                          }}
+                          className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-stone-700 transition hover:bg-rose-50 hover:text-rose-700 dark:text-stone-200 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
+                        >
+                          Remove this word from Practice
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </details>
+                <button
+                  type="button"
+                  onClick={() => setRunReviewOpen(true)}
+                  disabled={!runAnswerHistory.length}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-stone-200 px-3 text-xs font-semibold text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                >
+                  <IconList className="h-3.5 w-3.5" />
+                  Review answers
+                </button>
+              </div>
+            </div>
+            <dl
+              aria-label={`Practice run summary: ${runStatsLabel}`}
+              className="mt-3 grid grid-cols-3 gap-2 border-t border-stone-100 pt-3 text-xs dark:border-stone-800"
+            >
+              {runSummaryMetrics.map((metric) => (
+                <div key={metric.label} className="min-w-0">
+                  <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-600 dark:text-stone-500">
+                    {metric.label}
+                  </dt>
+                  <dd
+                    className={`mt-0.5 truncate text-sm font-semibold tabular-nums ${metric.valueClass}`}
+                  >
+                    {metric.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {!workoutProgress.continuous && showBoundedProgress && (
+              <div className="mt-3 space-y-1.5">
+                <div className="flex items-center justify-between gap-3 text-xs text-stone-600 dark:text-stone-400">
+                  <span className="font-semibold">{workoutProgress.label}</span>
+                  <span className="tabular-nums">
+                    {workoutProgress.now}/{workoutProgress.max}
+                  </span>
+                </div>
+                <div
+                  role="progressbar"
+                  aria-label={workoutProgress.label}
+                  aria-valuemin={0}
+                  aria-valuemax={workoutProgress.max}
+                  aria-valuenow={workoutProgress.now}
+                  className="h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
+                >
+                  <span
+                    className="block h-full rounded-full bg-indigo-600 dark:bg-indigo-400"
+                    style={{ width: `${workoutProgressPct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            <details className="mt-3">
+              <summary className="cursor-pointer list-none text-xs font-semibold text-stone-600 transition hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200">
+                Run details
+              </summary>
+              <div className="mt-2 grid gap-2 text-xs text-stone-600 dark:text-stone-400 sm:grid-cols-3">
+                <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
+                  <div className="font-semibold text-stone-700 dark:text-stone-200">
+                    Why this card
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 leading-snug">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${currentOriginMeta.chipClass}`}
+                    >
+                      {currentSourceChipLabel}
+                    </span>
+                    {currentSourceDetail && <span>{currentSourceDetail}</span>}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
+                  <div className="font-semibold text-stone-700 dark:text-stone-200">Top miss</div>
+                  <div className="mt-1 leading-snug">
+                    {topSessionMistake
+                      ? `${topSessionMistake.label} (${topSessionMistake.count}x)`
+                      : 'No pattern yet'}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
+                  <div className="font-semibold text-stone-700 dark:text-stone-200">
+                    Recent answers
+                  </div>
+                  {recentOutcomes.length ? (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {recentOutcomes.map((outcome, index) => (
+                        <span
+                          key={`${outcome.at || 0}-${outcome.cardId || outcome.label}-${index}`}
+                          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                            outcome.kind === 'correct'
+                              ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
+                              : outcome.kind === 'skipped'
+                                ? 'border-stone-200 text-stone-600 dark:border-stone-800 dark:text-stone-400'
+                                : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-300'
+                          }`}
+                        >
+                          {outcome.kind}: {outcome.label}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-1 leading-snug">No answers yet</div>
+                  )}
+                  {runStats.skipped > 0 && (
+                    <div className="mt-1 text-[11px] text-stone-600">
+                      {runStats.skipped} skipped
+                    </div>
+                  )}
+                </div>
+                {guideInsight && (
+                  <div className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-950/20 dark:text-amber-200 sm:col-span-3">
+                    <div className="font-semibold text-amber-950 dark:text-amber-100">
+                      Guide insight
+                    </div>
+                    <div className="mt-1 leading-snug">
+                      <span>{guideInsight.message}</span>
+                      {guideInsight.detail && (
+                        <span className="block text-amber-800 dark:text-amber-200/90">
+                          {guideInsight.detail}
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
-              </details>
-              <button
-                type="button"
-                onClick={() => setRunReviewOpen(true)}
-                disabled={!runAnswerHistory.length}
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-stone-200 px-3 text-xs font-semibold text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
-              >
-                <IconList className="h-3.5 w-3.5" />
-                Review answers
-              </button>
-            </div>
-          </div>
-          <dl
-            aria-label={`Practice run summary: ${runStatsLabel}`}
-            className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-stone-100 pt-3 text-xs dark:border-stone-800 sm:grid-cols-4"
-          >
-            {runSummaryMetrics.map((metric) => (
-              <div key={metric.label} className="min-w-0">
-                <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-600 dark:text-stone-500">
-                  {metric.label}
-                </dt>
-                <dd
-                  className={`mt-0.5 truncate text-sm font-semibold tabular-nums ${metric.valueClass}`}
-                >
-                  {metric.value}
-                </dd>
               </div>
-            ))}
-          </dl>
-          {!workoutProgress.continuous && (
-            <div className="mt-3 space-y-1.5">
-              <div className="flex items-center justify-between gap-3 text-xs text-stone-600 dark:text-stone-400">
-                <span className="font-semibold">{workoutProgress.label}</span>
-                <span className="tabular-nums">
-                  {workoutProgress.now}/{workoutProgress.max}
-                </span>
-              </div>
-              <div
-                role="progressbar"
-                aria-label={workoutProgress.label}
-                aria-valuemin={0}
-                aria-valuemax={workoutProgress.max}
-                aria-valuenow={workoutProgress.now}
-                className="h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
-              >
-                <span
-                  className="block h-full rounded-full bg-indigo-600 dark:bg-indigo-400"
-                  style={{ width: `${workoutProgressPct}%` }}
-                />
-              </div>
-            </div>
-          )}
-          <details className="mt-3">
-            <summary className="cursor-pointer list-none text-xs font-semibold text-stone-600 transition hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200">
-              Run details
-            </summary>
-            <div className="mt-2 grid gap-2 text-xs text-stone-600 dark:text-stone-400 sm:grid-cols-3">
-              <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
-                <div className="font-semibold text-stone-700 dark:text-stone-200">
-                  Why this card
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5 leading-snug">
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${currentOriginMeta.chipClass}`}
-                  >
-                    {currentSourceChipLabel}
-                  </span>
-                  {currentSourceDetail && <span>{currentSourceDetail}</span>}
-                </div>
-              </div>
-              <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
-                <div className="font-semibold text-stone-700 dark:text-stone-200">Top miss</div>
-                <div className="mt-1 leading-snug">
-                  {topSessionMistake
-                    ? `${topSessionMistake.label} (${topSessionMistake.count}x)`
-                    : 'No pattern yet'}
-                </div>
-              </div>
-              <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
-                <div className="font-semibold text-stone-700 dark:text-stone-200">
-                  Recent answers
-                </div>
-                {recentOutcomes.length ? (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {recentOutcomes.map((outcome, index) => (
-                      <span
-                        key={`${outcome.at || 0}-${outcome.cardId || outcome.label}-${index}`}
-                        className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                          outcome.kind === 'correct'
-                            ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
-                            : outcome.kind === 'skipped'
-                              ? 'border-stone-200 text-stone-600 dark:border-stone-800 dark:text-stone-400'
-                              : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-300'
-                        }`}
-                      >
-                        {outcome.kind}: {outcome.label}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-1 leading-snug">No answers yet</div>
-                )}
-                {runStats.skipped > 0 && (
-                  <div className="mt-1 text-[11px] text-stone-600">{runStats.skipped} skipped</div>
-                )}
-              </div>
-              {guideInsight && (
-                <div className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-950/20 dark:text-amber-200 sm:col-span-3">
-                  <div className="font-semibold text-amber-950 dark:text-amber-100">
-                    Guide insight
-                  </div>
-                  <div className="mt-1 leading-snug">
-                    <span>{guideInsight.message}</span>
-                    {guideInsight.detail && (
-                      <span className="block text-amber-800 dark:text-amber-200/90">
-                        {guideInsight.detail}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </details>
-        </section>
+            </details>
+          </section>
+        )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
           <div className="relative px-4 pb-4 pt-12 text-center sm:px-6 sm:pb-8 sm:pt-16">
             <div className="absolute left-4 right-4 top-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 sm:left-6 sm:right-6 sm:top-8">
@@ -3397,18 +3402,20 @@ export default function StudyView({ mode = 'practice' }) {
           , or press Esc to skip without penalty.
         </div>
       </div>
-      <PracticeScopeSidebar
-        className="order-2"
-        state={state}
-        weaknessFamilies={weaknessFamilies}
-        sessionFamilyStats={sessionFamilyStats}
-        openFamilyIds={openPracticeMapFamilyIds}
-        onToggleFamilyOpen={togglePracticeMapFamilyOpen}
-        onToggleFamily={togglePracticeFamily}
-        onIntroduceFamily={introducePracticeFamily}
-        onToggleType={togglePracticeType}
-        onToggleDimension={togglePracticeDimension}
-      />
+      {!transformationMode && (
+        <PracticeScopeSidebar
+          className="order-2"
+          state={state}
+          weaknessFamilies={weaknessFamilies}
+          sessionFamilyStats={sessionFamilyStats}
+          openFamilyIds={openPracticeMapFamilyIds}
+          onToggleFamilyOpen={togglePracticeMapFamilyOpen}
+          onToggleFamily={togglePracticeFamily}
+          onIntroduceFamily={introducePracticeFamily}
+          onToggleType={togglePracticeType}
+          onToggleDimension={togglePracticeDimension}
+        />
+      )}
     </div>
   );
 }

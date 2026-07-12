@@ -304,33 +304,7 @@ export default function RushView() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-            {score}
-          </div>
-          <div className="text-xs text-stone-500">Score</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-            {combo}
-          </div>
-          <div className="text-xs text-stone-500">Combo</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-            {wave}
-          </div>
-          <div className="text-xs text-stone-500">Wave</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-            {game.bestScore || 0}
-          </div>
-          <div className="text-xs text-stone-500">Best</div>
-        </div>
-      </div>
-      <div className="grid lg:grid-cols-[1fr_260px] gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]">
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
           <div className="flex items-center justify-between gap-3 mb-4">
             <div>
@@ -526,6 +500,32 @@ export default function RushView() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Rush results">
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {score}
+          </div>
+          <div className="text-xs text-stone-500">Score</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {combo}
+          </div>
+          <div className="text-xs text-stone-500">Combo</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {wave}
+          </div>
+          <div className="text-xs text-stone-500">Wave</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {game.bestScore || 0}
+          </div>
+          <div className="text-xs text-stone-500">Best</div>
         </div>
       </div>
     </div>

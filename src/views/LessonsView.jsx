@@ -8,7 +8,6 @@ import {
   LESSON_TRACKS,
   ONBIN_ROWS,
   RU_MASU_DIAGNOSTIC_ROWS,
-  getLessonCoverage,
 } from '../data/lessonContent.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import {
@@ -16,17 +15,6 @@ import {
   buildRuleReviewRecommendation,
 } from '../utils/reviewRecommendations.js';
 import { parseFormationKeysHash } from '../utils/formationKeys.js';
-
-function LessonStat({ label, value }) {
-  return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2">
-      <div className="text-lg font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-        {value}
-      </div>
-      <div className="text-[11px] uppercase tracking-wide text-stone-600">{label}</div>
-    </div>
-  );
-}
 
 function TypeChip({ id }) {
   const type = getTypeInfo(id);
@@ -159,46 +147,51 @@ function TrackCard({ track, lessons, onLearnLesson, onPracticeLesson, onPractice
         Practice track
       </button>
 
-      <ol className="mt-4 space-y-2">
-        {lessons.map((lesson, index) => (
-          <li
-            key={`${track.id}-${lesson.groupId}`}
-            className="rounded-xl border border-white/70 bg-white/80 p-3 shadow-sm dark:border-stone-800/80 dark:bg-stone-950/80"
-          >
-            <div className="flex gap-3">
-              <span
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${styles.step}`}
-              >
-                {index + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold text-stone-900 dark:text-stone-100">
-                  {lesson.title}
-                </div>
-                <p className="mt-1 text-xs leading-relaxed text-stone-600 dark:text-stone-400">
-                  Learn the rule, then practice the forms while they are fresh.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <a
-                    href={`#lesson-${lesson.groupId}`}
-                    onClick={() => onLearnLesson(lesson.groupId)}
-                    className="inline-flex items-center rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
-                  >
-                    Learn this
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => onPracticeLesson(lesson)}
-                    className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${styles.button}`}
-                  >
-                    Practice this
-                  </button>
+      <details className="mt-4 rounded-xl border border-white/70 bg-white/60 dark:border-stone-800 dark:bg-stone-950/60">
+        <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-stone-700 dark:text-stone-200">
+          Browse {lessons.length} lessons
+        </summary>
+        <ol className="space-y-2 border-t border-stone-200/70 p-2 dark:border-stone-800">
+          {lessons.map((lesson, index) => (
+            <li
+              key={`${track.id}-${lesson.groupId}`}
+              className="rounded-xl border border-white/70 bg-white/80 p-3 shadow-sm dark:border-stone-800/80 dark:bg-stone-950/80"
+            >
+              <div className="flex gap-3">
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${styles.step}`}
+                >
+                  {index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-stone-900 dark:text-stone-100">
+                    {lesson.title}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-stone-600 dark:text-stone-400">
+                    Learn the rule, then practice the forms while they are fresh.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a
+                      href={`#lesson-${lesson.groupId}`}
+                      onClick={() => onLearnLesson(lesson.groupId)}
+                      className="inline-flex items-center rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
+                    >
+                      Learn this
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => onPracticeLesson(lesson)}
+                      className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${styles.button}`}
+                    >
+                      Practice this
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      </details>
     </article>
   );
 }
@@ -238,7 +231,6 @@ export default function LessonsView() {
   const [formationKeyHighlight, setFormationKeyHighlight] = useState({ ending: '', row: '' });
   const [openLessonIds, setOpenLessonIds] = useState(() => new Set());
   const lessonRefs = useRef(new Map());
-  const coverage = useMemo(() => getLessonCoverage(), []);
   const lessonMap = useMemo(
     () => new Map(LESSON_SECTIONS.map((lesson) => [lesson.groupId, lesson])),
     [],
@@ -382,19 +374,6 @@ export default function LessonsView() {
             need a specific rule. Each lesson can hand a focused set back to Practice.
           </p>
         </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <LessonStat label="lessons" value={LESSON_SECTIONS.length} />
-          <LessonStat label="forms mapped" value={`${coverage.covered}/${coverage.total}`} />
-          <LessonStat label="verb families" value="4" />
-          <LessonStat label="adjective types" value="2" />
-        </div>
-
-        {coverage.missing.length > 0 && (
-          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/25 dark:text-amber-300">
-            {coverage.missing.length} form type needs a lesson mapping.
-          </div>
-        )}
       </section>
 
       {learnFocus?.lessonGroupId && (
@@ -434,8 +413,8 @@ export default function LessonsView() {
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[15rem_1fr]">
-        <aside className="lg:sticky lg:top-4 lg:self-start">
+      <div className="space-y-4">
+        <aside>
           <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-3">
             <label
               htmlFor="lesson-search"
@@ -450,7 +429,7 @@ export default function LessonsView() {
               placeholder="potential, て, passive..."
               className="mt-2 w-full rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 px-3 py-2 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-950"
             />
-            <nav className="mt-3 space-y-1" aria-label="Lesson list">
+            <nav className="mt-3" aria-label="Lesson reference">
               <a
                 href="#formation-keys"
                 onClick={() => {
@@ -462,39 +441,6 @@ export default function LessonsView() {
                 <IconList className="w-4 h-4 text-indigo-600" />
                 Formation keys
               </a>
-              {LESSON_TRACKS.map((track) => (
-                <a
-                  key={track.id}
-                  href={`#track-${track.id}`}
-                  className="block rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-50 hover:text-stone-950 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
-                >
-                  <span className="block font-medium">{track.level} track</span>
-                  <span className="block text-[11px] text-stone-600">
-                    {track.lessonGroupIds.length} lessons
-                  </span>
-                </a>
-              ))}
-            </nav>
-            <nav
-              className="mt-3 border-t border-stone-100 pt-3 dark:border-stone-800"
-              aria-label="All lessons"
-            >
-              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-stone-600">
-                All lessons
-              </div>
-              {LESSON_SECTIONS.map((lesson) => (
-                <a
-                  key={lesson.groupId}
-                  href={`#lesson-${lesson.groupId}`}
-                  onClick={() => openLesson(lesson.groupId)}
-                  className="block rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-50 hover:text-stone-950 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
-                >
-                  <span className="block font-medium">{lesson.title}</span>
-                  <span className="block text-[11px] text-stone-600">
-                    {lesson.typeIds.length} forms
-                  </span>
-                </a>
-              ))}
             </nav>
           </div>
         </aside>

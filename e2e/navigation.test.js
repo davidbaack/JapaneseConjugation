@@ -13,7 +13,7 @@ const VIEW_ANCHORS = {
   practice: () => /Practice map/,
   stats: () => /Practice pulse/,
   learn: () => /Conjugation formation guide/,
-  drills: () => /Focused exercises for endings, transformations, groups, and speed/,
+  drills: () => /Pick a drill and start/,
   tools: () => /Lookup, check, word lists, and word management/,
   settings: () => /Display scripts/,
 };
@@ -78,11 +78,13 @@ test.describe('Tab navigation', () => {
     await expect(page.getByRole('tab', { name: /^Custom words/ })).toBeVisible();
 
     await page.getByRole('tab', { name: /^Words/ }).click();
-    await expect(page.getByRole('button', { name: 'Practice now' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Practice this' }).first()).toBeVisible();
 
     await page.getByRole('tab', { name: /^Lookup/ }).click();
+    await expect(page.getByText(/Search a dictionary word or any conjugated form/)).toBeVisible();
+    await page.getByLabel('Search for a word or conjugation form').fill('taberu');
     await expect(page.getByText('Copy table')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Drill word' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Practice this' })).toBeVisible();
     await page.getByLabel('Search for a word or conjugation form').fill('tabeta');
     await expect(page.getByText('AI disambiguate')).toBeVisible();
 
@@ -127,6 +129,9 @@ test.describe('Tab navigation', () => {
 
     await expect(page.getByText('Display scripts')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Cloud Sync' })).toBeVisible();
+    await expect(page.getByText('Data & account')).toBeVisible();
+    await expect(page.getByText('Backup & restore')).toBeHidden();
+    await page.getByText('Data & account').click();
     await expect(page.getByText('Backup & restore')).toBeVisible();
     await expect(page.getByText('Practice session')).toHaveCount(0);
     await expect(page.getByText('Conjugation types in scope')).toHaveCount(0);

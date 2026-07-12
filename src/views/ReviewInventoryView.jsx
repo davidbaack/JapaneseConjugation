@@ -28,6 +28,7 @@ function wordRank(word) {
 export default function ReviewInventoryView() {
   const { state, setState, allWords, practiceWord } = useApp();
   const [query, setQuery] = useState('');
+  const [visibleLimit, setVisibleLimit] = useState(30);
   const q = query.trim().toLowerCase();
   const sortedWords = useMemo(
     () =>
@@ -41,7 +42,7 @@ export default function ReviewInventoryView() {
             word.meaning?.toLowerCase().includes(q)
           );
         })
-        .slice(0, 80),
+        .slice(0, 120),
     [allWords, q, query],
   );
 
@@ -93,13 +94,16 @@ export default function ReviewInventoryView() {
           <input
             type="search"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setVisibleLimit(30);
+            }}
             placeholder="Search words..."
             className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-indigo-400 dark:border-stone-800 dark:bg-stone-950"
           />
         </div>
         <div className="divide-y divide-stone-100 rounded-xl border border-stone-200 dark:divide-stone-800 dark:border-stone-800">
-          {sortedWords.map((word) => {
+          {sortedWords.slice(0, visibleLimit).map((word) => {
             const excluded = isWordExcludedFromReview(state, word);
             return (
               <div
@@ -130,7 +134,7 @@ export default function ReviewInventoryView() {
                     onClick={() => practiceInventoryWord(word)}
                     className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300"
                   >
-                    Practice now
+                    Practice this
                   </button>
                   <button
                     type="button"
@@ -148,6 +152,15 @@ export default function ReviewInventoryView() {
             );
           })}
         </div>
+        {visibleLimit < sortedWords.length && (
+          <button
+            type="button"
+            onClick={() => setVisibleLimit((limit) => limit + 30)}
+            className="mt-3 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
+          >
+            Load 30 more
+          </button>
+        )}
       </section>
     </div>
   );
