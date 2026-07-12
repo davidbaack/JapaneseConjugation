@@ -1839,6 +1839,19 @@ export default function StudyView({ mode = 'practice' }) {
     });
   }
 
+  function openPracticeFamilyLesson(family) {
+    const lesson = LESSON_BY_GROUP_ID.get(family?.id);
+    if (!lesson) return false;
+    if (typeof window !== 'undefined') {
+      window.location.hash = `lesson-${lesson.groupId}`;
+    }
+    return openLearnFocus?.({
+      source: 'practice-map',
+      lessonGroupId: lesson.groupId,
+      lessonTitle: lesson.title,
+    });
+  }
+
   // Deterministic, offline step coach — no API key required. Irregular forms
   // are masked on the first click; a second click reveals the spelled-out steps.
   function showStepHint() {
@@ -3397,6 +3410,7 @@ export default function StudyView({ mode = 'practice' }) {
           onToggleMobileOpen={() => setPracticeMapMobileOpen((open) => !open)}
           onToggleFamilyOpen={togglePracticeMapFamilyOpen}
           onToggleFamily={togglePracticeFamily}
+          onLearnFamily={openPracticeFamilyLesson}
           onIntroduceFamily={introducePracticeFamily}
           onToggleType={togglePracticeType}
           onToggleDimension={togglePracticeDimension}

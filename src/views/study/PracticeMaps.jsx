@@ -88,6 +88,7 @@ export function PracticeScopeSidebar({
   openFamilyIds,
   onToggleFamilyOpen,
   onToggleFamily,
+  onLearnFamily,
   onIntroduceFamily,
   onToggleType,
   onToggleDimension,
@@ -412,6 +413,16 @@ export function PracticeScopeSidebar({
                         <span className="max-w-28 text-right text-[10px] leading-tight text-amber-700 dark:text-amber-300">
                           Saved and ready when filters match
                         </span>
+                      )}
+                      {lesson && onLearnFamily && (
+                        <button
+                          type="button"
+                          onClick={() => onLearnFamily(family)}
+                          className="max-w-28 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-semibold leading-tight text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
+                          title={`Open ${title} in Learn`}
+                        >
+                          Learn this
+                        </button>
                       )}
                       {introEligible && onIntroduceFamily && (
                         <button

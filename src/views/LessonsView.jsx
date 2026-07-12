@@ -376,7 +376,7 @@ export default function LessonsView() {
         </div>
       </section>
 
-      {learnFocus?.lessonGroupId && (
+      {learnFocus?.source === 'practice-result' && learnFocus?.lessonGroupId && (
         <PracticeCardReturnPanel
           focus={learnFocus}
           onGuide={guideFocusedRule}

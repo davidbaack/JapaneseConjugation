@@ -185,6 +185,75 @@ describe('App shell', () => {
     ).toBeTruthy();
   });
 
+  it('opens Learn from active, inactive, and filter-disabled Practice categories without changing scope', async () => {
+    const conditionals = FORM_GROUPS.find((group) => group.id === 'conditional');
+    const withoutConditionals = EVERYDAY_TYPE_IDS.filter(
+      (typeId) => !conditionals.typeIds.includes(typeId),
+    );
+    let practiceScope = practiceScopeFromEnabledTypes(withoutConditionals);
+    practiceScope = reducePracticeScope(practiceScope, {
+      type: 'toggle-filter',
+      optionId: 'plain',
+    });
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          practiceScope,
+          enabledTypes: enabledTypeIdsForPracticeScope(practiceScope),
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+
+    render(<App />);
+    expect(await waitForPracticeCard()).toBeTruthy();
+
+    const practiceMap = screen.getByRole('complementary', { name: 'Practice map' });
+    const basicsCard = within(practiceMap).getByRole('article', {
+      name: 'Basics and Politeness',
+    });
+    const passiveCard = within(practiceMap).getByRole('article', { name: 'Passive' });
+    const conditionalsCard = within(practiceMap).getByRole('article', {
+      name: 'Conditionals',
+    });
+
+    expect(within(basicsCard).getByRole('button', { name: 'Learn this' })).toBeTruthy();
+    expect(within(passiveCard).getByRole('button', { name: 'Learn this' })).toBeTruthy();
+    expect(within(conditionalsCard).getByRole('button', { name: 'Learn this' })).toBeTruthy();
+    expect(
+      within(conditionalsCard).getByRole('button', { name: 'Turn Conditionals on' }).disabled,
+    ).toBe(true);
+
+    fireEvent.click(within(conditionalsCard).getByRole('button', { name: 'Learn this' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'Learn' }).getAttribute('aria-selected')).toBe('true'),
+    );
+    const lessonHeading = await screen.findByRole('heading', { name: 'Conditionals' });
+    const lessonCard = lessonHeading.closest('article');
+    await waitFor(() =>
+      expect(within(lessonCard).getByRole('button', { name: 'Hide lesson' })).toBeTruthy(),
+    );
+    expect(screen.queryByRole('region', { name: 'Missed Practice card' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Practice' }));
+    expect(await waitForPracticeCard()).toBeTruthy();
+
+    const restoredMap = screen.getByRole('complementary', { name: 'Practice map' });
+    expect(
+      within(restoredMap).getByRole('button', { name: 'Turn Basics and Politeness off' }),
+    ).toBeTruthy();
+    expect(within(restoredMap).getByRole('button', { name: 'Turn Passive on' })).toBeTruthy();
+    expect(within(restoredMap).getByRole('button', { name: 'Turn Conditionals on' }).disabled).toBe(
+      true,
+    );
+  });
+
   it('renders the header, subtitle, and restored nav', async () => {
     render(<App />);
     expect(screen.getByRole('heading', { name: /Katachiya/ })).toBeTruthy();
