@@ -835,6 +835,32 @@ describe('App shell', () => {
     expect(within(closeMatches).getAllByText('Wrong').length).toBeGreaterThan(0);
   }, 15000);
 
+  it('explains likely learner intent before literal Check alternatives', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Check/i }));
+    fireEvent.change(screen.getByPlaceholderText(/tabeta/i), {
+      target: { value: 'yomunai' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
+
+    expect(await screen.findByText('Likely intended form')).toBeTruthy();
+    expect(
+      screen.getByText(
+        (_, node) =>
+          node?.textContent === 'You probably wanted よまない. Godan む shifts to ま before ない.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('Your input')).toBeTruthy();
+    expect(screen.getByText('Correct answer')).toBeTruthy();
+
+    const alternatives = screen.getByText('Other possible forms').closest('details');
+    expect(alternatives).toBeTruthy();
+    const firstAlternative = within(alternatives).getAllByRole('listitem')[0];
+    expect(within(firstAlternative).getByText('Prohibition')).toBeTruthy();
+    expect(firstAlternative.textContent).toContain('読むな');
+  }, 15000);
+
   it('exposes practice exercises in the Drills tab', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Drills', exact: true }));

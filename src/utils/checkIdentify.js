@@ -114,6 +114,33 @@ function commonPrefixLength(a, b) {
   return length;
 }
 
+function commonSuffixLength(a, b) {
+  const left = Array.from(a || '');
+  const right = Array.from(b || '');
+  const length = Math.min(left.length, right.length);
+  for (let i = 1; i <= length; i++) {
+    if (left[left.length - i] !== right[right.length - i]) return i - 1;
+  }
+  return length;
+}
+
+function godanNegativeIntent(normalized, word, type, kana, readingStem) {
+  if (word.group !== 'godan' || type !== 'plain-negative') return null;
+
+  const reading = normalizeInput(word.reading);
+  if (!reading || normalized !== `${reading}ない`) return null;
+
+  const ending = Array.from(reading).at(-1);
+  const shifted = Array.from(kana.slice(readingStem.length))[0];
+  if (!ending || !shifted || ending === shifted) return null;
+
+  return {
+    kind: 'godan-plain-negative-overregularization',
+    confidence: 'high',
+    explanation: `Godan ${ending} shifts to ${shifted} before ない.`,
+  };
+}
+
 // identifyConjugation(input, words, options)
 //   input:   raw user string (kana, romaji, or kanji)
 //   words:   active/enabled word set (array of { dict, reading, meaning, group })
@@ -217,7 +244,24 @@ export function identifyConjugation(input, words = [], options = {}) {
       const floorOk = onbinAttempt || shared >= 2;
       if (distance > 0 && distance <= limit && floorOk) {
         const regularized = type === regularizedType;
-        near.push({ word, type, kana, kanji, distance, anchored, regularized });
+        const intent =
+          godanNegativeIntent(normalized, word, type, kana, readingStem) ||
+          (regularized
+            ? {
+                kind: 'regularized-te-ta',
+                confidence: 'high',
+              }
+            : null);
+        near.push({
+          word,
+          type,
+          kana,
+          kanji,
+          distance,
+          anchored,
+          regularized,
+          ...(intent ? { intent } : {}),
+        });
       }
     }
   }
@@ -238,7 +282,7 @@ export function identifyConjugation(input, words = [], options = {}) {
   const anchoredNear = near.filter((c) => c.anchored);
   const pool = anchoredNear.length > 0 ? anchoredNear : near;
 
-  pool.sort((a, b) => {
+  const compareLiteralCloseness = (a, b) => {
     // An exact over-regularization (のみた→のんだ) names the intended form
     // outright, so it wins even over a closer-by-distance coincidence.
     if (a.regularized !== b.regularized) return a.regularized ? -1 : 1;
@@ -254,7 +298,31 @@ export function identifyConjugation(input, words = [], options = {}) {
     const bWanted = wantSuffix && b.type === wantSuffix ? 0 : 1;
     if (aWanted !== bWanted) return aWanted - bWanted;
     return a.kana.length - b.kana.length;
-  });
+  };
+
+  const literalPool = [...pool].sort(compareLiteralCloseness);
+
+  // Pick one primary candidate using learner-intent evidence, then leave the
+  // remaining possibilities in literal-closeness order. A preserved, multi-
+  // kana ending (ない, なかった, ません, etc.) is meaningful evidence; a single
+  // matching kana is too weak to overrule edit distance. Explicit formation
+  // mistakes such as dictionary-form + ない receive the strongest signal.
+  const intentStrength = (candidate) => {
+    if (candidate.intent?.confidence === 'high') return 1000;
+    const suffixLength = commonSuffixLength(normalized, candidate.kana);
+    return suffixLength >= 2 ? suffixLength : 0;
+  };
+  const intentPrimary =
+    exact.length === 0
+      ? [...literalPool].sort((a, b) => {
+          const strengthDelta = intentStrength(b) - intentStrength(a);
+          return strengthDelta || compareLiteralCloseness(a, b);
+        })[0]
+      : null;
+  const rankedPool =
+    intentPrimary && intentStrength(intentPrimary) > 0
+      ? [intentPrimary, ...literalPool.filter((candidate) => candidate !== intentPrimary)]
+      : literalPool;
 
   // When there is already a correct answer, keep only a small set of the best
   // wrong interpretations with a real shared head. The correct hit is the
@@ -262,8 +330,10 @@ export function identifyConjugation(input, words = [], options = {}) {
   // inspect them, not a list of every one-kana-stem coincidence.
   const exactNearPool =
     exact.length > 0 && includeNearWhenExact
-      ? pool.filter((cand) => commonPrefixLength(normalized, cand.kana) >= MIN_EXACT_NEAR_PREFIX)
-      : pool;
+      ? literalPool.filter(
+          (cand) => commonPrefixLength(normalized, cand.kana) >= MIN_EXACT_NEAR_PREFIX,
+        )
+      : rankedPool;
   const bestExactNearDistance = exactNearPool[0]?.distance;
   const matchedPool =
     exact.length > 0 && includeNearWhenExact
@@ -272,7 +342,7 @@ export function identifyConjugation(input, words = [], options = {}) {
             .filter((cand) => cand.distance === bestExactNearDistance)
             .slice(0, MAX_NEAR_WHEN_EXACT)
         : []
-      : pool.slice(0, MAX_NEAR_RESULTS);
+      : rankedPool.slice(0, MAX_NEAR_RESULTS);
 
   for (const cand of matchedPool) {
     cand.diff = describeDiff(normalized, cand.kana);

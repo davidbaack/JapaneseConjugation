@@ -219,14 +219,14 @@ function RightMatchList({ matches, practicePrefs, onSpeak }) {
   );
 }
 
-function CandidateMatchList({ matches, practicePrefs, onSpeak }) {
+function CandidateMatchList({ matches, practicePrefs, onSpeak, heading = 'Other close matches' }) {
   if (matches.length === 0) return null;
 
   return (
     <details className="mt-4 overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800">
       <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 border-b border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-950/70 [&::-webkit-details-marker]:hidden">
         <div className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-          Other close matches
+          {heading}
         </div>
         <div className="text-xs text-stone-400">
           {matches.length} {matches.length === 1 ? 'match' : 'matches'}
@@ -379,6 +379,12 @@ export default function CheckView() {
   const nearRule =
     explanationLine(nearExplanation?.rule) || explanationLine(nearExplanation?.intro);
   const nearDerivation = explanationLine(nearExplanation?.derivation);
+  const highConfidenceIntent =
+    result?.status === 'near' &&
+    result.near?.[0]?.intent?.confidence === 'high' &&
+    result.near[0].intent.explanation
+      ? result.near[0].intent
+      : null;
 
   return (
     <div className="space-y-4">
@@ -502,7 +508,9 @@ export default function CheckView() {
               whole card) keeps screen readers from re-announcing the breakdown,
               forms table, etc. each time the user expands a disclosure. */}
           <span role="status" aria-live="polite" className="sr-only">
-            {lookupResultHeadline(result.status)}
+            {result.status === 'near' && highConfidenceIntent
+              ? 'Likely intended form.'
+              : lookupResultHeadline(result.status)}
           </span>
           {result.status === 'exact' && (
             <div>
@@ -638,19 +646,41 @@ export default function CheckView() {
             <div>
               <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-semibold mb-3">
                 <IconX className="w-5 h-5" />
-                Closest match
+                {highConfidenceIntent ? 'Likely intended form' : 'Closest match'}
               </div>
-              <p className="text-stone-700 dark:text-stone-300">
-                The closest valid form is the{' '}
-                <span className="font-semibold">{getTypeInfo(result.near[0].type).label}</span> of{' '}
-                <span className="font-semibold" lang="ja">
-                  {result.near[0].word.dict}
-                </span>{' '}
-                <span className="text-stone-500" lang="ja">
-                  （{result.near[0].word.reading}）
-                </span>{' '}
-                — {result.near[0].word.meaning}.
-              </p>
+              {highConfidenceIntent ? (
+                <div className="space-y-1 text-stone-700 dark:text-stone-300">
+                  <p>
+                    You probably wanted{' '}
+                    <span className="font-semibold" lang="ja">
+                      {result.near[0].kana}
+                    </span>
+                    . {highConfidenceIntent.explanation}
+                  </p>
+                  <p className="text-sm text-stone-500 dark:text-stone-400">
+                    This is the{' '}
+                    <span className="font-semibold">{getTypeInfo(result.near[0].type).label}</span>{' '}
+                    of{' '}
+                    <span className="font-semibold" lang="ja">
+                      {result.near[0].word.dict}
+                    </span>{' '}
+                    <span lang="ja">（{result.near[0].word.reading}）</span> —{' '}
+                    {result.near[0].word.meaning}.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-stone-700 dark:text-stone-300">
+                  The closest valid form is the{' '}
+                  <span className="font-semibold">{getTypeInfo(result.near[0].type).label}</span> of{' '}
+                  <span className="font-semibold" lang="ja">
+                    {result.near[0].word.dict}
+                  </span>{' '}
+                  <span className="text-stone-500" lang="ja">
+                    （{result.near[0].word.reading}）
+                  </span>{' '}
+                  — {result.near[0].word.meaning}.
+                </p>
+              )}
               <div className="mt-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-stone-400">{LOOKUP_COMPARISON_LABELS.submitted}</span>
@@ -659,7 +689,9 @@ export default function CheckView() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm mt-2">
-                  <span className="text-stone-400">{LOOKUP_COMPARISON_LABELS.expected}</span>
+                  <span className="text-stone-400">
+                    {highConfidenceIntent ? 'Correct answer' : LOOKUP_COMPARISON_LABELS.expected}
+                  </span>
                   <span className="flex items-center gap-1.5">
                     <span className="text-emerald-700 dark:text-emerald-300 text-lg">
                       <DiffForm
@@ -696,17 +728,20 @@ export default function CheckView() {
                   matches={wrongMatchRows}
                   practicePrefs={practicePrefs}
                   onSpeak={speak}
+                  heading="Other possible forms"
                 />
               )}
 
               {/* Lead with the rule — the most useful part for learning. */}
-              <p className="mt-4 text-sm text-stone-700 dark:text-stone-200">
-                {nearRule}
-                <span className="text-stone-400">
-                  {' '}
-                  ({englishForForm(result.near[0].word, result.near[0].type)})
-                </span>
-              </p>
+              {!highConfidenceIntent && (
+                <p className="mt-4 text-sm text-stone-700 dark:text-stone-200">
+                  {nearRule}
+                  <span className="text-stone-400">
+                    {' '}
+                    ({englishForForm(result.near[0].word, result.near[0].type)})
+                  </span>
+                </p>
+              )}
               {nearDerivation && nearDerivation !== result.near[0].kana && (
                 <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{nearDerivation}</p>
               )}
