@@ -107,12 +107,10 @@ import {
   PracticeScopeSidebar,
   familyIntroFocusFromLaunch,
   familyIntroTypeIds,
-  togglePracticeDimensionEnabledTypes,
-  togglePracticeFamilyEnabledTypes,
-  togglePracticeTypeEnabledTypes,
 } from './study/PracticeMaps.jsx';
 import { MistakeRouteHint, ReviewsDashboard } from './study/ReviewsDashboard.jsx';
 import { AnswerInputPanel } from './study/AnswerInputPanel.jsx';
+import { updateStatePracticeScope } from '../utils/practiceScope.js';
 export { kanaCoachCells, explainReversePrompt };
 export { reviewFeedbackActionForRecord, ReviewsDashboard };
 
@@ -556,6 +554,7 @@ export default function StudyView({ mode = 'practice' }) {
     () => focus?.recommendation || null,
   );
   const [openPracticeMapFamilyIds, setOpenPracticeMapFamilyIds] = useState(() => new Set());
+  const [practiceMapMobileOpen, setPracticeMapMobileOpen] = useState(false);
   const [runAnswerHistory, setRunAnswerHistory] = useState([]);
   const [runReviewOpen, setRunReviewOpen] = useState(false);
   const [practiceSettingsOpen, setPracticeSettingsOpen] = useState(false);
@@ -1805,10 +1804,7 @@ export default function StudyView({ mode = 'practice' }) {
     setState((prev) => {
       const restored = groupId ? includeFormFamilyInReviewState(prev, groupId) : prev;
       if (!group?.typeIds?.length) return restored;
-      return {
-        ...restored,
-        enabledTypes: [...new Set([...(restored.enabledTypes || []), ...group.typeIds])],
-      };
+      return updateStatePracticeScope(restored, { type: 'enable-family', familyId: groupId });
     });
     setFamilyIntroFocus(null);
     setRecommendationFocus(null);
@@ -1819,35 +1815,19 @@ export default function StudyView({ mode = 'practice' }) {
 
   function togglePracticeDimension(optionId) {
     if (!optionId) return;
-    setState((prev) => {
-      const nextEnabledTypes = togglePracticeDimensionEnabledTypes(
-        prev.enabledTypes || [],
-        optionId,
-      );
-      if (nextEnabledTypes === prev.enabledTypes) return prev;
-      return { ...prev, enabledTypes: nextEnabledTypes };
-    });
-    setCurrent(null);
+    setState((prev) => updateStatePracticeScope(prev, { type: 'toggle-filter', optionId }));
   }
 
   function togglePracticeFamily(family) {
     if (!family?.typeIds?.length) return;
-    setState((prev) => {
-      const nextEnabledTypes = togglePracticeFamilyEnabledTypes(prev.enabledTypes || [], family);
-      if (nextEnabledTypes === prev.enabledTypes) return prev;
-      return { ...prev, enabledTypes: nextEnabledTypes };
-    });
-    setCurrent(null);
+    setState((prev) =>
+      updateStatePracticeScope(prev, { type: 'toggle-family', familyId: family.id }),
+    );
   }
 
   function togglePracticeType(typeId) {
     if (!typeId) return;
-    setState((prev) => {
-      const nextEnabledTypes = togglePracticeTypeEnabledTypes(prev.enabledTypes || [], typeId);
-      if (nextEnabledTypes === prev.enabledTypes) return prev;
-      return { ...prev, enabledTypes: nextEnabledTypes };
-    });
-    setCurrent(null);
+    setState((prev) => updateStatePracticeScope(prev, { type: 'toggle-form', typeId }));
   }
 
   function togglePracticeMapFamilyOpen(familyId) {
@@ -2651,9 +2631,13 @@ export default function StudyView({ mode = 'practice' }) {
     if (!family?.id || !typeIds.length) return;
     setState((prev) => {
       const restored = includeFormFamilyInReviewState(prev, family.id);
+      const scoped = updateStatePracticeScope(restored, {
+        type: 'enable-family',
+        familyId: family.id,
+        typeIds,
+      });
       return {
-        ...restored,
-        enabledTypes: [...new Set([...(restored.enabledTypes || []), ...typeIds])],
+        ...scoped,
         session: { ...(restored.session || {}), mistakePatterns: {} },
       };
     });
@@ -3409,6 +3393,8 @@ export default function StudyView({ mode = 'practice' }) {
           weaknessFamilies={weaknessFamilies}
           sessionFamilyStats={sessionFamilyStats}
           openFamilyIds={openPracticeMapFamilyIds}
+          mobileOpen={practiceMapMobileOpen}
+          onToggleMobileOpen={() => setPracticeMapMobileOpen((open) => !open)}
           onToggleFamilyOpen={togglePracticeMapFamilyOpen}
           onToggleFamily={togglePracticeFamily}
           onIntroduceFamily={introducePracticeFamily}

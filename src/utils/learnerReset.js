@@ -30,6 +30,7 @@ export function buildLearnerResetPayload(parts = {}, kind) {
         enabledTypes: Array.isArray(current.state.enabledTypes)
           ? [...current.state.enabledTypes]
           : [...base.enabledTypes],
+        practiceScope: current.state.practiceScope || base.practiceScope,
         reviewScope: current.state.reviewScope || base.reviewScope,
       },
     };
@@ -40,6 +41,7 @@ export function buildLearnerResetPayload(parts = {}, kind) {
       ...current,
       state: {
         ...current.state,
+        practiceScope: base.practiceScope,
         enabledTypes: [...base.enabledTypes],
       },
       practicePrefs: mergePracticePrefs(DEFAULT_PREFS),

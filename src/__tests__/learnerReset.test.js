@@ -4,6 +4,7 @@ import { EVERYDAY_TYPE_IDS } from '../data/conjugationTypes.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
 import { excludeWordFromReviewState } from '../utils/reviewScope.js';
 import { buildLearnerResetPayload, commitLearnerResetPayload } from '../utils/learnerReset.js';
+import { practiceScopeFromEnabledTypes } from '../utils/practiceScope.js';
 
 const WORD = { dict: 'taberu', reading: 'taberu', meaning: 'to eat', group: 'ichidan' };
 const CUSTOM_WORD = { dict: 'custom', reading: 'custom', meaning: 'custom', group: 'godan' };
@@ -14,6 +15,7 @@ function populatedParts() {
     {
       ...defaultState(),
       enabledTypes: ['plain-past'],
+      practiceScope: practiceScopeFromEnabledTypes(['plain-past']),
       cards: {
         [cardId]: {
           reps: 3,
@@ -58,6 +60,7 @@ describe('buildLearnerResetPayload', () => {
     expect(reset.state.daily.count).toBe(0);
     expect(reset.state.game.played).toBe(0);
     expect(reset.state.enabledTypes).toEqual(['plain-past']);
+    expect(reset.state.practiceScope.activeFamilyIds).toEqual(['te-ta-sound-changes']);
     expect(reset.state.reviewScope.excludedWordKeys).toEqual(['ichidan:taberu']);
     expect(reset.practicePrefs.theme).toBe('dark');
     expect(reset.customVerbs).toEqual(parts.customVerbs);
@@ -71,6 +74,7 @@ describe('buildLearnerResetPayload', () => {
     expect(reset.state.cards).toEqual(parts.state.cards);
     expect(reset.state.reviewScope).toEqual(parts.state.reviewScope);
     expect(reset.state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(reset.state.practiceScope).toEqual(defaultState().practiceScope);
     expect(reset.practicePrefs).toEqual(DEFAULT_PREFS);
     expect(reset.customVerbs).toEqual(parts.customVerbs);
     expect(reset.wordLists).toEqual(parts.wordLists);

@@ -9,10 +9,15 @@ globalThis.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 import App from '../App.jsx';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
-import { EVERYDAY_TYPE_IDS, FORM_GROUPS } from '../data/conjugationTypes.js';
+import { ALL_CARD_TYPES, EVERYDAY_TYPE_IDS, FORM_GROUPS } from '../data/conjugationTypes.js';
 import { STARTER_VERBS } from '../data/starterWords.js';
 import { cardIdFor, defaultState, localDateKey } from '../utils/storage.js';
 import { recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
+import {
+  enabledTypeIdsForPracticeScope,
+  practiceScopeFromEnabledTypes,
+  reducePracticeScope,
+} from '../utils/practiceScope.js';
 import {
   togglePracticeDimensionEnabledTypes,
   togglePracticeFamilyEnabledTypes,
@@ -57,6 +62,127 @@ describe('App shell', () => {
 
     expect(restoredTeTa).toContain('plain-past');
     expect(restoredTeTa).toContain('te-form');
+  });
+
+  it('keeps form filters independent and remembers exact category choices', async () => {
+    const conditionals = FORM_GROUPS.find((group) => group.id === 'conditional');
+    const conditionalNara = ALL_CARD_TYPES.find((type) => type.id === 'conditional-nara');
+    expect(conditionals).toBeTruthy();
+    expect(conditionalNara).toBeTruthy();
+    const withoutConditionals = EVERYDAY_TYPE_IDS.filter(
+      (typeId) => !conditionals.typeIds.includes(typeId),
+    );
+    const practiceScope = practiceScopeFromEnabledTypes(withoutConditionals);
+    const state = {
+      ...defaultState(),
+      practiceScope,
+      enabledTypes: enabledTypeIdsForPracticeScope(practiceScope),
+    };
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state,
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+
+    render(<App />);
+    expect(await waitForPracticeCard()).toBeTruthy();
+    const practiceMap = () => screen.getByRole('complementary', { name: 'Practice map' });
+    const conditionalCard = () =>
+      within(practiceMap()).getByRole('article', { name: 'Conditionals' });
+
+    await waitFor(() =>
+      expect(
+        within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
+      ).toBeTruthy(),
+    );
+    fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Focus' }));
+    expect(within(practiceMap()).getByRole('button', { name: 'Close' })).toBeTruthy();
+    fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Turn Negative off' }));
+    await waitFor(() =>
+      expect(within(practiceMap()).getByRole('button', { name: 'Turn Negative on' })).toBeTruthy(),
+    );
+    expect(within(practiceMap()).getByRole('button', { name: 'Close' })).toBeTruthy();
+    fireEvent.click(
+      within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
+    );
+    await waitFor(() => expect(within(conditionalCard()).getByText('3/5 forms on')).toBeTruthy());
+    expect(within(practiceMap()).getByRole('button', { name: 'Turn Negative on' })).toBeTruthy();
+
+    const details = () =>
+      within(conditionalCard()).getByRole('button', {
+        name: 'Conditional category details',
+      });
+    fireEvent.click(details());
+    fireEvent.click(
+      within(conditionalCard()).getByRole('button', { name: `Turn ${conditionalNara.label} off` }),
+    );
+    await waitFor(() => expect(within(conditionalCard()).getByText('2/5 forms on')).toBeTruthy());
+
+    fireEvent.click(
+      within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals off' }),
+    );
+    await waitFor(() => expect(within(conditionalCard()).getByText('0/5 forms on')).toBeTruthy());
+    fireEvent.click(
+      within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
+    );
+    await waitFor(() => expect(within(conditionalCard()).getByText('2/5 forms on')).toBeTruthy());
+    expect(details().getAttribute('aria-expanded')).toBe('true');
+    expect(within(practiceMap()).getByRole('button', { name: 'Turn Negative on' })).toBeTruthy();
+
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      expect(saved.state.practiceScope.selectedTypeIdsByFamily.conditional).not.toContain(
+        'conditional-nara',
+      );
+      expect(saved.state.practiceScope.filters.polarity).toEqual(['affirmative']);
+    });
+  });
+
+  it('disables category activation when no forms match the saved filters', async () => {
+    const conditionals = FORM_GROUPS.find((group) => group.id === 'conditional');
+    const withoutConditionals = EVERYDAY_TYPE_IDS.filter(
+      (typeId) => !conditionals.typeIds.includes(typeId),
+    );
+    let practiceScope = practiceScopeFromEnabledTypes(withoutConditionals);
+    practiceScope = reducePracticeScope(practiceScope, {
+      type: 'toggle-filter',
+      optionId: 'plain',
+    });
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...defaultState(),
+          practiceScope,
+          enabledTypes: enabledTypeIdsForPracticeScope(practiceScope),
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+
+    render(<App />);
+    expect(await waitForPracticeCard()).toBeTruthy();
+    const practiceMap = screen.getByRole('complementary', { name: 'Practice map' });
+    const conditionalsToggle = within(practiceMap).getByRole('button', {
+      name: 'Turn Conditionals on',
+    });
+    expect(conditionalsToggle.disabled).toBe(true);
+    expect(within(practiceMap).getAllByText('No forms match your filters').length).toBeGreaterThan(
+      0,
+    );
+    expect(
+      within(practiceMap).getByText(
+        'Practicing: Polite only · Affirmative + Negative · Past + Non-past',
+      ),
+    ).toBeTruthy();
   });
 
   it('renders the header, subtitle, and restored nav', async () => {

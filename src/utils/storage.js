@@ -37,6 +37,12 @@ import {
   recencyDecayFactor,
   weaknessScoreForCard,
 } from './subcategoryWeakness.js';
+import {
+  enabledTypeIdsForPracticeScope,
+  mergePracticeScopes,
+  normalizePracticeScope,
+  practiceScopeFromEnabledTypes,
+} from './practiceScope.js';
 
 export const DAY = 86400000;
 export const SRS_SCHEMA_VERSION = 3;
@@ -796,9 +802,21 @@ export function mergeCloudState(local, cloud) {
         };
   local = normalizedLocal;
   cloud = normalizedCloud;
-  const enabledTypes = normalizeDefaultTypeScope([
+  const mergedLegacyEnabledTypes = normalizeDefaultTypeScope([
     ...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])]),
   ]);
+  const practiceScope = mergePracticeScopes(
+    local.practiceScope,
+    cloud.practiceScope,
+    local.enabledTypes || [],
+    cloud.enabledTypes || [],
+  );
+  const enabledTypes = enabledTypeIdsForPracticeScope(practiceScope);
+  const enabledSet = new Set(enabledTypes);
+  const orderedEnabledTypes = [
+    ...mergedLegacyEnabledTypes.filter((typeId) => enabledSet.has(typeId)),
+    ...enabledTypes.filter((typeId) => !mergedLegacyEnabledTypes.includes(typeId)),
+  ];
   return {
     ...local,
     schemaVersion: SRS_SCHEMA_VERSION,
@@ -811,7 +829,8 @@ export function mergeCloudState(local, cloud) {
     mistakes: mergeMistakes(local.mistakes || [], cloud.mistakes || []),
     readiness: mergeReadinessState(local.readiness, cloud.readiness),
     weakness: mergeWeaknessState(local.weakness, cloud.weakness),
-    enabledTypes,
+    practiceScope,
+    enabledTypes: orderedEnabledTypes.length ? orderedEnabledTypes : mergedLegacyEnabledTypes,
     daily: (() => {
       const ld = local.daily || {},
         cd = cloud.daily || {};
@@ -974,6 +993,7 @@ export function normalizeReferenceState(ref = null) {
 
 /** @returns {Record<string, any>} */
 export function defaultState() {
+  const enabledTypes = [...QUICK_PRACTICE_DEFAULT_TYPE_IDS];
   return {
     schemaVersion: SRS_SCHEMA_VERSION,
     cards: {},
@@ -1013,7 +1033,8 @@ export function defaultState() {
     minimalPairs: { bySet: {} },
     reference: normalizeReferenceState(),
     reviewScope: defaultReviewScope(),
-    enabledTypes: [...QUICK_PRACTICE_DEFAULT_TYPE_IDS],
+    practiceScope: practiceScopeFromEnabledTypes(enabledTypes),
+    enabledTypes,
     weakness: defaultWeaknessState(),
     session: {
       reviewed: 0,
@@ -1117,6 +1138,24 @@ export function mergeState(saved, sessionOverride) {
     ]);
   } else {
     merged.enabledTypes = normalizeDefaultTypeScope(merged.enabledTypes);
+  }
+
+  const hasSavedPracticeScope = !!(saved && saved.practiceScope);
+  merged.practiceScope = normalizePracticeScope(
+    hasSavedPracticeScope ? saved.practiceScope : null,
+    merged.enabledTypes,
+  );
+  const scopedEnabledTypes = enabledTypeIdsForPracticeScope(merged.practiceScope);
+  const enabledSet = new Set(merged.enabledTypes);
+  const scopeMatchesEnabledTypes =
+    scopedEnabledTypes.length === enabledSet.size &&
+    scopedEnabledTypes.every((typeId) => enabledSet.has(typeId));
+  if (scopedEnabledTypes.length && (!hasSavedPracticeScope || scopeMatchesEnabledTypes)) {
+    const scoped = new Set(scopedEnabledTypes);
+    merged.enabledTypes = [
+      ...merged.enabledTypes.filter((typeId) => scoped.has(typeId)),
+      ...scopedEnabledTypes.filter((typeId) => !merged.enabledTypes.includes(typeId)),
+    ];
   }
 
   return merged;

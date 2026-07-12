@@ -1,6 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ALL_CARD_TYPES, FORM_GROUPS } from '../../data/conjugationTypes.js';
 import { LESSON_SECTIONS } from '../../data/lessonContent.js';
+import {
+  PRACTICE_FORM_FILTER_GROUPS,
+  enabledTypeIdsForPracticeScope,
+  normalizePracticeScope,
+  practiceScopeFamilyState,
+  practiceScopeFilterSummary,
+  practiceScopeFromEnabledTypes,
+  practiceScopeOptionSelected,
+  practiceTypeMatchesScopeFilters,
+  reducePracticeScope,
+} from '../../utils/practiceScope.js';
+
+export { PRACTICE_FORM_FILTER_GROUPS } from '../../utils/practiceScope.js';
 
 export const FAMILY_INTRO_REVIEW_LIMIT_SOURCE = 'intro-family';
 const FAMILY_INTRO_TYPE_LIMIT = 4;
@@ -27,231 +40,33 @@ export const LESSON_BY_GROUP_ID = new Map(
 );
 export const CARD_TYPE_BY_ID = new Map(ALL_CARD_TYPES.map((type) => [type.id, type]));
 
-function isPolitePracticeType(type) {
-  return (
-    String(type?.id || '').includes('polite') ||
-    /\bPolite\b/.test(type?.label || '') ||
-    type?.id === 'request-kudasai' ||
-    type?.id === 'negative-request'
-  );
-}
-
-function isNegativePracticeType(type) {
-  return (
-    String(type?.id || '').includes('negative') ||
-    /\bNegative\b/.test(type?.label || '') ||
-    type?.id === 'prohibition'
-  );
-}
-
-function isPastPracticeType(type) {
-  return String(type?.id || '').includes('past') || /\bPast\b/.test(type?.label || '');
-}
-
-const POLITE_TYPE_IDS = ALL_CARD_TYPES.filter(isPolitePracticeType).map((type) => type.id);
-const PLAIN_TYPE_IDS = ALL_CARD_TYPES.filter((type) => !isPolitePracticeType(type)).map(
-  (type) => type.id,
-);
-const NEGATIVE_TYPE_IDS = ALL_CARD_TYPES.filter(isNegativePracticeType).map((type) => type.id);
-const AFFIRMATIVE_TYPE_IDS = ALL_CARD_TYPES.filter((type) => !isNegativePracticeType(type)).map(
-  (type) => type.id,
-);
-const PAST_TYPE_IDS = ALL_CARD_TYPES.filter(isPastPracticeType).map((type) => type.id);
-const NON_PAST_TYPE_IDS = ALL_CARD_TYPES.filter((type) => !isPastPracticeType(type)).map(
-  (type) => type.id,
-);
-
-export const PRACTICE_FORM_FILTER_GROUPS = [
-  {
-    id: 'register',
-    label: 'Register',
-    options: [
-      {
-        id: 'plain',
-        label: 'Plain',
-        typeIds: PLAIN_TYPE_IDS,
-      },
-      {
-        id: 'polite',
-        label: 'Polite',
-        typeIds: POLITE_TYPE_IDS,
-      },
-    ],
-  },
-  {
-    id: 'polarity',
-    label: 'Polarity',
-    options: [
-      {
-        id: 'affirmative',
-        label: 'Affirmative',
-        typeIds: AFFIRMATIVE_TYPE_IDS,
-      },
-      {
-        id: 'negative',
-        label: 'Negative',
-        typeIds: NEGATIVE_TYPE_IDS,
-      },
-    ],
-  },
-  {
-    id: 'tense',
-    label: 'Time',
-    options: [
-      {
-        id: 'past',
-        label: 'Past',
-        typeIds: PAST_TYPE_IDS,
-      },
-      {
-        id: 'non-past',
-        label: 'Non-past',
-        typeIds: NON_PAST_TYPE_IDS,
-      },
-    ],
-  },
-];
-
-const PRACTICE_FORM_FILTERS = PRACTICE_FORM_FILTER_GROUPS.flatMap((group) =>
-  group.options.map((option) => ({ ...option, groupId: group.id })),
-);
-const PRACTICE_FORM_FILTER_BY_ID = new Map(
-  PRACTICE_FORM_FILTERS.map((option) => [option.id, option]),
-);
-
-function optionMatchesType(optionId, type) {
-  switch (optionId) {
-    case 'plain':
-      return !isPolitePracticeType(type);
-    case 'polite':
-      return isPolitePracticeType(type);
-    case 'affirmative':
-      return !isNegativePracticeType(type);
-    case 'negative':
-      return isNegativePracticeType(type);
-    case 'past':
-      return isPastPracticeType(type);
-    case 'non-past':
-      return !isPastPracticeType(type);
-    default:
-      return false;
-  }
-}
-
-function selectedPracticeDimensions(enabledTypeIds = []) {
-  const enabled = new Set((enabledTypeIds || []).filter((typeId) => CARD_TYPE_BY_ID.has(typeId)));
-  return new Map(
-    PRACTICE_FORM_FILTER_GROUPS.map((group) => {
-      const selected = group.options
-        .filter((option) => option.typeIds.some((typeId) => enabled.has(typeId)))
-        .map((option) => option.id);
-      return [group.id, selected.length ? selected : group.options.map((option) => option.id)];
-    }),
-  );
-}
-
-function typeMatchesDimensionSelection(type, selections) {
-  return PRACTICE_FORM_FILTER_GROUPS.every((group) => {
-    const selected = selections.get(group.id) || group.options.map((option) => option.id);
-    return selected.some((optionId) => optionMatchesType(optionId, type));
-  });
-}
-
-function typeIdsForDimensionSelection(
-  selections,
-  sourceTypeIds = ALL_CARD_TYPES.map((type) => type.id),
-) {
-  return sourceTypeIds.filter((typeId) => {
-    const type = CARD_TYPE_BY_ID.get(typeId);
-    return type && typeMatchesDimensionSelection(type, selections);
-  });
-}
-
-function activeFamilyTypeIdsFor(enabledTypeIds = []) {
-  const enabled = new Set((enabledTypeIds || []).filter((typeId) => CARD_TYPE_BY_ID.has(typeId)));
-  const familyTypeIds = FORM_GROUPS.filter((family) =>
-    (family.typeIds || []).some((typeId) => enabled.has(typeId)),
-  ).flatMap((family) => family.typeIds || []);
-  const source = familyTypeIds.length ? familyTypeIds : enabledTypeIds;
-  return [...new Set(source)].filter((typeId) => CARD_TYPE_BY_ID.has(typeId));
+function legacyScopeUpdate(enabledTypeIds, action) {
+  const scope = practiceScopeFromEnabledTypes(enabledTypeIds);
+  return enabledTypeIdsForPracticeScope(reducePracticeScope(scope, action));
 }
 
 export function togglePracticeDimensionEnabledTypes(enabledTypeIds = [], optionId) {
-  const option = PRACTICE_FORM_FILTER_BY_ID.get(optionId);
-  if (!option) return enabledTypeIds;
-  const currentTypeIds = [
-    ...new Set(enabledTypeIds.filter((typeId) => CARD_TYPE_BY_ID.has(typeId))),
-  ];
-  const current = new Set(currentTypeIds);
-  const selections = selectedPracticeDimensions(enabledTypeIds);
-  const selectedInGroup = new Set(selections.get(option.groupId) || []);
-  if (selectedInGroup.has(option.id)) {
-    if (selectedInGroup.size <= 1) return enabledTypeIds;
-    const next = currentTypeIds.filter((typeId) => {
-      const type = CARD_TYPE_BY_ID.get(typeId);
-      return type && !optionMatchesType(option.id, type);
-    });
-    return next.length ? next : enabledTypeIds;
-  }
-  selectedInGroup.add(option.id);
-  selections.set(option.groupId, [...selectedInGroup]);
-  const restoredTypeIds = typeIdsForDimensionSelection(
-    selections,
-    activeFamilyTypeIdsFor(currentTypeIds),
-  );
-  const next = [...new Set([...current, ...restoredTypeIds])];
-  return next.length ? next : enabledTypeIds;
+  return legacyScopeUpdate(enabledTypeIds, { type: 'toggle-filter', optionId });
 }
 
 export function togglePracticeTypeEnabledTypes(enabledTypeIds = [], typeId) {
-  if (!CARD_TYPE_BY_ID.has(typeId)) return enabledTypeIds;
-  const currentTypeIds = [
-    ...new Set(enabledTypeIds.filter((enabledTypeId) => CARD_TYPE_BY_ID.has(enabledTypeId))),
-  ];
-  const current = new Set(currentTypeIds);
-  if (current.has(typeId)) {
-    if (current.size <= 1) return enabledTypeIds;
-    current.delete(typeId);
-  } else {
-    current.add(typeId);
-  }
-  return [...current];
+  return legacyScopeUpdate(enabledTypeIds, { type: 'toggle-form', typeId });
 }
 
 export function togglePracticeFamilyEnabledTypes(enabledTypeIds = [], family) {
-  const familyTypeIds = (family?.typeIds || []).filter((typeId) => CARD_TYPE_BY_ID.has(typeId));
-  if (!familyTypeIds.length) return enabledTypeIds;
-  const currentTypeIds = [
-    ...new Set(enabledTypeIds.filter((enabledTypeId) => CARD_TYPE_BY_ID.has(enabledTypeId))),
-  ];
-  const current = new Set(currentTypeIds);
-  const enabledInFamily = familyTypeIds.filter((typeId) => current.has(typeId));
-  if (enabledInFamily.length) {
-    const next = currentTypeIds.filter((typeId) => !familyTypeIds.includes(typeId));
-    return next.length ? next : enabledTypeIds;
-  }
-  return [...new Set([...currentTypeIds, ...familyTypeIds])];
-}
-
-function practiceDimensionOptionState(option, enabled) {
-  const enabledTypeIds = option.typeIds.filter((typeId) => enabled.has(typeId));
-  return {
-    ...option,
-    active: enabledTypeIds.length > 0,
-    activeCount: enabledTypeIds.length,
-  };
+  return legacyScopeUpdate(enabledTypeIds, { type: 'toggle-family', familyId: family?.id });
 }
 
 export function familyIntroTypeIds(family, enabledTypeIds = null) {
   const familyTypeIds = (family?.typeIds || []).filter((typeId) => CARD_TYPE_BY_ID.has(typeId));
   if (!familyTypeIds.length) return [];
   if (!Array.isArray(enabledTypeIds)) return familyTypeIds.slice(0, FAMILY_INTRO_TYPE_LIMIT);
-  const selections = selectedPracticeDimensions(enabledTypeIds);
-  const matchingTypeIds = typeIdsForDimensionSelection(selections, familyTypeIds);
-  return (matchingTypeIds.length ? matchingTypeIds : familyTypeIds).slice(
-    0,
-    FAMILY_INTRO_TYPE_LIMIT,
-  );
+  const scope = practiceScopeFromEnabledTypes(enabledTypeIds);
+  const matchingTypeIds = familyTypeIds.filter((typeId) => {
+    const type = CARD_TYPE_BY_ID.get(typeId);
+    return type && practiceTypeMatchesScopeFilters(type, scope);
+  });
+  return matchingTypeIds.slice(0, FAMILY_INTRO_TYPE_LIMIT);
 }
 
 export function familyIntroFocusFromLaunch(focus) {
@@ -276,12 +91,16 @@ export function PracticeScopeSidebar({
   onIntroduceFamily,
   onToggleType,
   onToggleDimension,
+  mobileOpen = false,
+  onToggleMobileOpen,
   className = '',
 }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const enabled = new Set(state.enabledTypes || []);
+  const scope = normalizePracticeScope(state.practiceScope, state.enabledTypes || []);
+  const scopedEnabledTypeIds = enabledTypeIdsForPracticeScope(scope);
+  const enabled = new Set(scopedEnabledTypeIds);
   const weaknessByFamily = new Map(weaknessFamilies.map((family) => [family.id, family]));
-  const activeCount = (state.enabledTypes || []).length;
+  const activeCount = scopedEnabledTypeIds.length;
+  const filterSummary = practiceScopeFilterSummary(scope);
 
   return (
     <aside
@@ -306,7 +125,7 @@ export function PracticeScopeSidebar({
               type="button"
               aria-expanded={mobileOpen}
               aria-controls="practice-map-controls"
-              onClick={() => setMobileOpen((open) => !open)}
+              onClick={onToggleMobileOpen}
               className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-stone-700 dark:border-stone-800 dark:text-stone-300 lg:hidden"
             >
               {mobileOpen ? 'Close' : 'Focus'}
@@ -318,75 +137,88 @@ export function PracticeScopeSidebar({
           id="practice-map-controls"
           className={`${mobileOpen ? 'block' : 'hidden'} space-y-3 lg:block`}
         >
-          <div className="space-y-2">
-            {PRACTICE_FORM_FILTER_GROUPS.map((group) => (
-              <div
-                key={group.id}
-                role="group"
-                aria-label={`${group.label} filters`}
-                className="rounded-xl border border-stone-200 bg-white p-2 dark:border-stone-800 dark:bg-stone-900"
-              >
-                <div className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
-                  {group.label}
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {group.options.map((option) => {
-                    const optionState = practiceDimensionOptionState(option, enabled);
-                    const active = optionState.active;
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        aria-pressed={active}
-                        aria-label={`Turn ${option.label} ${active ? 'off' : 'on'}`}
-                        onClick={() => onToggleDimension?.(option.id)}
-                        className={`flex min-h-14 items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
-                          active
-                            ? 'border-indigo-200 bg-indigo-50/70 text-indigo-950 dark:border-indigo-900/70 dark:bg-indigo-950/20 dark:text-indigo-100'
-                            : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300'
-                        }`}
-                      >
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold leading-tight">
-                            {option.label}
-                          </span>
-                          <span className="mt-0.5 block text-[11px] tabular-nums opacity-70">
-                            {optionState.activeCount} active
-                          </span>
-                        </span>
-                        <span
-                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold ${
+          <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm dark:border-stone-800 dark:bg-stone-900">
+            <div className="mb-3">
+              <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+                Form filters
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-stone-600 dark:text-stone-400">
+                These choices apply to every category you turn on.
+              </p>
+            </div>
+            <div className="space-y-2.5">
+              {PRACTICE_FORM_FILTER_GROUPS.map((group) => (
+                <div key={group.id} role="group" aria-label={`${group.label} filters`}>
+                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+                    {group.label}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1 dark:bg-stone-950">
+                    {group.options.map((option) => {
+                      const active = practiceScopeOptionSelected(scope, option.id);
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          aria-pressed={active}
+                          aria-label={`Turn ${option.label} ${active ? 'off' : 'on'}`}
+                          onClick={() => onToggleDimension?.(option.id)}
+                          className={`min-h-10 rounded-lg border px-2.5 py-2 text-sm font-semibold transition ${
                             active
-                              ? 'border-indigo-300 bg-white text-indigo-700 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300'
-                              : 'border-stone-200 bg-white text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400'
+                              ? 'border-indigo-200 bg-white text-indigo-800 shadow-sm dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200'
+                              : 'border-transparent bg-transparent text-stone-500 hover:bg-white hover:text-stone-800 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-200'
                           }`}
                         >
-                          <span
-                            className={`h-2 w-2 rounded-full ${
-                              active ? 'bg-emerald-500' : 'bg-stone-400'
-                            }`}
-                          />
-                          {active ? 'On' : 'Off'}
-                        </span>
-                      </button>
-                    );
-                  })}
+                          <span className="inline-flex items-center gap-1.5">
+                            <span
+                              className={`h-2 w-2 rounded-full ${active ? 'bg-emerald-500' : 'bg-stone-400'}`}
+                            />
+                            {option.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-2.5 py-2 text-[11px] font-medium leading-relaxed text-indigo-800 dark:border-indigo-900/70 dark:bg-indigo-950/25 dark:text-indigo-200">
+              Practicing: {filterSummary}
+            </div>
+          </section>
 
-          <div className="space-y-3">
+          <section className="space-y-3" aria-labelledby="practice-category-list-title">
+            <div className="px-1">
+              <div
+                id="practice-category-list-title"
+                className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300"
+              >
+                Categories
+              </div>
+              <p className="mt-1 text-xs text-stone-600 dark:text-stone-400">
+                Each category remembers its form choices when you turn it off.
+              </p>
+            </div>
             {FORM_GROUPS.map((family) => {
               const lesson = LESSON_BY_GROUP_ID.get(family.id);
-              const enabledInFamily = family.typeIds.filter((typeId) => enabled.has(typeId));
+              const familyScopeState = practiceScopeFamilyState(scope, family);
+              const enabledInFamily = familyScopeState?.enabledTypeIds || [];
               const allEnabled = enabledInFamily.length === family.typeIds.length;
               const someEnabled = enabledInFamily.length > 0;
-              const statusLabel = someEnabled ? 'Active' : 'Off';
+              const familyActive = !!familyScopeState?.active;
+              const statusLabel =
+                familyScopeState?.status === 'no-matches'
+                  ? 'No matches'
+                  : familyScopeState?.status === 'filtered-out'
+                    ? 'Filtered out'
+                    : familyActive
+                      ? `${enabledInFamily.length} practicing`
+                      : 'Off';
               const familyTypes = family.typeIds
                 .map((typeId) => CARD_TYPE_BY_ID.get(typeId))
                 .filter(Boolean);
-              const familyToggleDisabled = someEnabled && enabled.size <= enabledInFamily.length;
+              const familyToggleDisabled = familyActive
+                ? someEnabled && enabled.size <= enabledInFamily.length
+                : !familyScopeState?.canActivate;
               const progress = weaknessByFamily.get(family.id) || {};
               const weaknessRows = progress.rows || [];
               const attempted = progress.attempted || 0;
@@ -430,7 +262,8 @@ export function PracticeScopeSidebar({
                 : 0;
               const open = openFamilyIds.has(family.id);
               const contentId = `practice-map-family-${family.id}`;
-              const introEligible = enabledInFamily.length === 0 || (!introduced && !allEnabled);
+              const introEligible =
+                familyScopeState?.canActivate && (!familyActive || (!introduced && !allEnabled));
               const title = lesson?.title || family.label;
               const titleId = `practice-map-title-${family.id}`;
               return (
@@ -440,7 +273,7 @@ export function PracticeScopeSidebar({
                   className={`rounded-2xl border p-3 transition ${
                     allEnabled
                       ? 'border-indigo-200 bg-indigo-50/70 dark:border-indigo-900/70 dark:bg-indigo-950/20'
-                      : someEnabled
+                      : familyActive
                         ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/70 dark:bg-amber-950/20'
                         : 'border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900'
                   }`}
@@ -547,21 +380,39 @@ export function PracticeScopeSidebar({
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
                       <button
                         type="button"
-                        aria-pressed={someEnabled}
-                        aria-label={`Turn ${title} ${someEnabled ? 'off' : 'on'}`}
+                        aria-pressed={familyActive}
+                        aria-label={`Turn ${title} ${familyActive ? 'off' : 'on'}`}
                         onClick={() => onToggleFamily?.(family)}
                         disabled={familyToggleDisabled}
                         className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold transition ${
-                          someEnabled
+                          familyActive
                             ? 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/50'
-                            : 'border-stone-200 bg-stone-50 text-stone-600 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300'
+                            : familyScopeState?.status === 'no-matches'
+                              ? 'border-stone-200 bg-stone-100 text-stone-500 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-500'
+                              : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300'
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                       >
                         <span
-                          className={`h-2 w-2 rounded-full ${someEnabled ? 'bg-emerald-500' : 'bg-stone-400'}`}
+                          className={`h-2 w-2 rounded-full ${
+                            someEnabled
+                              ? 'bg-emerald-500'
+                              : familyActive
+                                ? 'bg-amber-500'
+                                : 'bg-stone-400'
+                          }`}
                         />
                         {statusLabel}
                       </button>
+                      {familyScopeState?.status === 'no-matches' && (
+                        <span className="max-w-28 text-right text-[10px] leading-tight text-stone-500 dark:text-stone-400">
+                          No forms match your filters
+                        </span>
+                      )}
+                      {familyScopeState?.status === 'filtered-out' && (
+                        <span className="max-w-28 text-right text-[10px] leading-tight text-amber-700 dark:text-amber-300">
+                          Saved and ready when filters match
+                        </span>
+                      )}
                       {introEligible && onIntroduceFamily && (
                         <button
                           type="button"
@@ -614,30 +465,42 @@ export function PracticeScopeSidebar({
                         {familyTypes.length ? (
                           <div className="grid gap-1.5">
                             {familyTypes.map((type) => {
-                              const checked = enabled.has(type.id);
-                              const disabled = checked && enabled.size <= 1;
+                              const selected = familyScopeState?.selectedTypeIds.includes(type.id);
+                              const matchesFilters = practiceTypeMatchesScopeFilters(type, scope);
+                              const practicing = familyActive && selected && matchesFilters;
+                              const disabled =
+                                selected && (familyScopeState?.selectedTypeIds.length || 0) <= 1;
+                              const formStatus = practicing
+                                ? 'Practicing'
+                                : selected && !matchesFilters
+                                  ? 'Filtered out'
+                                  : selected
+                                    ? 'Saved'
+                                    : 'Off';
                               return (
                                 <button
                                   key={type.id}
                                   type="button"
-                                  aria-pressed={checked}
-                                  aria-label={`Turn ${type.label} ${checked ? 'off' : 'on'}`}
+                                  aria-pressed={selected}
+                                  aria-label={`Turn ${type.label} ${selected ? 'off' : 'on'}`}
                                   onClick={() => onToggleType?.(type.id)}
                                   disabled={disabled}
                                   className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
-                                    checked
+                                    practicing
                                       ? 'border-indigo-200 bg-indigo-50 text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100'
-                                      : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800'
+                                      : selected
+                                        ? 'border-amber-200 bg-amber-50/60 text-stone-700 hover:bg-amber-50 dark:border-amber-900/70 dark:bg-amber-950/15 dark:text-stone-200 dark:hover:bg-amber-950/25'
+                                        : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800'
                                   } disabled:cursor-not-allowed disabled:opacity-60`}
                                 >
                                   <span
                                     className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded border ${
-                                      checked
+                                      selected
                                         ? 'border-indigo-600 bg-indigo-600 dark:border-indigo-400 dark:bg-indigo-400'
                                         : 'border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-950'
                                     }`}
                                   />
-                                  <span className="min-w-0">
+                                  <span className="min-w-0 flex-1">
                                     <span className="block text-xs font-semibold">
                                       {type.label}
                                     </span>
@@ -646,6 +509,19 @@ export function PracticeScopeSidebar({
                                         {type.sub}
                                       </span>
                                     )}
+                                  </span>
+                                  <span
+                                    className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+                                      practicing
+                                        ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-200'
+                                        : selected && !matchesFilters
+                                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
+                                          : selected
+                                            ? 'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300'
+                                            : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400'
+                                    }`}
+                                  >
+                                    {formStatus}
                                   </span>
                                 </button>
                               );
@@ -662,7 +538,7 @@ export function PracticeScopeSidebar({
                 </article>
               );
             })}
-          </div>
+          </section>
         </div>
       </section>
     </aside>
@@ -670,7 +546,8 @@ export function PracticeScopeSidebar({
 }
 
 export function FocusCategoryMap({ state, onToggleFamily, className = '' }) {
-  const enabled = new Set(state.enabledTypes || []);
+  const scope = normalizePracticeScope(state.practiceScope, state.enabledTypes || []);
+  const enabled = new Set(enabledTypeIdsForPracticeScope(scope));
   const activeCount = enabled.size;
 
   return (
@@ -694,11 +571,19 @@ export function FocusCategoryMap({ state, onToggleFamily, className = '' }) {
       <div className="space-y-3">
         {FORM_GROUPS.map((family) => {
           const lesson = LESSON_BY_GROUP_ID.get(family.id);
-          const enabledInFamily = family.typeIds.filter((typeId) => enabled.has(typeId));
+          const familyScopeState = practiceScopeFamilyState(scope, family);
+          const enabledInFamily = familyScopeState?.enabledTypeIds || [];
           const allEnabled = enabledInFamily.length === family.typeIds.length;
           const someEnabled = enabledInFamily.length > 0;
-          const statusLabel = allEnabled ? 'On' : someEnabled ? 'Partial' : 'Off';
-          const pressed = allEnabled ? true : someEnabled ? 'mixed' : false;
+          const statusLabel =
+            familyScopeState?.status === 'no-matches'
+              ? 'No matches'
+              : familyScopeState?.status === 'filtered-out'
+                ? 'Filtered out'
+                : familyScopeState?.active
+                  ? `${enabledInFamily.length} practicing`
+                  : 'Off';
+          const pressed = !!familyScopeState?.active;
           const title = lesson?.title || family.label;
           const titleId = `focus-map-title-${family.id}`;
 
@@ -734,8 +619,9 @@ export function FocusCategoryMap({ state, onToggleFamily, className = '' }) {
                 <button
                   type="button"
                   aria-pressed={pressed}
-                  aria-label={`Turn ${title} focus ${allEnabled ? 'off' : 'on'}`}
+                  aria-label={`Turn ${title} focus ${pressed ? 'off' : 'on'}`}
                   onClick={() => onToggleFamily(family)}
+                  disabled={!pressed && !familyScopeState?.canActivate}
                   className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold transition ${
                     allEnabled
                       ? 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/50'

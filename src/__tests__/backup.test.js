@@ -6,11 +6,13 @@ import {
   BACKUP_FORMAT,
   BACKUP_VERSION,
 } from '../utils/backup.js';
+import { practiceScopeFromEnabledTypes } from '../utils/practiceScope.js';
 
 const parts = () => ({
   state: {
     cards: { 'a|b': { reps: 2 } },
     enabledTypes: ['plain-past'],
+    practiceScope: practiceScopeFromEnabledTypes(['plain-past']),
     daily: { count: 3 },
   },
   customVerbs: [{ dict: '走る', reading: 'はしる', meaning: 'to run', group: 'godan' }],
@@ -30,6 +32,7 @@ describe('buildBackup / serializeBackup', () => {
   it('captures progress and settings sections', () => {
     const b = buildBackup(parts());
     expect(b.state.cards).toEqual({ 'a|b': { reps: 2 } });
+    expect(b.state.practiceScope.activeFamilyIds).toContain('te-ta-sound-changes');
     expect(b.state.guide).toBeTruthy();
     expect(b.customVerbs).toHaveLength(1);
     expect(b.wordLists[0].name).toBe('N5');

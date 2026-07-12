@@ -42,6 +42,11 @@ import {
   includeWordInReviewState,
   reviewTypeIdsForState,
 } from '../utils/reviewScope.js';
+import {
+  enabledTypeIdsForPracticeScope,
+  practiceScopeFromEnabledTypes,
+  reducePracticeScope,
+} from '../utils/practiceScope.js';
 
 // Mock localStorage for storage tests (mergeState etc. are pure but defaultState references CONJ_TYPES)
 // No localStorage calls in the functions we're testing — they're all pure.
@@ -528,6 +533,7 @@ describe('mergeState', () => {
     const state = mergeState(null, null);
     expect(state).toHaveProperty('cards');
     expect(state).toHaveProperty('enabledTypes');
+    expect(state).toHaveProperty('practiceScope');
     expect(state).toHaveProperty('daily');
     expect(state).toHaveProperty('mistakes');
     expect(Array.isArray(state.enabledTypes)).toBe(true);
@@ -590,6 +596,28 @@ describe('mergeState', () => {
     );
 
     expect(state.enabledTypes).toEqual(['plain-past', 'adj-plain-past']);
+  });
+
+  it('hydrates a persisted practice scope without losing its remembered forms', () => {
+    let practiceScope = practiceScopeFromEnabledTypes(EVERYDAY_TYPE_IDS);
+    practiceScope = reducePracticeScope(practiceScope, {
+      type: 'toggle-form',
+      typeId: 'conditional-ba',
+    });
+    practiceScope = reducePracticeScope(practiceScope, {
+      type: 'toggle-filter',
+      optionId: 'negative',
+    });
+    const enabledTypes = enabledTypeIdsForPracticeScope(practiceScope);
+
+    const state = mergeState(
+      { schemaVersion: SRS_SCHEMA_VERSION, enabledTypes, practiceScope },
+      null,
+    );
+
+    expect(state.practiceScope.filters.polarity).toEqual(['affirmative']);
+    expect(state.practiceScope.selectedTypeIdsByFamily.conditional).not.toContain('conditional-ba');
+    expect(new Set(state.enabledTypes)).toEqual(new Set(enabledTypes));
   });
 
   it('preserves saved cards from the current SRS schema', () => {

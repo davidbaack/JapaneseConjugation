@@ -39,6 +39,7 @@ import {
   removeReviewRecommendationState,
   upsertReviewRecommendationState,
 } from '../utils/reviewScope.js';
+import { updateStatePracticeScope } from '../utils/practiceScope.js';
 
 // Centralized global app state (improvement #6). All the practice/customs/prefs
 // state, the hydration + cloud-sync effects, theme/voice wiring, and the
@@ -522,9 +523,12 @@ function useAppController() {
     if (!family?.typeIds?.length) return false;
     setState((prev) => {
       const restored = includeFormFamilyInReviewState(prev, familyId);
+      const scoped = updateStatePracticeScope(restored, {
+        type: 'enable-family',
+        familyId,
+      });
       return {
-        ...restored,
-        enabledTypes: [...new Set([...(restored.enabledTypes || []), ...family.typeIds])],
+        ...scoped,
         session: { ...(restored.session || {}), mistakePatterns: {} },
       };
     });
