@@ -2325,9 +2325,9 @@ export default function StudyView({ mode = 'practice' }) {
     });
   }
 
-  function openGuideForReviewRule(word, type) {
+  function openGuideForReviewRule(word, type, options = {}) {
     if (openGuideForRule) {
-      openGuideForRule(word, type, { source: 'practice-result' });
+      openGuideForRule(word, type, { ...options, source: 'practice-result' });
       return;
     }
     setTab('guide');

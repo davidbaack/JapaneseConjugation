@@ -310,6 +310,23 @@ function GuideReviewPrompt({ buttonRef = null, onClick }) {
   );
 }
 
+function guideFocusOptionsForReview(record) {
+  const submittedAnswer = record.reviewChoiceLabel
+    ? record.reviewChoiceLabel
+    : record.revealedMiss
+      ? "I don't know"
+      : String(record.submittedAnswer || '').trim();
+  const sourceTypeId = record.promptType || 'dictionary';
+  return {
+    sourceTypeId,
+    sourceForm: record.promptForm || '',
+    submittedAnswer,
+    expectedAnswer: record.expected || '',
+    missed: !record.correct,
+    formToForm: sourceTypeId !== 'dictionary',
+  };
+}
+
 function RunAnswerReveal({
   record,
   geminiKey,
@@ -388,9 +405,10 @@ function RunAnswerReveal({
     const handled = onOpenLearnFocus?.(record);
     if (!handled) onOpenLearn?.(relatedLesson.groupId);
   };
+  const guideFocusOptions = guideFocusOptionsForReview(record);
   const runReviewAction = () => {
     if (reviewAction.kind === 'guide') {
-      onOpenGuide?.(record.word, reviewTypeId);
+      onOpenGuide?.(record.word, reviewTypeId, guideFocusOptions);
       return;
     }
     if (reviewAction.kind === 'drill') {
@@ -405,7 +423,7 @@ function RunAnswerReveal({
     onTryAnother?.();
   };
   const openGuidePrompt = () => {
-    onOpenGuide?.(record.word, reviewTypeId);
+    onOpenGuide?.(record.word, reviewTypeId, guideFocusOptions);
   };
   const panelClass = record.correct
     ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'

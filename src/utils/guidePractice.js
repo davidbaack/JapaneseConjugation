@@ -121,6 +121,28 @@ function guideBaseForm(word) {
   );
 }
 
+function guideBaseTypeId(word) {
+  return isAdjective(word) ? 'adj-plain-present' : 'plain-present';
+}
+
+function focusedGuideSource(word, options = {}) {
+  if (!options.sourceTypeId) return null;
+  const requestedTypeId = options.sourceTypeId;
+  const sourceTypeId = requestedTypeId === 'dictionary' ? guideBaseTypeId(word) : requestedTypeId;
+  if (!isTypeCompatible(word, sourceTypeId)) return null;
+  const generatedForm = surfaceFormFor(word, sourceTypeId) || conjugateItem(word, sourceTypeId);
+  const sourceForm = options.sourceForm || generatedForm;
+  if (!sourceForm) return null;
+  return {
+    sourceTypeId,
+    sourceForm,
+    sourceLabel:
+      requestedTypeId === 'dictionary'
+        ? 'Dictionary Form'
+        : getTypeInfo(sourceTypeId).label || sourceTypeId,
+  };
+}
+
 export function guideGroupChoice(word) {
   if (word?.group === 'suru' || word?.group === 'kuru' || word?.group === 'irregular-adjective') {
     return 'irregular';
@@ -208,9 +230,13 @@ export function buildGuideCard(words, state = defaultState(), prefs = DEFAULT_PR
     : null;
   const row = weakMatch || rows[0];
   const seed = options.seed ?? Date.now();
-  const sourceTypeId = selectGuideSourceType(row.word, row.typeId, { seed });
+  const focusedSource = focusedGuideSource(row.word, options);
+  const sourceTypeId =
+    focusedSource?.sourceTypeId || selectGuideSourceType(row.word, row.typeId, { seed });
   const sourceForm =
-    surfaceFormFor(row.word, sourceTypeId) || conjugateItem(row.word, sourceTypeId);
+    focusedSource?.sourceForm ||
+    surfaceFormFor(row.word, sourceTypeId) ||
+    conjugateItem(row.word, sourceTypeId);
   const expectedAnswer =
     surfaceFormFor(row.word, row.typeId) || conjugateItem(row.word, row.typeId);
   return {
@@ -230,7 +256,7 @@ export function buildGuideCard(words, state = defaultState(), prefs = DEFAULT_PR
     expectedAnswer,
     expectedAnswerVariants: [expectedAnswer, conjugateItem(row.word, row.typeId)],
     targetLabel: getTypeInfo(row.typeId).label || row.typeId,
-    sourceLabel: getTypeInfo(sourceTypeId).label || sourceTypeId,
+    sourceLabel: focusedSource?.sourceLabel || getTypeInfo(sourceTypeId).label || sourceTypeId,
   };
 }
 

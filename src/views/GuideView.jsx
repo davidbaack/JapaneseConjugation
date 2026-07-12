@@ -66,6 +66,70 @@ function HintText({ stepId, card }) {
   return `Answer starts with ${Array.from(card.expectedAnswer || '')[0] || 'the target form'}.`;
 }
 
+export function FocusedGuideBanner({ focus, card, onExit }) {
+  return (
+    <section className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 dark:border-indigo-900/70 dark:bg-indigo-950/20">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+            Focused Guide
+          </div>
+          <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
+            {focus.typeLabel || getTypeInfo(focus.type).label || 'This form'}
+          </h2>
+          <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
+            {focus.source === 'practice-result'
+              ? focus.formToForm
+                ? `Form-to-form repair: ${card.sourceLabel} to ${card.targetLabel}.`
+                : 'Step through the same form from your Practice answer. Source: Dictionary Form.'
+              : 'Step through the same form from the Learn lesson.'}
+            {focus.word?.dict ? (
+              <>
+                {' '}
+                Current word:{' '}
+                <span lang="ja" className="font-semibold text-stone-950 dark:text-stone-50">
+                  {focus.word.dict}
+                </span>
+                .
+              </>
+            ) : null}
+          </p>
+          {focus.missed && focus.expectedAnswer ? (
+            <div
+              className="mt-3 grid gap-2 text-sm sm:grid-cols-2"
+              aria-label="Practice miss comparison"
+            >
+              <div className="rounded-lg border border-rose-200 bg-white/75 px-3 py-2 dark:border-rose-900/70 dark:bg-stone-950/35">
+                <div className="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">
+                  Your answer
+                </div>
+                <div className="mt-0.5 font-semibold text-stone-950 dark:text-stone-50">
+                  {focus.submittedAnswer || '(empty)'}
+                </div>
+              </div>
+              <div className="rounded-lg border border-emerald-200 bg-white/75 px-3 py-2 dark:border-emerald-900/70 dark:bg-stone-950/35">
+                <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                  Correct answer
+                </div>
+                <div lang="ja" className="mt-0.5 font-semibold text-stone-950 dark:text-stone-50">
+                  {card.expectedAnswer || focus.expectedAnswer}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={onExit}
+          className="inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-white/80 px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-white dark:border-indigo-800 dark:bg-stone-950/40 dark:text-indigo-300 dark:hover:bg-stone-900"
+        >
+          Exit focus
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export default function GuideView() {
   const {
     allWords,
@@ -111,6 +175,8 @@ export default function GuideView() {
         ...options,
         targetWord: focus.word,
         targetTypeId: focus.type,
+        sourceTypeId: focus.sourceTypeId,
+        sourceForm: focus.sourceForm,
       };
     },
     [activeGuideFocus, guideFocus],
@@ -128,13 +194,21 @@ export default function GuideView() {
 
   useEffect(() => {
     const focusKey =
-      guideFocus?.word && guideFocus?.type ? `${wordKey(guideFocus.word)}|${guideFocus.type}` : '';
+      guideFocus?.word && guideFocus?.type
+        ? [
+            wordKey(guideFocus.word),
+            guideFocus.type,
+            guideFocus.sourceTypeId || '',
+            guideFocus.sourceForm || '',
+          ].join('|')
+        : '';
     if (focusKey && completedFocusRef.current !== focusKey && guideWords.length) {
-      const focusedCard = buildGuideCard(guideWords, state, practicePrefs, {
-        targetWord: guideFocus.word,
-        targetTypeId: guideFocus.type,
-        seed: Date.now(),
-      });
+      const focusedCard = buildGuideCard(
+        guideWords,
+        state,
+        practicePrefs,
+        guideCardOptions({ seed: Date.now() }),
+      );
       if (focusedCard) {
         completedFocusRef.current = focusKey;
         setActiveGuideFocus({ ...guideFocus });
@@ -311,42 +385,7 @@ export default function GuideView() {
   return (
     <div className="space-y-4">
       {activeGuideFocus && (
-        <section className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 dark:border-indigo-900/70 dark:bg-indigo-950/20">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                Focused Guide
-              </div>
-              <h2 className="mt-1 text-xl font-semibold text-stone-950 dark:text-stone-50">
-                {activeGuideFocus.typeLabel ||
-                  getTypeInfo(activeGuideFocus.type).label ||
-                  'This form'}
-              </h2>
-              <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
-                {activeGuideFocus.source === 'practice-result'
-                  ? 'Step through the same form from your Practice answer.'
-                  : 'Step through the same form from the Learn lesson.'}
-                {activeGuideFocus.word?.dict ? (
-                  <>
-                    {' '}
-                    Current word:{' '}
-                    <span lang="ja" className="font-semibold text-stone-950 dark:text-stone-50">
-                      {activeGuideFocus.word.dict}
-                    </span>
-                    .
-                  </>
-                ) : null}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={exitGuideFocus}
-              className="inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-white/80 px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-white dark:border-indigo-800 dark:bg-stone-950/40 dark:text-indigo-300 dark:hover:bg-stone-900"
-            >
-              Exit focus
-            </button>
-          </div>
-        </section>
+        <FocusedGuideBanner focus={activeGuideFocus} card={card} onExit={exitGuideFocus} />
       )}
       <section className="rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

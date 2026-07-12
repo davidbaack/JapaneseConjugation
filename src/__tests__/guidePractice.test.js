@@ -23,6 +23,12 @@ const KAKU = {
   meaning: 'to write',
   group: 'godan',
 };
+const NERU = {
+  dict: '\u5bdd\u308b',
+  reading: '\u306d\u308b',
+  meaning: 'to sleep',
+  group: 'ichidan',
+};
 const SHIZUKA = {
   dict: '\u9759\u304b',
   reading: '\u3057\u305a\u304b',
@@ -40,6 +46,36 @@ describe('guide practice engine', () => {
     expect(card.expectedBase).toBe('\u98df\u3079\u308b');
     expect(card.expectedAnswer).toBe('\u98df\u3079\u305f');
     expect(card.sourceTypeId).not.toBe(card.typeId);
+  });
+
+  it('locks a focused dictionary-form miss to the original Practice route', () => {
+    const state = { ...defaultState(), enabledTypes: ['plain-negative'] };
+
+    for (const seed of [0, 1, 2, 3, 4, 5]) {
+      const card = buildGuideCard([NERU], state, DEFAULT_PREFS, {
+        targetWord: NERU,
+        targetTypeId: 'plain-negative',
+        sourceTypeId: 'dictionary',
+        seed,
+      });
+
+      expect(card.sourceTypeId).toBe('plain-present');
+      expect(card.sourceForm).toBe('\u5bdd\u308b');
+      expect(card.sourceLabel).toBe('Dictionary Form');
+      expect(card.expectedAnswer).toBe('\u5bdd\u306a\u3044');
+    }
+  });
+
+  it('keeps varied source forms for ordinary non-focused Guide cards', () => {
+    const state = { ...defaultState(), enabledTypes: ['plain-negative'] };
+    const sourceTypes = new Set(
+      [0, 1, 2, 3].map(
+        (seed) => buildGuideCard([NERU], state, DEFAULT_PREFS, { seed }).sourceTypeId,
+      ),
+    );
+
+    expect(sourceTypes.size).toBeGreaterThan(1);
+    expect(sourceTypes.has('plain-present')).toBe(false);
   });
 
   it('prefers weakness-prioritized cards before fallback cards', () => {
