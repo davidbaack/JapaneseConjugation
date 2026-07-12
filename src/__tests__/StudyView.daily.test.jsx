@@ -28,6 +28,7 @@ vi.mock('../utils/speech.js', async () => {
 });
 
 import StudyView, { reviewFeedbackActionForRecord } from '../views/StudyView.jsx';
+import { RunAnswerReveal } from '../views/study/StudyReviewPanels.jsx';
 
 beforeEach(() => {
   originalScrollIntoView = window.Element.prototype.scrollIntoView;
@@ -302,6 +303,52 @@ describe('reviewFeedbackActionForRecord', () => {
         { relatedLesson: { groupId: 'plain', title: 'Plain forms' } },
       ).label,
     ).toBe('Review lesson');
+  });
+});
+
+describe('RunAnswerReveal next action', () => {
+  it('keeps one primary Next card action alongside a recommended drill', () => {
+    const target = STARTER_VERBS.find((word) => word.group === 'godan');
+    const onNext = vi.fn();
+    expect(target).toBeTruthy();
+
+    render(
+      <RunAnswerReveal
+        record={{
+          id: 'sound-change-miss',
+          correct: false,
+          word: target,
+          practicedType: 'plain-past',
+          cardType: 'plain-past',
+          promptType: 'dictionary',
+          promptForm: target.dict,
+          expected: conjugateItem(target, 'plain-past'),
+          submittedAnswer: `${target.reading.slice(0, -1)}\u304d\u305f`,
+          answerMode: 'choice',
+          practicePrefs: DEFAULT_PREFS,
+          diagnosis: {
+            category: 'godan-sound-change',
+            patternId: 'godan-onbin-ku',
+            targetType: 'plain-past',
+            repairTypeIds: ['plain-past'],
+          },
+          explanation: {
+            intro: 'Use the godan sound change.',
+            rule: 'Change the final sound before adding the past ending.',
+          },
+        }}
+        onOpenGuide={vi.fn()}
+        onOpenLab={vi.fn()}
+        onTryAnother={onNext}
+      />,
+    );
+
+    const nextButtons = screen.getAllByRole('button', { name: 'Next card' });
+    expect(nextButtons).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Drill the trap' })).toBeTruthy();
+
+    fireEvent.click(nextButtons[0]);
+    expect(onNext).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1474,6 +1521,7 @@ describe('StudyView continuous Practice startup', () => {
     });
     expect(nextState.cards[cardId].incorrect).toBe(1);
     expect(screen.getAllByText('Assisted correction.').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Next card' })).toHaveLength(1);
     expect(screen.getByText(/revealed answer help/)).toBeTruthy();
     expect(screen.getByText('Rule to apply')).toBeTruthy();
     expect(screen.queryByText(/does not match the requested/)).toBeNull();
@@ -1547,6 +1595,7 @@ describe('StudyView continuous Practice startup', () => {
       kind: 'missed',
       label: 'Plain Past',
     });
+    expect(screen.getAllByRole('button', { name: 'Next card' })).toHaveLength(1);
     expect(nextState.cards[cardId].incorrect).toBe(1);
     expect(screen.getAllByText('Assisted correction.').length).toBeGreaterThan(0);
     expect(screen.getByText(/revealed answer help/)).toBeTruthy();
@@ -1710,6 +1759,7 @@ describe('StudyView continuous Practice startup', () => {
       kind: 'missed',
       label: 'Plain Past',
     });
+    expect(screen.getAllByRole('button', { name: 'Next card' })).toHaveLength(1);
   });
 
   it("counts I don't know as missed in choice mode", async () => {
@@ -1965,6 +2015,12 @@ describe('StudyView continuous Practice startup', () => {
     expect(
       within(reviewRegion).getByRole('button', { name: 'Open Guide for this rule' }),
     ).toBeTruthy();
+    const nextButtons = within(reviewRegion).getAllByRole('button', { name: 'Next card' });
+    expect(nextButtons).toHaveLength(1);
+    expect(
+      nextButtons[0].compareDocumentPosition(answerBreakdown) &
+        window.Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('walks a word form sweep in order and repeats missed forms before completion', async () => {
@@ -2069,6 +2125,17 @@ describe('StudyView continuous Practice startup', () => {
 
     expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
     expect(screen.queryByText('Next card coming up...')).toBeNull();
+    const nextButtons = screen.getAllByRole('button', { name: 'Next card' });
+    expect(nextButtons).toHaveLength(1);
+    const nextButton = nextButtons[0];
+    expect(nextButton.className).toContain('sm:absolute');
+    expect(nextButton.className).toContain('sm:inset-y-0');
+    expect(nextButton.className).toContain('sm:rounded-r-xl');
+    const answerBreakdown = screen.getByText('Answer breakdown').closest('section');
+    expect(
+      nextButton.compareDocumentPosition(answerBreakdown) & window.Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(nextButton));
   });
 
   it('auto-advances non-guided typed answers after enabling that answer form', async () => {

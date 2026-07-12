@@ -256,7 +256,7 @@ export function reviewFeedbackActionForRecord(
   return { kind: 'try', label: 'Next card' };
 }
 
-function ReviewFeedbackAction({ action, buttonRef, onClick }) {
+function ReviewFeedbackAction({ action, onClick }) {
   if (!action?.label || !onClick) return null;
   const Icon =
     action.kind === 'lesson'
@@ -274,7 +274,6 @@ function ReviewFeedbackAction({ action, buttonRef, onClick }) {
   return (
     <div className="mt-4 border-t border-stone-200/70 pt-3 text-left dark:border-stone-800/70">
       <button
-        ref={buttonRef}
         type="button"
         onClick={onClick}
         className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-sm transition ${toneClass}`}
@@ -286,7 +285,7 @@ function ReviewFeedbackAction({ action, buttonRef, onClick }) {
   );
 }
 
-function GuideReviewPrompt({ buttonRef = null, onClick }) {
+function GuideReviewPrompt({ onClick }) {
   if (!onClick) return null;
 
   return (
@@ -298,7 +297,6 @@ function GuideReviewPrompt({ buttonRef = null, onClick }) {
         Drills this same word and target form: plain form, word group, final answer.
       </div>
       <button
-        ref={buttonRef}
         type="button"
         onClick={onClick}
         className="mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
@@ -451,7 +449,7 @@ function RunAnswerReveal({
     : 'text-rose-950 dark:text-rose-50';
 
   return (
-    <div className={`rounded-xl p-4 ${panelClass}`}>
+    <div className={`relative rounded-xl p-4 sm:pr-[6.5rem] ${panelClass}`}>
       <div className="flex items-start gap-3 text-left">
         <div
           className={`mt-0.5 flex-shrink-0 ${
@@ -635,6 +633,26 @@ function RunAnswerReveal({
         </div>
       </div>
 
+      {onTryAnother && (
+        <button
+          ref={actionButtonRef}
+          type="button"
+          onClick={onTryAnother}
+          aria-label="Next card"
+          className="group mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-stone-800 bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-100 sm:absolute sm:inset-y-0 sm:right-0 sm:mt-0 sm:w-[5.5rem] sm:flex-col sm:justify-start sm:rounded-l-none sm:rounded-r-xl sm:border-y-0 sm:border-r-0 sm:border-l sm:px-2 sm:py-4"
+        >
+          <span className="inline-flex items-center gap-2 sm:sticky sm:top-1/2 sm:-translate-y-1/2 sm:flex-col sm:gap-1">
+            <IconArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            <span
+              aria-hidden="true"
+              className="inline-flex gap-1 sm:flex-col sm:gap-0 sm:leading-tight"
+            >
+              <span>Next</span>
+              <span>card</span>
+            </span>
+          </span>
+        </button>
+      )}
       {record.correct && explanation && (
         <div className="mt-4 space-y-2.5 border-t border-emerald-200 pt-4 text-left dark:border-emerald-900/50">
           <ReviewDisclosure tone="emerald" summary="Answer breakdown" alwaysOpen>
@@ -797,18 +815,9 @@ function RunAnswerReveal({
           </div>
         </div>
       )}
-      {canOpenGuidePrompt && (
-        <GuideReviewPrompt
-          buttonRef={reviewAction.kind === 'guide' ? actionButtonRef : null}
-          onClick={openGuidePrompt}
-        />
-      )}
-      {reviewAction.kind !== 'guide' && (
-        <ReviewFeedbackAction
-          action={reviewAction}
-          buttonRef={actionButtonRef}
-          onClick={runReviewAction}
-        />
+      {canOpenGuidePrompt && <GuideReviewPrompt onClick={openGuidePrompt} />}
+      {reviewAction.kind !== 'guide' && reviewAction.kind !== 'try' && (
+        <ReviewFeedbackAction action={reviewAction} onClick={runReviewAction} />
       )}
     </div>
   );
