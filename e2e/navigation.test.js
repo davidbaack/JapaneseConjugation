@@ -90,7 +90,7 @@ test.describe('Tab navigation', () => {
 
     await page.getByRole('tab', { name: /^Check/ }).click();
     await expect(page.getByText('Check a conjugation')).toBeVisible();
-    await page.getByPlaceholder(/tabeta/).fill('tabeta');
+    await page.getByLabel('Conjugated form').fill('tabeta');
     await page.getByRole('button', { name: 'Check', exact: true }).click();
     await expect(page.getByText('Recognized form', { exact: true })).toBeVisible();
 

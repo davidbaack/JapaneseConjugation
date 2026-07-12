@@ -20,8 +20,10 @@ function seriousOrCritical(violations) {
     }));
 }
 
-async function expectNoSeriousViolations(page, surface) {
-  const { violations } = await new AxeBuilder({ page }).analyze();
+async function expectNoSeriousViolations(page, surface, include) {
+  const builder = new AxeBuilder({ page });
+  if (include) builder.include(include);
+  const { violations } = await builder.analyze();
   expect(seriousOrCritical(violations), `${surface} accessibility violations`).toEqual([]);
 }
 
@@ -61,6 +63,17 @@ test.describe('Serious and critical accessibility checks', () => {
     await expect(page.getByText('Not quite.').last()).toBeVisible();
 
     await expectNoSeriousViolations(page, 'answer feedback');
+  });
+
+  test('Check tool input', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('nav').getByRole('tab', { name: 'Tools', exact: true }).click();
+    await page.getByRole('tab', { name: /^Check/ }).click();
+    await expect(page.getByLabel('Conjugated form')).toBeVisible();
+
+    await expectNoSeriousViolations(page, 'Check tool input', '#check-conjugation-input');
   });
 
   test('authentication dialog when cloud sync is configured', async ({ page }) => {

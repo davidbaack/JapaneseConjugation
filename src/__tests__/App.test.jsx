@@ -772,7 +772,11 @@ describe('App shell', () => {
     expect(screen.getByRole('button', { name: 'Copy table' })).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /^Check/i }));
     expect(await screen.findByText('Check a conjugation')).toBeTruthy();
-    fireEvent.change(screen.getByPlaceholderText(/tabeta/i), { target: { value: 'tabeta' } });
+    const checkInput = screen.getByLabelText('Conjugated form');
+    const checkLabel = screen.getByText('Conjugated form');
+    expect(checkLabel.tagName).toBe('LABEL');
+    expect(checkLabel.getAttribute('for')).toBe(checkInput.id);
+    fireEvent.change(checkInput, { target: { value: 'tabeta' } });
     fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
     expect(await screen.findByText('Recognized form')).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /^Lists/i }));
@@ -811,7 +815,7 @@ describe('App shell', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
     fireEvent.click(await screen.findByRole('tab', { name: /^Check/i }));
-    fireEvent.change(screen.getByPlaceholderText(/tabeta/i), {
+    fireEvent.change(screen.getByLabelText('Conjugated form'), {
       target: { value: '\u304b\u304b\u306a\u3044' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));
@@ -927,7 +931,7 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
 
     fireEvent.click(await screen.findByRole('tab', { name: /^Check/i }));
-    fireEvent.change(screen.getByPlaceholderText(/tabeta/i), {
+    fireEvent.change(screen.getByLabelText('Conjugated form'), {
       target: { value: '\u98df\u3079\u308c\u308b' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Check', exact: true }));

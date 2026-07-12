@@ -392,9 +392,17 @@ export default function CheckView() {
             which dictionary word it is and which form you made.
           </p>
 
+          <label
+            htmlFor="check-conjugation-input"
+            className="mb-2 block text-sm font-medium text-stone-700 dark:text-stone-300"
+          >
+            Conjugated form
+          </label>
+
           {/* Input row — mirrors Study's answer input */}
           <div className="flex items-center gap-2">
             <input
+              id="check-conjugation-input"
               ref={inputRef}
               type="text"
               value={input}
