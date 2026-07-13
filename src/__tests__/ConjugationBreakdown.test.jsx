@@ -49,15 +49,12 @@ describe('ConjugationBreakdown', () => {
     expect(screen.getByText(/く → か \/ き \/ け \/ こ/)).toBeTruthy();
     expect(screen.getByText(/書きます shows き, 書かない shows か/)).toBeTruthy();
     expect(screen.getByText(/Watch for る-ending godan verbs too/)).toBeTruthy();
-    expect(screen.getByText('2. Step-by-step conjugation rules')).toBeTruthy();
-    expect(screen.getByText('From dictionary/plain form')).toBeTruthy();
-    expect(screen.getByText('From polite/masu stem')).toBeTruthy();
-    expect(screen.getByText('Stem')).toBeTruthy();
-    expect(screen.getByText('Ending')).toBeTruthy();
-    expect(screen.getByText('Replace')).toBeTruthy();
-    expect(screen.getAllByText('Result').length).toBeGreaterThan(1);
-    expect(screen.getAllByText('か + いて = かいて').length).toBeGreaterThan(1);
-    expect(screen.getByText('書きます -> 書き -> 書いて')).toBeTruthy();
+    expect(screen.getByText('2. Apply the rule')).toBeTruthy();
+    expect(screen.queryByText('From dictionary/plain form')).toBeNull();
+    expect(screen.queryByText('From polite/masu stem')).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Dictionary form', selected: true })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'ます form', selected: false })).toBeTruthy();
+    expect(screen.getByText('か + いて = かいて')).toBeTruthy();
     expect(screen.getAllByText(/う\/つ\/る -> って/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/く -> いて/).length).toBeGreaterThan(0);
     expect(screen.getByText(/kaku -> kaite/)).toBeTruthy();
@@ -69,6 +66,12 @@ describe('ConjugationBreakdown', () => {
     ).toBeTruthy();
     expect(screen.queryByText('Row visual')).toBeNull();
     expect(screen.queryByText('Full godan row table')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'ます form' }));
+    expect(screen.getByRole('tab', { name: 'ます form', selected: true })).toBeTruthy();
+    expect(screen.getByText('書きます -> 書き -> 書いて')).toBeTruthy();
+    expect(screen.getByText('ます stem final')).toBeTruthy();
+    expect(screen.getAllByText('き').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('いて').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'See Learn table' }));
     expect(openLearn).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Pattern you used')).toBeTruthy();
@@ -113,6 +116,7 @@ describe('ConjugationBreakdown', () => {
     expect(
       screen.getByText(/Compare: a る-ending godan verb \(帰る, 入る, 走る\) row-shifts/),
     ).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'ます form' }));
     expect(screen.getByText('食べます -> 食べ -> 食べた')).toBeTruthy();
   });
 
@@ -133,6 +137,11 @@ describe('ConjugationBreakdown', () => {
     expect(
       screen.getByText(/Common る-trap verbs to memorize: 帰る, 入る, 走る, and 切る/),
     ).toBeTruthy();
+    const masuTab = screen.getByRole('tab', { name: 'ます form' });
+    fireEvent.keyDown(masuTab, { key: 'ArrowRight' });
+    expect(screen.getByRole('tab', { name: 'ます form', selected: true })).toBeTruthy();
+    expect(screen.getByText(/り -> った \(ri -> tta\)/)).toBeTruthy();
+    expect(screen.getByText('帰ります -> 帰り -> 帰った')).toBeTruthy();
   });
 
   it('keeps suru and kuru style verbs in one learner-facing irregular bucket', () => {

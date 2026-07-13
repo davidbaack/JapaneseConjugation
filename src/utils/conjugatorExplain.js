@@ -481,6 +481,9 @@ function buildMasuStemBridge(item, type, expected) {
     return {
       title: 'From polite/masu stem',
       kind: 'direct-masu-stem',
+      source: polite,
+      stem: masuStem,
+      result,
       cells: [
         { label: 'Polite', value: polite },
         { label: 'Drop ます', value: masuStem },
@@ -519,6 +522,11 @@ function buildMasuStemBridge(item, type, expected) {
   return {
     title: 'From polite/masu stem',
     kind: 'te-ta-bridge',
+    source: polite,
+    stem: masuStem,
+    stemEnding: fromEnding,
+    bridgeEnding: toEnding,
+    result,
     cells,
     formula,
     detail:

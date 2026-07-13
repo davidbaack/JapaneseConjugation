@@ -892,7 +892,8 @@ describe('App shell', () => {
     const rationale = screen.getByText('Answer breakdown');
     expect(rationale.closest('details')).toBeNull();
     expect(screen.getByText('Visual Rule Path')).toBeTruthy();
-    expect(screen.getByText('From polite/masu stem')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Dictionary form', selected: true })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'ます form', selected: false })).toBeTruthy();
     expect(screen.queryByText('More')).toBeNull();
     expect(screen.getByText('Walk through this form in Guide')).toBeTruthy();
     expect(screen.getByText(/Drills this same word and target form/)).toBeTruthy();
