@@ -40,6 +40,7 @@ import {
   upsertReviewRecommendationState,
 } from '../utils/reviewScope.js';
 import { updateStatePracticeScope } from '../utils/practiceScope.js';
+import { reconcileDerivedProgressState } from '../utils/derivedProgress.js';
 
 // Centralized global app state (improvement #6). All the practice/customs/prefs
 // state, the hydration + cloud-sync effects, theme/voice wiring, and the
@@ -104,6 +105,7 @@ function useAppController() {
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const [hydrated, setHydrated] = useState(false);
   const lastSyncedAtRef = useRef(0);
+  const diagnosticRepairPendingRef = useRef(false);
   const authEventVersionRef = useRef(0);
   const activeAuthUserIdRef = useRef('');
 
@@ -112,12 +114,28 @@ function useAppController() {
   }
 
   function applySyncPayload(payload) {
-    if (!payload) return;
-    if (payload.state) setState(mergeState(payload.state, { reviewed: 0, correct: 0 }));
-    if (Array.isArray(payload.customVerbs)) setCustomVerbs(payload.customVerbs);
-    if (Array.isArray(payload.customAdjectives)) setCustomAdjectives(payload.customAdjectives);
-    if (Array.isArray(payload.wordLists)) setWordLists(normalizeWordLists(payload.wordLists));
-    if (payload.practicePrefs) setPracticePrefs(mergePracticePrefs(payload.practicePrefs));
+    if (!payload) return { payload, repaired: false };
+    const repair = payload.state
+      ? reconcileDerivedProgressState(payload.state)
+      : { state: payload.state, repaired: false };
+    const normalizedPayload = repair.repaired ? { ...payload, state: repair.state } : payload;
+    if (repair.repaired) diagnosticRepairPendingRef.current = true;
+    if (normalizedPayload.state) {
+      setState(mergeState(normalizedPayload.state, { reviewed: 0, correct: 0 }));
+    }
+    if (Array.isArray(normalizedPayload.customVerbs)) {
+      setCustomVerbs(normalizedPayload.customVerbs);
+    }
+    if (Array.isArray(normalizedPayload.customAdjectives)) {
+      setCustomAdjectives(normalizedPayload.customAdjectives);
+    }
+    if (Array.isArray(normalizedPayload.wordLists)) {
+      setWordLists(normalizeWordLists(normalizedPayload.wordLists));
+    }
+    if (normalizedPayload.practicePrefs) {
+      setPracticePrefs(mergePracticePrefs(normalizedPayload.practicePrefs));
+    }
+    return { payload: normalizedPayload, repaired: repair.repaired };
   }
 
   function applyLearnerResetPayload(payload, syncedAt = null) {
@@ -161,7 +179,11 @@ function useAppController() {
     pruneAICache();
     const local = loadAll();
     if (local) {
-      if (local.state) setState(mergeState(local.state, { reviewed: 0, correct: 0 }));
+      if (local.state) {
+        const repair = reconcileDerivedProgressState(local.state);
+        diagnosticRepairPendingRef.current = repair.repaired;
+        setState(mergeState(repair.state, { reviewed: 0, correct: 0 }));
+      }
       if (Array.isArray(local.customVerbs)) setCustomVerbs(local.customVerbs);
       if (Array.isArray(local.customAdjectives)) setCustomAdjectives(local.customAdjectives);
       if (Array.isArray(local.wordLists)) setWordLists(normalizeWordLists(local.wordLists));
@@ -266,6 +288,7 @@ function useAppController() {
                 if (!syncStillCurrent()) return;
                 const now = Date.now();
                 lastSyncedAtRef.current = now;
+                diagnosticRepairPendingRef.current = false;
                 setCloudReadyUserId(syncUserId);
                 setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: cloudAt });
               })
@@ -279,13 +302,55 @@ function useAppController() {
               });
           } else if (action === 'pull') {
             const cloudAt = cloudTimestamp(cloud);
-            applySyncPayload(cloud.data);
-            lastSyncedAtRef.current = cloudAt;
-            setCloudReadyUserId(syncUserId);
-            setSyncStatus({ kind: 'ok', message: 'Restored from cloud', at: cloudAt });
+            const applied = applySyncPayload(cloud.data);
+            if (applied.repaired) {
+              setSyncStatus({ kind: 'syncing', message: 'Repairing cloud progressâ€¦', at: null });
+              cloudUpsert(applied.payload, syncUserId)
+                .then(() => {
+                  if (!syncStillCurrent()) return;
+                  const now = Date.now();
+                  lastSyncedAtRef.current = now;
+                  diagnosticRepairPendingRef.current = false;
+                  setCloudReadyUserId(syncUserId);
+                  setSyncStatus({ kind: 'ok', message: 'Repaired cloud progress', at: now });
+                })
+                .catch((e) => {
+                  if (!syncStillCurrent()) return;
+                  setSyncStatus({
+                    kind: 'error',
+                    message: e.message || 'Progress repair push failed',
+                    at: null,
+                  });
+                });
+            } else {
+              lastSyncedAtRef.current = cloudAt;
+              setCloudReadyUserId(syncUserId);
+              setSyncStatus({ kind: 'ok', message: 'Restored from cloud', at: cloudAt });
+            }
           } else if (action === 'noop') {
-            setCloudReadyUserId(syncUserId);
-            setSyncStatus({ kind: 'ok', message: 'Up to date', at: lastSyncedAtRef.current });
+            if (diagnosticRepairPendingRef.current) {
+              setSyncStatus({ kind: 'syncing', message: 'Repairing cloud progressâ€¦', at: null });
+              cloudUpsert(localPayload, syncUserId)
+                .then(() => {
+                  if (!syncStillCurrent()) return;
+                  const now = Date.now();
+                  lastSyncedAtRef.current = now;
+                  diagnosticRepairPendingRef.current = false;
+                  setCloudReadyUserId(syncUserId);
+                  setSyncStatus({ kind: 'ok', message: 'Repaired cloud progress', at: now });
+                })
+                .catch((e) => {
+                  if (!syncStillCurrent()) return;
+                  setSyncStatus({
+                    kind: 'error',
+                    message: e.message || 'Progress repair push failed',
+                    at: null,
+                  });
+                });
+            } else {
+              setCloudReadyUserId(syncUserId);
+              setSyncStatus({ kind: 'ok', message: 'Up to date', at: lastSyncedAtRef.current });
+            }
           } else {
             const hadCloud = !!(cloud && cloud.data);
             setSyncStatus({
@@ -300,6 +365,7 @@ function useAppController() {
                 if (!syncStillCurrent()) return;
                 const now = Date.now();
                 lastSyncedAtRef.current = now;
+                diagnosticRepairPendingRef.current = false;
                 setCloudReadyUserId(syncUserId);
                 setSyncStatus({
                   kind: 'ok',
@@ -402,18 +468,29 @@ function useAppController() {
         if (!syncStillCurrent()) return;
         const now = Date.now();
         lastSyncedAtRef.current = now;
+        diagnosticRepairPendingRef.current = false;
         setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: now });
       } else if (action === 'pull') {
         const cloudAt = cloudTimestamp(cloud);
         if (!syncStillCurrent()) return;
-        applySyncPayload(cloud.data);
-        lastSyncedAtRef.current = cloudAt;
-        setSyncStatus({ kind: 'ok', message: 'Pulled from cloud', at: cloudAt });
+        const applied = applySyncPayload(cloud.data);
+        if (applied.repaired) {
+          await cloudUpsert(applied.payload, syncUserId);
+          if (!syncStillCurrent()) return;
+          const now = Date.now();
+          lastSyncedAtRef.current = now;
+          diagnosticRepairPendingRef.current = false;
+          setSyncStatus({ kind: 'ok', message: 'Repaired cloud progress', at: now });
+        } else {
+          lastSyncedAtRef.current = cloudAt;
+          setSyncStatus({ kind: 'ok', message: 'Pulled from cloud', at: cloudAt });
+        }
       } else {
         await cloudUpsert(localPayload, syncUserId);
         if (!syncStillCurrent()) return;
         const now = Date.now();
         lastSyncedAtRef.current = now;
+        diagnosticRepairPendingRef.current = false;
         setSyncStatus({ kind: 'ok', message: 'Pushed to cloud', at: now });
       }
       setCloudReadyUserId(syncUserId);

@@ -19,6 +19,7 @@ import {
   reducePracticeScope,
 } from '../utils/practiceScope.js';
 import {
+  practiceMapTypeLabel,
   togglePracticeDimensionEnabledTypes,
   togglePracticeFamilyEnabledTypes,
   togglePracticeTypeEnabledTypes,
@@ -36,6 +37,11 @@ async function waitForPracticeCard() {
 }
 
 describe('App shell', () => {
+  it('uses Ta-form only inside the Te/Ta Sound Changes category', () => {
+    expect(practiceMapTypeLabel('plain-past', 'Plain Past', 'te-ta-sound-changes')).toBe('Ta-form');
+    expect(practiceMapTypeLabel('plain-past', 'Plain Past', 'basic-tenses')).toBe('Plain Past');
+  });
+
   it('keeps Practice scope toggles within the active family scope', () => {
     const noPast = togglePracticeDimensionEnabledTypes(EVERYDAY_TYPE_IDS, 'past');
 
@@ -384,7 +390,7 @@ describe('App shell', () => {
     expect(within(practiceMap()).getByText('0/2')).toBeTruthy();
 
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Te-form off' })).toBeTruthy();
-    expect(within(practiceMap()).getByRole('button', { name: 'Turn Plain Past off' })).toBeTruthy();
+    expect(within(practiceMap()).getByRole('button', { name: 'Turn Ta-form off' })).toBeTruthy();
     fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Turn Te-form off' }));
     await waitFor(() => expect(within(practiceMap()).getByText('1/2 forms on')).toBeTruthy());
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Te-form on' })).toBeTruthy();

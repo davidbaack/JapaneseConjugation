@@ -43,6 +43,7 @@ import {
   normalizePracticeScope,
   practiceScopeFromEnabledTypes,
 } from './practiceScope.js';
+import { reconcileDerivedProgressState } from './derivedProgress.js';
 
 export const DAY = 86400000;
 export const SRS_SCHEMA_VERSION = 3;
@@ -817,7 +818,7 @@ export function mergeCloudState(local, cloud) {
     ...mergedLegacyEnabledTypes.filter((typeId) => enabledSet.has(typeId)),
     ...enabledTypes.filter((typeId) => !mergedLegacyEnabledTypes.includes(typeId)),
   ];
-  return {
+  const merged = {
     ...local,
     schemaVersion: SRS_SCHEMA_VERSION,
     cards: mergeCards(local.cards || {}, cloud.cards || {}),
@@ -932,6 +933,7 @@ export function mergeCloudState(local, cloud) {
       ],
     }),
   };
+  return reconcileDerivedProgressState(merged).state;
 }
 
 // ============================================================================
@@ -1158,7 +1160,7 @@ export function mergeState(saved, sessionOverride) {
     ];
   }
 
-  return merged;
+  return reconcileDerivedProgressState(merged).state;
 }
 
 export function bumpDaily(daily, correct, dailyGoal) {
@@ -1265,6 +1267,7 @@ export function gradeCard(card, correct, now = Date.now()) {
       lastSeen: 0,
     };
   const decayedMiss = (Number(card.recentMiss) || 0) * recencyDecayFactor(card.lastSeen, now);
+  const sourceTypeStats = card.sourceTypeStats ? { sourceTypeStats: card.sourceTypeStats } : {};
   if (correct) {
     let iv;
     if (card.reps === 0) iv = 1;
@@ -1277,6 +1280,7 @@ export function gradeCard(card, correct, now = Date.now()) {
       ...(isNew ? { introducedDate: localDateKey(), createdAt: now } : {}),
       ...(card.introducedDate ? { introducedDate: card.introducedDate } : {}),
       ...(card.createdAt ? { createdAt: card.createdAt } : {}),
+      ...sourceTypeStats,
       ease,
       reps: card.reps + 1,
       interval: iv,
@@ -1291,6 +1295,7 @@ export function gradeCard(card, correct, now = Date.now()) {
     ...(isNew ? { introducedDate: localDateKey(), createdAt: now } : {}),
     ...(card.introducedDate ? { introducedDate: card.introducedDate } : {}),
     ...(card.createdAt ? { createdAt: card.createdAt } : {}),
+    ...sourceTypeStats,
     ease: Math.max(1.3, card.ease - 0.2),
     reps: 0,
     interval: 0,

@@ -40,6 +40,10 @@ export const LESSON_BY_GROUP_ID = new Map(
 );
 export const CARD_TYPE_BY_ID = new Map(ALL_CARD_TYPES.map((type) => [type.id, type]));
 
+export function practiceMapTypeLabel(typeId, fallbackLabel, familyId) {
+  return familyId === 'te-ta-sound-changes' && typeId === 'plain-past' ? 'Ta-form' : fallbackLabel;
+}
+
 function legacyScopeUpdate(enabledTypeIds, action) {
   const scope = practiceScopeFromEnabledTypes(enabledTypeIds);
   return enabledTypeIdsForPracticeScope(reducePracticeScope(scope, action));
@@ -453,7 +457,8 @@ export function PracticeScopeSidebar({
                             >
                               <div className="flex items-center justify-between gap-2 text-xs">
                                 <span className="truncate font-medium text-stone-700 dark:text-stone-200">
-                                  {row.typeLabel} - {row.subcategoryLabel}
+                                  {practiceMapTypeLabel(row.typeId, row.typeLabel, family.id)} -{' '}
+                                  {row.subcategoryLabel}
                                 </span>
                                 <span className="tabular-nums text-stone-600">
                                   {row.correct}/{row.attempted}
@@ -477,6 +482,11 @@ export function PracticeScopeSidebar({
                           <div className="grid gap-1.5">
                             {familyTypes.map((type) => {
                               const selected = familyScopeState?.selectedTypeIds.includes(type.id);
+                              const typeLabel = practiceMapTypeLabel(
+                                type.id,
+                                type.label,
+                                family.id,
+                              );
                               const matchesFilters = practiceTypeMatchesScopeFilters(type, scope);
                               const practicing = familyActive && selected && matchesFilters;
                               const disabled =
@@ -493,7 +503,7 @@ export function PracticeScopeSidebar({
                                   key={type.id}
                                   type="button"
                                   aria-pressed={selected}
-                                  aria-label={`Turn ${type.label} ${selected ? 'off' : 'on'}`}
+                                  aria-label={`Turn ${typeLabel} ${selected ? 'off' : 'on'}`}
                                   onClick={() => onToggleType?.(type.id)}
                                   disabled={disabled}
                                   className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
@@ -512,9 +522,7 @@ export function PracticeScopeSidebar({
                                     }`}
                                   />
                                   <span className="min-w-0 flex-1">
-                                    <span className="block text-xs font-semibold">
-                                      {type.label}
-                                    </span>
+                                    <span className="block text-xs font-semibold">{typeLabel}</span>
                                     {type.sub && (
                                       <span className="block truncate text-[11px] opacity-70">
                                         {type.sub}

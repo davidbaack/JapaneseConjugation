@@ -299,19 +299,32 @@ export function mergeWeaknessState(local, cloud) {
   for (const [key, row] of Object.entries(right.byLane)) {
     const a = normalizeLane(byLane[key], key);
     const b = normalizeLane(row, key);
+    const preferred =
+      b.attempted > a.attempted ||
+      (b.attempted === a.attempted && (b.lastAt || 0) > (a.lastAt || 0))
+        ? b
+        : a;
+    const recentKeys = new Set();
     const recent = [...a.recent, ...b.recent]
       .sort((x, y) => y.at - x.at)
+      .filter((attempt) => {
+        const signature = [
+          attempt.at,
+          attempt.correct ? 1 : 0,
+          attempt.responseMs || 0,
+          attempt.wordKey || '',
+        ].join('|');
+        if (recentKeys.has(signature)) return false;
+        recentKeys.add(signature);
+        return true;
+      })
       .slice(0, MAX_RECENT_ATTEMPTS);
     byLane[key] = {
-      ...a,
+      ...preferred,
       typeId: a.typeId || b.typeId,
       typeLabel: a.typeLabel || b.typeLabel,
       subcategoryId: a.subcategoryId || b.subcategoryId,
       subcategoryLabel: a.subcategoryLabel || b.subcategoryLabel,
-      attempted: a.attempted + b.attempted,
-      correct: a.correct + b.correct,
-      incorrect: a.incorrect + b.incorrect,
-      totalResponseMs: a.totalResponseMs + b.totalResponseMs,
       lastAt: Math.max(a.lastAt || 0, b.lastAt || 0),
       recent,
     };

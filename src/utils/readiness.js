@@ -86,7 +86,28 @@ function speedWithAttempt(metric, correct, responseMs, now) {
   };
 }
 
-function mergeMetric(left, right) {
+function mergeMetricSnapshot(left, right) {
+  const a = normalizeMetric(left);
+  const b = normalizeMetric(right);
+  const preferred =
+    b.attempted > a.attempted || (b.attempted === a.attempted && (b.lastAt || 0) > (a.lastAt || 0))
+      ? b
+      : a;
+  const lastFromRight = (b.lastAt || 0) > (a.lastAt || 0);
+  const fastest = [a.fastestMs, b.fastestMs].filter(Boolean);
+  return {
+    attempted: preferred.attempted,
+    correct: preferred.correct,
+    totalResponseMs: preferred.totalResponseMs,
+    correctResponseMs: preferred.correctResponseMs,
+    fastCorrect: preferred.fastCorrect,
+    fastestMs: fastest.length ? Math.min(...fastest) : null,
+    lastMs: lastFromRight ? b.lastMs : a.lastMs,
+    lastAt: Math.max(a.lastAt || 0, b.lastAt || 0) || null,
+  };
+}
+
+function aggregateMetric(left, right) {
   const a = normalizeMetric(left);
   const b = normalizeMetric(right);
   const lastFromRight = (b.lastAt || 0) > (a.lastAt || 0);
@@ -154,7 +175,7 @@ export function mergeReadinessState(local, cloud) {
   for (const [ruleId, ruleMetrics] of Object.entries(right.byRule)) {
     const mergedRule = { ...(byRule[ruleId] || {}) };
     for (const id of DIMENSION_IDS) {
-      mergedRule[id] = mergeMetric(mergedRule[id], ruleMetrics[id]);
+      mergedRule[id] = mergeMetricSnapshot(mergedRule[id], ruleMetrics[id]);
       if (!hasAttempts(mergedRule[id])) delete mergedRule[id];
     }
     if (Object.keys(mergedRule).length) byRule[ruleId] = mergedRule;
@@ -276,11 +297,11 @@ export function buildReadinessFamilyRows(state, families = FORM_GROUPS) {
       if (!typeIds.has(typeId)) continue;
       const typeMetrics = byType.get(typeId) || { recognition: {}, production: {}, speed: {} };
       for (const dimension of READINESS_DIMENSIONS) {
-        familyMetrics[dimension.id] = mergeMetric(
+        familyMetrics[dimension.id] = aggregateMetric(
           familyMetrics[dimension.id],
           ruleMetrics[dimension.id],
         );
-        typeMetrics[dimension.id] = mergeMetric(
+        typeMetrics[dimension.id] = aggregateMetric(
           typeMetrics[dimension.id],
           ruleMetrics[dimension.id],
         );

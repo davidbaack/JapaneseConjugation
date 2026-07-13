@@ -27,7 +27,8 @@ vi.mock('../utils/storage.js', async () => {
 
 import { AppStateProvider, useApp } from '../state/AppStateContext.jsx';
 import { PUSH_DEBOUNCE_MS } from '../hooks/useCloudAutoSync.js';
-import { defaultState } from '../utils/storage.js';
+import { cardIdFor, defaultState } from '../utils/storage.js';
+import { weaknessLaneForCard } from '../utils/subcategoryWeakness.js';
 
 const SESSION_A = { user: { id: 'user-a', email: 'a@example.com' } };
 const SESSION_B = { user: { id: 'user-b', email: 'b@example.com' } };
@@ -100,6 +101,62 @@ afterEach(() => {
 });
 
 describe('AppStateProvider cloud session races', () => {
+  it('writes a repaired diagnostic snapshot back after a cloud pull', async () => {
+    const word = {
+      dict: '書く',
+      reading: 'かく',
+      meaning: 'to write',
+      group: 'godan',
+    };
+    const ruleId = cardIdFor(word, 'plain-past');
+    const lane = weaknessLaneForCard(word, 'plain-past');
+    cloudFetch.mockResolvedValueOnce({
+      data: {
+        state: {
+          ...defaultState(),
+          cards: {
+            [ruleId]: { reps: 1, correct: 2, incorrect: 1, lastSeen: 2000 },
+          },
+          weakness: {
+            byLane: {
+              [lane.key]: {
+                ...lane,
+                attempted: Number('99999999999999990000'),
+                correct: Number('33333333333333330000'),
+                incorrect: Number('66666666666666660000'),
+                totalResponseMs: Number('99999999999999990000'),
+                lastAt: 2000,
+                recent: [],
+              },
+            },
+          },
+        },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: null,
+      },
+      updated_at: '2030-01-01T00:00:00.000Z',
+    });
+    renderProvider();
+
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+
+    await waitFor(() => expect(cloudUpsert).toHaveBeenCalledTimes(1));
+    const repairedPayload = cloudUpsert.mock.calls[0][0];
+    expect(repairedPayload.state.weakness.byLane[lane.key]).toMatchObject({
+      attempted: 3,
+      correct: 2,
+      incorrect: 1,
+    });
+    expect(cloudUpsert).toHaveBeenCalledWith(repairedPayload, 'user-a');
+    await waitFor(() =>
+      expect(screen.getByTestId('sync').textContent).toBe('Repaired cloud progress'),
+    );
+  });
+
   it('does not auto-push while the initial cloud restore is pending', async () => {
     vi.useFakeTimers();
     const pending = deferred();
