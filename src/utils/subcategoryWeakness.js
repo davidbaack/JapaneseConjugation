@@ -78,12 +78,67 @@ function cardTotalsForFamily(state = {}, family) {
   let incorrect = 0;
   let introduced = 0;
   for (const [cardId, card] of Object.entries(state.cards || {})) {
-    if (!typeIds.has(typeIdFromCardId(cardId))) continue;
+    const cardTypeId = typeIdFromCardId(cardId);
+    if (cardTypeId === 'dictionary') {
+      const sourceRows = Object.entries(card?.sourceTypeStats || {}).filter(([typeId]) =>
+        typeIds.has(typeId),
+      );
+      if (sourceRows.length) {
+        sourceRows.forEach(([, stats]) => {
+          correct += cleanNumber(stats?.correct);
+          incorrect += cleanNumber(stats?.incorrect);
+        });
+        introduced += sourceRows.length;
+        continue;
+      }
+      if (!typeIds.has(card?.sourceType)) continue;
+    } else if (!typeIds.has(cardTypeId)) {
+      continue;
+    }
     correct += cleanNumber(card?.correct);
     incorrect += cleanNumber(card?.incorrect);
     if (cardHasIntroductionSignal(card)) introduced += 1;
   }
   return { correct, incorrect, attempted: correct + incorrect, introduced };
+}
+
+function cardTotalsByType(state = {}) {
+  const totals = new Map();
+  function add(typeId, stats = {}) {
+    if (!typeId) return;
+    const current = totals.get(typeId) || { correct: 0, incorrect: 0, attempted: 0 };
+    const correct = cleanNumber(stats.correct);
+    const incorrect = cleanNumber(stats.incorrect);
+    totals.set(typeId, {
+      correct: current.correct + correct,
+      incorrect: current.incorrect + incorrect,
+      attempted: current.attempted + correct + incorrect,
+    });
+  }
+  for (const [cardId, card] of Object.entries(state.cards || {})) {
+    const cardTypeId = typeIdFromCardId(cardId);
+    if (cardTypeId === 'dictionary') {
+      const sourceRows = Object.entries(card?.sourceTypeStats || {});
+      if (sourceRows.length) {
+        sourceRows.forEach(([typeId, stats]) => add(typeId, stats));
+        continue;
+      }
+      add(card?.sourceType, card);
+    } else {
+      add(cardTypeId, card);
+    }
+  }
+  return totals;
+}
+
+function lanesByType(rows = []) {
+  const byType = new Map();
+  rows.forEach((row) => {
+    const current = byType.get(row.typeId) || [];
+    current.push(row);
+    byType.set(row.typeId, current);
+  });
+  return byType;
 }
 
 function laneTotalsForFamily(rows = []) {
@@ -115,9 +170,34 @@ function readinessSkillForFamily(row = {}) {
   };
 }
 
+function readinessSkillForType(row = {}) {
+  const scoreByStatus = { strong: 92, developing: 68, weak: 35 };
+  const measured = READINESS_DIMENSIONS.map((dimension) => row.cells?.[dimension.id]).filter(
+    (cell) => cell && cell.status !== 'untested' && cell.attempted > 0,
+  );
+  const attempted = measured.reduce((sum, cell) => sum + cleanNumber(cell.attempted), 0);
+  const observedAttempted = measured.reduce(
+    (highest, cell) => Math.max(highest, cleanNumber(cell.attempted)),
+    0,
+  );
+  if (!attempted) {
+    return { readinessScore: null, readinessAttempted: 0, observedAttempted: 0 };
+  }
+  const weighted = measured.reduce(
+    (sum, cell) => sum + (scoreByStatus[cell.status] || 50) * cleanNumber(cell.attempted),
+    0,
+  );
+  return {
+    readinessScore: clampSkillScore(weighted / attempted),
+    readinessAttempted: attempted,
+    observedAttempted,
+  };
+}
+
 function skillForFamily({
   correct,
   attempted,
+  observedAttempted = null,
   laneAttempted,
   totalResponseMs,
   recent,
@@ -125,8 +205,12 @@ function skillForFamily({
   readinessAttempted = 0,
 }) {
   const hasReadiness = readinessAttempted > 0 && readinessScore !== null;
-  if (attempted < MIN_SKILL_ATTEMPTS && !hasReadiness) {
-    const status = skillStatusFor(0, attempted);
+  const statusAttempted =
+    observedAttempted === null
+      ? Math.max(attempted, hasReadiness ? MIN_SKILL_ATTEMPTS : 0)
+      : observedAttempted;
+  if (statusAttempted < MIN_SKILL_ATTEMPTS) {
+    const status = skillStatusFor(0, statusAttempted);
     return {
       accuracy: attempted ? Math.round((correct / attempted) * 100) : 0,
       skillScore: 0,
@@ -152,10 +236,7 @@ function skillForFamily({
       : hasReadiness
         ? clampSkillScore(answerSkill * 0.75 + readinessScore * 0.25)
         : answerSkill;
-  const status = skillStatusFor(
-    skillScore,
-    Math.max(attempted, hasReadiness ? MIN_SKILL_ATTEMPTS : 0),
-  );
+  const status = skillStatusFor(skillScore, statusAttempted);
   return {
     accuracy,
     skillScore,
@@ -178,6 +259,76 @@ function learnerStateForFamily({
     return { id: 'reliable', label: 'Reliable' };
   }
   return { id: 'learning', label: 'Learning' };
+}
+
+function typeHistoryStatus(skill, observedAttempted) {
+  if (observedAttempted <= 0) {
+    return { id: 'not-practiced', label: 'Not practiced', countKey: 'notPracticed' };
+  }
+  if (observedAttempted < MIN_SKILL_ATTEMPTS) {
+    return { id: 'gathering', label: 'Gathering data', countKey: 'learning' };
+  }
+  if (skill.skillScore >= 85) {
+    return { id: 'strong', label: 'Strong', countKey: 'strong' };
+  }
+  if (skill.skillScore >= 60) {
+    return { id: 'developing', label: 'Developing', countKey: 'learning' };
+  }
+  return { id: 'weak', label: 'Needs practice', countKey: 'needsPractice' };
+}
+
+function typeHistoryRowsForFamily(family, cardTotalsByTypeId, lanesByTypeId, readinessFamily) {
+  const readinessByType = new Map((readinessFamily?.types || []).map((row) => [row.typeId, row]));
+  return (family.typeIds || []).map((typeId) => {
+    const lanes = lanesByTypeId.get(typeId) || [];
+    const laneTotals = laneTotalsForFamily(lanes);
+    const cardTotals = cardTotalsByTypeId.get(typeId) || {
+      correct: 0,
+      incorrect: 0,
+      attempted: 0,
+    };
+    const totals = cardTotals.attempted ? cardTotals : laneTotals;
+    const readiness = readinessSkillForType(readinessByType.get(typeId));
+    const observedAttempted = Math.max(
+      totals.attempted,
+      laneTotals.attempted,
+      readiness.observedAttempted,
+    );
+    const skill = skillForFamily({
+      ...totals,
+      observedAttempted,
+      laneAttempted: laneTotals.attempted,
+      totalResponseMs: laneTotals.totalResponseMs,
+      recent: laneTotals.recent,
+      readinessScore: readiness.readinessScore,
+      readinessAttempted: readiness.readinessAttempted,
+    });
+    const status = typeHistoryStatus(skill, observedAttempted);
+    const type = getTypeInfo(typeId);
+    return {
+      id: typeId,
+      typeId,
+      label: type.label || typeId,
+      sub: type.sub || '',
+      attempted: observedAttempted,
+      correct: totals.correct,
+      incorrect: totals.incorrect,
+      accuracy: skill.accuracy,
+      skillScore: skill.skillScore,
+      avgResponseMs: skill.avgResponseMs,
+      readinessAttempted: readiness.readinessAttempted,
+      status: status.id,
+      statusLabel: status.label,
+      statusCountKey: status.countKey,
+    };
+  });
+}
+
+function statusCountsForTypeRows(typeRows) {
+  return typeRows.reduce(
+    (counts, row) => ({ ...counts, [row.statusCountKey]: counts[row.statusCountKey] + 1 }),
+    { strong: 0, needsPractice: 0, learning: 0, notPracticed: 0 },
+  );
 }
 
 export function deriveWeaknessSubcategory(word, typeId = '') {
@@ -369,6 +520,8 @@ export function rankedWeaknessLanes(weakness, options = {}) {
 export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
   const normalized = normalizeWeaknessState(state.weakness);
   const allLanes = Object.values(normalized.byLane);
+  const cardTotalsByTypeId = cardTotalsByType(state);
+  const lanesByTypeId = lanesByType(allLanes);
   const rankedLanes = rankedWeaknessLanes(normalized);
   const readinessByFamily = new Map(
     buildReadinessFamilyRows(state, families).map((row) => [row.id, row]),
@@ -380,6 +533,12 @@ export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
     const cardTotals = cardTotalsForFamily(state, family);
     const totals = cardTotals.attempted ? cardTotals : laneTotals;
     const readiness = readinessSkillForFamily(readinessByFamily.get(family.id));
+    const typeRows = typeHistoryRowsForFamily(
+      family,
+      cardTotalsByTypeId,
+      lanesByTypeId,
+      readinessByFamily.get(family.id),
+    );
     const skill = skillForFamily({
       ...totals,
       laneAttempted: laneTotals.attempted,
@@ -426,6 +585,8 @@ export function buildWeaknessFamilyRows(state = {}, families = FORM_GROUPS) {
       skillLabel: displaySkillLabel,
       rows,
       top: rows[0] || null,
+      typeRows,
+      statusCounts: statusCountsForTypeRows(typeRows),
     };
   });
 }

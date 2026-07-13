@@ -35,6 +35,65 @@ const LEARNER_STATE_TONE = {
     'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300',
 };
 
+const HISTORY_STATUS_TONE = {
+  strong:
+    'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300',
+  weak: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300',
+  developing:
+    'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300',
+  gathering:
+    'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300',
+  'not-practiced':
+    'border-stone-200 bg-stone-50 text-stone-600 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300',
+};
+
+const HISTORY_COUNT_META = [
+  { key: 'strong', label: 'strong', dot: 'bg-emerald-500' },
+  { key: 'needsPractice', label: 'need practice', dot: 'bg-rose-500' },
+  { key: 'learning', label: 'learning', dot: 'bg-amber-500' },
+  { key: 'notPracticed', label: 'not practiced', dot: 'bg-stone-400' },
+];
+
+const EMPTY_HISTORY_COUNTS = {
+  strong: 0,
+  needsPractice: 0,
+  learning: 0,
+  notPracticed: 0,
+};
+
+function mergeHistoryCounts(rows = []) {
+  return rows.reduce(
+    (total, row) =>
+      Object.fromEntries(
+        HISTORY_COUNT_META.map(({ key }) => [key, total[key] + (row.statusCounts?.[key] || 0)]),
+      ),
+    { ...EMPTY_HISTORY_COUNTS },
+  );
+}
+
+function HistoryCountSummary({ counts = EMPTY_HISTORY_COUNTS, includeZero = false }) {
+  const visible = HISTORY_COUNT_META.filter(({ key }) => includeZero || counts[key] > 0);
+  return (
+    <span className="flex flex-wrap gap-1.5" aria-label="Form history summary">
+      {visible.map(({ key, label, dot }) => (
+        <span
+          key={key}
+          className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white/80 px-1.5 py-1 text-[10px] font-semibold text-stone-600 dark:border-stone-700 dark:bg-stone-950/70 dark:text-stone-300"
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+          <span className="tabular-nums">{counts[key] || 0}</span> {label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function typeHistoryDetail(row = {}) {
+  if (!row.attempted) return 'No attempts yet';
+  const balance = `${row.correct || 0} right / ${row.incorrect || 0} wrong`;
+  return row.attempted < 3 ? `${balance} - more practice needed to rate` : balance;
+}
+
 export const LESSON_BY_GROUP_ID = new Map(
   LESSON_SECTIONS.map((lesson) => [lesson.groupId, lesson]),
 );
@@ -92,6 +151,7 @@ export function PracticeScopeSidebar({
   openFamilyIds,
   onToggleFamilyOpen,
   onToggleFamily,
+  onPracticeFamilyNow,
   onLearnFamily,
   onIntroduceFamily,
   onToggleType,
@@ -106,6 +166,7 @@ export function PracticeScopeSidebar({
   const weaknessByFamily = new Map(weaknessFamilies.map((family) => [family.id, family]));
   const activeCount = scopedEnabledTypeIds.length;
   const filterSummary = practiceScopeFilterSummary(scope);
+  const overallHistoryCounts = mergeHistoryCounts(weaknessFamilies);
 
   return (
     <aside
@@ -113,28 +174,36 @@ export function PracticeScopeSidebar({
       aria-label="Practice map"
     >
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white px-3 py-2 dark:border-stone-800 dark:bg-stone-900 lg:border-0 lg:bg-transparent lg:px-1 lg:py-0 lg:dark:bg-transparent">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-              Practice map
+        <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 dark:border-stone-800 dark:bg-stone-900 lg:border-0 lg:bg-transparent lg:px-1 lg:py-0 lg:dark:bg-transparent">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
+                Practice map
+              </div>
+              <h2 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
+                Practice categories
+              </h2>
             </div>
-            <h2 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
-              Practice categories
-            </h2>
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">
+                {activeCount} in default
+              </span>
+              <button
+                type="button"
+                aria-expanded={mobileOpen}
+                aria-controls="practice-map-controls"
+                onClick={onToggleMobileOpen}
+                className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-stone-700 dark:border-stone-800 dark:text-stone-300 lg:hidden"
+              >
+                {mobileOpen ? 'Close' : 'Focus'}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">
-              {activeCount} forms on
-            </span>
-            <button
-              type="button"
-              aria-expanded={mobileOpen}
-              aria-controls="practice-map-controls"
-              onClick={onToggleMobileOpen}
-              className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-stone-700 dark:border-stone-800 dark:text-stone-300 lg:hidden"
-            >
-              {mobileOpen ? 'Close' : 'Focus'}
-            </button>
+          <div className="mt-2">
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+              Your history
+            </div>
+            <HistoryCountSummary counts={overallHistoryCounts} includeZero />
           </div>
         </div>
 
@@ -148,7 +217,8 @@ export function PracticeScopeSidebar({
                 Form filters
               </div>
               <p className="mt-1 text-xs leading-relaxed text-stone-600 dark:text-stone-400">
-                These choices apply to every category you turn on.
+                These choices shape your default mix and temporary category focus. They never change
+                your history.
               </p>
             </div>
             <div className="space-y-2.5">
@@ -200,7 +270,7 @@ export function PracticeScopeSidebar({
                 Categories
               </div>
               <p className="mt-1 text-xs text-stone-600 dark:text-stone-400">
-                Each category remembers its form choices when you turn it off.
+                Practice now is temporary. Expand a category to manage your default mix.
               </p>
             </div>
             {FORM_GROUPS.map((family) => {
@@ -210,21 +280,28 @@ export function PracticeScopeSidebar({
               const allEnabled = enabledInFamily.length === family.typeIds.length;
               const someEnabled = enabledInFamily.length > 0;
               const familyActive = !!familyScopeState?.active;
-              const statusLabel =
+              const defaultStatusLabel =
                 familyScopeState?.status === 'no-matches'
                   ? 'No matches'
                   : familyScopeState?.status === 'filtered-out'
                     ? 'Filtered out'
                     : familyActive
-                      ? `${enabledInFamily.length} practicing`
-                      : 'Off';
+                      ? `${enabledInFamily.length} in default`
+                      : 'Not in default';
               const familyTypes = family.typeIds
                 .map((typeId) => CARD_TYPE_BY_ID.get(typeId))
                 .filter(Boolean);
+              const focusTypeIds = familyTypes
+                .filter((type) => practiceTypeMatchesScopeFilters(type, scope))
+                .map((type) => type.id);
               const familyToggleDisabled = familyActive
                 ? someEnabled && enabled.size <= enabledInFamily.length
                 : !familyScopeState?.canActivate;
               const progress = weaknessByFamily.get(family.id) || {};
+              const historyCounts = progress.statusCounts || EMPTY_HISTORY_COUNTS;
+              const historyByType = new Map(
+                (progress.typeRows || []).map((row) => [row.typeId, row]),
+              );
               const weaknessRows = progress.rows || [];
               const attempted = progress.attempted || 0;
               const correct = progress.correct || 0;
@@ -275,13 +352,7 @@ export function PracticeScopeSidebar({
                 <article
                   key={family.id}
                   aria-labelledby={titleId}
-                  className={`rounded-2xl border p-3 transition ${
-                    allEnabled
-                      ? 'border-indigo-200 bg-indigo-50/70 dark:border-indigo-900/70 dark:bg-indigo-950/20'
-                      : familyActive
-                        ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/70 dark:bg-amber-950/20'
-                        : 'border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900'
-                  }`}
+                  className="rounded-2xl border border-stone-200 bg-white p-3 transition hover:border-stone-300 dark:border-stone-800 dark:bg-stone-900 dark:hover:border-stone-700"
                 >
                   <div className="flex items-start justify-between gap-3 px-3 py-3">
                     <button
@@ -318,8 +389,11 @@ export function PracticeScopeSidebar({
                           {displayLearnerState.label}
                         </span>
                         <span className="text-[11px] font-medium text-stone-600 dark:text-stone-400">
-                          {enabledInFamily.length}/{family.typeIds.length} forms on
+                          {enabledInFamily.length}/{family.typeIds.length} in default
                         </span>
+                      </span>
+                      <span className="mt-2 block">
+                        <HistoryCountSummary counts={historyCounts} />
                       </span>
                       {open && (
                         <>
@@ -385,37 +459,16 @@ export function PracticeScopeSidebar({
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
                       <button
                         type="button"
-                        aria-pressed={familyActive}
-                        aria-label={`Turn ${title} ${familyActive ? 'off' : 'on'}`}
-                        onClick={() => onToggleFamily?.(family)}
-                        disabled={familyToggleDisabled}
-                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold transition ${
-                          familyActive
-                            ? 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/50'
-                            : familyScopeState?.status === 'no-matches'
-                              ? 'border-stone-200 bg-stone-100 text-stone-500 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-500'
-                              : 'border-stone-200 bg-stone-50 text-stone-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300'
-                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                        aria-label={`Practice ${title} now`}
+                        onClick={() => onPracticeFamilyNow?.(family, focusTypeIds)}
+                        disabled={!focusTypeIds.length}
+                        className="max-w-28 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-semibold leading-tight text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-500 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400 dark:disabled:bg-stone-800 dark:disabled:text-stone-500"
                       >
-                        <span
-                          className={`h-2 w-2 rounded-full ${
-                            someEnabled
-                              ? 'bg-emerald-500'
-                              : familyActive
-                                ? 'bg-amber-500'
-                                : 'bg-stone-400'
-                          }`}
-                        />
-                        {statusLabel}
+                        Practice now
                       </button>
-                      {familyScopeState?.status === 'no-matches' && (
+                      {!focusTypeIds.length && (
                         <span className="max-w-28 text-right text-[10px] leading-tight text-stone-500 dark:text-stone-400">
                           No forms match your filters
-                        </span>
-                      )}
-                      {familyScopeState?.status === 'filtered-out' && (
-                        <span className="max-w-28 text-right text-[10px] leading-tight text-amber-700 dark:text-amber-300">
-                          Saved and ready when filters match
                         </span>
                       )}
                       {lesson && onLearnFamily && (
@@ -445,6 +498,47 @@ export function PracticeScopeSidebar({
                       id={contentId}
                       className="border-t border-stone-200 px-3 py-3 dark:border-stone-800"
                     >
+                      <div className="mb-3 rounded-xl border border-stone-200 bg-stone-50/80 p-2.5 dark:border-stone-800 dark:bg-stone-950/50">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
+                              Default practice mix
+                            </div>
+                            <p className="mt-1 text-[11px] leading-relaxed text-stone-600 dark:text-stone-400">
+                              Saved for ordinary Practice. Changing it never changes your history.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            aria-pressed={familyActive}
+                            aria-label={`Turn ${title} ${familyActive ? 'off' : 'on'}`}
+                            onClick={() => onToggleFamily?.(family)}
+                            disabled={familyToggleDisabled}
+                            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold transition ${
+                              familyActive
+                                ? 'border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/50'
+                                : 'border-stone-200 bg-white text-stone-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-300'
+                            } disabled:cursor-not-allowed disabled:opacity-60`}
+                          >
+                            <span
+                              className={`h-2 w-2 rounded-full ${
+                                familyActive ? 'bg-emerald-500' : 'bg-stone-400'
+                              }`}
+                            />
+                            {defaultStatusLabel}
+                          </button>
+                        </div>
+                        {familyScopeState?.status === 'no-matches' && (
+                          <p className="mt-2 text-[10px] leading-tight text-stone-500 dark:text-stone-400">
+                            No saved forms match the current filters.
+                          </p>
+                        )}
+                        {familyScopeState?.status === 'filtered-out' && (
+                          <p className="mt-2 text-[10px] leading-tight text-amber-700 dark:text-amber-300">
+                            Saved and ready when the global filters match.
+                          </p>
+                        )}
+                      </div>
                       {weaknessRows.length > 0 && (
                         <div className="mb-3 space-y-1.5">
                           <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-600">
@@ -481,68 +575,84 @@ export function PracticeScopeSidebar({
                         {familyTypes.length ? (
                           <div className="grid gap-1.5">
                             {familyTypes.map((type) => {
-                              const selected = familyScopeState?.selectedTypeIds.includes(type.id);
                               const typeLabel = practiceMapTypeLabel(
                                 type.id,
                                 type.label,
                                 family.id,
                               );
+                              const history = historyByType.get(type.id) || {
+                                typeId: type.id,
+                                status: 'not-practiced',
+                                statusLabel: 'Not practiced',
+                                attempted: 0,
+                                correct: 0,
+                                incorrect: 0,
+                              };
+                              const selected = familyScopeState?.selectedTypeIds.includes(type.id);
                               const matchesFilters = practiceTypeMatchesScopeFilters(type, scope);
                               const practicing = familyActive && selected && matchesFilters;
                               const disabled =
                                 selected && (familyScopeState?.selectedTypeIds.length || 0) <= 1;
                               const formStatus = practicing
-                                ? 'Practicing'
+                                ? 'In default'
                                 : selected && !matchesFilters
-                                  ? 'Filtered out'
+                                  ? 'Saved, filtered'
                                   : selected
                                     ? 'Saved'
-                                    : 'Off';
+                                    : 'Not selected';
                               return (
-                                <button
+                                <div
                                   key={type.id}
-                                  type="button"
-                                  aria-pressed={selected}
-                                  aria-label={`Turn ${typeLabel} ${selected ? 'off' : 'on'}`}
-                                  onClick={() => onToggleType?.(type.id)}
-                                  disabled={disabled}
-                                  className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
-                                    practicing
-                                      ? 'border-indigo-200 bg-indigo-50 text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100'
-                                      : selected
-                                        ? 'border-amber-200 bg-amber-50/60 text-stone-700 hover:bg-amber-50 dark:border-amber-900/70 dark:bg-amber-950/15 dark:text-stone-200 dark:hover:bg-amber-950/25'
-                                        : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800'
-                                  } disabled:cursor-not-allowed disabled:opacity-60`}
+                                  className="rounded-lg border border-stone-200 bg-white px-2.5 py-2 dark:border-stone-800 dark:bg-stone-900"
                                 >
-                                  <span
-                                    className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded border ${
-                                      selected
-                                        ? 'border-indigo-600 bg-indigo-600 dark:border-indigo-400 dark:bg-indigo-400'
-                                        : 'border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-950'
-                                    }`}
-                                  />
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block text-xs font-semibold">{typeLabel}</span>
-                                    {type.sub && (
-                                      <span className="block truncate text-[11px] opacity-70">
-                                        {type.sub}
-                                      </span>
-                                    )}
-                                  </span>
-                                  <span
-                                    className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
-                                      practicing
-                                        ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-200'
-                                        : selected && !matchesFilters
-                                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="text-xs font-semibold text-stone-800 dark:text-stone-100">
+                                          {typeLabel}
+                                        </span>
+                                        <span
+                                          className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${
+                                            HISTORY_STATUS_TONE[history.status] ||
+                                            HISTORY_STATUS_TONE['not-practiced']
+                                          }`}
+                                        >
+                                          {history.statusLabel}
+                                        </span>
+                                      </div>
+                                      <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-stone-500 dark:text-stone-400">
+                                        {type.sub && <span lang="ja">{type.sub}</span>}
+                                        <span>{typeHistoryDetail(history)}</span>
+                                        {history.attempted >= 3 && (
+                                          <span className="font-semibold tabular-nums">
+                                            {history.skillScore}% skill
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      aria-pressed={selected}
+                                      aria-label={`Turn ${typeLabel} ${selected ? 'off' : 'on'}`}
+                                      onClick={() => onToggleType?.(type.id)}
+                                      disabled={disabled}
+                                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-1.5 py-1 text-[10px] font-semibold transition ${
+                                        practicing
+                                          ? 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200'
                                           : selected
-                                            ? 'bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300'
-                                            : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400'
-                                    }`}
-                                  >
-                                    {formStatus}
-                                  </span>
-                                </button>
+                                            ? 'border-stone-200 bg-stone-50 text-stone-600 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300'
+                                            : 'border-stone-200 bg-white text-stone-500 hover:border-indigo-300 hover:text-indigo-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400 dark:hover:text-indigo-300'
+                                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                                    >
+                                      <span
+                                        className={`h-2 w-2 rounded-full ${
+                                          selected ? 'bg-indigo-500' : 'bg-stone-400'
+                                        }`}
+                                      />
+                                      {formStatus}
+                                    </button>
+                                  </div>
+                                </div>
                               );
                             })}
                           </div>

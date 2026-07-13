@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { recordReadinessAttempt } from '../utils/readiness.js';
 import { cardIdFor, DAY, defaultState, localDateKey, selectNext } from '../utils/storage.js';
 import {
   RECENT_DECAY_MS,
@@ -80,6 +81,137 @@ function withMisses(weakness, word, typeId, count = 3) {
 }
 
 describe('subcategory weakness model', () => {
+  it('derives exact-form history states and compact family counts', () => {
+    const rows = buildWeaknessFamilyRows({
+      ...defaultState(),
+      cards: {
+        [cardIdFor(TABERU, 'plain-present')]: { correct: 3, incorrect: 0 },
+        [cardIdFor(TABERU, 'plain-negative')]: { correct: 1, incorrect: 0 },
+        [cardIdFor(TABERU, 'polite-present')]: { correct: 1, incorrect: 2 },
+      },
+    });
+    const basics = rows.find((family) => family.id === 'basic-tenses');
+    const byType = new Map(basics.typeRows.map((row) => [row.typeId, row]));
+
+    expect(byType.get('plain-present')).toMatchObject({
+      status: 'strong',
+      statusLabel: 'Strong',
+      attempted: 3,
+    });
+    expect(byType.get('plain-negative')).toMatchObject({
+      status: 'gathering',
+      statusLabel: 'Gathering data',
+      attempted: 1,
+    });
+    expect(byType.get('polite-present')).toMatchObject({
+      status: 'weak',
+      statusLabel: 'Needs practice',
+      attempted: 3,
+    });
+    expect(byType.get('polite-past')).toMatchObject({
+      status: 'not-practiced',
+      statusLabel: 'Not practiced',
+      attempted: 0,
+    });
+    expect(basics.statusCounts).toEqual({
+      strong: 1,
+      needsPractice: 1,
+      learning: 1,
+      notPracticed: 4,
+    });
+  });
+
+  it('attributes reverse-card source history to the exact source form', () => {
+    const rows = buildWeaknessFamilyRows({
+      ...defaultState(),
+      cards: {
+        [cardIdFor(TABERU, 'dictionary')]: {
+          correct: 2,
+          incorrect: 1,
+          sourceTypeStats: {
+            'plain-negative': { correct: 2, incorrect: 1 },
+          },
+        },
+      },
+    });
+    const basics = rows.find((family) => family.id === 'basic-tenses');
+    const plainNegative = basics.typeRows.find((row) => row.typeId === 'plain-negative');
+
+    expect(plainNegative).toMatchObject({
+      correct: 2,
+      incorrect: 1,
+      attempted: 3,
+      status: 'developing',
+      statusLabel: 'Developing',
+    });
+    expect(basics.correct).toBe(2);
+    expect(basics.incorrect).toBe(1);
+  });
+
+  it('uses readiness and response evidence when card totals are unavailable', () => {
+    let readiness = defaultState().readiness;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      readiness = recordReadinessAttempt(readiness, cardIdFor(TABERU, 'plain-negative'), {
+        correct: true,
+        responseMs: 1200,
+        answerMode: 'type',
+        now: Date.now() + attempt,
+      });
+    }
+    const rows = buildWeaknessFamilyRows({ ...defaultState(), readiness });
+    const basics = rows.find((family) => family.id === 'basic-tenses');
+    const plainNegative = basics.typeRows.find((row) => row.typeId === 'plain-negative');
+
+    expect(plainNegative.attempted).toBe(3);
+    expect(plainNegative.status).toBe('strong');
+    expect(plainNegative.readinessAttempted).toBeGreaterThan(0);
+  });
+
+  it('keeps exact-form strength independent from the saved Practice scope', () => {
+    const historyState = {
+      ...defaultState(),
+      cards: {
+        [cardIdFor(TABERU, 'plain-negative')]: { correct: 3, incorrect: 0 },
+      },
+    };
+    const enabled = buildWeaknessFamilyRows({
+      ...historyState,
+      enabledTypes: ['plain-negative'],
+    });
+    const disabled = buildWeaknessFamilyRows({
+      ...historyState,
+      enabledTypes: ['polite-present'],
+    });
+
+    expect(disabled.map((family) => family.typeRows)).toEqual(
+      enabled.map((family) => family.typeRows),
+    );
+  });
+
+  it('lets an old miss recover to strong after sustained correct answers', () => {
+    const now = Date.now();
+    let weakness = recordWeaknessAttempt(defaultWeaknessState(), {
+      word: TABERU,
+      typeId: 'plain-negative',
+      correct: false,
+      responseMs: 9000,
+      now: now - RECENT_DECAY_MS * 2,
+    });
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      weakness = recordWeaknessAttempt(weakness, {
+        word: TABERU,
+        typeId: 'plain-negative',
+        correct: true,
+        responseMs: 1200,
+        now: now - attempt * 1000,
+      });
+    }
+    const rows = buildWeaknessFamilyRows({ ...defaultState(), weakness });
+    const basics = rows.find((family) => family.id === 'basic-tenses');
+
+    expect(basics.typeRows.find((row) => row.typeId === 'plain-negative').status).toBe('strong');
+  });
+
   it('derives broad groups, irregulars, and te/ta godan sound-change buckets', () => {
     expect(deriveWeaknessSubcategory(TABERU, 'plain-past').id).toBe('ichidan');
     expect(deriveWeaknessSubcategory(SURU, 'te-form').id).toBe('suru');

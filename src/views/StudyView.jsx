@@ -547,6 +547,7 @@ export default function StudyView({ mode = 'practice' }) {
     () => focus?.formGroupId || null,
   );
   const [familyIntroFocus, setFamilyIntroFocus] = useState(() => familyIntroFocusFromLaunch(focus));
+  const [practiceCategoryFocus, setPracticeCategoryFocus] = useState(null);
   const [launchContext, setLaunchContext] = useState(() =>
     focus?.returnTo === 'reference' ? focus : null,
   );
@@ -587,6 +588,12 @@ export default function StudyView({ mode = 'practice' }) {
   const enabledTypes = useMemo(() => {
     if (sessionFilterFormGroupId) {
       if (
+        practiceCategoryFocus?.familyId === sessionFilterFormGroupId &&
+        practiceCategoryFocus.typeIds?.length
+      ) {
+        return practiceCategoryFocus.typeIds;
+      }
+      if (
         familyIntroFocus?.familyId === sessionFilterFormGroupId &&
         familyIntroFocus.typeIds?.length
       ) {
@@ -597,7 +604,7 @@ export default function StudyView({ mode = 'practice' }) {
     }
     const baseTypes = state.enabledTypes?.length ? state.enabledTypes : ['plain-past'];
     return reviewTypeIdsForState(state, baseTypes);
-  }, [state, sessionFilterFormGroupId, familyIntroFocus]);
+  }, [state, sessionFilterFormGroupId, familyIntroFocus, practiceCategoryFocus]);
   const practiceWords = useMemo(() => {
     const base = filterWordsForStudyScope(
       verbs,
@@ -688,8 +695,15 @@ export default function StudyView({ mode = 'practice' }) {
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
     [state.session?.mistakePatterns],
   );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const weaknessFamilies = useMemo(() => buildWeaknessFamilyRows(state), [state.weakness]);
+  const weaknessFamilies = useMemo(
+    () =>
+      buildWeaknessFamilyRows({
+        cards: state.cards,
+        readiness: state.readiness,
+        weakness: state.weakness,
+      }),
+    [state.cards, state.readiness, state.weakness],
+  );
   const sessionFamilyStats = useMemo(
     () => sessionFamilyStatsFromHistory(runAnswerHistory),
     [runAnswerHistory],
@@ -1793,6 +1807,7 @@ export default function StudyView({ mode = 'practice' }) {
       setState((prev) => includeWordInReviewState(prev, word));
     }
     setFamilyIntroFocus(null);
+    setPracticeCategoryFocus(null);
     setRecommendationFocus(null);
     setWordSweep(null);
     setSessionFilterWord(word);
@@ -1807,6 +1822,7 @@ export default function StudyView({ mode = 'practice' }) {
       return updateStatePracticeScope(restored, { type: 'enable-family', familyId: groupId });
     });
     setFamilyIntroFocus(null);
+    setPracticeCategoryFocus(null);
     setRecommendationFocus(null);
     setWordSweep(null);
     setSessionFilterFormGroupId(groupId);
@@ -1823,6 +1839,32 @@ export default function StudyView({ mode = 'practice' }) {
     setState((prev) =>
       updateStatePracticeScope(prev, { type: 'toggle-family', familyId: family.id }),
     );
+  }
+
+  function practiceFamilyNow(family, typeIds = []) {
+    const matchingTypeIds = [...new Set(typeIds)].filter((typeId) =>
+      family?.typeIds?.includes(typeId),
+    );
+    if (!family?.id || !matchingTypeIds.length) return;
+    setPracticeCategoryFocus({ familyId: family.id, typeIds: matchingTypeIds });
+    setFamilyIntroFocus(null);
+    setRecommendationFocus(null);
+    setFocusWordLock(null);
+    setWordSweep(null);
+    setSessionFilterWord(null);
+    setSessionFilterFormGroupId(family.id);
+    setLaunchContext(null);
+    onFocusConsumed?.();
+    clearPersistedCurrent();
+    resetActiveAttempt();
+    setCurrent(null);
+  }
+
+  function exitPracticeCategoryFocus() {
+    setPracticeCategoryFocus(null);
+    setSessionFilterFormGroupId(null);
+    resetActiveAttempt();
+    setCurrent(null);
   }
 
   function togglePracticeType(typeId) {
@@ -2583,6 +2625,7 @@ export default function StudyView({ mode = 'practice' }) {
   function returnToReference() {
     setLaunchContext(null);
     setFamilyIntroFocus(null);
+    setPracticeCategoryFocus(null);
     setFocusWordLock(null);
     setWordSweep(null);
     setRecommendationFocus(null);
@@ -2628,6 +2671,7 @@ export default function StudyView({ mode = 'practice' }) {
     }
     setLaunchContext(null);
     setFamilyIntroFocus(null);
+    setPracticeCategoryFocus(null);
     setFocusWordLock(null);
     setWordSweep(null);
     setRecommendationFocus(null);
@@ -2664,6 +2708,7 @@ export default function StudyView({ mode = 'practice' }) {
       reviewLimitSource: FAMILY_INTRO_REVIEW_LIMIT_SOURCE,
     }));
     setSessionFilterFormGroupId(family.id);
+    setPracticeCategoryFocus(null);
     setFamilyIntroFocus({ familyId: family.id, typeIds });
     setSessionFilterWord(null);
     setFocusWordLock(null);
@@ -2687,6 +2732,8 @@ export default function StudyView({ mode = 'practice' }) {
     : null;
   const familyIntroActive =
     !!familyIntroFocus && familyIntroFocus.familyId === focusBannerGroup?.id;
+  const practiceCategoryFocusActive =
+    !!practiceCategoryFocus && practiceCategoryFocus.familyId === focusBannerGroup?.id;
   const familyIntroLesson = familyIntroActive
     ? LESSON_BY_GROUP_ID.get(familyIntroFocus.familyId)
     : null;
@@ -2724,16 +2771,22 @@ export default function StudyView({ mode = 'practice' }) {
       }
     : focusBannerGroup
       ? {
-          kicker: familyIntroActive ? 'Family primer' : 'Form family practice',
+          kicker: familyIntroActive
+            ? 'Family primer'
+            : practiceCategoryFocusActive
+              ? 'Category focus'
+              : 'Form family practice',
           title: focusBannerGroup.label,
           reading: '',
           subtitle: familyIntroActive
             ? `${familyIntroTypes.length || familyIntroFocus?.typeIds?.length || 0}-card guided set`
-            : focusBannerGroup.typeIds?.length
-              ? `${focusBannerGroup.typeIds.length} forms in this family`
-              : 'Focused form practice',
+            : practiceCategoryFocusActive
+              ? `${practiceCategoryFocus.typeIds.length} forms matching your filters - Your default mix is unchanged`
+              : focusBannerGroup.typeIds?.length
+                ? `${focusBannerGroup.typeIds.length} forms in this family`
+                : 'Focused form practice',
           exitLabel: 'Exit focus',
-          onExit: returnToOverview,
+          onExit: practiceCategoryFocusActive ? exitPracticeCategoryFocus : returnToOverview,
         }
       : focusBannerWord
         ? {
@@ -3410,6 +3463,7 @@ export default function StudyView({ mode = 'practice' }) {
           onToggleMobileOpen={() => setPracticeMapMobileOpen((open) => !open)}
           onToggleFamilyOpen={togglePracticeMapFamilyOpen}
           onToggleFamily={togglePracticeFamily}
+          onPracticeFamilyNow={practiceFamilyNow}
           onLearnFamily={openPracticeFamilyLesson}
           onIntroduceFamily={introducePracticeFamily}
           onToggleType={togglePracticeType}

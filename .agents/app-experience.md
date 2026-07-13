@@ -47,10 +47,16 @@ confirms the new direction, update this document in the same change.
   untried families, in Focus-map-style category cards. The map uses global
   Plain, Polite, Affirmative, Negative, Past, and Non-past toggles for active
   Practice scope; those toggles apply across every form family. Family cards
-  can also be toggled on or off as categories. Collapsed family cards show the
-  learner state and active-form count; expanded families expose descriptions,
-  lifetime and session balance, skill, exact form toggles, and subgroup weakness
-  rows. On mobile the persistent summary opens through a view-local Focus
+  can also be toggled on or off as categories through the expanded Default
+  practice mix controls. The map keeps observed history separate from that
+  saved mix: collapsed family cards show learner state, active-form count, and
+  exact-form strength counts; expanded families expose descriptions, lifetime
+  and session balance, skill, exact-form history plus saved-form controls, and
+  subgroup weakness rows. A family-level Practice now action starts temporary
+  continuous focus using forms that match the global filters without changing
+  `practiceScope` or `enabledTypes`; its banner says the default mix is unchanged
+  and exits back to ordinary Practice. On mobile the history summary remains
+  visible while the persistent controls open through a view-local Focus
   disclosure. Active but untried families are "New" with "No attempts yet,"
   never "Not introduced."
 - Form scope persists through `state.enabledTypes`. The default and reset scope

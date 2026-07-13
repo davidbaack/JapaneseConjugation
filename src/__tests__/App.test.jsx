@@ -100,7 +100,12 @@ describe('App shell', () => {
     const practiceMap = () => screen.getByRole('complementary', { name: 'Practice map' });
     const conditionalCard = () =>
       within(practiceMap()).getByRole('article', { name: 'Conditionals' });
+    const details = () =>
+      within(conditionalCard()).getByRole('button', {
+        name: 'Conditional category details',
+      });
 
+    fireEvent.click(details());
     await waitFor(() =>
       expect(
         within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
@@ -116,27 +121,22 @@ describe('App shell', () => {
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
     );
-    await waitFor(() => expect(within(conditionalCard()).getByText('3/5 forms on')).toBeTruthy());
+    await waitFor(() => expect(within(conditionalCard()).getByText('3/5 in default')).toBeTruthy());
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Negative on' })).toBeTruthy();
 
-    const details = () =>
-      within(conditionalCard()).getByRole('button', {
-        name: 'Conditional category details',
-      });
-    fireEvent.click(details());
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: `Turn ${conditionalNara.label} off` }),
     );
-    await waitFor(() => expect(within(conditionalCard()).getByText('2/5 forms on')).toBeTruthy());
+    await waitFor(() => expect(within(conditionalCard()).getByText('2/5 in default')).toBeTruthy());
 
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals off' }),
     );
-    await waitFor(() => expect(within(conditionalCard()).getByText('0/5 forms on')).toBeTruthy());
+    await waitFor(() => expect(within(conditionalCard()).getByText('0/5 in default')).toBeTruthy());
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
     );
-    await waitFor(() => expect(within(conditionalCard()).getByText('2/5 forms on')).toBeTruthy());
+    await waitFor(() => expect(within(conditionalCard()).getByText('2/5 in default')).toBeTruthy());
     expect(details().getAttribute('aria-expanded')).toBe('true');
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Negative on' })).toBeTruthy();
 
@@ -177,7 +177,11 @@ describe('App shell', () => {
     render(<App />);
     expect(await waitForPracticeCard()).toBeTruthy();
     const practiceMap = screen.getByRole('complementary', { name: 'Practice map' });
-    const conditionalsToggle = within(practiceMap).getByRole('button', {
+    const conditionalsCard = within(practiceMap).getByRole('article', { name: 'Conditionals' });
+    fireEvent.click(
+      within(conditionalsCard).getByRole('button', { name: 'Conditional category details' }),
+    );
+    const conditionalsToggle = within(conditionalsCard).getByRole('button', {
       name: 'Turn Conditionals on',
     });
     expect(conditionalsToggle.disabled).toBe(true);
@@ -189,6 +193,56 @@ describe('App shell', () => {
         'Practicing: Polite only · Affirmative + Negative · Past + Non-past',
       ),
     ).toBeTruthy();
+  });
+
+  it('starts temporary category focus without changing the saved default mix', async () => {
+    const conditionals = FORM_GROUPS.find((group) => group.id === 'conditional');
+    const withoutConditionals = EVERYDAY_TYPE_IDS.filter(
+      (typeId) => !conditionals.typeIds.includes(typeId),
+    );
+    const practiceScope = practiceScopeFromEnabledTypes(withoutConditionals);
+    const enabledTypes = enabledTypeIdsForPracticeScope(practiceScope);
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: { ...defaultState(), practiceScope, enabledTypes },
+        customVerbs: [],
+        customAdjectives: [],
+        wordLists: [],
+        practicePrefs: DEFAULT_PREFS,
+      }),
+    );
+
+    render(<App />);
+    expect(await waitForPracticeCard()).toBeTruthy();
+    const practiceMap = screen.getByRole('complementary', { name: 'Practice map' });
+    const conditionalsCard = within(practiceMap).getByRole('article', { name: 'Conditionals' });
+    fireEvent.click(
+      within(conditionalsCard).getByRole('button', { name: 'Practice Conditionals now' }),
+    );
+
+    expect(await screen.findByText('Category focus')).toBeTruthy();
+    expect(
+      screen.getByText('5 forms matching your filters - Your default mix is unchanged'),
+    ).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Practice' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      expect(saved.state.enabledTypes).toEqual(enabledTypes);
+      expect(saved.state.practiceScope).toEqual(practiceScope);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
+    await waitFor(() => expect(screen.queryByText('Category focus')).toBeNull());
+    expect(screen.getByRole('tab', { name: 'Practice' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    expect(await waitForPracticeCard()).toBeTruthy();
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    expect(saved.state.enabledTypes).toEqual(enabledTypes);
+    expect(saved.state.practiceScope).toEqual(practiceScope);
   });
 
   it('opens Learn from active, inactive, and filter-disabled Practice categories without changing scope', async () => {
@@ -232,7 +286,7 @@ describe('App shell', () => {
     expect(within(passiveCard).getByRole('button', { name: 'Learn this' })).toBeTruthy();
     expect(within(conditionalsCard).getByRole('button', { name: 'Learn this' })).toBeTruthy();
     expect(
-      within(conditionalsCard).getByRole('button', { name: 'Turn Conditionals on' }).disabled,
+      within(conditionalsCard).getByRole('button', { name: 'Practice Conditionals now' }).disabled,
     ).toBe(true);
 
     fireEvent.click(within(conditionalsCard).getByRole('button', { name: 'Learn this' }));
@@ -252,11 +306,14 @@ describe('App shell', () => {
 
     const restoredMap = screen.getByRole('complementary', { name: 'Practice map' });
     expect(
-      within(restoredMap).getByRole('button', { name: 'Turn Basics and Politeness off' }),
+      within(restoredMap).getByRole('button', { name: 'Practice Basics and Politeness now' }),
     ).toBeTruthy();
-    expect(within(restoredMap).getByRole('button', { name: 'Turn Passive on' })).toBeTruthy();
-    expect(within(restoredMap).getByRole('button', { name: 'Turn Conditionals on' }).disabled).toBe(
-      true,
+    expect(within(restoredMap).getByRole('button', { name: 'Practice Passive now' })).toBeTruthy();
+    expect(
+      within(restoredMap).getByRole('button', { name: 'Practice Conditionals now' }).disabled,
+    ).toBe(true);
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)).state.practiceScope).toEqual(
+      practiceScope,
     );
   });
 
@@ -379,11 +436,11 @@ describe('App shell', () => {
     fireEvent.click(teTaDetailsButton());
     expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
 
-    expect(within(practiceMap()).getByText('2/2 forms on')).toBeTruthy();
+    expect(within(practiceMap()).getByText('2/2 in default')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
     expect(within(practiceMap()).getByText('0 right / 2 wrong lifetime')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
-    expect(within(practiceMap()).getByText('Gathering data')).toBeTruthy();
+    expect(within(practiceMap()).getAllByText('Gathering data').length).toBeGreaterThan(0);
     expect(within(practiceMap()).getByText('Forms in this category')).toBeTruthy();
     expect(within(practiceMap()).getByText('Recent weak spots')).toBeTruthy();
     expect(within(practiceMap()).getByText('Te-form - Godan ku sound changes')).toBeTruthy();
@@ -392,12 +449,12 @@ describe('App shell', () => {
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Te-form off' })).toBeTruthy();
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Ta-form off' })).toBeTruthy();
     fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Turn Te-form off' }));
-    await waitFor(() => expect(within(practiceMap()).getByText('1/2 forms on')).toBeTruthy());
+    await waitFor(() => expect(within(practiceMap()).getByText('1/2 in default')).toBeTruthy());
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Te-form on' })).toBeTruthy();
     fireEvent.click(
       within(practiceMap()).getByRole('button', { name: 'Turn Te/Ta Sound Changes off' }),
     );
-    await waitFor(() => expect(within(practiceMap()).getByText('0/2 forms on')).toBeTruthy());
+    await waitFor(() => expect(within(practiceMap()).getByText('0/2 in default')).toBeTruthy());
     expect(
       within(practiceMap()).getByRole('button', { name: 'Turn Te/Ta Sound Changes on' }),
     ).toBeTruthy();
@@ -421,7 +478,7 @@ describe('App shell', () => {
     expect(await screen.findByText('Family primer')).toBeTruthy();
     expect(screen.getByText('4-card guided set')).toBeTruthy();
     expect(screen.getByRole('progressbar', { name: 'Intro progress' })).toBeTruthy();
-    expect(within(practiceMap()).getByText('4/10 forms on')).toBeTruthy();
+    expect(within(practiceMap()).getByText('4/10 in default')).toBeTruthy();
 
     const primer = screen.getByRole('region', { name: 'Passive primer' });
     expect(within(primer).getByText('Passive Polite Negative')).toBeTruthy();
@@ -470,7 +527,7 @@ describe('App shell', () => {
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
     expect(screen.queryByRole('complementary', { name: 'Focus map' })).toBeNull();
-    expect(screen.getByText('52 forms on')).toBeTruthy();
+    expect(screen.getByText('52 in default')).toBeTruthy();
     // "Sentence" is now the cued-cloze presentation toggle: a valid review
     // control, not a legacy study-mode button.
     expect(screen.queryByRole('button', { name: 'Sentence off', exact: true })).toBeNull();
