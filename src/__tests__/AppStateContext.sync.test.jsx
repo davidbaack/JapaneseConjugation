@@ -189,6 +189,42 @@ describe('AppStateProvider cloud session races', () => {
     expect(cloudUpsert).toHaveBeenCalledWith(expect.any(Object), 'user-a');
   });
 
+  it('preserves learner changes made while the initial cloud restore is pending', async () => {
+    const pending = deferred();
+    cloudFetch.mockReturnValueOnce(pending.promise);
+    renderProvider();
+
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(cloudFetch).toHaveBeenCalledWith('user-a'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change learner data' }));
+    expect(screen.getByTestId('cards').textContent).toContain('local-change');
+
+    await act(async () => {
+      pending.resolve(cloudRow('cloud-card'));
+      await pending.promise;
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cards').textContent).toContain('local-change');
+      expect(screen.getByTestId('cards').textContent).toContain('cloud-card');
+    });
+    expect(cloudUpsert).toHaveBeenCalledTimes(1);
+    expect(cloudUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        state: expect.objectContaining({
+          cards: expect.objectContaining({
+            'local-change': expect.any(Object),
+            'cloud-card': expect.any(Object),
+          }),
+        }),
+      }),
+      'user-a',
+    );
+  });
+
   it('keeps autosync closed after restore failure until manual retry succeeds', async () => {
     vi.useFakeTimers();
     cloudFetch.mockRejectedValueOnce(new Error('cloud unavailable'));

@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useMemo,
+} from 'react';
 import {
   defaultState,
   getSystemTheme,
@@ -105,12 +113,26 @@ function useAppController() {
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const [hydrated, setHydrated] = useState(false);
   const lastSyncedAtRef = useRef(0);
+  const latestSyncPayloadRef = useRef(null);
   const diagnosticRepairPendingRef = useRef(false);
   const authEventVersionRef = useRef(0);
   const activeAuthUserIdRef = useRef('');
 
+  useLayoutEffect(() => {
+    latestSyncPayloadRef.current = buildSyncPayload({
+      state,
+      customVerbs,
+      customAdjectives,
+      wordLists,
+      practicePrefs,
+    });
+  }, [state, customVerbs, customAdjectives, wordLists, practicePrefs]);
+
   function currentSyncPayload() {
-    return buildSyncPayload({ state, customVerbs, customAdjectives, wordLists, practicePrefs });
+    return (
+      latestSyncPayloadRef.current ||
+      buildSyncPayload({ state, customVerbs, customAdjectives, wordLists, practicePrefs })
+    );
   }
 
   function applySyncPayload(payload) {
