@@ -18,7 +18,7 @@ import {
 } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
-import { lessonForType } from '../data/lessonContent.js';
+import { lessonForType, LESSON_TRACKS } from '../data/lessonContent.js';
 import { ChatPanel } from '../components/ChatPanel.jsx';
 import { toHiragana, toHiraganaProgress, toKanaInputValue } from '../utils/romaji.js';
 import {
@@ -118,6 +118,10 @@ export { reviewFeedbackActionForRecord, ReviewsDashboard };
 // same word/form rather than drawing a fresh one. Scoped to sessionStorage so
 // it survives reloads but resets when the tab is closed.
 const STUDY_CURRENT_KEY = 'jp-study-current';
+const BEGINNER_RECOMMENDATION_PREFIXES = [
+  'lesson-track-beginner',
+  ...LESSON_TRACKS[0].lessonGroupIds.map((groupId) => `lesson-${groupId}`),
+];
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
 const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation', FAMILY_INTRO_REVIEW_LIMIT_SOURCE]);
@@ -944,7 +948,6 @@ export default function StudyView({ mode = 'practice' }) {
           nextTypeId,
           complete: !nextTypeId,
         });
-        onFocusConsumed?.();
         clearPersistedCurrent();
         setAnswer('');
         setPhase('answering');
@@ -952,7 +955,6 @@ export default function StudyView({ mode = 'practice' }) {
         return;
       }
       const card = buildFocusCard(state, focus.word, focus.type);
-      onFocusConsumed?.();
       if (card) {
         setAnswer('');
         setPhase('answering');
@@ -967,7 +969,6 @@ export default function StudyView({ mode = 'practice' }) {
       setFocusWordLock(null);
       setWordSweep(null);
       setRecommendationFocus(null);
-      onFocusConsumed?.();
     }
     if (focus?.recommendation && !focusSeededRef.current) {
       focusSeededRef.current = true;
@@ -978,7 +979,6 @@ export default function StudyView({ mode = 'practice' }) {
       setSessionFilterWord(null);
       setSessionFilterFormGroupId(null);
       setLaunchContext(null);
-      onFocusConsumed?.();
       resetActiveAttempt();
     }
     if (current !== null) return;
@@ -1231,6 +1231,7 @@ export default function StudyView({ mode = 'practice' }) {
                 onClick={() => {
                   setSessionFilterWord(null);
                   setSessionFilterFormGroupId(null);
+                  onFocusConsumed?.();
                 }}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
               >
@@ -1810,6 +1811,7 @@ export default function StudyView({ mode = 'practice' }) {
     setPracticeCategoryFocus(null);
     setRecommendationFocus(null);
     setWordSweep(null);
+    onFocusConsumed?.();
     setSessionFilterWord(word);
     setCurrent(null);
   }
@@ -1825,6 +1827,7 @@ export default function StudyView({ mode = 'practice' }) {
     setPracticeCategoryFocus(null);
     setRecommendationFocus(null);
     setWordSweep(null);
+    onFocusConsumed?.();
     setSessionFilterFormGroupId(groupId);
     setCurrent(null);
   }
@@ -2741,20 +2744,26 @@ export default function StudyView({ mode = 'practice' }) {
     ? (familyIntroFocus.typeIds || []).map((typeId) => CARD_TYPE_BY_ID.get(typeId)).filter(Boolean)
     : [];
   const focusBannerWord = sessionFilterWord || focusWordLock;
+  const showFocusedSentenceMode =
+    recommendationFocus?.source === 'lesson' &&
+    !BEGINNER_RECOMMENDATION_PREFIXES.some((prefix) => recommendationFocus.id?.startsWith(prefix));
   const recommendationCountParts = recommendationFocus
     ? [
         recommendationFocus.suggestedCount
-          ? `${recommendationFocus.suggestedCount}-card target`
+          ? `${recommendationFocus.suggestedCount} recommended cards`
           : '',
-        recommendationFocus.wordCount ? `${recommendationFocus.wordCount} words` : '',
-        recommendationFocus.typeCount ? `${recommendationFocus.typeCount} form types` : '',
+        recommendationFocus.wordCount ? `${recommendationFocus.wordCount} focused words` : '',
+        recommendationFocus.typeCount ? `${recommendationFocus.typeCount} focused form types` : '',
       ].filter(Boolean)
     : [];
   const recommendationSubtitle = recommendationFocus
-    ? [recommendationFocus.detail, recommendationCountParts.join(' - '), 'Locked Practice set']
+    ? [recommendationFocus.detail, recommendationCountParts.join(' · '), 'Locked until you exit']
         .filter(Boolean)
-        .join(' - ')
+        .join(' · ')
     : '';
+  function toggleSentenceMode() {
+    setPracticePrefs((prev) => ({ ...prev, sentenceMode: !prev.sentenceMode }));
+  }
   const focusBanner = recommendationFocus
     ? {
         kicker:
@@ -2766,6 +2775,7 @@ export default function StudyView({ mode = 'practice' }) {
         title: recommendationFocus.label || 'Recommended practice',
         reading: '',
         subtitle: recommendationSubtitle,
+        showSentenceMode: showFocusedSentenceMode,
         exitLabel: 'Exit focus',
         onExit: returnToOverview,
       }
@@ -2885,6 +2895,30 @@ export default function StudyView({ mode = 'practice' }) {
                 {focusBanner.subtitle && (
                   <div className="mt-0.5 text-sm text-stone-600 dark:text-stone-300">
                     {focusBanner.subtitle}
+                  </div>
+                )}
+                {focusBanner.showSentenceMode && (
+                  <div className="mt-3 flex flex-col gap-2 rounded-xl border border-indigo-200/80 bg-white/70 p-3 text-left sm:flex-row sm:items-center sm:justify-between dark:border-indigo-800 dark:bg-stone-950/35">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-stone-800 dark:text-stone-100">
+                        Practice these forms in sentence context
+                      </div>
+                      <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-400">
+                        Recommended for connected recall; you can switch it off at any time.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleSentenceMode}
+                      aria-pressed={sentenceMode}
+                      className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                        sentenceMode
+                          ? 'border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 dark:border-indigo-400 dark:bg-indigo-400 dark:text-stone-950 dark:hover:bg-indigo-300'
+                          : 'border-indigo-200 bg-white text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/40'
+                      }`}
+                    >
+                      Sentence context {sentenceMode ? 'on' : 'off'}
+                    </button>
                   </div>
                 )}
               </div>
@@ -3102,12 +3136,7 @@ export default function StudyView({ mode = 'practice' }) {
                         </button>
                         <button
                           type="button"
-                          onClick={() =>
-                            setPracticePrefs((prev) => ({
-                              ...prev,
-                              sentenceMode: !prev.sentenceMode,
-                            }))
-                          }
+                          onClick={toggleSentenceMode}
                           aria-pressed={sentenceMode}
                           aria-label={`Sentence ${sentenceMode ? 'on' : 'off'}`}
                           title="Show each prompt inside an example sentence (stays on until you turn it off)"
@@ -3270,20 +3299,23 @@ export default function StudyView({ mode = 'practice' }) {
           </section>
         )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-          <div className="relative px-4 pb-4 pt-12 text-center sm:px-6 sm:pb-8 sm:pt-16">
-            <div className="absolute left-4 right-4 top-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 sm:left-6 sm:right-6 sm:top-8">
+          <div className="relative px-4 pb-4 pt-20 text-center sm:px-6 sm:pb-8 sm:pt-16">
+            <div className="absolute left-4 right-4 top-4 grid grid-cols-2 items-start gap-x-2 gap-y-1 sm:left-6 sm:right-6 sm:top-8 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-y-0">
               <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
                 JLPT {currentWordMeta.jlpt}
               </span>
-              <span aria-label="Current card source" className="min-w-0 justify-self-center">
+              <span
+                aria-label="Current card source"
+                className="col-span-2 row-start-2 min-w-0 justify-self-center sm:col-span-1 sm:col-start-2 sm:row-start-1"
+              >
                 <span
                   title={currentSourceChipLabel}
-                  className={`block max-w-[48vw] truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold ${currentOriginMeta.chipClass} sm:max-w-[18rem]`}
+                  className={`block max-w-64 truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold ${currentOriginMeta.chipClass} sm:max-w-[18rem]`}
                 >
                   {currentSourceChipLabel}
                 </span>
               </span>
-              <span className="min-w-0 justify-self-end text-right">
+              <span className="col-start-2 row-start-1 min-w-0 justify-self-end text-right sm:col-start-3">
                 {lessonMetaText && (
                   <span className="inline-block max-w-full truncate rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
                     {lessonMetaText}

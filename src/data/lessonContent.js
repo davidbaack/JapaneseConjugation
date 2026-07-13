@@ -243,6 +243,13 @@ export const LESSON_SECTIONS = [
       ['書く', '書かれる', 'godan a-row + れる'],
       ['する', 'される', 'suru passive'],
     ],
+    contextExamples: [
+      {
+        situation: 'Affected experience',
+        japanese: '私は雨に降られました。',
+        english: 'I got caught in the rain.',
+      },
+    ],
   }),
   lessonFromGroup('causative', {
     title: 'Causative and Short Causative',
@@ -259,6 +266,13 @@ export const LESSON_SECTIONS = [
       ['食べる', '食べさせる / 食べさす', 'long and short ichidan'],
       ['書く', '書かせる / 書かす', 'godan a-row'],
       ['勉強する', '勉強させる', 'compound suru keeps the noun'],
+    ],
+    contextExamples: [
+      {
+        situation: 'Giving permission',
+        japanese: '母は子どもを外で遊ばせました。',
+        english: 'The mother let her child play outside.',
+      },
     ],
   }),
   lessonFromGroup('causative-passive', {
@@ -277,6 +291,13 @@ export const LESSON_SECTIONS = [
       ['書く', '書かせられる / 書かされる', 'long and common short godan'],
       ['する', 'させられる', 'suru long form'],
     ],
+    contextExamples: [
+      {
+        situation: 'Unwanted obligation',
+        japanese: '私は上司に残業させられました。',
+        english: 'I was made to work overtime by my boss.',
+      },
+    ],
   }),
   lessonFromGroup('keigo', {
     title: 'Keigo: Honorific and Humble',
@@ -294,6 +315,18 @@ export const LESSON_SECTIONS = [
       ['行く', 'いらっしゃる / 参る', 'movement special pair'],
       ['待つ', 'お待ちになる / お待ちする', 'regular stem pattern'],
     ],
+    contextExamples: [
+      {
+        situation: 'Speaking about a superior',
+        japanese: '社長はもうお帰りになりました。',
+        english: 'The company president has already gone home.',
+      },
+      {
+        situation: 'Offering your action',
+        japanese: '私が資料をご説明いたします。',
+        english: 'I will explain the materials.',
+      },
+    ],
   }),
   lessonFromGroup('special-forms', {
     title: 'Negative Connectors and Special Forms',
@@ -310,6 +343,13 @@ export const LESSON_SECTIONS = [
       ['食べないで', 'without eating / do not eat', 'negative te'],
       ['食べなくて', 'not eating and / because not eating', 'negative connective'],
       ['勉強せずに', 'without studying', 'formal ずに with suru'],
+    ],
+    contextExamples: [
+      {
+        situation: 'One action left undone',
+        japanese: '朝ご飯を食べないで、学校へ行きました。',
+        english: 'I went to school without eating breakfast.',
+      },
     ],
   }),
   lessonFromGroup('adjectives', {

@@ -98,6 +98,8 @@ const TRACK_STYLES = {
     step: 'bg-emerald-600 text-white dark:bg-emerald-400 dark:text-stone-950',
     button:
       'border-emerald-200 bg-white text-emerald-800 hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-stone-950 dark:text-emerald-300 dark:hover:bg-emerald-950/30',
+    primaryButton:
+      'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 dark:border-emerald-400 dark:bg-emerald-400 dark:text-stone-950 dark:hover:bg-emerald-300',
   },
   intermediate: {
     shell: 'border-sky-200 bg-sky-50/70 dark:border-sky-900/60 dark:bg-sky-950/20',
@@ -105,6 +107,8 @@ const TRACK_STYLES = {
     step: 'bg-sky-600 text-white dark:bg-sky-400 dark:text-stone-950',
     button:
       'border-sky-200 bg-white text-sky-800 hover:border-sky-300 hover:bg-sky-50 dark:border-sky-900 dark:bg-stone-950 dark:text-sky-300 dark:hover:bg-sky-950/30',
+    primaryButton:
+      'border-sky-600 bg-sky-600 text-white hover:bg-sky-700 dark:border-sky-400 dark:bg-sky-400 dark:text-stone-950 dark:hover:bg-sky-300',
   },
   advanced: {
     shell: 'border-amber-200 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20',
@@ -112,6 +116,8 @@ const TRACK_STYLES = {
     step: 'bg-amber-500 text-stone-950 dark:bg-amber-300',
     button:
       'border-amber-200 bg-white text-amber-900 hover:border-amber-300 hover:bg-amber-50 dark:border-amber-900 dark:bg-stone-950 dark:text-amber-300 dark:hover:bg-amber-950/30',
+    primaryButton:
+      'border-amber-500 bg-amber-500 text-stone-950 hover:bg-amber-400 dark:border-amber-300 dark:bg-amber-300 dark:hover:bg-amber-200',
   },
 };
 
@@ -136,20 +142,12 @@ function TrackCard({ track, lessons, onLearnLesson, onPracticeLesson, onPractice
       </p>
       <div className="mt-3 flex items-center justify-between gap-3 text-xs text-stone-600 dark:text-stone-400">
         <span>{lessons.length} lessons</span>
-        <span>{formCount} forms</span>
+        <span>{formCount} form types</span>
       </div>
-      <button
-        type="button"
-        onClick={() => onPracticeTrack(track, lessons)}
-        className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${styles.button}`}
-      >
-        <IconRefresh className="w-4 h-4" />
-        Practice track
-      </button>
 
-      <details className="mt-4 rounded-xl border border-white/70 bg-white/60 dark:border-stone-800 dark:bg-stone-950/60">
+      <details className="mt-3 rounded-xl border border-white/70 bg-white/60 dark:border-stone-800 dark:bg-stone-950/60">
         <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-stone-700 dark:text-stone-200">
-          Browse {lessons.length} lessons
+          Start with one of {lessons.length} lessons
         </summary>
         <ol className="space-y-2 border-t border-stone-200/70 p-2 dark:border-stone-800">
           {lessons.map((lesson, index) => (
@@ -181,9 +179,9 @@ function TrackCard({ track, lessons, onLearnLesson, onPracticeLesson, onPractice
                     <button
                       type="button"
                       onClick={() => onPracticeLesson(lesson)}
-                      className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${styles.button}`}
+                      className={`inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${styles.primaryButton}`}
                     >
-                      Practice this
+                      Practice this lesson
                     </button>
                   </div>
                 </div>
@@ -192,6 +190,14 @@ function TrackCard({ track, lessons, onLearnLesson, onPracticeLesson, onPractice
           ))}
         </ol>
       </details>
+      <button
+        type="button"
+        onClick={() => onPracticeTrack(track, lessons)}
+        className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${styles.button}`}
+      >
+        <IconRefresh className="w-4 h-4" />
+        Practice all {formCount} forms
+      </button>
     </article>
   );
 }
@@ -755,6 +761,35 @@ export default function LessonsView() {
                         </tbody>
                       </table>
                     </div>
+
+                    {lesson.contextExamples?.length > 0 && (
+                      <section className="mt-4">
+                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400">
+                          Use it in context
+                        </h4>
+                        <ul className="grid gap-3 md:grid-cols-2">
+                          {lesson.contextExamples.map((example) => (
+                            <li
+                              key={`${lesson.groupId}-${example.japanese}`}
+                              className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 dark:border-indigo-900/60 dark:bg-indigo-950/20"
+                            >
+                              <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                                {example.situation}
+                              </div>
+                              <p
+                                lang="ja"
+                                className="mt-2 text-base font-semibold leading-relaxed text-stone-950 dark:text-stone-50"
+                              >
+                                {example.japanese}
+                              </p>
+                              <p className="mt-1 text-sm text-stone-700 dark:text-stone-300">
+                                {example.english}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
 
                     <div className="mt-4">
                       <div className="mb-2 flex items-center justify-between gap-2">

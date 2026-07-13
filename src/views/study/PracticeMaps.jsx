@@ -186,7 +186,7 @@ export function PracticeScopeSidebar({
             </div>
             <div className="flex items-center gap-2">
               <span className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">
-                {activeCount} in default
+                {activeCount} saved forms
               </span>
               <button
                 type="button"
@@ -270,7 +270,7 @@ export function PracticeScopeSidebar({
                 Categories
               </div>
               <p className="mt-1 text-xs text-stone-600 dark:text-stone-400">
-                Practice now is temporary. Expand a category to manage your default mix.
+                Practice now is temporary. Expand a category to manage your saved Practice mix.
               </p>
             </div>
             {FORM_GROUPS.map((family) => {
@@ -286,8 +286,8 @@ export function PracticeScopeSidebar({
                   : familyScopeState?.status === 'filtered-out'
                     ? 'Filtered out'
                     : familyActive
-                      ? `${enabledInFamily.length} in default`
-                      : 'Not in default';
+                      ? `${enabledInFamily.length} forms saved`
+                      : 'No forms saved';
               const familyTypes = family.typeIds
                 .map((typeId) => CARD_TYPE_BY_ID.get(typeId))
                 .filter(Boolean);
@@ -389,7 +389,7 @@ export function PracticeScopeSidebar({
                           {displayLearnerState.label}
                         </span>
                         <span className="text-[11px] font-medium text-stone-600 dark:text-stone-400">
-                          {enabledInFamily.length}/{family.typeIds.length} in default
+                          {enabledInFamily.length}/{family.typeIds.length} forms saved
                         </span>
                       </span>
                       <span className="mt-2 block">

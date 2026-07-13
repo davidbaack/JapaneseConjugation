@@ -449,7 +449,7 @@ function RunAnswerReveal({
     : 'text-rose-950 dark:text-rose-50';
 
   return (
-    <div className={`relative rounded-xl p-4 sm:pr-[6.5rem] ${panelClass}`}>
+    <div className={`rounded-xl p-4 ${panelClass}`}>
       <div className="flex items-start gap-3 text-left">
         <div
           className={`mt-0.5 flex-shrink-0 ${
@@ -639,17 +639,11 @@ function RunAnswerReveal({
           type="button"
           onClick={onTryAnother}
           aria-label="Next card"
-          className="group mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-stone-800 bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-100 sm:absolute sm:inset-y-0 sm:right-0 sm:mt-0 sm:w-[5.5rem] sm:flex-col sm:justify-start sm:rounded-l-none sm:rounded-r-xl sm:border-y-0 sm:border-r-0 sm:border-l sm:px-2 sm:py-4"
+          className="group mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-stone-800 bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-100"
         >
-          <span className="inline-flex items-center gap-2 sm:sticky sm:top-1/2 sm:-translate-y-1/2 sm:flex-col sm:gap-1">
+          <span className="inline-flex items-center gap-2">
             <IconArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            <span
-              aria-hidden="true"
-              className="inline-flex gap-1 sm:flex-col sm:gap-0 sm:leading-tight"
-            >
-              <span>Next</span>
-              <span>card</span>
-            </span>
+            <span aria-hidden="true">Next card</span>
           </span>
         </button>
       )}

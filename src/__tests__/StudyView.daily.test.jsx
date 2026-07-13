@@ -571,7 +571,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(app.setTab).toHaveBeenCalledWith('stats');
   });
 
-  it('does not auto-start today over a focused word launch', async () => {
+  it('keeps a focused word launch until the learner exits it', async () => {
     const clearStudyFocus = vi.fn();
     const app = makeApp({
       clearStudyFocus,
@@ -584,8 +584,28 @@ describe('StudyView continuous Practice startup', () => {
 
     render(<StudyView />);
 
-    await waitFor(() => expect(clearStudyFocus).toHaveBeenCalled());
+    const exitFocus = await screen.findByRole('button', { name: 'Exit focus' });
+    expect(clearStudyFocus).not.toHaveBeenCalled();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
+    fireEvent.click(exitFocus);
+    expect(clearStudyFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a persisted launch from the empty-focus fallback', async () => {
+    const clearStudyFocus = vi.fn();
+    const word = { dict: '猫', reading: 'ねこ', meaning: 'cat', group: 'noun' };
+    mockedApp.value = makeApp({
+      allWords: [word],
+      clearStudyFocus,
+      studyFocus: { word, type: 'plain-past' },
+    });
+
+    render(<StudyView />);
+
+    const clearFocus = await screen.findByRole('button', { name: 'Clear focus' });
+    expect(clearStudyFocus).not.toHaveBeenCalled();
+    fireEvent.click(clearFocus);
+    expect(clearStudyFocus).toHaveBeenCalledTimes(1);
   });
 
   it('does not auto-start today for stale repair launch prefs', async () => {
@@ -2128,9 +2148,9 @@ describe('StudyView continuous Practice startup', () => {
     const nextButtons = screen.getAllByRole('button', { name: 'Next card' });
     expect(nextButtons).toHaveLength(1);
     const nextButton = nextButtons[0];
-    expect(nextButton.className).toContain('sm:absolute');
-    expect(nextButton.className).toContain('sm:inset-y-0');
-    expect(nextButton.className).toContain('sm:rounded-r-xl');
+    expect(nextButton.className).toContain('w-full');
+    expect(nextButton.className).not.toContain('sm:absolute');
+    expect(nextButton.textContent).toContain('Next card');
     const answerBreakdown = screen.getByText('Answer breakdown').closest('section');
     expect(
       nextButton.compareDocumentPosition(answerBreakdown) & window.Node.DOCUMENT_POSITION_FOLLOWING,

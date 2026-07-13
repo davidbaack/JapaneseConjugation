@@ -150,6 +150,8 @@ export function AnswerInputPanel({
   openLearnForRuleRecord,
   autoAdvanceCorrect,
 }) {
+  const answerInputId = transformationMode ? 'transformation-answer' : 'practice-answer';
+
   return phase === 'answering' ? (
     <>
       <div className="flex justify-center mb-4">
@@ -292,9 +294,12 @@ export function AnswerInputPanel({
         </div>
       ) : answerMode === 'speak' ? (
         <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
-          <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
-            Speak answer
-          </div>
+          <label
+            htmlFor="spoken-answer"
+            className="mb-2 block text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400"
+          >
+            Answer
+          </label>
           <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -317,7 +322,6 @@ export function AnswerInputPanel({
                     }
                   }}
                   placeholder="Heard Japanese answer..."
-                  aria-label="Heard spoken answer"
                   className="w-full min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-800 rounded-xl bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-100 focus:border-indigo-500 focus:outline-none transition"
                   lang="ja"
                   autoComplete="off"
@@ -470,9 +474,16 @@ export function AnswerInputPanel({
             stepHintButtonLabel={stepHintButtonLabel}
             hintDisclosure={hintDisclosure}
           />
+          <label
+            htmlFor={answerInputId}
+            className="mb-1.5 block text-left text-xs font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400"
+          >
+            Answer
+          </label>
           <div className="flex items-center gap-2">
             <input
               ref={inputRef}
+              id={answerInputId}
               type="text"
               value={answer}
               onCompositionStart={() => {
@@ -498,9 +509,6 @@ export function AnswerInputPanel({
                 }
               }}
               placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-              aria-label={
-                reverseDrill ? 'Type the dictionary form' : 'Type your answer in romaji or kana'
-              }
               className={answerInputClassName}
               lang="ja"
               autoComplete="off"
@@ -564,9 +572,16 @@ export function AnswerInputPanel({
         </>
       ) : (
         <>
+          <label
+            htmlFor={answerInputId}
+            className="mb-1.5 block text-left text-xs font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400"
+          >
+            Answer
+          </label>
           <div className="flex items-center gap-2">
             <input
               ref={inputRef}
+              id={answerInputId}
               type="text"
               value={answer}
               onCompositionStart={() => {
@@ -592,9 +607,6 @@ export function AnswerInputPanel({
                 }
               }}
               placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-              aria-label={
-                reverseDrill ? 'Type the dictionary form' : 'Type your answer in romaji or kana'
-              }
               className={answerInputClassName}
               lang="ja"
               autoComplete="off"

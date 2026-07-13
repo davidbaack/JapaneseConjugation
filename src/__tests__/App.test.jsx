@@ -121,22 +121,30 @@ describe('App shell', () => {
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
     );
-    await waitFor(() => expect(within(conditionalCard()).getByText('3/5 in default')).toBeTruthy());
+    await waitFor(() =>
+      expect(within(conditionalCard()).getByText('3/5 forms saved')).toBeTruthy(),
+    );
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Negative on' })).toBeTruthy();
 
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: `Turn ${conditionalNara.label} off` }),
     );
-    await waitFor(() => expect(within(conditionalCard()).getByText('2/5 in default')).toBeTruthy());
+    await waitFor(() =>
+      expect(within(conditionalCard()).getByText('2/5 forms saved')).toBeTruthy(),
+    );
 
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals off' }),
     );
-    await waitFor(() => expect(within(conditionalCard()).getByText('0/5 in default')).toBeTruthy());
+    await waitFor(() =>
+      expect(within(conditionalCard()).getByText('0/5 forms saved')).toBeTruthy(),
+    );
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
     );
-    await waitFor(() => expect(within(conditionalCard()).getByText('2/5 in default')).toBeTruthy());
+    await waitFor(() =>
+      expect(within(conditionalCard()).getByText('2/5 forms saved')).toBeTruthy(),
+    );
     expect(details().getAttribute('aria-expanded')).toBe('true');
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Negative on' })).toBeTruthy();
 
@@ -436,7 +444,7 @@ describe('App shell', () => {
     fireEvent.click(teTaDetailsButton());
     expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
 
-    expect(within(practiceMap()).getByText('2/2 in default')).toBeTruthy();
+    expect(within(practiceMap()).getByText('2/2 forms saved')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
     expect(within(practiceMap()).getByText('0 right / 2 wrong lifetime')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
@@ -449,12 +457,12 @@ describe('App shell', () => {
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Te-form off' })).toBeTruthy();
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Ta-form off' })).toBeTruthy();
     fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Turn Te-form off' }));
-    await waitFor(() => expect(within(practiceMap()).getByText('1/2 in default')).toBeTruthy());
+    await waitFor(() => expect(within(practiceMap()).getByText('1/2 forms saved')).toBeTruthy());
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Te-form on' })).toBeTruthy();
     fireEvent.click(
       within(practiceMap()).getByRole('button', { name: 'Turn Te/Ta Sound Changes off' }),
     );
-    await waitFor(() => expect(within(practiceMap()).getByText('0/2 in default')).toBeTruthy());
+    await waitFor(() => expect(within(practiceMap()).getByText('0/2 forms saved')).toBeTruthy());
     expect(
       within(practiceMap()).getByRole('button', { name: 'Turn Te/Ta Sound Changes on' }),
     ).toBeTruthy();
@@ -478,7 +486,7 @@ describe('App shell', () => {
     expect(await screen.findByText('Family primer')).toBeTruthy();
     expect(screen.getByText('4-card guided set')).toBeTruthy();
     expect(screen.getByRole('progressbar', { name: 'Intro progress' })).toBeTruthy();
-    expect(within(practiceMap()).getByText('4/10 in default')).toBeTruthy();
+    expect(within(practiceMap()).getByText('4/10 forms saved')).toBeTruthy();
 
     const primer = screen.getByRole('region', { name: 'Passive primer' });
     expect(within(primer).getByText('Passive Polite Negative')).toBeTruthy();
@@ -527,7 +535,7 @@ describe('App shell', () => {
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
     expect(screen.queryByRole('complementary', { name: 'Focus map' })).toBeNull();
-    expect(screen.getByText('52 in default')).toBeTruthy();
+    expect(screen.getByText('52 saved forms')).toBeTruthy();
     // "Sentence" is now the cued-cloze presentation toggle: a valid review
     // control, not a legacy study-mode button.
     expect(screen.queryByRole('button', { name: 'Sentence off', exact: true })).toBeNull();
@@ -536,6 +544,7 @@ describe('App shell', () => {
     expect(screen.queryByRole('button', { name: 'Transform', exact: true })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Study mode' })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Practice direction' })).toBeNull();
+    expect(screen.getByLabelText('Answer')).toBeTruthy();
     expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
     expect(screen.queryByText(/Prompt form:/i)).toBeNull();
   }, 15000);
@@ -768,7 +777,8 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Practice this form' }));
     expect(await screen.findByText('Learn focus')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Plain Past Practice/i })).toBeTruthy();
-    expect(screen.getByText(/Locked Practice set/)).toBeTruthy();
+    expect(screen.getByText(/Locked until you exit/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Sentence context/ })).toBeNull();
   }, 15000);
 
   it('opens the exact Learn lesson from Teach me this rule and focuses it', async () => {
@@ -1147,14 +1157,62 @@ describe('App shell', () => {
     expect(await waitForPracticeCard()).toBeTruthy();
 
     fireEvent.click(screen.getByRole('tab', { name: 'Learn', exact: true }));
-    const trackButtons = await screen.findAllByRole('button', { name: 'Practice track' });
+    const trackButtons = await screen.findAllByRole('button', {
+      name: /Practice all \d+ forms/,
+    });
     fireEvent.click(trackButtons[0]);
 
     expect(await screen.findByText('Learn focus')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Beginner track Practice/i })).toBeTruthy();
-    expect(screen.getByText(/Locked Practice set/)).toBeTruthy();
+    expect(screen.getByText(/12 recommended cards/)).toBeTruthy();
+    expect(screen.getByText(/18 focused words/)).toBeTruthy();
+    expect(screen.getByText(/focused form types/)).toBeTruthy();
+    expect(screen.getByText(/Locked until you exit/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Exit focus' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Stats', exact: true }));
+    expect(await screen.findByRole('heading', { name: 'Practice pulse.' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'Practice', exact: true }));
+    expect(await screen.findByText('Learn focus')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Beginner track Practice/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
+    await waitFor(() => expect(screen.queryByText('Learn focus')).toBeNull());
+  }, 15000);
+
+  it('offers sentence context after intermediate and advanced Learn handoffs', async () => {
+    render(<App />);
+    expect(await waitForPracticeCard()).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Learn', exact: true }));
+    const trackButtons = await screen.findAllByRole('button', {
+      name: /Practice all \d+ forms/,
+    });
+    fireEvent.click(trackButtons[1]);
+
+    const sentenceContext = await screen.findByRole('button', { name: 'Sentence context off' });
+    expect(sentenceContext.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(sentenceContext);
+    expect(
+      screen.getByRole('button', { name: 'Sentence context on' }).getAttribute('aria-pressed'),
+    ).toBe('true');
+  }, 15000);
+
+  it('shows real-world contexts for advanced lessons', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Learn', exact: true }));
+
+    fireEvent.change(await screen.findByLabelText('Find a rule'), {
+      target: { value: 'Keigo' },
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Keigo: Honorific and Humble' }),
+    ).toBeTruthy();
+    expect(screen.getByText('Use it in context')).toBeTruthy();
+    expect(screen.getByText('私が資料をご説明いたします。')).toBeTruthy();
+    expect(screen.getByText('I will explain the materials.')).toBeTruthy();
   }, 15000);
 
   it('starts Lookup Practice this as focused word Practice', async () => {

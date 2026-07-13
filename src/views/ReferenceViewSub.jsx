@@ -544,7 +544,7 @@ export default function ReferenceViewSub({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 text-left lg:grid-cols-[280px_1fr]">
+    <div className="grid grid-cols-1 gap-4 text-left lg:grid-cols-[360px_1fr]">
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden flex flex-col">
         <div className="p-3 border-b border-stone-100 dark:border-stone-800">
           <div className="relative">
