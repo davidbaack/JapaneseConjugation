@@ -51,7 +51,8 @@ import { recordReadinessAttempt } from '../utils/readiness.js';
 import {
   formDisplay,
   promptDisplay,
-  englishForForm,
+  exerciseEnglishForForm,
+  exerciseMeaningForWord,
   answerPhaseTaskDetails,
   makeChoices,
   makeReverseChoices,
@@ -1267,11 +1268,11 @@ export default function StudyView({ mode = 'practice' }) {
     ? promptDisplay(current.verb, null, practicePrefs)
     : formDisplay(expected, practicePrefs, current.verb, current.type);
   const promptEnglish = reverseDrill
-    ? englishForForm(current.verb, practicedType)
-    : englishForForm(current.verb, promptType);
+    ? exerciseEnglishForForm(current.verb, practicedType)
+    : exerciseEnglishForForm(current.verb, promptType);
   const targetEnglish = reverseDrill
-    ? englishForForm(current.verb, null)
-    : englishForForm(current.verb, current.type);
+    ? exerciseEnglishForForm(current.verb, null)
+    : exerciseEnglishForForm(current.verb, current.type);
   const spokenAnswerTargets = reverseDrill
     ? [current.verb.reading, current.verb.dict]
     : [expected, surfaceFormFor(current.verb, current.type)];
@@ -1307,7 +1308,9 @@ export default function StudyView({ mode = 'practice' }) {
     .join(' · ');
   const noChangePrompt = !reverseDrill && promptType === current.type;
   const taskLabel = reverseDrill ? `Recover dictionary form` : typeInfo.label;
-  const transformationActionLabel = reverseDrill ? 'Answer with' : 'Conjugate to';
+  const transformationActionLabel = reverseDrill
+    ? 'Recover the dictionary word'
+    : 'Change to the target form';
   const taskHint = reverseDrill
     ? 'answer with dictionary form'
     : noChangePrompt
@@ -1321,6 +1324,8 @@ export default function StudyView({ mode = 'practice' }) {
     taskSub,
   });
   const transformationSupportText = answerTaskDetails.supportText;
+  const transformationContractText =
+    'Use the same dictionary word. Build the named target form; grammar from the starting form is not carried over unless the target names it.';
   const taskOverride = reverseDrill
     ? transformationMode
       ? `Reading: recover the dictionary form from ${typeInfo.label} (${sourceForm})`
@@ -2757,7 +2762,13 @@ export default function StudyView({ mode = 'practice' }) {
       ].filter(Boolean)
     : [];
   const recommendationSubtitle = recommendationFocus
-    ? [recommendationFocus.detail, recommendationCountParts.join(' · '), 'Locked until you exit']
+    ? [
+        recommendationFocus.detail,
+        recommendationCountParts.join(' · '),
+        'Continuous practice',
+        'exit anytime',
+        'Default Practice unchanged',
+      ]
         .filter(Boolean)
         .join(' · ')
     : '';
@@ -2791,9 +2802,9 @@ export default function StudyView({ mode = 'practice' }) {
           subtitle: familyIntroActive
             ? `${familyIntroTypes.length || familyIntroFocus?.typeIds?.length || 0}-card guided set`
             : practiceCategoryFocusActive
-              ? `${practiceCategoryFocus.typeIds.length} forms matching your filters - Your default mix is unchanged`
+              ? `${practiceCategoryFocus.typeIds.length} form types matching filters · Continuous practice · exit anytime · Default Practice unchanged`
               : focusBannerGroup.typeIds?.length
-                ? `${focusBannerGroup.typeIds.length} forms in this family`
+                ? `${focusBannerGroup.typeIds.length} form types in this family · Continuous practice · exit anytime`
                 : 'Focused form practice',
           exitLabel: 'Exit focus',
           onExit: practiceCategoryFocusActive ? exitPracticeCategoryFocus : returnToOverview,
@@ -2809,9 +2820,9 @@ export default function StudyView({ mode = 'practice' }) {
             lang: 'ja',
             reading: focusBannerWord.reading || '',
             subtitle: [
-              focusBannerWord.meaning,
+              exerciseMeaningForWord(focusBannerWord),
               wordSweep
-                ? `${wordSweep.allTypeIds?.length || 0} enabled forms`
+                ? `${wordSweep.allTypeIds?.length || 0} enabled form types`
                 : referenceLaunch?.referenceLabel || typeInfo.label,
             ]
               .filter(Boolean)
@@ -2863,6 +2874,16 @@ export default function StudyView({ mode = 'practice' }) {
       (runStats.reviewed > 0 && runStats.missed === 0
         ? `${currentSelectionReason}. Clean run so far.`
         : `${currentSelectionReason}.`);
+
+  function adjustPracticeFocus() {
+    setPracticeMapMobileOpen(true);
+    window.requestAnimationFrame?.(() => {
+      const map = document.getElementById('practice-map');
+      map?.scrollIntoView?.({ block: 'start' });
+      map?.querySelector('button')?.focus({ preventScroll: true });
+    });
+  }
+
   return (
     <div
       className={
@@ -3000,7 +3021,7 @@ export default function StudyView({ mode = 'practice' }) {
         {!transformationMode && (
           <section
             aria-labelledby="practice-run-heading"
-            className="rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-950/5 dark:border-stone-800 dark:bg-stone-900 dark:shadow-black/20"
+            className="rounded-xl border border-stone-200 bg-white px-3 py-2.5 shadow-sm shadow-stone-950/5 dark:border-stone-800 dark:bg-stone-900 dark:shadow-black/20 sm:px-4 sm:py-3"
           >
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0 flex-1">
@@ -3176,16 +3197,23 @@ export default function StudyView({ mode = 'practice' }) {
                   type="button"
                   onClick={() => setRunReviewOpen(true)}
                   disabled={!runAnswerHistory.length}
-                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-stone-200 px-3 text-xs font-semibold text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-stone-200 px-3 text-xs font-semibold text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100 max-[359px]:hidden"
                 >
                   <IconList className="h-3.5 w-3.5" />
                   Review answers
+                </button>
+                <button
+                  type="button"
+                  onClick={adjustPracticeFocus}
+                  className="inline-flex min-h-10 items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 active:scale-[0.96] dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
+                >
+                  Adjust focus
                 </button>
               </div>
             </div>
             <dl
               aria-label={`Practice run summary: ${runStatsLabel}`}
-              className="mt-3 grid grid-cols-3 gap-2 border-t border-stone-100 pt-3 text-xs dark:border-stone-800"
+              className={`mt-3 max-[359px]:hidden grid-cols-3 gap-2 border-t border-stone-100 pt-3 text-xs dark:border-stone-800 ${runStats.reviewed > 0 ? 'hidden sm:grid' : 'grid'}`}
             >
               {runSummaryMetrics.map((metric) => (
                 <div key={metric.label} className="min-w-0">
@@ -3200,6 +3228,41 @@ export default function StudyView({ mode = 'practice' }) {
                 </div>
               ))}
             </dl>
+            {runStats.reviewed === 0 && (
+              <div className="mt-2 hidden items-center gap-2 rounded-lg bg-stone-50 px-3 py-2 text-[11px] font-semibold tabular-nums text-stone-600 dark:bg-stone-950 dark:text-stone-300 max-[359px]:flex">
+                <span>{runCardsLabel}</span>
+                <span aria-hidden="true">·</span>
+                <span>{runStats.missed} missed</span>
+                <span aria-hidden="true">·</span>
+                <span>{runStats.streak} streak</span>
+              </div>
+            )}
+            {runStats.reviewed > 0 && (
+              <details className="mt-2 sm:hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-700 dark:bg-stone-950 dark:text-stone-300">
+                  <span className="truncate font-semibold tabular-nums">{runStatsLabel}</span>
+                  <span className="shrink-0 text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
+                    Show run summary
+                  </span>
+                </summary>
+                <div className="mt-2 space-y-2 rounded-lg border border-stone-100 p-2.5 text-xs text-stone-600 dark:border-stone-800 dark:text-stone-400">
+                  <div>
+                    <span className="font-semibold text-stone-700 dark:text-stone-200">
+                      Why this card:{' '}
+                    </span>
+                    {currentSelectionReason}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-stone-700 dark:text-stone-200">
+                      Top miss:{' '}
+                    </span>
+                    {topSessionMistake
+                      ? `${topSessionMistake.label} (${topSessionMistake.count}x)`
+                      : 'No pattern yet'}
+                  </div>
+                </div>
+              </details>
+            )}
             {!workoutProgress.continuous && showBoundedProgress && (
               <div className="mt-3 space-y-1.5">
                 <div className="flex items-center justify-between gap-3 text-xs text-stone-600 dark:text-stone-400">
@@ -3223,7 +3286,7 @@ export default function StudyView({ mode = 'practice' }) {
                 </div>
               </div>
             )}
-            <details className="mt-3">
+            <details className="mt-3 hidden sm:block">
               <summary className="cursor-pointer list-none text-xs font-semibold text-stone-600 transition hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200">
                 Run details
               </summary>
@@ -3299,10 +3362,10 @@ export default function StudyView({ mode = 'practice' }) {
           </section>
         )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-          <div className="relative px-4 pb-4 pt-20 text-center sm:px-6 sm:pb-8 sm:pt-16">
+          <div className="relative px-4 pb-3 pt-14 text-center sm:px-6 sm:pb-8 sm:pt-16">
             <div className="absolute left-4 right-4 top-4 grid grid-cols-2 items-start gap-x-2 gap-y-1 sm:left-6 sm:right-6 sm:top-8 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-y-0">
               <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
-                JLPT {currentWordMeta.jlpt}
+                Word level: {currentWordMeta.jlpt}
               </span>
               <span
                 aria-label="Current card source"
@@ -3324,27 +3387,52 @@ export default function StudyView({ mode = 'practice' }) {
               </span>
             </div>
             {sentencePrompt && !hidePromptText && (
-              <div
-                className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20"
-                data-sentence-mode={sentencePrompt.mode}
-              >
-                <ScriptDisplay
-                  view={sentencePromptView}
-                  className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
-                  subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
-                  colorHighlight={false}
-                />
-                {sentencePrompt.cue && (
-                  <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
-                    {sentencePrompt.cue}
+              <>
+                <div
+                  className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 max-[359px]:hidden"
+                  data-sentence-mode={sentencePrompt.mode}
+                >
+                  <ScriptDisplay
+                    view={sentencePromptView}
+                    className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
+                    subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
+                    colorHighlight={false}
+                  />
+                  {sentencePrompt.cue && (
+                    <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
+                      {sentencePrompt.cue}
+                    </div>
+                  )}
+                  {!hideEnglishMeaning && sentencePrompt.note && (
+                    <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
+                      {sentencePrompt.note}
+                    </div>
+                  )}
+                </div>
+                <details className="mx-auto mb-2 hidden max-w-md rounded-xl border border-indigo-200 bg-indigo-50/70 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 max-[359px]:block">
+                  <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                    Sentence context
+                  </summary>
+                  <div className="border-t border-indigo-100 px-3 py-2 dark:border-indigo-900/50">
+                    <ScriptDisplay
+                      view={sentencePromptView}
+                      className="text-base leading-relaxed text-stone-900 dark:text-stone-100"
+                      subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
+                      colorHighlight={false}
+                    />
+                    {sentencePrompt.cue && (
+                      <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
+                        {sentencePrompt.cue}
+                      </div>
+                    )}
+                    {!hideEnglishMeaning && sentencePrompt.note && (
+                      <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
+                        {sentencePrompt.note}
+                      </div>
+                    )}
                   </div>
-                )}
-                {!hideEnglishMeaning && sentencePrompt.note && (
-                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
-                    {sentencePrompt.note}
-                  </div>
-                )}
-              </div>
+                </details>
+              </>
             )}
             {hidePromptText ? (
               <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
@@ -3371,9 +3459,14 @@ export default function StudyView({ mode = 'practice' }) {
               </div>
             ) : (
               <>
+                {transformationMode && (
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                    Starting form
+                  </div>
+                )}
                 <ScriptDisplay
                   view={promptView}
-                  className="text-4xl sm:text-5xl font-medium mb-2 text-stone-900 dark:text-stone-100"
+                  className="mb-1 text-3xl font-medium text-stone-900 dark:text-stone-100 sm:mb-2 sm:text-5xl"
                   subClassName="text-base text-stone-600"
                 />
               </>
@@ -3388,7 +3481,9 @@ export default function StudyView({ mode = 'practice' }) {
             )}
 
             {!hideEnglishMeaning && (
-              <div className="text-sm text-stone-600 mt-2 italic">{promptEnglish}</div>
+              <div className="mt-2 text-sm italic text-stone-600 max-[359px]:hidden">
+                {promptEnglish}
+              </div>
             )}
 
             {phase === 'reviewing' && practicePrefs.showWordCategory && (
@@ -3399,7 +3494,7 @@ export default function StudyView({ mode = 'practice' }) {
                   : ''}
               </div>
             )}
-            <div className="mt-4 flex flex-col gap-1">
+            <div className="mt-3 flex flex-col gap-1 sm:mt-4">
               <AnswerInputPanel
                 phase={phase}
                 transformationMode={transformationMode}
@@ -3408,6 +3503,7 @@ export default function StudyView({ mode = 'practice' }) {
                 answerTaskDetails={answerTaskDetails}
                 sourceTypeInfo={sourceTypeInfo}
                 transformationSupportText={transformationSupportText}
+                transformationContractText={transformationContractText}
                 taskLabel={taskLabel}
                 current={current}
                 practicePrefs={practicePrefs}

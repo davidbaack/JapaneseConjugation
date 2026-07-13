@@ -266,3 +266,30 @@ describe('StatsDashboard per-family speed routing', () => {
     expect(screen.queryByRole('button', { name: /Drill speed in Rush/i })).toBeNull();
   });
 });
+
+describe('StatsDashboard family evidence', () => {
+  it('labels answer attempts and flags percentages based on fewer than three attempts', () => {
+    renderDashboard({
+      state: {
+        ...defaultState(),
+        cards: { [GODAN_PLAIN_PAST_ID]: { correct: 1, incorrect: 0 } },
+      },
+    });
+
+    expect(screen.getByText('Answer attempts')).toBeTruthy();
+    expect(screen.getByText('100% · 1 attempt')).toBeTruthy();
+    expect(screen.getByText('Early estimate')).toBeTruthy();
+  });
+
+  it('stops calling the percentage an early estimate after three attempts', () => {
+    renderDashboard({
+      state: {
+        ...defaultState(),
+        cards: { [GODAN_PLAIN_PAST_ID]: { correct: 3, incorrect: 0 } },
+      },
+    });
+
+    expect(screen.getByText('100% · 3 attempts')).toBeTruthy();
+    expect(screen.queryByText('Early estimate')).toBeNull();
+  });
+});

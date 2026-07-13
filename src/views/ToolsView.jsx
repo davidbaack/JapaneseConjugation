@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import HorizontalTabList from '../components/HorizontalTabList.jsx';
 import { IconBook, IconCheck, IconList, IconPen } from '../components/Icons.jsx';
 import { useTablist } from '../components/useTablist.js';
 import { useApp } from '../state/AppStateContext.jsx';
@@ -77,10 +78,12 @@ export default function ToolsView() {
           </div>
         </div>
 
-        <div
-          role="tablist"
-          aria-label="Tools"
-          className="mt-4 flex flex-nowrap gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
+        <HorizontalTabList
+          activeId={active}
+          ariaLabel="Tools"
+          wrapperClassName="mt-4"
+          fadeClassName="from-stone-50 dark:from-stone-950"
+          className="flex flex-nowrap gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-stone-50 p-1 [scrollbar-width:thin] dark:border-stone-800 dark:bg-stone-950"
         >
           {TOOL_TABS.map((tool) => {
             const activeTool = active === tool.id;
@@ -102,7 +105,7 @@ export default function ToolsView() {
               </button>
             );
           })}
-        </div>
+        </HorizontalTabList>
         <p className="mt-2 text-xs text-stone-600 dark:text-stone-400">{activeTool.desc}</p>
       </section>
 

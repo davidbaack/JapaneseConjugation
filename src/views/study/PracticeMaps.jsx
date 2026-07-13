@@ -51,7 +51,7 @@ const HISTORY_COUNT_META = [
   { key: 'strong', label: 'strong', dot: 'bg-emerald-500' },
   { key: 'needsPractice', label: 'need practice', dot: 'bg-rose-500' },
   { key: 'learning', label: 'learning', dot: 'bg-amber-500' },
-  { key: 'notPracticed', label: 'not practiced', dot: 'bg-stone-400' },
+  { key: 'notPracticed', label: 'no attempts', dot: 'bg-stone-400' },
 ];
 
 const EMPTY_HISTORY_COUNTS = {
@@ -74,7 +74,7 @@ function mergeHistoryCounts(rows = []) {
 function HistoryCountSummary({ counts = EMPTY_HISTORY_COUNTS, includeZero = false }) {
   const visible = HISTORY_COUNT_META.filter(({ key }) => includeZero || counts[key] > 0);
   return (
-    <span className="flex flex-wrap gap-1.5" aria-label="Form history summary">
+    <span className="flex flex-wrap gap-1.5" aria-label="Form type history summary">
       {visible.map(({ key, label, dot }) => (
         <span
           key={key}
@@ -170,12 +170,13 @@ export function PracticeScopeSidebar({
 
   return (
     <aside
+      id="practice-map"
       className={`space-y-3 lg:sticky lg:top-4 lg:self-start ${className}`}
       aria-label="Practice map"
     >
       <section className="space-y-3">
         <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 dark:border-stone-800 dark:bg-stone-900 lg:border-0 lg:bg-transparent lg:px-1 lg:py-0 lg:dark:bg-transparent">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
                 Practice map
@@ -184,9 +185,10 @@ export function PracticeScopeSidebar({
                 Practice categories
               </h2>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
               <span className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">
-                {activeCount} saved forms
+                <span className="sm:hidden">Default: {activeCount} form types</span>
+                <span className="hidden sm:inline">Default Practice: {activeCount} form types</span>
               </span>
               <button
                 type="button"
@@ -195,7 +197,7 @@ export function PracticeScopeSidebar({
                 onClick={onToggleMobileOpen}
                 className="rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-stone-700 dark:border-stone-800 dark:text-stone-300 lg:hidden"
               >
-                {mobileOpen ? 'Close' : 'Focus'}
+                {mobileOpen ? 'Close focus controls' : 'Adjust focus'}
               </button>
             </div>
           </div>
@@ -217,8 +219,8 @@ export function PracticeScopeSidebar({
                 Form filters
               </div>
               <p className="mt-1 text-xs leading-relaxed text-stone-600 dark:text-stone-400">
-                These choices shape your default mix and temporary category focus. They never change
-                your history.
+                These choices shape your Default Practice mix and temporary focus. They never change
+                History.
               </p>
             </div>
             <div className="space-y-2.5">
@@ -270,7 +272,7 @@ export function PracticeScopeSidebar({
                 Categories
               </div>
               <p className="mt-1 text-xs text-stone-600 dark:text-stone-400">
-                Practice now is temporary. Expand a category to manage your saved Practice mix.
+                Practice now is temporary. Expand a category to manage your Default Practice mix.
               </p>
             </div>
             {FORM_GROUPS.map((family) => {
@@ -286,8 +288,8 @@ export function PracticeScopeSidebar({
                   : familyScopeState?.status === 'filtered-out'
                     ? 'Filtered out'
                     : familyActive
-                      ? `${enabledInFamily.length} forms saved`
-                      : 'No forms saved';
+                      ? `${enabledInFamily.length} form types in default mix`
+                      : 'No form types in default mix';
               const familyTypes = family.typeIds
                 .map((typeId) => CARD_TYPE_BY_ID.get(typeId))
                 .filter(Boolean);
@@ -389,7 +391,8 @@ export function PracticeScopeSidebar({
                           {displayLearnerState.label}
                         </span>
                         <span className="text-[11px] font-medium text-stone-600 dark:text-stone-400">
-                          {enabledInFamily.length}/{family.typeIds.length} forms saved
+                          {enabledInFamily.length} of {family.typeIds.length} form types in default
+                          mix
                         </span>
                       </span>
                       <span className="mt-2 block">
@@ -505,7 +508,7 @@ export function PracticeScopeSidebar({
                               Default practice mix
                             </div>
                             <p className="mt-1 text-[11px] leading-relaxed text-stone-600 dark:text-stone-400">
-                              Saved for ordinary Practice. Changing it never changes your history.
+                              Used for ordinary Practice. Changing it never changes History.
                             </p>
                           </div>
                           <button
@@ -530,12 +533,12 @@ export function PracticeScopeSidebar({
                         </div>
                         {familyScopeState?.status === 'no-matches' && (
                           <p className="mt-2 text-[10px] leading-tight text-stone-500 dark:text-stone-400">
-                            No saved forms match the current filters.
+                            No form types in the default mix match the current filters.
                           </p>
                         )}
                         {familyScopeState?.status === 'filtered-out' && (
                           <p className="mt-2 text-[10px] leading-tight text-amber-700 dark:text-amber-300">
-                            Saved and ready when the global filters match.
+                            In the default mix and ready when the global filters match.
                           </p>
                         )}
                       </div>

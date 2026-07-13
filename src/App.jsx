@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import AuthModal from './components/AuthModal.jsx';
+import HorizontalTabList from './components/HorizontalTabList.jsx';
 import ViewSkeleton from './components/Skeleton.jsx';
 import UpdatePrompt from './components/UpdatePrompt.jsx';
 import { t } from './i18n/index.js';
@@ -34,20 +35,24 @@ function AppShell() {
       style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif' }}
     >
       <div className={`${shellWidthClass} mx-auto px-4 py-3 sm:py-6`}>
-        <header className="mb-4 sm:mb-6">
+        <header className="mb-2 min-[360px]:mb-4 sm:mb-6">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
               {t('app.title')}{' '}
               <span className="text-stone-500 dark:text-stone-400 font-normal">形屋</span>{' '}
-              <span className="text-stone-400 font-normal">·</span>{' '}
-              <span className="font-normal">{t('app.subtitle')}</span>
+              <span className="max-[359px]:hidden">
+                <span className="text-stone-400 font-normal">·</span>{' '}
+                <span className="font-normal">{t('app.subtitle')}</span>
+              </span>
             </h1>
           </div>
         </header>
-        <nav
-          role="tablist"
-          aria-label="App sections"
-          className="mb-3 flex flex-nowrap gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-white p-1 [scrollbar-width:thin] dark:border-stone-800 dark:bg-stone-900"
+        <HorizontalTabList
+          activeId={tab}
+          ariaLabel="App sections"
+          as="nav"
+          wrapperClassName="mb-3"
+          className="flex flex-nowrap gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-white p-1 [scrollbar-width:thin] dark:border-stone-800 dark:bg-stone-900"
         >
           {TABS.map((id) => (
             <button
@@ -63,7 +68,7 @@ function AppShell() {
               {t(`nav.${id}`)}
             </button>
           ))}
-        </nav>
+        </HorizontalTabList>
         <Suspense fallback={<ViewSkeleton />}>
           <div {...panelProps(tab)}>
             {tab === 'practice' && <StudyView />}

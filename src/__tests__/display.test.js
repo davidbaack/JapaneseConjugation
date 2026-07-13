@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   englishForForm,
+  exerciseEnglishForForm,
+  exerciseMeaningForWord,
   editDistance,
   normalizeJapaneseText,
   typoGuardForAnswer,
@@ -303,6 +305,28 @@ describe('englishForForm', () => {
 
   it('returns meaning for null item', () => {
     expect(englishForForm(null, 'plain-past')).toBe('');
+  });
+});
+
+describe('exercise English glosses', () => {
+  it('prefers a curated exercise meaning without changing the reference meaning', () => {
+    const suru = {
+      dict: 'する',
+      reading: 'する',
+      meaning: 'to do, to try; to wear small items',
+      exerciseMeaning: 'to do',
+      group: 'suru',
+    };
+    expect(exerciseMeaningForWord(suru)).toBe('to do');
+    expect(exerciseEnglishForForm(suru, 'plain-past')).toBe('did');
+    expect(suru.meaning).toBe('to do, to try; to wear small items');
+  });
+
+  it('uses the first complete top-level sense for imported words', () => {
+    expect(exerciseMeaningForWord({ meaning: 'to wear (on the body), to put on; to carry' })).toBe(
+      'to wear (on the body)',
+    );
+    expect(exerciseMeaningForWord({ meaning: 'to see / watch' })).toBe('to see');
   });
 });
 

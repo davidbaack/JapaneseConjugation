@@ -81,6 +81,12 @@ function mergeVerbMetadata(target, source) {
   );
   if (source.jlpt && !target.jlpt) target.jlpt = source.jlpt;
   if (source.common && !target.common) target.common = true;
+  if (!target.exerciseMeaning) {
+    if (source.exerciseMeaning) target.exerciseMeaning = source.exerciseMeaning;
+    else if (source.meaning && source.meaning !== target.meaning) {
+      target.exerciseMeaning = source.meaning;
+    }
+  }
   if (lessons.length) {
     target.lessons = lessons;
     target.lesson = lessons[0];

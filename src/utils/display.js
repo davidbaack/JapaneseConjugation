@@ -283,6 +283,34 @@ export function cleanEnglishAction(meaning = '') {
   );
 }
 
+function firstTopLevelSense(meaning = '') {
+  const source = String(meaning || '').trim();
+  if (!source) return '';
+
+  let depth = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '(') depth += 1;
+    if (char === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (char === ';' || char === ',' || char === '/')) {
+      return source.slice(0, index).trim();
+    }
+  }
+  return source;
+}
+
+// Exercises need one stable, scannable sense while Lookup remains the place for
+// complete dictionary coverage. Starter vocabulary can provide a curated
+// exerciseMeaning; imported and custom words fall back to their first sense.
+export function exerciseMeaningForWord(item) {
+  if (!item) return '';
+  return (
+    String(item.exerciseMeaning || '').trim() ||
+    firstTopLevelSense(item.meaning) ||
+    String(item.meaning || '').trim()
+  );
+}
+
 function beComplement(action) {
   const match = String(action || '').match(/^be\s+(.+)$/i);
   return match ? match[1] : '';
@@ -856,6 +884,11 @@ export function englishForForm(item, type) {
     obligation: `must ${action}`,
   };
   return M[type] || item.meaning;
+}
+
+export function exerciseEnglishForForm(item, type) {
+  if (!item) return '';
+  return englishForForm({ ...item, meaning: exerciseMeaningForWord(item) }, type);
 }
 
 export function editDistance(a, b) {

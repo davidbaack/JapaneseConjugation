@@ -12,7 +12,7 @@ import {
   gradeGuideSteps,
   guideGroupOptions,
 } from '../utils/guidePractice.js';
-import { formDisplay } from '../utils/display.js';
+import { exerciseMeaningForWord, formDisplay } from '../utils/display.js';
 import { wordKey } from '../utils/conjugator.js';
 import { ANSWER_OUTCOME, answerOutcomeCopy } from '../utils/answerFeedbackCopy.js';
 import { groupDisplayLabel } from '../utils/groupDisplay.js';
@@ -245,6 +245,7 @@ export default function GuideView() {
   const sourceView = card
     ? formDisplay(card.sourceForm, practicePrefs, card.word, card.sourceTypeId)
     : null;
+  const currentCardNumber = Math.min(GUIDE_SESSION_TARGET, result ? completed : completed + 1);
 
   function markAssisted(stepId) {
     setAssistedSteps((prev) => ({ ...prev, [stepId]: true }));
@@ -398,8 +399,14 @@ export default function GuideView() {
             </h2>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 font-semibold text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
-              {completed + 1}/{GUIDE_SESSION_TARGET}
+            <span
+              aria-label={`Card ${currentCardNumber} of ${GUIDE_SESSION_TARGET}`}
+              role="status"
+              className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 font-semibold text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300"
+            >
+              <span aria-hidden="true">
+                {currentCardNumber}/{GUIDE_SESSION_TARGET}
+              </span>
             </span>
             <span className="rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 font-semibold text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-200">
               {card.targetLabel}
@@ -422,7 +429,11 @@ export default function GuideView() {
                 <ScriptDisplay view={sourceView} word={card.word} type={card.sourceTypeId} />
               </div>
               <div className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-                {[card.word.dict, !hideEnglishMeaning && card.word.meaning, card.sourceLabel]
+                {[
+                  card.word.dict,
+                  !hideEnglishMeaning && exerciseMeaningForWord(card.word),
+                  card.sourceLabel,
+                ]
                   .filter(Boolean)
                   .join(' · ')}
               </div>

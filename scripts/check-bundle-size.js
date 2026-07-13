@@ -31,7 +31,9 @@ const ASSET_DIR = 'dist/assets';
 // measured build at ~307 KB gzipped.
 // Bumped 315->325: godan row map, sound changes, and Learn handoffs put the
 // measured build at ~310 KB gzipped locally, close to the previous cap.
-const TOTAL_GZIP_KB = 325;
+// Bumped 325->330: compact Practice controls, responsive tab cues, richer
+// Transform/Lookup guidance, and learner-confidence labels measure ~328 KB.
+const TOTAL_GZIP_KB = 330;
 const MAX_CHUNK_GZIP_KB = 70;
 
 const KB = 1024;

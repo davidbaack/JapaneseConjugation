@@ -23,6 +23,29 @@ const READINESS_TONE = {
   weak: 'bg-rose-500',
   untested: 'bg-stone-300 dark:bg-stone-700',
 };
+
+function attemptCountLabel(attempted) {
+  return `${attempted} ${attempted === 1 ? 'attempt' : 'attempts'}`;
+}
+
+function FamilyEvidence({ row }) {
+  if (!row.attempted) {
+    return <span className="tabular-nums text-stone-500">new</span>;
+  }
+
+  return (
+    <span className="text-right text-stone-500">
+      <span className="block tabular-nums">
+        {row.accuracy}% · {attemptCountLabel(row.attempted)}
+      </span>
+      {row.attempted < 3 && (
+        <span className="block text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+          Early estimate
+        </span>
+      )}
+    </span>
+  );
+}
 // Exported for unit tests of the Practice-to-Drills routing nudge ladder; the app
 // renders it through StudyView's default export.
 export function ReviewsDashboard({
@@ -130,7 +153,7 @@ export function ReviewsDashboard({
             {hasHistory && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {[
-                  ['Practiced', totalPracticed],
+                  ['Answer attempts', totalPracticed],
                   ['Today', `${daily.count || 0} cards`],
                   ['Recent misses', weakCount],
                 ].map(([label, value]) => (
@@ -294,7 +317,6 @@ export function ReviewsDashboard({
                 const rowToEndingLab =
                   row.id === TE_TA_FAMILY_ID && onbinWeakness && !!onDrillEndingLab;
                 const rowToRush = !rowToEndingLab && weakest?.id === 'speed' && !!onDrillRush;
-                const accuracyLabel = row.attempted ? `${row.accuracy}%` : 'new';
                 const bar = (
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
                     <span
@@ -312,7 +334,7 @@ export function ReviewsDashboard({
                         <span className="font-medium text-stone-700 dark:text-stone-200">
                           {row.label}
                         </span>
-                        <span className="tabular-nums text-stone-500">{accuracyLabel}</span>
+                        <FamilyEvidence row={row} />
                       </div>
                       {bar}
                     </div>
@@ -329,7 +351,7 @@ export function ReviewsDashboard({
                           </span>
                           {row.label}
                         </span>
-                        <span className="tabular-nums text-stone-500">{accuracyLabel}</span>
+                        <FamilyEvidence row={row} />
                       </div>
                       {bar}
                     </summary>

@@ -2,7 +2,7 @@ import React from 'react';
 import { IconMic, IconSpark } from '../../components/Icons.jsx';
 import ScriptDisplay from '../../components/ScriptDisplay.jsx';
 import StickyAction from '../../components/StickyAction.jsx';
-import { formDisplay, promptDisplay } from '../../utils/display.js';
+import { exerciseMeaningForWord, formDisplay, promptDisplay } from '../../utils/display.js';
 import { buildFormationKeysHash } from '../../utils/formationKeys.js';
 import { clearMinimalPairPrefs, minimalPairReturnEnabledTypes } from '../../utils/minimalPairs.js';
 import { RunAnswerReveal } from './StudyReviewPanels.jsx';
@@ -85,6 +85,7 @@ export function AnswerInputPanel({
   answerTaskDetails,
   sourceTypeInfo,
   transformationSupportText,
+  transformationContractText,
   taskLabel,
   current,
   practicePrefs,
@@ -160,6 +161,9 @@ export function AnswerInputPanel({
             <div className="text-[10px] font-semibold uppercase text-indigo-600 dark:text-indigo-300">
               {transformationActionLabel}
             </div>
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+              Target form
+            </div>
             <div className="mt-1 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl bg-indigo-600 px-5 py-3 text-white shadow-lg shadow-indigo-950/20 dark:bg-indigo-500/95">
               <span className="text-xl sm:text-2xl font-bold leading-tight">
                 {targetTypeInfo.label}
@@ -174,12 +178,15 @@ export function AnswerInputPanel({
               )}
             </div>
             <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-stone-600 dark:text-stone-400">
-              <span>From {sourceTypeInfo.label}</span>
+              <span>Starting form: {sourceTypeInfo.label}</span>
               <span aria-hidden="true" className="text-indigo-600">
                 -&gt;
               </span>
-              <span>{transformationSupportText}</span>
+              <span>Target cue: {transformationSupportText}</span>
             </div>
+            <p className="mx-auto mt-2 max-w-xl text-xs leading-relaxed text-stone-600 dark:text-stone-400">
+              {transformationContractText}
+            </p>
           </div>
         ) : (
           <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
@@ -244,20 +251,22 @@ export function AnswerInputPanel({
               <p className="text-sm text-stone-600 dark:text-stone-400 mb-3">
                 Say or write the answer on your own, then reveal it and grade honestly.
               </p>
-              <div className="grid sm:grid-cols-2 gap-2">
-                <button
-                  onClick={() => setSelfCheckOpen(true)}
-                  className="py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium transition"
-                >
-                  Reveal answer
-                </button>
-                <button
-                  onClick={skipCurrent}
-                  className="py-2.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 rounded-xl font-medium dark:bg-stone-900 dark:border-stone-800 dark:text-stone-300 transition"
-                >
-                  Skip without penalty
-                </button>
-              </div>
+              <StickyAction className="mt-3" dock>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setSelfCheckOpen(true)}
+                    className="py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium transition"
+                  >
+                    Reveal answer
+                  </button>
+                  <button
+                    onClick={skipCurrent}
+                    className="py-2.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 rounded-xl font-medium dark:bg-stone-900 dark:border-stone-800 dark:text-stone-300 transition"
+                  >
+                    Skip without penalty
+                  </button>
+                </div>
+              </StickyAction>
             </>
           ) : (
             <>
@@ -275,20 +284,22 @@ export function AnswerInputPanel({
                 />
                 <div className="text-xs text-stone-600 mt-2">{targetEnglish}</div>
               </div>
-              <div className="grid grid-cols-2 gap-2 mt-3">
-                <button
-                  onClick={() => gradeSelfCheck(true, 'Remembered')}
-                  className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition"
-                >
-                  Remembered
-                </button>
-                <button
-                  onClick={() => gradeSelfCheck(false, 'Missed')}
-                  className="py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-xl text-sm font-medium transition"
-                >
-                  Missed
-                </button>
-              </div>
+              <StickyAction className="mt-3" dock>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => gradeSelfCheck(true, 'Remembered')}
+                    className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition"
+                  >
+                    Remembered
+                  </button>
+                  <button
+                    onClick={() => gradeSelfCheck(false, 'Missed')}
+                    className="py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-xl text-sm font-medium transition"
+                  >
+                    Missed
+                  </button>
+                </div>
+              </StickyAction>
             </>
           )}
         </div>
@@ -381,7 +392,7 @@ export function AnswerInputPanel({
               {speechError}
             </div>
           )}
-          <StickyAction className="mt-3">
+          <StickyAction className="mt-3" dock>
             <button
               onClick={() => submit(answer, { spoken: true })}
               disabled={!answer.trim()}
@@ -389,21 +400,21 @@ export function AnswerInputPanel({
             >
               Check spoken answer
             </button>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                onClick={revealAnswer}
+                className="py-2 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-sm font-medium transition"
+              >
+                Reveal
+              </button>
+              <button
+                onClick={skipCurrent}
+                className="py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl text-sm font-medium transition"
+              >
+                Skip
+              </button>
+            </div>
           </StickyAction>
-          <div className="grid sm:grid-cols-2 gap-2 mt-3">
-            <button
-              onClick={revealAnswer}
-              className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
-            >
-              Reveal
-            </button>
-            <button
-              onClick={skipCurrent}
-              className="py-2.5 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-            >
-              Skip
-            </button>
-          </div>
         </div>
       ) : answerMode === 'choice' ? (
         <>
@@ -423,7 +434,9 @@ export function AnswerInputPanel({
                         subClassName="text-xs text-stone-600 mt-1"
                       />
                       {!hideEnglishMeaning && (
-                        <div className="mt-1 text-xs text-stone-600">{w.meaning}</div>
+                        <div className="mt-1 text-xs text-stone-600">
+                          {exerciseMeaningForWord(w)}
+                        </div>
                       )}
                     </button>
                   );
@@ -539,7 +552,7 @@ export function AnswerInputPanel({
               {liveStatus}
             </div>
           )}
-          <StickyAction className="mt-3">
+          <StickyAction className="mt-3" dock>
             <button
               onClick={() => submit()}
               disabled={!answer.trim()}
@@ -547,97 +560,97 @@ export function AnswerInputPanel({
             >
               Check (Enter)
             </button>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <button
+                onClick={revealKanaHint}
+                disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
+                className="py-2 border border-stone-200 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
+              >
+                Hint
+              </button>
+              <button
+                onClick={revealAnswer}
+                className="py-2 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm text-amber-800"
+              >
+                Reveal
+              </button>
+              <button
+                onClick={skipCurrent}
+                className="py-2 border border-stone-200 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl text-sm"
+              >
+                Skip
+              </button>
+            </div>
           </StickyAction>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            <button
-              onClick={revealKanaHint}
-              disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
-              className="py-2.5 border border-stone-200 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
-            >
-              Hint
-            </button>
-            <button
-              onClick={revealAnswer}
-              className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm text-amber-800"
-            >
-              Reveal
-            </button>
-            <button
-              onClick={skipCurrent}
-              className="py-2.5 border border-stone-200 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl text-sm"
-            >
-              Skip
-            </button>
-          </div>
         </>
       ) : (
         <>
-          <label
-            htmlFor={answerInputId}
-            className="mb-1.5 block text-left text-xs font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400"
-          >
-            Answer
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              ref={inputRef}
-              id={answerInputId}
-              type="text"
-              value={answer}
-              onCompositionStart={() => {
-                answerComposingRef.current = true;
-              }}
-              onChange={(e) =>
-                updateAnswerFromInput(e, {
-                  trackKanaMistake: liveKanaHelpEnabled,
-                })
-              }
-              onCompositionEnd={(e) =>
-                commitAnswerComposition(e, {
-                  trackKanaMistake: liveKanaHelpEnabled,
-                })
-              }
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  if (answer.trim()) submit();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  skipCurrent();
-                }
-              }}
-              placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
-              className={answerInputClassName}
-              lang="ja"
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-              enterKeyHint="done"
-              spellCheck="false"
-            />
-            {!reverseDrill && (
-              <button
-                type="button"
-                onClick={revealNextKana}
-                disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
-                aria-label="Reveal next kana"
-                title="Reveal next kana"
-                className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-              >
-                <IconSpark className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          {liveKana && liveStatus && (
-            <div
-              role="status"
-              aria-live="polite"
-              className={`mt-2 min-h-5 text-center text-xs ${answerFeedbackClassName}`}
+          <StickyAction className="mt-1" dock>
+            <label
+              htmlFor={answerInputId}
+              className="mb-1.5 block text-left text-xs font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400"
             >
-              {liveStatus}
+              Answer
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                ref={inputRef}
+                id={answerInputId}
+                type="text"
+                value={answer}
+                onCompositionStart={() => {
+                  answerComposingRef.current = true;
+                }}
+                onChange={(e) =>
+                  updateAnswerFromInput(e, {
+                    trackKanaMistake: liveKanaHelpEnabled,
+                  })
+                }
+                onCompositionEnd={(e) =>
+                  commitAnswerComposition(e, {
+                    trackKanaMistake: liveKanaHelpEnabled,
+                  })
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (answer.trim()) submit();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    skipCurrent();
+                  }
+                }}
+                placeholder={reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'}
+                className={answerInputClassName}
+                lang="ja"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                enterKeyHint="done"
+                spellCheck="false"
+              />
+              {!reverseDrill && (
+                <button
+                  type="button"
+                  onClick={revealNextKana}
+                  disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
+                  aria-label="Reveal next kana"
+                  title="Reveal next kana"
+                  className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                >
+                  <IconSpark className="w-4 h-4" />
+                </button>
+              )}
             </div>
-          )}
-          <StickyAction className="mt-3">
+            {liveKana && liveStatus && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={`mt-2 min-h-5 text-center text-xs ${answerFeedbackClassName}`}
+              >
+                {liveStatus}
+              </div>
+            )}
             <button
               onClick={() => submit()}
               disabled={!answer.trim()}
@@ -645,29 +658,29 @@ export function AnswerInputPanel({
             >
               Check (Enter)
             </button>
-          </StickyAction>
-          <div className={`mt-2 grid gap-2 ${!reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            {!reverseDrill && (
+            <div className={`mt-2 grid gap-2 ${!reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              {!reverseDrill && (
+                <button
+                  onClick={showStepHint}
+                  className="py-2 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl text-sm font-medium transition"
+                >
+                  {stepHintButtonLabel}
+                </button>
+              )}
               <button
-                onClick={showStepHint}
-                className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
+                onClick={revealAnswer}
+                className="py-2 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-sm font-medium transition"
               >
-                {stepHintButtonLabel}
+                Reveal
               </button>
-            )}
-            <button
-              onClick={revealAnswer}
-              className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
-            >
-              Reveal
-            </button>
-            <button
-              onClick={skipCurrent}
-              className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-            >
-              Skip
-            </button>
-          </div>
+              <button
+                onClick={skipCurrent}
+                className="py-2 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 text-stone-600 dark:text-stone-300 rounded-xl text-sm font-medium transition"
+              >
+                Skip
+              </button>
+            </div>
+          </StickyAction>
           {hintDisclosure}
         </>
       )}

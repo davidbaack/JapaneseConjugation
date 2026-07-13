@@ -87,7 +87,12 @@ function useKeyboardInset() {
 // so the backdrop spans the card's full width. It defaults to the common
 // `p-4` card case. Sticky only engages once content would overflow, so wrapping
 // a button that already fits on screen is harmless.
-export default function StickyAction({ children, pad = '-mx-4 px-4', className = '' }) {
+export default function StickyAction({
+  children,
+  pad = '-mx-4 px-4',
+  className = '',
+  dock = false,
+}) {
   const keyboardInset = useKeyboardInset();
   const bottom = `${keyboardInset}px`;
   const paddingBottom =
@@ -95,6 +100,7 @@ export default function StickyAction({ children, pad = '-mx-4 px-4', className =
 
   return (
     <div
+      data-action-dock={dock ? 'true' : undefined}
       className={`sticky z-10 pt-3 pb-1 bg-gradient-to-t from-white via-white dark:from-stone-900 dark:via-stone-900 to-transparent ${pad} ${className}`}
       style={{ bottom, paddingBottom }}
     >

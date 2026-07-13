@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import HorizontalTabList from '../components/HorizontalTabList.jsx';
 import { IconList, IconRefresh, IconSpark } from '../components/Icons.jsx';
 import { useTablist } from '../components/useTablist.js';
 import { useApp } from '../state/AppStateContext.jsx';
@@ -74,10 +75,11 @@ export default function PracticeLabView() {
           </h2>
         </div>
         <div className="mt-3">
-          <div
-            role="tablist"
-            aria-label="Drills"
-            className="flex flex-nowrap gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
+          <HorizontalTabList
+            activeId={active}
+            ariaLabel="Drills"
+            fadeClassName="from-stone-50 dark:from-stone-950"
+            className="flex flex-nowrap gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-stone-50 p-1 [scrollbar-width:thin] dark:border-stone-800 dark:bg-stone-950"
           >
             {LAB_TABS.map((tab) => {
               const Icon = tab.icon;
@@ -98,7 +100,7 @@ export default function PracticeLabView() {
                 </button>
               );
             })}
-          </div>
+          </HorizontalTabList>
         </div>
       </section>
 

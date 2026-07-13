@@ -11,7 +11,10 @@ confirms the new direction, update this document in the same change.
 
 - Top-level sections are Practice, Guide, Stats, Learn, Drills, Tools, and Settings.
 - On narrow screens those seven sections stay in one horizontally scrollable tab
-  row rather than wrapping into a second navigation row.
+  row rather than wrapping into a second navigation row. Boundary-aware edge
+  fades show when more destinations are available, and the active destination
+  is always scrolled fully into view. The same pattern applies to nested Tools
+  and Drills tab rows.
 - Practice is the landing page and the main learner loop. It is built around
   continuous practice, not bounded workouts or a visible long-term SRS queue.
 - Guide is a scaffolded practice mode for recovering the base form, identifying
@@ -20,12 +23,16 @@ confirms the new direction, update this document in the same change.
   available for correction.
   It can count as Practice progress after the full guided card is submitted, and
   it records step-level diagnostics separately.
-- Stats leads with practiced cards, answer balance, recent misses, and one
+- Stats leads with answer attempts, answer balance, recent misses, and one
   primary recommendation. Upcoming reviews and readiness summaries do not need
-  to block active Practice; an empty schedule is one calm empty state.
+  to block active Practice; an empty schedule is one calm empty state. Accuracy
+  always appears with its attempt count, and one or two attempts are explicitly
+  labeled as an early estimate.
 - Learn teaches forms and verb/adjective groups from start to finish through
   three collapsed tracks and one searchable lesson index. It can recommend
-  focused Practice, but it does not gate Practice.
+  focused Practice, but it does not gate Practice. Track counts describe form
+  type coverage; the action is Focus Practice on this track and is explicitly
+  continuous, exit-anytime, and separate from the Default Practice mix.
 - Drills contains Ending Lab, group drills, and speed games.
 - Tools contains lookup, check, word management, saved lists, and custom words.
 - Settings is for durable display, audio, sync, backup, and reset preferences.
@@ -42,22 +49,29 @@ confirms the new direction, update this document in the same change.
   cards, missed count, streak, and why the current card appeared. Detailed form
   and subgroup weakness data lives in the Practice map and Stats, with coach
   strip details limited to the selection reason, top session miss pattern, and
-  recent answer trail.
+  recent answer trail. On narrow screens the larger metrics and details collapse
+  after the first answer, while the compact summary remains visible. The answer
+  field and primary action remain reachable above the soft keyboard; Hint,
+  Reveal, and Skip stay adjacent as secondary actions. Next card is likewise
+  sticky during review.
 - The persistent Practice map shows all form families, including disabled and
   untried families, in Focus-map-style category cards. The map uses global
   Plain, Polite, Affirmative, Negative, Past, and Non-past toggles for active
   Practice scope; those toggles apply across every form family. Family cards
   can also be toggled on or off as categories through the expanded Default
   practice mix controls. The map keeps observed history separate from that
-  saved mix: collapsed family cards show learner state, active-form count, and
-  exact-form strength counts; expanded families expose descriptions, lifetime
-  and session balance, skill, exact-form history plus saved-form controls, and
+  Default Practice mix: collapsed family cards show learner state, active form
+  type count, and exact-form strength counts; expanded families expose
+  descriptions, lifetime and session balance, skill, exact-form history plus
+  Default Practice controls, and
   subgroup weakness rows. A family-level Practice now action starts temporary
   continuous focus using forms that match the global filters without changing
-  `practiceScope` or `enabledTypes`; its banner says the default mix is unchanged
+  `practiceScope` or `enabledTypes`; its banner says Default Practice is unchanged
   and exits back to ordinary Practice. On mobile the history summary remains
-  visible while the persistent controls open through a view-local Focus
-  disclosure. Active but untried families are "New" with "No attempts yet,"
+  visible while the persistent controls open through a view-local Adjust focus
+  disclosure. This disclosure is stable and learner-controlled rather than
+  inferred from proficiency; every family remains available at every level.
+  Active but untried families are "New" with "No attempts yet,"
   never "Not introduced."
 - Form scope persists through `state.enabledTypes`. The default and reset scope
   is Everyday.
@@ -66,6 +80,9 @@ confirms the new direction, update this document in the same change.
 - Main Practice prompts from the dictionary form only for forward production
   cards. Form-to-form transformations belong in Drills, not the main Practice
   loop.
+- Exercise surfaces use one concise, deterministic exercise meaning. Curated
+  starter meanings take priority and imported words fall back to their first
+  sense. Lookup retains the complete dictionary meaning and alternate senses.
 - Sentence mode remains an active-card presentation toggle. It uses bundled
   sentence chunks first when available or cached, then the shared Supabase
   sentence table, then deterministic local templates for custom, missing, or
@@ -118,7 +135,10 @@ confirms the new direction, update this document in the same change.
 - Lookup and Check can launch targeted Practice for a selected word or exact form.
 - Lookup starts with search, recent items, and suggestions; it does not render a
   dictionary entry or inventory until the learner enters or chooses a word. Full
-  conjugation tables are disclosed on demand.
+  conjugation tables are disclosed on demand. Ambiguous exact forms require an
+  explicit learner choice; chooser cards avoid repeated rules, the chosen rule
+  appears once in the detail panel, and other dictionary matches remain in a
+  separate collapsed disclosure while exact results exist.
 - Words and list word pickers render 30 results at a time. Lists lead with My
   lists, disclose built-in packs and the AI builder, and show an editor only for
   the selected list. Custom Words leads with learner-added entries and discloses
@@ -127,11 +147,15 @@ confirms the new direction, update this document in the same change.
 ## Drills
 
 - Ending Lab supports onbin and te/ta repair. Transform supports practice
-  between non-dictionary source and target forms. Groups supports verb/adjective
+  between non-dictionary source and target forms by recovering the same
+  dictionary word and rebuilding the named target. Grammar from the starting
+  form does not carry over unless the target names it. Groups supports verb/adjective
   classification. Rush supports speed and recall.
 - Every drill starts with its exercise. Recommendations and detailed metrics
   follow the task. Transform reuses Practice grading in a compact presentation
-  without the Practice coach strip, continuous framing, or Practice map.
+  without the Practice coach strip, continuous framing, or Practice map. It
+  labels Starting form and Target form explicitly, and word JLPT metadata is
+  labeled as a word level rather than grammar difficulty.
 - Drills can create visible recommended Practice sets. The learner starts the set
   explicitly; once practiced in Practice, it updates normal progress.
 - Practice can also route a detected weakness into the matching Drill: godan
@@ -156,3 +180,6 @@ confirms the new direction, update this document in the same change.
   requested a hint.
 - Preserve inline AI continuation for hints, missed-answer explanations, and
   Learn.
+- Answer review leads with outcome, correct answer, learner answer, one concise
+  diagnosis, and Next card. Deterministic derivation and Visual Rule Path live
+  under an Explain the rule disclosure for both correct and missed answers.

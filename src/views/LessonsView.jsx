@@ -142,7 +142,7 @@ function TrackCard({ track, lessons, onLearnLesson, onPracticeLesson, onPractice
       </p>
       <div className="mt-3 flex items-center justify-between gap-3 text-xs text-stone-600 dark:text-stone-400">
         <span>{lessons.length} lessons</span>
-        <span>{formCount} form types</span>
+        <span>Covers {formCount} form types</span>
       </div>
 
       <details className="mt-3 rounded-xl border border-white/70 bg-white/60 dark:border-stone-800 dark:bg-stone-950/60">
@@ -196,8 +196,11 @@ function TrackCard({ track, lessons, onLearnLesson, onPracticeLesson, onPractice
         className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${styles.button}`}
       >
         <IconRefresh className="w-4 h-4" />
-        Practice all {formCount} forms
+        Focus Practice on this track
       </button>
+      <p className="mt-1.5 text-center text-[11px] font-medium text-stone-600 dark:text-stone-400">
+        Temporary focus · Continuous until you exit
+      </p>
     </article>
   );
 }

@@ -135,4 +135,20 @@ describe('expanded vocabulary lexicon', () => {
     );
     expect(getWordMeta(word).lessons).toContain(3);
   });
+
+  it('keeps the complete imported meaning and the concise fallback exercise meaning', () => {
+    const [word] = mergeBuiltInVerbs(
+      [
+        {
+          dict: 'する',
+          reading: 'する',
+          meaning: 'to do, to try; to wear small items',
+          group: 'suru',
+        },
+      ],
+      [{ dict: 'する', reading: 'する', meaning: 'to do', group: 'suru' }],
+    );
+    expect(word.meaning).toBe('to do, to try; to wear small items');
+    expect(word.exerciseMeaning).toBe('to do');
+  });
 });

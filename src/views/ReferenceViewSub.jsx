@@ -192,6 +192,15 @@ export default function ReferenceViewSub({
     queryActive && selectedMatchesQuery && !activeLookupMatch && !ambiguousExactLookup
       ? selected
       : null;
+  const hasReferenceDetail = !!(showScratch || activeLookupMatch || detailWord);
+  const primaryLookupMatches = lookupMatches.slice(0, 5);
+  const additionalExactLookupMatches = ambiguousExactLookup ? lookupMatches.slice(5) : [];
+  const primaryResultWordKeys = new Set(
+    lookupMatches.map((match) => wordKeyLocal(match.word)).filter(Boolean),
+  );
+  if (activeLookupMatch?.word) primaryResultWordKeys.add(wordKeyLocal(activeLookupMatch.word));
+  if (detailWord) primaryResultWordKeys.add(wordKeyLocal(detailWord));
+  const otherWordMatches = matches.filter((word) => !primaryResultWordKeys.has(wordKeyLocal(word)));
   const rows = detailWord ? referenceRows(detailWord, state) : [];
   const selectedView = detailWord ? promptDisplay(detailWord, null, practicePrefs) : null;
   const selectedMasuDiagnostic = detailWord ? ruMasuDiagnostic(detailWord) : null;
@@ -304,7 +313,7 @@ export default function ReferenceViewSub({
 
   function drillSelectedWordSweep() {
     if (!detailWord || !practiceWord) return;
-    setFavoriteMsg(`Drilling enabled forms for ${detailWord.dict}.`);
+    setFavoriteMsg(`Practicing enabled form types for ${detailWord.dict}.`);
     practiceWord(detailWord, null, {
       source: 'reference',
       launchMode: 'word-sweep',
@@ -543,8 +552,67 @@ export default function ReferenceViewSub({
     playPronunciation(text, 0.9, practicePrefs.voiceURI);
   }
 
+  function renderLookupChoice(match) {
+    const active = lookupMatchKey(match) === lookupMatchKey(activeLookupMatch);
+    const answerView =
+      match.matchKind === 'variant'
+        ? {
+            main: match.surface || match.answer,
+            sub: match.surface && match.surface !== match.answer ? match.answer : '',
+            lang: 'ja',
+          }
+        : formDisplay(match.answer, practicePrefs, match.word, match.type.id);
+    const wordView = promptDisplay(match.word, null, practicePrefs);
+
+    return (
+      <button
+        key={`${wordKeyLocal(match.word)}-${match.type.id}-${match.matchKind}`}
+        onClick={() => confirmLookupMatch(match)}
+        className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+          active
+            ? 'border-indigo-200 bg-indigo-50 dark:bg-indigo-950/20'
+            : 'border-stone-100 hover:border-stone-200 hover:bg-stone-50 dark:border-stone-800 dark:hover:border-stone-700 dark:hover:bg-stone-800/40'
+        }`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <ScriptDisplay
+              view={answerView}
+              className="text-sm font-medium text-stone-900 dark:text-stone-50"
+              subClassName="text-[11px] text-stone-600"
+            />
+            <div className="mt-0.5 text-[11px] text-stone-600">{match.type.label}</div>
+          </div>
+          <span
+            className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs font-semibold ${
+              match.matchKind === 'exact'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            {match.matchKind}
+          </span>
+        </div>
+        <div className="mt-1 truncate text-xs text-stone-600">
+          <span className="font-semibold text-stone-800 dark:text-stone-200" lang={wordView.lang}>
+            {wordView.main}
+          </span>
+          {wordView.sub && <span className="text-stone-600"> ({wordView.sub})</span>} Â·{' '}
+          {match.word.meaning}
+        </div>
+        {match.variantNote && (
+          <div className="mt-1 text-[11px] leading-tight text-stone-600">{match.variantNote}</div>
+        )}
+      </button>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-4 text-left lg:grid-cols-[360px_1fr]">
+    <div
+      className={`grid grid-cols-1 gap-4 text-left ${
+        hasReferenceDetail ? 'lg:grid-cols-[360px_1fr]' : ''
+      }`}
+    >
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden flex flex-col">
         <div className="p-3 border-b border-stone-100 dark:border-stone-800">
           <div className="relative">
@@ -645,8 +713,14 @@ export default function ReferenceViewSub({
                 </p>
               ) : null}
               {lookupMatches.length > 0 ? (
-                <div className="mt-2 space-y-1.5">
-                  {lookupMatches.slice(0, ambiguousExactLookup ? 12 : 5).map((m) => {
+                <div
+                  className={`mt-2 gap-1.5 ${
+                    ambiguousExactLookup && !hasReferenceDetail
+                      ? 'grid sm:grid-cols-2 lg:grid-cols-3'
+                      : 'flex flex-col'
+                  }`}
+                >
+                  {primaryLookupMatches.map((m) => {
                     const active = lookupMatchKey(m) === lookupMatchKey(activeLookupMatch);
                     const av =
                       m.matchKind === 'variant'
@@ -692,12 +766,27 @@ export default function ReferenceViewSub({
                           {bv.sub && <span className="text-stone-600"> ({bv.sub})</span>} ·{' '}
                           {m.word.meaning}
                         </div>
-                        <div className="mt-1 text-[11px] text-stone-600 leading-tight">
-                          {m.variantNote || m.explanation.rule}
-                        </div>
+                        {m.variantNote && (
+                          <div className="mt-1 text-[11px] text-stone-600 leading-tight">
+                            {m.variantNote}
+                          </div>
+                        )}
                       </button>
                     );
                   })}
+                  {additionalExactLookupMatches.length > 0 && (
+                    <details className="mt-0 overflow-hidden rounded-lg border border-stone-200 dark:border-stone-800 sm:col-span-2 lg:col-span-3">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-stone-50 px-3 py-2 text-xs font-semibold text-stone-700 dark:bg-stone-950/60 dark:text-stone-200 [&::-webkit-details-marker]:hidden">
+                        <span>More exact interpretations</span>
+                        <span className="font-normal text-stone-600">
+                          {additionalExactLookupMatches.length}
+                        </span>
+                      </summary>
+                      <div className="space-y-1.5 border-t border-stone-200 p-2 dark:border-stone-800">
+                        {additionalExactLookupMatches.map(renderLookupChoice)}
+                      </div>
+                    </details>
+                  )}
                 </div>
               ) : (
                 <div className="mt-2 text-xs text-stone-600">
@@ -775,42 +864,58 @@ export default function ReferenceViewSub({
             </div>
           )}
         </div>
-        <div className="flex-1 overflow-y-auto max-h-[560px] divide-y divide-stone-50 dark:divide-stone-800">
-          {!queryActive && (
-            <div className="p-4 text-sm leading-relaxed text-stone-600 dark:text-stone-400">
-              Search a dictionary word or any conjugated form. Recent lookups stay above for quick
-              access.
-            </div>
-          )}
-          {queryActive &&
-            matches.slice(0, 30).map((w) => {
-              const wv = promptDisplay(w, null, practicePrefs);
-              return (
-                <button
-                  key={`${w.group}:${w.dict}`}
-                  onClick={() => chooseReferenceWord(w)}
-                  className={`w-full text-left px-4 py-3 transition ${
-                    isSelectedWord(w)
-                      ? 'bg-indigo-50 dark:bg-indigo-950/20'
-                      : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'
-                  }`}
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <div className="font-medium text-stone-800 dark:text-stone-100">
-                      <ScriptDisplay view={wv} className="" subClassName="text-xs text-stone-600" />
+        {!queryActive && (
+          <div className="border-t border-stone-100 p-4 text-sm leading-relaxed text-stone-600 dark:border-stone-800 dark:text-stone-400">
+            Search a dictionary word or any conjugated form. Recent lookups stay above for quick
+            access.
+          </div>
+        )}
+        {queryActive && otherWordMatches.length > 0 && (
+          <details className="border-t border-stone-100 dark:border-stone-800">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-stone-700 hover:bg-stone-50 dark:text-stone-200 dark:hover:bg-stone-800/40 [&::-webkit-details-marker]:hidden">
+              <span>Other words matching this search</span>
+              <span className="text-xs font-normal text-stone-600">{otherWordMatches.length}</span>
+            </summary>
+            <div className="max-h-[560px] divide-y divide-stone-50 overflow-y-auto border-t border-stone-100 dark:divide-stone-800 dark:border-stone-800">
+              {otherWordMatches.slice(0, 30).map((word) => {
+                const wordView = promptDisplay(word, null, practicePrefs);
+                return (
+                  <button
+                    key={`${word.group}:${word.dict}`}
+                    onClick={() => chooseReferenceWord(word, '')}
+                    className={`w-full px-4 py-3 text-left transition ${
+                      isSelectedWord(word)
+                        ? 'bg-indigo-50 dark:bg-indigo-950/20'
+                        : 'hover:bg-stone-50 dark:hover:bg-stone-800/40'
+                    }`}
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="font-medium text-stone-800 dark:text-stone-100">
+                        <ScriptDisplay
+                          view={wordView}
+                          className=""
+                          subClassName="text-xs text-stone-600"
+                        />
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-stone-600">
+                        {favoriteListHasWord(wordLists, word) && (
+                          <IconStar className="h-3 w-3 text-amber-500" />
+                        )}
+                        {isAdjective(word) ? 'adj' : 'verb'}
+                      </span>
                     </div>
-                    <span className="text-[11px] text-stone-600 inline-flex items-center gap-1 font-semibold">
-                      {favoriteListHasWord(wordLists, w) && (
-                        <IconStar className="w-3 h-3 text-amber-500" />
-                      )}
-                      {isAdjective(w) ? 'adj' : 'verb'}
-                    </span>
-                  </div>
-                  <div className="text-xs text-stone-600 truncate">{w.meaning}</div>
-                </button>
-              );
-            })}
-        </div>
+                    <div className="truncate text-xs text-stone-600">{word.meaning}</div>
+                  </button>
+                );
+              })}
+              {otherWordMatches.length > 30 && (
+                <div className="px-4 py-2 text-xs text-stone-600">
+                  Showing the first 30 matches. Refine the search to narrow the list.
+                </div>
+              )}
+            </div>
+          </details>
+        )}
       </div>
       <div className="space-y-4">
         {showScratch && (
@@ -1072,7 +1177,7 @@ export default function ReferenceViewSub({
                   className="px-3 py-2 border border-indigo-200 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 disabled:opacity-40 dark:border-indigo-900/60 dark:bg-indigo-950/25 dark:text-indigo-300 dark:hover:bg-indigo-950/40 rounded-lg text-sm inline-flex items-center gap-1.5 transition"
                 >
                   <IconList className="w-4 h-4" />
-                  Practice enabled forms
+                  Practice enabled form types
                 </button>
                 <button
                   onClick={toggleFavorite}

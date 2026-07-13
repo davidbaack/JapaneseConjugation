@@ -71,4 +71,21 @@ describe('StickyAction', () => {
       expect(screen.getByRole('button', { name: 'Check' }).parentElement.style.bottom).toBe('0px');
     });
   });
+
+  it('marks a full answer dock while preserving every adjacent action', () => {
+    render(
+      <StickyAction dock>
+        <button type="button">Check</button>
+        <button type="button">Hint</button>
+        <button type="button">Reveal</button>
+        <button type="button">Skip</button>
+      </StickyAction>,
+    );
+
+    const dock = screen.getByRole('button', { name: 'Check' }).parentElement;
+    expect(dock.dataset.actionDock).toBe('true');
+    expect(screen.getByRole('button', { name: 'Hint' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Reveal' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeTruthy();
+  });
 });

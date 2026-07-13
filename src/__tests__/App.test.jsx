@@ -111,18 +111,22 @@ describe('App shell', () => {
         within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
       ).toBeTruthy(),
     );
-    fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Focus' }));
-    expect(within(practiceMap()).getByRole('button', { name: 'Close' })).toBeTruthy();
+    fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Adjust focus' }));
+    expect(
+      within(practiceMap()).getByRole('button', { name: 'Close focus controls' }),
+    ).toBeTruthy();
     fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Turn Negative off' }));
     await waitFor(() =>
       expect(within(practiceMap()).getByRole('button', { name: 'Turn Negative on' })).toBeTruthy(),
     );
-    expect(within(practiceMap()).getByRole('button', { name: 'Close' })).toBeTruthy();
+    expect(
+      within(practiceMap()).getByRole('button', { name: 'Close focus controls' }),
+    ).toBeTruthy();
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
     );
     await waitFor(() =>
-      expect(within(conditionalCard()).getByText('3/5 forms saved')).toBeTruthy(),
+      expect(within(conditionalCard()).getByText('3 of 5 form types in default mix')).toBeTruthy(),
     );
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Negative on' })).toBeTruthy();
 
@@ -130,20 +134,20 @@ describe('App shell', () => {
       within(conditionalCard()).getByRole('button', { name: `Turn ${conditionalNara.label} off` }),
     );
     await waitFor(() =>
-      expect(within(conditionalCard()).getByText('2/5 forms saved')).toBeTruthy(),
+      expect(within(conditionalCard()).getByText('2 of 5 form types in default mix')).toBeTruthy(),
     );
 
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals off' }),
     );
     await waitFor(() =>
-      expect(within(conditionalCard()).getByText('0/5 forms saved')).toBeTruthy(),
+      expect(within(conditionalCard()).getByText('0 of 5 form types in default mix')).toBeTruthy(),
     );
     fireEvent.click(
       within(conditionalCard()).getByRole('button', { name: 'Turn Conditionals on' }),
     );
     await waitFor(() =>
-      expect(within(conditionalCard()).getByText('2/5 forms saved')).toBeTruthy(),
+      expect(within(conditionalCard()).getByText('2 of 5 form types in default mix')).toBeTruthy(),
     );
     expect(details().getAttribute('aria-expanded')).toBe('true');
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Negative on' })).toBeTruthy();
@@ -231,7 +235,9 @@ describe('App shell', () => {
 
     expect(await screen.findByText('Category focus')).toBeTruthy();
     expect(
-      screen.getByText('5 forms matching your filters - Your default mix is unchanged'),
+      screen.getByText(
+        '5 form types matching filters · Continuous practice · exit anytime · Default Practice unchanged',
+      ),
     ).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Practice' }).getAttribute('aria-selected')).toBe(
       'true',
@@ -348,9 +354,9 @@ describe('App shell', () => {
     expect(screen.queryByText('No attempts yet')).toBeNull();
     expect(screen.queryByText('Untested')).toBeNull();
     expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getByText('0 cards')).toBeTruthy();
-    expect(screen.getByText('0 missed')).toBeTruthy();
-    expect(screen.getByText('0 streak')).toBeTruthy();
+    expect(screen.getAllByText('0 cards').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 streak').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Start workout' })).toBeNull();
     expect(screen.queryByText('Next workout')).toBeNull();
     expect(screen.queryByText('Form families')).toBeNull();
@@ -444,7 +450,7 @@ describe('App shell', () => {
     fireEvent.click(teTaDetailsButton());
     expect(teTaDetailsButton().getAttribute('aria-expanded')).toBe('true');
 
-    expect(within(practiceMap()).getByText('2/2 forms saved')).toBeTruthy();
+    expect(within(practiceMap()).getByText('2 of 2 form types in default mix')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
     expect(within(practiceMap()).getByText('0 right / 2 wrong lifetime')).toBeTruthy();
     expect(within(practiceMap()).getByText('Needs review')).toBeTruthy();
@@ -457,12 +463,16 @@ describe('App shell', () => {
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Te-form off' })).toBeTruthy();
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Ta-form off' })).toBeTruthy();
     fireEvent.click(within(practiceMap()).getByRole('button', { name: 'Turn Te-form off' }));
-    await waitFor(() => expect(within(practiceMap()).getByText('1/2 forms saved')).toBeTruthy());
+    await waitFor(() =>
+      expect(within(practiceMap()).getByText('1 of 2 form types in default mix')).toBeTruthy(),
+    );
     expect(within(practiceMap()).getByRole('button', { name: 'Turn Te-form on' })).toBeTruthy();
     fireEvent.click(
       within(practiceMap()).getByRole('button', { name: 'Turn Te/Ta Sound Changes off' }),
     );
-    await waitFor(() => expect(within(practiceMap()).getByText('0/2 forms saved')).toBeTruthy());
+    await waitFor(() =>
+      expect(within(practiceMap()).getByText('0 of 2 form types in default mix')).toBeTruthy(),
+    );
     expect(
       within(practiceMap()).getByRole('button', { name: 'Turn Te/Ta Sound Changes on' }),
     ).toBeTruthy();
@@ -486,7 +496,7 @@ describe('App shell', () => {
     expect(await screen.findByText('Family primer')).toBeTruthy();
     expect(screen.getByText('4-card guided set')).toBeTruthy();
     expect(screen.getByRole('progressbar', { name: 'Intro progress' })).toBeTruthy();
-    expect(within(practiceMap()).getByText('4/10 forms saved')).toBeTruthy();
+    expect(within(practiceMap()).getByText('4 of 10 form types in default mix')).toBeTruthy();
 
     const primer = screen.getByRole('region', { name: 'Passive primer' });
     expect(within(primer).getByText('Passive Polite Negative')).toBeTruthy();
@@ -535,7 +545,7 @@ describe('App shell', () => {
     expect(screen.getByText('Practice run')).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Practice map' })).toBeTruthy();
     expect(screen.queryByRole('complementary', { name: 'Focus map' })).toBeNull();
-    expect(screen.getByText('52 saved forms')).toBeTruthy();
+    expect(screen.getByText('Default Practice: 52 form types')).toBeTruthy();
     // "Sentence" is now the cued-cloze presentation toggle: a valid review
     // control, not a legacy study-mode button.
     expect(screen.queryByRole('button', { name: 'Sentence off', exact: true })).toBeNull();
@@ -658,10 +668,12 @@ describe('App shell', () => {
     ).toBeTruthy();
     expect(within(ruleCard).getByText(/Shift the final/)).toBeTruthy();
     expect(screen.queryByText(/does not match the requested/)).toBeNull();
-    const answerBreakdown = screen.getByText('Answer breakdown').closest('section');
+    const answerBreakdown = screen.getByText('Explain the rule').closest('details');
     expect(answerBreakdown).toBeTruthy();
-    expect(answerBreakdown.tagName.toLowerCase()).toBe('section');
+    expect(answerBreakdown.open).toBe(false);
     expect(within(answerBreakdown).queryByText('More')).toBeNull();
+    fireEvent.click(screen.getByText('Explain the rule'));
+    expect(answerBreakdown.open).toBe(true);
     expect(screen.getByText('1. What category is this and why?').closest('summary')).toBeNull();
     expect(within(answerBreakdown).getByText('Visual Rule Path')).toBeTruthy();
     expect(within(answerBreakdown).getByText('Row visual')).toBeTruthy();
@@ -777,7 +789,7 @@ describe('App shell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Practice this form' }));
     expect(await screen.findByText('Learn focus')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Plain Past Practice/i })).toBeTruthy();
-    expect(screen.getByText(/Locked until you exit/)).toBeTruthy();
+    expect(screen.getByText(/exit anytime/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Sentence context/ })).toBeNull();
   }, 15000);
 
@@ -852,7 +864,7 @@ describe('App shell', () => {
     });
   }, 15000);
 
-  it('shows correct-answer rationale expanded without a More toggle', async () => {
+  it('keeps correct-answer rationale available on demand without a More toggle', async () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -899,8 +911,11 @@ describe('App shell', () => {
     if (checkButton) fireEvent.click(checkButton);
 
     await screen.findAllByText('Correct.', {}, { timeout: 5000 });
-    const rationale = screen.getByText('Answer breakdown');
-    expect(rationale.closest('details')).toBeNull();
+    const rationale = screen.getByText('Explain the rule').closest('details');
+    expect(rationale).toBeTruthy();
+    expect(rationale.open).toBe(false);
+    fireEvent.click(screen.getByText('Explain the rule'));
+    expect(rationale.open).toBe(true);
     expect(screen.getByText('Visual Rule Path')).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Dictionary form', selected: true })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'ます form', selected: false })).toBeTruthy();
@@ -1143,7 +1158,15 @@ describe('App shell', () => {
 
     expect(await screen.findByRole('heading', { name: 'Ending Lab' })).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: /^Transform/i }));
-    expect(await screen.findByText(/Conjugate to/i)).toBeTruthy();
+    expect(await screen.findByText('Change to the target form')).toBeTruthy();
+    expect(screen.getByText('Starting form')).toBeTruthy();
+    expect(screen.getByText('Target form')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Use the same dictionary word. Build the named target form; grammar from the starting form is not carried over unless the target names it.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/Word level: N[1-5]/)).toBeTruthy();
     expect(screen.queryByText('Practice run')).toBeNull();
     expect(screen.queryByRole('complementary', { name: 'Practice map' })).toBeNull();
     fireEvent.click(screen.getByRole('tab', { name: /^Groups/i }));
@@ -1158,7 +1181,7 @@ describe('App shell', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Learn', exact: true }));
     const trackButtons = await screen.findAllByRole('button', {
-      name: /Practice all \d+ forms/,
+      name: 'Focus Practice on this track',
     });
     fireEvent.click(trackButtons[0]);
 
@@ -1167,7 +1190,7 @@ describe('App shell', () => {
     expect(screen.getByText(/12 recommended cards/)).toBeTruthy();
     expect(screen.getByText(/18 focused words/)).toBeTruthy();
     expect(screen.getByText(/focused form types/)).toBeTruthy();
-    expect(screen.getByText(/Locked until you exit/)).toBeTruthy();
+    expect(screen.getByText(/exit anytime/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Exit focus' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
 
@@ -1187,7 +1210,7 @@ describe('App shell', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Learn', exact: true }));
     const trackButtons = await screen.findAllByRole('button', {
-      name: /Practice all \d+ forms/,
+      name: 'Focus Practice on this track',
     });
     fireEvent.click(trackButtons[1]);
 
@@ -1233,7 +1256,7 @@ describe('App shell', () => {
     expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
   }, 15000);
 
-  it('starts Lookup Practice enabled forms as a word form sweep', async () => {
+  it('starts Lookup Practice enabled form types as a word form sweep', async () => {
     render(<App />);
     expect(await waitForPracticeCard()).toBeTruthy();
 
@@ -1243,7 +1266,7 @@ describe('App shell', () => {
       target: { value: 'taberu' },
     });
     expect(await screen.findAllByText('to eat')).toBeTruthy();
-    fireEvent.click(await screen.findByRole('button', { name: 'Practice enabled forms' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Practice enabled form types' }));
 
     expect(await screen.findByText('Word form sweep')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /食べる/ })).toBeTruthy();
@@ -1252,7 +1275,7 @@ describe('App shell', () => {
     expect(screen.getByRole('button', { name: 'Back to reference' })).toBeTruthy();
   }, 15000);
 
-  it('does not offer Practice enabled forms for unmatched scratch lookup words', async () => {
+  it('does not offer Practice enabled form types for unmatched scratch lookup words', async () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('tab', { name: 'Tools', exact: true }));
@@ -1266,7 +1289,7 @@ describe('App shell', () => {
       screen.getByText('No local form match yet. Try a dictionary form or romaji.'),
     ).toBeTruthy();
     expect(screen.queryByText(/Scanner/i)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Practice enabled forms' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Practice enabled form types' })).toBeNull();
   }, 15000);
 
   it('recognizes conversational 食べれる in Check without guessing 滑る', async () => {
@@ -1312,7 +1335,7 @@ describe('App shell', () => {
     ).toBeGreaterThan(0);
     expect(screen.queryByText('Scratch conjugator')).toBeNull();
     expect(screen.queryByText(/お食べれ/)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Practice enabled forms' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Practice enabled form types' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Copy table' })).toBeNull();
   }, 15000);
 
@@ -1332,7 +1355,7 @@ describe('App shell', () => {
     const referenceDetails = screen.getByText('Show full word reference').closest('details');
     expect(referenceDetails).toBeTruthy();
     expect(referenceDetails.open).toBe(false);
-    expect(screen.queryByRole('button', { name: 'Practice enabled forms' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Practice enabled form types' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Copy table' })).toBeNull();
   }, 15000);
 

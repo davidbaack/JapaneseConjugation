@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import React, { useState } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import ReferenceViewSub from '../views/ReferenceViewSub.jsx';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { defaultState } from '../utils/storage.js';
+import { explainItem } from '../utils/conjugatorExplain.js';
 
 const IU = {
   dict: '言う',
@@ -69,10 +70,15 @@ describe('ReferenceViewSub ambiguity chooser', () => {
     expect(goButton).toBeTruthy();
     expect(sayButton).toBeTruthy();
     expect(rankedButtons).toEqual([goButton, sayButton]);
+    const selectedRule = explainItem(IU, 'plain-past').rule;
+    expect(screen.queryByText(selectedRule)).toBeNull();
 
     fireEvent.click(sayButton);
 
     expect(await screen.findByText('Focused lookup hit')).toBeTruthy();
+    expect(
+      screen.getAllByText(selectedRule).filter((node) => !node.closest('details')),
+    ).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Practice this form' })).toBeTruthy();
     await waitFor(() => {
       const reference = JSON.parse(screen.getByTestId('reference-state').textContent);
@@ -112,5 +118,49 @@ describe('ReferenceViewSub ambiguity chooser', () => {
     expect(screen.getByText('Potential')).toBeTruthy();
     expect(screen.getByText('Passive')).toBeTruthy();
     expect(screen.queryByText('Focused lookup hit')).toBeNull();
+  });
+
+  it('keeps every exact interpretation available while disclosing overflow after five choices', async () => {
+    const homophones = Array.from({ length: 7 }, (_, index) => ({
+      dict: `語${index}う`,
+      reading: 'いう',
+      meaning: `sense ${index}`,
+      group: 'godan',
+      jlpt: 'N5',
+      common: index < 5,
+    }));
+    render(<LookupHarness verbs={homophones} />);
+
+    searchFor('itta');
+
+    expect(await screen.findByText('Ambiguous exact match')).toBeTruthy();
+    const more = screen.getByText('More exact interpretations').closest('details');
+    expect(more).toBeTruthy();
+    expect(more.open).toBe(false);
+    expect(within(more).getAllByRole('button', { hidden: true })).toHaveLength(2);
+    for (const word of homophones) expect(screen.getByText(word.dict)).toBeTruthy();
+  });
+
+  it('deduplicates exact words and collapses looser dictionary matches', async () => {
+    const looseMatch = {
+      dict: '別語',
+      reading: 'べつご',
+      meaning: 'itta companion entry',
+      group: 'godan',
+    };
+    render(<LookupHarness verbs={[IU, IKU, looseMatch]} />);
+
+    searchFor('itta');
+
+    expect(await screen.findByText('Ambiguous exact match')).toBeTruthy();
+    const others = screen.getByText('Other words matching this search').closest('details');
+    expect(others).toBeTruthy();
+    expect(others.open).toBe(false);
+    expect(within(others).getByText('別語')).toBeTruthy();
+    expect(within(others).queryByText('言う')).toBeNull();
+    expect(within(others).queryByText('行く')).toBeNull();
+
+    fireEvent.click(within(others).getByRole('button', { hidden: true }));
+    expect(screen.getByLabelText('Search for a word or conjugation form').value).toBe('別語');
   });
 });

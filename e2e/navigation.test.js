@@ -57,7 +57,7 @@ test.describe('Tab navigation', () => {
     await expect(practiceTab).toHaveClass(/font-semibold/);
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
     await expect(page.getByText('Practice run', { exact: true })).toBeVisible();
-    await expect(page.getByText(/0 cards/)).toBeVisible();
+    await expect(page.getByLabel(/Practice run summary: 0 cards/)).toBeVisible();
     await expect(page.getByRole('button', { name: /Start workout|Continue workout/ })).toHaveCount(
       0,
     );

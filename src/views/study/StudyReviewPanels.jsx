@@ -9,11 +9,12 @@ import {
   IconX,
 } from '../../components/Icons.jsx';
 import ScriptDisplay from '../../components/ScriptDisplay.jsx';
+import StickyAction from '../../components/StickyAction.jsx';
 import { ConjugationBreakdown } from '../../components/ConjugationBreakdown.jsx';
 import { ChatPanel } from '../../components/ChatPanel.jsx';
 import { lessonForType } from '../../data/lessonContent.js';
 import { DEFAULT_PREFS } from '../../data/defaults.js';
-import { englishForForm, formDisplay, promptDisplay } from '../../utils/display.js';
+import { exerciseEnglishForForm, formDisplay, promptDisplay } from '../../utils/display.js';
 import { toHiragana } from '../../utils/romaji.js';
 import { getConjugationDebugInfo } from '../../utils/conjugatorExplain.js';
 import { labRouteForMistakePattern } from '../../utils/mistakeDiagnosis.js';
@@ -24,28 +25,13 @@ import {
   buildMistakeExplanation,
 } from '../../utils/answerFeedbackCopy.js';
 
-function ReviewDisclosure({
-  tone = 'stone',
-  summary,
-  children,
-  alwaysOpen = false,
-  hintLabel = 'More',
-}) {
+function ReviewDisclosure({ tone = 'stone', summary, children, hintLabel = 'More' }) {
   const toneClass =
     tone === 'rose'
       ? 'border-rose-200 dark:border-rose-900/60 bg-white/70 dark:bg-stone-950/50'
       : tone === 'emerald'
         ? 'border-emerald-200 dark:border-emerald-900/60 bg-white/70 dark:bg-stone-950/50'
         : 'border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-950/50';
-
-  if (alwaysOpen) {
-    return (
-      <section className={`rounded-xl border ${toneClass} px-3 py-2`}>
-        <div className="text-sm font-semibold text-stone-800 dark:text-stone-100">{summary}</div>
-        <div className="mt-3 space-y-2.5">{children}</div>
-      </section>
-    );
-  }
 
   return (
     <details className={`rounded-xl border ${toneClass} px-3 py-2`}>
@@ -365,8 +351,8 @@ function RunAnswerReveal({
     : formDisplay(record.expected, prefs, record.word, record.cardType);
   const reviewTypeId = record.practicedType || record.cardType;
   const targetEnglish = record.reverseDrill
-    ? englishForForm(record.word, null)
-    : englishForForm(record.word, record.cardType);
+    ? exerciseEnglishForForm(record.word, null)
+    : exerciseEnglishForForm(record.word, record.cardType);
   const explanation = record.explanation;
   const relatedLesson = lessonForType(reviewTypeId);
   const minimalPairFeedback = record.minimalPairFeedback;
@@ -634,22 +620,27 @@ function RunAnswerReveal({
       </div>
 
       {onTryAnother && (
-        <button
-          ref={actionButtonRef}
-          type="button"
-          onClick={onTryAnother}
-          aria-label="Next card"
-          className="group mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-stone-800 bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-100"
+        <StickyAction
+          pad="-mx-3 px-3 sm:mx-0 sm:px-0"
+          className="mt-1 sm:static sm:z-auto sm:mt-4 sm:bg-none sm:pt-0 sm:pb-0"
         >
-          <span className="inline-flex items-center gap-2">
-            <IconArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            <span aria-hidden="true">Next card</span>
-          </span>
-        </button>
+          <button
+            ref={actionButtonRef}
+            type="button"
+            onClick={onTryAnother}
+            aria-label="Next card"
+            className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-stone-800 bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-100"
+          >
+            <span className="inline-flex items-center gap-2">
+              <IconArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              <span aria-hidden="true">Next card</span>
+            </span>
+          </button>
+        </StickyAction>
       )}
       {record.correct && explanation && (
         <div className="mt-4 space-y-2.5 border-t border-emerald-200 pt-4 text-left dark:border-emerald-900/50">
-          <ReviewDisclosure tone="emerald" summary="Answer breakdown" alwaysOpen>
+          <ReviewDisclosure tone="emerald" summary="Explain the rule" hintLabel="">
             <ConjugationBreakdown
               word={record.word}
               type={record.practicedType}
@@ -726,7 +717,7 @@ function RunAnswerReveal({
               {missedExplanation.body}
             </div>
           )}
-          <ReviewDisclosure tone="rose" summary="Answer breakdown" alwaysOpen>
+          <ReviewDisclosure tone="rose" summary="Explain the rule" hintLabel="">
             {!minimalPairFeedback && (
               <div className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
                 {explanation.intro}

@@ -68,6 +68,7 @@ describe('Practice miss to focused Guide handoff', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open Guide for this rule' }));
     expect(await screen.findByText('Focused Guide')).toBeTruthy();
     expect(screen.getByText(/Source: Dictionary Form/)).toBeTruthy();
+    expect(screen.getByLabelText('Card 1 of 8')).toBeTruthy();
 
     const missComparison = screen.getByLabelText('Practice miss comparison');
     expect(within(missComparison).getByText('\u306d\u307e\u3059')).toBeTruthy();
@@ -90,8 +91,10 @@ describe('Practice miss to focused Guide handoff', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ichidan / ru-verb' }));
     fireEvent.change(screen.getByLabelText('Final conjugation'), { target: { value: 'nenai' } });
     fireEvent.click(screen.getByRole('button', { name: 'Submit guide card' }));
+    expect(screen.getByLabelText('Card 1 of 8')).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: 'Next card' }));
 
+    expect(screen.getByLabelText('Card 2 of 8')).toBeTruthy();
     expectDictionaryPrompt();
   }, 15000);
 });

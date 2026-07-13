@@ -361,10 +361,18 @@ describe('StudyView continuous Practice startup', () => {
 
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getByText('0 cards')).toBeTruthy();
-    expect(screen.getByText('0 missed')).toBeTruthy();
-    expect(screen.getByText('0 streak')).toBeTruthy();
+    expect(screen.getAllByText('0 cards').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 streak').length).toBeGreaterThan(0);
     expect(screen.getByText('New enabled form.')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Check (Enter)' }).closest('[data-action-dock="true"]'),
+    ).toBeTruthy();
+    expect(
+      within(screen.getByText('Practice run').closest('section')).getByRole('button', {
+        name: 'Adjust focus',
+      }),
+    ).toBeTruthy();
     expect(screen.queryByRole('progressbar', { name: 'Session cards' })).toBeNull();
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
@@ -379,9 +387,9 @@ describe('StudyView continuous Practice startup', () => {
 
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getByText('0 cards')).toBeTruthy();
-    expect(screen.getByText('0 missed')).toBeTruthy();
-    expect(screen.getByText('0 streak')).toBeTruthy();
+    expect(screen.getAllByText('0 cards').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 streak').length).toBeGreaterThan(0);
     expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
@@ -1295,9 +1303,9 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitForPracticeCard();
     expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getByText('0 cards')).toBeTruthy();
-    expect(screen.getByText('0 missed')).toBeTruthy();
-    expect(screen.getByText('0 streak')).toBeTruthy();
+    expect(screen.getAllByText('0 cards').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 streak').length).toBeGreaterThan(0);
     expect(screen.queryByText('0/1 ready')).toBeNull();
     expect(screen.getByRole('button', { name: 'Practice run settings' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
@@ -1374,7 +1382,13 @@ describe('StudyView continuous Practice startup', () => {
 
     render(<StudyView mode="transform" />);
 
-    expect(await screen.findByText(/Conjugate to/i)).toBeTruthy();
+    expect(await screen.findByText('Change to the target form')).toBeTruthy();
+    expect(screen.getByText('Starting form')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Use the same dictionary word. Build the named target form; grammar from the starting form is not carried over unless the target names it.',
+      ),
+    ).toBeTruthy();
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
 
@@ -1680,10 +1694,13 @@ describe('StudyView continuous Practice startup', () => {
     rerender(<StudyView />);
 
     expect(screen.getByText('1 card')).toBeTruthy();
-    expect(screen.getByText('0 missed')).toBeTruthy();
+    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
     expect(screen.getByText('1 streak')).toBeTruthy();
     expect(screen.getByText('100% right')).toBeTruthy();
     expect(screen.getByText('Focused practice: 食べる. Clean run so far.')).toBeTruthy();
+    const compactSummary = screen.getByText('Show run summary').closest('details');
+    expect(compactSummary).toBeTruthy();
+    expect(compactSummary.open).toBe(false);
   });
 
   it('counts a typed wrong answer as missed and resets the current streak', async () => {
@@ -1914,7 +1931,7 @@ describe('StudyView continuous Practice startup', () => {
 
     fireEvent.click(screen.getByText('Answer #1'));
     expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
-    expect(screen.getByText('Answer breakdown')).toBeTruthy();
+    expect(screen.getByText('Explain the rule')).toBeTruthy();
     expect(within(reviewRegion).getByText('Walk through this form in Guide')).toBeTruthy();
     expect(within(reviewRegion).getByText(/Drills this same word and target form/)).toBeTruthy();
     expect(
@@ -1976,13 +1993,13 @@ describe('StudyView continuous Practice startup', () => {
     rerender(<StudyView />);
 
     expect(screen.getByText('100% right')).toBeTruthy();
-    expect(screen.getByText('0 missed')).toBeTruthy();
+    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
     expect(
       screen.getByText('Clean run so far. This card was missed in an earlier practice run.'),
     ).toBeTruthy();
   });
 
-  it('opens missed run review answers with the rule first and breakdown inline', async () => {
+  it('keeps the concise miss diagnosis visible and discloses the detailed rule on demand', async () => {
     const target = STARTER_VERBS.find((word) => word.group === 'godan');
     expect(target).toBeTruthy();
     const type = 'plain-negative';
@@ -2022,10 +2039,12 @@ describe('StudyView continuous Practice startup', () => {
     const explanationRow = within(reviewRegion).getByText('Why it missed:').closest('div');
     expect(explanationRow.textContent).toMatch(/You added/);
     expect(within(reviewRegion).queryByText(/does not match the requested/)).toBeNull();
-    const answerBreakdown = within(reviewRegion).getByText('Answer breakdown').closest('section');
+    const answerBreakdown = within(reviewRegion).getByText('Explain the rule').closest('details');
     expect(answerBreakdown).toBeTruthy();
-    expect(answerBreakdown.tagName.toLowerCase()).toBe('section');
+    expect(answerBreakdown.open).toBe(false);
     expect(within(answerBreakdown).queryByText('More')).toBeNull();
+    fireEvent.click(within(answerBreakdown).getByText('Explain the rule'));
+    expect(answerBreakdown.open).toBe(true);
     expect(within(answerBreakdown).getByText('Visual Rule Path')).toBeTruthy();
     expect(within(answerBreakdown).getByText('Row visual')).toBeTruthy();
     expect(within(answerBreakdown).getByText('1. What category is this and why?')).toBeTruthy();
@@ -2063,7 +2082,7 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     expect(await screen.findByText('Word form sweep')).toBeTruthy();
-    expect(screen.getByText(/3 enabled forms/)).toBeTruthy();
+    expect(screen.getByText(/3 enabled form types/)).toBeTruthy();
     expect(screen.getAllByText('Plain Past').length).toBeGreaterThan(0);
 
     fireEvent.change(await waitForPracticeCard(), { target: { value: 'wrong' } });
@@ -2151,7 +2170,10 @@ describe('StudyView continuous Practice startup', () => {
     expect(nextButton.className).toContain('w-full');
     expect(nextButton.className).not.toContain('sm:absolute');
     expect(nextButton.textContent).toContain('Next card');
-    const answerBreakdown = screen.getByText('Answer breakdown').closest('section');
+    expect(nextButton.parentElement.className).toContain('sticky');
+    expect(nextButton.parentElement.style.paddingBottom).toContain('safe-area-inset-bottom');
+    const answerBreakdown = screen.getByText('Explain the rule').closest('details');
+    expect(answerBreakdown.open).toBe(false);
     expect(
       nextButton.compareDocumentPosition(answerBreakdown) & window.Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
