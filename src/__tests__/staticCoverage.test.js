@@ -95,13 +95,29 @@ describe('static coverage configuration', () => {
   it('runtime-caches the sentence corpus without precaching every chunk', () => {
     const config = readRepoText('vite.config.js');
 
-    expect(config).toContain(
-      "globIgnores: ['**/data/sentences/manifest.json', '**/data/sentences/by-type/*.json']",
-    );
+    expect(config).toContain("'**/data/sentences/manifest.json'");
+    expect(config).toContain("'**/data/sentences/by-type/*.json'");
+    expect(config).toContain("'**/assets/vendor-supabase-*.js'");
     expect(config).toContain("cacheName: 'sentence-corpus-manifest-v1'");
     expect(config).toContain("handler: 'NetworkFirst'");
     expect(config).toContain("cacheName: 'sentence-corpus-v1'");
     expect(config).toContain("handler: 'CacheFirst'");
+    expect(config).toContain("cacheName: 'supabase-sdk-v1'");
+    expect(config).toContain('manifest: true');
+  });
+
+  it('enforces separate eager, precache, total, and per-chunk bundle budgets', () => {
+    const budget = readRepoText('scripts/check-bundle-size.js');
+
+    expect(budget).toContain('EAGER_CRITICAL_GZIP_KB');
+    expect(budget).toContain('PRECACHE_GZIP_KB');
+    expect(budget).toContain('TOTAL_GZIP_KB = 330');
+    expect(budget).toContain('MAX_CHUNK_GZIP_KB');
+    expect(budget).toContain("'EAGER/CRITICAL'");
+    expect(budget).toContain("'PRECACHE'");
+    expect(budget).toContain("'TOTAL'");
+    expect(budget).toContain('sumPrecache(cachedPaths)');
+    expect(budget).toContain("gzipFile(join(DIST_DIR, 'index.html'))");
   });
 
   it('runs browser tests against the configured deploy artifact', () => {

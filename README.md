@@ -226,15 +226,33 @@ an `srs_sync` table with:
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `id` | text | Primary key, set to the Supabase user id. |
+| `id` | uuid | Primary key, set to the Supabase user id. |
 | `data` | jsonb | Full app sync payload. |
 | `updated_at` | timestamptz | Updated on every sync write and used for merge/pull decisions. |
+| `revision` | bigint | Server-side compare-and-set revision for conflict-safe writes. |
 
-The tracked migration in
-`supabase/migrations/20260601133136_create_srs_sync.sql` creates this table,
-enables row-level security, grants access to authenticated users, and adds
-owner-only policies. Users can only select, insert, update, or delete the row
-whose `id` matches `auth.uid()::text`; anonymous users have no table policy.
+The tracked migrations create this table, enable row-level security, add
+owner-only policies, and install the revisioned `cas_srs_sync` function plus a
+protocol-downgrade guard. Users can only access the row whose `id` matches
+`auth.uid()`; anonymous users have no table policy. Apply every migration
+before deploying a client that uses revisioned sync. The CAS migration is safe
+to deploy first: while a row still contains legacy metadata, legacy direct
+upserts receive a server-incremented revision and timestamp. After an upgraded
+client writes `syncMeta.version >= 1`, direct legacy downgrades are rejected and
+all upgraded writes must advance the revision. If the CAS migration is missing,
+the upgraded app deliberately keeps changes local and asks the learner to retry
+instead of risking a blind overwrite.
+
+For a staging rollout probe, apply the migration, save once from the currently
+deployed legacy client, and verify both `revision` and `updated_at` advance. Then
+save from the upgraded client and verify `syncMeta.version >= 1`; a subsequent
+legacy save to that same row must fail with `sync_protocol_downgrade_rejected`,
+while an upgraded CAS save must advance `revision` again.
+
+The first upgraded sync adopts legacy payloads preservation-first, because an
+old missing item cannot be distinguished from a deletion that was never
+recorded. Once sync metadata version 1 is established, tombstones and scoped
+reset epochs prevent stale offline devices from resurrecting deleted data.
 
 To self-host cloud sync:
 
@@ -245,8 +263,8 @@ To self-host cloud sync:
 4. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for the app build. Never
    ship a service-role key to the browser.
 5. Sign in as a test user, complete one Practice card, then confirm `public.srs_sync`
-   contains exactly one row with that user's id, a JSON `data` payload, and a
-   fresh `updated_at`.
+   contains exactly one row with that user's id, a versioned JSON `data` payload,
+   a fresh `updated_at`, and an incremented `revision`.
 
 ## PWA / Deployment
 

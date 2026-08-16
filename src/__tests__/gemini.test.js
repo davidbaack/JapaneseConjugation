@@ -26,7 +26,9 @@ afterEach(() => {
 describe('Gemini requests', () => {
   it('uses the Supabase proxy without requiring a signed-in session', async () => {
     const getSession = vi.fn().mockResolvedValue({ data: { session: null } });
-    vi.doMock('../utils/supabase.js', () => ({ supabase: { auth: { getSession } } }));
+    vi.doMock('../utils/supabase.js', () => ({
+      getLoadedSupabaseClient: () => ({ auth: { getSession } }),
+    }));
     vi.stubEnv('VITE_SUPABASE_URL', 'https://katachiya.example.supabase.co');
     const fetchMock = stubGeminiFetch();
 
@@ -45,13 +47,13 @@ describe('Gemini requests', () => {
 
   it('includes the Supabase access token when a session exists', async () => {
     vi.doMock('../utils/supabase.js', () => ({
-      supabase: {
+      getLoadedSupabaseClient: () => ({
         auth: {
           getSession: vi.fn().mockResolvedValue({
             data: { session: { access_token: 'session-token' } },
           }),
         },
-      },
+      }),
     }));
     vi.stubEnv('VITE_SUPABASE_URL', 'https://katachiya.example.supabase.co');
     const fetchMock = stubGeminiFetch();
@@ -63,7 +65,7 @@ describe('Gemini requests', () => {
   });
 
   it('does not use client-provided Gemini API keys', async () => {
-    vi.doMock('../utils/supabase.js', () => ({ supabase: null }));
+    vi.doMock('../utils/supabase.js', () => ({ getLoadedSupabaseClient: () => null }));
     const fetchMock = stubGeminiFetch();
 
     const { callGemini } = await import('../utils/gemini.js');

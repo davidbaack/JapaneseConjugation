@@ -1,29 +1,36 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const WORD = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
-
+const WORD = {
+  dict: '\u98df\u3079\u308b',
+  reading: '\u305f\u3079\u308b',
+  meaning: 'to eat',
+  group: 'ichidan',
+};
 const ADJECTIVE = {
   dict: '\u304b\u3086\u3044',
   reading: '\u304b\u3086\u3044',
   meaning: 'itchy',
   group: 'i-adjective',
 };
+const CONFIG = { url: 'https://katachiya.example.supabase.co', anonKey: 'anon-key' };
 
-// Mirror the chainable Supabase query builder: from().select().eq().eq().maybeSingle().
-function selectChain(result) {
-  const maybeSingle = vi.fn(() => Promise.resolve(result));
-  const eqType = vi.fn(() => ({ maybeSingle }));
-  const eqWord = vi.fn(() => ({ eq: eqType }));
-  const select = vi.fn(() => ({ eq: eqWord }));
-  const from = vi.fn(() => ({ select }));
-  return { from, select, eqWord, eqType, maybeSingle };
+function response(rows, { ok = true, status = 200 } = {}) {
+  return { ok, status, json: vi.fn().mockResolvedValue(rows) };
 }
 
-// Load sentenceLibrary fresh with a specific (or null) Supabase client mock.
-async function load(client) {
+function validRow(overrides = {}) {
+  return {
+    ja_template: '\u4eca\u65e5 {w}\u3002',
+    segments: [{ t: '\u4eca\u65e5', r: '\u304d\u3087\u3046' }, { w: true }, { t: '\u3002', r: '' }],
+    en: 'I ate today.',
+    ...overrides,
+  };
+}
+
+async function load(config = CONFIG) {
   vi.resetModules();
-  vi.doMock('../utils/supabase.js', () => ({ supabase: client }));
+  vi.doMock('../utils/supabase.js', () => ({ getSupabaseConfig: () => config }));
   return import('../utils/sentenceLibrary.js');
 }
 
@@ -32,133 +39,105 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.resetModules();
+});
+
 describe('fetchTailoredSentence', () => {
-  it('returns null when Supabase is unconfigured', async () => {
-    const { fetchTailoredSentence } = await load(null);
+  it('returns null without configuration and does not touch the network', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load({ url: '', anonKey: '' });
+
     expect(await fetchTailoredSentence(WORD, 'plain-past')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('maps a row and derives the form locally from the engine', async () => {
-    const data = {
-      ja_template: '今日 {w}。',
-      segments: [{ t: '今日', r: 'きょう' }, { w: true }, { t: '。', r: '' }],
-      en: 'I ate today.',
-    };
-    const chain = selectChain({ data, error: null });
-    const { fetchTailoredSentence } = await load(chain);
-
-    const res = await fetchTailoredSentence(WORD, 'plain-past');
-    expect(res).toMatchObject({
-      jaTemplate: '今日 {w}。',
-      en: 'I ate today.',
-      source: 'db',
-    });
-    expect(res.segments).toHaveLength(3);
-    // surface / kanaSurface come from the conjugation engine, not the DB.
-    expect(res.surface).toBe('食べた');
-    expect(res.kanaSurface).toBe('たべた');
-    expect(chain.eqWord).toHaveBeenCalledWith('word_key', 'ichidan:食べる');
-    expect(chain.eqType).toHaveBeenCalledWith('type', 'plain-past');
-  });
-
-  it('caches a hit so a repeat lookup skips the query', async () => {
-    const chain = selectChain({
-      data: { ja_template: 'x {w}', segments: [{ w: true }], en: 'x' },
-      error: null,
-    });
-    const { fetchTailoredSentence } = await load(chain);
-
-    await fetchTailoredSentence(WORD, 'plain-past');
-    await fetchTailoredSentence(WORD, 'plain-past');
-    expect(chain.maybeSingle).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not cache a table miss so later imports can appear', async () => {
-    const chain = selectChain({ data: null, error: null });
-    const { fetchTailoredSentence } = await load(chain);
-
-    expect(await fetchTailoredSentence(WORD, 'plain-negative')).toBeNull();
-    chain.maybeSingle.mockResolvedValueOnce({
-      data: {
-        ja_template: 'later {w}',
-        segments: [{ t: 'later ', r: '' }, { w: true }],
-        en: 'Later.',
-      },
-      error: null,
-    });
-
-    const res = await fetchTailoredSentence(WORD, 'plain-negative');
-    expect(res).toMatchObject({ jaTemplate: 'later {w}', source: 'db' });
-    expect(chain.maybeSingle).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not cache semantically awkward adjective rows', async () => {
-    const chain = selectChain({
-      data: {
-        ja_template: 'if {w}.',
-        segments: [{ w: true }],
-        en: 'If this task is itchy, I will add a break.',
-      },
-      error: null,
-    });
-    const { fetchTailoredSentence } = await load(chain);
-
-    expect(await fetchTailoredSentence(ADJECTIVE, 'adj-tara')).toBeNull();
-    chain.maybeSingle.mockResolvedValueOnce({
-      data: {
-        ja_template: 'if {w}.',
-        segments: [{ w: true }],
-        en: 'If my skin is itchy, I will rest for a bit.',
-      },
-      error: null,
-    });
-
-    const res = await fetchTailoredSentence(ADJECTIVE, 'adj-tara');
-    expect(res).toMatchObject({ jaTemplate: 'if {w}.', source: 'db' });
-    expect(chain.maybeSingle).toHaveBeenCalledTimes(2);
-  });
-
-  it('ignores semantically awkward cached adjective rows and retries the table', async () => {
+  it('checks the local cache before configuration or network access', async () => {
     localStorage.setItem(
       'katachiya_ai_sentence_cache',
       JSON.stringify({
-        ['i-adjective:\u304b\u3086\u3044|adj-tara']: {
-          ts: Date.now(),
-          v: {
-            jaTemplate: 'if {w}.',
-            segments: [{ w: true }],
-            en: 'If this task is itchy, I will add a break.',
-          },
-        },
+        ['ichidan:\u98df\u3079\u308b|plain-past']: { ts: Date.now(), v: validRow() },
       }),
     );
-    const chain = selectChain({
-      data: {
-        ja_template: 'if {w}.',
-        segments: [{ w: true }],
-        en: 'If my skin is itchy, I will rest for a bit.',
-      },
-      error: null,
-    });
-    const { fetchTailoredSentence } = await load(chain);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load({ url: '', anonKey: '' });
 
-    const res = await fetchTailoredSentence(ADJECTIVE, 'adj-tara');
-    expect(res).toMatchObject({ jaTemplate: 'if {w}.', source: 'db' });
-    expect(chain.maybeSingle).toHaveBeenCalledTimes(1);
+    await expect(fetchTailoredSentence(WORD, 'plain-past')).resolves.toMatchObject({
+      source: 'db',
+      surface: '\u98df\u3079\u305f',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('returns null on a query error without caching the miss', async () => {
-    // Non-transient (403) so retryWithBackoff fails fast.
-    const chain = selectChain({ data: null, error: { message: 'denied', status: 403 } });
-    const { fetchTailoredSentence } = await load(chain);
+  it('reads the public sentence row over REST with anonymous headers', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response([validRow()]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
 
-    expect(await fetchTailoredSentence(WORD, 'potential')).toBeNull();
-    // A later success for the same key must still query (miss not cached).
-    chain.maybeSingle.mockResolvedValueOnce({
-      data: { ja_template: 'y {w}', segments: [{ w: true }], en: 'y' },
-      error: null,
+    const result = await fetchTailoredSentence(WORD, 'plain-past');
+
+    expect(result).toMatchObject({
+      jaTemplate: '\u4eca\u65e5 {w}\u3002',
+      source: 'db',
+      surface: '\u98df\u3079\u305f',
+      kanaSurface: '\u305f\u3079\u305f',
     });
-    const res = await fetchTailoredSentence(WORD, 'potential');
-    expect(res?.source).toBe('db');
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toContain('/rest/v1/sentences?');
+    expect(decodeURIComponent(url)).toContain('word_key=eq.ichidan:\u98df\u3079\u308b');
+    expect(decodeURIComponent(url)).toContain('type=eq.plain-past');
+    expect(options.headers).toEqual({
+      apikey: 'anon-key',
+      Authorization: 'Bearer anon-key',
+      Accept: 'application/json',
+    });
+  });
+
+  it('caches a hit so a repeat lookup skips the network', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response([validRow()]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
+
+    await fetchTailoredSentence(WORD, 'plain-past');
+    await fetchTailoredSentence(WORD, 'plain-past');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not cache a miss, an HTTP error, or an awkward adjective row', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response([]))
+      .mockResolvedValueOnce(response([], { ok: false, status: 403 }))
+      .mockResolvedValueOnce(
+        response([
+          validRow({
+            ja_template: 'if {w}.',
+            segments: [{ w: true }],
+            en: 'If this task is itchy, I will add a break.',
+          }),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        response([
+          validRow({
+            ja_template: 'if {w}.',
+            segments: [{ w: true }],
+            en: 'If my skin is itchy, I will rest for a bit.',
+          }),
+        ]),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
+
+    expect(await fetchTailoredSentence(WORD, 'plain-negative')).toBeNull();
+    expect(await fetchTailoredSentence(WORD, 'plain-negative')).toBeNull();
+    expect(await fetchTailoredSentence(ADJECTIVE, 'adj-tara')).toBeNull();
+    await expect(fetchTailoredSentence(ADJECTIVE, 'adj-tara')).resolves.toMatchObject({
+      source: 'db',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });

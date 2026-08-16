@@ -70,6 +70,9 @@ export default function SettingsView() {
     speechVoices,
     resolvedTheme,
     supabase,
+    supabaseConfigured,
+    supabaseStatus,
+    supabaseError,
     showAuth: onShowAuth,
   } = useApp();
   const [pendingReset, setPendingReset] = useState(null);
@@ -360,7 +363,7 @@ export default function SettingsView() {
           <IconCloud className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           Cloud Sync
         </h3>
-        {!supabase ? (
+        {!supabaseConfigured ? (
           <div className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-xl p-4">
             <p className="font-medium">Cloud sync is not configured</p>
             <p className="text-xs text-stone-600 mt-1">
@@ -373,11 +376,31 @@ export default function SettingsView() {
             <p className="text-xs text-stone-600">
               Sync your progress, custom vocabulary, and word lists across all devices.
             </p>
+            {supabaseStatus === 'error' && (
+              <div
+                role="alert"
+                className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-300"
+              >
+                Cloud sign-in could not load.{' '}
+                {supabaseError?.message || 'Check your connection and try again.'} Local practice is
+                still available.
+              </div>
+            )}
+            {supabaseStatus === 'loading' && (
+              <p role="status" aria-live="polite" className="text-xs text-stone-600">
+                Loading cloud sign-in... Local practice remains available.
+              </p>
+            )}
             <button
               onClick={onShowAuth}
+              disabled={supabaseStatus === 'loading'}
               className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition"
             >
-              Sign In / Sign Up
+              {supabaseStatus === 'loading'
+                ? 'Loading Cloud Sign-in...'
+                : supabaseStatus === 'error'
+                  ? 'Retry Cloud Sign-in'
+                  : 'Sign In / Sign Up'}
             </button>
           </div>
         ) : (
@@ -397,11 +420,16 @@ export default function SettingsView() {
               </div>
             </div>
             {syncStatus.message && (
-              <div className={`mb-3 text-xs rounded-lg border px-3 py-2 ${statusColor}`}>
+              <div
+                role="status"
+                aria-live="polite"
+                className={`mb-3 text-xs rounded-lg border px-3 py-2 ${statusColor}`}
+              >
                 <div className="flex items-center justify-between">
                   <span>{syncStatus.message}</span>
                   {syncStatus.at && <span>{new Date(syncStatus.at).toLocaleTimeString()}</span>}
                 </div>
+                {syncStatus.detail && <div className="mt-1 opacity-80">{syncStatus.detail}</div>}
               </div>
             )}
             <div className="flex gap-2">
@@ -548,8 +576,8 @@ export default function SettingsView() {
           <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
             <h3 className="font-medium mb-1 text-stone-800 dark:text-stone-200">Reset & cleanup</h3>
             <p className="text-xs text-stone-600 mb-4">
-              Signed-in resets update this browser and your cloud account. Signed-out resets are
-              local.
+              Signed-in resets update this browser and your cloud account. Signed-out resets stay on
+              this browser and sync if this local data is later connected to a cloud account.
             </p>
             <div role="status" aria-live="polite">
               {resetErr && (

@@ -3,7 +3,16 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-library/react';
 
 // No Supabase configured in tests → auth/sync effects no-op (offline-first path).
-vi.mock('../utils/supabase.js', () => ({ supabase: null }));
+vi.mock('../utils/supabase.js', () => ({
+  getSupabaseClientState: () => ({
+    configured: false,
+    status: 'unconfigured',
+    error: null,
+    client: null,
+  }),
+  subscribeSupabaseClient: () => () => {},
+  shouldRestoreSupabaseSession: () => false,
+}));
 
 globalThis.HTMLElement.prototype.scrollIntoView = vi.fn();
 
@@ -1193,6 +1202,17 @@ describe('App shell', () => {
     expect(screen.getByText(/exit anytime/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Exit focus' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Drills', exact: true }));
+    await screen.findByText('Pick a drill and start.', {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('tab', { name: /^Transform/i }));
+    expect(await screen.findByText('Change to the target form')).toBeTruthy();
+    expect(screen.queryByText('Learn focus')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Exit focus' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Practice', exact: true }));
+    expect(await screen.findByText('Learn focus')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Beginner track Practice/i })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('tab', { name: 'Stats', exact: true }));
     expect(await screen.findByRole('heading', { name: 'Practice pulse.' })).toBeTruthy();

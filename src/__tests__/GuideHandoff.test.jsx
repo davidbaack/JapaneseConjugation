@@ -4,7 +4,16 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../utils/supabase.js', () => ({ supabase: null }));
+vi.mock('../utils/supabase.js', () => ({
+  getSupabaseClientState: () => ({
+    configured: false,
+    status: 'unconfigured',
+    error: null,
+    client: null,
+  }),
+  subscribeSupabaseClient: () => () => {},
+  shouldRestoreSupabaseSession: () => false,
+}));
 
 globalThis.HTMLElement.prototype.scrollIntoView = vi.fn();
 

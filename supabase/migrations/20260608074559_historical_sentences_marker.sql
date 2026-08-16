@@ -1,0 +1,7 @@
+-- Historical linked-project migration marker.
+--
+-- The remote project created `public.sentences` under this version. The
+-- repository's canonical, idempotent definition is the immediately following
+-- 20260608120000_create_sentences.sql migration, which also grants the service
+-- role used by corpus tooling. This marker keeps both fresh and linked migration
+-- histories deterministic.

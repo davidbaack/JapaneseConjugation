@@ -597,7 +597,7 @@ export default function ReferenceViewSub({
           <span className="font-semibold text-stone-800 dark:text-stone-200" lang={wordView.lang}>
             {wordView.main}
           </span>
-          {wordView.sub && <span className="text-stone-600"> ({wordView.sub})</span>} Â·{' '}
+          {wordView.sub && <span className="text-stone-600"> ({wordView.sub})</span>} ·{' '}
           {match.word.meaning}
         </div>
         {match.variantNote && (

@@ -2,7 +2,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-vi.mock('../utils/supabase.js', () => ({ supabase: null }));
+vi.mock('../utils/supabase.js', () => ({
+  getSupabaseClientState: () => ({
+    configured: false,
+    status: 'unconfigured',
+    error: null,
+    client: null,
+  }),
+  subscribeSupabaseClient: () => () => {},
+  shouldRestoreSupabaseSession: () => false,
+}));
 
 import { AppStateProvider, useApp } from '../state/AppStateContext.jsx';
 

@@ -18,6 +18,7 @@ import {
   recordWeaknessAttempt,
   weaknessScoreForCard,
 } from './subcategoryWeakness.js';
+import { createSyncEventId } from './syncMetadata.js';
 
 export const GUIDE_SESSION_TARGET = 8;
 export const GUIDE_STEP_IDS = ['base', 'group', 'answer'];
@@ -436,6 +437,7 @@ export function recordGuideAttempt(guide, card, result, options = {}) {
     byStep,
     recent: [
       {
+        id: options.eventId || createSyncEventId(),
         at: options.now || Date.now(),
         wordKey: wordKey(card.word),
         group: card.word?.group || '',

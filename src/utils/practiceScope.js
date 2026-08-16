@@ -352,7 +352,10 @@ export function mergePracticeScopes(localScope, cloudScope, localEnabled = [], c
           ),
       ]),
     ),
-    activeFamilyIds: [...new Set([...local.activeFamilyIds, ...cloud.activeFamilyIds])],
+    activeFamilyIds: FORM_GROUPS.map((family) => family.id).filter(
+      (familyId) =>
+        local.activeFamilyIds.includes(familyId) || cloud.activeFamilyIds.includes(familyId),
+    ),
     selectedTypeIdsByFamily: Object.fromEntries(
       FORM_GROUPS.map((family) => [
         family.id,

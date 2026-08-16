@@ -495,18 +495,28 @@ export default function StudyView({ mode = 'practice' }) {
     allWords: verbs,
     builtInWords,
     activeGeminiKey: geminiKey,
-    practicePrefs,
+    practicePrefs: rawPracticePrefs,
     setPracticePrefs,
     wordLists,
-    studyFocus: focus,
+    studyFocus: rawFocus,
     clearStudyFocus: onFocusConsumed,
-    learnFocus,
+    learnFocus: rawLearnFocus,
     openLearnFocus,
     clearLearnFocus,
     openGuideForRule,
     openLabTool,
     hydrated,
   } = useApp();
+  const transformationMode = mode === 'transform';
+  // Transform is a Drills surface. A pending Practice/Learn launch may remain
+  // in the provider while the learner visits it, but it must not seed, narrow,
+  // consume, or clear that launch.
+  const focus = transformationMode ? null : rawFocus;
+  const learnFocus = transformationMode ? null : rawLearnFocus;
+  const practicePrefs = useMemo(() => {
+    if (!transformationMode) return rawPracticePrefs;
+    return clearBoundedReviewPrefs(rawFocus?.returnPracticePrefs || rawPracticePrefs);
+  }, [rawFocus?.returnPracticePrefs, rawPracticePrefs, transformationMode]);
   const [current, setCurrent] = useState(null);
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');
@@ -607,9 +617,27 @@ export default function StudyView({ mode = 'practice' }) {
       const group = FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId);
       if (group?.typeIds?.length) return group.typeIds;
     }
-    const baseTypes = state.enabledTypes?.length ? state.enabledTypes : ['plain-past'];
+    const returnEnabledTypes = Array.isArray(
+      rawFocus?.returnEnabledTypes || rawFocus?.recommendation?.returnEnabledTypes,
+    )
+      ? (rawFocus.returnEnabledTypes || rawFocus.recommendation.returnEnabledTypes).filter(Boolean)
+      : [];
+    const baseTypes =
+      transformationMode && returnEnabledTypes.length
+        ? returnEnabledTypes
+        : state.enabledTypes?.length
+          ? state.enabledTypes
+          : ['plain-past'];
     return reviewTypeIdsForState(state, baseTypes);
-  }, [state, sessionFilterFormGroupId, familyIntroFocus, practiceCategoryFocus]);
+  }, [
+    state,
+    sessionFilterFormGroupId,
+    familyIntroFocus,
+    practiceCategoryFocus,
+    rawFocus?.recommendation?.returnEnabledTypes,
+    rawFocus?.returnEnabledTypes,
+    transformationMode,
+  ]);
   const practiceWords = useMemo(() => {
     const base = filterWordsForStudyScope(
       verbs,
@@ -657,7 +685,6 @@ export default function StudyView({ mode = 'practice' }) {
   const autoAdvanceCorrect = resolveAutoAdvanceCorrect(practicePrefs);
   const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
   const typedAnswerMode = answerMode === 'input';
-  const transformationMode = mode === 'transform';
   const listeningPrompt = !!practicePrefs.listeningPrompt;
   const sentenceMode = !transformationMode && !!practicePrefs.sentenceMode;
   const activeMinimalPairSet = transformationMode
@@ -1026,13 +1053,17 @@ export default function StudyView({ mode = 'practice' }) {
   }, [current, transformationMode]);
 
   useEffect(() => {
-    if (current && !cardMatchesPractice(current, practiceWords, enabledTypes, practicePrefs)) {
+    if (
+      !transformationMode &&
+      current &&
+      !cardMatchesPractice(current, practiceWords, enabledTypes, practicePrefs)
+    ) {
       clearPersistedCurrent();
       setCurrent(null);
       setAnswer('');
       setPhase('answering');
     }
-  }, [practiceWords, enabledTypes, practicePrefs, current]);
+  }, [practiceWords, enabledTypes, practicePrefs, current, transformationMode]);
 
   useEffect(() => {
     if (!current || !activeMinimalPairSet) return;
@@ -1500,6 +1531,12 @@ export default function StudyView({ mode = 'practice' }) {
     verbStats,
     daily,
   }) {
+    if (transformationMode) {
+      return {
+        ...state,
+        transformation: nextTransformationStats(correct),
+      };
+    }
     const progressTypeId = reverseDrill ? sourceTypeForReading : current.type;
     const readinessRuleId = reverseDrill ? cardIdFor(current.verb, progressTypeId) : rid;
     const gradedAt = Date.now();
@@ -1518,7 +1555,6 @@ export default function StudyView({ mode = 'practice' }) {
         mistakeDiagnosis,
       }),
     };
-    if (transformationMode) return graded;
     return {
       ...graded,
       cards: { ...state.cards, [rid]: storedCard },
@@ -2081,16 +2117,18 @@ export default function StudyView({ mode = 'practice' }) {
       autoAdvanceRef.current = null;
     }
     stopSpeechRecognition();
-    const nextState = {
-      ...state,
-      session: sessionAfterSkip(state.session, current),
-    };
+    const nextState = transformationMode
+      ? state
+      : {
+          ...state,
+          session: sessionAfterSkip(state.session, current),
+        };
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, false)
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
     const likelyNextCard = prepareLikelyNextCard(nextState, current.id, sweepStep);
-    setState(nextState);
+    if (!transformationMode) setState(nextState);
     setAnswer('');
     setCoachRevealed(0);
     setSelfCheckOpen(false);

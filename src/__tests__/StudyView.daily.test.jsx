@@ -1370,9 +1370,20 @@ describe('StudyView continuous Practice startup', () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
+    const initialState = {
+      ...defaultState(),
+      enabledTypes: [type],
+      cards: { preserved: { due: 123, correct: 4, incorrect: 2 } },
+      mistakes: [{ key: 'preserved-mistake', resolved: false }],
+      retryQueue: ['preserved'],
+      readiness: { preserved: { attempted: 2 } },
+      weakness: { preserved: { attempted: 3 } },
+      daily: { ...defaultState().daily, count: 4 },
+      session: { ...defaultState().session, reviewed: 7, correct: 5, skipped: 1 },
+    };
     mockedApp.value = makeApp({
       setState,
-      state: { ...defaultState(), enabledTypes: [type] },
+      state: initialState,
       allWords: [target],
       practicePrefs: {
         ...DEFAULT_PREFS,
@@ -1395,13 +1406,186 @@ describe('StudyView continuous Practice startup', () => {
     await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
       .map(([arg]) => arg)
-      .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
+      .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
 
     expect(nextState.transformation.attempted).toBe(1);
     expect(nextState.transformation.correct).toBe(1);
     expect(Object.keys(nextState.transformation.byPair)).toHaveLength(1);
-    expect(nextState.cards).toEqual({});
-    expect(nextState.daily.count).toBe(0);
+    for (const field of [
+      'cards',
+      'mistakes',
+      'retryQueue',
+      'readiness',
+      'weakness',
+      'daily',
+      'session',
+    ]) {
+      expect(nextState[field]).toEqual(initialState[field]);
+    }
+  });
+
+  it('leaves pending Practice and Learn focus untouched while Transform is open', async () => {
+    const clearStudyFocus = vi.fn();
+    const clearLearnFocus = vi.fn();
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      clearStudyFocus,
+      clearLearnFocus,
+      learnFocus: {
+        source: 'practice-result',
+        reviewRecord: { word: target, cardType: 'te-form', correct: false },
+      },
+      state: { ...defaultState(), enabledTypes: ['te-form'] },
+      studyFocus: {
+        source: 'lab',
+        launchMode: 'recommendation',
+        recommendation: {
+          id: 'pending-practice-focus',
+          source: 'lab',
+          label: 'Pending Practice focus',
+          returnEnabledTypes: ['plain-past'],
+        },
+      },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        reviewLimit: 6,
+        reviewLimitSource: 'recommendation',
+        wordListIds: ['list-review-rec-pending-practice-focus'],
+      },
+    });
+
+    render(<StudyView mode="transform" />);
+
+    expect(await screen.findByText('Change to the target form')).toBeTruthy();
+    expect(screen.queryByText('Pending Practice focus')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Exit focus' })).toBeNull();
+    expect(clearStudyFocus).not.toHaveBeenCalled();
+    expect(clearLearnFocus).not.toHaveBeenCalled();
+  });
+
+  it('uses the pre-focus scope while a direct form-family Practice launch is pending', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      setState,
+      state: { ...defaultState(), enabledTypes: ['te-form'] },
+      studyFocus: {
+        formGroupId: 'te-ta-sound-changes',
+        source: 'stats',
+        launchMode: 'form-group',
+        returnEnabledTypes: ['plain-past'],
+        returnPracticePrefs: { ...DEFAULT_PREFS },
+      },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        wordListIds: ['focused-list'],
+      },
+      wordLists: [],
+    });
+
+    render(<StudyView mode="transform" />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, 'plain-past') } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
+    const nextState = setState.mock.calls
+      .map(([arg]) => arg)
+      .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
+    expect(nextState.transformation.correct).toBe(1);
+    expect(screen.queryByRole('button', { name: 'Exit focus' })).toBeNull();
+  });
+
+  it('isolates Transform self-check and reveal misses from Practice progress', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const initialState = {
+      ...defaultState(),
+      enabledTypes: [type],
+      cards: { preserved: { due: 123, correct: 4, incorrect: 2 } },
+      mistakes: [{ key: 'preserved-mistake', resolved: false }],
+      retryQueue: ['preserved'],
+      readiness: { preserved: { attempted: 2 } },
+      weakness: { preserved: { attempted: 3 } },
+      daily: { ...defaultState().daily, count: 4 },
+      session: { ...defaultState().session, reviewed: 7, correct: 5, skipped: 1 },
+    };
+
+    for (const answerMode of ['self-check', 'input']) {
+      cleanup();
+      const setState = vi.fn();
+      mockedApp.value = makeApp({
+        setState,
+        state: initialState,
+        allWords: [target],
+        practicePrefs: { ...DEFAULT_PREFS, answerMode },
+      });
+      render(<StudyView mode="transform" />);
+
+      await screen.findByText('Change to the target form');
+      if (answerMode === 'self-check') {
+        fireEvent.click(screen.getByRole('button', { name: 'Reveal answer' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Missed' }));
+      } else {
+        fireEvent.click(screen.getByRole('button', { name: 'Reveal' }));
+      }
+      await waitFor(() => expect(setState).toHaveBeenCalled());
+      const nextState = setState.mock.calls
+        .map(([arg]) => arg)
+        .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
+
+      expect(nextState.transformation.correct).toBe(0);
+      for (const field of [
+        'cards',
+        'mistakes',
+        'retryQueue',
+        'readiness',
+        'weakness',
+        'daily',
+        'session',
+      ]) {
+        expect(nextState[field]).toEqual(initialState[field]);
+      }
+    }
+  });
+
+  it('keeps Transform skip entirely local', async () => {
+    const setState = vi.fn();
+    mockedApp.value = makeApp({
+      setState,
+      state: { ...defaultState(), enabledTypes: ['plain-past'] },
+      allWords: [STARTER_VERBS[0]],
+    });
+
+    render(<StudyView mode="transform" />);
+
+    await screen.findByText('Change to the target form');
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(setState).not.toHaveBeenCalled();
+  });
+
+  it('does not clear the suspended Practice card when Transform scope changes', async () => {
+    const practiceWord = STARTER_VERBS[0];
+    const transformWord = STARTER_VERBS[1];
+    persistStudyCard(practiceWord, 'plain-past');
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: ['plain-past'] },
+      allWords: [practiceWord],
+    });
+
+    const view = render(<StudyView mode="transform" />);
+    await screen.findByText('Change to the target form');
+
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: ['plain-past'] },
+      allWords: [transformWord],
+    });
+    view.rerender(<StudyView mode="transform" />);
+
+    await waitFor(() => expect(screen.getByText('Change to the target form')).toBeTruthy());
+    expect(JSON.parse(sessionStorage.getItem('jp-study-current')).dict).toBe(practiceWord.dict);
   });
 
   it('keeps an exact romaji answer unsubmitted until Check or Enter when kana help is off', async () => {

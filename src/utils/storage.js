@@ -44,6 +44,17 @@ import {
   practiceScopeFromEnabledTypes,
 } from './practiceScope.js';
 import { reconcileDerivedProgressState } from './derivedProgress.js';
+import {
+  adoptSyncMetadata,
+  assertPendingSyncResetOwner,
+  bindPendingSyncReset,
+  clearPendingSyncReset,
+  getLocalSyncDeviceId,
+  mergeSyncSidecar,
+  pendingSyncResetIntent,
+  rebaseSyncReset,
+  stripPendingSyncReset,
+} from './syncMetadata.js';
 
 export const DAY = 86400000;
 export const SRS_SCHEMA_VERSION = 3;
@@ -159,11 +170,16 @@ export function loadAll() {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return parsed;
-    return {
-      ...parsed,
-      wordLists: normalizeWordLists(parsed.wordLists),
-      ...(parsed.practicePrefs ? { practicePrefs: mergePracticePrefs(parsed.practicePrefs) } : {}),
-    };
+    return adoptSyncMetadata(
+      {
+        ...parsed,
+        wordLists: normalizeWordLists(parsed.wordLists),
+        ...(parsed.practicePrefs
+          ? { practicePrefs: mergePracticePrefs(parsed.practicePrefs) }
+          : {}),
+      },
+      getLocalSyncDeviceId(),
+    );
   } catch {
     return null;
   }
@@ -185,6 +201,7 @@ export function saveAll(
   syncConfig,
   lastSyncedAt,
   practicePrefs = DEFAULT_PREFS,
+  syncMeta = null,
 ) {
   const payload = JSON.stringify({
     state,
@@ -194,6 +211,7 @@ export function saveAll(
     syncConfig,
     lastSyncedAt,
     practicePrefs: mergePracticePrefs(practicePrefs),
+    syncMeta,
   });
   try {
     localStorage.setItem(STORAGE_KEY, payload);
@@ -313,10 +331,21 @@ export function resolveThemePreference(theme = 'system', systemTheme = getSystem
 // ============================================================================
 // CLOUD SYNC
 // ============================================================================
-import { supabase } from './supabase.js';
+import * as supabaseClientModule from './supabase.js';
+
+function configuredSupabaseClient() {
+  return supabaseClientModule.getLoadedSupabaseClient?.() || null;
+}
+
+async function requireSupabaseClient() {
+  const loaded = configuredSupabaseClient();
+  if (loaded) return loaded;
+  if (supabaseClientModule.loadSupabaseClient) return supabaseClientModule.loadSupabaseClient();
+  throw new Error('Supabase client is not configured');
+}
 
 export function syncReady() {
-  return !!supabase;
+  return supabaseClientModule.isSupabaseConfigured?.() ?? false;
 }
 
 /**
@@ -333,7 +362,7 @@ function assertExpectedCloudUser(session, expectedUserId) {
 
 /** @param {string} [expectedUserId] */
 export async function cloudFetch(expectedUserId = '') {
-  if (!supabase) throw new Error('Supabase client is not configured');
+  const supabase = await requireSupabaseClient();
 
   const {
     data: { session },
@@ -349,11 +378,11 @@ export async function cloudFetch(expectedUserId = '') {
   return retryWithBackoff(async () => {
     const { data, error } = await supabase
       .from('srs_sync')
-      .select('data, updated_at')
+      .select('data, updated_at, revision')
       .eq('id', session.user.id)
       .maybeSingle();
     if (error) throw error;
-    return data;
+    return data?.data ? { ...data, data: stripPendingSyncReset(data.data) } : data;
   });
 }
 
@@ -361,25 +390,72 @@ export async function cloudFetch(expectedUserId = '') {
  * @param {any} payload
  * @param {string} [expectedUserId]
  */
-export async function cloudUpsert(payload, expectedUserId = '') {
-  if (!supabase) throw new Error('Supabase client is not configured');
+export async function cloudUpsert(payload, expectedUserId = '', expectedRevision = undefined) {
+  const supabase = await requireSupabaseClient();
+  if (expectedRevision === undefined) {
+    throw new Error('Cloud compare-and-set revision is required');
+  }
 
   const {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session) throw new Error('User is not authenticated');
   assertExpectedCloudUser(session, expectedUserId);
+  if (!expectedUserId) throw new Error('Expected cloud user is required');
 
-  // Retry transient failures so a momentary network blip doesn't drop the
-  // user's progress; a fresh timestamp is written on each attempt.
-  await retryWithBackoff(async () => {
-    const { error } = await supabase.from('srs_sync').upsert({
-      id: session.user.id,
-      data: payload,
-      updated_at: new Date().toISOString(),
+  return retryWithBackoff(async () => {
+    const { data, error } = await supabase.rpc('cas_srs_sync', {
+      expected_revision: expectedRevision,
+      next_data: payload,
+      expected_user_id: expectedUserId,
     });
-    if (error) throw error;
+    if (error) {
+      if (
+        error.code === '40001' ||
+        String(error.message || '').includes('sync_revision_conflict')
+      ) {
+        const conflict = Object.assign(
+          new Error('Cloud changed while saving; retrying is required'),
+          { code: 'SYNC_REVISION_CONFLICT' },
+        );
+        throw conflict;
+      }
+      throw error;
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row || typeof row.sync_revision !== 'number') {
+      throw new Error('Cloud compare-and-set did not return a revision');
+    }
+    return {
+      data: row.sync_data,
+      updated_at: row.sync_updated_at,
+      revision: row.sync_revision,
+    };
   });
+}
+
+export async function syncCloudPayload(localPayload, expectedUserId = '', options = {}) {
+  const attempts = Math.max(1, Number(options.attempts) || 4);
+  let lastConflict = null;
+  const ownerSafePayload = bindPendingSyncReset(localPayload, expectedUserId);
+  const pendingReset = assertPendingSyncResetOwner(ownerSafePayload, expectedUserId);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const cloud = await cloudFetch(expectedUserId);
+    const mergedPayload = cloud?.data
+      ? mergeSyncPayload(ownerSafePayload, cloud.data, { userId: expectedUserId })
+      : ownerSafePayload;
+    const nextPayload = pendingReset
+      ? clearPendingSyncReset(mergedPayload, pendingReset.eventId)
+      : mergedPayload;
+    try {
+      const row = await cloudUpsert(nextPayload, expectedUserId, cloud?.revision ?? null);
+      return { payload: nextPayload, row };
+    } catch (error) {
+      if (error?.code !== 'SYNC_REVISION_CONFLICT') throw error;
+      lastConflict = error;
+    }
+  }
+  throw lastConflict || new Error('Cloud changed repeatedly; sync needs retry');
 }
 
 // Parse the cloud row's updated_at into epoch millis (0 when absent/invalid).
@@ -472,6 +548,7 @@ function normalizeSyncPayload(value) {
 function hasLocalSyncData(value) {
   const payload = normalizeSyncPayload(value);
   return !!(
+    pendingSyncResetIntent(payload) ||
     hasLocalStateData(payload.state) ||
     hasItems(payload.customVerbs) ||
     hasItems(payload.customAdjectives) ||
@@ -494,7 +571,10 @@ export function resolveSyncAction(cloud, localSyncedAt = 0, localState = null) {
     return hasLocalSyncData(localState) ? 'merge' : 'pull';
   }
   if (cloudAt < localSyncedAt) return 'push';
-  return 'noop';
+  if (localState == null) return 'noop';
+  return sameJSON(normalizeSyncPayload(localState), normalizeSyncPayload(cloud.data))
+    ? 'noop'
+    : 'merge';
 }
 
 /**
@@ -504,6 +584,7 @@ export function resolveSyncAction(cloud, localSyncedAt = 0, localState = null) {
  *   customAdjectives?: any[],
  *   wordLists?: any[],
  *   practicePrefs?: any,
+ *   syncMeta?: any,
  * }} [parts]
  */
 export function buildSyncPayload({
@@ -512,6 +593,7 @@ export function buildSyncPayload({
   customAdjectives,
   wordLists,
   practicePrefs,
+  syncMeta,
 } = {}) {
   return {
     state: state || defaultState(),
@@ -519,6 +601,7 @@ export function buildSyncPayload({
     customAdjectives: Array.isArray(customAdjectives) ? customAdjectives : [],
     wordLists: normalizeWordLists(wordLists),
     practicePrefs: mergePracticePrefs(practicePrefs),
+    syncMeta: syncMeta || null,
   };
 }
 
@@ -577,10 +660,25 @@ function mergeSyncPracticePrefs(localPrefs, cloudPrefs) {
   return local || DEFAULT_PREFS;
 }
 
-export function mergeSyncPayload(localPayload, cloudPayload) {
-  const local = buildSyncPayload(localPayload);
-  const cloud = buildSyncPayload(cloudPayload);
-  return {
+export function mergeSyncPayload(localPayload, cloudPayload, options = {}) {
+  const builtLocal = buildSyncPayload(localPayload);
+  const builtCloud = buildSyncPayload(cloudPayload);
+  const storedPendingReset = pendingSyncResetIntent(builtLocal);
+  const activePendingReset = pendingSyncResetIntent(builtLocal, options.userId);
+  const ownerSafeLocal =
+    storedPendingReset && options.userId && !activePendingReset
+      ? clearPendingSyncReset(builtLocal, storedPendingReset.eventId)
+      : builtLocal;
+  const preparedLocal =
+    activePendingReset && !options.skipPendingResetRebase
+      ? rebaseSyncReset(ownerSafeLocal, builtCloud, activePendingReset.domains)
+      : ownerSafeLocal;
+  const local = adoptSyncMetadata(
+    preparedLocal,
+    localPayload?.syncMeta?.deviceId || getLocalSyncDeviceId(),
+  );
+  const cloud = adoptSyncMetadata(builtCloud);
+  const mergedBase = {
     state: hasLocalStateData(local.state)
       ? mergeCloudState(local.state, cloud.state)
       : cloud.state || local.state,
@@ -588,6 +686,12 @@ export function mergeSyncPayload(localPayload, cloudPayload) {
     customAdjectives: mergeWordArrays(local.customAdjectives, cloud.customAdjectives),
     wordLists: mergeWordLists(local.wordLists, cloud.wordLists),
     practicePrefs: mergeSyncPracticePrefs(local.practicePrefs, cloud.practicePrefs),
+  };
+  const merged = mergeSyncSidecar(local, cloud, mergedBase, local.syncMeta.deviceId);
+  return {
+    ...merged,
+    wordLists: normalizeWordLists(merged.wordLists),
+    practicePrefs: mergePracticePrefs(merged.practicePrefs),
   };
 }
 
@@ -613,36 +717,47 @@ function mergeCardSourceTypeStats(local = {}, cloud = {}) {
 }
 
 export function mergeCards(local = {}, cloud = {}) {
-  const merged = { ...cloud };
-  for (const key of Object.keys(local)) {
-    const lc = local[key],
-      cc = cloud[key];
+  const merged = {};
+  for (const key of new Set([...Object.keys(local), ...Object.keys(cloud)])) {
+    const lc = local[key];
+    const cc = cloud[key];
     const sourceTypeStats = mergeCardSourceTypeStats(lc?.sourceTypeStats, cc?.sourceTypeStats);
     const hasSourceTypeStats = Object.keys(sourceTypeStats).length > 0;
-    if (!cc || lc.reps > cc.reps || (lc.reps === cc.reps && lc.nextReview > cc.nextReview)) {
-      merged[key] = hasSourceTypeStats ? { ...lc, sourceTypeStats } : lc;
-    } else if (hasSourceTypeStats) {
-      merged[key] = { ...cc, sourceTypeStats };
-    }
+    const candidates = [lc, cc].filter(Boolean);
+    const preferred = candidates.sort(
+      (a, b) =>
+        maxNum(b.reps, 0) - maxNum(a.reps, 0) ||
+        maxNum(b.nextReview, 0) - maxNum(a.nextReview, 0) ||
+        maxNum(b.lastSeen, 0) - maxNum(a.lastSeen, 0) ||
+        compareSyncText(stableSyncStringify(a), stableSyncStringify(b)),
+    )[0];
+    merged[key] = hasSourceTypeStats ? { ...preferred, sourceTypeStats } : preferred;
   }
   return merged;
 }
 
 // Merge two verbStats maps: per-word per-rule, take the entry with more `seen`.
 export function mergeVerbStats(local = {}, cloud = {}) {
-  const merged = { ...cloud };
-  for (const word of Object.keys(local)) {
-    if (!merged[word]) {
-      merged[word] = local[word];
-    } else {
-      const lw = local[word],
-        cw = cloud[word];
-      merged[word] = { ...cw };
-      for (const ruleId of Object.keys(lw)) {
-        const ls = lw[ruleId],
-          cs = cw[ruleId];
-        merged[word][ruleId] = !cs || (ls.seen || 0) > (cs.seen || 0) ? ls : cs;
+  const merged = {};
+  for (const word of new Set([...Object.keys(local), ...Object.keys(cloud)])) {
+    const lw = local[word] || {};
+    const cw = cloud[word] || {};
+    merged[word] = {};
+    for (const ruleId of new Set([...Object.keys(lw), ...Object.keys(cw)])) {
+      const left = lw[ruleId];
+      const right = cw[ruleId];
+      if (!left || !right) {
+        merged[word][ruleId] = left || right;
+        continue;
       }
+      const leftSeen = Number(left.seen) || 0;
+      const rightSeen = Number(right.seen) || 0;
+      merged[word][ruleId] =
+        leftSeen === rightSeen
+          ? deterministicSyncValue(left, right)
+          : leftSeen > rightSeen
+            ? left
+            : right;
     }
   }
   return merged;
@@ -653,14 +768,211 @@ export function mergeMistakes(local = [], cloud = []) {
   const byKey = new Map();
   for (const m of [...cloud, ...local]) {
     const prev = byKey.get(m.key);
-    if (!prev || m.at > prev.at) byKey.set(m.key, m);
+    if (
+      !prev ||
+      m.at > prev.at ||
+      (m.at === prev.at && stableSyncStringify(m) > stableSyncStringify(prev))
+    ) {
+      byKey.set(m.key, m);
+    }
   }
-  return [...byKey.values()].sort((a, b) => b.at - a.at).slice(0, 50);
+  return [...byKey.values()]
+    .sort((a, b) => b.at - a.at || compareSyncText(stableSyncStringify(a), stableSyncStringify(b)))
+    .slice(0, 50);
 }
 
 // Take the higher of two numeric values, treating nullish as 0.
 function maxNum(a, b) {
   return Math.max(Number(a) || 0, Number(b) || 0);
+}
+
+function stableSyncStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableSyncStringify).join(',')}]`;
+  if (!value || typeof value !== 'object') return JSON.stringify(value);
+  return `{${Object.keys(value)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableSyncStringify(value[key])}`)
+    .join(',')}}`;
+}
+
+function compareSyncText(left, right) {
+  return left === right ? 0 : left > right ? 1 : -1;
+}
+
+function deterministicSyncValue(left, right) {
+  if (left === undefined || left === null) return right;
+  if (right === undefined || right === null) return left;
+  return stableSyncStringify(left) >= stableSyncStringify(right) ? left : right;
+}
+
+function mergeProgressValue(left, right) {
+  if (typeof left === 'number' || typeof right === 'number') return maxNum(left, right);
+  if (typeof left === 'boolean' || typeof right === 'boolean') return !!(left || right);
+  if (Array.isArray(left) || Array.isArray(right)) {
+    const byValue = new Map();
+    for (const value of [...(left || []), ...(right || [])]) {
+      byValue.set(stableSyncStringify(value), value);
+    }
+    return [...byValue.entries()]
+      .sort(([a], [b]) => compareSyncText(a, b))
+      .map(([, value]) => value);
+  }
+  if (left && typeof left === 'object' && right && typeof right === 'object') {
+    const merged = {};
+    for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) {
+      merged[key] = mergeProgressValue(left[key], right[key]);
+    }
+    return merged;
+  }
+  return deterministicSyncValue(left, right);
+}
+
+function preferredProgressSnapshot(left = {}, right = {}, primary = 'lastAt') {
+  const leftPrimary = Number(left?.[primary]) || 0;
+  const rightPrimary = Number(right?.[primary]) || 0;
+  if (leftPrimary !== rightPrimary) return leftPrimary > rightPrimary ? left : right;
+  return deterministicSyncValue(left || {}, right || {});
+}
+
+function mergeLatestProgressSnapshot(
+  left = {},
+  right = {},
+  numericFields = [],
+  primary = 'lastAt',
+) {
+  const preferred = preferredProgressSnapshot(left, right, primary);
+  const merged = { ...preferred };
+  for (const field of numericFields) merged[field] = maxNum(left?.[field], right?.[field]);
+  return merged;
+}
+
+function mergeRecentProgressRows(left = [], right = [], limit = 20) {
+  const byKey = new Map();
+  for (const row of [...(left || []), ...(right || [])]) {
+    const key = row?.id || stableSyncStringify(row);
+    const previous = byKey.get(key);
+    byKey.set(key, previous ? preferredProgressSnapshot(previous, row, 'at') : row);
+  }
+  return [...byKey.values()]
+    .sort(
+      (a, b) =>
+        (Number(b?.at) || 0) - (Number(a?.at) || 0) ||
+        compareSyncText(stableSyncStringify(a), stableSyncStringify(b)),
+    )
+    .slice(0, limit);
+}
+
+function mergeReferenceProgress(local, cloud) {
+  const left = local || {};
+  const right = cloud || {};
+  const recentSearches = [
+    ...new Set([...(left.recentSearches || []), ...(right.recentSearches || [])]),
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .sort()
+    .slice(0, 12);
+  const historyByKey = new Map();
+  for (const row of [...(left.history || []), ...(right.history || [])]) {
+    if (!row?.dict || !row?.reading || !row?.group) continue;
+    const key = `${row.group}:${row.dict}:${row.reading}`;
+    const previous = historyByKey.get(key);
+    historyByKey.set(
+      key,
+      previous
+        ? mergeLatestProgressSnapshot(previous, row, ['count', 'lastAt'])
+        : { ...row, count: Number(row.count) || 1, lastAt: Number(row.lastAt) || 1 },
+    );
+  }
+  const weakRuleByKey = new Map();
+  for (const rule of [...(left.weakRules || []), ...(right.weakRules || [])]) {
+    if (!rule?.key) continue;
+    const previous = weakRuleByKey.get(rule.key);
+    weakRuleByKey.set(
+      rule.key,
+      previous
+        ? mergeLatestProgressSnapshot(previous, rule, ['addedAt'], 'addedAt')
+        : { ...rule, addedAt: Number(rule.addedAt) || 1 },
+    );
+  }
+  const selected = preferredProgressSnapshot(left.selected, right.selected, 'selectedAt');
+  return {
+    recentSearches,
+    history: [...historyByKey.values()]
+      .sort(
+        (a, b) =>
+          (Number(b.lastAt) || 0) - (Number(a.lastAt) || 0) ||
+          compareSyncText(stableSyncStringify(a), stableSyncStringify(b)),
+      )
+      .slice(0, 24),
+    selected: selected ? { ...selected, selectedAt: Number(selected.selectedAt) || 1 } : null,
+    weakRules: [...weakRuleByKey.values()]
+      .sort(
+        (a, b) =>
+          (Number(b.addedAt) || 0) - (Number(a.addedAt) || 0) ||
+          compareSyncText(String(a.key), String(b.key)),
+      )
+      .slice(0, 24),
+  };
+}
+
+function mergeSessionProgress(local = {}, cloud = {}) {
+  const mistakePatterns = {};
+  for (const key of new Set([
+    ...Object.keys(local.mistakePatterns || {}),
+    ...Object.keys(cloud.mistakePatterns || {}),
+  ])) {
+    mistakePatterns[key] = mergeLatestProgressSnapshot(
+      local.mistakePatterns?.[key],
+      cloud.mistakePatterns?.[key],
+      ['count', 'latestAt'],
+      'latestAt',
+    );
+  }
+  return {
+    reviewed: maxNum(local.reviewed, cloud.reviewed),
+    correct: maxNum(local.correct, cloud.correct),
+    skipped: maxNum(local.skipped, cloud.skipped),
+    currentStreak: maxNum(local.currentStreak, cloud.currentStreak),
+    bestStreak: maxNum(local.bestStreak, cloud.bestStreak),
+    recentOutcomes: mergeRecentProgressRows(local.recentOutcomes, cloud.recentOutcomes, 6),
+    mistakePatterns,
+  };
+}
+
+function mergeDailyProgress(local = {}, cloud = {}) {
+  const localDate = String(local.date || '');
+  const cloudDate = String(cloud.date || '');
+  if (localDate !== cloudDate) return localDate > cloudDate ? local : cloud;
+  return {
+    date: localDate || cloudDate || localDateKey(),
+    count: maxNum(local.count, cloud.count),
+    goalHit: !!(local.goalHit || cloud.goalHit),
+    goalStreak: maxNum(local.goalStreak, cloud.goalStreak),
+    bestGoalStreak: maxNum(local.bestGoalStreak, cloud.bestGoalStreak),
+    currentAnswerStreak: maxNum(local.currentAnswerStreak, cloud.currentAnswerStreak),
+    bestAnswerStreak: maxNum(local.bestAnswerStreak, cloud.bestAnswerStreak),
+  };
+}
+
+function mergeReviewScopeProgress(local = {}, cloud = {}) {
+  const recommendationById = new Map();
+  for (const item of [...(local.recommendations || []), ...(cloud.recommendations || [])]) {
+    const key = item?.id || stableSyncStringify(item);
+    const previous = recommendationById.get(key);
+    recommendationById.set(key, previous ? deterministicSyncValue(previous, item) : item);
+  }
+  return normalizeReviewScope({
+    excludedWordKeys: [
+      ...new Set([...(local.excludedWordKeys || []), ...(cloud.excludedWordKeys || [])]),
+    ].sort(),
+    excludedFormFamilyIds: [
+      ...new Set([...(local.excludedFormFamilyIds || []), ...(cloud.excludedFormFamilyIds || [])]),
+    ].sort(),
+    recommendations: [...recommendationById.values()].sort((a, b) =>
+      compareSyncText(stableSyncStringify(a), stableSyncStringify(b)),
+    ),
+  });
 }
 
 export function emptyTransformationStats() {
@@ -694,14 +1006,13 @@ function mergeProgressMap(local = {}, cloud = {}) {
 }
 
 function mergeGameProgressBucket(local = {}, cloud = {}) {
-  const newer = Number(local?.lastAt || 0) >= Number(cloud?.lastAt || 0) ? local : cloud;
+  const newer = preferredProgressSnapshot(local, cloud);
   return {
-    ...cloud,
-    ...local,
-    dict: local?.dict || cloud?.dict || newer?.dict,
-    reading: local?.reading || cloud?.reading || newer?.reading,
-    meaning: local?.meaning || cloud?.meaning || newer?.meaning,
-    group: local?.group || cloud?.group || newer?.group,
+    ...newer,
+    dict: newer?.dict || deterministicSyncValue(local?.dict, cloud?.dict),
+    reading: newer?.reading || deterministicSyncValue(local?.reading, cloud?.reading),
+    meaning: newer?.meaning || deterministicSyncValue(local?.meaning, cloud?.meaning),
+    group: newer?.group || deterministicSyncValue(local?.group, cloud?.group),
     attempted: maxNum(local?.attempted, cloud?.attempted),
     correct: maxNum(local?.correct, cloud?.correct),
     incorrect: maxNum(local?.incorrect, cloud?.incorrect),
@@ -803,9 +1114,20 @@ export function mergeCloudState(local, cloud) {
         };
   local = normalizedLocal;
   cloud = normalizedCloud;
-  const mergedLegacyEnabledTypes = normalizeDefaultTypeScope([
-    ...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])]),
-  ]);
+  const mergedLegacySet = new Set(
+    normalizeDefaultTypeScope([
+      ...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])]),
+    ]),
+  );
+  const canonicalTypeOrder = [
+    ...QUICK_PRACTICE_DEFAULT_TYPE_IDS,
+    ...ALL_CARD_TYPES.map((type) => type.id).filter(
+      (typeId) => !QUICK_PRACTICE_DEFAULT_TYPE_IDS.includes(typeId),
+    ),
+  ];
+  const mergedLegacyEnabledTypes = canonicalTypeOrder.filter((typeId) =>
+    mergedLegacySet.has(typeId),
+  );
   const practiceScope = mergePracticeScopes(
     local.practiceScope,
     cloud.practiceScope,
@@ -823,36 +1145,32 @@ export function mergeCloudState(local, cloud) {
     schemaVersion: SRS_SCHEMA_VERSION,
     cards: mergeCards(local.cards || {}, cloud.cards || {}),
     verbStats: mergeVerbStats(local.verbStats || {}, cloud.verbStats || {}),
-    retryQueue: [...new Set([...(local.retryQueue || []), ...(cloud.retryQueue || [])])].slice(
-      0,
-      20,
-    ),
+    retryQueue: [...new Set([...(local.retryQueue || []), ...(cloud.retryQueue || [])])]
+      .sort()
+      .slice(0, 20),
     mistakes: mergeMistakes(local.mistakes || [], cloud.mistakes || []),
     readiness: mergeReadinessState(local.readiness, cloud.readiness),
     weakness: mergeWeaknessState(local.weakness, cloud.weakness),
     practiceScope,
     enabledTypes: orderedEnabledTypes.length ? orderedEnabledTypes : mergedLegacyEnabledTypes,
-    daily: (() => {
-      const ld = local.daily || {},
-        cd = cloud.daily || {};
-      const today = localDateKey();
-      if (ld.date === today && cd.date === today) {
-        return {
-          ...ld,
-          count: maxNum(ld.count, cd.count),
-          goalHit: !!(ld.goalHit || cd.goalHit),
-          goalStreak: maxNum(ld.goalStreak, cd.goalStreak),
-          bestGoalStreak: maxNum(ld.bestGoalStreak, cd.bestGoalStreak),
-          currentAnswerStreak: maxNum(ld.currentAnswerStreak, cd.currentAnswerStreak),
-          bestAnswerStreak: maxNum(ld.bestAnswerStreak, cd.bestAnswerStreak),
-        };
-      }
-      return ld.date === today ? ld : cd.date === today ? cd : ld;
-    })(),
+    daily: mergeDailyProgress(local.daily, cloud.daily),
     classify: {
       attempted: maxNum(local.classify?.attempted, cloud.classify?.attempted),
       correct: maxNum(local.classify?.correct, cloud.classify?.correct),
-      byGroup: { ...(cloud.classify?.byGroup || {}), ...(local.classify?.byGroup || {}) },
+      byGroup: mergeProgressValue(local.classify?.byGroup || {}, cloud.classify?.byGroup || {}),
+    },
+    shadow: {
+      attempted: maxNum(local.shadow?.attempted, cloud.shadow?.attempted),
+      totalRating: maxNum(local.shadow?.totalRating, cloud.shadow?.totalRating),
+      byScenario: mergeProgressValue(
+        local.shadow?.byScenario || {},
+        cloud.shadow?.byScenario || {},
+      ),
+    },
+    ambient: {
+      sessions: maxNum(local.ambient?.sessions, cloud.ambient?.sessions),
+      played: maxNum(local.ambient?.played, cloud.ambient?.played),
+      lastAt: maxNum(local.ambient?.lastAt, cloud.ambient?.lastAt) || null,
     },
     game: {
       played: maxNum(local.game?.played, cloud.game?.played),
@@ -867,71 +1185,73 @@ export function mergeCloudState(local, cloud) {
       hints: maxNum(local.onbin?.hints, cloud.onbin?.hints),
       streak: maxNum(local.onbin?.streak, cloud.onbin?.streak),
       bestStreak: maxNum(local.onbin?.bestStreak, cloud.onbin?.bestStreak),
-      byPattern: { ...(cloud.onbin?.byPattern || {}), ...(local.onbin?.byPattern || {}) },
+      byPattern: mergeProgressValue(local.onbin?.byPattern || {}, cloud.onbin?.byPattern || {}),
+    },
+    register: {
+      attempted: maxNum(local.register?.attempted, cloud.register?.attempted),
+      correct: maxNum(local.register?.correct, cloud.register?.correct),
+      streak: maxNum(local.register?.streak, cloud.register?.streak),
+      bestStreak: maxNum(local.register?.bestStreak, cloud.register?.bestStreak),
+      byPattern: mergeProgressValue(
+        local.register?.byPattern || {},
+        cloud.register?.byPattern || {},
+      ),
+      byVerb: mergeProgressValue(local.register?.byVerb || {}, cloud.register?.byVerb || {}),
     },
     meaning: {
       attempted: maxNum(local.meaning?.attempted, cloud.meaning?.attempted),
       correct: maxNum(local.meaning?.correct, cloud.meaning?.correct),
-      byWord: { ...(cloud.meaning?.byWord || {}), ...(local.meaning?.byWord || {}) },
+      byWord: mergeProgressValue(local.meaning?.byWord || {}, cloud.meaning?.byWord || {}),
     },
     mock: {
       taken: maxNum(local.mock?.taken, cloud.mock?.taken),
       bestPct: maxNum(local.mock?.bestPct, cloud.mock?.bestPct),
-      lastPct:
-        (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
-          ? local.mock?.lastPct
-          : cloud.mock?.lastPct,
-      lastScore:
-        (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
-          ? local.mock?.lastScore
-          : cloud.mock?.lastScore,
-      lastTotal:
-        (local.mock?.lastAt || 0) > (cloud.mock?.lastAt || 0)
-          ? local.mock?.lastTotal
-          : cloud.mock?.lastTotal,
+      lastPct: preferredProgressSnapshot(local.mock, cloud.mock)?.lastPct || 0,
+      lastScore: preferredProgressSnapshot(local.mock, cloud.mock)?.lastScore || 0,
+      lastTotal: preferredProgressSnapshot(local.mock, cloud.mock)?.lastTotal || 0,
       lastAt: maxNum(local.mock?.lastAt, cloud.mock?.lastAt) || null,
-      bySkill: { ...(cloud.mock?.bySkill || {}), ...(local.mock?.bySkill || {}) },
+      bySkill: mergeProgressValue(local.mock?.bySkill || {}, cloud.mock?.bySkill || {}),
+    },
+    reader: {
+      sessions: maxNum(local.reader?.sessions, cloud.reader?.sessions),
+      chars: maxNum(local.reader?.chars, cloud.reader?.chars),
+      encounters: maxNum(local.reader?.encounters, cloud.reader?.encounters),
+      wordSeen: mergeProgressValue(local.reader?.wordSeen || {}, cloud.reader?.wordSeen || {}),
+      lastAt: maxNum(local.reader?.lastAt, cloud.reader?.lastAt) || null,
+    },
+    production: {
+      attempted: maxNum(local.production?.attempted, cloud.production?.attempted),
+      correct: maxNum(local.production?.correct, cloud.production?.correct),
+      lastScore: preferredProgressSnapshot(local.production, cloud.production)?.lastScore || 0,
+      lastAt: maxNum(local.production?.lastAt, cloud.production?.lastAt) || null,
     },
     guide: {
-      attempted: maxNum(local.guide?.attempted, 0) + maxNum(cloud.guide?.attempted, 0),
-      correct: maxNum(local.guide?.correct, 0) + maxNum(cloud.guide?.correct, 0),
-      assisted: maxNum(local.guide?.assisted, 0) + maxNum(cloud.guide?.assisted, 0),
+      attempted: maxNum(local.guide?.attempted, cloud.guide?.attempted),
+      correct: maxNum(local.guide?.correct, cloud.guide?.correct),
+      assisted: maxNum(local.guide?.assisted, cloud.guide?.assisted),
       byStep: Object.fromEntries(
         ['base', 'group', 'answer'].map((id) => [
           id,
           {
-            attempted:
-              maxNum(local.guide?.byStep?.[id]?.attempted, 0) +
-              maxNum(cloud.guide?.byStep?.[id]?.attempted, 0),
-            correct:
-              maxNum(local.guide?.byStep?.[id]?.correct, 0) +
-              maxNum(cloud.guide?.byStep?.[id]?.correct, 0),
-            assisted:
-              maxNum(local.guide?.byStep?.[id]?.assisted, 0) +
-              maxNum(cloud.guide?.byStep?.[id]?.assisted, 0),
+            attempted: maxNum(
+              local.guide?.byStep?.[id]?.attempted,
+              cloud.guide?.byStep?.[id]?.attempted,
+            ),
+            correct: maxNum(local.guide?.byStep?.[id]?.correct, cloud.guide?.byStep?.[id]?.correct),
+            assisted: maxNum(
+              local.guide?.byStep?.[id]?.assisted,
+              cloud.guide?.byStep?.[id]?.assisted,
+            ),
           },
         ]),
       ),
-      recent: [...(local.guide?.recent || []), ...(cloud.guide?.recent || [])]
-        .sort((a, b) => (b?.at || 0) - (a?.at || 0))
-        .slice(0, 20),
+      recent: mergeRecentProgressRows(local.guide?.recent, cloud.guide?.recent, 20),
     },
     transformation: mergeTransformationStats(local.transformation, cloud.transformation),
     minimalPairs: mergeMinimalPairProgress(local.minimalPairs, cloud.minimalPairs),
-    reviewScope: normalizeReviewScope({
-      excludedWordKeys: [
-        ...(cloud.reviewScope?.excludedWordKeys || []),
-        ...(local.reviewScope?.excludedWordKeys || []),
-      ],
-      excludedFormFamilyIds: [
-        ...(cloud.reviewScope?.excludedFormFamilyIds || []),
-        ...(local.reviewScope?.excludedFormFamilyIds || []),
-      ],
-      recommendations: [
-        ...(local.reviewScope?.recommendations || []),
-        ...(cloud.reviewScope?.recommendations || []),
-      ],
-    }),
+    reference: mergeReferenceProgress(local.reference, cloud.reference),
+    session: mergeSessionProgress(local.session, cloud.session),
+    reviewScope: mergeReviewScopeProgress(local.reviewScope, cloud.reviewScope),
   };
   return reconcileDerivedProgressState(merged).state;
 }

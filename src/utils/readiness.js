@@ -89,11 +89,14 @@ function speedWithAttempt(metric, correct, responseMs, now) {
 function mergeMetricSnapshot(left, right) {
   const a = normalizeMetric(left);
   const b = normalizeMetric(right);
+  const tied = a.attempted === b.attempted && (a.lastAt || 0) === (b.lastAt || 0);
   const preferred =
     b.attempted > a.attempted || (b.attempted === a.attempted && (b.lastAt || 0) > (a.lastAt || 0))
       ? b
-      : a;
-  const lastFromRight = (b.lastAt || 0) > (a.lastAt || 0);
+      : tied && JSON.stringify(b) > JSON.stringify(a)
+        ? b
+        : a;
+  const lastFromRight = (b.lastAt || 0) > (a.lastAt || 0) || (tied && preferred === b);
   const fastest = [a.fastestMs, b.fastestMs].filter(Boolean);
   return {
     attempted: preferred.attempted,

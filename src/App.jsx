@@ -24,7 +24,17 @@ const DevHistoryPanel = import.meta.env.DEV
 const TABS = ['practice', 'guide', 'stats', 'learn', 'drills', 'tools', 'settings'];
 
 function AppShell() {
-  const { tab, setTab, showAuthModal, setShowAuthModal, supabase } = useApp();
+  const {
+    tab,
+    setTab,
+    showAuthModal,
+    setShowAuthModal,
+    supabase,
+    supabaseConfigured,
+    supabaseStatus,
+    supabaseError,
+    retrySupabase,
+  } = useApp();
 
   const { tabProps, panelProps } = useTablist(TABS, tab, setTab);
   const shellWidthClass = tab === 'practice' ? 'max-w-[80rem]' : 'max-w-4xl';
@@ -85,6 +95,10 @@ function AppShell() {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         supabase={supabase}
+        configured={supabaseConfigured}
+        clientStatus={supabaseStatus}
+        clientError={supabaseError}
+        onRetryClient={retrySupabase}
       />
       <UpdatePrompt />
       {DevHistoryPanel && (

@@ -23,8 +23,9 @@ const READINESS_TONE = {
   untested: 'bg-stone-300 dark:bg-stone-700',
 };
 
-function reviewForecastRows(forecast) {
+function reviewForecastRows(forecast, readyNow = 0) {
   return [
+    ['Ready', readyNow],
     ['1h', forecast?.in1h || 0],
     ['4h', forecast?.in4h || 0],
     ['Today', forecast?.today || 0],
@@ -94,7 +95,6 @@ function answerStatsFromCards(cards = {}) {
 
 export function StatsDashboard({
   daily,
-  srsQueue,
   state,
   todayPlan,
   onStartRecommendation,
@@ -111,7 +111,7 @@ export function StatsDashboard({
   onDrillRush,
   onOpenGuide,
 }) {
-  const dueTotal = srsQueue?.dueRuleIds?.length || 0;
+  const dueTotal = todayPlan?.dueRuleIds?.length || 0;
   const recommendations = state.reviewScope?.recommendations || [];
   const mistakeHistoryCount = (state.mistakes || []).length;
   const { rows: strengthRows, totalPracticed } = buildFormFamilyProgress(state);
@@ -302,13 +302,15 @@ export function StatsDashboard({
             Upcoming reviews
           </div>
           {dueTotal === 0 &&
-          reviewForecastRows(todayPlan.upcomingForecast).every(([, value]) => value === 0) ? (
+          reviewForecastRows(todayPlan.upcomingForecast, dueTotal).every(
+            ([, value]) => value === 0,
+          ) ? (
             <div className="rounded-xl border border-dashed border-stone-300 px-4 py-6 text-center text-sm text-stone-500 dark:border-stone-700">
               No reviews scheduled.
             </div>
           ) : (
-            <div className="grid grid-cols-5 gap-2">
-              {reviewForecastRows(todayPlan.upcomingForecast).map(([label, value]) => (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {reviewForecastRows(todayPlan.upcomingForecast, dueTotal).map(([label, value]) => (
                 <div
                   key={label}
                   className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-center dark:border-stone-800 dark:bg-stone-950"
@@ -486,7 +488,6 @@ export default function StatsView() {
     state,
     daily,
     todayPlan,
-    srsQueue,
     startReviewRecommendation,
     openLabTool,
     practiceFormGroup,
@@ -535,7 +536,6 @@ export default function StatsView() {
   return (
     <StatsDashboard
       daily={daily}
-      srsQueue={srsQueue}
       state={state}
       todayPlan={todayPlan}
       onStartRecommendation={startReviewRecommendation}

@@ -13,7 +13,6 @@ import {
   resolveThemePreference,
   loadAll,
   cloudFetch,
-  cloudUpsert,
   cloudTimestamp,
   resolveSyncAction,
   mergeState,
@@ -24,14 +23,26 @@ import {
   localDateKey,
   normalizeWordLists,
 } from '../utils/storage.js';
+import {
+  adoptSyncMetadata,
+  bindPendingSyncReset,
+  createSyncMeta,
+  getLocalSyncDeviceId,
+  stampSyncChanges,
+  stripPendingSyncReset,
+} from '../utils/syncMetadata.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { FORM_GROUPS } from '../data/conjugationTypes.js';
 import { getJapaneseVoices } from '../utils/speech.js';
 import { mergePracticePrefs } from '../utils/display.js';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
 import { loadVerbLexicon } from '../data/verbLexicon.js';
-import { supabase } from '../utils/supabase.js';
-import { useCloudAutoSync } from '../hooks/useCloudAutoSync.js';
+import * as supabaseClientModule from '../utils/supabase.js';
+import {
+  cloudCommitTimestamp,
+  commitCloudWithRetry,
+  useCloudAutoSync,
+} from '../hooks/useCloudAutoSync.js';
 import { buildLearnerResetPayload, commitLearnerResetPayload } from '../utils/learnerReset.js';
 import {
   buildTodayDrillPlan,
@@ -75,6 +86,28 @@ function isTodayDrillPractice(prefs = DEFAULT_PREFS) {
   );
 }
 
+function cloudRetryStatus(error, fallback) {
+  return {
+    kind: 'error',
+    message: 'Saved locally; cloud sync needs retry',
+    detail: error?.message || fallback,
+    at: null,
+  };
+}
+
+function resetCloudFailureStatus(error) {
+  return {
+    kind: 'error',
+    message: 'Reset not saved; cloud sync needs retry',
+    detail: error?.message || 'Reset failed',
+    at: null,
+  };
+}
+
+function initialSupabaseState() {
+  return supabaseClientModule.getSupabaseClientState();
+}
+
 function useAppController() {
   const [tab, setRawTab] = useState('practice');
   const setTab = (nextTab) =>
@@ -93,6 +126,7 @@ function useAppController() {
     message: '',
   });
   const [practicePrefs, setPracticePrefs] = useState(DEFAULT_PREFS);
+  const [syncMeta, setSyncMeta] = useState(() => createSyncMeta(getLocalSyncDeviceId()));
   const [session, setSession] = useState(null);
   // A focused Practice launch requested by another view; consumed by Study.
   const [studyFocus, setStudyFocus] = useState(null);
@@ -102,66 +136,148 @@ function useAppController() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
   const [cloudReadyUserId, setCloudReadyUserId] = useState('');
+  const [syncOwnerUserId, setSyncOwnerUserId] = useState('');
   const [srsQueue, setSrsQueue] = useState(() => ({
     date: localDateKey(),
     dueRuleIds: [],
     completedDueRuleIds: [],
     startedAt: null,
   }));
-  const activeGeminiKey = supabase ? 'proxy' : '';
+  const [supabaseState, setSupabaseState] = useState(initialSupabaseState);
+  const supabase = supabaseState.client;
+  const activeGeminiKey = supabaseState.configured ? 'proxy' : '';
   const [speechVoices, setSpeechVoices] = useState([]);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const [hydrated, setHydrated] = useState(false);
   const lastSyncedAtRef = useRef(0);
   const latestSyncPayloadRef = useRef(null);
+  const previousLocalPayloadRef = useRef(null);
+  const incomingSyncMetaRef = useRef(null);
   const diagnosticRepairPendingRef = useRef(false);
   const authEventVersionRef = useRef(0);
   const activeAuthUserIdRef = useRef('');
 
   useLayoutEffect(() => {
-    latestSyncPayloadRef.current = buildSyncPayload({
+    const payload = buildSyncPayload({
       state,
       customVerbs,
       customAdjectives,
       wordLists,
       practicePrefs,
+      syncMeta,
     });
-  }, [state, customVerbs, customAdjectives, wordLists, practicePrefs]);
+    if (incomingSyncMetaRef.current) {
+      const incoming = incomingSyncMetaRef.current;
+      incomingSyncMetaRef.current = null;
+      previousLocalPayloadRef.current = { ...payload, syncMeta: incoming };
+      latestSyncPayloadRef.current = { ...payload, syncMeta: incoming };
+      if (incoming !== syncMeta) setSyncMeta(incoming);
+      return;
+    }
+    const previous = previousLocalPayloadRef.current;
+    const nextMeta = previous ? stampSyncChanges(syncMeta, previous, payload) : syncMeta;
+    previousLocalPayloadRef.current = { ...payload, syncMeta: nextMeta };
+    latestSyncPayloadRef.current = { ...payload, syncMeta: nextMeta };
+    if (nextMeta !== syncMeta) setSyncMeta(nextMeta);
+  }, [state, customVerbs, customAdjectives, wordLists, practicePrefs, syncMeta]);
 
   function currentSyncPayload() {
     return (
       latestSyncPayloadRef.current ||
-      buildSyncPayload({ state, customVerbs, customAdjectives, wordLists, practicePrefs })
+      buildSyncPayload({
+        state,
+        customVerbs,
+        customAdjectives,
+        wordLists,
+        practicePrefs,
+        syncMeta,
+      })
     );
+  }
+
+  function syncPayloadForUser(userId) {
+    if (!syncOwnerUserId || syncOwnerUserId === userId) return currentSyncPayload();
+    return buildSyncPayload({
+      state: defaultState(),
+      customVerbs: [],
+      customAdjectives: [],
+      wordLists: [],
+      practicePrefs: DEFAULT_PREFS,
+      syncMeta: createSyncMeta(getLocalSyncDeviceId()),
+    });
+  }
+
+  function syncedAtForUser(userId) {
+    return syncOwnerUserId && syncOwnerUserId !== userId ? 0 : lastSyncedAtRef.current;
+  }
+
+  function claimPendingResetForUser(userId) {
+    const payload = syncPayloadForUser(userId);
+    const claimed = bindPendingSyncReset(payload, userId);
+    if (claimed !== payload) {
+      setSyncOwnerUserId(userId);
+      applySyncPayload(claimed);
+    }
+    return claimed;
+  }
+
+  function markCloudReady(userId) {
+    setSyncOwnerUserId(userId);
+    setCloudReadyUserId(userId);
   }
 
   function applySyncPayload(payload) {
     if (!payload) return { payload, repaired: false };
-    const repair = payload.state
-      ? reconcileDerivedProgressState(payload.state)
-      : { state: payload.state, repaired: false };
-    const normalizedPayload = repair.repaired ? { ...payload, state: repair.state } : payload;
+    const localPayload = adoptSyncMetadata(payload, getLocalSyncDeviceId());
+    const repair = localPayload.state
+      ? reconcileDerivedProgressState(localPayload.state)
+      : { state: localPayload.state, repaired: false };
+    const normalizedPayload = repair.repaired
+      ? { ...localPayload, state: repair.state }
+      : localPayload;
+    if (normalizedPayload.syncMeta) incomingSyncMetaRef.current = normalizedPayload.syncMeta;
     if (repair.repaired) diagnosticRepairPendingRef.current = true;
+    let appliedState = normalizedPayload.state;
     if (normalizedPayload.state) {
-      setState(mergeState(normalizedPayload.state, { reviewed: 0, correct: 0 }));
+      appliedState = mergeState(normalizedPayload.state, { reviewed: 0, correct: 0 });
+      setState(appliedState);
     }
+    let appliedCustomVerbs = customVerbs;
     if (Array.isArray(normalizedPayload.customVerbs)) {
-      setCustomVerbs(normalizedPayload.customVerbs);
+      appliedCustomVerbs = normalizedPayload.customVerbs;
+      setCustomVerbs(appliedCustomVerbs);
     }
+    let appliedCustomAdjectives = customAdjectives;
     if (Array.isArray(normalizedPayload.customAdjectives)) {
-      setCustomAdjectives(normalizedPayload.customAdjectives);
+      appliedCustomAdjectives = normalizedPayload.customAdjectives;
+      setCustomAdjectives(appliedCustomAdjectives);
     }
+    let appliedWordLists = wordLists;
     if (Array.isArray(normalizedPayload.wordLists)) {
-      setWordLists(normalizeWordLists(normalizedPayload.wordLists));
+      appliedWordLists = normalizeWordLists(normalizedPayload.wordLists);
+      setWordLists(appliedWordLists);
     }
+    let appliedPracticePrefs = practicePrefs;
     if (normalizedPayload.practicePrefs) {
-      setPracticePrefs(mergePracticePrefs(normalizedPayload.practicePrefs));
+      appliedPracticePrefs = mergePracticePrefs(normalizedPayload.practicePrefs);
+      setPracticePrefs(appliedPracticePrefs);
     }
-    return { payload: normalizedPayload, repaired: repair.repaired };
+    return {
+      payload: {
+        ...normalizedPayload,
+        state: appliedState,
+        customVerbs: appliedCustomVerbs,
+        customAdjectives: appliedCustomAdjectives,
+        wordLists: appliedWordLists,
+        practicePrefs: appliedPracticePrefs,
+      },
+      repaired: repair.repaired,
+    };
   }
 
   function applyLearnerResetPayload(payload, syncedAt = null) {
     if (!payload) return;
+    if (payload.syncMeta) incomingSyncMetaRef.current = payload.syncMeta;
     if (typeof syncedAt === 'number') lastSyncedAtRef.current = syncedAt;
     setState(payload.state || defaultState());
     setCustomVerbs(Array.isArray(payload.customVerbs) ? payload.customVerbs : []);
@@ -190,17 +306,19 @@ function useAppController() {
       payload.customVerbs,
       payload.customAdjectives,
       payload.wordLists,
-      { enabled: !!session },
+      { enabled: !!session, userId: syncOwnerUserId },
       nextSyncedAt,
       payload.practicePrefs,
+      payload.syncMeta,
     );
   }
 
-  // Local storage hydration on mount + Supabase auth listener
+  // Local storage hydration stays independent from the optional cloud SDK.
   useEffect(() => {
     pruneAICache();
     const local = loadAll();
     if (local) {
+      if (local.syncMeta) incomingSyncMetaRef.current = local.syncMeta;
       if (local.state) {
         const repair = reconcileDerivedProgressState(local.state);
         diagnosticRepairPendingRef.current = repair.repaired;
@@ -211,31 +329,47 @@ function useAppController() {
       if (Array.isArray(local.wordLists)) setWordLists(normalizeWordLists(local.wordLists));
       if (local.practicePrefs) setPracticePrefs(mergePracticePrefs(local.practicePrefs));
       if (typeof local.lastSyncedAt === 'number') lastSyncedAtRef.current = local.lastSyncedAt;
+      if (local.syncConfig?.userId) setSyncOwnerUserId(local.syncConfig.userId);
     }
     setHydrated(true);
+  }, []);
 
-    if (supabase) {
-      const sessionRequestVersion = authEventVersionRef.current;
-      supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+  // Keep the SDK out of local-only startup. A stored auth session (or OAuth
+  // callback) restores it immediately; otherwise the auth modal loads it on
+  // first cloud interaction.
+  useEffect(() => {
+    const unsubscribe = supabaseClientModule.subscribeSupabaseClient?.(setSupabaseState);
+    if (supabaseClientModule.shouldRestoreSupabaseSession?.()) {
+      void supabaseClientModule.loadSupabaseClient?.().catch(() => {});
+    }
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return undefined;
+    const sessionRequestVersion = authEventVersionRef.current;
+    void supabase.auth
+      .getSession()
+      .then(({ data: { session: currentSession } }) => {
         if (authEventVersionRef.current !== sessionRequestVersion) return;
         activeAuthUserIdRef.current = currentSession?.user?.id || '';
         setSession(currentSession);
-      });
+      })
+      .catch(() => {});
 
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-        authEventVersionRef.current += 1;
-        activeAuthUserIdRef.current = currentSession?.user?.id || '';
-        setSession(currentSession);
-        if (_event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
-          window.history.replaceState(null, '', window.location.pathname);
-        }
-      });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      authEventVersionRef.current += 1;
+      activeAuthUserIdRef.current = currentSession?.user?.id || '';
+      setSession(currentSession);
+      if (_event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    });
 
-      return () => subscription.unsubscribe();
-    }
-  }, []);
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   useEffect(() => {
     if (typeof fetch !== 'function' || import.meta.env.MODE === 'test') return undefined;
@@ -295,82 +429,75 @@ function useAppController() {
       cloudFetch(syncUserId)
         .then((cloud) => {
           if (!syncStillCurrent()) return;
-          const localPayload = currentSyncPayload();
-          const action = resolveSyncAction(cloud, lastSyncedAtRef.current, localPayload);
+          const localPayload = claimPendingResetForUser(syncUserId);
+          const action = resolveSyncAction(cloud, syncedAtForUser(syncUserId), localPayload);
           if (action === 'merge') {
             // Both local and cloud have learner data, so resolve one payload
             // before applying React state or writing anything back to cloud.
             const cloudAt = cloudTimestamp(cloud);
-            const mergedPayload = mergeSyncPayload(localPayload, cloud.data);
+            const mergedPayload = mergeSyncPayload(localPayload, cloud.data, {
+              userId: syncUserId,
+            });
             applySyncPayload(mergedPayload);
             // Upload the merged result so the cloud reflects the combined state.
             setSyncStatus({ kind: 'syncing', message: 'Merging devices…', at: null });
-            cloudUpsert(mergedPayload, syncUserId)
-              .then(() => {
+            commitCloudWithRetry(mergedPayload, syncUserId, { initialCloud: cloud })
+              .then((committed) => {
                 if (!syncStillCurrent()) return;
-                const now = Date.now();
+                applySyncPayload(committed.payload);
+                const now = cloudCommitTimestamp(committed);
                 lastSyncedAtRef.current = now;
                 diagnosticRepairPendingRef.current = false;
-                setCloudReadyUserId(syncUserId);
+                markCloudReady(syncUserId);
                 setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: cloudAt });
               })
               .catch((e) => {
                 if (!syncStillCurrent()) return;
-                setSyncStatus({
-                  kind: 'error',
-                  message: e.message || 'Merge push failed',
-                  at: null,
-                });
+                setSyncStatus(cloudRetryStatus(e, 'Merge push failed'));
               });
           } else if (action === 'pull') {
             const cloudAt = cloudTimestamp(cloud);
-            const applied = applySyncPayload(cloud.data);
+            const applied = applySyncPayload(stripPendingSyncReset(cloud.data));
             if (applied.repaired) {
-              setSyncStatus({ kind: 'syncing', message: 'Repairing cloud progressâ€¦', at: null });
-              cloudUpsert(applied.payload, syncUserId)
-                .then(() => {
+              setSyncStatus({ kind: 'syncing', message: 'Repairing cloud progress…', at: null });
+              commitCloudWithRetry(applied.payload, syncUserId, { initialCloud: cloud })
+                .then((committed) => {
                   if (!syncStillCurrent()) return;
-                  const now = Date.now();
+                  applySyncPayload(committed.payload);
+                  const now = cloudCommitTimestamp(committed);
                   lastSyncedAtRef.current = now;
                   diagnosticRepairPendingRef.current = false;
-                  setCloudReadyUserId(syncUserId);
+                  markCloudReady(syncUserId);
                   setSyncStatus({ kind: 'ok', message: 'Repaired cloud progress', at: now });
                 })
                 .catch((e) => {
                   if (!syncStillCurrent()) return;
-                  setSyncStatus({
-                    kind: 'error',
-                    message: e.message || 'Progress repair push failed',
-                    at: null,
-                  });
+                  setSyncStatus(cloudRetryStatus(e, 'Progress repair push failed'));
                 });
             } else {
               lastSyncedAtRef.current = cloudAt;
-              setCloudReadyUserId(syncUserId);
+              markCloudReady(syncUserId);
               setSyncStatus({ kind: 'ok', message: 'Restored from cloud', at: cloudAt });
             }
           } else if (action === 'noop') {
             if (diagnosticRepairPendingRef.current) {
-              setSyncStatus({ kind: 'syncing', message: 'Repairing cloud progressâ€¦', at: null });
-              cloudUpsert(localPayload, syncUserId)
-                .then(() => {
+              setSyncStatus({ kind: 'syncing', message: 'Repairing cloud progress…', at: null });
+              commitCloudWithRetry(localPayload, syncUserId, { initialCloud: cloud })
+                .then((committed) => {
                   if (!syncStillCurrent()) return;
-                  const now = Date.now();
+                  applySyncPayload(committed.payload);
+                  const now = cloudCommitTimestamp(committed);
                   lastSyncedAtRef.current = now;
                   diagnosticRepairPendingRef.current = false;
-                  setCloudReadyUserId(syncUserId);
+                  markCloudReady(syncUserId);
                   setSyncStatus({ kind: 'ok', message: 'Repaired cloud progress', at: now });
                 })
                 .catch((e) => {
                   if (!syncStillCurrent()) return;
-                  setSyncStatus({
-                    kind: 'error',
-                    message: e.message || 'Progress repair push failed',
-                    at: null,
-                  });
+                  setSyncStatus(cloudRetryStatus(e, 'Progress repair push failed'));
                 });
             } else {
-              setCloudReadyUserId(syncUserId);
+              markCloudReady(syncUserId);
               setSyncStatus({ kind: 'ok', message: 'Up to date', at: lastSyncedAtRef.current });
             }
           } else {
@@ -382,13 +509,14 @@ function useAppController() {
                 : 'Syncing local progress to cloud…',
               at: null,
             });
-            cloudUpsert(localPayload, syncUserId)
-              .then(() => {
+            commitCloudWithRetry(localPayload, syncUserId, { initialCloud: cloud })
+              .then((committed) => {
                 if (!syncStillCurrent()) return;
-                const now = Date.now();
+                applySyncPayload(committed.payload);
+                const now = cloudCommitTimestamp(committed);
                 lastSyncedAtRef.current = now;
                 diagnosticRepairPendingRef.current = false;
-                setCloudReadyUserId(syncUserId);
+                markCloudReady(syncUserId);
                 setSyncStatus({
                   kind: 'ok',
                   message: hadCloud ? 'Uploaded local progress' : 'Synced to cloud',
@@ -397,17 +525,15 @@ function useAppController() {
               })
               .catch((e) => {
                 if (!syncStillCurrent()) return;
-                setSyncStatus({
-                  kind: 'error',
-                  message: e.message || (hadCloud ? 'Push failed' : 'Initial sync failed'),
-                  at: null,
-                });
+                setSyncStatus(
+                  cloudRetryStatus(e, hadCloud ? 'Push failed' : 'Initial sync failed'),
+                );
               });
           }
         })
         .catch((e) => {
           if (!syncStillCurrent()) return;
-          setSyncStatus({ kind: 'error', message: e.message || 'Cloud unreachable', at: null });
+          setSyncStatus(cloudRetryStatus(e, 'Cloud unreachable'));
         });
       return () => {
         cancelled = true;
@@ -418,7 +544,7 @@ function useAppController() {
     }
     // Triggered by login, not data changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, hydrated]);
+  }, [session, hydrated, supabase]);
 
   // Local save on every change + debounced cloud push when signed in.
   useCloudAutoSync({
@@ -430,8 +556,11 @@ function useAppController() {
     customAdjectives,
     wordLists,
     practicePrefs,
+    syncMeta,
+    syncOwnerUserId,
     lastSyncedAtRef,
     setSyncStatus,
+    applySyncPayload,
   });
 
   useEffect(() => {
@@ -481,25 +610,33 @@ function useAppController() {
     try {
       const cloud = await cloudFetch(syncUserId);
       if (!syncStillCurrent()) return;
-      const localPayload = currentSyncPayload();
-      const action = resolveSyncAction(cloud, lastSyncedAtRef.current, localPayload);
+      const localPayload = claimPendingResetForUser(syncUserId);
+      const action = resolveSyncAction(cloud, syncedAtForUser(syncUserId), localPayload);
       if (action === 'merge') {
-        const mergedPayload = mergeSyncPayload(localPayload, cloud.data);
+        const mergedPayload = mergeSyncPayload(localPayload, cloud.data, {
+          userId: syncUserId,
+        });
         applySyncPayload(mergedPayload);
-        await cloudUpsert(mergedPayload, syncUserId);
+        const committed = await commitCloudWithRetry(mergedPayload, syncUserId, {
+          initialCloud: cloud,
+        });
         if (!syncStillCurrent()) return;
-        const now = Date.now();
+        applySyncPayload(committed.payload);
+        const now = cloudCommitTimestamp(committed);
         lastSyncedAtRef.current = now;
         diagnosticRepairPendingRef.current = false;
         setSyncStatus({ kind: 'ok', message: 'Merged from cloud', at: now });
       } else if (action === 'pull') {
         const cloudAt = cloudTimestamp(cloud);
         if (!syncStillCurrent()) return;
-        const applied = applySyncPayload(cloud.data);
+        const applied = applySyncPayload(stripPendingSyncReset(cloud.data));
         if (applied.repaired) {
-          await cloudUpsert(applied.payload, syncUserId);
+          const committed = await commitCloudWithRetry(applied.payload, syncUserId, {
+            initialCloud: cloud,
+          });
           if (!syncStillCurrent()) return;
-          const now = Date.now();
+          applySyncPayload(committed.payload);
+          const now = cloudCommitTimestamp(committed);
           lastSyncedAtRef.current = now;
           diagnosticRepairPendingRef.current = false;
           setSyncStatus({ kind: 'ok', message: 'Repaired cloud progress', at: now });
@@ -508,24 +645,36 @@ function useAppController() {
           setSyncStatus({ kind: 'ok', message: 'Pulled from cloud', at: cloudAt });
         }
       } else {
-        await cloudUpsert(localPayload, syncUserId);
+        const committed = await commitCloudWithRetry(localPayload, syncUserId, {
+          initialCloud: cloud,
+        });
         if (!syncStillCurrent()) return;
-        const now = Date.now();
+        applySyncPayload(committed.payload);
+        const now = cloudCommitTimestamp(committed);
         lastSyncedAtRef.current = now;
         diagnosticRepairPendingRef.current = false;
         setSyncStatus({ kind: 'ok', message: 'Pushed to cloud', at: now });
       }
-      setCloudReadyUserId(syncUserId);
+      markCloudReady(syncUserId);
     } catch (e) {
       if (!syncStillCurrent()) return;
-      setSyncStatus({ kind: 'error', message: e.message || 'Sync failed', at: null });
+      setCloudReadyUserId('');
+      setSyncStatus(cloudRetryStatus(e, 'Sync failed'));
     }
   }
 
   async function resetLearnerData(kind) {
+    const signedInUserId = session?.user?.id || '';
+    if (
+      signedInUserId &&
+      (cloudReadyUserId !== signedInUserId || syncOwnerUserId !== signedInUserId)
+    ) {
+      throw new Error("Wait for this account's cloud restore before resetting learner data.");
+    }
     const payload = buildLearnerResetPayload(
-      { state, customVerbs, customAdjectives, wordLists, practicePrefs },
+      { state, customVerbs, customAdjectives, wordLists, practicePrefs, syncMeta },
       kind,
+      { ownerUserId: syncOwnerUserId },
     );
     const writesCloud = !!(session?.user && supabase);
     const resetUserId = writesCloud ? session.user.id : '';
@@ -537,8 +686,11 @@ function useAppController() {
     try {
       const result = await commitLearnerResetPayload({
         payload,
+        kind,
         session: writesCloud ? session : null,
-        writeCloud: writesCloud ? (nextPayload) => cloudUpsert(nextPayload, resetUserId) : null,
+        writeCloud: writesCloud
+          ? (nextPayload, options) => commitCloudWithRetry(nextPayload, resetUserId, options)
+          : null,
         shouldCommit: resetStillCurrent,
         saveLocal: saveResetPayload,
         applyLocal: applyLearnerResetPayload,
@@ -550,7 +702,8 @@ function useAppController() {
       return result;
     } catch (e) {
       if (writesCloud && !resetStillCurrent()) return { cloud: true, at: null, stale: true };
-      setSyncStatus({ kind: 'error', message: e.message || 'Reset failed', at: null });
+      setCloudReadyUserId('');
+      setSyncStatus(resetCloudFailureStatus(e));
       throw e;
     }
   }
@@ -620,6 +773,8 @@ function useAppController() {
   function practiceFormGroup({ familyId, launchPrefs = {} } = {}) {
     const family = FORM_GROUPS.find((item) => item.id === familyId);
     if (!family?.typeIds?.length) return false;
+    const returnEnabledTypes = Array.isArray(state.enabledTypes) ? [...state.enabledTypes] : [];
+    const returnPracticePrefs = mergePracticePrefs(practicePrefs);
     setState((prev) => {
       const restored = includeFormFamilyInReviewState(prev, familyId);
       const scoped = updateStatePracticeScope(restored, {
@@ -644,7 +799,13 @@ function useAppController() {
     try {
       sessionStorage.removeItem('jp-study-current');
     } catch {}
-    setStudyFocus({ formGroupId: familyId, source: 'stats', launchMode: 'form-group' });
+    setStudyFocus({
+      formGroupId: familyId,
+      source: 'stats',
+      launchMode: 'form-group',
+      returnEnabledTypes,
+      returnPracticePrefs,
+    });
     setTab('practice');
     return true;
   }
@@ -673,7 +834,14 @@ function useAppController() {
     setTab('drills');
   }
   const clearLabFocus = () => setLabFocus(null);
-  const showAuth = () => setShowAuthModal(true);
+  const showAuth = () => {
+    setShowAuthModal(true);
+    if (supabaseState.configured && !supabase) {
+      void supabaseClientModule.loadSupabaseClient?.().catch(() => {});
+    }
+  };
+  const retrySupabase = () =>
+    supabaseClientModule.loadSupabaseClient?.({ retry: true }).catch(() => null);
   const addReviewRecommendation = (recommendation) =>
     setState((prev) => upsertReviewRecommendationState(prev, recommendation));
 
@@ -684,6 +852,7 @@ function useAppController() {
     const suggestedCount = Math.max(0, Number(recommendation.suggestedCount || 0));
     const listId = `list-review-rec-${recommendation.id}`;
     const returnEnabledTypes = Array.isArray(state.enabledTypes) ? [...state.enabledTypes] : [];
+    const returnPracticePrefs = mergePracticePrefs(practicePrefs);
     setState((prev) => {
       let next = { ...prev };
       for (const key of wordKeys) next = includeWordKeyInReviewState(next, key);
@@ -723,6 +892,7 @@ function useAppController() {
     setStudyFocus({
       source: recommendation.source || 'recommendation',
       launchMode: 'recommendation',
+      returnPracticePrefs,
       recommendation: {
         id: recommendation.id,
         source: recommendation.source || '',
@@ -732,6 +902,7 @@ function useAppController() {
         wordCount: wordKeys.length,
         typeCount: typeIds.length,
         returnEnabledTypes,
+        returnPracticePrefs,
       },
     });
     setTab('practice');
@@ -819,6 +990,10 @@ function useAppController() {
     resolvedTheme,
     hydrated,
     supabase,
+    supabaseConfigured: supabaseState.configured,
+    supabaseStatus: supabaseState.status,
+    supabaseError: supabaseState.error,
+    retrySupabase,
     allVerbs,
     allAdjectives,
     builtInWords,

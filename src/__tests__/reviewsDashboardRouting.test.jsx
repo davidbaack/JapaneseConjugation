@@ -47,6 +47,23 @@ function renderDashboard(overrides = {}) {
   return { ...handlers, ...overrides };
 }
 
+describe('StatsDashboard review timing', () => {
+  it('shows ready-now reviews from the full today plan even when the active queue is empty', () => {
+    renderDashboard({
+      daily: { count: 0, goalStreak: 0 },
+      srsQueue: { dueRuleIds: [], completedDueRuleIds: [] },
+      todayPlan: {
+        available: true,
+        dueRuleIds: ['ready-card'],
+        upcomingForecast: { in1h: 0, in4h: 0, today: 0, tomorrow: 0, week: 0 },
+      },
+    });
+
+    expect(screen.getByText('Ready').previousElementSibling?.textContent).toBe('1');
+    expect(screen.queryByText('No reviews scheduled.')).toBeNull();
+  });
+});
+
 const speedWeakest = {
   familyId: 'basic-tenses',
   label: 'Basics & Politeness',

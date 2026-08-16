@@ -1,21 +1,31 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { useState } from 'react';
 
 // The hook only mutates through two storage helpers and the Supabase client;
 // replace those with spies while keeping the real payload normalizer.
-const { saveAll, cloudUpsert } = vi.hoisted(() => ({
+const { saveAll, cloudFetch, cloudUpsert } = vi.hoisted(() => ({
   saveAll: vi.fn(),
-  cloudUpsert: vi.fn(() => Promise.resolve()),
+  cloudFetch: vi.fn(() => Promise.resolve(null)),
+  cloudUpsert: vi.fn(() =>
+    Promise.resolve({ updated_at: '2026-08-15T12:00:00.000Z', revision: 1 }),
+  ),
 }));
 
 vi.mock('../utils/supabase.js', () => ({ supabase: { _fake: true } }));
 vi.mock('../utils/storage.js', async () => {
   const actual = await vi.importActual('../utils/storage.js');
-  return { ...actual, saveAll, cloudUpsert };
+  return { ...actual, saveAll, cloudFetch, cloudUpsert };
 });
 
-import { useCloudAutoSync, PUSH_DEBOUNCE_MS } from '../hooks/useCloudAutoSync.js';
+import {
+  commitCloudWithRetry,
+  useCloudAutoSync,
+  PUSH_DEBOUNCE_MS,
+} from '../hooks/useCloudAutoSync.js';
+import { buildSyncPayload, defaultState } from '../utils/storage.js';
+import { adoptSyncMetadata } from '../utils/syncMetadata.js';
 
 const SESSION = { user: { id: 'user-123' } };
 const OTHER_SESSION = { user: { id: 'user-456' } };
@@ -56,6 +66,8 @@ function props(overrides = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  cloudFetch.mockResolvedValue(null);
+  cloudUpsert.mockResolvedValue({ updated_at: '2026-08-15T12:00:00.000Z', revision: 1 });
   vi.useFakeTimers();
   lastSyncedAtRef = { current: 0 };
   setSyncStatus = vi.fn();
@@ -66,6 +78,29 @@ afterEach(() => {
 });
 
 describe('useCloudAutoSync', () => {
+  it('refetches and retries after a compare-and-set race', async () => {
+    const conflict = Object.assign(new Error('revision conflict'), {
+      code: 'SYNC_REVISION_CONFLICT',
+    });
+    const fetchCloud = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, revision: 3 })
+      .mockResolvedValueOnce({ data: null, revision: 4 });
+    const writeCloud = vi
+      .fn()
+      .mockRejectedValueOnce(conflict)
+      .mockResolvedValueOnce({ updated_at: '2026-08-15T12:00:00.000Z', revision: 5 });
+
+    const committed = await commitCloudWithRetry({ state: { v: 1 } }, 'user-123', {
+      fetchCloud,
+      writeCloud,
+    });
+
+    expect(fetchCloud).toHaveBeenCalledTimes(2);
+    expect(writeCloud.mock.calls.map((call) => call[2])).toEqual([3, 4]);
+    expect(committed.row.revision).toBe(5);
+  });
+
   it('saves to localStorage synchronously on every change', () => {
     renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
     // Local save is immediate, not debounced.
@@ -92,7 +127,94 @@ describe('useCloudAutoSync', () => {
     expect(cloudUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ state: { v: 4 } }),
       'user-123',
+      null,
     );
+  });
+
+  it('does not re-save forever after applying a merge from an existing cloud row', async () => {
+    const cloudState = defaultState();
+    cloudState.cards = { 'remote-card': { reps: 1, nextReview: 1 } };
+    const cloudPayload = adoptSyncMetadata(
+      buildSyncPayload({ state: cloudState, practicePrefs: { theme: 'dark' } }),
+      'device-cloud',
+    );
+    cloudFetch.mockResolvedValue({
+      data: cloudPayload,
+      updated_at: '2026-08-15T11:00:00.000Z',
+      revision: 3,
+    });
+    cloudUpsert.mockResolvedValue({
+      updated_at: '2026-08-15T12:00:00.000Z',
+      revision: 4,
+    });
+    const initial = adoptSyncMetadata(
+      buildSyncPayload({ state: defaultState(), practicePrefs: { theme: 'dark' } }),
+      'device-local',
+    );
+
+    const { result } = renderHook(() => {
+      const [snapshot, setSnapshot] = useState({
+        state: initial.state,
+        syncMeta: initial.syncMeta,
+        practicePrefs: initial.practicePrefs,
+      });
+      useCloudAutoSync(
+        props({
+          state: snapshot.state,
+          syncMeta: snapshot.syncMeta,
+          practicePrefs: snapshot.practicePrefs,
+          applySyncPayload: (payload) => {
+            setSnapshot({
+              state: payload.state,
+              syncMeta: payload.syncMeta,
+              practicePrefs: payload.practicePrefs,
+            });
+            return { payload };
+          },
+        }),
+      );
+      return { snapshot, setSnapshot };
+    });
+
+    act(() => {
+      result.current.setSnapshot((current) => ({
+        ...current,
+        state: {
+          ...current.state,
+          cards: { ...current.state.cards, 'local-card': { reps: 1, nextReview: 1 } },
+        },
+      }));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+
+    expect(result.current.snapshot.state.cards).toEqual(
+      expect.objectContaining({
+        'local-card': expect.any(Object),
+        'remote-card': expect.any(Object),
+      }),
+    );
+    expect(cloudUpsert).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS * 3);
+    });
+    expect(cloudUpsert).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.setSnapshot((current) => ({
+        ...current,
+        state: {
+          ...current.state,
+          cards: { ...current.state.cards, 'next-local-card': { reps: 1, nextReview: 2 } },
+        },
+      }));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+    expect(cloudUpsert).toHaveBeenCalledTimes(2);
   });
 
   it('normalizes legacy kana answer preferences before cloud upsert', async () => {
@@ -166,6 +288,7 @@ describe('useCloudAutoSync', () => {
     expect(cloudUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ state: { user: 'new-change' } }),
       'user-456',
+      null,
     );
   });
 
@@ -220,7 +343,11 @@ describe('useCloudAutoSync', () => {
     });
 
     expect(setSyncStatus).toHaveBeenLastCalledWith(
-      expect.objectContaining({ kind: 'error', message: 'network down' }),
+      expect.objectContaining({
+        kind: 'error',
+        message: 'Saved locally; cloud sync needs retry',
+        detail: 'network down',
+      }),
     );
     // A failed push must not advance the last-synced marker.
     expect(lastSyncedAtRef.current).toBe(0);
@@ -279,6 +406,7 @@ describe('useCloudAutoSync', () => {
     expect(cloudUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ state: { v: 3 } }),
       'user-123',
+      null,
     );
   });
 });

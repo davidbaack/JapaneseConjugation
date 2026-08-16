@@ -6,7 +6,7 @@
 // The conjugated surface form is NEVER trusted to the database: it is always
 // recomputed locally from the engine so it stays aligned with what the learner
 // is actually being asked to produce.
-import { supabase } from './supabase.js';
+import { getSupabaseConfig } from './supabase.js';
 import { wordKey } from './conjugator.js';
 import { getAICache, setAICache } from './storage.js';
 import { retryWithBackoff } from './retry.js';
@@ -20,7 +20,7 @@ function cacheKey(word, type) {
 }
 
 export async function fetchTailoredSentence(word, type) {
-  if (!supabase || !word?.dict || !type) return null;
+  if (!word?.dict || !type) return null;
 
   const key = cacheKey(word, type);
   const cached = getAICache(CACHE_STORE, key);
@@ -30,17 +30,32 @@ export async function fetchTailoredSentence(word, type) {
     }
   }
 
+  const { url, anonKey } = getSupabaseConfig();
+  if (!url || !anonKey || typeof fetch !== 'function') return null;
+
   let row;
   try {
     row = await retryWithBackoff(async () => {
-      const { data, error } = await supabase
-        .from('sentences')
-        .select('ja_template, segments, en')
-        .eq('word_key', wordKey(word))
-        .eq('type', type)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      const query = new globalThis.URLSearchParams({
+        select: 'ja_template,segments,en',
+        word_key: `eq.${wordKey(word)}`,
+        type: `eq.${type}`,
+        limit: '1',
+      });
+      const response = await fetch(`${url}/rest/v1/sentences?${query}`, {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+          Accept: 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw Object.assign(new Error(`Sentence library HTTP ${response.status}`), {
+          status: response.status,
+        });
+      }
+      const rows = await response.json();
+      return Array.isArray(rows) ? rows[0] || null : null;
     });
   } catch {
     // Network / RLS / missing-table errors: fall back silently, do not cache a

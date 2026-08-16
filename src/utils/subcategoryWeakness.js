@@ -38,6 +38,10 @@ function uniqueStrings(values = []) {
   return [...new Set((values || []).map((value) => String(value || '').trim()).filter(Boolean))];
 }
 
+function compareText(left, right) {
+  return left === right ? 0 : left > right ? 1 : -1;
+}
+
 function typeLabel(typeId) {
   return getTypeInfo(typeId).label || typeId;
 }
@@ -450,14 +454,17 @@ export function mergeWeaknessState(local, cloud) {
   for (const [key, row] of Object.entries(right.byLane)) {
     const a = normalizeLane(byLane[key], key);
     const b = normalizeLane(row, key);
+    const tied = a.attempted === b.attempted && (a.lastAt || 0) === (b.lastAt || 0);
     const preferred =
       b.attempted > a.attempted ||
       (b.attempted === a.attempted && (b.lastAt || 0) > (a.lastAt || 0))
         ? b
-        : a;
+        : tied && JSON.stringify(b) > JSON.stringify(a)
+          ? b
+          : a;
     const recentKeys = new Set();
     const recent = [...a.recent, ...b.recent]
-      .sort((x, y) => y.at - x.at)
+      .sort((x, y) => y.at - x.at || compareText(JSON.stringify(x), JSON.stringify(y)))
       .filter((attempt) => {
         const signature = [
           attempt.at,
@@ -472,10 +479,10 @@ export function mergeWeaknessState(local, cloud) {
       .slice(0, MAX_RECENT_ATTEMPTS);
     byLane[key] = {
       ...preferred,
-      typeId: a.typeId || b.typeId,
-      typeLabel: a.typeLabel || b.typeLabel,
-      subcategoryId: a.subcategoryId || b.subcategoryId,
-      subcategoryLabel: a.subcategoryLabel || b.subcategoryLabel,
+      typeId: preferred.typeId || a.typeId || b.typeId,
+      typeLabel: preferred.typeLabel || a.typeLabel || b.typeLabel,
+      subcategoryId: preferred.subcategoryId || a.subcategoryId || b.subcategoryId,
+      subcategoryLabel: preferred.subcategoryLabel || a.subcategoryLabel || b.subcategoryLabel,
       lastAt: Math.max(a.lastAt || 0, b.lastAt || 0),
       recent,
     };

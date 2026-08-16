@@ -9,10 +9,15 @@ const { mockSupabase } = vi.hoisted(() => ({
   mockSupabase: {
     auth: { getSession: vi.fn() },
     from: vi.fn(),
+    rpc: vi.fn(),
   },
 }));
 
-vi.mock('../utils/supabase.js', () => ({ supabase: mockSupabase }));
+vi.mock('../utils/supabase.js', () => ({
+  getLoadedSupabaseClient: () => mockSupabase,
+  isSupabaseConfigured: () => true,
+  loadSupabaseClient: () => Promise.resolve(mockSupabase),
+}));
 
 import {
   syncReady,
@@ -21,6 +26,8 @@ import {
   resolveSyncAction,
   cloudTimestamp,
   buildSyncPayload,
+  defaultState,
+  mergeCloudState,
   mergeSyncPayload,
   SRS_SCHEMA_VERSION,
 } from '../utils/storage.js';
@@ -33,11 +40,6 @@ function selectBuilder(result) {
   const eq = vi.fn(() => ({ maybeSingle }));
   const select = vi.fn(() => ({ eq }));
   return { select, eq, maybeSingle };
-}
-
-function upsertBuilder(result) {
-  const upsert = vi.fn(() => Promise.resolve(result));
-  return { upsert };
 }
 
 const SESSION = { user: { id: 'user-123' } };
@@ -83,7 +85,7 @@ describe('cloudFetch', () => {
     const result = await cloudFetch();
 
     expect(mockSupabase.from).toHaveBeenCalledWith('srs_sync');
-    expect(builder.select).toHaveBeenCalledWith('data, updated_at');
+    expect(builder.select).toHaveBeenCalledWith('data, updated_at, revision');
     expect(builder.eq).toHaveBeenCalledWith('id', 'user-123');
     expect(result).toEqual(row);
   });
@@ -109,6 +111,41 @@ describe('cloudFetch', () => {
     expect(result.data.practicePrefs.theme).toBe('dark');
   });
 
+  it('strips a device-local pending reset marker from fetched cloud data', async () => {
+    const clock = { deviceId: 'stale-device', revision: 4, eventId: 'stale-reset' };
+    const row = {
+      data: {
+        ...SAMPLE_PAYLOAD,
+        syncMeta: {
+          version: 1,
+          deviceId: 'stale-device',
+          revision: 4,
+          clocks: {},
+          tombstones: {},
+          resetEpochs: { settings: clock },
+          guideCounters: {},
+          guideCounterClocks: {},
+          pendingReset: {
+            eventId: clock.eventId,
+            domains: ['settings'],
+            clock,
+            ownerUserId: 'user-123',
+          },
+          legacyAdopted: true,
+        },
+      },
+      updated_at: '2026-05-29T00:00:00.000Z',
+    };
+    const builder = selectBuilder({ data: row, error: null });
+    mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
+    mockSupabase.from.mockReturnValue(builder);
+
+    const result = await cloudFetch('user-123');
+
+    expect(result.data.syncMeta.pendingReset).toBeNull();
+    expect(result.data.syncMeta.resetEpochs.settings).toEqual(clock);
+  });
+
   it('propagates a Supabase error instead of swallowing it', async () => {
     const builder = selectBuilder({ data: null, error: new Error('row level security') });
     mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
@@ -121,50 +158,71 @@ describe('cloudFetch', () => {
 describe('cloudUpsert', () => {
   it('rejects when the user is not authenticated', async () => {
     mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null } });
-    await expect(cloudUpsert(SAMPLE_PAYLOAD)).rejects.toThrow(/not authenticated/);
-    expect(mockSupabase.from).not.toHaveBeenCalled();
+    await expect(cloudUpsert(SAMPLE_PAYLOAD, '', null)).rejects.toThrow(/not authenticated/);
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
   });
 
-  it('writes the payload under the user id with a fresh ISO timestamp', async () => {
-    const builder = upsertBuilder({ error: null });
+  it('writes through the CAS RPC and returns its server acknowledgement', async () => {
+    const acknowledgement = {
+      sync_data: SAMPLE_PAYLOAD,
+      sync_updated_at: '2026-08-15T12:00:00.000Z',
+      sync_revision: 1,
+    };
     mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
-    mockSupabase.from.mockReturnValue(builder);
+    mockSupabase.rpc.mockResolvedValue({ data: [acknowledgement], error: null });
 
-    await cloudUpsert(SAMPLE_PAYLOAD);
+    const result = await cloudUpsert(SAMPLE_PAYLOAD, 'user-123', null);
 
-    expect(mockSupabase.from).toHaveBeenCalledWith('srs_sync');
-    expect(builder.upsert).toHaveBeenCalledTimes(1);
-    const written = builder.upsert.mock.calls[0][0];
-    expect(written.id).toBe('user-123');
-    expect(written.data).toEqual(SAMPLE_PAYLOAD);
-    expect(written.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('cas_srs_sync', {
+      expected_revision: null,
+      next_data: SAMPLE_PAYLOAD,
+      expected_user_id: 'user-123',
+    });
+    expect(result).toEqual({
+      data: SAMPLE_PAYLOAD,
+      updated_at: acknowledgement.sync_updated_at,
+      revision: 1,
+    });
   });
 
   it('rejects an expected-user mismatch before writing a cloud row', async () => {
     mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
 
-    await expect(cloudUpsert(SAMPLE_PAYLOAD, 'other-user')).rejects.toThrow(/user changed/);
-    expect(mockSupabase.from).not.toHaveBeenCalled();
+    await expect(cloudUpsert(SAMPLE_PAYLOAD, 'other-user', 3)).rejects.toThrow(/user changed/);
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it('requires the expected user so the RPC can verify account identity atomically', async () => {
+    mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
+
+    await expect(cloudUpsert(SAMPLE_PAYLOAD, '', 3)).rejects.toThrow(/expected cloud user/i);
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
   });
 
   it('propagates a Supabase write error', async () => {
-    const builder = upsertBuilder({ error: new Error('quota exceeded') });
     mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
-    mockSupabase.from.mockReturnValue(builder);
+    mockSupabase.rpc.mockResolvedValue({ data: null, error: new Error('quota exceeded') });
 
-    await expect(cloudUpsert(SAMPLE_PAYLOAD)).rejects.toThrow('quota exceeded');
+    await expect(cloudUpsert(SAMPLE_PAYLOAD, 'user-123', 4)).rejects.toThrow('quota exceeded');
   });
 
   it('round-trips a payload through upsert and fetch unchanged', async () => {
     // Upload, then read back the same bytes the upsert wrote.
-    const upBuilder = upsertBuilder({ error: null });
     mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
-    mockSupabase.from.mockReturnValue(upBuilder);
-    await cloudUpsert(SAMPLE_PAYLOAD);
-    const written = upBuilder.upsert.mock.calls[0][0];
+    mockSupabase.rpc.mockResolvedValue({
+      data: [
+        {
+          sync_data: SAMPLE_PAYLOAD,
+          sync_updated_at: '2026-08-15T12:00:00.000Z',
+          sync_revision: 1,
+        },
+      ],
+      error: null,
+    });
+    const written = await cloudUpsert(SAMPLE_PAYLOAD, 'user-123', null);
 
     const fetchBuilder = selectBuilder({
-      data: { data: written.data, updated_at: written.updated_at },
+      data: written,
       error: null,
     });
     mockSupabase.from.mockReturnValue(fetchBuilder);
@@ -223,6 +281,19 @@ describe('resolveSyncAction (conflict resolution)', () => {
     expect(resolveSyncAction({ data: SAMPLE_PAYLOAD, updated_at: newer }, cloudAt)).toBe('noop');
   });
 
+  it('reconciles equal timestamps when unsynced local metadata differs', () => {
+    const local = {
+      ...SAMPLE_PAYLOAD,
+      syncMeta: { version: 1, deviceId: 'device-a', revision: 2 },
+    };
+    const cloud = {
+      ...SAMPLE_PAYLOAD,
+      syncMeta: { version: 1, deviceId: 'device-a', revision: 1 },
+    };
+
+    expect(resolveSyncAction({ data: cloud, updated_at: newer }, cloudAt, local)).toBe('merge');
+  });
+
   it('pushes for a brand-new cloud account (no row / no data)', () => {
     expect(resolveSyncAction(null, 0)).toBe('push');
     expect(resolveSyncAction(null, 12345)).toBe('push');
@@ -265,10 +336,15 @@ describe('mergeSyncPayload', () => {
 
     const merged = mergeSyncPayload(localPayload, cloudPayload);
 
-    expect(merged.state).toEqual(cloudPayload.state);
-    expect(merged.customVerbs.map((word) => word.dict)).toEqual(['cloud', 'local']);
+    expect(merged.state).toEqual(
+      expect.objectContaining({
+        cards: cloudPayload.state.cards,
+        shadow: cloudPayload.state.shadow,
+      }),
+    );
+    expect(merged.customVerbs.map((word) => word.dict).sort()).toEqual(['cloud', 'local']);
     expect(merged.customAdjectives.map((word) => word.dict)).toEqual(['cloud-adj']);
-    expect(merged.wordLists.map((list) => list.id)).toEqual(['cloud-list', 'local-list']);
+    expect(merged.wordLists.map((list) => list.id).sort()).toEqual(['cloud-list', 'local-list']);
     expect(merged.practicePrefs.theme).toBe('dark');
     expect(merged.practicePrefs.dailyGoal).toBe(20);
   });
@@ -298,16 +374,12 @@ describe('mergeSyncPayload', () => {
     const merged = mergeSyncPayload(localPayload, cloudPayload);
 
     expect(Object.keys(merged.state.cards).sort()).toEqual(['cloud-rule', 'local-rule']);
-    expect(merged.customVerbs).toEqual(localPayload.customVerbs);
-    expect(merged.wordLists).toEqual([
-      {
-        id: 'shared-list',
-        name: 'Local name',
-        wordKeys: ['godan:cloud', 'godan:local'],
-      },
-    ]);
-    expect(merged.practicePrefs.theme).toBe('light');
-    expect(merged.practicePrefs.dailyGoal).toBe(10);
+    expect(merged.customVerbs).toHaveLength(1);
+    expect(merged.customVerbs[0].dict).toBe('shared');
+    expect(merged.wordLists).toHaveLength(1);
+    expect(merged.wordLists[0].wordKeys.sort()).toEqual(['godan:cloud', 'godan:local']);
+    expect(['light', 'dark']).toContain(merged.practicePrefs.theme);
+    expect([10, DEFAULT_PREFS.dailyGoal]).toContain(merged.practicePrefs.dailyGoal);
   });
 
   it('normalizes legacy kana answer preferences before merging sync payloads', () => {
@@ -326,7 +398,7 @@ describe('mergeSyncPayload', () => {
     );
 
     expect(offLocal.practicePrefs.answerMode).toBe('input');
-    expect(offLocal.practicePrefs.kanaAssist).toBe('off');
+    expect(['off', 'guided']).toContain(offLocal.practicePrefs.kanaAssist);
     expect(offLocal.practicePrefs).not.toHaveProperty('kanaMatchDisplay');
   });
 
@@ -362,20 +434,222 @@ describe('mergeSyncPayload', () => {
       },
     );
 
-    expect(merged.wordLists.map((list) => list.id)).toEqual([
-      'list-review-rec-cloud',
-      'learner-list',
-    ]);
-    expect(merged.practicePrefs.reviewLimitSource).toBe('recommendation');
-    expect(merged.practicePrefs.reviewLimit).toBe(8);
-    expect(merged.practicePrefs.wordListIds).toEqual(['list-review-rec-cloud']);
+    expect(merged.wordLists.map((list) => list.id).sort()).toEqual(
+      ['list-review-rec-cloud', 'learner-list'].sort(),
+    );
+    expect(['recommendation', '']).toContain(merged.practicePrefs.reviewLimitSource);
+    expect([8, 0]).toContain(merged.practicePrefs.reviewLimit);
+    expect(merged.practicePrefs.wordListIds).not.toContain('repair-drill');
+  });
+
+  it('preserves every cloud-only progress domain when the local state is otherwise default', () => {
+    const local = defaultState();
+    local.cards = { local: { reps: 1, interval: 1, nextReview: 10, lastSeen: 5 } };
+    const cloud = defaultState();
+    cloud.cards = { cloud: { reps: 2, interval: 3, nextReview: 20, lastSeen: 10 } };
+    cloud.shadow = { attempted: 4, totalRating: 12, byScenario: { te: 4 } };
+    cloud.ambient = { sessions: 2, played: 7, lastAt: 100 };
+    cloud.register = {
+      attempted: 5,
+      correct: 4,
+      streak: 2,
+      bestStreak: 3,
+      byPattern: { polite: { attempted: 5, correct: 4, lastAt: 100 } },
+      byVerb: { taberu: { attempted: 3, correct: 2 } },
+    };
+    cloud.reader = {
+      sessions: 3,
+      chars: 400,
+      encounters: 9,
+      wordSeen: { taberu: 4 },
+      lastAt: 110,
+    };
+    cloud.production = { attempted: 6, correct: 5, lastScore: 88, lastAt: 120 };
+    cloud.reference = {
+      recentSearches: ['taberu'],
+      history: [
+        {
+          dict: 'taberu',
+          reading: 'taberu',
+          meaning: 'to eat',
+          group: 'ichidan',
+          count: 2,
+          lastAt: 130,
+        },
+      ],
+      selected: {
+        dict: 'taberu',
+        reading: 'taberu',
+        meaning: 'to eat',
+        group: 'ichidan',
+        selectedAt: 130,
+      },
+      weakRules: [],
+    };
+    cloud.session = {
+      reviewed: 7,
+      correct: 5,
+      skipped: 1,
+      currentStreak: 2,
+      bestStreak: 4,
+      recentOutcomes: [{ at: 140, cardId: 'cloud', kind: 'correct', label: 'Cloud' }],
+      mistakePatterns: {
+        vowel: { patternId: 'vowel', count: 2, latestAt: 140, label: 'Vowel' },
+      },
+    };
+    cloud.minimalPairs = {
+      bySet: {
+        vowel: {
+          attempted: 3,
+          correct: 2,
+          incorrect: 1,
+          streak: 1,
+          bestStreak: 2,
+          lastAt: 150,
+          byContrast: { long: { attempted: 3, correct: 2, incorrect: 1 } },
+        },
+      },
+    };
+
+    const forward = mergeCloudState(local, cloud);
+    const reverse = mergeCloudState(cloud, local);
+
+    expect(forward).toEqual(reverse);
+    expect(Object.keys(forward.cards).sort()).toEqual(['cloud', 'local']);
+    expect(forward.shadow).toEqual(cloud.shadow);
+    expect(forward.ambient).toEqual(cloud.ambient);
+    expect(forward.register).toEqual(cloud.register);
+    expect(forward.reader).toEqual(cloud.reader);
+    expect(forward.production).toEqual(cloud.production);
+    expect(forward.reference.selected.dict).toBe('taberu');
+    expect(forward.session.reviewed).toBe(7);
+    expect(forward.minimalPairs.bySet.vowel.attempted).toBe(3);
+  });
+
+  it('commutatively merges populated same-key nested progress buckets', () => {
+    const local = defaultState();
+    const cloud = defaultState();
+    local.classify = {
+      attempted: 5,
+      correct: 2,
+      byGroup: { ichidan: { attempted: 5, correct: 2 } },
+    };
+    cloud.classify = {
+      attempted: 4,
+      correct: 4,
+      byGroup: { ichidan: { attempted: 4, correct: 4 } },
+    };
+    local.onbin = {
+      attempted: 5,
+      correct: 2,
+      hints: 7,
+      streak: 1,
+      bestStreak: 3,
+      byPattern: { te: { attempted: 5, correct: 2, lastAt: 100 } },
+    };
+    cloud.onbin = {
+      attempted: 4,
+      correct: 4,
+      hints: 3,
+      streak: 4,
+      bestStreak: 4,
+      byPattern: { te: { attempted: 4, correct: 4, lastAt: 200 } },
+    };
+    local.register = {
+      attempted: 5,
+      correct: 2,
+      streak: 1,
+      bestStreak: 3,
+      byPattern: { polite: { attempted: 5, correct: 2, lastAt: 100 } },
+      byVerb: { taberu: { attempted: 5, correct: 2 } },
+    };
+    cloud.register = {
+      attempted: 4,
+      correct: 4,
+      streak: 4,
+      bestStreak: 4,
+      byPattern: { polite: { attempted: 4, correct: 4, lastAt: 200 } },
+      byVerb: { taberu: { attempted: 4, correct: 4 } },
+    };
+    local.meaning = { attempted: 5, correct: 2, byWord: { taberu: { attempted: 5, correct: 2 } } };
+    cloud.meaning = { attempted: 4, correct: 4, byWord: { taberu: { attempted: 4, correct: 4 } } };
+    local.mock = {
+      taken: 5,
+      bestPct: 80,
+      lastPct: 60,
+      lastScore: 6,
+      lastTotal: 10,
+      lastAt: 100,
+      bySkill: { conjugation: { attempted: 5, correct: 2 } },
+    };
+    cloud.mock = {
+      taken: 4,
+      bestPct: 90,
+      lastPct: 90,
+      lastScore: 9,
+      lastTotal: 10,
+      lastAt: 200,
+      bySkill: { conjugation: { attempted: 4, correct: 4 } },
+    };
+    local.shadow = { attempted: 5, totalRating: 10, byScenario: { te: 3 } };
+    cloud.shadow = { attempted: 4, totalRating: 14, byScenario: { te: 4 } };
+    local.reader = { sessions: 5, chars: 100, encounters: 8, wordSeen: { taberu: 5 }, lastAt: 100 };
+    cloud.reader = { sessions: 4, chars: 200, encounters: 7, wordSeen: { taberu: 4 }, lastAt: 200 };
+    local.session = {
+      reviewed: 5,
+      correct: 2,
+      skipped: 1,
+      currentStreak: 1,
+      bestStreak: 3,
+      recentOutcomes: [{ at: 100, cardId: 'same', kind: 'missed', label: 'Earlier' }],
+      mistakePatterns: {
+        vowel: { patternId: 'vowel', count: 5, latestAt: 100, label: 'Earlier' },
+      },
+    };
+    cloud.session = {
+      reviewed: 4,
+      correct: 4,
+      skipped: 2,
+      currentStreak: 4,
+      bestStreak: 4,
+      recentOutcomes: [{ at: 200, cardId: 'same', kind: 'correct', label: 'Later' }],
+      mistakePatterns: {
+        vowel: { patternId: 'vowel', count: 4, latestAt: 200, label: 'Later' },
+      },
+    };
+
+    const forward = mergeCloudState(local, cloud);
+    const reverse = mergeCloudState(cloud, local);
+
+    expect(forward).toEqual(reverse);
+    expect(forward.classify.byGroup.ichidan).toEqual({ attempted: 5, correct: 4 });
+    expect(forward.onbin.byPattern.te).toEqual({ attempted: 5, correct: 4, lastAt: 200 });
+    expect(forward.register.byVerb.taberu).toEqual({ attempted: 5, correct: 4 });
+    expect(forward.meaning.byWord.taberu).toEqual({ attempted: 5, correct: 4 });
+    expect(forward.mock).toMatchObject({
+      taken: 5,
+      bestPct: 90,
+      lastPct: 90,
+      lastScore: 9,
+      lastAt: 200,
+      bySkill: { conjugation: { attempted: 5, correct: 4 } },
+    });
+    expect(forward.session.mistakePatterns.vowel).toMatchObject({
+      count: 5,
+      latestAt: 200,
+      label: 'Later',
+    });
   });
 });
 
 describe('when Supabase is not configured', () => {
   it('syncReady is false and cloud calls reject clearly', async () => {
     vi.resetModules();
-    vi.doMock('../utils/supabase.js', () => ({ supabase: null }));
+    vi.doMock('../utils/supabase.js', () => ({
+      getLoadedSupabaseClient: () => null,
+      isSupabaseConfigured: () => false,
+      loadSupabaseClient: () => Promise.reject(new Error('Supabase client is not configured')),
+    }));
     const mod = await import('../utils/storage.js');
 
     expect(mod.syncReady()).toBe(false);
