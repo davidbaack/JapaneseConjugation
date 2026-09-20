@@ -96,10 +96,15 @@ describe('Practice miss to focused Guide handoff', () => {
     expectDictionaryPrompt();
 
     fireEvent.change(screen.getByLabelText('Plain form'), { target: { value: 'neru' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Next: choose the group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check plain form' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to group' }));
     fireEvent.click(screen.getByRole('button', { name: 'ichidan / ru-verb' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to answer' }));
     fireEvent.change(screen.getByLabelText('Final conjugation'), { target: { value: 'nenai' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Submit guide card' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check answer' }));
+    expect(screen.queryByRole('button', { name: 'Submit guide card' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Finish card' }));
     expect(screen.getByLabelText('Card 1 of 8')).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: 'Next card' }));
 

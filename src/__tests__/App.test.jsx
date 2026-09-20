@@ -967,15 +967,41 @@ describe('App shell', () => {
     expect(screen.getByTestId('godan-row-む-a-row').getAttribute('aria-current')).toBe('true');
   });
 
-  it('opens Guide and submits a completed assisted guide card', async () => {
+  it('opens Guide and completes an assisted card through each correction gate', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Guide', exact: true }));
 
     expect(await screen.findByText('Build the conjugation step by step.')).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: 'Skip plain form step' }));
+    const plainAnswer = screen
+      .getByText(/^Correct answer:/)
+      .textContent.replace('Correct answer:', '')
+      .trim();
+    fireEvent.change(screen.getByLabelText('Plain form'), { target: { value: plainAnswer } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check correction' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to group' }));
+
     fireEvent.click(screen.getByRole('button', { name: 'Skip word group step' }));
+    const groupAnswer = screen.getByText(/^Correct answer:/).textContent;
+    const groupButton = groupAnswer.includes('godan')
+      ? 'godan / u-verb'
+      : groupAnswer.includes('ichidan')
+        ? 'ichidan / ru-verb'
+        : 'irregular';
+    fireEvent.click(screen.getByRole('button', { name: groupButton }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check correction' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to answer' }));
+
     fireEvent.click(screen.getByRole('button', { name: 'Skip final answer step' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Submit guide card' }));
+    const finalAnswer = screen
+      .getByText(/^Correct answer:/)
+      .textContent.replace('Correct answer:', '')
+      .trim();
+    fireEvent.change(screen.getByLabelText('Final conjugation'), {
+      target: { value: finalAnswer },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check correction' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish card' }));
 
     expect(await screen.findAllByText(/assisted/i)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Next card' })).toBeTruthy();

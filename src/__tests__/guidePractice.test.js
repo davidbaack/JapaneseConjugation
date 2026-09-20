@@ -5,7 +5,9 @@ import {
   applyGuideAttemptToState,
   buildGuideDiagnosticInsight,
   buildGuideCard,
+  gradeGuideStep,
   gradeGuideSteps,
+  guideResultFromSteps,
   guideGroupChoice,
   guideGroupOptions,
 } from '../utils/guidePractice.js';
@@ -112,6 +114,30 @@ describe('guide practice engine', () => {
     expect(result.steps.base.correct).toBe(true);
     expect(result.steps.group.correct).toBe(true);
     expect(result.steps.answer.correct).toBe(true);
+  });
+
+  it('keeps a missed first response immutable after the correction matches', () => {
+    const card = buildGuideCard(
+      [NERU],
+      { ...defaultState(), enabledTypes: ['plain-negative'] },
+      DEFAULT_PREFS,
+      { sourceTypeId: 'dictionary' },
+    );
+    const missedBase = gradeGuideStep(card, 'base', 'taberu');
+    const correctedBase = gradeGuideStep(card, 'base', 'neru');
+    const steps = {
+      base: missedBase,
+      group: gradeGuideStep(card, 'group', 'ichidan'),
+      answer: gradeGuideStep(card, 'answer', 'nenai'),
+    };
+
+    expect(missedBase.correct).toBe(false);
+    expect(missedBase.submitted).toBe('taberu');
+    expect(correctedBase.correct).toBe(true);
+    expect(guideResultFromSteps(steps)).toMatchObject({
+      correct: false,
+      steps: { base: { correct: false, submitted: 'taberu' } },
+    });
   });
 
   it('grades all three steps correctly for adjectives', () => {

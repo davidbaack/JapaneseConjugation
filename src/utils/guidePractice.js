@@ -261,43 +261,53 @@ export function buildGuideCard(words, state = defaultState(), prefs = DEFAULT_PR
   };
 }
 
-export function gradeGuideSteps(card, answers = {}, assistedSteps = {}) {
-  const baseOk = answerMatches(answers.base, card.expectedBaseVariants || [card.expectedBase]);
-  const groupOk = String(answers.group || '') === card.expectedGroup;
-  const answerOk = answerMatches(
-    answers.answer,
-    card.expectedAnswerVariants || [card.expectedAnswer],
-  );
-  const steps = {
-    base: {
+export function gradeGuideStep(card, stepId, submitted = '', assisted = false) {
+  if (stepId === 'base') {
+    return {
       id: 'base',
       label: 'Find plain form',
-      correct: baseOk,
+      correct: answerMatches(submitted, card.expectedBaseVariants || [card.expectedBase]),
       expected: card.expectedBase,
-      submitted: answers.base || '',
-      assisted: !!assistedSteps.base,
-    },
-    group: {
+      submitted: submitted || '',
+      assisted: !!assisted,
+    };
+  }
+  if (stepId === 'group') {
+    return {
       id: 'group',
       label: 'Choose the group',
-      correct: groupOk,
+      correct: String(submitted || '') === card.expectedGroup,
       expected: card.expectedGroup,
       expectedLabel: groupDisplayLabel(card.word.group),
-      submitted: answers.group || '',
-      assisted: !!assistedSteps.group,
-    },
-    answer: {
+      submitted: submitted || '',
+      assisted: !!assisted,
+    };
+  }
+  if (stepId === 'answer') {
+    return {
       id: 'answer',
       label: 'Build the answer',
-      correct: answerOk,
+      correct: answerMatches(submitted, card.expectedAnswerVariants || [card.expectedAnswer]),
       expected: card.expectedAnswer,
-      submitted: answers.answer || '',
-      assisted: !!assistedSteps.answer,
-    },
-  };
-  const assisted = Object.values(assistedSteps || {}).some(Boolean);
+      submitted: submitted || '',
+      assisted: !!assisted,
+    };
+  }
+  throw new Error(`Unknown Guide step: ${stepId}`);
+}
+
+export function guideResultFromSteps(steps = {}) {
   const correct = GUIDE_STEP_IDS.every((id) => steps[id].correct);
+  const assisted = GUIDE_STEP_IDS.some((id) => steps[id].assisted);
   return { correct, assisted, steps };
+}
+
+export function gradeGuideSteps(card, answers = {}, assistedSteps = {}) {
+  return guideResultFromSteps(
+    Object.fromEntries(
+      GUIDE_STEP_IDS.map((id) => [id, gradeGuideStep(card, id, answers[id], assistedSteps[id])]),
+    ),
+  );
 }
 
 export function defaultGuideState() {

@@ -18,11 +18,12 @@ confirms the new direction, update this document in the same change.
 - Practice is the landing page and the main learner loop. It is built around
   continuous practice, not bounded workouts or a visible long-term SRS queue.
 - Guide is a scaffolded practice mode for recovering the base form, identifying
-  the word group, and producing the target conjugation before one final submit.
-  It presents one active step at a time and keeps completed-step summaries
-  available for correction.
-  It can count as Practice progress after the full guided card is submitted, and
-  it records step-level diagnostics separately.
+  the word group, and producing the target conjugation through three gated steps.
+  It checks each first response immediately, keeps completed-step summaries
+  available for review, and requires a missed step to be corrected before the
+  learner can continue. The original miss remains the recorded result.
+  It can count as Practice progress once after the final step is resolved, and it
+  records step-level diagnostics separately.
 - Stats leads with answer attempts, answer balance, recent misses, and one
   primary recommendation. Upcoming reviews and readiness summaries do not need
   to block active Practice; an empty schedule is one calm empty state. Accuracy
