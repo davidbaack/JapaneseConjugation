@@ -153,6 +153,9 @@ export function mergePracticePrefs(prefs) {
   ) {
     wordGroups = [...wordGroups, 'irregular-adjective'];
   }
+  for (const key of Object.keys(source)) {
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_PREFS, key)) delete source[key];
+  }
   return {
     ...DEFAULT_PREFS,
     ...source,
