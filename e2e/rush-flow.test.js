@@ -30,25 +30,18 @@ test.describe('Rush mode', () => {
   test('auto-submits a completed correct answer', async ({ page }) => {
     await page.addInitScript(
       ({ key }) => {
-        const today = new Date();
-        const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
-          2,
-          '0',
-        )}-${String(today.getDate()).padStart(2, '0')}`;
         localStorage.setItem(
           key,
           JSON.stringify({
             state: {
-              schemaVersion: 3,
+              schemaVersion: 4,
               enabledTypes: ['plain-past'],
-              daily: {
-                date: localDate,
-                count: 30,
-                goalHit: true,
-                goalStreak: 1,
-                bestGoalStreak: 1,
-                currentAnswerStreak: 0,
-                bestAnswerStreak: 0,
+              practiceSelection: {
+                mixed: false,
+                selectedTopicIds: ['te-ta-sound-changes'],
+                selectedTypeIdsByTopic: {
+                  'te-ta-sound-changes': ['plain-past'],
+                },
               },
             },
             customVerbs: [],

@@ -359,7 +359,6 @@ export default function GuideView() {
     setState((prev) =>
       applyGuideAttemptToState(prev, card, graded, {
         responseMs,
-        dailyGoal: practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal,
       }),
     );
   }

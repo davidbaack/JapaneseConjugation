@@ -58,13 +58,13 @@ function deferred() {
 
 function cloudRow(cardKey) {
   return {
-    data: { state: { schemaVersion: 3, cards: { [cardKey]: { reps: 1 } } } },
+    data: { state: { ...defaultState(), cards: { [cardKey]: { reps: 1 } } } },
     updated_at: '2030-01-01T00:00:00.000Z',
   };
 }
 
 function settingsCloudRow({
-  dailyGoal = 99,
+  autoSpeak = true,
   clockRevision = 50,
   rowRevision = 7,
   updatedAt = '2030-01-01T00:00:00.000Z',
@@ -78,12 +78,12 @@ function settingsCloudRow({
       customVerbs: [],
       customAdjectives: [],
       wordLists: [],
-      practicePrefs: { ...DEFAULT_PREFS, dailyGoal },
+      practicePrefs: { ...DEFAULT_PREFS, autoSpeak },
       syncMeta: {
         version: 1,
         deviceId: 'device-cloud',
         revision: clockRevision,
-        clocks: { 'prefs.dailyGoal': clock },
+        clocks: { 'prefs.autoSpeak': clock },
         tombstones: {},
         resetEpochs: { settings: clock },
         guideCounters: {},
@@ -116,7 +116,7 @@ function Probe() {
   return (
     <div>
       <output data-testid="cards">{Object.keys(state.cards || {}).join(',')}</output>
-      <output data-testid="daily-goal">{practicePrefs.dailyGoal}</output>
+      <output data-testid="auto-speak">{String(practicePrefs.autoSpeak)}</output>
       <output data-testid="sync">{syncStatus.message}</output>
       <button type="button" onClick={() => void resetLearnerData('factory').catch(() => {})}>
         Reset learner
@@ -137,9 +137,9 @@ function Probe() {
       </button>
       <button
         type="button"
-        onClick={() => setPracticePrefs((current) => ({ ...current, dailyGoal: 23 }))}
+        onClick={() => setPracticePrefs((current) => ({ ...current, autoSpeak: true }))}
       >
-        Set daily goal 23
+        Enable auto speak
       </button>
       <button type="button" onClick={() => void syncNow()}>
         Sync now
@@ -541,7 +541,7 @@ describe('AppStateProvider cloud session races', () => {
       customVerbs: [],
       customAdjectives: [],
       wordLists: [],
-      practicePrefs: { ...DEFAULT_PREFS, dailyGoal: 12 },
+      practicePrefs: { ...DEFAULT_PREFS },
       lastSyncedAt: 0,
       syncConfig: { enabled: false, userId: 'user-a' },
     });
@@ -552,14 +552,14 @@ describe('AppStateProvider cloud session races', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Reset settings' }));
     await waitFor(() =>
-      expect(screen.getByTestId('daily-goal').textContent).toBe(String(DEFAULT_PREFS.dailyGoal)),
+      expect(screen.getByTestId('auto-speak').textContent).toBe(String(DEFAULT_PREFS.autoSpeak)),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Set daily goal 23' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enable auto speak' }));
 
     let pendingEventId = '';
     await waitFor(() => {
       const saved = saveAll.mock.calls.at(-1);
-      expect(saved?.[6]?.dailyGoal).toBe(23);
+      expect(saved?.[6]?.autoSpeak).toBe(true);
       expect(saved?.[7]?.pendingReset).toMatchObject({
         domains: ['settings'],
         ownerUserId: 'user-a',
@@ -577,10 +577,10 @@ describe('AppStateProvider cloud session races', () => {
     await waitFor(() =>
       expect(screen.getByTestId('sync').textContent).toBe('Saved locally; cloud sync needs retry'),
     );
-    expect(screen.getByTestId('daily-goal').textContent).toBe('23');
+    expect(screen.getByTestId('auto-speak').textContent).toBe('true');
     expect(cloudUpsert).toHaveBeenCalledTimes(1);
     expect(cloudUpsert.mock.calls[0][0]).toMatchObject({
-      practicePrefs: { dailyGoal: 23 },
+      practicePrefs: { autoSpeak: true },
       syncMeta: {
         pendingReset: null,
         resetEpochs: { settings: expect.objectContaining({ revision: expect.any(Number) }) },
@@ -589,7 +589,7 @@ describe('AppStateProvider cloud session races', () => {
     expect(cloudUpsert.mock.calls[0][0].syncMeta.resetEpochs.settings.revision).toBeGreaterThan(50);
     await waitFor(() => {
       const saved = saveAll.mock.calls.at(-1);
-      expect(saved?.[6]?.dailyGoal).toBe(23);
+      expect(saved?.[6]?.autoSpeak).toBe(true);
       expect(saved?.[7]?.pendingReset?.eventId).toBe(pendingEventId);
     });
 
@@ -601,7 +601,7 @@ describe('AppStateProvider cloud session races', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
 
     await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Merged from cloud'));
-    expect(screen.getByTestId('daily-goal').textContent).toBe('23');
+    expect(screen.getByTestId('auto-speak').textContent).toBe('true');
     expect(cloudUpsert).toHaveBeenCalledTimes(2);
     expect(cloudUpsert.mock.calls[1][0].syncMeta.pendingReset).toBeNull();
     expect(cloudUpsert.mock.calls[1][0].syncMeta.resetEpochs.settings.revision).toBeGreaterThan(50);
@@ -610,13 +610,13 @@ describe('AppStateProvider cloud session races', () => {
 
   it('discards a cloud-only pending marker and accepts the next remote settings epoch', async () => {
     const staleMarkerRow = settingsCloudRow({
-      dailyGoal: 99,
+      autoSpeak: true,
       clockRevision: 10,
       rowRevision: 3,
       pendingReset: true,
     });
     const newerRow = settingsCloudRow({
-      dailyGoal: 55,
+      autoSpeak: false,
       clockRevision: 50,
       rowRevision: 4,
       updatedAt: '2030-01-02T00:00:00.000Z',
@@ -628,17 +628,17 @@ describe('AppStateProvider cloud session races', () => {
       authCallbacks[0]('SIGNED_IN', SESSION_A);
     });
     await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Restored from cloud'));
-    expect(screen.getByTestId('daily-goal').textContent).toBe('99');
+    expect(screen.getByTestId('auto-speak').textContent).toBe('true');
     expect(cloudUpsert).not.toHaveBeenCalled();
     await waitFor(() => expect(saveAll.mock.calls.at(-1)?.[7]?.pendingReset).toBeNull());
 
     fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
 
     await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Merged from cloud'));
-    expect(screen.getByTestId('daily-goal').textContent).toBe('55');
+    expect(screen.getByTestId('auto-speak').textContent).toBe('false');
     expect(cloudUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        practicePrefs: expect.objectContaining({ dailyGoal: 55 }),
+        practicePrefs: expect.objectContaining({ autoSpeak: false }),
         syncMeta: expect.objectContaining({
           pendingReset: null,
           resetEpochs: expect.objectContaining({
@@ -657,7 +657,7 @@ describe('AppStateProvider cloud session races', () => {
       customVerbs: [],
       customAdjectives: [],
       wordLists: [],
-      practicePrefs: { ...DEFAULT_PREFS, dailyGoal: 12 },
+      practicePrefs: { ...DEFAULT_PREFS },
       lastSyncedAt: 0,
     });
     renderProvider();
@@ -693,7 +693,7 @@ describe('AppStateProvider cloud session races', () => {
       authCallbacks[0]('SIGNED_IN', SESSION_B);
     });
 
-    await waitFor(() => expect(screen.getByTestId('daily-goal').textContent).toBe('99'));
+    await waitFor(() => expect(screen.getByTestId('auto-speak').textContent).toBe('true'));
     expect(cloudUpsert.mock.calls.filter((call) => call[1] === 'user-b')).toEqual([]);
     await waitFor(() => {
       const saved = saveAll.mock.calls.at(-1);

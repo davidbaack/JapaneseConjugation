@@ -6,14 +6,15 @@ import {
   BACKUP_FORMAT,
   BACKUP_VERSION,
 } from '../utils/backup.js';
-import { practiceScopeFromEnabledTypes } from '../utils/practiceScope.js';
+import { defaultState } from '../utils/storage.js';
+import { practiceSelectionForTypeIds } from '../utils/practiceSelection.js';
 
 const parts = () => ({
   state: {
+    ...defaultState(),
     cards: { 'a|b': { reps: 2 } },
     enabledTypes: ['plain-past'],
-    practiceScope: practiceScopeFromEnabledTypes(['plain-past']),
-    daily: { count: 3 },
+    practiceSelection: practiceSelectionForTypeIds(['plain-past']),
   },
   customVerbs: [{ dict: '走る', reading: 'はしる', meaning: 'to run', group: 'godan' }],
   customAdjectives: [],
@@ -32,7 +33,8 @@ describe('buildBackup / serializeBackup', () => {
   it('captures progress and settings sections', () => {
     const b = buildBackup(parts());
     expect(b.state.cards).toEqual({ 'a|b': { reps: 2 } });
-    expect(b.state.practiceScope.activeFamilyIds).toContain('te-ta-sound-changes');
+    expect(b.state.practiceSelection.selectedTopicIds).toContain('te-ta-sound-changes');
+    expect(b.state.practiceStats).toBeTruthy();
     expect(b.state.guide).toBeTruthy();
     expect(b.customVerbs).toHaveLength(1);
     expect(b.wordLists[0].name).toBe('N5');

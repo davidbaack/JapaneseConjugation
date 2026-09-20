@@ -17,7 +17,6 @@ export default {
   'nav.tools': 'Tools',
   'nav.settings': 'Settings',
 
-  'header.session': '{correct}/{reviewed} this session',
   'header.today': '{count}/{goal} today',
   'header.goalStreak': '{days} day goal streak',
 

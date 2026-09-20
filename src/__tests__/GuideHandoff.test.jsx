@@ -19,7 +19,7 @@ globalThis.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 import App from '../App.jsx';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
-import { defaultState, localDateKey } from '../utils/storage.js';
+import { defaultState } from '../utils/storage.js';
 
 afterEach(() => {
   cleanup();
@@ -36,15 +36,6 @@ describe('Practice miss to focused Guide handoff', () => {
         state: {
           ...defaultState(),
           enabledTypes: ['plain-negative'],
-          daily: {
-            date: localDateKey(),
-            count: DEFAULT_PREFS.dailyGoal,
-            goalHit: true,
-            goalStreak: 1,
-            bestGoalStreak: 1,
-            currentAnswerStreak: 0,
-            bestAnswerStreak: 0,
-          },
         },
         customVerbs: [],
         customAdjectives: [],

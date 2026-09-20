@@ -56,7 +56,7 @@ export function buildLearnerResetPayload(parts = {}, kind, options = {}) {
           enabledTypes: Array.isArray(current.state.enabledTypes)
             ? [...current.state.enabledTypes]
             : [...base.enabledTypes],
-          practiceScope: current.state.practiceScope || base.practiceScope,
+          practiceSelection: current.state.practiceSelection || base.practiceSelection,
           reviewScope: current.state.reviewScope || base.reviewScope,
         },
       },
@@ -70,11 +70,7 @@ export function buildLearnerResetPayload(parts = {}, kind, options = {}) {
       current,
       {
         ...current,
-        state: {
-          ...current.state,
-          practiceScope: base.practiceScope,
-          enabledTypes: [...base.enabledTypes],
-        },
+        state: current.state,
         practicePrefs: mergePracticePrefs(DEFAULT_PREFS),
       },
       kind,

@@ -7,6 +7,10 @@ import { buildFormationKeysHash } from '../../utils/formationKeys.js';
 import { clearMinimalPairPrefs, minimalPairReturnEnabledTypes } from '../../utils/minimalPairs.js';
 import { RunAnswerReveal } from './StudyReviewPanels.jsx';
 import { ANSWER_OUTCOME, answerOutcomeCopy } from '../../utils/answerFeedbackCopy.js';
+import {
+  practiceSelectionForTypeIds,
+  updateStatePracticeSelection,
+} from '../../utils/practiceSelection.js';
 
 export function KanaCoachStrip({
   visibleCoachCells,
@@ -142,6 +146,7 @@ export function AnswerInputPanel({
   wasCorrect,
   wasCorrected,
   reviewRecord,
+  contextStats,
   geminiKey,
   nextButtonRef,
   wordSweep,
@@ -216,11 +221,11 @@ export function AnswerInputPanel({
         <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-200">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold uppercase tracking-wider">
-              {activeMinimalPairSet ? 'Minimal pair' : 'Today contrast'}
+              {activeMinimalPairSet ? 'Minimal pair' : 'Contrast'}
             </span>
             <span>{minimalPairSetForCurrent.label}</span>
             {reviewsDone > 0 && (
-              <span className="tabular-nums opacity-70">{reviewsDone} this run</span>
+              <span className="tabular-nums opacity-70">{reviewsDone} answered</span>
             )}
           </div>
           {activeMinimalPairSet && (
@@ -229,7 +234,15 @@ export function AnswerInputPanel({
                 if (setPracticePrefs) setPracticePrefs(clearMinimalPairPrefs(practicePrefs));
                 if (setState) {
                   const enabledTypes = minimalPairReturnEnabledTypes(practicePrefs);
-                  setState((prev) => ({ ...prev, enabledTypes: enabledTypes || [] }));
+                  setState((prev) =>
+                    updateStatePracticeSelection(
+                      prev,
+                      practiceSelectionForTypeIds(
+                        enabledTypes || prev.enabledTypes,
+                        prev.practiceSelection,
+                      ),
+                    ),
+                  );
                 }
               }}
               className="ml-1 font-bold leading-none hover:text-emerald-950 dark:hover:text-emerald-100 transition"
@@ -696,6 +709,7 @@ export function AnswerInputPanel({
       </span>
       <RunAnswerReveal
         record={reviewRecord}
+        contextStats={contextStats}
         geminiKey={geminiKey}
         actionButtonRef={nextButtonRef}
         onOpenGuide={wordSweep ? null : openGuideForReviewRule}

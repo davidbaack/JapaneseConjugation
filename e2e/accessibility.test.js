@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 
 const SURFACES = [
-  { tab: 'Practice', anchor: 'Practice run' },
+  { tab: 'Practice', anchor: 'What do you want to practice?' },
   { tab: 'Guide', anchor: 'Build the conjugation step by step.' },
   { tab: 'Learn', anchor: 'Conjugation formation guide' },
   { tab: 'Tools', anchor: 'Lookup, check, word lists, and word management.' },

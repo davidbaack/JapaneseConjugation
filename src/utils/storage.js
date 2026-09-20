@@ -1,13 +1,5 @@
 import { STORAGE_KEY, DEFAULT_PREFS } from '../data/defaults.js';
-import {
-  CONJ_TYPES,
-  ALL_CARD_TYPES,
-  TYPE_PACKS,
-  TEXTBOOK_CORE_TYPE_IDS,
-  LEGACY_BROAD_DEFAULT_TYPE_IDS,
-  INTRODUCED_DEFAULT_TYPE_IDS,
-  RETIRED_STANDALONE_TYPE_IDS,
-} from '../data/conjugationTypes.js';
+import { ALL_CARD_TYPES, TYPE_PACKS, TEXTBOOK_CORE_TYPE_IDS } from '../data/conjugationTypes.js';
 import { RULES, wordKey, wordKind, getWordMeta, enabledTypeIdsFor } from './conjugator.js';
 import { filterWordsForStudyScope } from './vocabularyProgression.js';
 import { diagnoseMistake } from './mistakeDiagnosis.js';
@@ -38,11 +30,16 @@ import {
   weaknessScoreForCard,
 } from './subcategoryWeakness.js';
 import {
-  enabledTypeIdsForPracticeScope,
-  mergePracticeScopes,
-  normalizePracticeScope,
-  practiceScopeFromEnabledTypes,
-} from './practiceScope.js';
+  defaultPracticeSelection,
+  effectiveTypeIdsForPracticeSelection,
+  mergePracticeSelections,
+  normalizePracticeSelection,
+} from './practiceSelection.js';
+import {
+  defaultPracticeStats,
+  mergePracticeStats,
+  normalizePracticeStats,
+} from './practiceStats.js';
 import { reconcileDerivedProgressState } from './derivedProgress.js';
 import {
   adoptSyncMetadata,
@@ -57,7 +54,7 @@ import {
 } from './syncMetadata.js';
 
 export const DAY = 86400000;
-export const SRS_SCHEMA_VERSION = 3;
+export const SRS_SCHEMA_VERSION = 4;
 export const DICTIONARY_TYPE_ID = 'dictionary';
 const REVIEW_ROTATION_SIZE = 8;
 const WEAK_BOOST_CAP = 12;
@@ -74,39 +71,7 @@ const BEGINNER_LADDER_STAGES = [
 ];
 const SIMPLE_GODAN_ENDINGS = /[うくぐすつぬぶむ]$/;
 
-const LEGACY_VERB_DEFAULT_TYPE_IDS = [
-  ...CONJ_TYPES.filter((t) => t.id !== 'plain-present').map((t) => t.id),
-  ...RETIRED_STANDALONE_TYPE_IDS,
-];
-const LEGACY_PREINTRO_DEFAULT_TYPE_IDS = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
-  (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
-);
-const LEGACY_VERB_PREINTRO_DEFAULT_TYPE_IDS = LEGACY_VERB_DEFAULT_TYPE_IDS.filter(
-  (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
-);
 const RETIRED_REPAIR_DRILL_LIST_ID = 'repair-drill';
-
-function sameIdSet(ids, targetIds) {
-  const uniqueIds = [...new Set(ids || [])];
-  if (uniqueIds.length !== targetIds.length) return false;
-  const target = new Set(targetIds);
-  return uniqueIds.every((id) => target.has(id));
-}
-
-function isLegacyBroadDefaultTypeScope(ids) {
-  return (
-    sameIdSet(ids, LEGACY_BROAD_DEFAULT_TYPE_IDS) ||
-    sameIdSet(ids, LEGACY_PREINTRO_DEFAULT_TYPE_IDS) ||
-    sameIdSet(ids, LEGACY_VERB_DEFAULT_TYPE_IDS) ||
-    sameIdSet(ids, LEGACY_VERB_PREINTRO_DEFAULT_TYPE_IDS)
-  );
-}
-
-function normalizeDefaultTypeScope(ids) {
-  if (isLegacyBroadDefaultTypeScope(ids)) return [...QUICK_PRACTICE_DEFAULT_TYPE_IDS];
-  const valid = new Set(ALL_CARD_TYPES.map((type) => type.id));
-  return [...new Set(ids || [])].map((id) => String(id || '').trim()).filter((id) => valid.has(id));
-}
 
 export function wordSrsKey(word) {
   if (!word) return '';
@@ -130,14 +95,12 @@ export function wordKeyFromCardId(cardId) {
   return marker >= 0 ? id.slice(0, marker) : '';
 }
 
-export function dailyNewCardLimit(prefs = DEFAULT_PREFS) {
-  const explicit = Number(prefs?.newCardsPerDay || 0);
-  if (Number.isFinite(explicit) && explicit > 0) return Math.round(explicit);
+export function freshCardLimit() {
   return 60;
 }
 
-export function bonusNewCardLimit(prefs = DEFAULT_PREFS) {
-  return Math.max(2, Math.floor(dailyNewCardLimit(prefs) / 2));
+export function bonusFreshCardLimit() {
+  return 30;
 }
 
 function newCardsIntroducedToday(state = {}) {
@@ -519,14 +482,9 @@ function hasLocalStateData(state) {
     hasItems(state.reviewScope?.excludedWordKeys) ||
     hasItems(state.reviewScope?.excludedFormFamilyIds) ||
     hasItems(state.reviewScope?.recommendations) ||
-    (state.daily &&
-      ((state.daily.count || 0) > 0 ||
-        !!state.daily.goalHit ||
-        (state.daily.goalStreak || 0) > 0 ||
-        (state.daily.bestGoalStreak || 0) > 0 ||
-        (state.daily.currentAnswerStreak || 0) > 0 ||
-        (state.daily.bestAnswerStreak || 0) > 0)) ||
+    (state.practiceStats?.lifetime?.attempted || 0) > 0 ||
     hasProgressBucketData(state.classify) ||
+    !sameJSON(state.practiceSelection, base.practiceSelection) ||
     (Array.isArray(state.enabledTypes) && !sameJSON(state.enabledTypes, base.enabledTypes))
   );
 }
@@ -940,21 +898,6 @@ function mergeSessionProgress(local = {}, cloud = {}) {
   };
 }
 
-function mergeDailyProgress(local = {}, cloud = {}) {
-  const localDate = String(local.date || '');
-  const cloudDate = String(cloud.date || '');
-  if (localDate !== cloudDate) return localDate > cloudDate ? local : cloud;
-  return {
-    date: localDate || cloudDate || localDateKey(),
-    count: maxNum(local.count, cloud.count),
-    goalHit: !!(local.goalHit || cloud.goalHit),
-    goalStreak: maxNum(local.goalStreak, cloud.goalStreak),
-    bestGoalStreak: maxNum(local.bestGoalStreak, cloud.bestGoalStreak),
-    currentAnswerStreak: maxNum(local.currentAnswerStreak, cloud.currentAnswerStreak),
-    bestAnswerStreak: maxNum(local.bestAnswerStreak, cloud.bestAnswerStreak),
-  };
-}
-
 function mergeReviewScopeProgress(local = {}, cloud = {}) {
   const recommendationById = new Map();
   for (const item of [...(local.recommendations || []), ...(cloud.recommendations || [])]) {
@@ -1114,32 +1057,10 @@ export function mergeCloudState(local, cloud) {
         };
   local = normalizedLocal;
   cloud = normalizedCloud;
-  const mergedLegacySet = new Set(
-    normalizeDefaultTypeScope([
-      ...new Set([...(local.enabledTypes || []), ...(cloud.enabledTypes || [])]),
-    ]),
+  const practiceSelection = mergePracticeSelections(
+    local.practiceSelection,
+    cloud.practiceSelection,
   );
-  const canonicalTypeOrder = [
-    ...QUICK_PRACTICE_DEFAULT_TYPE_IDS,
-    ...ALL_CARD_TYPES.map((type) => type.id).filter(
-      (typeId) => !QUICK_PRACTICE_DEFAULT_TYPE_IDS.includes(typeId),
-    ),
-  ];
-  const mergedLegacyEnabledTypes = canonicalTypeOrder.filter((typeId) =>
-    mergedLegacySet.has(typeId),
-  );
-  const practiceScope = mergePracticeScopes(
-    local.practiceScope,
-    cloud.practiceScope,
-    local.enabledTypes || [],
-    cloud.enabledTypes || [],
-  );
-  const enabledTypes = enabledTypeIdsForPracticeScope(practiceScope);
-  const enabledSet = new Set(enabledTypes);
-  const orderedEnabledTypes = [
-    ...mergedLegacyEnabledTypes.filter((typeId) => enabledSet.has(typeId)),
-    ...enabledTypes.filter((typeId) => !mergedLegacyEnabledTypes.includes(typeId)),
-  ];
   const merged = {
     ...local,
     schemaVersion: SRS_SCHEMA_VERSION,
@@ -1151,9 +1072,9 @@ export function mergeCloudState(local, cloud) {
     mistakes: mergeMistakes(local.mistakes || [], cloud.mistakes || []),
     readiness: mergeReadinessState(local.readiness, cloud.readiness),
     weakness: mergeWeaknessState(local.weakness, cloud.weakness),
-    practiceScope,
-    enabledTypes: orderedEnabledTypes.length ? orderedEnabledTypes : mergedLegacyEnabledTypes,
-    daily: mergeDailyProgress(local.daily, cloud.daily),
+    practiceSelection,
+    practiceStats: mergePracticeStats(local.practiceStats, cloud.practiceStats),
+    enabledTypes: effectiveTypeIdsForPracticeSelection(practiceSelection),
     classify: {
       attempted: maxNum(local.classify?.attempted, cloud.classify?.attempted),
       correct: maxNum(local.classify?.correct, cloud.classify?.correct),
@@ -1315,7 +1236,8 @@ export function normalizeReferenceState(ref = null) {
 
 /** @returns {Record<string, any>} */
 export function defaultState() {
-  const enabledTypes = [...QUICK_PRACTICE_DEFAULT_TYPE_IDS];
+  const practiceSelection = defaultPracticeSelection();
+  const enabledTypes = effectiveTypeIdsForPracticeSelection(practiceSelection);
   return {
     schemaVersion: SRS_SCHEMA_VERSION,
     cards: {},
@@ -1355,7 +1277,8 @@ export function defaultState() {
     minimalPairs: { bySet: {} },
     reference: normalizeReferenceState(),
     reviewScope: defaultReviewScope(),
-    practiceScope: practiceScopeFromEnabledTypes(enabledTypes),
+    practiceSelection,
+    practiceStats: defaultPracticeStats(),
     enabledTypes,
     weakness: defaultWeaknessState(),
     session: {
@@ -1367,15 +1290,6 @@ export function defaultState() {
       recentOutcomes: [],
       mistakePatterns: {},
     },
-    daily: {
-      date: localDateKey(),
-      count: 0,
-      goalHit: false,
-      goalStreak: 0,
-      bestGoalStreak: 0,
-      currentAnswerStreak: 0,
-      bestAnswerStreak: 0,
-    },
     classify: { attempted: 0, correct: 0, byGroup: {} },
   };
 }
@@ -1383,6 +1297,9 @@ export function defaultState() {
 export function mergeState(saved, sessionOverride) {
   const base = defaultState();
   const oldSrsSchema = !saved || saved.schemaVersion !== SRS_SCHEMA_VERSION;
+  if (oldSrsSchema) {
+    return { ...base, session: sessionOverride || base.session };
+  }
   const merged = {
     ...base,
     ...(saved || {}),
@@ -1436,83 +1353,14 @@ export function mergeState(saved, sessionOverride) {
     minimalPairs: mergeMinimalPairProgress(base.minimalPairs, saved && saved.minimalPairs),
     reference: normalizeReferenceState(saved && saved.reference ? saved.reference : null),
     reviewScope: normalizeReviewScope(saved && saved.reviewScope ? saved.reviewScope : null),
-    daily: (saved && saved.daily) || base.daily,
+    practiceSelection: normalizePracticeSelection(saved && saved.practiceSelection),
+    practiceStats: normalizePracticeStats(saved && saved.practiceStats),
     classify: (saved && saved.classify) || base.classify,
     session: sessionOverride || base.session,
   };
-
-  if (oldSrsSchema) {
-    merged.enabledTypes = [...QUICK_PRACTICE_DEFAULT_TYPE_IDS];
-  } else if (
-    saved &&
-    Array.isArray(saved.enabledTypes) &&
-    isLegacyBroadDefaultTypeScope(saved.enabledTypes)
-  ) {
-    merged.enabledTypes = [...QUICK_PRACTICE_DEFAULT_TYPE_IDS];
-  } else if (
-    saved &&
-    Array.isArray(saved.enabledTypes) &&
-    !saved.enabledTypes.some((id) => id.startsWith('adj-'))
-  ) {
-    merged.enabledTypes = normalizeDefaultTypeScope([
-      ...saved.enabledTypes,
-      ...base.enabledTypes.filter((id) => id.startsWith('adj-')),
-    ]);
-  } else {
-    merged.enabledTypes = normalizeDefaultTypeScope(merged.enabledTypes);
-  }
-
-  const hasSavedPracticeScope = !!(saved && saved.practiceScope);
-  merged.practiceScope = normalizePracticeScope(
-    hasSavedPracticeScope ? saved.practiceScope : null,
-    merged.enabledTypes,
-  );
-  const scopedEnabledTypes = enabledTypeIdsForPracticeScope(merged.practiceScope);
-  const enabledSet = new Set(merged.enabledTypes);
-  const scopeMatchesEnabledTypes =
-    scopedEnabledTypes.length === enabledSet.size &&
-    scopedEnabledTypes.every((typeId) => enabledSet.has(typeId));
-  if (scopedEnabledTypes.length && (!hasSavedPracticeScope || scopeMatchesEnabledTypes)) {
-    const scoped = new Set(scopedEnabledTypes);
-    merged.enabledTypes = [
-      ...merged.enabledTypes.filter((typeId) => scoped.has(typeId)),
-      ...scopedEnabledTypes.filter((typeId) => !merged.enabledTypes.includes(typeId)),
-    ];
-  }
+  merged.enabledTypes = effectiveTypeIdsForPracticeSelection(merged.practiceSelection);
 
   return reconcileDerivedProgressState(merged).state;
-}
-
-export function bumpDaily(daily, correct, dailyGoal) {
-  const today = localDateKey(),
-    yesterday = localDateKey(-1);
-  let d = daily || {};
-  if (d.date !== today) {
-    const keepGoalStreak = d.date === yesterday && d.goalHit;
-    d = {
-      date: today,
-      count: 0,
-      goalHit: false,
-      goalStreak: keepGoalStreak ? d.goalStreak || 0 : 0,
-      bestGoalStreak: d.bestGoalStreak || 0,
-      currentAnswerStreak: 0,
-      bestAnswerStreak: d.bestAnswerStreak || 0,
-    };
-  }
-  const count = (d.count || 0) + 1;
-  const wasGoalHit = !!d.goalHit;
-  const goalHit = count >= dailyGoal;
-  const goalStreak = (d.goalStreak || 0) + (!wasGoalHit && goalHit ? 1 : 0);
-  const currentAnswerStreak = correct ? (d.currentAnswerStreak || 0) + 1 : 0;
-  return {
-    ...d,
-    count,
-    goalHit,
-    goalStreak,
-    bestGoalStreak: Math.max(d.bestGoalStreak || 0, goalStreak),
-    currentAnswerStreak,
-    bestAnswerStreak: Math.max(d.bestAnswerStreak || 0, currentAnswerStreak),
-  };
 }
 
 export function recordMistake(
@@ -1980,7 +1828,7 @@ export function selectNext(
         return c && c.nextReview <= now;
       })
     : [];
-  const freshLimit = options.bonusMode ? bonusNewCardLimit(prefs) : dailyNewCardLimit(prefs);
+  const freshLimit = options.bonusMode ? bonusFreshCardLimit() : freshCardLimit();
   const canIntroduceFresh = newCardsIntroducedToday(state) < freshLimit;
   const fresh = canIntroduceFresh ? scoredAvail.filter((p) => !state.cards[p.id]) : [];
   const reviewed = scoredAvail.filter((p) => state.cards[p.id]);

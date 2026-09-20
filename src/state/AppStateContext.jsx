@@ -20,7 +20,6 @@ import {
   mergeSyncPayload,
   saveAll,
   pruneAICache,
-  localDateKey,
   normalizeWordLists,
 } from '../utils/storage.js';
 import {
@@ -32,7 +31,6 @@ import {
   stripPendingSyncReset,
 } from '../utils/syncMetadata.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import { FORM_GROUPS } from '../data/conjugationTypes.js';
 import { getJapaneseVoices } from '../utils/speech.js';
 import { mergePracticePrefs } from '../utils/display.js';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
@@ -45,20 +43,16 @@ import {
 } from '../hooks/useCloudAutoSync.js';
 import { buildLearnerResetPayload, commitLearnerResetPayload } from '../utils/learnerReset.js';
 import {
-  buildTodayDrillPlan,
-  practicePrefsForTodayDrill,
-  TODAY_DRILL_LIST_ID,
-  upsertTodayDrillList,
-} from '../utils/todayDrill.js';
-import {
-  includeFormFamilyInReviewState,
   includeTypeFamilyInReviewState,
   includeWordInReviewState,
-  includeWordKeyInReviewState,
   removeReviewRecommendationState,
   upsertReviewRecommendationState,
 } from '../utils/reviewScope.js';
-import { updateStatePracticeScope } from '../utils/practiceScope.js';
+import {
+  practiceSelectionForTopic,
+  practiceSelectionForTypeIds,
+  updateStatePracticeSelection,
+} from '../utils/practiceSelection.js';
 import { reconcileDerivedProgressState } from '../utils/derivedProgress.js';
 
 // Centralized global app state (improvement #6). All the practice/customs/prefs
@@ -76,14 +70,6 @@ function normalizeAppTab(tab) {
   return ['practice', 'guide', 'stats', 'learn', 'drills', 'tools', 'settings'].includes(tab)
     ? tab
     : 'practice';
-}
-
-function isTodayDrillPractice(prefs = DEFAULT_PREFS) {
-  return (
-    !prefs.minimalPairSetId &&
-    !prefs.reviewLimitSource &&
-    (prefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID)
-  );
 }
 
 function cloudRetryStatus(error, fallback) {
@@ -137,12 +123,6 @@ function useAppController() {
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
   const [cloudReadyUserId, setCloudReadyUserId] = useState('');
   const [syncOwnerUserId, setSyncOwnerUserId] = useState('');
-  const [srsQueue, setSrsQueue] = useState(() => ({
-    date: localDateKey(),
-    dueRuleIds: [],
-    completedDueRuleIds: [],
-    startedAt: null,
-  }));
   const [supabaseState, setSupabaseState] = useState(initialSupabaseState);
   const supabase = supabaseState.client;
   const activeGeminiKey = supabaseState.configured ? 'proxy' : '';
@@ -288,12 +268,6 @@ function useAppController() {
     setLearnFocus(null);
     setGuideFocus(null);
     setLabFocus(null);
-    setSrsQueue({
-      date: localDateKey(),
-      dueRuleIds: [],
-      completedDueRuleIds: [],
-      startedAt: null,
-    });
     try {
       sessionStorage.removeItem('jp-study-current');
     } catch {}
@@ -718,40 +692,6 @@ function useAppController() {
     [builtInVerbs, builtInAdjectives],
   );
   const allWords = useMemo(() => [...allVerbs, ...allAdjectives], [allVerbs, allAdjectives]);
-  const todayKey = localDateKey();
-  const daily = state.daily || defaultState().daily;
-  const dailyPct = Math.min(100, Math.round((daily.count / (practicePrefs.dailyGoal || 30)) * 100));
-  const todayPlan = useMemo(
-    () => buildTodayDrillPlan(state, allWords, practicePrefs, wordLists, { builtInWords }),
-    [state, allWords, practicePrefs, wordLists, builtInWords],
-  );
-  const todayGoalHit = daily.date === todayKey && !!daily.goalHit;
-  const todayDrillActive = isTodayDrillPractice(practicePrefs);
-  const activeSrsQueue = useMemo(() => {
-    if (srsQueue.date !== todayKey) {
-      return { date: todayKey, dueRuleIds: [], completedDueRuleIds: [], startedAt: null };
-    }
-    const dueRuleIds = [...new Set(srsQueue.dueRuleIds || [])];
-    const completedDueRuleIds = [...new Set(srsQueue.completedDueRuleIds || [])].filter((id) =>
-      dueRuleIds.includes(id),
-    );
-    return { ...srsQueue, dueRuleIds, completedDueRuleIds };
-  }, [srsQueue, todayKey]);
-
-  useEffect(() => {
-    if (!hydrated || !todayDrillActive) return;
-    setSrsQueue((prev) => {
-      const today = localDateKey();
-      if (prev.date === today && prev.startedAt) return prev;
-      return {
-        date: today,
-        dueRuleIds: [...(todayPlan.dueRuleIds || [])],
-        completedDueRuleIds: [],
-        startedAt: Date.now(),
-      };
-    });
-  }, [hydrated, todayDrillActive, todayPlan]);
-
   // Cross-view actions, so views don't need ad-hoc callback props.
   function practiceWord(word, type, options = {}) {
     if (word || type) {
@@ -771,20 +711,10 @@ function useAppController() {
    * @param {{ familyId?: string, launchPrefs?: Record<string, any> }} [options]
    */
   function practiceFormGroup({ familyId, launchPrefs = {} } = {}) {
-    const family = FORM_GROUPS.find((item) => item.id === familyId);
-    if (!family?.typeIds?.length) return false;
-    const returnEnabledTypes = Array.isArray(state.enabledTypes) ? [...state.enabledTypes] : [];
-    const returnPracticePrefs = mergePracticePrefs(practicePrefs);
     setState((prev) => {
-      const restored = includeFormFamilyInReviewState(prev, familyId);
-      const scoped = updateStatePracticeScope(restored, {
-        type: 'enable-family',
-        familyId,
-      });
-      return {
-        ...scoped,
-        session: { ...(restored.session || {}), mistakePatterns: {} },
-      };
+      const selection = practiceSelectionForTopic(familyId, prev.practiceSelection);
+      if (!selection.selectedTopicIds.includes(familyId)) return prev;
+      return updateStatePracticeSelection(prev, selection);
     });
     setPracticePrefs((prev) => ({
       ...prev,
@@ -799,13 +729,7 @@ function useAppController() {
     try {
       sessionStorage.removeItem('jp-study-current');
     } catch {}
-    setStudyFocus({
-      formGroupId: familyId,
-      source: 'stats',
-      launchMode: 'form-group',
-      returnEnabledTypes,
-      returnPracticePrefs,
-    });
+    setStudyFocus(null);
     setTab('practice');
     return true;
   }
@@ -847,106 +771,33 @@ function useAppController() {
 
   function startReviewRecommendation(recommendation) {
     if (!recommendation) return false;
-    const wordKeys = Array.isArray(recommendation.wordKeys) ? recommendation.wordKeys : [];
     const typeIds = Array.isArray(recommendation.typeIds) ? recommendation.typeIds : [];
-    const suggestedCount = Math.max(0, Number(recommendation.suggestedCount || 0));
-    const listId = `list-review-rec-${recommendation.id}`;
-    const returnEnabledTypes = Array.isArray(state.enabledTypes) ? [...state.enabledTypes] : [];
-    const returnPracticePrefs = mergePracticePrefs(practicePrefs);
+    if (!typeIds.length) return false;
     setState((prev) => {
       let next = { ...prev };
-      for (const key of wordKeys) next = includeWordKeyInReviewState(next, key);
       for (const typeId of typeIds) next = includeTypeFamilyInReviewState(next, typeId);
       next = removeReviewRecommendationState(next, recommendation.id);
-      return {
-        ...next,
-        ...(typeIds.length ? { enabledTypes: typeIds } : {}),
-        session: { ...(next.session || {}), mistakePatterns: {} },
-      };
+      return updateStatePracticeSelection(
+        next,
+        practiceSelectionForTypeIds(typeIds, next.practiceSelection),
+      );
     });
-    if (wordKeys.length) {
-      setWordLists((prev) => {
-        const list = {
-          id: listId,
-          name: recommendation.label || 'Recommended practice',
-          wordKeys,
-        };
-        return (prev || []).some((item) => item.id === listId)
-          ? prev.map((item) => (item.id === listId ? list : item))
-          : [...(prev || []), list];
-      });
-    }
     setPracticePrefs((prev) => ({
       ...prev,
       reviewStyle: 'auto',
       minimalPairSetId: '',
       minimalPairReturn: null,
-      reviewLimit: suggestedCount,
-      reviewLimitSource: suggestedCount ? 'recommendation' : '',
+      reviewLimit: 0,
+      reviewLimitSource: '',
       practicePath: '',
-      wordListIds: wordKeys.length ? [listId] : [],
+      wordListIds: [],
     }));
     try {
       sessionStorage.removeItem('jp-study-current');
     } catch {}
-    setStudyFocus({
-      source: recommendation.source || 'recommendation',
-      launchMode: 'recommendation',
-      returnPracticePrefs,
-      recommendation: {
-        id: recommendation.id,
-        source: recommendation.source || '',
-        label: recommendation.label || 'Recommended practice',
-        detail: recommendation.detail || '',
-        suggestedCount,
-        wordCount: wordKeys.length,
-        typeCount: typeIds.length,
-        returnEnabledTypes,
-        returnPracticePrefs,
-      },
-    });
-    setTab('practice');
-    return true;
-  }
-
-  function startTodayDrill(plan = todayPlan) {
-    const drillPlan = plan || todayPlan;
-    if (!drillPlan?.available) return false;
-    try {
-      sessionStorage.removeItem('jp-study-current');
-    } catch {}
-    setWordLists((prev) => upsertTodayDrillList(prev, drillPlan));
-    setState((prev) => ({
-      ...prev,
-      session: { ...(prev.session || {}), mistakePatterns: {} },
-    }));
-    setPracticePrefs(
-      (prev) => /** @type {typeof DEFAULT_PREFS} */ (practicePrefsForTodayDrill(prev, drillPlan)),
-    );
-    setSrsQueue({
-      date: localDateKey(),
-      dueRuleIds: [...(drillPlan.dueRuleIds || [])],
-      completedDueRuleIds: [],
-      startedAt: Date.now(),
-    });
     setStudyFocus(null);
     setTab('practice');
     return true;
-  }
-
-  function markSrsQueueCompleted(ruleId) {
-    if (!ruleId) return;
-    setSrsQueue((prev) => {
-      const today = localDateKey();
-      const dueRuleIds = prev.date === today ? prev.dueRuleIds || [] : [];
-      if (!dueRuleIds.includes(ruleId)) return prev;
-      const completedDueRuleIds = prev.completedDueRuleIds || [];
-      if (completedDueRuleIds.includes(ruleId)) return prev;
-      return {
-        ...prev,
-        completedDueRuleIds: [...completedDueRuleIds, ruleId],
-      };
-    });
   }
 
   return {
@@ -998,14 +849,6 @@ function useAppController() {
     allAdjectives,
     builtInWords,
     allWords,
-    daily,
-    dailyPct,
-    todayPlan,
-    todayGoalHit,
-    todayDrillActive,
-    srsQueue: activeSrsQueue,
-    startTodayDrill,
-    markSrsQueueCompleted,
   };
 }
 

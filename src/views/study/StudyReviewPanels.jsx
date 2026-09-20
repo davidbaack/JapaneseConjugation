@@ -24,6 +24,7 @@ import {
   answerOutcomeCopy,
   buildMistakeExplanation,
 } from '../../utils/answerFeedbackCopy.js';
+import { accuracyForTotals, evidenceLabelForTotals } from '../../utils/practiceStats.js';
 
 function ReviewDisclosure({ tone = 'stone', summary, children, hintLabel = 'More' }) {
   const toneClass =
@@ -313,6 +314,7 @@ function guideFocusOptionsForReview(record) {
 
 function RunAnswerReveal({
   record,
+  contextStats = null,
   geminiKey,
   onOpenLearn,
   onOpenLearnFocus = null,
@@ -619,6 +621,49 @@ function RunAnswerReveal({
         </div>
       </div>
 
+      {contextStats?.type && (
+        <section
+          aria-label={`Stats for ${contextStats.type.label}`}
+          className="mt-4 rounded-xl border border-stone-200 bg-white/75 p-3 text-left dark:border-stone-800 dark:bg-stone-950/45"
+        >
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+            Your progress
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-lg bg-indigo-50 px-3 py-2 dark:bg-indigo-950/30">
+              <div className="text-xs font-semibold text-indigo-900 dark:text-indigo-100">
+                {contextStats.type.label}
+              </div>
+              <div className="mt-1 text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-100">
+                {contextStats.exact.correct} right / {contextStats.exact.attempted} attempts
+              </div>
+              <div className="mt-0.5 text-[11px] text-stone-600 dark:text-stone-400">
+                {evidenceLabelForTotals(contextStats.exact)}
+                {contextStats.recent.attempted >= 3
+                  ? ` · Recent ${contextStats.recent.correct}/${contextStats.recent.attempted}`
+                  : ''}
+              </div>
+            </div>
+            {contextStats.topic && (
+              <div className="rounded-lg bg-stone-100 px-3 py-2 dark:bg-stone-900">
+                <div className="text-xs font-semibold text-stone-700 dark:text-stone-200">
+                  {contextStats.topic.label} overall
+                </div>
+                <div className="mt-1 text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-100">
+                  {contextStats.topicTotals.correct} right / {contextStats.topicTotals.attempted}{' '}
+                  attempts
+                </div>
+                <div className="mt-0.5 text-[11px] text-stone-600 dark:text-stone-400">
+                  {contextStats.topicTotals.attempted >= 3
+                    ? `${accuracyForTotals(contextStats.topicTotals)}% right across this topic`
+                    : evidenceLabelForTotals(contextStats.topicTotals)}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {onTryAnother && (
         <StickyAction
           pad="-mx-3 px-3 sm:mx-0 sm:px-0"
@@ -808,133 +853,7 @@ function RunAnswerReveal({
   );
 }
 
-function RunAnswerReviewItem({
-  record,
-  geminiKey,
-  onOpenGuide,
-  onOpenLab,
-  onOpenLearn,
-  onOpenLearnFocus,
-  onTryAnother,
-}) {
-  const answerText =
-    record.reviewChoiceLabel ||
-    (record.revealedMiss ? "I don't know" : record.submittedAnswer?.trim() || '(empty)');
-  const toneClass = record.correct
-    ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
-    : record.wasCorrected
-      ? 'border-amber-200 text-amber-700 dark:border-amber-900 dark:text-amber-300'
-      : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-300';
-  const statusLabel = record.correct ? 'Correct' : record.wasCorrected ? 'Assisted' : 'Not quite';
-
-  return (
-    <details className="group rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
-      <summary className="cursor-pointer list-none px-4 py-3 transition hover:bg-stone-50 dark:hover:bg-stone-950/40">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-stone-600">
-                Answer #{record.number}
-              </span>
-              <span lang="ja" className="text-base font-semibold text-stone-900 dark:text-stone-50">
-                {record.word?.dict}
-              </span>
-              <span className="text-xs text-stone-600 dark:text-stone-400">{record.typeLabel}</span>
-            </div>
-            <div className="mt-1 truncate text-xs text-stone-600 dark:text-stone-400">
-              Your answer: <span lang="ja">{answerText}</span>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span
-              className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${toneClass}`}
-            >
-              {statusLabel}
-            </span>
-            <span className="text-xs font-semibold text-stone-600 group-open:hidden">Expand</span>
-            <span className="hidden text-xs font-semibold text-stone-600 group-open:inline">
-              Collapse
-            </span>
-          </div>
-        </div>
-      </summary>
-      <div className="border-t border-stone-100 p-3 dark:border-stone-800">
-        <RunAnswerReveal
-          record={record}
-          geminiKey={geminiKey}
-          onOpenGuide={onOpenGuide}
-          onOpenLab={onOpenLab}
-          onOpenLearn={onOpenLearn}
-          onOpenLearnFocus={onOpenLearnFocus}
-          onTryAnother={onTryAnother}
-        />
-      </div>
-    </details>
-  );
-}
-
-function PracticeRunReviewPage({
-  answers,
-  runStatsLabel,
-  onBack,
-  geminiKey,
-  onOpenGuide,
-  onOpenLab,
-  onOpenLearn,
-  onOpenLearnFocus,
-}) {
-  return (
-    <section className="mx-auto max-w-3xl space-y-4" aria-label="Practice run review">
-      <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-              Practice run review
-            </div>
-            <h2 className="mt-0.5 text-xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
-              Answers from this run
-            </h2>
-            <div className="mt-1 text-sm text-stone-600 dark:text-stone-400">
-              {answers.length
-                ? `${answers.length} answer${answers.length === 1 ? '' : 's'} captured - ${runStatsLabel}`
-                : 'No answers captured yet.'}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center justify-center rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
-          >
-            Back to Practice
-          </button>
-        </div>
-      </div>
-      {answers.length ? (
-        <div className="space-y-2">
-          {answers.map((record) => (
-            <RunAnswerReviewItem
-              key={record.id}
-              record={record}
-              geminiKey={geminiKey}
-              onOpenGuide={onOpenGuide}
-              onOpenLab={onOpenLab}
-              onOpenLearn={onOpenLearn}
-              onOpenLearnFocus={onOpenLearnFocus}
-              onTryAnother={onBack}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-dashed border-stone-300 bg-white px-4 py-8 text-center text-sm text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400">
-          Answer a card, then come back here to expand the reveal details.
-        </div>
-      )}
-    </section>
-  );
-}
-
 export {
-  PracticeRunReviewPage,
   RunAnswerReveal,
   cardOriginForStudyCard,
   cardOriginMeta,

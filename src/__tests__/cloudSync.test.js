@@ -48,13 +48,12 @@ const SESSION = { user: { id: 'user-123' } };
 const SAMPLE_PAYLOAD = {
   state: {
     cards: { 'taberu|plain-past': { reps: 3, interval: 6 } },
-    daily: { count: 5 },
     mistakes: [],
   },
   customVerbs: [{ dict: '走る', reading: 'はしる', meaning: 'to run', group: 'godan' }],
   customAdjectives: [{ dict: '青い', reading: 'あおい', meaning: 'blue', group: 'i-adjective' }],
   wordLists: [{ id: 'l1', name: 'JLPT N5', words: ['taberu'] }],
-  practicePrefs: { theme: 'dark', dailyGoal: 20 },
+  practicePrefs: { theme: 'dark', autoSpeak: true },
 };
 
 beforeEach(() => {
@@ -259,7 +258,7 @@ describe('resolveSyncAction (conflict resolution)', () => {
 
   it('merges when the cloud row is newer but local data only has custom learner content', () => {
     const localPayload = buildSyncPayload({
-      state: { cards: {} },
+      state: { ...defaultState(), cards: {} },
       customVerbs: [{ dict: 'local', reading: 'local', meaning: 'local word', group: 'godan' }],
       customAdjectives: [],
       wordLists: [{ id: 'local-list', name: 'Local list', wordKeys: ['godan:local'] }],
@@ -318,6 +317,7 @@ describe('mergeSyncPayload', () => {
     });
     const cloudPayload = buildSyncPayload({
       state: {
+        ...defaultState(),
         cards: { 'godan|plain-past': { reps: 2, interval: 3, nextReview: 10 } },
         shadow: { attempted: 4, totalRating: 12, byScenario: { te: 4 } },
       },
@@ -331,7 +331,7 @@ describe('mergeSyncPayload', () => {
         },
       ],
       wordLists: [{ id: 'cloud-list', name: 'Cloud list', wordKeys: ['godan:cloud'] }],
-      practicePrefs: { ...DEFAULT_PREFS, theme: 'dark', dailyGoal: 20 },
+      practicePrefs: { ...DEFAULT_PREFS, theme: 'dark', autoSpeak: true },
     });
 
     const merged = mergeSyncPayload(localPayload, cloudPayload);
@@ -346,7 +346,7 @@ describe('mergeSyncPayload', () => {
     expect(merged.customAdjectives.map((word) => word.dict)).toEqual(['cloud-adj']);
     expect(merged.wordLists.map((list) => list.id).sort()).toEqual(['cloud-list', 'local-list']);
     expect(merged.practicePrefs.theme).toBe('dark');
-    expect(merged.practicePrefs.dailyGoal).toBe(20);
+    expect(merged.practicePrefs.autoSpeak).toBe(true);
   });
 
   it('uses local unsynced learner data in the merged payload written back to cloud', () => {
@@ -368,7 +368,7 @@ describe('mergeSyncPayload', () => {
       customVerbs: [{ dict: 'shared', reading: 'cloud', meaning: 'cloud meaning', group: 'godan' }],
       customAdjectives: [],
       wordLists: [{ id: 'shared-list', name: 'Cloud name', wordKeys: ['godan:cloud'] }],
-      practicePrefs: { ...DEFAULT_PREFS, theme: 'dark', dailyGoal: 10 },
+      practicePrefs: { ...DEFAULT_PREFS, theme: 'dark', autoSpeak: true },
     });
 
     const merged = mergeSyncPayload(localPayload, cloudPayload);
@@ -379,7 +379,7 @@ describe('mergeSyncPayload', () => {
     expect(merged.wordLists).toHaveLength(1);
     expect(merged.wordLists[0].wordKeys.sort()).toEqual(['godan:cloud', 'godan:local']);
     expect(['light', 'dark']).toContain(merged.practicePrefs.theme);
-    expect([10, DEFAULT_PREFS.dailyGoal]).toContain(merged.practicePrefs.dailyGoal);
+    expect([true, DEFAULT_PREFS.autoSpeak]).toContain(merged.practicePrefs.autoSpeak);
   });
 
   it('normalizes legacy kana answer preferences before merging sync payloads', () => {
@@ -389,7 +389,7 @@ describe('mergeSyncPayload', () => {
     );
 
     expect(guidedLocal.practicePrefs.answerMode).toBe('input');
-    expect(guidedLocal.practicePrefs.kanaAssist).toBe('guided');
+    expect(guidedLocal.practicePrefs.kanaAssist).toBe('off');
     expect(guidedLocal.practicePrefs).not.toHaveProperty('kanaMatchDisplay');
 
     const offLocal = mergeSyncPayload(

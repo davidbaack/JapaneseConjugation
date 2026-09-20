@@ -8,7 +8,7 @@ const TRACKED_PREFIXES = {
   customVerbs: 'customVerbs.',
   customAdjectives: 'customAdjectives.',
   lists: 'lists.',
-  practiceScope: 'state.practiceScope',
+  practiceSelection: 'state.practiceSelection',
   enabledTypes: 'state.enabledTypes',
   excludedWords: 'state.reviewScope.excludedWordKeys.',
   excludedFamilies: 'state.reviewScope.excludedFormFamilyIds.',
@@ -22,7 +22,7 @@ const PROGRESS_FIELDS = [
   'mistakes',
   'readiness',
   'weakness',
-  'daily',
+  'practiceStats',
   'classify',
   'game',
   'onbin',
@@ -210,8 +210,8 @@ function trackedSnapshot(payload = {}) {
       values.set(`${TRACKED_PREFIXES.lists}${encode(list.id)}.members.${encode(key)}`, true);
     }
   }
-  if (payload.state?.practiceScope !== undefined) {
-    values.set(TRACKED_PREFIXES.practiceScope, payload.state.practiceScope);
+  if (payload.state?.practiceSelection !== undefined) {
+    values.set(TRACKED_PREFIXES.practiceSelection, payload.state.practiceSelection);
   }
   if (payload.state?.enabledTypes !== undefined) {
     values.set(TRACKED_PREFIXES.enabledTypes, payload.state.enabledTypes);
@@ -381,7 +381,7 @@ export function adoptSyncMetadata(payload = {}, deviceId = '') {
     customAdjectives: payload.customAdjectives,
     wordLists: payload.wordLists,
     practicePrefs: payload.practicePrefs,
-    practiceScope: payload.state?.practiceScope,
+    practiceSelection: payload.state?.practiceSelection,
     reviewScope: payload.state?.reviewScope,
   })}`;
   const clock = { deviceId: legacyDeviceId, revision: 1, eventId: `${legacyDeviceId}:adopt` };
@@ -572,7 +572,7 @@ function domainForPath(path) {
   ) {
     return 'custom-content';
   }
-  if (path === TRACKED_PREFIXES.practiceScope || path === TRACKED_PREFIXES.enabledTypes)
+  if (path === TRACKED_PREFIXES.practiceSelection || path === TRACKED_PREFIXES.enabledTypes)
     return 'settings';
   return 'review';
 }
@@ -793,7 +793,7 @@ function materializeTracked(base, values) {
       if (kind === 'record') list.record = value;
       if (kind === 'members') list.members.push(decode(encodedMember));
       lists.set(id, list);
-    } else if (path === TRACKED_PREFIXES.practiceScope) next.state.practiceScope = value;
+    } else if (path === TRACKED_PREFIXES.practiceSelection) next.state.practiceSelection = value;
     else if (path === TRACKED_PREFIXES.enabledTypes) next.state.enabledTypes = value;
     else if (path.startsWith(TRACKED_PREFIXES.excludedWords))
       excludedWordKeys.push(decode(path.slice(TRACKED_PREFIXES.excludedWords.length)));

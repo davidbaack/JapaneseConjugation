@@ -78,9 +78,6 @@ export function mergePracticePrefs(prefs) {
       : source.promptForm === 'polite-present' || source.promptForm === 'masu'
         ? 'masu'
         : DEFAULT_PREFS.sourceFormStrategy;
-  const rawNewCardsPerDay = Number(source.newCardsPerDay || 0);
-  const newCardsPerDay =
-    Number.isFinite(rawNewCardsPerDay) && rawNewCardsPerDay > 0 ? Math.round(rawNewCardsPerDay) : 0;
   delete source.kanaMatchDisplay;
   delete source.durationSec;
   delete source.skipDuplicateForms;
@@ -167,7 +164,6 @@ export function mergePracticePrefs(prefs) {
     autoAdvanceCorrectByAnswerForm,
     reviewStyle,
     sourceFormStrategy,
-    newCardsPerDay,
     promptForm:
       sourceFormStrategy === 'mixed'
         ? 'random'

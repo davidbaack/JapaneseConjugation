@@ -86,21 +86,18 @@ describe('openLabTool', () => {
 });
 
 describe('startReviewRecommendation', () => {
-  it('keeps the pre-focus enabled forms so Exit Focus can restore them', async () => {
+  it('updates the persistent Practice selection without creating a temporary focus', async () => {
     render(
       <AppStateProvider>
         <RecommendationProbe />
       </AppStateProvider>,
     );
 
-    const beforeTypes = JSON.parse(screen.getByTestId('enabled-types').textContent);
-
     fireEvent.click(screen.getByRole('button', { name: 'start recommendation' }));
 
     await waitFor(() =>
       expect(JSON.parse(screen.getByTestId('enabled-types').textContent)).toEqual(['te-form']),
     );
-    const focus = JSON.parse(screen.getByTestId('study-focus').textContent);
-    expect(focus.recommendation.returnEnabledTypes).toEqual(beforeTypes);
+    expect(screen.getByTestId('study-focus').textContent).toBe('null');
   });
 });

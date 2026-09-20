@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import {
   gradeCard,
-  bumpDaily,
   recordMistake,
   markMistakeResolved,
   normalizeWordLists,
@@ -13,9 +12,9 @@ import {
   normalizeReferenceState,
   buildFocusCard,
   cardIdFor,
-  dailyNewCardLimit,
+  freshCardLimit,
   defaultState,
-  bonusNewCardLimit,
+  bonusFreshCardLimit,
   selectNext,
   cardWeakScore,
   ruleWeakScore,
@@ -43,10 +42,10 @@ import {
   reviewTypeIdsForState,
 } from '../utils/reviewScope.js';
 import {
-  enabledTypeIdsForPracticeScope,
-  practiceScopeFromEnabledTypes,
-  reducePracticeScope,
-} from '../utils/practiceScope.js';
+  defaultPracticeSelection,
+  practiceSelectionForTopic,
+  practiceSelectionForTypeIds,
+} from '../utils/practiceSelection.js';
 
 // Mock localStorage for storage tests (mergeState etc. are pure but defaultState references CONJ_TYPES)
 // No localStorage calls in the functions we're testing — they're all pure.
@@ -267,82 +266,6 @@ describe('getCardLevel', () => {
   });
 });
 
-describe('bumpDaily', () => {
-  it('initialises a fresh daily state on first call', () => {
-    const today = localDateKey();
-    const result = bumpDaily(null, true, 10);
-    expect(result.date).toBe(today);
-    expect(result.count).toBe(1);
-    expect(result.goalHit).toBe(false);
-  });
-
-  it('marks goalHit when count reaches dailyGoal', () => {
-    const today = localDateKey();
-    let d = {
-      date: today,
-      count: 9,
-      goalHit: false,
-      goalStreak: 0,
-      bestGoalStreak: 0,
-      currentAnswerStreak: 0,
-      bestAnswerStreak: 0,
-    };
-    d = bumpDaily(d, true, 10);
-    expect(d.goalHit).toBe(true);
-    expect(d.goalStreak).toBe(1);
-  });
-
-  it('increments answer streak on correct', () => {
-    const today = localDateKey();
-    let d = {
-      date: today,
-      count: 0,
-      goalHit: false,
-      goalStreak: 0,
-      bestGoalStreak: 0,
-      currentAnswerStreak: 2,
-      bestAnswerStreak: 2,
-    };
-    d = bumpDaily(d, true, 10);
-    expect(d.currentAnswerStreak).toBe(3);
-    expect(d.bestAnswerStreak).toBe(3);
-  });
-
-  it('resets answer streak on incorrect', () => {
-    const today = localDateKey();
-    let d = {
-      date: today,
-      count: 5,
-      goalHit: false,
-      goalStreak: 0,
-      bestGoalStreak: 0,
-      currentAnswerStreak: 5,
-      bestAnswerStreak: 5,
-    };
-    d = bumpDaily(d, false, 10);
-    expect(d.currentAnswerStreak).toBe(0);
-    expect(d.bestAnswerStreak).toBe(5); // best preserved
-  });
-
-  it('resets count when date changes', () => {
-    const yesterday = localDateKey(-1);
-    let d = {
-      date: yesterday,
-      count: 99,
-      goalHit: true,
-      goalStreak: 3,
-      bestGoalStreak: 3,
-      currentAnswerStreak: 10,
-      bestAnswerStreak: 10,
-    };
-    d = bumpDaily(d, true, 10);
-    expect(d.date).toBe(localDateKey());
-    expect(d.count).toBe(1);
-    expect(d.goalHit).toBe(false);
-    expect(d.goalStreak).toBe(3); // kept because yesterday's goal was hit
-  });
-});
-
 describe('recordMistake', () => {
   const item = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
 
@@ -533,8 +456,8 @@ describe('mergeState', () => {
     const state = mergeState(null, null);
     expect(state).toHaveProperty('cards');
     expect(state).toHaveProperty('enabledTypes');
-    expect(state).toHaveProperty('practiceScope');
-    expect(state).toHaveProperty('daily');
+    expect(state).toHaveProperty('practiceSelection');
+    expect(state).toHaveProperty('practiceStats');
     expect(state).toHaveProperty('mistakes');
     expect(Array.isArray(state.enabledTypes)).toBe(true);
     expect(state.enabledTypes.length).toBeGreaterThan(0);
@@ -581,16 +504,22 @@ describe('mergeState', () => {
 
   it('preserves an explicit all-forms scope', () => {
     const allTypeIds = ALL_CARD_TYPES.map((t) => t.id);
-    const state = mergeState({ schemaVersion: SRS_SCHEMA_VERSION, enabledTypes: allTypeIds }, null);
-    expect(state.enabledTypes).toEqual(allTypeIds);
+    const practiceSelection = practiceSelectionForTypeIds(allTypeIds, defaultPracticeSelection());
+    const state = mergeState({ schemaVersion: SRS_SCHEMA_VERSION, practiceSelection }, null);
+    expect(new Set(state.enabledTypes)).toEqual(new Set(allTypeIds));
     expect(state.enabledTypes).not.toContain('masu-stem');
   });
 
-  it('filters retired standalone practice forms from saved scopes', () => {
+  it('derives enabled forms from the canonical selection instead of a saved compatibility list', () => {
+    const practiceSelection = practiceSelectionForTypeIds(
+      ['plain-past', 'adj-plain-past'],
+      defaultPracticeSelection(),
+    );
     const state = mergeState(
       {
         schemaVersion: SRS_SCHEMA_VERSION,
         enabledTypes: ['plain-past', 'masu-stem', 'adj-plain-past'],
+        practiceSelection,
       },
       null,
     );
@@ -598,26 +527,14 @@ describe('mergeState', () => {
     expect(state.enabledTypes).toEqual(['plain-past', 'adj-plain-past']);
   });
 
-  it('hydrates a persisted practice scope without losing its remembered forms', () => {
-    let practiceScope = practiceScopeFromEnabledTypes(EVERYDAY_TYPE_IDS);
-    practiceScope = reducePracticeScope(practiceScope, {
-      type: 'toggle-form',
-      typeId: 'conditional-ba',
-    });
-    practiceScope = reducePracticeScope(practiceScope, {
-      type: 'toggle-filter',
-      optionId: 'negative',
-    });
-    const enabledTypes = enabledTypeIdsForPracticeScope(practiceScope);
-
-    const state = mergeState(
-      { schemaVersion: SRS_SCHEMA_VERSION, enabledTypes, practiceScope },
-      null,
+  it('hydrates a persisted topic selection and its exact-form refinements', () => {
+    const practiceSelection = practiceSelectionForTypeIds(
+      ['conditional-tara', 'conditional-nara'],
+      practiceSelectionForTopic('conditional'),
     );
-
-    expect(state.practiceScope.filters.polarity).toEqual(['affirmative']);
-    expect(state.practiceScope.selectedTypeIdsByFamily.conditional).not.toContain('conditional-ba');
-    expect(new Set(state.enabledTypes)).toEqual(new Set(enabledTypes));
+    const state = mergeState({ schemaVersion: SRS_SCHEMA_VERSION, practiceSelection }, null);
+    expect(state.practiceSelection.selectedTopicIds).toEqual(['conditional']);
+    expect(state.enabledTypes).toEqual(['conditional-tara', 'conditional-nara']);
   });
 
   it('preserves saved cards from the current SRS schema', () => {
@@ -688,7 +605,7 @@ describe('mergeCloudState', () => {
     expect(merged.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
   });
 
-  it('preserves explicit all-forms cloud scopes', () => {
+  it('merges concurrent persistent selections deterministically', () => {
     const allTypeIds = ALL_CARD_TYPES.map((t) => t.id);
     const merged = mergeCloudState(
       {
@@ -696,18 +613,17 @@ describe('mergeCloudState', () => {
         cards: {},
         verbStats: {},
         mistakes: [],
-        enabledTypes: EVERYDAY_TYPE_IDS,
+        practiceSelection: practiceSelectionForTopic('volitional'),
       },
       {
         schemaVersion: SRS_SCHEMA_VERSION,
         cards: {},
         verbStats: {},
         mistakes: [],
-        enabledTypes: allTypeIds,
+        practiceSelection: practiceSelectionForTypeIds(allTypeIds),
       },
     );
     expect(new Set(merged.enabledTypes)).toEqual(new Set(allTypeIds));
-    expect(merged.enabledTypes).toHaveLength(allTypeIds.length);
   });
 
   it('merges reading source-form stats when choosing the newer SRS card', () => {
@@ -1172,9 +1088,9 @@ describe('word-form SRS selection', () => {
     expect(seen.map((card) => card.verb.dict)).not.toContain(IKU.dict);
   });
 
-  it('uses a continuous fresh-card budget instead of the visible daily goal', () => {
-    expect(dailyNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(60);
-    expect(bonusNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(30);
+  it('uses a generous internal fresh-card budget for continuous variety', () => {
+    expect(freshCardLimit()).toBe(60);
+    expect(bonusFreshCardLimit()).toBe(30);
     const introduced = {};
     for (let i = 0; i < 60; i += 1) {
       introduced[`synthetic-${i}`] = {
@@ -1192,7 +1108,7 @@ describe('word-form SRS selection', () => {
       [TABERU, KAKU],
       ['plain-past'],
       null,
-      { ...DEFAULT_PREFS, dailyGoal: 10 },
+      DEFAULT_PREFS,
     );
     expect(card).toBeNull();
   });
@@ -1234,7 +1150,7 @@ describe('word-form SRS selection', () => {
     );
 
     expect(card.type).toBe('plain-negative');
-    expect(card.selectionReason).toBe('Strengthening Basics & Politeness');
+    expect(card.selectionReason).toBe('Strengthening Core Verb Forms');
   });
 
   it('surfaces a neutral untested enabled family ahead of a higher-skill started family', () => {
@@ -1260,7 +1176,7 @@ describe('word-form SRS selection', () => {
     const card = selectNext(state, [TABERU, KAKU], ['te-form', 'volitional'], null, DEFAULT_PREFS);
 
     expect(card.type).toBe('volitional');
-    expect(card.selectionReason).toBe('Introducing Volitional & Desire');
+    expect(card.selectionReason).toBe('Introducing Volitional');
   });
 
   it('avoids repeating the same family back-to-back when a comparable family is available', () => {

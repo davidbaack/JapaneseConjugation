@@ -44,9 +44,14 @@ const STATIVE_DEFECTIVE_SUPPRESSED = new Set([
   ...FORM_GROUP_TYPE_IDS.passive,
   ...FORM_GROUP_TYPE_IDS.causative, // plain + short causative
   ...FORM_GROUP_TYPE_IDS['causative-passive'], // plain + short causative-passive
-  ...FORM_GROUP_TYPE_IDS.keigo,
-  ...FORM_GROUP_TYPE_IDS['volitional-desire'], // volitional, polite-volitional, tai-forms
-  ...FORM_GROUP_TYPE_IDS['commands-requests'], // imperative, nasai, request, permission, obligation
+  ...FORM_GROUP_TYPE_IDS.honorific,
+  ...FORM_GROUP_TYPE_IDS.humble,
+  ...FORM_GROUP_TYPE_IDS.volitional,
+  ...FORM_GROUP_TYPE_IDS.wanting,
+  ...FORM_GROUP_TYPE_IDS.commands,
+  ...FORM_GROUP_TYPE_IDS.requests,
+  ...FORM_GROUP_TYPE_IDS.permission,
+  ...FORM_GROUP_TYPE_IDS.obligation,
   'negative-zuni',
   'prohibition',
 ]);

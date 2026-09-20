@@ -1,6 +1,7 @@
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { EVERYDAY_TYPE_IDS, getTypeInfo } from '../data/conjugationTypes.js';
-import { cardIdFor, bumpDaily, defaultState, gradeCard, recordMistake } from './storage.js';
+import { cardIdFor, defaultState, gradeCard, recordMistake } from './storage.js';
+import { recordPracticeAnswer } from './practiceStats.js';
 import {
   conjugateItem,
   isAdjective,
@@ -474,19 +475,25 @@ export function recordGuideAttempt(guide, card, result, options = {}) {
 export function applyGuideAttemptToState(state, card, result, options = {}) {
   const rid = cardIdFor(card.word, card.typeId);
   const responseMs = Math.max(0, Number(options.responseMs) || 0);
-  const dailyGoal = Number(options.dailyGoal || DEFAULT_PREFS.dailyGoal);
+  const gradedAt = Number(options.now) || Date.now();
   const next = {
     ...state,
     cards: {
       ...(state.cards || {}),
-      [rid]: gradeCard((state.cards || {})[rid], result.correct),
+      [rid]: gradeCard((state.cards || {})[rid], result.correct, gradedAt),
     },
     session: {
       ...(state.session || defaultState().session),
       reviewed: (state.session?.reviewed || 0) + 1,
       correct: (state.session?.correct || 0) + (result.correct ? 1 : 0),
     },
-    daily: bumpDaily(state.daily, result.correct, dailyGoal),
+    practiceStats: recordPracticeAnswer(state.practiceStats, {
+      typeId: card.typeId,
+      correct: result.correct,
+      responseMs,
+      mode: result.assisted ? 'self-check' : 'input',
+      at: gradedAt,
+    }),
     readiness: recordReadinessAttempt(state.readiness, rid, {
       correct: result.correct,
       responseMs,
@@ -498,7 +505,7 @@ export function applyGuideAttemptToState(state, card, result, options = {}) {
       correct: result.correct,
       responseMs,
     }),
-    guide: recordGuideAttempt(state.guide, card, result, { now: options.now }),
+    guide: recordGuideAttempt(state.guide, card, result, { now: gradedAt }),
   };
   if (!result.correct) {
     next.mistakes = recordMistake(

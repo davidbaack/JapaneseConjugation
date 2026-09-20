@@ -8,7 +8,6 @@ import { conjugateItem, surfaceFormFor, wordKey } from '../utils/conjugator.js';
 import { englishForForm } from '../utils/display.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
 import { clearSentenceCorpusCache } from '../utils/sentenceCorpus.js';
-import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 import { buildReadinessFamilyRows } from '../utils/readiness.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
@@ -54,74 +53,13 @@ function makeApp(overrides = {}) {
     hydrated: true,
     ...overrides,
   };
-  const todayDrillActive =
-    !base.practicePrefs.minimalPairSetId &&
-    !base.practicePrefs.reviewLimitSource &&
-    (base.practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID);
-  const todayPlan =
-    overrides.todayPlan ||
-    buildTodayDrillPlan(base.state, base.allWords, base.practicePrefs, base.wordLists);
   return {
     ...base,
-    todayPlan,
-    todayDrillActive: overrides.todayDrillActive ?? todayDrillActive,
-    srsQueue: overrides.srsQueue || {
-      date: base.state.daily.date,
-      dueRuleIds: todayDrillActive ? [...(todayPlan.dueRuleIds || [])] : [],
-      completedDueRuleIds: [],
-      startedAt: todayDrillActive ? Date.now() : null,
-    },
-    startTodayDrill: overrides.startTodayDrill || vi.fn(() => true),
-    markSrsQueueCompleted: overrides.markSrsQueueCompleted || vi.fn(),
   };
 }
 
 function goalHitState() {
-  const state = defaultState();
-  return {
-    ...state,
-    daily: {
-      ...state.daily,
-      count: DEFAULT_PREFS.dailyGoal,
-      goalHit: true,
-    },
-  };
-}
-
-function guideGroupInsightState() {
-  return {
-    ...defaultState(),
-    guide: {
-      attempted: 2,
-      correct: 0,
-      assisted: 0,
-      byStep: {
-        base: { attempted: 2, correct: 2, assisted: 0 },
-        group: { attempted: 2, correct: 0, assisted: 0 },
-        answer: { attempted: 2, correct: 2, assisted: 0 },
-      },
-      recent: [
-        {
-          group: 'godan',
-          expectedGroup: 'godan',
-          steps: {
-            base: { correct: true, assisted: false },
-            group: { correct: false, assisted: false },
-            answer: { correct: true, assisted: false },
-          },
-        },
-        {
-          group: 'godan',
-          expectedGroup: 'godan',
-          steps: {
-            base: { correct: true, assisted: false },
-            group: { correct: false, assisted: false },
-            answer: { correct: true, assisted: false },
-          },
-        },
-      ],
-    },
-  };
+  return defaultState();
 }
 
 function stateWithDueRule(ruleId) {
@@ -138,14 +76,6 @@ function stateWithDueRule(ruleId) {
         lastSeen: 0,
       },
     },
-  };
-}
-
-function todayListFor(word) {
-  return {
-    id: TODAY_DRILL_LIST_ID,
-    name: "Today's Drill",
-    wordKeys: [wordKey(word)],
   };
 }
 
@@ -200,8 +130,9 @@ function expectElementBefore(first, second) {
 }
 
 function openPracticeRunSettings() {
-  fireEvent.click(screen.getByRole('button', { name: 'Practice run settings' }));
-  return within(screen.getByRole('group', { name: 'Practice run settings' }));
+  const summary = screen.getByText('Answer settings');
+  fireEvent.click(summary);
+  return within(summary.closest('details'));
 }
 
 async function clickTopReviewNext() {
@@ -360,21 +291,13 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getAllByText('0 cards').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 streak').length).toBeGreaterThan(0);
-    expect(screen.getByText('New enabled form.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'What do you want to practice?' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Mixed practice on' })).toBeTruthy();
+    expect(screen.queryByText('Practice run')).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Check (Enter)' }).closest('[data-action-dock="true"]'),
     ).toBeTruthy();
-    expect(
-      within(screen.getByText('Practice run').closest('section')).getByRole('button', {
-        name: 'Adjust focus',
-      }),
-    ).toBeTruthy();
-    expect(screen.queryByRole('progressbar', { name: 'Session cards' })).toBeNull();
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
+    expect(screen.getByText('Answer settings')).toBeTruthy();
   });
 
   it('opens continuous Practice while signed out', async () => {
@@ -386,37 +309,8 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getAllByText('0 cards').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 streak').length).toBeGreaterThan(0);
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
-  });
-
-  it('surfaces Guide step diagnostics inside the active Practice run', async () => {
-    const setTab = vi.fn();
-    const app = makeApp({
-      state: guideGroupInsightState(),
-      setTab,
-    });
-    mockedApp.value = app;
-
-    render(<StudyView />);
-
-    expect(await waitForPracticeCard()).toBeTruthy();
-    const nudge = screen.getByRole('button', {
-      name: /Guide: word group.*You know the ending.*final-answer step land/i,
-    });
-    expect(nudge.textContent).toMatch(/Guide: word group/);
-    expect(nudge.textContent).not.toMatch(/misclassifying godan verbs/);
-
-    fireEvent.click(screen.getByText('Run details'));
-    expect(screen.getByText('Guide insight')).toBeTruthy();
-    expect(screen.getByText(/misclassifying godan verbs/)).toBeTruthy();
-    expect(screen.getByText(/Guide is seeing the final-answer step land/)).toBeTruthy();
-
-    fireEvent.click(nudge);
-    expect(setTab).toHaveBeenCalledWith('guide');
+    expect(screen.getByRole('heading', { name: 'What do you want to practice?' })).toBeTruthy();
+    expect(screen.queryByText('Practice run')).toBeNull();
   });
 
   it('does not surface a local Stats shortcut on an active card', async () => {
@@ -433,20 +327,17 @@ describe('StudyView continuous Practice startup', () => {
     expect(app.setTab).not.toHaveBeenCalled();
   });
 
-  it('keeps the active card before the Practice map in DOM order', async () => {
+  it('keeps the selection controls before the active card in DOM order', async () => {
     mockedApp.value = makeApp();
 
     render(<StudyView />);
 
     const answerInput = await waitForPracticeCard();
-    const checkButton = screen.getByRole('button', { name: 'Check (Enter)' });
-    const practiceMap = screen.getByRole('complementary', { name: 'Practice map' });
-
-    expectElementBefore(answerInput, practiceMap);
-    expectElementBefore(checkButton, practiceMap);
+    const selector = screen.getByRole('region', { name: 'What do you want to practice?' });
+    expectElementBefore(selector, answerInput);
   });
 
-  it('surfaces answer style and kana help controls in the Practice run gear menu', async () => {
+  it('surfaces answer style and kana help controls beside the topic selector', async () => {
     const setPracticePrefs = vi.fn();
     mockedApp.value = makeApp({
       setPracticePrefs,
@@ -459,9 +350,6 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     await waitForPracticeCard();
-    expect(screen.getByRole('button', { name: 'Practice run settings' })).toBeTruthy();
-    expect(screen.queryByRole('group', { name: 'Answer style' })).toBeNull();
-
     const settings = openPracticeRunSettings();
     const answerStyle = within(settings.getByRole('group', { name: 'Answer style' }));
     expect(answerStyle.getByRole('button', { name: 'Type' }).getAttribute('aria-pressed')).toBe(
@@ -489,11 +377,9 @@ describe('StudyView continuous Practice startup', () => {
     });
 
     expect(settings.getByRole('button', { name: 'Sentence off' })).toBeTruthy();
-    expect(settings.getByText('Adjust scope')).toBeTruthy();
-    expect(settings.getByRole('button', { name: 'Remove this word from Practice' })).toBeTruthy();
   });
 
-  it('offers an Overview return path from a focused (special) session', async () => {
+  it('returns from a focused word to the persistent Practice mix', async () => {
     const app = makeApp({ studyFocus: { word: STARTER_VERBS[0], type: 'plain-past' } });
     // Consuming the focus clears it in the real provider; mirror that so the
     // dashboard can re-render once the focus lock is released.
@@ -504,79 +390,11 @@ describe('StudyView continuous Practice startup', () => {
 
     render(<StudyView />);
 
-    // A focus launch is a "special" session: it leads with a title banner and
-    // exits the locked focus through that banner rather than the generic
-    // "Back to Stats" header button.
+    // Word-level focus remains explicit, while exiting returns to ordinary Practice.
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
 
-    expect(app.setTab).toHaveBeenCalledWith('stats');
-  });
-
-  it('restores normal enabled forms when exiting a Drills recommendation focus', async () => {
-    const returnEnabledTypes = ['plain-past', 'plain-negative'];
-    const focusedTypes = ['te-form'];
-    const list = {
-      id: 'list-review-rec-lab-onbin-review',
-      name: 'Practice te/ta sound changes',
-      wordKeys: STARTER_VERBS.slice(0, 3).map(wordKey),
-    };
-    const app = makeApp({
-      state: { ...defaultState(), enabledTypes: focusedTypes },
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        reviewLimit: 6,
-        reviewLimitSource: 'recommendation',
-        wordListIds: [list.id],
-      },
-      wordLists: [list],
-      studyFocus: {
-        source: 'lab',
-        launchMode: 'recommendation',
-        recommendation: {
-          id: 'lab-onbin-review',
-          source: 'lab',
-          label: 'Practice te/ta sound changes',
-          detail: 'Full recall for te and ta forms.',
-          suggestedCount: 6,
-          wordCount: list.wordKeys.length,
-          typeCount: focusedTypes.length,
-          returnEnabledTypes,
-        },
-      },
-    });
-    app.clearStudyFocus = vi.fn(() => {
-      app.studyFocus = null;
-      mockedApp.value = app;
-    });
-    mockedApp.value = app;
-
-    render(<StudyView />);
-
-    expect(await screen.findByText('Drills focus')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
-
-    const stateUpdater = app.setState.mock.calls.at(-1)?.[0];
-    expect(typeof stateUpdater).toBe('function');
-    expect(stateUpdater({ ...app.state, enabledTypes: focusedTypes }).enabledTypes).toEqual(
-      returnEnabledTypes,
-    );
-
-    const prefsUpdater = app.setPracticePrefs.mock.calls.at(-1)?.[0];
-    expect(typeof prefsUpdater).toBe('function');
-    expect(
-      prefsUpdater({
-        ...DEFAULT_PREFS,
-        reviewLimit: 6,
-        reviewLimitSource: 'recommendation',
-        wordListIds: ['favorites', list.id, 'repair-drill'],
-      }),
-    ).toMatchObject({
-      reviewLimit: 0,
-      reviewLimitSource: '',
-      wordListIds: ['favorites'],
-    });
-    expect(app.setTab).toHaveBeenCalledWith('stats');
+    expect(app.setTab).toHaveBeenCalledWith('practice');
   });
 
   it('keeps a focused word launch until the learner exits it', async () => {
@@ -594,7 +412,6 @@ describe('StudyView continuous Practice startup', () => {
 
     const exitFocus = await screen.findByRole('button', { name: 'Exit focus' });
     expect(clearStudyFocus).not.toHaveBeenCalled();
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
     fireEvent.click(exitFocus);
     expect(clearStudyFocus).toHaveBeenCalledTimes(1);
   });
@@ -614,45 +431,6 @@ describe('StudyView continuous Practice startup', () => {
     expect(clearStudyFocus).not.toHaveBeenCalled();
     fireEvent.click(clearFocus);
     expect(clearStudyFocus).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not auto-start today for stale repair launch prefs', async () => {
-    const app = makeApp({
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        reviewLimit: 10,
-        reviewLimitSource: 'repair',
-      },
-    });
-    mockedApp.value = app;
-
-    render(<StudyView />);
-
-    await waitForPracticeCard();
-    expect(screen.queryByText('No cards available')).toBeNull();
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
-  });
-
-  it('does not auto-start today over a persisted study card', async () => {
-    const target = STARTER_VERBS[0];
-    sessionStorage.setItem(
-      'jp-study-current',
-      JSON.stringify({
-        dict: target.dict,
-        reading: target.reading,
-        meaning: target.meaning,
-        group: target.group,
-        type: 'plain-past',
-        word: target,
-      }),
-    );
-    const app = makeApp();
-    mockedApp.value = app;
-
-    render(<StudyView />);
-
-    await waitForPracticeCard();
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
   it('restores a persisted study card when vocabulary metadata changes', async () => {
@@ -811,7 +589,6 @@ describe('StudyView continuous Practice startup', () => {
 
   it('does not treat a retired repair list as a persisted special launch', async () => {
     // Retired repair-drill prefs can remain in older storage. They should not
-    // launch a fresh Today drill now that generic repair drills are retired.
     const target = STARTER_VERBS[0];
     mockedApp.value = makeApp({
       state: defaultState(),
@@ -830,7 +607,6 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitForPracticeCard();
     expect(screen.queryByText('No cards available')).toBeNull();
-    expect(mockedApp.value.startTodayDrill).not.toHaveBeenCalled();
   });
 
   it('automatically checks a final spoken answer in speak answer mode', async () => {
@@ -1260,7 +1036,7 @@ describe('StudyView continuous Practice startup', () => {
       .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
 
     expect(nextState).toBeTruthy();
-    expect(nextState.daily.count).toBe(1);
+    expect(nextState.practiceStats.byType[sourceType]).toMatchObject({ attempted: 1, correct: 1 });
     expect(nextState.cards[dictionaryCardId]).toMatchObject({
       correct: 1,
       incorrect: 0,
@@ -1283,53 +1059,18 @@ describe('StudyView continuous Practice startup', () => {
     expect(sourceFamily.cells.recognition.attempted).toBe(1);
   });
 
-  it('keeps continuous Practice status even when old Today drill prefs are present', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    const dueCardId = cardIdFor(target, type);
-    persistStudyCard(target, type);
-
-    mockedApp.value = makeApp({
-      state: stateWithDueRule(dueCardId),
-      allWords: [target],
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        wordListIds: [TODAY_DRILL_LIST_ID],
-      },
-      wordLists: [todayListFor(target)],
-    });
-
-    render(<StudyView />);
-
-    await waitForPracticeCard();
-    expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getAllByText('0 cards').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 streak').length).toBeGreaterThan(0);
-    expect(screen.queryByText('0/1 ready')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Practice run settings' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
-  });
-
-  it('counts a correct Practice answer without completing the old ready queue', async () => {
+  it('records a correct Practice answer without exposing a ready queue', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
     const dueCardId = cardIdFor(target, type);
     const state = stateWithDueRule(dueCardId);
-    const markSrsQueueCompleted = vi.fn();
     persistStudyCard(target, type);
 
     mockedApp.value = makeApp({
       state,
       setState,
-      markSrsQueueCompleted,
       allWords: [target],
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        wordListIds: [TODAY_DRILL_LIST_ID],
-      },
-      wordLists: [todayListFor(target)],
     });
 
     render(<StudyView />);
@@ -1350,20 +1091,9 @@ describe('StudyView continuous Practice startup', () => {
       label: 'Plain Past',
     });
     expect(nextState.cards[dueCardId].correct).toBe(1);
-    expect(
-      screen.queryByRole('img', {
-        name: 'Te/Ta Sound Changes this session: 1 right / 0 wrong',
-      }),
-    ).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Te/Ta Sound Changes category details' }));
-    expect(
-      screen.getByRole('img', {
-        name: 'Te/Ta Sound Changes this session: 1 right / 0 wrong',
-      }),
-    ).toBeTruthy();
-    expect(nextState.daily.count).toBe(1);
+    expect(nextState.practiceStats.byType[type]).toMatchObject({ attempted: 1, correct: 1 });
+    expect(screen.queryByText(/ready queue/i)).toBeNull();
     expect(nextState.transformation.attempted).toBe(0);
-    expect(markSrsQueueCompleted).not.toHaveBeenCalled();
   });
 
   it('records Transform drill answers in transformation progress', async () => {
@@ -1853,40 +1583,6 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.queryByText('Almost - possible typo.')).toBeNull();
   });
 
-  it('updates the coach strip after a correct answer in the current run', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    let app;
-    const setState = vi.fn((nextState) => {
-      app = { ...app, state: nextState };
-      mockedApp.value = app;
-    });
-    app = makeApp({
-      setState,
-      allWords: [target],
-      studyFocus: {
-        word: target,
-        type,
-      },
-    });
-    mockedApp.value = app;
-    const { rerender } = render(<StudyView />);
-
-    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.change(input, { target: { value: 'tabeta' } });
-    await waitFor(() => expect(setState).toHaveBeenCalled());
-    rerender(<StudyView />);
-
-    expect(screen.getByText('1 card')).toBeTruthy();
-    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
-    expect(screen.getByText('1 streak')).toBeTruthy();
-    expect(screen.getByText('100% right')).toBeTruthy();
-    expect(screen.getByText('Focused practice: 食べる. Clean run so far.')).toBeTruthy();
-    const compactSummary = screen.getByText('Show run summary').closest('details');
-    expect(compactSummary).toBeTruthy();
-    expect(compactSummary.open).toBe(false);
-  });
-
   it('counts a typed wrong answer as missed and resets the current streak', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];
@@ -2047,142 +1743,6 @@ describe('StudyView continuous Practice startup', () => {
     });
   });
 
-  it('shows the top session mistake pattern and recent trail in run details', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-negative';
-    let app;
-    const setState = vi.fn((nextState) => {
-      app = { ...app, state: nextState };
-      mockedApp.value = app;
-    });
-    app = makeApp({
-      setState,
-      allWords: [target],
-      studyFocus: {
-        word: target,
-        type,
-      },
-    });
-    mockedApp.value = app;
-    const { rerender } = render(<StudyView />);
-
-    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.change(input, { target: { value: 'tabeta' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
-    await waitFor(() => expect(setState).toHaveBeenCalled());
-    rerender(<StudyView />);
-
-    fireEvent.click(screen.getByText('Run details'));
-    expect(screen.getByText('Why this card')).toBeTruthy();
-    expect(screen.getByText('Top miss')).toBeTruthy();
-    expect(
-      screen.getAllByText(/Negative\/affirmative mismatch: Plain Negative/).length,
-    ).toBeGreaterThan(0);
-    expect(screen.getByText('missed: Plain Negative')).toBeTruthy();
-  });
-
-  it('opens a run review page with expandable answer reveals', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    mockedApp.value = makeApp({
-      allWords: [target],
-      studyFocus: {
-        word: target,
-        type,
-      },
-    });
-
-    render(<StudyView />);
-
-    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    const cardSource = screen.getByLabelText('Current card source');
-    expect(within(cardSource).getByText('New')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Review answers' }).disabled).toBe(true);
-
-    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
-    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
-
-    const reviewButton = screen.getByRole('button', { name: 'Review answers' });
-    expect(reviewButton.disabled).toBe(false);
-    fireEvent.click(reviewButton);
-
-    const reviewRegion = screen.getByRole('region', { name: 'Practice run review' });
-    expect(reviewRegion).toBeTruthy();
-    expect(screen.getByText('Answers from this run')).toBeTruthy();
-    expect(screen.getByText('Answer #1')).toBeTruthy();
-    expect(screen.getByText('Your answer:')).toBeTruthy();
-    expect(within(reviewRegion).queryByText('New')).toBeNull();
-
-    fireEvent.click(screen.getByText('Answer #1'));
-    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
-    expect(screen.getByText('Explain the rule')).toBeTruthy();
-    expect(within(reviewRegion).getByText('Walk through this form in Guide')).toBeTruthy();
-    expect(within(reviewRegion).getByText(/Drills this same word and target form/)).toBeTruthy();
-    expect(
-      within(reviewRegion).getByRole('button', { name: 'Open Guide for this rule' }),
-    ).toBeTruthy();
-    expect(within(reviewRegion).getByRole('button', { name: 'Next card' })).toBeTruthy();
-    expect(within(reviewRegion).queryByText('New')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Practice' }));
-    expect(screen.getByText('Practice run')).toBeTruthy();
-  });
-
-  it('separates a previously missed card from a clean current run', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    const retryCardId = cardIdFor(target, type);
-    const state = {
-      ...defaultState(),
-      enabledTypes: [type],
-      retryQueue: [retryCardId],
-      cards: {
-        [retryCardId]: {
-          ease: 2.3,
-          interval: 0,
-          reps: 0,
-          nextReview: Date.now() + 24 * 60 * 60 * 1000,
-          correct: 0,
-          incorrect: 1,
-          lastSeen: 1,
-        },
-      },
-    };
-    let app;
-    const setState = vi.fn((nextState) => {
-      app = { ...app, state: nextState };
-      mockedApp.value = app;
-    });
-    app = makeApp({
-      state,
-      setState,
-      allWords: [target],
-    });
-    mockedApp.value = app;
-
-    const { rerender } = render(<StudyView />);
-
-    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    const cardSource = screen.getByLabelText('Current card source');
-    expect(within(cardSource).getByText('Previously missed')).toBeTruthy();
-    expect(screen.queryByText('Recent miss')).toBeNull();
-    expect(within(cardSource).queryByText('Returning after a miss')).toBeNull();
-    expect(screen.queryByText('Returning after a miss')).toBeNull();
-    fireEvent.click(screen.getByText('Run details'));
-    const whyThisCard = screen.getByText('Why this card').parentElement;
-    expect(within(whyThisCard).getByText('Previously missed')).toBeTruthy();
-
-    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
-    await waitFor(() => expect(setState).toHaveBeenCalled());
-    rerender(<StudyView />);
-
-    expect(screen.getByText('100% right')).toBeTruthy();
-    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
-    expect(
-      screen.getByText('Clean run so far. This card was missed in an earlier practice run.'),
-    ).toBeTruthy();
-  });
-
   it('keeps the concise miss diagnosis visible and discloses the detailed rule on demand', async () => {
     const target = STARTER_VERBS.find((word) => word.group === 'godan');
     expect(target).toBeTruthy();
@@ -2202,9 +1762,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     await waitFor(() => expect(screen.getAllByText('Not quite.').length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Review answers' }));
-    const reviewRegion = screen.getByRole('region', { name: 'Practice run review' });
-    fireEvent.click(screen.getByText('Answer #1'));
+    const reviewRegion = document.body;
 
     expect(within(reviewRegion).getAllByText('Not quite.').length).toBeGreaterThan(0);
     const ruleCard = within(reviewRegion).getByText('Rule to apply').closest('section');
