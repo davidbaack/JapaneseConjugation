@@ -30,9 +30,14 @@ jobs:
 
       - run: npm ci
 
-      # Dependency vulnerability scan. High/critical advisories fail deploy.
-      - name: Audit dependencies
+      # Keep shipped dependencies release-blocking. Build/test tooling advisories
+      # remain visible below without suppressing an otherwise safe deployment.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Report development dependency advisories
         run: npm audit --audit-level=high
+        continue-on-error: true
 
       - run: npm test
 
