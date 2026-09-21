@@ -1,206 +1,232 @@
 import { ALL_CARD_TYPES, EVERYDAY_TYPE_IDS, FORM_GROUPS } from '../data/conjugationTypes.js';
+import {
+  DEFAULT_PRACTICE_CATEGORY_ID,
+  DEFAULT_PRACTICE_FILTERS,
+  PRACTICE_CATEGORIES,
+  PRACTICE_FILTERS,
+  practiceCategoryForType,
+  practiceDimensionsForType,
+} from '../data/practiceTaxonomy.js';
 
+const PRACTICE_SELECTION_VERSION = 2;
 const TYPE_ID_SET = new Set(ALL_CARD_TYPES.map((type) => type.id));
 const TOPIC_BY_ID = new Map(FORM_GROUPS.map((topic) => [topic.id, topic]));
 const TOPIC_ID_BY_TYPE_ID = new Map(
   FORM_GROUPS.flatMap((topic) => topic.typeIds.map((typeId) => [typeId, topic.id])),
 );
+const CATEGORY_BY_ID = new Map(PRACTICE_CATEGORIES.map((category) => [category.id, category]));
+const FILTER_VALUES_BY_ID = new Map(
+  PRACTICE_FILTERS.map((filter) => [filter.id, new Set(filter.options.map((option) => option.id))]),
+);
 
-export const PRACTICE_TOPIC_SECTIONS = [
-  {
-    id: 'everyday',
-    label: 'Everyday forms',
-    topicIds: [
-      'basic-tenses',
-      'te-ta-sound-changes',
-      'volitional',
-      'wanting',
-      'potential',
-      'progressive',
-    ],
-  },
-  {
-    id: 'connecting',
-    label: 'Conditions and direction',
-    topicIds: ['conditional', 'commands', 'requests', 'permission', 'obligation'],
-  },
-  {
-    id: 'voice',
-    label: 'Voice and advanced forms',
-    topicIds: [
-      'passive',
-      'causative',
-      'causative-passive',
-      'honorific',
-      'humble',
-      'negative-connectors',
-      'conjecture',
-    ],
-  },
-  {
-    id: 'adjectives',
-    label: 'Adjectives',
-    topicIds: [
-      'adjective-core',
-      'adjective-connectors',
-      'adjective-conditionals',
-      'adjective-patterns',
-    ],
-  },
-];
-
-export const FEATURED_PRACTICE_TOPIC_IDS = [
-  'volitional',
-  'wanting',
-  'potential',
-  'conditional',
-  'te-ta-sound-changes',
-  'basic-tenses',
-];
-
-function validTypeIds(typeIds = []) {
+function uniqueValidTypeIds(typeIds = []) {
   return [...new Set(typeIds)].filter((typeId) => TYPE_ID_SET.has(typeId));
 }
 
-function defaultCustomTypeIdsByTopic() {
-  const everyday = new Set(EVERYDAY_TYPE_IDS);
+function defaultSelectedTypeIdsByCategory() {
   return Object.fromEntries(
-    FORM_GROUPS.map((topic) => {
-      const everydayTypes = topic.typeIds.filter((typeId) => everyday.has(typeId));
-      return [topic.id, everydayTypes.length ? everydayTypes : [...topic.typeIds]];
+    PRACTICE_CATEGORIES.map((category) => [category.id, [...category.typeIds]]),
+  );
+}
+
+function normalizedFilters(filters = {}) {
+  return Object.fromEntries(
+    PRACTICE_FILTERS.map((filter) => {
+      const requested = filters?.[filter.id];
+      const value = FILTER_VALUES_BY_ID.get(filter.id)?.has(requested)
+        ? requested
+        : DEFAULT_PRACTICE_FILTERS[filter.id];
+      return [filter.id, value];
     }),
   );
 }
 
-export function defaultPracticeSelection() {
-  const selectedTypeIdsByTopic = defaultCustomTypeIdsByTopic();
-  const selectedTopicIds = FORM_GROUPS.filter((topic) =>
-    topic.typeIds.some((typeId) => EVERYDAY_TYPE_IDS.includes(typeId)),
-  ).map((topic) => topic.id);
+function baseTypeIdsForSelection(selection) {
+  const selected = new Set(selection.selectedCategoryIds);
+  return PRACTICE_CATEGORIES.flatMap((category) =>
+    selected.has(category.id)
+      ? selection.selectedTypeIdsByCategory[category.id] || category.typeIds
+      : [],
+  );
+}
+
+function typeMatchesFilters(typeId, filters) {
+  const dimensions = practiceDimensionsForType(typeId);
+  return PRACTICE_FILTERS.every((filter) => {
+    const selected = filters[filter.id];
+    return selected === 'all' || dimensions[filter.id] === selected;
+  });
+}
+
+function filteredTypeIdsForSelection(selection) {
+  return baseTypeIdsForSelection(selection).filter((typeId) =>
+    typeMatchesFilters(typeId, selection.filters),
+  );
+}
+
+function selectionForRequestedTypeIds(typeIds, selection = null) {
+  const requested = uniqueValidTypeIds(typeIds);
+  if (!requested.length) return normalizePracticeSelection(selection);
+  const normalized = normalizePracticeSelection(selection);
+  const requestedSet = new Set(requested);
+  const selectedCategoryIds = PRACTICE_CATEGORIES.filter((category) =>
+    category.typeIds.some((typeId) => requestedSet.has(typeId)),
+  ).map((category) => category.id);
+  const selectedTypeIdsByCategory = { ...normalized.selectedTypeIdsByCategory };
+  for (const categoryId of selectedCategoryIds) {
+    const category = CATEGORY_BY_ID.get(categoryId);
+    selectedTypeIdsByCategory[categoryId] = category.typeIds.filter((typeId) =>
+      requestedSet.has(typeId),
+    );
+  }
   return {
-    mixed: true,
-    selectedTopicIds,
-    selectedTypeIdsByTopic,
+    version: PRACTICE_SELECTION_VERSION,
+    selectedCategoryIds,
+    selectedTypeIdsByCategory,
+    filters: { ...DEFAULT_PRACTICE_FILTERS },
+  };
+}
+
+function legacyTypeIdsForSelection(selection) {
+  if (!selection || typeof selection !== 'object') return null;
+  if (selection.mixed !== false) return [...EVERYDAY_TYPE_IDS];
+  const selectedTopicIds = [...new Set(selection.selectedTopicIds || [])].filter((topicId) =>
+    TOPIC_BY_ID.has(topicId),
+  );
+  if (!selectedTopicIds.length) return [...EVERYDAY_TYPE_IDS];
+  const selected = new Set(selectedTopicIds);
+  return FORM_GROUPS.flatMap((topic) => {
+    if (!selected.has(topic.id)) return [];
+    const requested = uniqueValidTypeIds(selection.selectedTypeIdsByTopic?.[topic.id] || []).filter(
+      (typeId) => topic.typeIds.includes(typeId),
+    );
+    return requested.length ? requested : topic.typeIds;
+  });
+}
+
+export function defaultPracticeSelection() {
+  return {
+    version: PRACTICE_SELECTION_VERSION,
+    selectedCategoryIds: [DEFAULT_PRACTICE_CATEGORY_ID],
+    selectedTypeIdsByCategory: defaultSelectedTypeIdsByCategory(),
+    filters: { ...DEFAULT_PRACTICE_FILTERS },
   };
 }
 
 export function normalizePracticeSelection(selection) {
   const base = defaultPracticeSelection();
   if (!selection || typeof selection !== 'object') return base;
-  const selectedTopicIds = [...new Set(selection.selectedTopicIds || [])].filter((topicId) =>
-    TOPIC_BY_ID.has(topicId),
+  const isCurrentSelection =
+    selection.version === PRACTICE_SELECTION_VERSION ||
+    Array.isArray(selection.selectedCategoryIds);
+  if (!isCurrentSelection) {
+    const legacyTypeIds = legacyTypeIdsForSelection(selection);
+    return legacyTypeIds?.length ? selectionForRequestedTypeIds(legacyTypeIds, base) : base;
+  }
+
+  const selectedCategoryIds = [...new Set(selection.selectedCategoryIds || [])].filter(
+    (categoryId) => CATEGORY_BY_ID.has(categoryId),
   );
-  const selectedTypeIdsByTopic = Object.fromEntries(
-    FORM_GROUPS.map((topic) => {
-      const requested = validTypeIds(selection.selectedTypeIdsByTopic?.[topic.id] || []).filter(
-        (typeId) => topic.typeIds.includes(typeId),
-      );
-      return [topic.id, requested.length ? requested : base.selectedTypeIdsByTopic[topic.id]];
+  const resolvedCategoryIds = selectedCategoryIds.length
+    ? selectedCategoryIds
+    : [DEFAULT_PRACTICE_CATEGORY_ID];
+  const selectedTypeIdsByCategory = Object.fromEntries(
+    PRACTICE_CATEGORIES.map((category) => {
+      const requested = uniqueValidTypeIds(
+        selection.selectedTypeIdsByCategory?.[category.id] || [],
+      ).filter((typeId) => category.typeIds.includes(typeId));
+      return [category.id, requested.length ? requested : [...category.typeIds]];
     }),
   );
-  return {
-    mixed: selection.mixed !== false,
-    selectedTopicIds: selectedTopicIds.length ? selectedTopicIds : base.selectedTopicIds,
-    selectedTypeIdsByTopic,
+  const normalized = {
+    version: PRACTICE_SELECTION_VERSION,
+    selectedCategoryIds: PRACTICE_CATEGORIES.map((category) => category.id).filter((categoryId) =>
+      resolvedCategoryIds.includes(categoryId),
+    ),
+    selectedTypeIdsByCategory,
+    filters: normalizedFilters(selection.filters),
   };
+  if (filteredTypeIdsForSelection(normalized).length) return normalized;
+  return { ...normalized, filters: { ...DEFAULT_PRACTICE_FILTERS } };
 }
 
 export function effectiveTypeIdsForPracticeSelection(selection) {
-  const normalized = normalizePracticeSelection(selection);
-  if (normalized.mixed) return [...EVERYDAY_TYPE_IDS];
-  const selected = new Set(normalized.selectedTopicIds);
-  return FORM_GROUPS.flatMap((topic) =>
-    selected.has(topic.id) ? normalized.selectedTypeIdsByTopic[topic.id] || topic.typeIds : [],
-  );
+  return filteredTypeIdsForSelection(normalizePracticeSelection(selection));
 }
 
-export function toggleMixedPracticeSelection(selection) {
+export function togglePracticeCategorySelection(selection, categoryId) {
+  const category = CATEGORY_BY_ID.get(categoryId);
+  if (!category) return normalizePracticeSelection(selection);
   const normalized = normalizePracticeSelection(selection);
-  return { ...normalized, mixed: !normalized.mixed };
-}
-
-export function togglePracticeTopicSelection(selection, topicId) {
-  const topic = TOPIC_BY_ID.get(topicId);
-  if (!topic) return normalizePracticeSelection(selection);
-  const normalized = normalizePracticeSelection(selection);
-  if (normalized.mixed) {
-    return {
-      ...normalized,
-      mixed: false,
-      selectedTopicIds: [topic.id],
-      selectedTypeIdsByTopic: {
-        ...normalized.selectedTypeIdsByTopic,
-        [topic.id]: [...topic.typeIds],
-      },
-    };
-  }
-  const selected = new Set(normalized.selectedTopicIds);
-  if (selected.has(topic.id)) {
+  const selected = new Set(normalized.selectedCategoryIds);
+  if (selected.has(categoryId)) {
     if (selected.size === 1) return normalized;
-    selected.delete(topic.id);
+    selected.delete(categoryId);
   } else {
-    selected.add(topic.id);
+    selected.add(categoryId);
   }
-  return {
+  const next = {
     ...normalized,
-    selectedTopicIds: FORM_GROUPS.map((item) => item.id).filter((id) => selected.has(id)),
+    selectedCategoryIds: PRACTICE_CATEGORIES.map((item) => item.id).filter((id) =>
+      selected.has(id),
+    ),
   };
+  return filteredTypeIdsForSelection(next).length ? next : normalized;
+}
+
+export function setPracticeFilterSelection(selection, filterId, value) {
+  if (!FILTER_VALUES_BY_ID.get(filterId)?.has(value)) {
+    return normalizePracticeSelection(selection);
+  }
+  const normalized = normalizePracticeSelection(selection);
+  const next = {
+    ...normalized,
+    filters: { ...normalized.filters, [filterId]: value },
+  };
+  return filteredTypeIdsForSelection(next).length ? next : normalized;
 }
 
 export function togglePracticeTypeSelection(selection, typeId) {
-  const topicId = TOPIC_ID_BY_TYPE_ID.get(typeId);
-  const topic = TOPIC_BY_ID.get(topicId);
-  if (!topic) return normalizePracticeSelection(selection);
+  const category = practiceCategoryForType(typeId);
+  if (!category) return normalizePracticeSelection(selection);
   const normalized = normalizePracticeSelection(selection);
-  const current = new Set(normalized.selectedTypeIdsByTopic[topicId] || topic.typeIds);
+  const current = new Set(normalized.selectedTypeIdsByCategory[category.id] || category.typeIds);
   if (current.has(typeId)) {
     if (current.size === 1) return normalized;
     current.delete(typeId);
   } else {
     current.add(typeId);
   }
-  return {
+  const selectedCategoryIds = normalized.selectedCategoryIds.includes(category.id)
+    ? normalized.selectedCategoryIds
+    : PRACTICE_CATEGORIES.map((item) => item.id).filter(
+        (id) => normalized.selectedCategoryIds.includes(id) || id === category.id,
+      );
+  const next = {
     ...normalized,
-    mixed: false,
-    selectedTopicIds: normalized.selectedTopicIds.includes(topicId)
-      ? normalized.selectedTopicIds
-      : [...normalized.selectedTopicIds, topicId],
-    selectedTypeIdsByTopic: {
-      ...normalized.selectedTypeIdsByTopic,
-      [topicId]: topic.typeIds.filter((id) => current.has(id)),
+    selectedCategoryIds,
+    selectedTypeIdsByCategory: {
+      ...normalized.selectedTypeIdsByCategory,
+      [category.id]: category.typeIds.filter((id) => current.has(id)),
     },
   };
+  return filteredTypeIdsForSelection(next).length ? next : normalized;
+}
+
+export function practiceSelectionForCategory(categoryId, selection = null) {
+  const category = CATEGORY_BY_ID.get(categoryId);
+  if (!category) return normalizePracticeSelection(selection);
+  return selectionForRequestedTypeIds(category.typeIds, selection);
 }
 
 export function practiceSelectionForTopic(topicId, selection = null) {
   const topic = TOPIC_BY_ID.get(topicId);
   if (!topic) return normalizePracticeSelection(selection);
-  const normalized = normalizePracticeSelection(selection);
-  return {
-    ...normalized,
-    mixed: false,
-    selectedTopicIds: [topic.id],
-    selectedTypeIdsByTopic: {
-      ...normalized.selectedTypeIdsByTopic,
-      [topic.id]: [...topic.typeIds],
-    },
-  };
+  return selectionForRequestedTypeIds(topic.typeIds, selection);
 }
 
 export function practiceSelectionForTypeIds(typeIds, selection = null) {
-  const requested = validTypeIds(typeIds);
-  if (!requested.length) return normalizePracticeSelection(selection);
-  const normalized = normalizePracticeSelection(selection);
-  const requestedSet = new Set(requested);
-  const selectedTopicIds = FORM_GROUPS.filter((topic) =>
-    topic.typeIds.some((typeId) => requestedSet.has(typeId)),
-  ).map((topic) => topic.id);
-  const selectedTypeIdsByTopic = { ...normalized.selectedTypeIdsByTopic };
-  for (const topicId of selectedTopicIds) {
-    const topic = TOPIC_BY_ID.get(topicId);
-    selectedTypeIdsByTopic[topicId] = topic.typeIds.filter((typeId) => requestedSet.has(typeId));
-  }
-  return { mixed: false, selectedTopicIds, selectedTypeIdsByTopic };
+  return selectionForRequestedTypeIds(typeIds, selection);
 }
 
 export function updateStatePracticeSelection(state, nextSelection) {
@@ -215,31 +241,45 @@ export function updateStatePracticeSelection(state, nextSelection) {
 export function mergePracticeSelections(local, cloud) {
   const left = normalizePracticeSelection(local);
   const right = normalizePracticeSelection(cloud);
-  const selected = new Set([...left.selectedTopicIds, ...right.selectedTopicIds]);
-  return normalizePracticeSelection({
-    mixed: left.mixed && right.mixed,
-    selectedTopicIds: FORM_GROUPS.map((topic) => topic.id).filter((topicId) =>
-      selected.has(topicId),
+  const selected = new Set([...left.selectedCategoryIds, ...right.selectedCategoryIds]);
+  const merged = normalizePracticeSelection({
+    version: PRACTICE_SELECTION_VERSION,
+    selectedCategoryIds: PRACTICE_CATEGORIES.map((category) => category.id).filter((categoryId) =>
+      selected.has(categoryId),
     ),
-    selectedTypeIdsByTopic: Object.fromEntries(
-      FORM_GROUPS.map((topic) => [
-        topic.id,
-        topic.typeIds.filter(
+    selectedTypeIdsByCategory: Object.fromEntries(
+      PRACTICE_CATEGORIES.map((category) => [
+        category.id,
+        category.typeIds.filter(
           (typeId) =>
-            left.selectedTypeIdsByTopic[topic.id]?.includes(typeId) ||
-            right.selectedTypeIdsByTopic[topic.id]?.includes(typeId),
+            left.selectedTypeIdsByCategory[category.id]?.includes(typeId) ||
+            right.selectedTypeIdsByCategory[category.id]?.includes(typeId),
         ),
       ]),
     ),
+    filters: Object.fromEntries(
+      PRACTICE_FILTERS.map((filter) => [
+        filter.id,
+        left.filters[filter.id] === right.filters[filter.id] ? left.filters[filter.id] : 'all',
+      ]),
+    ),
   });
+  return effectiveTypeIdsForPracticeSelection(merged).length
+    ? merged
+    : { ...merged, filters: { ...DEFAULT_PRACTICE_FILTERS } };
 }
 
 export function topicForPracticeType(typeId) {
   return TOPIC_BY_ID.get(TOPIC_ID_BY_TYPE_ID.get(typeId)) || null;
 }
 
-export function selectedPracticeTopics(selection) {
+export function selectedPracticeCategories(selection) {
   const normalized = normalizePracticeSelection(selection);
-  const selected = new Set(normalized.selectedTopicIds);
-  return FORM_GROUPS.filter((topic) => selected.has(topic.id));
+  const selected = new Set(normalized.selectedCategoryIds);
+  return PRACTICE_CATEGORIES.filter((category) => selected.has(category.id));
+}
+
+export function selectedPracticeTopics(selection) {
+  const selectedTypes = new Set(effectiveTypeIdsForPracticeSelection(selection));
+  return FORM_GROUPS.filter((topic) => topic.typeIds.some((typeId) => selectedTypes.has(typeId)));
 }

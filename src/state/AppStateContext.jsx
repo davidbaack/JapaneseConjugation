@@ -49,6 +49,7 @@ import {
   upsertReviewRecommendationState,
 } from '../utils/reviewScope.js';
 import {
+  effectiveTypeIdsForPracticeSelection,
   practiceSelectionForTopic,
   practiceSelectionForTypeIds,
   updateStatePracticeSelection,
@@ -713,7 +714,7 @@ function useAppController() {
   function practiceFormGroup({ familyId, launchPrefs = {} } = {}) {
     setState((prev) => {
       const selection = practiceSelectionForTopic(familyId, prev.practiceSelection);
-      if (!selection.selectedTopicIds.includes(familyId)) return prev;
+      if (!effectiveTypeIdsForPracticeSelection(selection).length) return prev;
       return updateStatePracticeSelection(prev, selection);
     });
     setPracticePrefs((prev) => ({

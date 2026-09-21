@@ -291,8 +291,10 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'What do you want to practice?' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Mixed practice on' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Practice selection' })).toBeTruthy();
+    expect(screen.getAllByText('Core forms').length).toBeGreaterThan(0);
+    expect(screen.getByText('Change')).toBeTruthy();
+    expect(screen.queryByText(/Mixed practice/)).toBeNull();
     expect(screen.queryByText('Practice run')).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Check (Enter)' }).closest('[data-action-dock="true"]'),
@@ -309,7 +311,7 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'What do you want to practice?' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Practice selection' })).toBeTruthy();
     expect(screen.queryByText('Practice run')).toBeNull();
   });
 
@@ -327,13 +329,13 @@ describe('StudyView continuous Practice startup', () => {
     expect(app.setTab).not.toHaveBeenCalled();
   });
 
-  it('keeps the selection controls before the active card in DOM order', async () => {
+  it('keeps the compact selection summary before the active card in DOM order', async () => {
     mockedApp.value = makeApp();
 
     render(<StudyView />);
 
     const answerInput = await waitForPracticeCard();
-    const selector = screen.getByRole('region', { name: 'What do you want to practice?' });
+    const selector = screen.getByRole('region', { name: 'Practice selection' });
     expectElementBefore(selector, answerInput);
   });
 

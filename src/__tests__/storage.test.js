@@ -46,6 +46,11 @@ import {
   practiceSelectionForTopic,
   practiceSelectionForTypeIds,
 } from '../utils/practiceSelection.js';
+import { PRACTICE_CATEGORIES } from '../data/practiceTaxonomy.js';
+
+const CORE_FORM_TYPE_IDS = PRACTICE_CATEGORIES.find(
+  (category) => category.id === 'core-forms',
+).typeIds;
 
 // Mock localStorage for storage tests (mergeState etc. are pure but defaultState references CONJ_TYPES)
 // No localStorage calls in the functions we're testing — they're all pure.
@@ -463,15 +468,15 @@ describe('mergeState', () => {
     expect(state.enabledTypes.length).toBeGreaterThan(0);
   });
 
-  it('starts new learners on the Core plus Everyday conjugation scope', () => {
+  it('starts new learners on the Core forms category', () => {
     const state = defaultState();
-    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
     expect(state.enabledTypes).not.toContain('masu-stem');
     expect(state.enabledTypes).not.toContain('request-kudasai');
     expect(state.enabledTypes).not.toContain('permission');
     expect(state.enabledTypes).not.toContain('obligation');
-    expect(state.enabledTypes).toContain('progressive-past');
-    expect(state.enabledTypes).toContain('potential-polite-past');
+    expect(state.enabledTypes).not.toContain('progressive-past');
+    expect(state.enabledTypes).not.toContain('potential-polite-past');
     expect(state.enabledTypes).not.toContain('passive');
     expect(state.enabledTypes).not.toContain('causative');
     expect(state.enabledTypes).not.toContain('command-nasai');
@@ -480,26 +485,26 @@ describe('mergeState', () => {
     expect(state.enabledTypes).not.toContain('short-causative-passive-polite-past-negative');
   });
 
-  it('migrates the old broad default scope to Core plus Everyday', () => {
+  it('migrates the old broad default scope to the new Core default', () => {
     const state = mergeState({ enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS }, null);
-    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
   });
 
-  it('migrates old verb-only broad scopes with retired forms to Core plus Everyday', () => {
+  it('migrates old verb-only broad scopes with retired forms to the new Core default', () => {
     const oldVerbDefault = [
       ...CONJ_TYPES.filter((type) => type.id !== 'plain-present').map((type) => type.id),
       ...RETIRED_STANDALONE_TYPE_IDS,
     ];
     const state = mergeState({ enabledTypes: oldVerbDefault }, null);
-    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
   });
 
-  it('migrates pre-introduced broad default scopes to Core plus Everyday', () => {
+  it('migrates pre-introduced broad default scopes to the new Core default', () => {
     const preIntroducedIds = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
       (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
     );
     const state = mergeState({ enabledTypes: preIntroducedIds }, null);
-    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
   });
 
   it('preserves an explicit all-forms scope', () => {
@@ -533,7 +538,7 @@ describe('mergeState', () => {
       practiceSelectionForTopic('conditional'),
     );
     const state = mergeState({ schemaVersion: SRS_SCHEMA_VERSION, practiceSelection }, null);
-    expect(state.practiceSelection.selectedTopicIds).toEqual(['conditional']);
+    expect(state.practiceSelection.selectedCategoryIds).toEqual(['conditions-guesses']);
     expect(state.enabledTypes).toEqual(['conditional-tara', 'conditional-nara']);
   });
 
@@ -584,10 +589,11 @@ describe('mergeState', () => {
     expect(state.session).toEqual(override);
   });
 
-  it('backfills adj types for old saves without them', () => {
+  it('migrates old saves to the Core default without forcing adjective forms', () => {
     const saved = { enabledTypes: ['plain-past', 'te-form'] }; // no adj- types
     const state = mergeState(saved, null);
-    expect(state.enabledTypes.some((id) => id.startsWith('adj-'))).toBe(true);
+    expect(state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
+    expect(state.enabledTypes.some((id) => id.startsWith('adj-'))).toBe(false);
   });
 
   it('backfills readiness for old saves', () => {
@@ -602,7 +608,7 @@ describe('mergeCloudState', () => {
       { cards: {}, verbStats: {}, mistakes: [], enabledTypes: EVERYDAY_TYPE_IDS },
       { cards: {}, verbStats: {}, mistakes: [], enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS },
     );
-    expect(merged.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(merged.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
   });
 
   it('merges concurrent persistent selections deterministically', () => {

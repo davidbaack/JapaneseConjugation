@@ -10,7 +10,7 @@ const TABS = [
 ];
 
 const VIEW_ANCHORS = {
-  practice: () => /What do you want to practice/,
+  practice: () => /Core forms/,
   stats: () => /See what is getting easier/,
   learn: () => /Conjugation formation guide/,
   drills: () => /Pick a drill and start/,
@@ -55,9 +55,13 @@ test.describe('Tab navigation', () => {
 
     const practiceTab = page.locator('nav').getByRole('tab', { name: 'Practice', exact: true });
     await expect(practiceTab).toHaveClass(/font-semibold/);
-    await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
-    await expect(page.getByText('What do you want to practice?', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Mixed practice (on|off)/ })).toBeVisible();
+    const answer = page.getByPlaceholder('Type romaji or kana...');
+    await expect(answer).toBeVisible();
+    await expect(page.getByText('Core forms').first()).toBeVisible();
+    await expect(page.getByText('Change', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Mixed practice/)).toHaveCount(0);
+    const answerBox = await answer.boundingBox();
+    expect(answerBox?.y).toBeLessThan(720);
     await expect(page.getByRole('button', { name: /Start workout|Continue workout/ })).toHaveCount(
       0,
     );

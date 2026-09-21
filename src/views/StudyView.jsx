@@ -2,6 +2,11 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallba
 import { IconVolume, IconChat, IconFlame } from '../components/Icons.jsx';
 import { ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
 import {
+  PRACTICE_CATEGORIES,
+  PRACTICE_FILTERS,
+  practiceCategoryForType,
+} from '../data/practiceTaxonomy.js';
+import {
   getSpeechRecognitionConstructor,
   playPronunciation,
   speechRecognitionErrorMessage,
@@ -89,9 +94,10 @@ import { StudyFocusBar } from './study/StudyFocusBar.jsx';
 import { AnswerInputPanel } from './study/AnswerInputPanel.jsx';
 import PracticeSelector from './study/PracticeSelector.jsx';
 import {
-  toggleMixedPracticeSelection,
+  normalizePracticeSelection,
   practiceSelectionForTypeIds,
-  togglePracticeTopicSelection,
+  setPracticeFilterSelection,
+  togglePracticeCategorySelection,
   togglePracticeTypeSelection,
   updateStatePracticeSelection,
 } from '../utils/practiceSelection.js';
@@ -1154,49 +1160,52 @@ export default function StudyView({ mode = 'practice' }) {
     };
   }, []);
 
-  function applyPracticeSelection(nextSelection, message) {
+  function applyPracticeSelection(nextSelection, message, blockedMessage) {
+    const currentSelection = normalizePracticeSelection(state.practiceSelection);
+    const resolvedSelection = nextSelection(currentSelection);
+    if (JSON.stringify(resolvedSelection) === JSON.stringify(currentSelection)) {
+      setSelectionStatus(blockedMessage || message);
+      return;
+    }
     clearPersistedCurrent();
     preparedNextCardRef.current = null;
-    setState((prev) => updateStatePracticeSelection(prev, nextSelection(prev.practiceSelection)));
+    setState((prev) => updateStatePracticeSelection(prev, resolvedSelection));
     setSelectionStatus(message);
   }
 
-  function toggleMixedSelection() {
-    const turningOn = !state.practiceSelection?.mixed;
+  function togglePracticeCategory(categoryId) {
+    const category = PRACTICE_CATEGORIES.find((item) => item.id === categoryId);
+    if (!category) return;
+    const normalized = normalizePracticeSelection(state.practiceSelection);
+    const wasSelected = normalized.selectedCategoryIds.includes(categoryId);
     applyPracticeSelection(
-      toggleMixedPracticeSelection,
-      turningOn
-        ? 'Mixed practice is on. Your custom mix is saved.'
-        : 'Your custom practice mix is restored.',
+      (selection) => togglePracticeCategorySelection(selection, categoryId),
+      `${category.label} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
+      'Keep at least one category on, or choose another category first.',
     );
   }
 
-  function togglePracticeTopic(topicId) {
-    const topic = FORM_GROUPS.find((item) => item.id === topicId);
-    if (!topic) return;
-    const wasMixed = !!state.practiceSelection?.mixed;
-    const wasSelected = state.practiceSelection?.selectedTopicIds?.includes(topicId);
-    const selectedCount = state.practiceSelection?.selectedTopicIds?.length || 0;
-    if (!wasMixed && wasSelected && selectedCount <= 1) {
-      setSelectionStatus('Choose another topic before removing this one, or use Mixed practice.');
-      return;
-    }
+  function setPracticeSelectionFilter(filterId, value) {
+    const filter = PRACTICE_FILTERS.find((item) => item.id === filterId);
+    const option = filter?.options.find((item) => item.id === value);
+    if (!filter || !option) return;
     applyPracticeSelection(
-      (selection) => togglePracticeTopicSelection(selection, topicId),
-      wasMixed
-        ? `Practicing ${topic.label}.`
-        : wasSelected
-          ? `${topic.label} removed from your mix.`
-          : `${topic.label} added to your mix.`,
+      (selection) => setPracticeFilterSelection(selection, filterId, value),
+      `${filter.label} filter set to ${option.label}.`,
+      `No forms match ${option.label} with the current categories and filters.`,
     );
   }
 
   function togglePracticeSelectionType(typeId) {
     const type = CARD_TYPE_BY_ID.get(typeId);
     if (!type) return;
+    const category = practiceCategoryForType(typeId);
+    const normalized = normalizePracticeSelection(state.practiceSelection);
+    const wasSelected = normalized.selectedTypeIdsByCategory[category?.id]?.includes(typeId);
     applyPracticeSelection(
       (selection) => togglePracticeTypeSelection(selection, typeId),
-      `${type.label} ${state.enabledTypes?.includes(typeId) ? 'removed from' : 'added to'} your mix.`,
+      `${type.label} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
+      'Keep at least one matching exact form, or relax a quick filter first.',
     );
   }
 
@@ -1220,8 +1229,8 @@ export default function StudyView({ mode = 'practice' }) {
         {!transformationMode && (
           <PracticeSelector
             selection={state.practiceSelection}
-            onToggleMixed={toggleMixedSelection}
-            onToggleTopic={togglePracticeTopic}
+            onToggleCategory={togglePracticeCategory}
+            onSetFilter={setPracticeSelectionFilter}
             onToggleType={togglePracticeSelectionType}
             statusMessage={selectionStatus}
           />
@@ -2655,8 +2664,8 @@ export default function StudyView({ mode = 'practice' }) {
         {!transformationMode && (
           <PracticeSelector
             selection={state.practiceSelection}
-            onToggleMixed={toggleMixedSelection}
-            onToggleTopic={togglePracticeTopic}
+            onToggleCategory={togglePracticeCategory}
+            onSetFilter={setPracticeSelectionFilter}
             onToggleType={togglePracticeSelectionType}
             statusMessage={selectionStatus}
           />

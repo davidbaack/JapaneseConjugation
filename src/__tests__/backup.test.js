@@ -33,7 +33,7 @@ describe('buildBackup / serializeBackup', () => {
   it('captures progress and settings sections', () => {
     const b = buildBackup(parts());
     expect(b.state.cards).toEqual({ 'a|b': { reps: 2 } });
-    expect(b.state.practiceSelection.selectedTopicIds).toContain('te-ta-sound-changes');
+    expect(b.state.practiceSelection.selectedCategoryIds).toContain('core-forms');
     expect(b.state.practiceStats).toBeTruthy();
     expect(b.state.guide).toBeTruthy();
     expect(b.customVerbs).toHaveLength(1);

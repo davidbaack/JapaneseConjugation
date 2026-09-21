@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import { EVERYDAY_TYPE_IDS } from '../data/conjugationTypes.js';
+import { PRACTICE_CATEGORIES } from '../data/practiceTaxonomy.js';
 import { buildSyncPayload, cardIdFor, defaultState } from '../utils/storage.js';
 import { excludeWordFromReviewState } from '../utils/reviewScope.js';
 import { buildLearnerResetPayload, commitLearnerResetPayload } from '../utils/learnerReset.js';
@@ -11,6 +11,9 @@ import { adoptSyncMetadata, stampSyncChanges } from '../utils/syncMetadata.js';
 
 const WORD = { dict: 'taberu', reading: 'taberu', meaning: 'to eat', group: 'ichidan' };
 const CUSTOM_WORD = { dict: 'custom', reading: 'custom', meaning: 'custom', group: 'godan' };
+const CORE_FORM_TYPE_IDS = PRACTICE_CATEGORIES.find(
+  (category) => category.id === 'core-forms',
+).typeIds;
 
 function populatedParts() {
   const cardId = cardIdFor(WORD, 'plain-past');
@@ -197,7 +200,7 @@ describe('buildLearnerResetPayload', () => {
     expect(reset.state.game.played).toBe(0);
     expect(reset.state.minimalPairs).toEqual({ bySet: {} });
     expect(reset.state.enabledTypes).toEqual(['plain-past']);
-    expect(reset.state.practiceSelection.selectedTopicIds).toEqual(['te-ta-sound-changes']);
+    expect(reset.state.practiceSelection.selectedCategoryIds).toEqual(['core-forms']);
     expect(reset.state.reviewScope.excludedWordKeys).toEqual(['ichidan:taberu']);
     expect(reset.practicePrefs.theme).toBe('dark');
     expect(reset.customVerbs).toEqual(parts.customVerbs);
@@ -235,7 +238,7 @@ describe('buildLearnerResetPayload', () => {
     });
 
     expect(reset.state.cards).toEqual({});
-    expect(reset.state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(reset.state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
     expect(reset.state.reviewScope.excludedWordKeys).toEqual([]);
     expect(reset.customVerbs).toEqual([]);
     expect(reset.customAdjectives).toEqual([]);

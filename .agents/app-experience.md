@@ -1,4 +1,4 @@
-# Selection-First Practice Experience
+# Task-First Practice Experience
 
 This document is the product experience source of truth for learner-facing work.
 Agents must read it before changing Practice, Guide, Learn, Drills, Tools, Settings,
@@ -48,18 +48,24 @@ confirms the new direction, update this document in the same change.
 - Practice has no run, workout, daily-goal, completion, or temporary-focus
   framing. The learner chooses what they want to practice and answers
   continuously.
-- Practice leads with a compact selection surface: Mixed practice, quick topic
-  picks, the selected custom mix, and a Browse all disclosure. Topics are
-  positive selections rather than exclusions. Exact forms are optional
-  refinements inside a selected topic.
-- Mixed practice is a reversible override. Turning it on uses the broad mixed
-  pool while retaining the learner's custom topics and exact-form refinements.
-  Turning it off restores that custom mix. Choosing a topic while Mixed is on
-  exits Mixed and starts with that topic.
-- Practice restores the last selected custom mix across launches. Multiple
-  topics are balanced by topic rather than by raw exact-form count, so a large
-  topic cannot drown out a small one.
-- A manual topic or exact-form change keeps the active card if it is still
+- Practice leads with the active exercise. A compact, collapsed Practice
+  summary above it shows the selected learner-facing categories, any active
+  quick filters, the matching form count, and one Change control.
+- Change Practice exposes one category grid. There is no separate Mixed mode,
+  saved-mix override, Quick picks section, or duplicate Browse-all hierarchy.
+  Categories are positive multi-select toggles and persist across launches.
+- Fresh learners start with Core forms. Learner-facing categories are broader
+  than the exact-form families used by Learn, Stats, readiness, and weakness
+  analysis; a launch from those surfaces still selects its exact intended forms.
+- Global quick filters narrow selected categories by Time (All, Non-past,
+  Past), Polarity (All, Positive, Negative), and Style (All, Plain, Polite).
+  Specific filters match only exact forms carrying that distinction; neutral
+  forms are excluded. The UI shows the live matching count and refuses a change
+  that would leave no matching forms rather than silently substituting forms.
+- Exact forms remain available in one optional Refine exact forms disclosure.
+  Multiple selected categories are balanced by category rather than by raw
+  exact-form count, so a large category cannot drown out a small one.
+- A manual category, filter, or exact-form change keeps the active card if it is still
   eligible. If the card becomes ineligible it is replaced immediately, the
   unfinished answer is cleared, and no skip, miss, retry, or progress event is
   recorded.

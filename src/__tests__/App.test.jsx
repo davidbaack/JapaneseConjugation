@@ -32,36 +32,34 @@ async function renderApp() {
   await act(async () => {
     render(<App />);
   });
-  await screen.findByRole('heading', { name: 'What do you want to practice?' });
+  await screen.findByRole('textbox', { name: 'Answer' });
 }
 
 describe('App shell', () => {
-  it('opens directly into selection-first Practice', async () => {
+  it('opens directly into task-first Practice with a compact selection summary', async () => {
     await renderApp();
 
     expect(screen.getByRole('tab', { name: 'Practice' }).getAttribute('aria-selected')).toBe(
       'true',
     );
-    expect(screen.getByRole('button', { name: 'Mixed practice on' })).toBeTruthy();
+    expect(screen.getAllByText('Core forms').length).toBeGreaterThan(0);
+    expect(screen.getByText('8 forms')).toBeTruthy();
+    expect(screen.getByText('Change')).toBeTruthy();
+    expect(screen.queryByText(/Mixed practice/)).toBeNull();
     expect(screen.queryByText('Practice run')).toBeNull();
     expect(screen.queryByText('Today drill')).toBeNull();
   });
 
-  it('chooses a topic immediately and restores it after Mixed practice', async () => {
+  it('combines category toggles with cross-category quick filters', async () => {
     await renderApp();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Volitional' })[0]);
-    expect(
-      await screen.findByRole('button', { name: 'Remove Volitional from practice' }),
-    ).toBeTruthy();
+    fireEvent.click(screen.getByText('Change'));
+    fireEvent.click(screen.getByRole('button', { name: /Wants & intentions/ }));
+    expect(await screen.findByText('Wants & intentions added to Practice.')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mixed practice off' }));
-    expect(await screen.findByText('Mixed practice is on. Your custom mix is saved.')).toBeTruthy();
-    expect(screen.getByText(/Your custom mix is saved: Volitional/)).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Mixed practice on' }));
-    expect(await screen.findByText('Your custom practice mix is restored.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Remove Volitional from practice' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'Past' }));
+    expect(await screen.findByText('Time filter set to Past.')).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Past' }).getAttribute('aria-checked')).toBe('true');
   });
 
   it('shows lifetime and trend-oriented Stats without review scheduling', async () => {

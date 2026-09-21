@@ -1,39 +1,124 @@
 import { describe, expect, it } from 'vitest';
+import { ALL_CARD_TYPES, EVERYDAY_TYPE_IDS } from '../data/conjugationTypes.js';
+import { PRACTICE_CATEGORIES, practiceDimensionsForType } from '../data/practiceTaxonomy.js';
 import {
   defaultPracticeSelection,
   effectiveTypeIdsForPracticeSelection,
+  mergePracticeSelections,
+  normalizePracticeSelection,
+  practiceSelectionForCategory,
   practiceSelectionForTopic,
-  toggleMixedPracticeSelection,
-  togglePracticeTopicSelection,
+  practiceSelectionForTypeIds,
+  setPracticeFilterSelection,
+  togglePracticeCategorySelection,
   togglePracticeTypeSelection,
 } from '../utils/practiceSelection.js';
 
 describe('practice selection', () => {
-  it('uses Mixed as a reversible override without discarding the custom mix', () => {
-    const custom = practiceSelectionForTopic('volitional', defaultPracticeSelection());
-    const mixed = toggleMixedPracticeSelection(custom);
-    const restored = toggleMixedPracticeSelection(mixed);
+  it('partitions every exact form into one learner-facing category', () => {
+    const categorized = PRACTICE_CATEGORIES.flatMap((category) => category.typeIds);
 
-    expect(mixed.mixed).toBe(true);
-    expect(mixed.selectedTopicIds).toEqual(['volitional']);
-    expect(restored).toEqual(custom);
+    expect(new Set(categorized).size).toBe(categorized.length);
+    expect(new Set(categorized)).toEqual(new Set(ALL_CARD_TYPES.map((type) => type.id)));
   });
 
-  it('starts a new single-topic selection when a topic is chosen from Mixed', () => {
-    const selected = togglePracticeTopicSelection(defaultPracticeSelection(), 'wanting');
+  it('starts fresh learners with Core forms and no cross-category filters', () => {
+    const selection = defaultPracticeSelection();
 
-    expect(selected.mixed).toBe(false);
-    expect(selected.selectedTopicIds).toEqual(['wanting']);
-    expect(effectiveTypeIdsForPracticeSelection(selected)).toContain('desiderative');
-    expect(effectiveTypeIdsForPracticeSelection(selected)).not.toContain('volitional');
+    expect(selection.selectedCategoryIds).toEqual(['core-forms']);
+    expect(selection.filters).toEqual({ time: 'all', polarity: 'all', style: 'all' });
+    expect(effectiveTypeIdsForPracticeSelection(selection)).toEqual(
+      PRACTICE_CATEGORIES.find((category) => category.id === 'core-forms').typeIds,
+    );
   });
 
-  it('keeps at least one exact form inside a selected topic', () => {
-    let selected = practiceSelectionForTopic('volitional', defaultPracticeSelection());
-    selected = togglePracticeTypeSelection(selected, 'polite-volitional');
-    const unchanged = togglePracticeTypeSelection(selected, 'volitional');
+  it('adds and removes learner-facing categories without a Mixed override', () => {
+    const initial = defaultPracticeSelection();
+    const added = togglePracticeCategorySelection(initial, 'wants-intentions');
+    const restored = togglePracticeCategorySelection(added, 'wants-intentions');
 
-    expect(effectiveTypeIdsForPracticeSelection(selected)).toEqual(['volitional']);
-    expect(unchanged).toEqual(selected);
+    expect(added.selectedCategoryIds).toEqual(['core-forms', 'wants-intentions']);
+    expect(effectiveTypeIdsForPracticeSelection(added)).toContain('desiderative');
+    expect(restored.selectedCategoryIds).toEqual(['core-forms']);
+  });
+
+  it('strictly intersects time, polarity, and style filters', () => {
+    let selection = practiceSelectionForCategory('passive-causative');
+    selection = setPracticeFilterSelection(selection, 'time', 'past');
+    selection = setPracticeFilterSelection(selection, 'polarity', 'negative');
+    selection = setPracticeFilterSelection(selection, 'style', 'polite');
+    const enabled = effectiveTypeIdsForPracticeSelection(selection);
+
+    expect(enabled).toContain('passive-polite-past-negative');
+    expect(enabled).not.toContain('passive');
+    expect(
+      enabled.every((typeId) => {
+        const dimensions = practiceDimensionsForType(typeId);
+        return (
+          dimensions.time === 'past' &&
+          dimensions.polarity === 'negative' &&
+          dimensions.style === 'polite'
+        );
+      }),
+    ).toBe(true);
+  });
+
+  it('classifies plain volitional and positive polite commands for global filters', () => {
+    expect(practiceDimensionsForType('volitional')).toMatchObject({ style: 'plain' });
+    expect(practiceDimensionsForType('polite-volitional')).toMatchObject({ style: 'polite' });
+    expect(practiceDimensionsForType('command-nasai')).toMatchObject({
+      polarity: 'positive',
+      style: 'polite',
+    });
+  });
+
+  it('excludes neutral forms when a specific filter is active', () => {
+    let selection = practiceSelectionForTypeIds(['te-form', 'plain-past']);
+    selection = setPracticeFilterSelection(selection, 'time', 'past');
+
+    expect(effectiveTypeIdsForPracticeSelection(selection)).toEqual(['plain-past']);
+  });
+
+  it('refuses a filter or refinement that would leave zero forms', () => {
+    const teForm = practiceSelectionForCategory('te-form');
+    const blockedFilter = setPracticeFilterSelection(teForm, 'time', 'past');
+    expect(blockedFilter.filters.time).toBe('all');
+
+    const volitional = practiceSelectionForTopic('volitional');
+    const oneForm = togglePracticeTypeSelection(volitional, 'polite-volitional');
+    const blockedRemoval = togglePracticeTypeSelection(oneForm, 'volitional');
+    expect(effectiveTypeIdsForPracticeSelection(oneForm)).toEqual(['volitional']);
+    expect(blockedRemoval).toEqual(oneForm);
+  });
+
+  it('migrates the legacy Mixed pool without losing exact forms', () => {
+    const migrated = normalizePracticeSelection({
+      mixed: true,
+      selectedTopicIds: ['volitional'],
+      selectedTypeIdsByTopic: { volitional: ['volitional'] },
+    });
+
+    expect(new Set(effectiveTypeIdsForPracticeSelection(migrated))).toEqual(
+      new Set(EVERYDAY_TYPE_IDS),
+    );
+    expect(migrated.filters).toEqual({ time: 'all', polarity: 'all', style: 'all' });
+  });
+
+  it('merges categories and relaxes conflicting cloud filters to All', () => {
+    const left = setPracticeFilterSelection(
+      practiceSelectionForCategory('wants-intentions'),
+      'time',
+      'past',
+    );
+    const right = setPracticeFilterSelection(
+      practiceSelectionForCategory('ability-ongoing'),
+      'style',
+      'polite',
+    );
+    const merged = mergePracticeSelections(left, right);
+
+    expect(merged.selectedCategoryIds).toEqual(['wants-intentions', 'ability-ongoing']);
+    expect(merged.filters).toEqual({ time: 'all', polarity: 'all', style: 'all' });
+    expect(effectiveTypeIdsForPracticeSelection(merged).length).toBeGreaterThan(0);
   });
 });
