@@ -57,14 +57,63 @@ test.describe('Tab navigation', () => {
     await expect(practiceTab).toHaveClass(/font-semibold/);
     const answer = page.getByPlaceholder('Type romaji or kana...');
     await expect(answer).toBeVisible();
-    await expect(page.getByText('Core forms').first()).toBeVisible();
-    await expect(page.getByText('Change', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Core forms' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Practice categories' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Practice quick filters' })).toBeVisible();
+    await expect(page.getByText('Change', { exact: true })).toHaveCount(0);
     await expect(page.getByText(/Mixed practice/)).toHaveCount(0);
     const answerBox = await answer.boundingBox();
     expect(answerBox?.y).toBeLessThan(720);
     await expect(page.getByRole('button', { name: /Start workout|Continue workout/ })).toHaveCount(
       0,
     );
+  });
+
+  test('practice controls remain compact and reachable at 320px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await gotoFreshApp(page);
+
+    const answer = page.getByPlaceholder('Type romaji or kana...');
+    const answerBox = await answer.boundingBox();
+    if (!answerBox) throw new Error('Practice answer should be visible at 320px');
+    expect(answerBox.y + answerBox.height).toBeLessThanOrEqual(720);
+
+    const pageWidth = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(pageWidth.scrollWidth).toBe(pageWidth.clientWidth);
+
+    const categoryRail = page.getByTestId('practice-category-rail');
+    const railMetrics = await categoryRail.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(railMetrics.scrollWidth).toBeGreaterThan(railMetrics.clientWidth);
+    await expect(categoryRail.getByRole('button')).toHaveCount(11);
+
+    await categoryRail.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+      element.dispatchEvent(new Event('scroll'));
+    });
+    await expect(categoryRail.getByRole('button', { name: 'Adjectives' })).toBeInViewport();
+
+    await expect(page.getByRole('radiogroup', { name: 'Time' })).toBeAttached();
+    await expect(page.getByRole('radiogroup', { name: 'Polarity' })).toBeAttached();
+    await expect(page.getByRole('radiogroup', { name: 'Style' })).toBeAttached();
+  });
+
+  test('practice categories wrap into no more than two desktop rows', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await gotoFreshApp(page);
+
+    const rowCount = await page.getByTestId('practice-category-rail').evaluate((element) => {
+      const rows = [...element.children].map((child) =>
+        Math.round(child.getBoundingClientRect().top),
+      );
+      return new Set(rows).size;
+    });
+    expect(rowCount).toBeLessThanOrEqual(2);
   });
 
   test('tools exposes lookup, check, words, lists, and custom words', async ({ page }) => {

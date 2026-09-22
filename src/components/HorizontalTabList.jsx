@@ -1,16 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { horizontalEdges } from '../utils/horizontalScroll.js';
 
-const EDGE_EPSILON = 1;
 const ACTIVE_TAB_GUTTER = 4;
-
-function horizontalEdges(element) {
-  if (!element) return { canScrollLeft: false, canScrollRight: false };
-  const maxScrollLeft = Math.max(0, element.scrollWidth - element.clientWidth);
-  return {
-    canScrollLeft: element.scrollLeft > EDGE_EPSILON,
-    canScrollRight: element.scrollLeft < maxScrollLeft - EDGE_EPSILON,
-  };
-}
 
 /**
  * A single-row ARIA tablist with boundary-aware visual scroll cues.
@@ -111,5 +102,3 @@ export default function HorizontalTabList({
     </div>
   );
 }
-
-export { horizontalEdges };

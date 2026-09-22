@@ -36,15 +36,18 @@ async function renderApp() {
 }
 
 describe('App shell', () => {
-  it('opens directly into task-first Practice with a compact selection summary', async () => {
+  it('opens directly into task-first Practice with always-visible compact controls', async () => {
     await renderApp();
 
     expect(screen.getByRole('tab', { name: 'Practice' }).getAttribute('aria-selected')).toBe(
       'true',
     );
-    expect(screen.getAllByText('Core forms').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Core forms' })).toBeTruthy();
     expect(screen.getByText('8 forms')).toBeTruthy();
-    expect(screen.getByText('Change')).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Non-past' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Negative' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Polite' })).toBeTruthy();
+    expect(screen.queryByText('Change', { exact: true })).toBeNull();
     expect(screen.queryByText(/Mixed practice/)).toBeNull();
     expect(screen.queryByText('Practice run')).toBeNull();
     expect(screen.queryByText('Today drill')).toBeNull();
@@ -53,8 +56,7 @@ describe('App shell', () => {
   it('combines category toggles with cross-category quick filters', async () => {
     await renderApp();
 
-    fireEvent.click(screen.getByText('Change'));
-    fireEvent.click(screen.getByRole('button', { name: /Wants & intentions/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Wants & intentions' }));
     expect(await screen.findByText('Wants & intentions added to Practice.')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('radio', { name: 'Past' }));

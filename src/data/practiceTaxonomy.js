@@ -32,7 +32,7 @@ export const PRACTICE_CATEGORIES = [
   },
   {
     id: 'ability-ongoing',
-    label: 'Ability & ongoing actions',
+    label: 'Ability & ongoing',
     description: 'Practice can-do forms and actions or states in progress.',
     typeIds: typeIdsForGroups('potential', 'progressive'),
   },
@@ -44,7 +44,7 @@ export const PRACTICE_CATEGORIES = [
   },
   {
     id: 'requests-permission-obligation',
-    label: 'Requests, permission & obligation',
+    label: 'Requests & rules',
     description: 'Ask, allow, and express what must be done.',
     typeIds: typeIdsForGroups('requests', 'permission', 'obligation'),
   },

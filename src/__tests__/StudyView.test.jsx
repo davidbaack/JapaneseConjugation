@@ -292,8 +292,10 @@ describe('StudyView continuous Practice startup', () => {
 
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Practice selection' })).toBeTruthy();
-    expect(screen.getAllByText('Core forms').length).toBeGreaterThan(0);
-    expect(screen.getByText('Change')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Core forms' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Practice categories' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Practice quick filters' })).toBeTruthy();
+    expect(screen.queryByText('Change', { exact: true })).toBeNull();
     expect(screen.queryByText(/Mixed practice/)).toBeNull();
     expect(screen.queryByText('Practice run')).toBeNull();
     expect(
@@ -329,7 +331,7 @@ describe('StudyView continuous Practice startup', () => {
     expect(app.setTab).not.toHaveBeenCalled();
   });
 
-  it('keeps the compact selection summary before the active card in DOM order', async () => {
+  it('keeps the compact selection controls before the active card in DOM order', async () => {
     mockedApp.value = makeApp();
 
     render(<StudyView />);

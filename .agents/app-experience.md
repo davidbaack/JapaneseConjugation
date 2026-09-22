@@ -48,12 +48,16 @@ confirms the new direction, update this document in the same change.
 - Practice has no run, workout, daily-goal, completion, or temporary-focus
   framing. The learner chooses what they want to practice and answers
   continuously.
-- Practice leads with the active exercise. A compact, collapsed Practice
-  summary above it shows the selected learner-facing categories, any active
-  quick filters, the matching form count, and one Change control.
-- Change Practice exposes one category grid. There is no separate Mixed mode,
-  saved-mix override, Quick picks section, or duplicate Browse-all hierarchy.
-  Categories are positive multi-select toggles and persist across launches.
+- Practice leads with the active exercise while keeping its category and filter
+  controls visible in a compact area above the card. There is no Change menu.
+- All learner-facing categories appear as positive multi-select chips. On narrow
+  screens they stay in one horizontally scrollable row with boundary cues; on
+  desktop they wrap into no more than two compact rows. Category descriptions
+  remain available to assistive technology without adding visual height.
+- Time, Polarity, and Style filters remain visible below the category chips. On
+  narrow screens their segmented radio groups share a second horizontal rail;
+  on desktop they sit side by side. There is no separate Mixed mode, saved-mix
+  override, Quick picks section, or duplicate Browse-all hierarchy.
 - Fresh learners start with Core forms. Learner-facing categories are broader
   than the exact-form families used by Learn, Stats, readiness, and weakness
   analysis; a launch from those surfaces still selects its exact intended forms.
