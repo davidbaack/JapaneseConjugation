@@ -19,7 +19,7 @@ function CategoryButton({ category, active, onClick }) {
       aria-label={category.label}
       aria-description={category.description}
       title={category.description}
-      className={`min-h-9 shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
+      className={`min-h-9 shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition active:scale-[0.98] ${
         active
           ? 'border-indigo-500 bg-indigo-600 text-white shadow-sm shadow-indigo-950/15 dark:border-indigo-400 dark:bg-indigo-500 dark:text-stone-950'
           : 'border-stone-200 bg-white text-stone-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-800 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-200'
@@ -169,7 +169,7 @@ export default function PracticeSelector({
         ariaLabel="Practice categories"
         testId="practice-category-rail"
         wrapperClassName="mt-2"
-        className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:overflow-visible"
+        className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:auto-cols-max lg:grid-flow-col lg:grid-rows-2"
       >
         {categoryButtons}
       </HorizontalChoiceRail>
