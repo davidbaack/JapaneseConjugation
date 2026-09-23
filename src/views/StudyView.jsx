@@ -94,7 +94,10 @@ import { StudyFocusBar } from './study/StudyFocusBar.jsx';
 import { AnswerInputPanel } from './study/AnswerInputPanel.jsx';
 import PracticeSelector from './study/PracticeSelector.jsx';
 import {
+  addPracticeTypeSelection,
+  matchingPracticeTypeIdsForCategory,
   normalizePracticeSelection,
+  practiceFilterConflictsForType,
   practiceSelectionForTypeIds,
   setPracticeFilterSelection,
   togglePracticeCategorySelection,
@@ -1178,6 +1181,18 @@ export default function StudyView({ mode = 'practice' }) {
     if (!category) return;
     const normalized = normalizePracticeSelection(state.practiceSelection);
     const wasSelected = normalized.selectedCategoryIds.includes(categoryId);
+    if (!wasSelected && !matchingPracticeTypeIdsForCategory(normalized, categoryId).length) {
+      const activeFilters = PRACTICE_FILTERS.flatMap((filter) => {
+        const value = normalized.filters[filter.id];
+        if (value === 'all') return [];
+        const option = filter.options.find((item) => item.id === value);
+        return [`${filter.label}: ${option?.label || value}`];
+      });
+      setSelectionStatus(
+        `No ${category.label} forms match ${activeFilters.join(' and ')}. Set one or more of those filters to All first.`,
+      );
+      return;
+    }
     applyPracticeSelection(
       (selection) => togglePracticeCategorySelection(selection, categoryId),
       `${category.label} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
@@ -1200,10 +1215,27 @@ export default function StudyView({ mode = 'practice' }) {
     const type = CARD_TYPE_BY_ID.get(typeId);
     if (!type) return;
     const category = practiceCategoryForType(typeId);
+    if (!category) return;
     const normalized = normalizePracticeSelection(state.practiceSelection);
-    const wasSelected = normalized.selectedTypeIdsByCategory[category?.id]?.includes(typeId);
+    const categoryActive = normalized.selectedCategoryIds.includes(category.id);
+    const wasSelected =
+      categoryActive && normalized.selectedTypeIdsByCategory[category.id]?.includes(typeId);
+    const conflicts = practiceFilterConflictsForType(typeId, normalized.filters);
+    if (!wasSelected && conflicts.length) {
+      const currentFilters = conflicts
+        .map((conflict) => `${conflict.label}: ${conflict.valueLabel}`)
+        .join(' and ');
+      const resetFilters = conflicts.map((conflict) => conflict.label).join(' and ');
+      setSelectionStatus(
+        `${type.label} does not match ${currentFilters}. Set ${resetFilters} to All first.`,
+      );
+      return;
+    }
     applyPracticeSelection(
-      (selection) => togglePracticeTypeSelection(selection, typeId),
+      (selection) =>
+        categoryActive
+          ? togglePracticeTypeSelection(selection, typeId)
+          : addPracticeTypeSelection(selection, typeId),
       `${type.label} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
       'Keep at least one matching exact form, or relax a quick filter first.',
     );

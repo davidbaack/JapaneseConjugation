@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { ALL_CARD_TYPES, EVERYDAY_TYPE_IDS } from '../data/conjugationTypes.js';
 import { PRACTICE_CATEGORIES, practiceDimensionsForType } from '../data/practiceTaxonomy.js';
 import {
+  addPracticeTypeSelection,
   defaultPracticeSelection,
   effectiveTypeIdsForPracticeSelection,
+  matchingPracticeTypeIdsForCategory,
   mergePracticeSelections,
   normalizePracticeSelection,
+  practiceFilterConflictsForType,
   practiceSelectionForCategory,
   practiceSelectionForTopic,
   practiceSelectionForTypeIds,
@@ -20,6 +23,15 @@ describe('practice selection', () => {
 
     expect(new Set(categorized).size).toBe(categorized.length);
     expect(new Set(categorized)).toEqual(new Set(ALL_CARD_TYPES.map((type) => type.id)));
+  });
+
+  it('gives every learner-facing category a structured ending preview', () => {
+    for (const category of PRACTICE_CATEGORIES) {
+      expect(category.previewParts.length).toBeGreaterThan(0);
+      expect(
+        category.previewParts.every((part) => part.pattern.trim() && part.meaning.trim()),
+      ).toBe(true);
+    }
   });
 
   it('starts fresh learners with Core forms and no cross-category filters', () => {
@@ -77,6 +89,34 @@ describe('practice selection', () => {
     selection = setPracticeFilterSelection(selection, 'time', 'past');
 
     expect(effectiveTypeIdsForPracticeSelection(selection)).toEqual(['plain-past']);
+  });
+
+  it('reports per-category matches under the current exact selection and filters', () => {
+    const initial = defaultPracticeSelection();
+    const past = setPracticeFilterSelection(initial, 'time', 'past');
+
+    expect(matchingPracticeTypeIdsForCategory(initial, 'core-forms')).toHaveLength(8);
+    expect(matchingPracticeTypeIdsForCategory(past, 'core-forms')).toHaveLength(4);
+    expect(matchingPracticeTypeIdsForCategory(past, 'te-form')).toEqual([]);
+  });
+
+  it('adds one exact form from an off category without restoring its full saved mix', () => {
+    const added = addPracticeTypeSelection(defaultPracticeSelection(), 'potential');
+
+    expect(added.selectedCategoryIds).toEqual(['core-forms', 'ability-ongoing']);
+    expect(added.selectedTypeIdsByCategory['ability-ongoing']).toEqual(['potential']);
+    expect(effectiveTypeIdsForPracticeSelection(added)).toContain('potential');
+    expect(effectiveTypeIdsForPracticeSelection(added)).not.toContain('progressive');
+  });
+
+  it('identifies filter conflicts and blocks hidden exact-form additions', () => {
+    const past = setPracticeFilterSelection(defaultPracticeSelection(), 'time', 'past');
+    const conflicts = practiceFilterConflictsForType('te-form', past.filters);
+
+    expect(conflicts).toEqual([
+      expect.objectContaining({ id: 'time', label: 'Time', valueLabel: 'Past' }),
+    ]);
+    expect(addPracticeTypeSelection(past, 'te-form')).toEqual(past);
   });
 
   it('refuses a filter or refinement that would leave zero forms', () => {

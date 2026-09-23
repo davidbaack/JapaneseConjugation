@@ -58,6 +58,25 @@ function typeMatchesFilters(typeId, filters) {
   });
 }
 
+export function practiceFilterConflictsForType(typeId, filters = {}) {
+  if (!TYPE_ID_SET.has(typeId)) return [];
+  const resolvedFilters = normalizedFilters(filters);
+  const dimensions = practiceDimensionsForType(typeId);
+  return PRACTICE_FILTERS.flatMap((filter) => {
+    const value = resolvedFilters[filter.id];
+    if (value === 'all' || dimensions[filter.id] === value) return [];
+    const option = filter.options.find((item) => item.id === value);
+    return [
+      {
+        id: filter.id,
+        label: filter.label,
+        value,
+        valueLabel: option?.label || value,
+      },
+    ];
+  });
+}
+
 function filteredTypeIdsForSelection(selection) {
   return baseTypeIdsForSelection(selection).filter((typeId) =>
     typeMatchesFilters(typeId, selection.filters),
@@ -154,6 +173,14 @@ export function effectiveTypeIdsForPracticeSelection(selection) {
   return filteredTypeIdsForSelection(normalizePracticeSelection(selection));
 }
 
+export function matchingPracticeTypeIdsForCategory(selection, categoryId) {
+  const category = CATEGORY_BY_ID.get(categoryId);
+  if (!category) return [];
+  const normalized = normalizePracticeSelection(selection);
+  const selectedTypeIds = normalized.selectedTypeIdsByCategory[categoryId] || category.typeIds;
+  return selectedTypeIds.filter((typeId) => typeMatchesFilters(typeId, normalized.filters));
+}
+
 export function togglePracticeCategorySelection(selection, categoryId) {
   const category = CATEGORY_BY_ID.get(categoryId);
   if (!category) return normalizePracticeSelection(selection);
@@ -211,6 +238,24 @@ export function togglePracticeTypeSelection(selection, typeId) {
     },
   };
   return filteredTypeIdsForSelection(next).length ? next : normalized;
+}
+
+export function addPracticeTypeSelection(selection, typeId) {
+  const category = practiceCategoryForType(typeId);
+  if (!category) return normalizePracticeSelection(selection);
+  const normalized = normalizePracticeSelection(selection);
+  if (practiceFilterConflictsForType(typeId, normalized.filters).length) return normalized;
+  const selectedCategoryIds = PRACTICE_CATEGORIES.map((item) => item.id).filter(
+    (id) => normalized.selectedCategoryIds.includes(id) || id === category.id,
+  );
+  return {
+    ...normalized,
+    selectedCategoryIds,
+    selectedTypeIdsByCategory: {
+      ...normalized.selectedTypeIdsByCategory,
+      [category.id]: [typeId],
+    },
+  };
 }
 
 export function practiceSelectionForCategory(categoryId, selection = null) {
