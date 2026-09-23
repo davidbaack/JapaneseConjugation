@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IconCheck, IconRefresh, IconSpark, IconX } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
-import { getTypeInfo } from '../data/conjugationTypes.js';
+import { ALL_CARD_TYPES, EVERYDAY_TYPE_IDS, getTypeInfo } from '../data/conjugationTypes.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
@@ -15,7 +15,7 @@ import {
   guideGroupOptions,
 } from '../utils/guidePractice.js';
 import { exerciseMeaningForWord, formDisplay } from '../utils/display.js';
-import { wordKey } from '../utils/conjugator.js';
+import { conjugateItem, isTypeCompatible, wordKey } from '../utils/conjugator.js';
 import { ANSWER_OUTCOME, answerOutcomeCopy } from '../utils/answerFeedbackCopy.js';
 import { groupDisplayLabel } from '../utils/groupDisplay.js';
 
@@ -164,6 +164,7 @@ export default function GuideView() {
     [allWords, builtInWords, practicePrefs, state.cards, wordLists],
   );
   const [activeGuideFocus, setActiveGuideFocus] = useState(null);
+  const [guideTargetType, setGuideTargetType] = useState('');
   const guideWords = useMemo(() => {
     const focusedWord = activeGuideFocus?.word || guideFocus?.word;
     if (!focusedWord || filteredWords.some((word) => wordKey(word) === wordKey(focusedWord))) {
@@ -190,10 +191,22 @@ export default function GuideView() {
   const continueButtonRef = useRef(null);
   const recapRef = useRef(null);
 
+  const guideTypeOptions = useMemo(() => {
+    const enabledTypes = state.enabledTypes?.length ? state.enabledTypes : EVERYDAY_TYPE_IDS;
+    const enabled = new Set(enabledTypes);
+    return ALL_CARD_TYPES.filter(
+      (type) =>
+        enabled.has(type.id) &&
+        guideWords.some((word) => isTypeCompatible(word, type.id) && conjugateItem(word, type.id)),
+    );
+  }, [guideWords, state.enabledTypes]);
+
   const guideCardOptions = useCallback(
     (options = {}) => {
       const focus = activeGuideFocus || guideFocus;
-      if (!focus?.word || !focus?.type) return options;
+      if (!focus?.word || !focus?.type) {
+        return guideTargetType ? { ...options, targetTypeId: guideTargetType } : options;
+      }
       return {
         ...options,
         targetWord: focus.word,
@@ -202,7 +215,7 @@ export default function GuideView() {
         sourceForm: focus.sourceForm,
       };
     },
-    [activeGuideFocus, guideFocus],
+    [activeGuideFocus, guideFocus, guideTargetType],
   );
 
   function resetForCard(nextCard) {
@@ -415,7 +428,24 @@ export default function GuideView() {
     completedFocusRef.current = '';
     setCompleted(0);
     setCorrect(0);
-    resetForCard(buildGuideCard(filteredWords, state, practicePrefs, { seed: Date.now() }));
+    resetForCard(
+      buildGuideCard(filteredWords, state, practicePrefs, {
+        seed: Date.now(),
+        ...(guideTargetType ? { targetTypeId: guideTargetType } : {}),
+      }),
+    );
+  }
+
+  function chooseGuideTarget(typeId) {
+    setGuideTargetType(typeId);
+    setCompleted(0);
+    setCorrect(0);
+    resetForCard(
+      buildGuideCard(guideWords, state, practicePrefs, {
+        seed: Date.now(),
+        ...(typeId ? { targetTypeId: typeId } : {}),
+      }),
+    );
   }
 
   if (!guideWords.length) {
@@ -484,7 +514,25 @@ export default function GuideView() {
               Build the conjugation step by step.
             </h2>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs">
+          <div className="flex flex-wrap items-end gap-2 text-xs">
+            {!activeGuideFocus && (
+              <label className="flex flex-col gap-1 font-semibold text-stone-600 dark:text-stone-300">
+                <span>Practice form</span>
+                <select
+                  aria-label="Practice form"
+                  value={guideTargetType}
+                  onChange={(event) => chooseGuideTarget(event.target.value)}
+                  className="min-h-9 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-sm font-semibold text-stone-800 outline-none transition focus:border-indigo-400 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100"
+                >
+                  <option value="">Mixed from Practice</option>
+                  {guideTypeOptions.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <span
               aria-label={`Card ${currentCardNumber} of ${GUIDE_SESSION_TARGET}`}
               role="status"

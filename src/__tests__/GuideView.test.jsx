@@ -48,6 +48,21 @@ function renderFocusedGuide() {
   return { setState, state };
 }
 
+function renderGuide(enabledTypes = ['plain-negative', 'plain-past']) {
+  const state = { ...defaultState(), enabledTypes };
+  mockedApp.value = {
+    allWords: [NERU],
+    builtInWords: [NERU],
+    clearGuideFocus: vi.fn(),
+    guideFocus: null,
+    practicePrefs: DEFAULT_PREFS,
+    setState: vi.fn(),
+    state,
+    wordLists: [],
+  };
+  render(<GuideView />);
+}
+
 describe('Guide step result copy', () => {
   it('shows the learner and expected values for a missed step', () => {
     render(
@@ -87,6 +102,20 @@ describe('Guide step result copy', () => {
 });
 
 describe('Guide gated walkthrough', () => {
+  it('lets the learner choose one exact form for Guide cards', async () => {
+    renderGuide();
+
+    const formSelect = await screen.findByLabelText('Practice form');
+    expect(screen.getByRole('option', { name: 'Mixed from Practice' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Plain Negative' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Plain Past' })).toBeTruthy();
+
+    fireEvent.change(formSelect, { target: { value: 'plain-past' } });
+
+    expect(formSelect.value).toBe('plain-past');
+    expect(screen.getByText('Make: Plain Past')).toBeTruthy();
+  });
+
   it('keeps a missed plain-form step locked until the learner types the correction', async () => {
     renderFocusedGuide();
 
