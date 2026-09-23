@@ -11,6 +11,9 @@ const MAX_TEXT_CHARS = readPositiveNumber('GEMINI_MAX_TEXT_CHARS', 12000);
 const MAX_OUTPUT_TOKENS = readPositiveNumber('GEMINI_MAX_OUTPUT_TOKENS', 1200);
 const RATE_LIMIT_BURST = readPositiveNumber('GEMINI_RATE_LIMIT_BURST', 10);
 const RATE_LIMIT_REFILL_MS = readPositiveNumber('GEMINI_RATE_LIMIT_REFILL_MS', 6000);
+// Pin the provider contract used below. The auto-updating Flash-Lite alias can
+// move to a new model generation whose generationConfig schema is incompatible.
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
 type Bucket = {
   tokens: number;
@@ -233,7 +236,7 @@ Deno.serve(async (req) => {
       return jsonResponse(req, { error: result.error }, result.status);
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const response = await fetch(geminiUrl, {
       method: 'POST',
       headers: {

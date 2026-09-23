@@ -92,6 +92,13 @@ describe('static coverage configuration', () => {
     expect(proxy).toContain('ALLOWED_ORIGIN=* requires GEMINI_ALLOW_PUBLIC_ORIGIN=true');
   });
 
+  it('pins the Gemini proxy to the generation its request schema targets', () => {
+    const proxy = readRepoText('supabase/functions/gemini-proxy/index.ts');
+
+    expect(proxy).toContain("const GEMINI_MODEL = 'gemini-2.5-flash-lite'");
+    expect(proxy).not.toContain('gemini-flash-lite-latest');
+  });
+
   it('runtime-caches the sentence corpus without precaching every chunk', () => {
     const config = readRepoText('vite.config.js');
 
