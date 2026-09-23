@@ -95,8 +95,10 @@ describe('static coverage configuration', () => {
   it('pins the Gemini proxy to the generation its request schema targets', () => {
     const proxy = readRepoText('supabase/functions/gemini-proxy/index.ts');
 
-    expect(proxy).toContain("const GEMINI_MODEL = 'gemini-2.5-flash-lite'");
+    expect(proxy).toContain("const GEMINI_MODEL = 'gemini-3.5-flash-lite'");
     expect(proxy).not.toContain('gemini-flash-lite-latest');
+    expect(proxy).toContain("thinkingConfig: { thinkingLevel: 'MINIMAL' }");
+    expect(proxy).not.toContain('temperature: clampNumber');
   });
 
   it('runtime-caches the sentence corpus without precaching every chunk', () => {

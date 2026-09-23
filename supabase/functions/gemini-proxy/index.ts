@@ -13,7 +13,7 @@ const RATE_LIMIT_BURST = readPositiveNumber('GEMINI_RATE_LIMIT_BURST', 10);
 const RATE_LIMIT_REFILL_MS = readPositiveNumber('GEMINI_RATE_LIMIT_REFILL_MS', 6000);
 // Pin the provider contract used below. The auto-updating Flash-Lite alias can
 // move to a new model generation whose generationConfig schema is incompatible.
-const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 type Bucket = {
   tokens: number;
@@ -137,8 +137,9 @@ function sanitizeGenerationConfig(value: unknown) {
   const config = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   return {
     maxOutputTokens: Math.floor(clampNumber(config.maxOutputTokens, 600, 1, MAX_OUTPUT_TOKENS)),
-    temperature: clampNumber(config.temperature, 0.7, 0, 1),
-    thinkingConfig: { thinkingBudget: 0 },
+    // Gemini 3.x rejects the legacy numeric thinking budget used by 2.5.
+    // Flash-Lite's minimal level preserves the low-latency coaching behavior.
+    thinkingConfig: { thinkingLevel: 'MINIMAL' },
   };
 }
 
