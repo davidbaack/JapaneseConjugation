@@ -5,7 +5,9 @@ import {
   applyGuideAttemptToState,
   buildGuideDiagnosticInsight,
   buildGuideCard,
+  gradeGuideStep,
   gradeGuideSteps,
+  guideResultFromSteps,
   guideGroupChoice,
   guideGroupOptions,
 } from '../utils/guidePractice.js';
@@ -114,6 +116,30 @@ describe('guide practice engine', () => {
     expect(result.steps.answer.correct).toBe(true);
   });
 
+  it('keeps a missed first response immutable after the correction matches', () => {
+    const card = buildGuideCard(
+      [NERU],
+      { ...defaultState(), enabledTypes: ['plain-negative'] },
+      DEFAULT_PREFS,
+      { sourceTypeId: 'dictionary' },
+    );
+    const missedBase = gradeGuideStep(card, 'base', 'taberu');
+    const correctedBase = gradeGuideStep(card, 'base', 'neru');
+    const steps = {
+      base: missedBase,
+      group: gradeGuideStep(card, 'group', 'ichidan'),
+      answer: gradeGuideStep(card, 'answer', 'nenai'),
+    };
+
+    expect(missedBase.correct).toBe(false);
+    expect(missedBase.submitted).toBe('taberu');
+    expect(correctedBase.correct).toBe(true);
+    expect(guideResultFromSteps(steps)).toMatchObject({
+      correct: false,
+      steps: { base: { correct: false, submitted: 'taberu' } },
+    });
+  });
+
   it('grades all three steps correctly for adjectives', () => {
     const card = buildGuideCard(
       [SHIZUKA],
@@ -175,6 +201,38 @@ describe('guide practice engine', () => {
         answer: { correct: true, assisted: false },
       },
     });
+  });
+
+  it('uses one persisted identity across every credited Guide projection and rejects replay', () => {
+    const state = { ...defaultState(), enabledTypes: ['plain-past'] };
+    const card = buildGuideCard([TABERU], state, DEFAULT_PREFS);
+    const result = gradeGuideSteps(card, {
+      base: 'taberu',
+      group: 'godan',
+      answer: 'tabeta',
+    });
+    const options = { responseMs: 1200, now: 1000, eventId: 'guide-answer-a' };
+    const next = applyGuideAttemptToState(state, card, result, options);
+    const rid = cardIdFor(TABERU, 'plain-past');
+    expect(next.cards[rid].lastAttemptId).toBe(options.eventId);
+    expect(next.practiceStats.recent[0].id).toBe(options.eventId);
+    expect(next.guide.recent[0].id).toBe(options.eventId);
+    expect(next.session.recentOutcomes[0].id).toBe(options.eventId);
+    expect(next.readiness.byRule[rid].speed.lastAttemptId).toBe(options.eventId);
+    expect(Object.values(next.weakness.byLane)[0].recent[0].id).toBe(options.eventId);
+    expect(next.guide.recent[0].steps.group.correct).toBe(false);
+    const reloaded = JSON.parse(JSON.stringify(next));
+    expect(applyGuideAttemptToState(reloaded, card, result, options)).toBe(reloaded);
+    const distinct = applyGuideAttemptToState(reloaded, card, result, {
+      ...options,
+      eventId: 'guide-answer-b',
+    });
+    expect(distinct.guide.attempted).toBe(2);
+    expect(distinct.practiceStats.lifetime.attempted).toBe(2);
+    expect(distinct.guide.recent.map((attempt) => attempt.id)).toEqual([
+      'guide-answer-b',
+      'guide-answer-a',
+    ]);
   });
 
   it('records an incorrect completed card without advancing the Practice interval', () => {

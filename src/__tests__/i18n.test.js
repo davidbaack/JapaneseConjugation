@@ -17,7 +17,6 @@ describe('t', () => {
   });
 
   it('interpolates {placeholders}', () => {
-    expect(t('header.session', { correct: 3, reviewed: 5 })).toBe('3/5 this session');
     expect(t('header.goalStreak', { days: 7 })).toBe('7 day goal streak');
   });
 

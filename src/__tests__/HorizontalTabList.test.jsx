@@ -3,7 +3,8 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import HorizontalTabList, { horizontalEdges } from '../components/HorizontalTabList.jsx';
+import HorizontalTabList from '../components/HorizontalTabList.jsx';
+import { horizontalEdges } from '../utils/horizontalScroll.js';
 
 function defineMetric(element, name, value, writable = false) {
   Object.defineProperty(element, name, { configurable: true, value, writable });

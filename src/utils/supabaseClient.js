@@ -14,6 +14,22 @@ function responseError(body, status) {
   });
 }
 
+function abortableRequest(run) {
+  let signal;
+  let promise;
+  const query = {
+    abortSignal(nextSignal) {
+      signal = nextSignal;
+      return query;
+    },
+    then(resolve, reject) {
+      promise ||= run(signal);
+      return promise.then(resolve, reject);
+    },
+  };
+  return query;
+}
+
 export function createSupabaseClient(url, anonKey) {
   const auth = new AuthClient({
     url: `${url}/auth/v1`,
@@ -27,13 +43,16 @@ export function createSupabaseClient(url, anonKey) {
 
   /**
    * @param {string} path
-   * @param {{ method?: string, body?: any, headers?: Record<string, string> }} [options]
+   * @param {{ method?: string, body?: any, headers?: Record<string, string>, signal?: AbortSignal }} [options]
    */
-  async function request(path, { method = 'GET', body, headers = {} } = {}) {
+  async function request(path, { method = 'GET', body, headers = {}, signal } = {}) {
+    signal?.throwIfAborted();
     const { data } = await auth.getSession();
+    signal?.throwIfAborted();
     const token = data.session?.access_token || anonKey;
     const response = await fetch(`${url}/rest/v1/${path}`, {
       method,
+      ...(signal ? { signal } : {}),
       headers: {
         apikey: anonKey,
         Authorization: `Bearer ${token}`,
@@ -46,7 +65,9 @@ export function createSupabaseClient(url, anonKey) {
     let value = null;
     try {
       value = await response.json();
-    } catch {}
+    } catch {
+      signal?.throwIfAborted();
+    }
     return response.ok
       ? { data: value, error: null }
       : { data: null, error: responseError(value, response.status) };
@@ -60,19 +81,21 @@ export function createSupabaseClient(url, anonKey) {
           return {
             eq(column, value) {
               return {
-                async maybeSingle() {
+                maybeSingle() {
                   const query = new globalThis.URLSearchParams({
                     select: columns,
                     [column]: `eq.${value}`,
                     limit: '1',
                   });
-                  const result = await request(`${table}?${query}`);
-                  return result.error
-                    ? result
-                    : {
-                        data: Array.isArray(result.data) ? result.data[0] || null : null,
-                        error: null,
-                      };
+                  return abortableRequest(async (signal) => {
+                    const result = await request(`${table}?${query}`, { signal });
+                    return result.error
+                      ? result
+                      : {
+                          data: Array.isArray(result.data) ? result.data[0] || null : null,
+                          error: null,
+                        };
+                  });
                 },
               };
             },
@@ -81,7 +104,9 @@ export function createSupabaseClient(url, anonKey) {
       };
     },
     rpc(name, params) {
-      return request(`rpc/${name}`, { method: 'POST', body: params });
+      return abortableRequest((signal) =>
+        request(`rpc/${name}`, { method: 'POST', body: params, signal }),
+      );
     },
   };
 }

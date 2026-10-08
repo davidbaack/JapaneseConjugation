@@ -1,11 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { IconVolume, IconCloud, IconRefresh } from '../components/Icons.jsx';
-import { mergeState, normalizeWordLists } from '../utils/storage.js';
-import {
-  mergePracticePrefs,
-  resolveDisplayScripts,
-  scriptModeFromDisplay,
-} from '../utils/display.js';
+import { resolveDisplayScripts, scriptModeFromDisplay } from '../utils/display.js';
 import { speakJapanese } from '../utils/speech.js';
 import { serializeBackup, parseBackup } from '../utils/backup.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
@@ -54,17 +49,19 @@ const RESET_ACTIONS = [
 export default function SettingsView() {
   const {
     state,
-    setState,
     customVerbs,
-    setCustomVerbs,
     customAdjectives,
-    setCustomAdjectives,
     wordLists,
-    setWordLists,
     session,
     syncStatus,
     syncNow,
     resetLearnerData,
+    restoreBackup,
+    recoveryBackup,
+    restoreBusy,
+    restoreStatus,
+    dataRecoveryError,
+    localPersistenceBlocked,
     practicePrefs,
     setPracticePrefs,
     speechVoices,
@@ -75,6 +72,7 @@ export default function SettingsView() {
     supabaseError,
     showAuth: onShowAuth,
   } = useApp();
+  const exportBlocked = localPersistenceBlocked ?? !!dataRecoveryError;
   const [pendingReset, setPendingReset] = useState(null);
   const [factoryConfirm, setFactoryConfirm] = useState('');
   const [resetBusy, setResetBusy] = useState('');
@@ -84,12 +82,34 @@ export default function SettingsView() {
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importErr, setImportErr] = useState('');
+  const [stagedBackup, setStagedBackup] = useState(null);
   const [msg, setMsg] = useState('');
-  const [copyOk, setCopyOk] = useState(false);
+  const [transferNotice, setTransferNotice] = useState('');
+  const previewHeadingRef = useRef(null);
+  const importInputRef = useRef(null);
+  const restoreStatusRef = useRef(null);
+  const finishedRestoreRef = useRef(false);
+
+  useEffect(() => {
+    if (stagedBackup) previewHeadingRef.current?.focus();
+  }, [stagedBackup]);
+  useEffect(() => {
+    if (!importOpen && finishedRestoreRef.current && restoreStatusRef.current) {
+      restoreStatusRef.current.focus();
+      finishedRestoreRef.current = false;
+    }
+  }, [importOpen, restoreStatus]);
 
   const exportData = useMemo(
-    () => serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
-    [state, customVerbs, customAdjectives, wordLists, practicePrefs],
+    () =>
+      exportBlocked
+        ? ''
+        : serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
+    [state, customVerbs, customAdjectives, wordLists, practicePrefs, exportBlocked],
+  );
+  const recoveryIsBackup = useMemo(
+    () => !!recoveryBackup && parseBackup(recoveryBackup).ok,
+    [recoveryBackup],
   );
 
   function toggleDisplayScript(id) {
@@ -103,36 +123,73 @@ export default function SettingsView() {
     });
   }
 
-  async function copyExport() {
+  async function copyBackup(text, recovery = false) {
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(exportData);
-        setCopyOk(true);
-        setTimeout(() => setCopyOk(false), 2000);
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard unavailable');
       }
-    } catch {}
+      await navigator.clipboard.writeText(text);
+      setTransferNotice(recovery ? 'Recovery backup copied.' : 'Backup copied.');
+    } catch {
+      setTransferNotice(
+        recovery
+          ? 'Clipboard is unavailable. Download the recovery copy instead.'
+          : 'Clipboard is unavailable. Download the backup or select and copy the JSON.',
+      );
+    }
   }
 
-  function doImport() {
+  function downloadBackup(text, recovery = false, savedRecovery = false) {
+    let url;
+    try {
+      url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `katachiya-${savedRecovery ? 'saved-recovery-' : recovery ? 'before-restore-' : 'backup-'}${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTransferNotice(
+        recovery ? 'Recovery backup download started.' : 'Backup download started.',
+      );
+    } catch {
+      setTransferNotice('Download could not start. Copy the backup instead.');
+    } finally {
+      if (url) setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+  }
+
+  function checkImport() {
     setImportErr('');
-    const { ok, error, data } = parseBackup(importText);
-    if (!ok) {
-      setImportErr('Invalid: ' + error);
+    const checked = parseBackup(importText);
+    if (!checked.ok) {
+      setStagedBackup(null);
+      setImportErr(`Backup not accepted: ${checked.error}. Your learner data has not changed.`);
       return;
     }
-    setState(mergeState(data.state, { reviewed: 0, correct: 0 }));
-    if (Array.isArray(data.customVerbs)) setCustomVerbs(data.customVerbs);
-    if (Array.isArray(data.customAdjectives)) setCustomAdjectives(data.customAdjectives);
-    if (Array.isArray(data.wordLists)) setWordLists(normalizeWordLists(data.wordLists));
-    if (data.practicePrefs) setPracticePrefs(mergePracticePrefs(data.practicePrefs));
-    setImportText('');
-    setImportOpen(false);
-    setMsg('Restored!');
-    setTimeout(() => setMsg(''), 3000);
+    setStagedBackup({
+      text: importText,
+      summary: checked.summary,
+      warnings: checked.warnings || [],
+    });
+  }
+
+  async function doImport() {
+    if (!stagedBackup || restoreBusy || stagedBackup.text !== importText) return;
+    setImportErr('');
+    try {
+      await restoreBackup(stagedBackup.text);
+      finishedRestoreRef.current = true;
+      setStagedBackup(null);
+      setImportText('');
+      setImportOpen(false);
+    } catch (error) {
+      setImportErr(error.message || 'Restore did not complete. Your learner data has not changed.');
+    }
   }
 
   async function runReset(action) {
-    if (!action || resetBusy) return;
+    if (!action || resetBusy || restoreBusy) return;
     setResetErr('');
     setResetBusy(action.id);
     try {
@@ -435,6 +492,7 @@ export default function SettingsView() {
             <div className="flex gap-2">
               <button
                 onClick={syncNow}
+                disabled={restoreBusy || syncStatus.kind === 'syncing'}
                 className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition"
               >
                 {syncStatus.kind === 'error' ? 'Retry Sync' : 'Sync Now'}
@@ -443,6 +501,7 @@ export default function SettingsView() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-stone-600">Local progress is preserved.</span>
                   <button
+                    disabled={restoreBusy}
                     onClick={async () => {
                       setConfirmSignOut(false);
                       await supabase.auth.signOut();
@@ -461,6 +520,7 @@ export default function SettingsView() {
               ) : (
                 <button
                   onClick={() => setConfirmSignOut(true)}
+                  disabled={restoreBusy}
                   className="px-4 py-2 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-sm font-medium transition"
                 >
                   Sign Out
@@ -471,7 +531,10 @@ export default function SettingsView() {
         )}
       </div>
 
-      <details className="rounded-2xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+      <details
+        open={dataRecoveryError ? true : undefined}
+        className="rounded-2xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900"
+      >
         <summary className="cursor-pointer px-5 py-4">
           <span className="block font-medium text-stone-800 dark:text-stone-200">
             Data &amp; account
@@ -485,7 +548,66 @@ export default function SettingsView() {
             <h3 className="font-medium mb-1 text-stone-800 dark:text-stone-200">
               Backup & restore
             </h3>
-            <p className="text-xs text-stone-600 mb-3">Manual JSON transfer without cloud sync.</p>
+            <p className="text-xs text-stone-600 mb-3">
+              Save or replace your progress, preferences, custom words, and saved lists. Backups do
+              not contain your login credentials or recent Check inputs.
+            </p>
+            {dataRecoveryError && (
+              <div
+                role="alert"
+                className="mb-3 rounded-lg border border-rose-200 p-3 text-sm text-rose-700 dark:border-rose-900 dark:text-rose-300"
+              >
+                <p>{dataRecoveryError}</p>
+                <p className="mt-1">
+                  {exportBlocked
+                    ? 'Export is unavailable while saved data cannot be read. Download the saved recovery data before choosing a replacement; this file may need repair before import.'
+                    : 'Your local progress can be exported. Download a backup before choosing which learner snapshot to restore.'}
+                </p>
+                <button
+                  type="button"
+                  className="mt-2 rounded border border-current px-3 py-2"
+                  onClick={async () => {
+                    try {
+                      const { serializeSavedRecoveryData } =
+                        await import('../utils/localJournal.js');
+                      downloadBackup(serializeSavedRecoveryData(), true, true);
+                    } catch {
+                      setTransferNotice(
+                        'Saved recovery data could not be read. Keep this browser open.',
+                      );
+                    }
+                  }}
+                >
+                  Download saved recovery data
+                </button>
+              </div>
+            )}
+            {restoreStatus?.kind && restoreStatus.kind !== 'idle' && (
+              <div
+                ref={restoreStatusRef}
+                tabIndex={-1}
+                role={restoreStatus.kind === 'error' ? 'alert' : 'status'}
+                aria-live="polite"
+                className={`mb-3 rounded-lg border p-3 text-sm ${
+                  restoreStatus.kind === 'ok'
+                    ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
+                    : 'border-amber-200 text-amber-800 dark:border-amber-900 dark:text-amber-300'
+                }`}
+              >
+                <p>{restoreStatus.message}</p>
+                {restoreStatus.detail && <p className="mt-1 text-xs">{restoreStatus.detail}</p>}
+                {restoreStatus.kind === 'pending' && session && (
+                  <button
+                    type="button"
+                    onClick={syncNow}
+                    disabled={restoreBusy || syncStatus.kind === 'syncing'}
+                    className="mt-2 rounded-lg border border-current px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+                  >
+                    Retry cloud sync
+                  </button>
+                )}
+              </div>
+            )}
             <div role="status" aria-live="polite">
               {msg && (
                 <div className="mb-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
@@ -498,7 +620,9 @@ export default function SettingsView() {
                 onClick={() => {
                   setExportOpen(!exportOpen);
                   setImportOpen(false);
+                  setStagedBackup(null);
                 }}
+                disabled={restoreBusy || exportBlocked}
                 aria-expanded={exportOpen}
                 className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
                   exportOpen
@@ -513,7 +637,9 @@ export default function SettingsView() {
                   setImportOpen(!importOpen);
                   setExportOpen(false);
                   setImportErr('');
+                  setStagedBackup(null);
                 }}
+                disabled={restoreBusy}
                 aria-expanded={importOpen}
                 className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
                   importOpen
@@ -524,7 +650,7 @@ export default function SettingsView() {
                 Import
               </button>
             </div>
-            {exportOpen && (
+            {exportOpen && !exportBlocked && (
               <div className="mt-3 space-y-2">
                 <textarea
                   aria-label="Backup export JSON"
@@ -534,21 +660,30 @@ export default function SettingsView() {
                   className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg"
                 />
                 <button
-                  onClick={copyExport}
+                  onClick={() => downloadBackup(exportData)}
                   className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"
                 >
-                  {copyOk ? 'Copied' : 'Copy to clipboard'}
+                  Download backup
+                </button>
+                <button
+                  onClick={() => copyBackup(exportData)}
+                  className="w-full py-2 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 rounded-lg text-sm font-medium"
+                >
+                  Copy to clipboard
                 </button>
               </div>
             )}
             {importOpen && (
               <div className="mt-3 space-y-2">
                 <textarea
+                  ref={importInputRef}
                   value={importText}
                   onChange={(e) => {
                     setImportText(e.target.value);
                     setImportErr('');
+                    setStagedBackup(null);
                   }}
+                  disabled={restoreBusy}
                   placeholder="Paste backup JSON..."
                   aria-label="Paste backup JSON to restore"
                   className="w-full h-32 px-3 py-2 text-xs font-mono border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
@@ -556,21 +691,129 @@ export default function SettingsView() {
                   autoCapitalize="off"
                   spellCheck="false"
                 />
-                <div role="status" aria-live="polite">
-                  {importErr && <div className="text-sm text-rose-600">{importErr}</div>}
-                </div>
-                <p className="text-xs text-rose-600 dark:text-rose-400">
-                  Warning: Restoring replaces current progress.
-                </p>
-                <button
-                  onClick={doImport}
-                  disabled={!importText.trim()}
-                  className="w-full py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
-                >
-                  Restore
-                </button>
+                {importErr && (
+                  <div role="alert" className="text-sm text-rose-600">
+                    {importErr}
+                  </div>
+                )}
+                {!stagedBackup && (
+                  <button
+                    onClick={checkImport}
+                    disabled={!importText.trim() || restoreBusy}
+                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
+                  >
+                    Check backup
+                  </button>
+                )}
+                {stagedBackup && (
+                  <section
+                    aria-label="Backup preview"
+                    className="space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950"
+                  >
+                    <h4
+                      ref={previewHeadingRef}
+                      tabIndex={-1}
+                      className="font-medium text-stone-800 dark:text-stone-200"
+                    >
+                      Review backup
+                    </h4>
+                    <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-stone-700 dark:text-stone-300">
+                      {[
+                        [
+                          'Exported',
+                          stagedBackup.summary.exportedAt
+                            ? new Date(stagedBackup.summary.exportedAt).toLocaleString()
+                            : 'Date unavailable',
+                        ],
+                        ['Saved card histories', stagedBackup.summary.cards],
+                        ['Practice attempts', stagedBackup.summary.practiceAttempts],
+                        ['Guide attempts', stagedBackup.summary.guideAttempts],
+                        ['Custom words', stagedBackup.summary.customWords],
+                        ['Saved lists', stagedBackup.summary.lists],
+                      ].map(([label, value]) => (
+                        <React.Fragment key={label}>
+                          <dt>{label}</dt>
+                          <dd className="text-right break-words">{value}</dd>
+                        </React.Fragment>
+                      ))}
+                    </dl>
+                    {stagedBackup.warnings.length > 0 && (
+                      <div className="text-xs text-amber-800 dark:text-amber-300">
+                        <p className="font-medium">Older backup limitations</p>
+                        <ul className="mt-1 list-disc space-y-1 pl-4">
+                          {stagedBackup.warnings.map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <p className="text-xs text-rose-700 dark:text-rose-300">
+                      This replaces progress, preferences, custom words, and saved lists in this
+                      browser.{' '}
+                      {session
+                        ? 'The replacement will also sync to your signed-in cloud account.'
+                        : 'If you connect this browser to a cloud account later, the replacement will sync then.'}{' '}
+                      Your login stays the same. A recovery backup of your current data is saved
+                      before replacement.
+                    </p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button
+                        onClick={doImport}
+                        disabled={restoreBusy || !!resetBusy}
+                        className="flex-1 rounded-lg bg-rose-600 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-40"
+                      >
+                        {restoreBusy ? 'Restoring…' : 'Replace learner data'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setStagedBackup(null);
+                          setImportErr('');
+                          importInputRef.current?.focus();
+                        }}
+                        disabled={restoreBusy}
+                        className="rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-800 disabled:opacity-40"
+                      >
+                        Cancel restore
+                      </button>
+                    </div>
+                  </section>
+                )}
               </div>
             )}
+            {recoveryBackup && (
+              <div className="mt-4 space-y-2 rounded-xl border border-stone-200 p-3 dark:border-stone-800">
+                <h4 className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                  {recoveryIsBackup ? 'Backup before last restore' : 'Saved data recovery copy'}
+                </h4>
+                <p className="text-xs text-stone-600 dark:text-stone-400">
+                  {recoveryIsBackup
+                    ? 'Download this recovery backup to return to the learner data saved before your last restore.'
+                    : 'This copy preserves saved data that could not be read. Keep it for recovery; it may need repair before it can be imported.'}{' '}
+                  Keep a separate file; this browser keeps only the most recent recovery copy.
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    onClick={() => downloadBackup(recoveryBackup, true)}
+                    className="rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-800"
+                  >
+                    {recoveryIsBackup ? 'Download recovery backup' : 'Download recovery copy'}
+                  </button>
+                  <button
+                    onClick={() => copyBackup(recoveryBackup, true)}
+                    className="rounded-lg border border-stone-200 px-3 py-2 text-sm dark:border-stone-800"
+                  >
+                    {recoveryIsBackup ? 'Copy recovery backup' : 'Copy recovery copy'}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-2 text-xs text-stone-600 dark:text-stone-400"
+            >
+              {transferNotice}
+            </div>
           </div>
 
           <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
@@ -629,7 +872,7 @@ export default function SettingsView() {
                             setPendingReset(action.id);
                             setFactoryConfirm('');
                           }}
-                          disabled={!!resetBusy}
+                          disabled={!!resetBusy || restoreBusy}
                           className={`w-full sm:w-auto px-3 py-1.5 rounded-lg text-sm font-medium border transition disabled:opacity-50 ${
                             action.danger
                               ? 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/20'
@@ -667,7 +910,7 @@ export default function SettingsView() {
                               <button
                                 type="button"
                                 onClick={() => runReset(action)}
-                                disabled={!canFactoryReset || !!resetBusy}
+                                disabled={!canFactoryReset || !!resetBusy || restoreBusy}
                                 className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
                               >
                                 {busy ? 'Resetting...' : 'Factory reset'}
@@ -678,7 +921,7 @@ export default function SettingsView() {
                                   setPendingReset(null);
                                   setFactoryConfirm('');
                                 }}
-                                disabled={!!resetBusy}
+                                disabled={!!resetBusy || restoreBusy}
                                 className="px-3 py-1.5 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 hover:bg-white dark:hover:bg-stone-900 rounded-lg text-sm font-medium disabled:opacity-50"
                               >
                                 Cancel
@@ -690,7 +933,7 @@ export default function SettingsView() {
                             <button
                               type="button"
                               onClick={() => runReset(action)}
-                              disabled={!!resetBusy}
+                              disabled={!!resetBusy || restoreBusy}
                               className="px-3 py-1.5 bg-stone-800 hover:bg-stone-950 dark:bg-indigo-600 dark:hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-sm font-medium"
                             >
                               {busy ? 'Resetting...' : `Yes, ${action.confirm.toLowerCase()}`}
@@ -698,7 +941,7 @@ export default function SettingsView() {
                             <button
                               type="button"
                               onClick={() => setPendingReset(null)}
-                              disabled={!!resetBusy}
+                              disabled={!!resetBusy || restoreBusy}
                               className="px-3 py-1.5 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-white dark:hover:bg-stone-900 rounded-lg text-sm font-medium disabled:opacity-50"
                             >
                               Cancel

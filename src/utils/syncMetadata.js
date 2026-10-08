@@ -1,6 +1,15 @@
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { reconcileDerivedProgressState } from './derivedProgress.js';
+import {
+  getProgressWriterId,
+  materializeProgressContributions,
+  mergeProgressContributions,
+  seedProgressContributions,
+  stampProgressContributions,
+  validateProgressContributionsState,
+} from './progressContributions.js';
 
-const SYNC_META_VERSION = 1;
+const SYNC_META_VERSION = 2;
 const DEVICE_STORAGE_KEY = 'katachiya_sync_device_id';
 
 const TRACKED_PREFIXES = {
@@ -8,7 +17,7 @@ const TRACKED_PREFIXES = {
   customVerbs: 'customVerbs.',
   customAdjectives: 'customAdjectives.',
   lists: 'lists.',
-  practiceScope: 'state.practiceScope',
+  practiceSelection: 'state.practiceSelection',
   enabledTypes: 'state.enabledTypes',
   excludedWords: 'state.reviewScope.excludedWordKeys.',
   excludedFamilies: 'state.reviewScope.excludedFormFamilyIds.',
@@ -22,7 +31,7 @@ const PROGRESS_FIELDS = [
   'mistakes',
   'readiness',
   'weakness',
-  'daily',
+  'practiceStats',
   'classify',
   'game',
   'onbin',
@@ -210,8 +219,8 @@ function trackedSnapshot(payload = {}) {
       values.set(`${TRACKED_PREFIXES.lists}${encode(list.id)}.members.${encode(key)}`, true);
     }
   }
-  if (payload.state?.practiceScope !== undefined) {
-    values.set(TRACKED_PREFIXES.practiceScope, payload.state.practiceScope);
+  if (payload.state?.practiceSelection !== undefined) {
+    values.set(TRACKED_PREFIXES.practiceSelection, payload.state.practiceSelection);
   }
   if (payload.state?.enabledTypes !== undefined) {
     values.set(TRACKED_PREFIXES.enabledTypes, payload.state.enabledTypes);
@@ -337,16 +346,30 @@ export function createSyncMeta(deviceId = getLocalSyncDeviceId()) {
     resetEpochs: {},
     guideCounters: {},
     guideCounterClocks: {},
+    guideCounterEpochs: {},
     pendingReset: null,
     legacyAdopted: false,
+    progressContributions: seedProgressContributions(),
   };
 }
 
 function normalizeMeta(meta, deviceId) {
+  if (meta?.version !== undefined && ![1, SYNC_META_VERSION].includes(meta.version)) {
+    throw Object.assign(new Error('Unsupported learner sync metadata version.'), {
+      code: 'LEARNER_DATA_INVALID',
+    });
+  }
   const base = createSyncMeta(deviceId || meta?.deviceId || getLocalSyncDeviceId());
+  const reset = newerClock(meta?.resetEpochs?.progress, meta?.resetEpochs?.factory);
+  const guideCounterEpochs =
+    meta?.guideCounterEpochs ||
+    Object.fromEntries(
+      Object.keys(meta?.guideCounters || {}).map((id) => [id, reset?.eventId || '']),
+    );
   return {
     ...base,
     ...(meta || {}),
+    version: SYNC_META_VERSION,
     deviceId: deviceId || meta?.deviceId || base.deviceId,
     revision: Math.max(0, Number(meta?.revision) || 0),
     clocks: { ...(meta?.clocks || {}) },
@@ -354,6 +377,7 @@ function normalizeMeta(meta, deviceId) {
     resetEpochs: { ...(meta?.resetEpochs || {}) },
     guideCounters: { ...(meta?.guideCounters || {}) },
     guideCounterClocks: { ...(meta?.guideCounterClocks || {}) },
+    guideCounterEpochs: { ...guideCounterEpochs },
     pendingReset: normalizePendingReset(meta?.pendingReset),
   };
 }
@@ -364,15 +388,57 @@ function normalizeMeta(meta, deviceId) {
  * @returns {any}
  */
 export function adoptSyncMetadata(payload = {}, deviceId = '') {
-  if (payload.syncMeta?.version === SYNC_META_VERSION) {
+  if (payload.syncMeta && ![1, SYNC_META_VERSION].includes(payload.syncMeta.version)) {
+    throw Object.assign(new Error('Unsupported learner sync metadata version.'), {
+      code: 'LEARNER_DATA_INVALID',
+    });
+  }
+  if ([1, SYNC_META_VERSION].includes(payload.syncMeta?.version)) {
+    const isLegacy = payload.syncMeta.version === 1;
+    if (!isLegacy && !payload.syncMeta.progressContributions)
+      throw Object.assign(
+        new Error(
+          'Progress sync evidence is missing. Export this browser data and restore the intended backup in Settings.',
+        ),
+        { code: 'LEARNER_DATA_INVALID' },
+      );
+    if (isLegacy && payload.state?.practiceStats?.recent?.some((row) => row?.id && row?.day))
+      throw Object.assign(
+        new Error(
+          'An older app copied newer progress without its sync evidence. Export this browser data, reload every app tab, then restore the intended backup in Settings.',
+        ),
+        { code: 'LEARNER_DATA_INVALID' },
+      );
     const meta = normalizeMeta(payload.syncMeta, deviceId || payload.syncMeta.deviceId);
-    const guide = payload.state?.guide
-      ? { ...payload.state.guide, recent: normalizeRecent(payload.state.guide.recent) }
-      : payload.state?.guide;
+    const repair = isLegacy
+      ? reconcileDerivedProgressState(payload.state)
+      : { state: payload.state, repaired: false };
+    const state = repair.state;
+    const contributions = isLegacy
+      ? seedProgressContributions(state, progressEpoch(meta), { legacyBaseline: true })
+      : validateProgressContributionsState(
+          state,
+          payload.syncMeta.progressContributions,
+          progressEpoch(meta),
+        );
+    if (!isLegacy)
+      validateProgressContributionsState(
+        reconcileDerivedProgressState(state).state,
+        contributions,
+        progressEpoch(meta),
+      );
+    const guide = state?.guide
+      ? { ...state.guide, recent: normalizeRecent(state.guide.recent) }
+      : state?.guide;
     return {
       ...payload,
-      state: { ...(payload.state || {}), ...(guide ? { guide } : {}) },
-      syncMeta: meta,
+      state: { ...(state || {}), ...(guide ? { guide } : {}) },
+      ...(repair.repaired ? { diagnosticRepairNeeded: true } : {}),
+      syncMeta: {
+        ...meta,
+        version: SYNC_META_VERSION,
+        progressContributions: contributions,
+      },
     };
   }
 
@@ -381,7 +447,7 @@ export function adoptSyncMetadata(payload = {}, deviceId = '') {
     customAdjectives: payload.customAdjectives,
     wordLists: payload.wordLists,
     practicePrefs: payload.practicePrefs,
-    practiceScope: payload.state?.practiceScope,
+    practiceSelection: payload.state?.practiceSelection,
     reviewScope: payload.state?.reviewScope,
   })}`;
   const clock = { deviceId: legacyDeviceId, revision: 1, eventId: `${legacyDeviceId}:adopt` };
@@ -394,12 +460,14 @@ export function adoptSyncMetadata(payload = {}, deviceId = '') {
       stableStringify(defaultPrefValues.get(path)) === stableStringify(value);
     if (!isUnchangedDefaultPref) clocks[path] = clock;
   }
-  const guide = payload.state?.guide
-    ? { ...payload.state.guide, recent: normalizeRecent(payload.state.guide.recent) }
-    : payload.state?.guide;
+  const repair = reconcileDerivedProgressState(payload.state);
+  const guide = repair.state?.guide
+    ? { ...repair.state.guide, recent: normalizeRecent(repair.state.guide.recent) }
+    : repair.state?.guide;
   return {
     ...payload,
-    state: { ...(payload.state || {}), ...(guide ? { guide } : {}) },
+    state: { ...(repair.state || {}), ...(guide ? { guide } : {}) },
+    ...(repair.repaired ? { diagnosticRepairNeeded: true } : {}),
     syncMeta: {
       ...createSyncMeta(deviceId || getLocalSyncDeviceId()),
       revision: 1,
@@ -407,6 +475,7 @@ export function adoptSyncMetadata(payload = {}, deviceId = '') {
       guideCounters: (Number(guide?.attempted) || 0) > 0 ? { legacy: guideTotals(guide) } : {},
       guideCounterClocks: (Number(guide?.attempted) || 0) > 0 ? { legacy: clock } : {},
       legacyAdopted: true,
+      progressContributions: seedProgressContributions(repair.state, '', { legacyBaseline: true }),
     },
   };
 }
@@ -421,7 +490,24 @@ export function stampSyncChanges(metaValue, before = {}, after = {}, options = {
   );
   const guideChange = guideDelta(before.state?.guide, after.state?.guide);
   const resetDomains = [...new Set(options.resetDomains || [])];
-  if (!changed.length && !hasGuideDelta(guideChange) && !resetDomains.length) {
+  const previousContributions =
+    meta.progressContributions || seedProgressContributions(before.state, progressEpoch(meta));
+  validateProgressContributionsState(before.state, previousContributions, progressEpoch(meta));
+  const progressContributions = stampProgressContributions(
+    previousContributions,
+    before.state,
+    after.state,
+    {
+      epoch: progressEpoch(meta),
+      writerId: options.writerId || `${meta.deviceId}:${getProgressWriterId()}`,
+    },
+  );
+  if (
+    !changed.length &&
+    !hasGuideDelta(guideChange) &&
+    !resetDomains.length &&
+    progressContributions === previousContributions
+  ) {
     return metaValue || meta;
   }
 
@@ -441,9 +527,21 @@ export function stampSyncChanges(metaValue, before = {}, after = {}, options = {
   const resetsGuide = resetDomains.includes('progress') || resetDomains.includes('factory');
   const guideCounters = resetsGuide ? {} : { ...meta.guideCounters };
   const guideCounterClocks = resetsGuide ? {} : { ...meta.guideCounterClocks };
+  const guideCounterEpochs = resetsGuide ? {} : { ...meta.guideCounterEpochs };
   if (hasGuideDelta(guideChange)) {
-    guideCounters[meta.deviceId] = addGuideTotals(guideCounters[meta.deviceId], guideChange);
+    const epoch = resetsGuide
+      ? clock.eventId
+      : resetClockForDomain(meta, 'progress')?.eventId || '';
+    // Suppressed components can remain in merged metadata. Seeing the new
+    // reset does not make their old totals valid again: this replica starts a
+    // fresh component in the observed epoch before recording its next answer.
+    const previousCounter =
+      (guideCounterEpochs[meta.deviceId] || '') === epoch
+        ? guideCounters[meta.deviceId]
+        : undefined;
+    guideCounters[meta.deviceId] = addGuideTotals(previousCounter, guideChange);
     guideCounterClocks[meta.deviceId] = clock;
+    guideCounterEpochs[meta.deviceId] = epoch;
   }
   const resetEpochs = { ...meta.resetEpochs };
   for (const domain of resetDomains) resetEpochs[domain] = clock;
@@ -474,8 +572,49 @@ export function stampSyncChanges(metaValue, before = {}, after = {}, options = {
     resetEpochs,
     guideCounters,
     guideCounterClocks,
+    guideCounterEpochs,
     pendingReset,
     legacyAdopted: true,
+    progressContributions: resetsGuide
+      ? seedProgressContributions(after.state, clock.eventId)
+      : progressContributions,
+  };
+}
+
+// A backup is an intentional replacement, so existing replica counters cannot
+// be reused. Seed the complete restored Guide totals after the replacement
+// epoch, including when they are lower than the browser's previous totals.
+export function buildRestoreSyncPayload(currentValue, restoredValue, ownerUserId = '') {
+  const current = adoptSyncMetadata(currentValue, getLocalSyncDeviceId());
+  const restored = { ...restoredValue, syncMeta: current.syncMeta };
+  const stamped = stampSyncChanges(current.syncMeta, current, restored, {
+    resetDomains: resetDomainsForKind('factory'),
+    pendingResetOwnerUserId: ownerUserId,
+  });
+  const clock = {
+    deviceId: stamped.deviceId,
+    revision: stamped.revision + 1,
+    eventId: createSyncEventId(),
+  };
+  const totals = guideTotals(restored.state?.guide);
+  const hasGuide = !!(
+    totals.attempted ||
+    totals.correct ||
+    totals.assisted ||
+    Object.values(totals.byStep).some((step) => step.attempted || step.correct || step.assisted)
+  );
+  return {
+    ...restored,
+    syncMeta: {
+      ...stamped,
+      revision: clock.revision,
+      guideCounters: hasGuide ? { [clock.deviceId]: totals } : {},
+      guideCounterClocks: hasGuide ? { [clock.deviceId]: clock } : {},
+      guideCounterEpochs: hasGuide
+        ? { [clock.deviceId]: resetClockForDomain(stamped, 'progress')?.eventId || '' }
+        : {},
+      progressContributions: seedProgressContributions(restored.state, progressEpoch(stamped)),
+    },
   };
 }
 
@@ -522,6 +661,24 @@ export function mergeSyncMetadata(leftValue, rightValue, deviceId = '') {
   };
   const clocks = {};
   const tombstones = {};
+  const guideCounterEpochs = {};
+  for (const id of new Set([
+    ...Object.keys(left.guideCounters || {}),
+    ...Object.keys(right.guideCounters || {}),
+  ])) {
+    const comparison = compareSyncClocks(
+      left.guideCounterClocks?.[id],
+      right.guideCounterClocks?.[id],
+    );
+    guideCounterEpochs[id] =
+      comparison > 0
+        ? left.guideCounterEpochs?.[id] || ''
+        : comparison < 0
+          ? right.guideCounterEpochs?.[id] || ''
+          : [left.guideCounterEpochs?.[id] || '', right.guideCounterEpochs?.[id] || '']
+              .sort()
+              .at(-1);
+  }
   const paths = new Set([
     ...Object.keys(left.clocks || {}),
     ...Object.keys(left.tombstones || {}),
@@ -545,6 +702,7 @@ export function mergeSyncMetadata(leftValue, rightValue, deviceId = '') {
     if (winner.kind === 'deleted') tombstones[path] = winner.clock;
     else if (winner.kind === 'live') clocks[path] = winner.clock;
   }
+  const resetEpochs = mergeClockMap(left.resetEpochs, right.resetEpochs);
   return {
     ...left,
     version: SYNC_META_VERSION,
@@ -552,10 +710,16 @@ export function mergeSyncMetadata(leftValue, rightValue, deviceId = '') {
     revision: Math.max(left.revision, right.revision),
     clocks,
     tombstones,
-    resetEpochs: mergeClockMap(left.resetEpochs, right.resetEpochs),
+    resetEpochs,
     guideCounters: mergeCounterMaps(left, right),
     guideCounterClocks: mergeClockMap(left.guideCounterClocks, right.guideCounterClocks),
+    guideCounterEpochs,
     legacyAdopted: !!(left.legacyAdopted || right.legacyAdopted),
+    progressContributions: mergeProgressContributions(
+      left.progressContributions,
+      right.progressContributions,
+      progressEpoch({ resetEpochs }),
+    ),
   };
 }
 
@@ -572,13 +736,17 @@ function domainForPath(path) {
   ) {
     return 'custom-content';
   }
-  if (path === TRACKED_PREFIXES.practiceScope || path === TRACKED_PREFIXES.enabledTypes)
+  if (path === TRACKED_PREFIXES.practiceSelection || path === TRACKED_PREFIXES.enabledTypes)
     return 'settings';
   return 'review';
 }
 
 function resetClockForDomain(meta, domain) {
   return newerClock(meta?.resetEpochs?.[domain], meta?.resetEpochs?.factory);
+}
+
+export function progressEpoch(meta) {
+  return resetClockForDomain(meta, 'progress')?.eventId || '';
 }
 
 function clockRevision(clock) {
@@ -673,6 +841,11 @@ export function rebaseSyncReset(payloadValue, observedValue, resetDomains = []) 
 
   const resetEpochs = { ...meta.resetEpochs };
   for (const domain of domains) resetEpochs[domain] = resetClock;
+  const rebasedProgressEpoch = progressEpoch({ resetEpochs });
+  const changesProgressLineage = rebasedProgressEpoch !== progressEpoch(meta);
+  if (changesProgressLineage) hasPostResetMutation = true;
+  const guideTotalsAfterReset = guideTotals(payload.state?.guide);
+  const rebasedGuideClock = { [meta.deviceId]: postResetClock };
   return {
     ...payload,
     syncMeta: {
@@ -681,7 +854,16 @@ export function rebaseSyncReset(payloadValue, observedValue, resetDomains = []) 
       clocks,
       tombstones,
       resetEpochs,
-      guideCounterClocks,
+      guideCounterClocks: changesProgressLineage ? rebasedGuideClock : guideCounterClocks,
+      guideCounters: changesProgressLineage
+        ? { [meta.deviceId]: guideTotalsAfterReset }
+        : meta.guideCounters,
+      guideCounterEpochs: changesProgressLineage
+        ? { [meta.deviceId]: rebasedProgressEpoch }
+        : meta.guideCounterEpochs,
+      progressContributions: changesProgressLineage
+        ? seedProgressContributions(payload.state, rebasedProgressEpoch)
+        : meta.progressContributions,
       pendingReset: pendingReset
         ? {
             ...pendingReset,
@@ -793,7 +975,7 @@ function materializeTracked(base, values) {
       if (kind === 'record') list.record = value;
       if (kind === 'members') list.members.push(decode(encodedMember));
       lists.set(id, list);
-    } else if (path === TRACKED_PREFIXES.practiceScope) next.state.practiceScope = value;
+    } else if (path === TRACKED_PREFIXES.practiceSelection) next.state.practiceSelection = value;
     else if (path === TRACKED_PREFIXES.enabledTypes) next.state.enabledTypes = value;
     else if (path.startsWith(TRACKED_PREFIXES.excludedWords))
       excludedWordKeys.push(decode(path.slice(TRACKED_PREFIXES.excludedWords.length)));
@@ -844,6 +1026,9 @@ function guideFromMeta(meta, localGuide, cloudGuide, progressWinner = '') {
   const resetClock = newerClock(meta.resetEpochs?.progress, meta.resetEpochs?.factory);
   for (const [deviceId, value] of Object.entries(meta.guideCounters || {})) {
     const counterClock = meta.guideCounterClocks?.[deviceId];
+    // A high Lamport revision does not prove that a device saw this reset.
+    // Pre-restore replicas must not contribute their entire old totals again.
+    if ((meta.guideCounterEpochs?.[deviceId] || '') !== (resetClock?.eventId || '')) continue;
     if (resetClock && compareSyncClocks(counterClock, resetClock) <= 0) continue;
     totals = addGuideTotals(totals, value);
   }
@@ -887,6 +1072,7 @@ export function mergeSyncSidecar(localValue, cloudValue, mergedBase, deviceId = 
     ...next.state,
     guide: guideFromMeta(syncMeta, local.state?.guide, cloud.state?.guide, progressWinner),
   };
+  next.state = materializeProgressContributions(next.state, syncMeta.progressContributions);
   return { ...next, syncMeta };
 }
 

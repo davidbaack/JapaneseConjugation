@@ -1,15 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
+import { seedProgressContributions } from '../utils/progressContributions.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import { EVERYDAY_TYPE_IDS } from '../data/conjugationTypes.js';
+import { PRACTICE_CATEGORIES } from '../data/practiceTaxonomy.js';
 import { buildSyncPayload, cardIdFor, defaultState } from '../utils/storage.js';
 import { excludeWordFromReviewState } from '../utils/reviewScope.js';
 import { buildLearnerResetPayload, commitLearnerResetPayload } from '../utils/learnerReset.js';
-import { practiceScopeFromEnabledTypes } from '../utils/practiceScope.js';
+import { practiceSelectionForTypeIds } from '../utils/practiceSelection.js';
+import { recordPracticeAnswer } from '../utils/practiceStats.js';
 import { commitCloudWithRetry } from '../hooks/useCloudAutoSync.js';
 import { adoptSyncMetadata, stampSyncChanges } from '../utils/syncMetadata.js';
 
 const WORD = { dict: 'taberu', reading: 'taberu', meaning: 'to eat', group: 'ichidan' };
 const CUSTOM_WORD = { dict: 'custom', reading: 'custom', meaning: 'custom', group: 'godan' };
+const CORE_FORM_TYPE_IDS = PRACTICE_CATEGORIES.find(
+  (category) => category.id === 'core-forms',
+).typeIds;
 
 function populatedParts() {
   const cardId = cardIdFor(WORD, 'plain-past');
@@ -17,7 +22,7 @@ function populatedParts() {
     {
       ...defaultState(),
       enabledTypes: ['plain-past'],
-      practiceScope: practiceScopeFromEnabledTypes(['plain-past']),
+      practiceSelection: practiceSelectionForTypeIds(['plain-past']),
       cards: {
         [cardId]: {
           reps: 3,
@@ -31,7 +36,11 @@ function populatedParts() {
       },
       verbStats: { taberu: { 'plain-past': { seen: 4, incorrect: 1 } } },
       mistakes: [{ key: 'miss', dict: 'taberu', group: 'ichidan', type: 'plain-past' }],
-      daily: { ...defaultState().daily, count: 12, goalHit: true },
+      practiceStats: recordPracticeAnswer(defaultState().practiceStats, {
+        typeId: 'plain-past',
+        correct: true,
+        mode: 'input',
+      }),
       game: { ...defaultState().game, played: 2, bestScore: 100 },
       minimalPairs: {
         bySet: {
@@ -53,12 +62,19 @@ function populatedParts() {
   return {
     state,
     customVerbs: [CUSTOM_WORD],
-    customAdjectives: [{ dict: 'custom-adj', reading: 'custom-adj', group: 'i-adjective' }],
+    customAdjectives: [
+      {
+        dict: 'custom-adj',
+        reading: 'custom-adj',
+        meaning: 'custom adjective',
+        group: 'i-adjective',
+      },
+    ],
     wordLists: [{ id: 'list-1', name: 'Custom list', wordKeys: ['godan:custom'] }],
     practicePrefs: {
       ...DEFAULT_PREFS,
       theme: 'dark',
-      dailyGoal: 12,
+      autoSpeak: true,
       wordListIds: ['list-1'],
     },
   };
@@ -69,7 +85,7 @@ function highClockRemotePayload() {
   const parts = populatedParts();
   const remote = buildSyncPayload({
     ...parts,
-    practicePrefs: { ...parts.practicePrefs, dailyGoal: 99 },
+    practicePrefs: { ...parts.practicePrefs, autoSpeak: false },
     customVerbs: [
       ...parts.customVerbs,
       { dict: 'miru', reading: 'miru', meaning: 'to see', group: 'ichidan' },
@@ -106,6 +122,7 @@ function highClockRemotePayload() {
         settings: remoteResetClock,
         'custom-content': remoteResetClock,
       },
+      progressContributions: seedProgressContributions(remote.state, remoteResetClock.eventId),
     },
   };
 }
@@ -188,11 +205,11 @@ describe('buildLearnerResetPayload', () => {
     expect(reset.state.cards).toEqual({});
     expect(reset.state.verbStats).toEqual({});
     expect(reset.state.mistakes).toEqual([]);
-    expect(reset.state.daily.count).toBe(0);
+    expect(reset.state.practiceStats.lifetime.attempted).toBe(0);
     expect(reset.state.game.played).toBe(0);
     expect(reset.state.minimalPairs).toEqual({ bySet: {} });
     expect(reset.state.enabledTypes).toEqual(['plain-past']);
-    expect(reset.state.practiceScope.activeFamilyIds).toEqual(['te-ta-sound-changes']);
+    expect(reset.state.practiceSelection.selectedCategoryIds).toEqual(['core-forms']);
     expect(reset.state.reviewScope.excludedWordKeys).toEqual(['ichidan:taberu']);
     expect(reset.practicePrefs.theme).toBe('dark');
     expect(reset.customVerbs).toEqual(parts.customVerbs);
@@ -205,8 +222,8 @@ describe('buildLearnerResetPayload', () => {
 
     expect(reset.state.cards).toEqual(parts.state.cards);
     expect(reset.state.reviewScope).toEqual(parts.state.reviewScope);
-    expect(reset.state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
-    expect(reset.state.practiceScope).toEqual(defaultState().practiceScope);
+    expect(reset.state.enabledTypes).toEqual(['plain-past']);
+    expect(reset.state.practiceSelection).toEqual(parts.state.practiceSelection);
     expect(reset.practicePrefs).toEqual(DEFAULT_PREFS);
     expect(reset.customVerbs).toEqual(parts.customVerbs);
     expect(reset.wordLists).toEqual(parts.wordLists);
@@ -230,7 +247,7 @@ describe('buildLearnerResetPayload', () => {
     });
 
     expect(reset.state.cards).toEqual({});
-    expect(reset.state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(reset.state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
     expect(reset.state.reviewScope.excludedWordKeys).toEqual([]);
     expect(reset.customVerbs).toEqual([]);
     expect(reset.customAdjectives).toEqual([]);
@@ -326,7 +343,7 @@ describe('commitLearnerResetPayload', () => {
 
     const settings = await commitResetAgainstRemote('settings');
     expect(settings.committed.practicePrefs).toEqual(DEFAULT_PREFS);
-    expect(settings.committed.state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(settings.committed.state.enabledTypes).toEqual(['plain-past']);
     expect(settings.committed.state.cards).not.toEqual({});
     expect(settings.committed.customVerbs.length).toBeGreaterThan(0);
     expect(settings.committed.syncMeta.resetEpochs.settings.revision).toBeGreaterThan(50);
@@ -357,10 +374,10 @@ describe('commitLearnerResetPayload', () => {
       ownerUserId: 'user-1',
     });
     const settingsEdited = changeResetPayload(settingsReset, {
-      practicePrefs: { ...settingsReset.practicePrefs, dailyGoal: 23 },
+      practicePrefs: { ...settingsReset.practicePrefs, autoSpeak: true },
     });
     const settings = await commitPendingResetAgainstRemote(settingsEdited);
-    expect(settings.committed.practicePrefs.dailyGoal).toBe(23);
+    expect(settings.committed.practicePrefs.autoSpeak).toBe(true);
     expect(settings.committed.syncMeta.resetEpochs.settings.revision).toBeGreaterThan(50);
 
     const customReset = buildLearnerResetPayload(populatedParts(), 'custom-content', {
@@ -425,7 +442,7 @@ describe('commitLearnerResetPayload', () => {
 
     const { committed, writeRow } = await commitPendingResetAgainstRemote(combinedReset);
 
-    expect(committed.practicePrefs.dailyGoal).toBe(DEFAULT_PREFS.dailyGoal);
+    expect(committed.practicePrefs.autoSpeak).toBe(DEFAULT_PREFS.autoSpeak);
     expect(committed.customVerbs).toEqual([]);
     expect(committed.customAdjectives).toEqual([]);
     expect(committed.wordLists).toEqual([]);

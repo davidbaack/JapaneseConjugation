@@ -92,15 +92,24 @@ describe('static coverage configuration', () => {
     expect(proxy).toContain('ALLOWED_ORIGIN=* requires GEMINI_ALLOW_PUBLIC_ORIGIN=true');
   });
 
+  it('pins the Gemini proxy to the generation its request schema targets', () => {
+    const proxy = readRepoText('supabase/functions/gemini-proxy/index.ts');
+
+    expect(proxy).toContain("const GEMINI_MODEL = 'gemini-3.5-flash-lite'");
+    expect(proxy).not.toContain('gemini-flash-lite-latest');
+    expect(proxy).toContain("thinkingConfig: { thinkingLevel: 'MINIMAL' }");
+    expect(proxy).not.toContain('temperature: clampNumber');
+  });
+
   it('runtime-caches the sentence corpus without precaching every chunk', () => {
     const config = readRepoText('vite.config.js');
 
     expect(config).toContain("'**/data/sentences/manifest.json'");
     expect(config).toContain("'**/data/sentences/by-type/*.json'");
     expect(config).toContain("'**/assets/vendor-supabase-*.js'");
-    expect(config).toContain("cacheName: 'sentence-corpus-manifest-v1'");
+    expect(config).toContain("cacheName: 'sentence-corpus-manifest-v2'");
     expect(config).toContain("handler: 'NetworkFirst'");
-    expect(config).toContain("cacheName: 'sentence-corpus-v1'");
+    expect(config).toContain("cacheName: 'sentence-corpus-v2'");
     expect(config).toContain("handler: 'CacheFirst'");
     expect(config).toContain("cacheName: 'supabase-sdk-v1'");
     expect(config).toContain('manifest: true');

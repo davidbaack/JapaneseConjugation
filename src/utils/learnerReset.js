@@ -56,7 +56,7 @@ export function buildLearnerResetPayload(parts = {}, kind, options = {}) {
           enabledTypes: Array.isArray(current.state.enabledTypes)
             ? [...current.state.enabledTypes]
             : [...base.enabledTypes],
-          practiceScope: current.state.practiceScope || base.practiceScope,
+          practiceSelection: current.state.practiceSelection || base.practiceSelection,
           reviewScope: current.state.reviewScope || base.reviewScope,
         },
       },
@@ -70,11 +70,7 @@ export function buildLearnerResetPayload(parts = {}, kind, options = {}) {
       current,
       {
         ...current,
-        state: {
-          ...current.state,
-          practiceScope: base.practiceScope,
-          enabledTypes: [...base.enabledTypes],
-        },
+        state: current.state,
         practicePrefs: mergePracticePrefs(DEFAULT_PREFS),
       },
       kind,
@@ -107,7 +103,7 @@ export function buildLearnerResetPayload(parts = {}, kind, options = {}) {
  *   writeCloud?: ((payload: any, options?: any) => Promise<any>) | null,
  *   shouldCommit?: (() => boolean) | null,
  *   applyLocal?: ((payload: any, syncedAt: number | null) => void) | null,
- *   saveLocal?: ((payload: any, syncedAt: number | null) => void) | null,
+ *   saveLocal?: ((payload: any, syncedAt: number | null) => any) | null,
  * }} [options]
  */
 export async function commitLearnerResetPayload({
@@ -139,8 +135,12 @@ export async function commitLearnerResetPayload({
     }
   }
 
-  if (saveLocal) saveLocal(committedPayload, syncedAt);
-  if (applyLocal) applyLocal(committedPayload, syncedAt);
+  if (saveLocal) {
+    const saved = await saveLocal(committedPayload, syncedAt);
+    if (saved?.state) committedPayload = saved;
+  }
+  if (shouldCommit && !shouldCommit()) return { cloud: writesCloud, at: syncedAt, stale: true };
+  if (applyLocal) await applyLocal(committedPayload, syncedAt);
 
   return { cloud: writesCloud, at: syncedAt };
 }

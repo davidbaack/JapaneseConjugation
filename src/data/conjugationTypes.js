@@ -57,7 +57,7 @@ export const CONJ_TYPES = [
     hint: 'could not / was not able to ~',
   },
   { id: 'potential-conditional-ba', label: 'Potential ば', sub: '可能ば', hint: 'if can ~' },
-  { id: 'volitional', label: 'Volitional', sub: '意向形', hint: "let's ~" },
+  { id: 'volitional', label: 'Plain Volitional', sub: '意向形', hint: "let's ~" },
   { id: 'conditional-tara', label: 'Conditional たら', sub: '', hint: 'if / when' },
   {
     id: 'negative-conditional-tara',
@@ -675,7 +675,7 @@ export const TYPE_PACKS = [
 export const FORM_GROUPS = [
   {
     id: 'basic-tenses',
-    label: 'Basics & Politeness',
+    label: 'Core Verb Forms',
     typeIds: [
       'plain-present',
       'plain-negative',
@@ -692,11 +692,14 @@ export const FORM_GROUPS = [
     typeIds: ['plain-past', 'te-form'],
   },
   {
-    id: 'volitional-desire',
-    label: 'Volitional & Desire',
+    id: 'volitional',
+    label: 'Volitional',
+    typeIds: ['volitional', 'polite-volitional'],
+  },
+  {
+    id: 'wanting',
+    label: 'Wanting with 〜たい',
     typeIds: [
-      'volitional',
-      'polite-volitional',
       'desiderative',
       'desiderative-polite',
       'desiderative-negative',
@@ -749,16 +752,24 @@ export const FORM_GROUPS = [
     ],
   },
   {
-    id: 'commands-requests',
-    label: 'Commands & Requests',
-    typeIds: [
-      'imperative',
-      'command-nasai',
-      'request-kudasai',
-      'negative-request',
-      'permission',
-      'obligation',
-    ],
+    id: 'commands',
+    label: 'Commands',
+    typeIds: ['imperative', 'command-nasai', 'prohibition'],
+  },
+  {
+    id: 'requests',
+    label: 'Requests',
+    typeIds: ['request-kudasai', 'negative-request'],
+  },
+  {
+    id: 'permission',
+    label: 'Permission',
+    typeIds: ['permission'],
+  },
+  {
+    id: 'obligation',
+    label: 'Obligation',
+    typeIds: ['obligation'],
   },
   {
     id: 'passive',
@@ -829,24 +840,28 @@ export const FORM_GROUPS = [
     ],
   },
   {
-    id: 'keigo',
-    label: 'Keigo',
-    typeIds: ['honorific', 'honorific-polite', 'humble', 'humble-polite'],
+    id: 'honorific',
+    label: 'Honorific Keigo',
+    typeIds: ['honorific', 'honorific-polite'],
   },
   {
-    id: 'special-forms',
-    label: 'Special Forms',
-    typeIds: [
-      'negative-te',
-      'negative-te-connective',
-      'negative-zuni',
-      'conjectural',
-      'prohibition',
-    ],
+    id: 'humble',
+    label: 'Humble Keigo',
+    typeIds: ['humble', 'humble-polite'],
   },
   {
-    id: 'adjectives',
-    label: 'Adjectives',
+    id: 'negative-connectors',
+    label: 'Negative Connectors',
+    typeIds: ['negative-te', 'negative-te-connective', 'negative-zuni'],
+  },
+  {
+    id: 'conjecture',
+    label: 'Conjecture',
+    typeIds: ['conjectural'],
+  },
+  {
+    id: 'adjective-core',
+    label: 'Adjective Core Forms',
     typeIds: [
       'adj-plain-present',
       'adj-plain-past',
@@ -856,18 +871,22 @@ export const FORM_GROUPS = [
       'adj-polite-past',
       'adj-polite-negative',
       'adj-polite-past-negative',
-      'adj-te-form',
-      'adj-negative-te-form',
-      'adj-adverb',
-      'adj-attributive',
-      'adj-conditional',
-      'adj-negative-conditional',
-      'adj-tara',
-      'adj-negative-tara',
-      'adj-sou',
-      'adj-sugiru',
-      'adj-naru',
     ],
+  },
+  {
+    id: 'adjective-connectors',
+    label: 'Adjective Connectors',
+    typeIds: ['adj-te-form', 'adj-negative-te-form', 'adj-adverb', 'adj-attributive'],
+  },
+  {
+    id: 'adjective-conditionals',
+    label: 'Adjective Conditionals',
+    typeIds: ['adj-conditional', 'adj-negative-conditional', 'adj-tara', 'adj-negative-tara'],
+  },
+  {
+    id: 'adjective-patterns',
+    label: 'Adjective Patterns',
+    typeIds: ['adj-sou', 'adj-sugiru', 'adj-naru'],
   },
 ];
 

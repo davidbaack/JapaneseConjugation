@@ -78,9 +78,6 @@ export function mergePracticePrefs(prefs) {
       : source.promptForm === 'polite-present' || source.promptForm === 'masu'
         ? 'masu'
         : DEFAULT_PREFS.sourceFormStrategy;
-  const rawNewCardsPerDay = Number(source.newCardsPerDay || 0);
-  const newCardsPerDay =
-    Number.isFinite(rawNewCardsPerDay) && rawNewCardsPerDay > 0 ? Math.round(rawNewCardsPerDay) : 0;
   delete source.kanaMatchDisplay;
   delete source.durationSec;
   delete source.skipDuplicateForms;
@@ -156,6 +153,9 @@ export function mergePracticePrefs(prefs) {
   ) {
     wordGroups = [...wordGroups, 'irregular-adjective'];
   }
+  for (const key of Object.keys(source)) {
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_PREFS, key)) delete source[key];
+  }
   return {
     ...DEFAULT_PREFS,
     ...source,
@@ -167,7 +167,6 @@ export function mergePracticePrefs(prefs) {
     autoAdvanceCorrectByAnswerForm,
     reviewStyle,
     sourceFormStrategy,
-    newCardsPerDay,
     promptForm:
       sourceFormStrategy === 'mixed'
         ? 'random'

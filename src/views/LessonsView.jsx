@@ -196,10 +196,10 @@ function TrackCard({ track, lessons, onLearnLesson, onPracticeLesson, onPractice
         className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${styles.button}`}
       >
         <IconRefresh className="w-4 h-4" />
-        Focus Practice on this track
+        Practice this track
       </button>
       <p className="mt-1.5 text-center text-[11px] font-medium text-stone-600 dark:text-stone-400">
-        Temporary focus · Continuous until you exit
+        Replaces your current Practice selection
       </p>
     </article>
   );
@@ -380,7 +380,7 @@ export default function LessonsView() {
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
             Follow a track when you want a learning path, or use the reference sections when you
-            need a specific rule. Each lesson can hand a focused set back to Practice.
+            need a specific rule. Each lesson can select its matching forms in Practice.
           </p>
         </div>
       </section>

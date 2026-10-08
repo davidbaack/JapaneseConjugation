@@ -7,6 +7,8 @@ import {
   buildWeaknessFamilyRows,
   defaultWeaknessState,
   deriveWeaknessSubcategory,
+  mergeWeaknessState,
+  normalizeWeaknessState,
   rankedWeaknessLanes,
   recencyDecayFactor,
   recordWeaknessAttempt,
@@ -81,6 +83,32 @@ function withMisses(weakness, word, typeId, count = 3) {
 }
 
 describe('subcategory weakness model', () => {
+  it('preserves distinct identical simultaneous attempts and deduplicates their replay', () => {
+    const details = {
+      word: TABERU,
+      typeId: 'plain-past',
+      correct: false,
+      responseMs: 9000,
+      now: 1000,
+    };
+    const first = recordWeaknessAttempt(defaultWeaknessState(), {
+      ...details,
+      eventId: 'attempt-a',
+    });
+    const second = recordWeaknessAttempt(defaultWeaknessState(), {
+      ...details,
+      eventId: 'attempt-b',
+    });
+    const merged = mergeWeaknessState(first, second);
+    expect(merged).toEqual(mergeWeaknessState(second, first));
+    const lane = Object.values(merged.byLane)[0];
+    expect(lane.recent.map((attempt) => attempt.id)).toEqual(['attempt-b', 'attempt-a']);
+    expect(lane.lastAttemptId).toBe('attempt-b');
+    const reloaded = normalizeWeaknessState(JSON.parse(JSON.stringify(merged)));
+    expect(mergeWeaknessState(reloaded, first)).toEqual(reloaded);
+    expect(recordWeaknessAttempt(reloaded, { ...details, eventId: 'attempt-a' })).toEqual(reloaded);
+  });
+
   it('derives exact-form history states and compact family counts', () => {
     const rows = buildWeaknessFamilyRows({
       ...defaultState(),

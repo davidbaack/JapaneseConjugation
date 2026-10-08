@@ -1,172 +1,198 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHash, webcrypto } from 'node:crypto';
+import { TextEncoder } from 'node:util';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { wordKey } from '../utils/conjugator.js';
+import { sentenceContentSerialization } from '../utils/sentenceTrust.js';
 
-const WORD = { dict: '\u8cb7\u3046', reading: '\u304b\u3046', meaning: 'to buy', group: 'godan' };
-const TEMPLATE = '\u663c\u306b{w}\u3002';
+const WORD = { dict: '買う', reading: 'かう', meaning: 'to buy', group: 'godan' };
+const TYPE = 'plain-past';
+const TEMPLATE = '昼に{w}。';
+const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+
+function reviewedRow({ word = WORD, type = TYPE, ...overrides } = {}) {
+  const value = {
+    jaTemplate: TEMPLATE,
+    en: 'I bought it at noon.',
+    segments: [{ t: '昼', r: 'ひる' }, { t: 'に', r: '' }, { w: true }, { t: '。', r: '' }],
+    review: { status: 'accepted', version: 1, sense: word.meaning, basis: 'bilingual-fixture' },
+    ...overrides,
+  };
+  value.review.hash = createHash('sha256')
+    .update(sentenceContentSerialization(word, type, value))
+    .digest('hex');
+  return [wordKey(word), value.jaTemplate, value.en, value.segments, value.review];
+}
+
+function corpusPayload(rows = [reviewedRow()], type = TYPE) {
+  const revision = digest(rows);
+  const entry = { type, count: rows.length, path: `by-type/${type}.json`, revision };
+  return {
+    manifest: {
+      schema: 2,
+      revision: digest([[type, revision]]),
+      totalRows: rows.length,
+      rawBytes: 123,
+      gzipBytes: 45,
+      types: [entry],
+    },
+    chunk: { schema: 2, type, revision, rows },
+  };
+}
+
+function response(payload, ok = true) {
+  return { ok, json: vi.fn().mockResolvedValue(payload) };
+}
+
+function installCorpus(payload = corpusPayload()) {
+  const fetchMock = vi.fn((url) =>
+    Promise.resolve(
+      response(String(url).endsWith('/manifest.json') ? payload.manifest : payload.chunk),
+    ),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
 
 async function loadCorpus() {
   vi.resetModules();
   return import('../utils/sentenceCorpus.js');
 }
 
-function response(payload, ok = true) {
-  return {
-    ok,
-    json: vi.fn(() => Promise.resolve(payload)),
-  };
-}
-
-function manifestPayload(type = 'plain-past') {
-  return {
-    schema: 1,
-    totalRows: 1,
-    rawBytes: 123,
-    gzipBytes: 45,
-    types: [{ type, count: 1, path: `by-type/${type}.json` }],
-  };
-}
-
-function chunkPayload(
-  type = 'plain-past',
-  rows = [[wordKey(WORD), TEMPLATE, 'I bought it at noon.', [{ w: true }]]],
-) {
-  return { schema: 1, type, rows };
-}
+beforeEach(() => {
+  vi.stubGlobal('crypto', webcrypto);
+  vi.stubGlobal('TextEncoder', TextEncoder);
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   vi.resetModules();
 });
 
 describe('fetchBundledSentence', () => {
-  it('hydrates a bundled row and memoizes the type chunk', async () => {
-    const fetchMock = vi.fn((url) => {
-      if (String(url).endsWith('/manifest.json')) {
-        return Promise.resolve(response(manifestPayload()));
-      }
-      return Promise.resolve(response(chunkPayload()));
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const { fetchBundledSentence } = await loadCorpus();
-
-    const first = await fetchBundledSentence(WORD, 'plain-past');
-    const second = await fetchBundledSentence(WORD, 'plain-past');
-
+  it('verifies accepted content and memoizes chunks using their content revision', async () => {
+    const payload = corpusPayload();
+    const fetchMock = installCorpus(payload);
+    const { fetchBundledSentence, getSentenceCorpusRevision } = await loadCorpus();
+    const first = await fetchBundledSentence(WORD, TYPE);
+    const second = await fetchBundledSentence(WORD, TYPE);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/data/sentences/manifest.json', {
       cache: 'no-cache',
     });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      '/data/sentences/by-type/plain-past.json?v=1-1-123-45-1',
+      `/data/sentences/by-type/${TYPE}.json?v=${payload.chunk.revision}`,
       { cache: 'force-cache' },
     );
     expect(first).toMatchObject({
       jaTemplate: TEMPLATE,
       en: 'I bought it at noon.',
-      surface: '\u8cb7\u3063\u305f',
-      kanaSurface: '\u304b\u3063\u305f',
+      surface: '買った',
+      kanaSurface: 'かった',
       source: 'bundled',
     });
     expect(second).toEqual(first);
+    expect(await getSentenceCorpusRevision()).toBe(payload.manifest.revision);
   });
 
-  it('falls back to the unversioned chunk when the manifest is unavailable', async () => {
-    const fetchMock = vi.fn((url) => {
-      if (String(url).endsWith('/manifest.json')) return Promise.resolve(response({}, false));
-      return Promise.resolve(response(chunkPayload()));
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const { fetchBundledSentence } = await loadCorpus();
-
-    const sentence = await fetchBundledSentence(WORD, 'plain-past');
-
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/data/sentences/manifest.json', {
-      cache: 'no-cache',
-    });
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/data/sentences/by-type/plain-past.json', {
-      cache: 'force-cache',
-    });
-    expect(sentence).toMatchObject({
-      jaTemplate: TEMPLATE,
-      en: 'I bought it at noon.',
-      surface: '\u8cb7\u3063\u305f',
-      kanaSurface: '\u304b\u3063\u305f',
-      source: 'bundled',
-    });
+  it('does not fetch unversioned content when the manifest is missing or obsolete', async () => {
+    for (const manifest of [null, { ...corpusPayload().manifest, schema: 1 }]) {
+      const fetchMock = vi.fn().mockResolvedValue(response(manifest, !!manifest));
+      vi.stubGlobal('fetch', fetchMock);
+      const { fetchBundledSentence } = await loadCorpus();
+      expect(await fetchBundledSentence(WORD, TYPE)).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
   });
 
-  it('returns null and retries later for missing chunks', async () => {
-    const fetchMock = vi.fn((url) => {
-      if (String(url).endsWith('/manifest.json')) {
-        return Promise.resolve(response(manifestPayload('plain-negative')));
-      }
-      return Promise.resolve(response({}, false));
-    });
+  it('retries missing chunks without negative caching', async () => {
+    const payload = corpusPayload();
+    const fetchMock = vi.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/manifest.json') ? response(payload.manifest) : response({}, false),
+      ),
+    );
     vi.stubGlobal('fetch', fetchMock);
     const { fetchBundledSentence } = await loadCorpus();
-
-    expect(await fetchBundledSentence(WORD, 'plain-negative')).toBeNull();
-    expect(await fetchBundledSentence(WORD, 'plain-negative')).toBeNull();
+    expect(await fetchBundledSentence(WORD, TYPE)).toBeNull();
+    expect(await fetchBundledSentence(WORD, TYPE)).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      '/data/sentences/by-type/plain-negative.json?v=1-1-123-45-1',
-      { cache: 'force-cache' },
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
-      '/data/sentences/by-type/plain-negative.json?v=1-1-123-45-1',
-      { cache: 'force-cache' },
-    );
   });
 
-  it('ignores malformed corpus rows', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url) => {
-        if (String(url).endsWith('/manifest.json')) {
-          return Promise.resolve(response(manifestPayload()));
-        }
-        return Promise.resolve(
-          response(chunkPayload('plain-past', [[wordKey(WORD), '', 'Missing template.', []]])),
-        );
-      }),
-    );
+  it('rejects corrupt chunks even if their claimed revision is current', async () => {
+    const payload = corpusPayload();
+    payload.chunk.rows[0][2] = 'I sold it at noon.';
+    installCorpus(payload);
     const { fetchBundledSentence } = await loadCorpus();
-
-    expect(await fetchBundledSentence(WORD, 'plain-past')).toBeNull();
+    expect(await fetchBundledSentence(WORD, TYPE)).toBeNull();
   });
 
-  it('ignores bundled adjective rows with incompatible English contexts', async () => {
-    const adjective = {
-      dict: '\u304b\u3086\u3044',
-      reading: '\u304b\u3086\u3044',
-      meaning: 'itchy',
-      group: 'i-adjective',
-    };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url) => {
-        if (String(url).endsWith('/manifest.json')) {
-          return Promise.resolve(response(manifestPayload('adj-tara')));
-        }
-        return Promise.resolve(
-          response(
-            chunkPayload('adj-tara', [
-              [
-                wordKey(adjective),
-                'if {w}.',
-                'If this task is itchy, I will add a break.',
-                [{ w: true }],
-              ],
-            ]),
-          ),
-        );
-      }),
-    );
+  it.each(['schema', 'type', 'revision'])('rejects a mismatched chunk %s', async (field) => {
+    const payload = corpusPayload();
+    payload.chunk[field] = field === 'schema' ? 1 : 'obsolete';
+    installCorpus(payload);
     const { fetchBundledSentence } = await loadCorpus();
+    expect(await fetchBundledSentence(WORD, TYPE)).toBeNull();
+  });
 
-    expect(await fetchBundledSentence(adjective, 'adj-tara')).toBeNull();
+  it('rejects a manifest whose revision does not describe its type entries', async () => {
+    const payload = corpusPayload();
+    payload.manifest.revision = 'f'.repeat(64);
+    const fetchMock = installCorpus(payload);
+    const { fetchBundledSentence } = await loadCorpus();
+    expect(await fetchBundledSentence(WORD, TYPE)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not request unavailable types or unsafe type names', async () => {
+    const fetchMock = installCorpus();
+    const { fetchBundledSentence } = await loadCorpus();
+    expect(await fetchBundledSentence(WORD, '../plain-past')).toBeNull();
+    expect(await fetchBundledSentence(WORD, 'plain-negative')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects pending, malformed, or content-edited rows inside valid chunks', async () => {
+    const pending = reviewedRow();
+    pending[4].status = 'pending';
+    const edited = reviewedRow();
+    edited[2] = 'I sold it at noon.';
+    const malformed = reviewedRow({ segments: [{ w: true }] });
+    for (const row of [pending, edited, malformed, reviewedRow().slice(0, 4)]) {
+      installCorpus(corpusPayload([row]));
+      const { fetchBundledSentence } = await loadCorpus();
+      expect(await fetchBundledSentence(WORD, TYPE)).toBeNull();
+    }
+  });
+
+  it('rechecks the current word meaning instead of reusing an approved sense', async () => {
+    installCorpus();
+    const { fetchBundledSentence } = await loadCorpus();
+    expect(await fetchBundledSentence(WORD, TYPE)).not.toBeNull();
+    expect(await fetchBundledSentence({ ...WORD, meaning: 'to keep a pet' }, TYPE)).toBeNull();
+  });
+
+  it('refreshes the manifest and invalidates an old chunk when publication changes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const firstPayload = corpusPayload();
+    const nextRow = reviewedRow({ en: 'At noon, I bought it.' });
+    const nextPayload = corpusPayload([nextRow]);
+    let currentPayload = firstPayload;
+    const fetchMock = vi.fn((url) =>
+      Promise.resolve(
+        response(
+          String(url).endsWith('/manifest.json') ? currentPayload.manifest : currentPayload.chunk,
+        ),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchBundledSentence } = await loadCorpus();
+    expect((await fetchBundledSentence(WORD, TYPE)).en).toBe('I bought it at noon.');
+    currentPayload = nextPayload;
+    vi.setSystemTime(Date.now() + 60_001);
+    expect((await fetchBundledSentence(WORD, TYPE)).en).toBe('At noon, I bought it.');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[3][0]).toContain(nextPayload.chunk.revision);
   });
 });

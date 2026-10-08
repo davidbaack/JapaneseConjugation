@@ -367,7 +367,7 @@ export function diagnoseMistake({ item, type, promptType = null, userAnswer, exp
   );
 }
 
-export function bumpSessionMistakePattern(session = {}, mistakeDiagnosis = null) {
+export function bumpSessionMistakePattern(session = {}, mistakeDiagnosis = null, options = {}) {
   if (!mistakeDiagnosis?.patternId) return session || {};
   const patterns = session.mistakePatterns || {};
   const current = patterns[mistakeDiagnosis.patternId] || {
@@ -390,7 +390,7 @@ export function bumpSessionMistakePattern(session = {}, mistakeDiagnosis = null)
         ...current,
         feedback: mistakeDiagnosis.feedback || current.feedback,
         detail: mistakeDiagnosis.detail || current.detail,
-        latestAt: Date.now(),
+        latestAt: Number(options.now) || Date.now(),
         count: (current.count || 0) + 1,
       },
     },

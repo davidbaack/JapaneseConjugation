@@ -1,16 +1,11 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
-import {
-  IconVolume,
-  IconChat,
-  IconEye,
-  IconEyeOff,
-  IconFlame,
-  IconList,
-  IconRefresh,
-  IconSettings,
-  IconBook,
-} from '../components/Icons.jsx';
+import { IconVolume, IconChat, IconFlame } from '../components/Icons.jsx';
 import { ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
+import {
+  PRACTICE_CATEGORIES,
+  PRACTICE_FILTERS,
+  practiceCategoryForType,
+} from '../data/practiceTaxonomy.js';
 import {
   getSpeechRecognitionConstructor,
   playPronunciation,
@@ -18,7 +13,7 @@ import {
 } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
-import { lessonForType, LESSON_TRACKS } from '../data/lessonContent.js';
+import { lessonForType } from '../data/lessonContent.js';
 import { ChatPanel } from '../components/ChatPanel.jsx';
 import { toHiragana, toHiraganaProgress, toKanaInputValue } from '../utils/romaji.js';
 import {
@@ -35,7 +30,6 @@ import {
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { explainItem, stepCoachHint } from '../utils/conjugatorExplain.js';
-import { buildFormationKeysHash } from '../utils/formationKeys.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 import {
   selectNext,
@@ -44,7 +38,6 @@ import {
   markMistakeResolved,
   gradeCard,
   gradeTransformationStats,
-  bumpDaily,
   cardIdFor,
 } from '../utils/storage.js';
 import { recordReadinessAttempt } from '../utils/readiness.js';
@@ -67,7 +60,7 @@ import {
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
 import { fetchBundledSentence } from '../utils/sentenceCorpus.js';
 import { fetchTailoredSentence } from '../utils/sentenceLibrary.js';
-import { buildOfflineSentenceEntry, buildSentencePromptModel } from '../utils/sentencePrompt.js';
+import { buildSentencePromptModel } from '../utils/sentencePrompt.js';
 import {
   bumpSessionMistakePattern,
   labRouteForMistakePattern,
@@ -82,18 +75,15 @@ import {
   recordMinimalPairResult,
 } from '../utils/minimalPairs.js';
 import { buildRuleCandidates } from '../utils/ruleCandidates.js';
-import { buildWeaknessFamilyRows, recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
+import { recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
 import {
   excludeWordFromReviewState,
-  includeFormFamilyInReviewState,
   includeWordInReviewState,
   reviewTypeIdsForState,
 } from '../utils/reviewScope.js';
-import { buildGuideDiagnosticInsight } from '../utils/guidePractice.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
 import {
-  PracticeRunReviewPage,
   cardOriginForStudyCard,
   cardOriginMeta,
   reviewFeedbackActionForRecord,
@@ -101,50 +91,43 @@ import {
   withCardOrigin,
 } from './study/StudyReviewPanels.jsx';
 import { StudyFocusBar } from './study/StudyFocusBar.jsx';
-import {
-  CARD_TYPE_BY_ID,
-  FAMILY_INTRO_REVIEW_LIMIT_SOURCE,
-  LESSON_BY_GROUP_ID,
-  PracticeScopeSidebar,
-  familyIntroFocusFromLaunch,
-  familyIntroTypeIds,
-} from './study/PracticeMaps.jsx';
-import { MistakeRouteHint, ReviewsDashboard } from './study/ReviewsDashboard.jsx';
 import { AnswerInputPanel } from './study/AnswerInputPanel.jsx';
-import { updateStatePracticeScope } from '../utils/practiceScope.js';
+import PracticeSelector from './study/PracticeSelector.jsx';
+import {
+  addPracticeTypeSelection,
+  matchingPracticeTypeIdsForCategory,
+  normalizePracticeSelection,
+  practiceFilterConflictsForType,
+  practiceSelectionForTypeIds,
+  setPracticeFilterSelection,
+  togglePracticeCategorySelection,
+  togglePracticeTypeSelection,
+  updateStatePracticeSelection,
+} from '../utils/practiceSelection.js';
+import { contextualStatsForType, recordPracticeAnswer } from '../utils/practiceStats.js';
+import { createSyncEventId } from '../utils/syncMetadata.js';
 export { kanaCoachCells, explainReversePrompt };
-export { reviewFeedbackActionForRecord, ReviewsDashboard };
+export { reviewFeedbackActionForRecord };
 
 // Keep the active card across a page refresh so reloading Study resumes the
 // same word/form rather than drawing a fresh one. Scoped to sessionStorage so
 // it survives reloads but resets when the tab is closed.
 const STUDY_CURRENT_KEY = 'jp-study-current';
-const BEGINNER_RECOMMENDATION_PREFIXES = [
-  'lesson-track-beginner',
-  ...LESSON_TRACKS[0].lessonGroupIds.map((groupId) => `lesson-${groupId}`),
-];
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
-const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation', FAMILY_INTRO_REVIEW_LIMIT_SOURCE]);
+const REVIEW_LIMIT_SOURCES = new Set(['lab']);
+const CARD_TYPE_BY_ID = new Map(ALL_CARD_TYPES.map((type) => [type.id, type]));
 const REVIEW_SESSION_HISTORY_SIZE = 4;
 const CORRECT_AUTO_ADVANCE_MS = 850;
 const SENTENCE_PROMPT_GRACE_MS = 250;
+const SENTENCE_ENTRY_FRESH_MS = 60_000;
 const SESSION_RECENT_OUTCOME_LIMIT = 6;
-const GUIDE_INSIGHT_CHIP_LABELS = {
-  base: 'plain form',
-  group: 'word group',
-  answer: 'final ending',
-};
 const ANSWER_STYLE_OPTIONS = [
   { id: 'input', label: 'Type' },
   { id: 'choice', label: 'Choose' },
   { id: 'self-check', label: 'Self-check' },
   { id: 'speak', label: 'Speak' },
 ];
-
-function guideInsightChipLabel(insight) {
-  return GUIDE_INSIGHT_CHIP_LABELS[insight?.stepId] || 'weak step';
-}
 
 function focusWithoutScroll(element) {
   if (!element || typeof window === 'undefined') return;
@@ -156,6 +139,18 @@ function focusWithoutScroll(element) {
   }
 }
 
+function MistakeRouteHint({ route }) {
+  if (!route) return null;
+  return (
+    <div className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs dark:border-indigo-900/60 dark:bg-indigo-950/20">
+      <div className="font-semibold text-indigo-800 dark:text-indigo-200">
+        {route.triggerLabel} -&gt; {route.toolLabel}
+      </div>
+      <div className="mt-0.5 text-stone-600 dark:text-stone-300">{route.detail}</div>
+    </div>
+  );
+}
+
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
   const limit = Number(prefs.reviewLimit || 0);
@@ -163,7 +158,25 @@ function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
 }
 
 function sentenceEntryKey(word, type) {
-  return word?.dict && type ? `${wordKey(word)}|${type}` : '';
+  return word?.dict && type
+    ? JSON.stringify([
+        wordKey(word),
+        type,
+        word.reading || '',
+        word.meaning || '',
+        word.exerciseMeaning || '',
+      ])
+    : '';
+}
+
+function freshSentenceEntry(cache, key) {
+  const cached = cache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.loadedAt >= SENTENCE_ENTRY_FRESH_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return cached.entry;
 }
 
 function transformationRouteText(sourceInfo, targetInfo) {
@@ -279,34 +292,13 @@ function sessionRunStats(session = {}, base = {}) {
   };
 }
 
-function sessionFamilyStatsFromHistory(history = []) {
-  const familyByTypeId = new Map();
-  for (const family of FORM_GROUPS) {
-    for (const typeId of family.typeIds || []) {
-      familyByTypeId.set(typeId, family.id);
-    }
-  }
-
-  return history.reduce((stats, record) => {
-    const typeId = record?.practicedType || record?.cardType;
-    const familyId = familyByTypeId.get(typeId);
-    if (!familyId) return stats;
-    const current = stats[familyId] || { correct: 0, incorrect: 0 };
-    stats[familyId] = {
-      correct: current.correct + (record.correct ? 1 : 0),
-      incorrect: current.incorrect + (record.correct ? 0 : 1),
-    };
-    return stats;
-  }, {});
-}
-
 function sessionOutcomeLabel(card) {
   if (!card) return 'Practice card';
   if (isReadingPracticeCard(card)) return 'Reading';
   return getTypeInfo(card.type).label || 'Practice card';
 }
 
-function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now()) {
+function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now(), eventId) {
   if (!typeId || typeId === DICTIONARY_TYPE_ID) return card;
   const current = card.sourceTypeStats?.[typeId] || {};
   return {
@@ -317,6 +309,7 @@ function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now())
         correct: (Number(current.correct) || 0) + (correct ? 1 : 0),
         incorrect: (Number(current.incorrect) || 0) + (correct ? 0 : 1),
         lastAt: now,
+        ...(eventId ? { lastAttemptId: eventId } : {}),
       },
     },
   };
@@ -325,7 +318,8 @@ function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now())
 function appendSessionOutcome(session = {}, outcome) {
   const recentOutcomes = Array.isArray(session.recentOutcomes) ? session.recentOutcomes : [];
   const nextOutcome = {
-    at: Date.now(),
+    id: outcome.id || createSyncEventId(),
+    at: outcome.at || Date.now(),
     cardId: outcome.cardId || '',
     kind: outcome.kind,
     label: outcome.label || 'Practice card',
@@ -336,7 +330,7 @@ function appendSessionOutcome(session = {}, outcome) {
   };
 }
 
-function sessionAfterAnswer(session = {}, { card, correct, mistakeDiagnosis }) {
+function sessionAfterAnswer(session = {}, { card, correct, mistakeDiagnosis, eventId, now }) {
   const currentStreak = correct ? (session.currentStreak || 0) + 1 : 0;
   const nextSession = bumpSessionMistakePattern(
     {
@@ -347,21 +341,29 @@ function sessionAfterAnswer(session = {}, { card, correct, mistakeDiagnosis }) {
       bestStreak: Math.max(session.bestStreak || 0, currentStreak),
     },
     mistakeDiagnosis,
+    { now },
   );
   return appendSessionOutcome(nextSession, {
+    id: eventId,
+    at: now,
     cardId: card?.id,
     kind: correct ? 'correct' : 'missed',
     label: sessionOutcomeLabel(card),
   });
 }
 
-function sessionAfterSkip(session = {}, card) {
+/** @param {{ eventId?: string, now?: number }} [options] */
+function sessionAfterSkip(session = {}, card, options = {}) {
+  const { eventId, now } = options;
+  if (eventId && session.recentOutcomes?.some((outcome) => outcome.id === eventId)) return session;
   return appendSessionOutcome(
     {
       ...session,
       skipped: (session.skipped || 0) + 1,
     },
     {
+      id: eventId,
+      at: now,
       cardId: card?.id,
       kind: 'skipped',
       label: sessionOutcomeLabel(card),
@@ -517,7 +519,14 @@ export default function StudyView({ mode = 'practice' }) {
     if (!transformationMode) return rawPracticePrefs;
     return clearBoundedReviewPrefs(rawFocus?.returnPracticePrefs || rawPracticePrefs);
   }, [rawFocus?.returnPracticePrefs, rawPracticePrefs, transformationMode]);
-  const [current, setCurrent] = useState(null);
+  const [current, setCurrentState] = useState(null);
+  const setCurrent = useCallback((next) => {
+    // Every direct card launch is a new exercise, including an exact-word/form
+    // retry. Keep the initialization updater's existing-card behavior intact.
+    setCurrentState((previous) =>
+      typeof next === 'function' ? next(previous) : next ? { ...next } : null,
+    );
+  }, []);
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');
   const [wasCorrect, setWasCorrect] = useState(false);
@@ -561,27 +570,20 @@ export default function StudyView({ mode = 'practice' }) {
   const [sessionFilterFormGroupId, setSessionFilterFormGroupId] = useState(
     () => focus?.formGroupId || null,
   );
-  const [familyIntroFocus, setFamilyIntroFocus] = useState(() => familyIntroFocusFromLaunch(focus));
-  const [practiceCategoryFocus, setPracticeCategoryFocus] = useState(null);
   const [launchContext, setLaunchContext] = useState(() =>
     focus?.returnTo === 'reference' ? focus : null,
   );
-  const [recommendationFocus, setRecommendationFocus] = useState(
-    () => focus?.recommendation || null,
-  );
-  const [openPracticeMapFamilyIds, setOpenPracticeMapFamilyIds] = useState(() => new Set());
-  const [practiceMapMobileOpen, setPracticeMapMobileOpen] = useState(false);
-  const [runAnswerHistory, setRunAnswerHistory] = useState([]);
-  const [runReviewOpen, setRunReviewOpen] = useState(false);
-  const [practiceSettingsOpen, setPracticeSettingsOpen] = useState(false);
+  const [selectionStatus, setSelectionStatus] = useState('');
   const inputRef = useRef(null);
   const nextButtonRef = useRef(null);
   const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
   const refocusAfterAutoAdvanceRef = useRef(false);
   const answerStartedAtRef = useRef(0);
+  const committedAttemptRef = useRef(null);
   const hadKanaMistakeRef = useRef(false);
   const speechRecognitionRef = useRef(null);
+  const latestSpeechAttemptRef = useRef(null);
   const speechSubmittedRef = useRef(false);
   const speechAutoStartKeyRef = useRef('');
   const listeningPromptSpokenKeyRef = useRef('');
@@ -602,18 +604,6 @@ export default function StudyView({ mode = 'practice' }) {
 
   const enabledTypes = useMemo(() => {
     if (sessionFilterFormGroupId) {
-      if (
-        practiceCategoryFocus?.familyId === sessionFilterFormGroupId &&
-        practiceCategoryFocus.typeIds?.length
-      ) {
-        return practiceCategoryFocus.typeIds;
-      }
-      if (
-        familyIntroFocus?.familyId === sessionFilterFormGroupId &&
-        familyIntroFocus.typeIds?.length
-      ) {
-        return familyIntroFocus.typeIds;
-      }
       const group = FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId);
       if (group?.typeIds?.length) return group.typeIds;
     }
@@ -632,12 +622,11 @@ export default function StudyView({ mode = 'practice' }) {
   }, [
     state,
     sessionFilterFormGroupId,
-    familyIntroFocus,
-    practiceCategoryFocus,
     rawFocus?.recommendation?.returnEnabledTypes,
     rawFocus?.returnEnabledTypes,
     transformationMode,
   ]);
+  const enabledTypesKey = enabledTypes.join('|');
   const practiceWords = useMemo(() => {
     const base = filterWordsForStudyScope(
       verbs,
@@ -681,7 +670,6 @@ export default function StudyView({ mode = 'practice' }) {
   ]);
 
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
-  const autoAdvanceFormKey = autoAdvanceAnswerFormKey(practicePrefs);
   const autoAdvanceCorrect = resolveAutoAdvanceCorrect(practicePrefs);
   const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
   const typedAnswerMode = answerMode === 'input';
@@ -727,21 +715,7 @@ export default function StudyView({ mode = 'practice' }) {
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
     [state.session?.mistakePatterns],
   );
-  const weaknessFamilies = useMemo(
-    () =>
-      buildWeaknessFamilyRows({
-        cards: state.cards,
-        readiness: state.readiness,
-        weakness: state.weakness,
-      }),
-    [state.cards, state.readiness, state.weakness],
-  );
-  const sessionFamilyStats = useMemo(
-    () => sessionFamilyStatsFromHistory(runAnswerHistory),
-    [runAnswerHistory],
-  );
   const daily = state.daily || {};
-  const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const boundedReviewLaunchActive = activeReviewLimitFromPrefs(practicePrefs) > 0;
   const specialLaunchActive =
     !!focus?.word ||
@@ -751,7 +725,6 @@ export default function StudyView({ mode = 'practice' }) {
     !!wordSweep ||
     !!sessionFilterWord ||
     !!sessionFilterFormGroupId ||
-    !!recommendationFocus ||
     !!launchContext ||
     boundedReviewLaunchActive ||
     !!activeMinimalPairSet;
@@ -766,9 +739,8 @@ export default function StudyView({ mode = 'practice' }) {
   const loadSentenceEntry = useCallback((word, type) => {
     const key = sentenceEntryKey(word, type);
     if (!key) return Promise.resolve(null);
-    if (sentenceEntryCacheRef.current.has(key)) {
-      return Promise.resolve(sentenceEntryCacheRef.current.get(key));
-    }
+    const cached = freshSentenceEntry(sentenceEntryCacheRef.current, key);
+    if (cached) return Promise.resolve(cached);
     const existing = sentenceEntryInFlightRef.current.get(key);
     if (existing) return existing;
 
@@ -777,7 +749,7 @@ export default function StudyView({ mode = 'practice' }) {
       .then((res) => res || fetchTailoredSentence(word, type))
       .then((entry) => {
         if (entry?.jaTemplate) {
-          sentenceEntryCacheRef.current.set(key, entry);
+          sentenceEntryCacheRef.current.set(key, { entry, loadedAt: Date.now() });
           return entry;
         }
         return null;
@@ -810,29 +782,13 @@ export default function StudyView({ mode = 'practice' }) {
         listeningPrompt ? 'listening' : 'visible'
       }`
     : '';
-  const offlineSentencePrompt = useMemo(() => {
-    if (!sentencePromptEligible) return null;
-    try {
-      const entry = buildOfflineSentenceEntry(current.verb, sentenceType);
-      return buildSentencePromptModel({
-        entry,
-        word: current.verb,
-        type: sentenceType,
-        reverseDrill,
-        listeningPrompt,
-      });
-    } catch {
-      return null;
-    }
-  }, [current, sentencePromptEligible, sentenceType, reverseDrill, listeningPrompt]);
   const [finalizedSentencePrompt, setFinalizedSentencePrompt] = useState(null);
   useEffect(() => {
     if (
       !sentencePromptEligible ||
       !sentenceWord ||
       !sentencePromptEntryKey ||
-      !sentencePromptStateKey ||
-      !offlineSentencePrompt
+      !sentencePromptStateKey
     ) {
       setFinalizedSentencePrompt(null);
       return undefined;
@@ -855,16 +811,16 @@ export default function StudyView({ mode = 'practice' }) {
     const finalizePrompt = (entry) => {
       if (ignore || finalized) return;
       finalized = true;
-      const prompt = buildPrompt(entry) || offlineSentencePrompt;
-      setFinalizedSentencePrompt({ key: sentencePromptStateKey, prompt });
+      const prompt = buildPrompt(entry);
+      setFinalizedSentencePrompt({ key: sentencePromptStateKey, card: current, prompt });
     };
-    const cached = sentenceEntryCacheRef.current.get(sentencePromptEntryKey);
+    const cached = freshSentenceEntry(sentenceEntryCacheRef.current, sentencePromptEntryKey);
     if (cached?.jaTemplate) {
       finalizePrompt(cached);
       return undefined;
     }
 
-    setFinalizedSentencePrompt((prev) => (prev?.key === sentencePromptStateKey ? prev : null));
+    setFinalizedSentencePrompt(null);
     const fallbackTimer = setTimeout(() => finalizePrompt(null), SENTENCE_PROMPT_GRACE_MS);
     loadSentenceEntry(word, type).then((entry) => {
       if (finalized || ignore) return;
@@ -876,9 +832,9 @@ export default function StudyView({ mode = 'practice' }) {
       clearTimeout(fallbackTimer);
     };
   }, [
+    current,
     loadSentenceEntry,
     listeningPrompt,
-    offlineSentencePrompt,
     reverseDrill,
     sentencePromptEligible,
     sentencePromptEntryKey,
@@ -887,17 +843,29 @@ export default function StudyView({ mode = 'practice' }) {
     sentenceWord,
   ]);
   const sentencePrompt =
-    finalizedSentencePrompt?.key === sentencePromptStateKey ? finalizedSentencePrompt.prompt : null;
+    finalizedSentencePrompt?.key === sentencePromptStateKey &&
+    finalizedSentencePrompt?.card === current
+      ? finalizedSentencePrompt.prompt
+      : null;
+  const sentencePromptResolved =
+    sentencePromptEligible &&
+    finalizedSentencePrompt?.key === sentencePromptStateKey &&
+    finalizedSentencePrompt?.card === current;
+  const sentenceUnavailable = sentencePromptResolved && !sentencePrompt;
   const sentencePromptView = useMemo(
     () =>
       sentencePrompt
-        ? sentenceDisplay(sentencePrompt.sentence, practicePrefs, sentencePrompt.parts)
+        ? sentenceDisplay(
+            phase === 'reviewing' ? sentencePrompt.completedSentence : sentencePrompt.sentence,
+            practicePrefs,
+            phase === 'reviewing' ? sentencePrompt.completedParts : sentencePrompt.parts,
+          )
         : null,
-    [sentencePrompt, practicePrefs],
+    [sentencePrompt, practicePrefs, phase],
   );
   const promptAudioText = listeningPrompt
     ? sentencePromptEligible
-      ? sentencePrompt?.audioText || ''
+      ? sentencePrompt?.audioText || (sentencePromptResolved ? basePromptAudioText : '')
       : basePromptAudioText
     : basePromptAudioText;
 
@@ -912,6 +880,7 @@ export default function StudyView({ mode = 'practice' }) {
     sessionFilterWord?.dict,
     sessionFilterWord?.group,
     transformationMode,
+    enabledTypesKey,
   ]);
 
   useLayoutEffect(() => {
@@ -925,7 +894,6 @@ export default function StudyView({ mode = 'practice' }) {
       );
       if (card) {
         focusSeededRef.current = true;
-        setRecommendationFocus(null);
         setWordSweep(null);
         setSessionFilterWord(null);
         setSessionFilterFormGroupId(null);
@@ -956,8 +924,6 @@ export default function StudyView({ mode = 'practice' }) {
     if (focus?.word && !focusSeededRef.current) {
       focusSeededRef.current = true;
       setFocusWordLock(focus.word);
-      setFamilyIntroFocus(null);
-      setRecommendationFocus(null);
       // Lock Practice to this word so every follow-up card stays on it until
       // the learner exits the focus banner (rather than mixing back into the
       // general queue after the first seeded card).
@@ -992,22 +958,9 @@ export default function StudyView({ mode = 'practice' }) {
     }
     if (focus?.formGroupId && !focusSeededRef.current) {
       focusSeededRef.current = true;
-      setFamilyIntroFocus(familyIntroFocusFromLaunch(focus));
       setSessionFilterFormGroupId(focus.formGroupId);
       setFocusWordLock(null);
       setWordSweep(null);
-      setRecommendationFocus(null);
-    }
-    if (focus?.recommendation && !focusSeededRef.current) {
-      focusSeededRef.current = true;
-      setRecommendationFocus(focus.recommendation);
-      setFamilyIntroFocus(null);
-      setFocusWordLock(null);
-      setWordSweep(null);
-      setSessionFilterWord(null);
-      setSessionFilterFormGroupId(null);
-      setLaunchContext(null);
-      resetActiveAttempt();
     }
     if (current !== null) return;
     const persisted =
@@ -1059,11 +1012,31 @@ export default function StudyView({ mode = 'practice' }) {
       !cardMatchesPractice(current, practiceWords, enabledTypes, practicePrefs)
     ) {
       clearPersistedCurrent();
+      setSelectionStatus('Card changed to match your practice selection.');
+      preparedNextCardRef.current = null;
+      recentCardIdsRef.current = [];
+      try {
+        speechRecognitionRef.current?.abort?.();
+      } catch {}
+      speechRecognitionRef.current = null;
+      setSpeechListening(false);
       setCurrent(null);
       setAnswer('');
       setPhase('answering');
+      setCoachRevealed(0);
+      setGreenRevealed(0);
+      setSelfCheckOpen(false);
+      setStepHint('');
+      setHintMasked(false);
+      setHintRevealed(false);
+      setCoachChatOpen(false);
+      hadKanaMistakeRef.current = false;
+      wrongSnapshotRef.current = null;
+      usedAnswerHelpRef.current = false;
+      setWasCorrected(false);
+      setWasCorrect(false);
     }
-  }, [practiceWords, enabledTypes, practicePrefs, current, transformationMode]);
+  }, [practiceWords, enabledTypes, practicePrefs, current, transformationMode, setCurrent]);
 
   useEffect(() => {
     if (!current || !activeMinimalPairSet) return;
@@ -1073,7 +1046,7 @@ export default function StudyView({ mode = 'practice' }) {
     setPhase('answering');
     setStepHint('');
     setWasCorrect(false);
-  }, [current, activeMinimalPairSet]);
+  }, [current, activeMinimalPairSet, setCurrent]);
 
   useEffect(() => {
     const nextSetId = practicePrefs.minimalPairSetId || '';
@@ -1084,14 +1057,19 @@ export default function StudyView({ mode = 'practice' }) {
     setPhase('answering');
     setStepHint('');
     setWasCorrect(false);
-  }, [practicePrefs.minimalPairSetId]);
+  }, [practicePrefs.minimalPairSetId, setCurrent]);
 
   useLayoutEffect(() => {
+    if (phase === 'answering') committedAttemptRef.current = null;
     if (phase === 'answering' && inputRef.current) {
       focusWithoutScroll(inputRef.current);
       refocusAfterAutoAdvanceRef.current = false;
     }
   }, [current, phase]);
+
+  useLayoutEffect(() => {
+    latestSpeechAttemptRef.current = { card: current, phase, answerMode, submit };
+  });
 
   useEffect(() => {
     if (phase === 'answering') answerStartedAtRef.current = Date.now();
@@ -1103,7 +1081,8 @@ export default function StudyView({ mode = 'practice' }) {
 
   useEffect(() => {
     setShowPromptText(!listeningPrompt);
-  }, [current?.id, listeningPrompt]);
+    listeningPromptSpokenKeyRef.current = '';
+  }, [current, listeningPrompt]);
 
   useEffect(() => {
     if (stepHint && typingHintRef.current) {
@@ -1136,10 +1115,11 @@ export default function StudyView({ mode = 'practice' }) {
       listeningPromptSpokenKeyRef.current = promptKey;
       speakJapaneseLocal(promptAudioText, 0.85);
     }
-    // current?.id used intentionally instead of current to avoid re-triggering on unrelated state changes
+    // The card reference also distinguishes exact-word/form retries. The
+    // spoken-key guard keeps unrelated changes from replaying the same prompt.
     // speakJapaneseLocal is defined inline and omitted to avoid infinite re-runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id, phase, listeningPrompt, promptAudioText, practicePrefs.voiceURI]);
+  }, [current, phase, listeningPrompt, promptAudioText, practicePrefs.voiceURI]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1208,8 +1188,6 @@ export default function StudyView({ mode = 'practice' }) {
   useEffect(() => {
     setReviewBase(state.session.reviewed || 0);
     setRunBase(sessionBaseFrom(state.session));
-    setRunAnswerHistory([]);
-    setRunReviewOpen(false);
     // state.session.reviewed intentionally omitted — only reset baseline when limit setting changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, practicePrefs.reviewLimit, practicePrefs.reviewLimitSource]);
@@ -1225,6 +1203,84 @@ export default function StudyView({ mode = 'practice' }) {
       }
     };
   }, []);
+
+  function applyPracticeSelection(nextSelection, message, blockedMessage) {
+    const currentSelection = normalizePracticeSelection(state.practiceSelection);
+    const resolvedSelection = nextSelection(currentSelection);
+    if (JSON.stringify(resolvedSelection) === JSON.stringify(currentSelection)) {
+      setSelectionStatus(blockedMessage || message);
+      return;
+    }
+    clearPersistedCurrent();
+    preparedNextCardRef.current = null;
+    setState((prev) => updateStatePracticeSelection(prev, resolvedSelection));
+    setSelectionStatus(message);
+  }
+
+  function togglePracticeCategory(categoryId) {
+    const category = PRACTICE_CATEGORIES.find((item) => item.id === categoryId);
+    if (!category) return;
+    const normalized = normalizePracticeSelection(state.practiceSelection);
+    const wasSelected = normalized.selectedCategoryIds.includes(categoryId);
+    if (!wasSelected && !matchingPracticeTypeIdsForCategory(normalized, categoryId).length) {
+      const activeFilters = PRACTICE_FILTERS.flatMap((filter) => {
+        const value = normalized.filters[filter.id];
+        if (value === 'all') return [];
+        const option = filter.options.find((item) => item.id === value);
+        return [`${filter.label}: ${option?.label || value}`];
+      });
+      setSelectionStatus(
+        `No ${category.label} forms match ${activeFilters.join(' and ')}. Set one or more of those filters to All first.`,
+      );
+      return;
+    }
+    applyPracticeSelection(
+      (selection) => togglePracticeCategorySelection(selection, categoryId),
+      `${category.label} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
+      'Keep at least one category on, or choose another category first.',
+    );
+  }
+
+  function setPracticeSelectionFilter(filterId, value) {
+    const filter = PRACTICE_FILTERS.find((item) => item.id === filterId);
+    const option = filter?.options.find((item) => item.id === value);
+    if (!filter || !option) return;
+    applyPracticeSelection(
+      (selection) => setPracticeFilterSelection(selection, filterId, value),
+      `${filter.label} filter set to ${option.label}.`,
+      `No forms match ${option.label} with the current categories and filters.`,
+    );
+  }
+
+  function togglePracticeSelectionType(typeId) {
+    const type = CARD_TYPE_BY_ID.get(typeId);
+    if (!type) return;
+    const category = practiceCategoryForType(typeId);
+    if (!category) return;
+    const normalized = normalizePracticeSelection(state.practiceSelection);
+    const categoryActive = normalized.selectedCategoryIds.includes(category.id);
+    const wasSelected =
+      categoryActive && normalized.selectedTypeIdsByCategory[category.id]?.includes(typeId);
+    const conflicts = practiceFilterConflictsForType(typeId, normalized.filters);
+    if (!wasSelected && conflicts.length) {
+      const currentFilters = conflicts
+        .map((conflict) => `${conflict.label}: ${conflict.valueLabel}`)
+        .join(' and ');
+      const resetFilters = conflicts.map((conflict) => conflict.label).join(' and ');
+      setSelectionStatus(
+        `${type.label} does not match ${currentFilters}. Set ${resetFilters} to All first.`,
+      );
+      return;
+    }
+    applyPracticeSelection(
+      (selection) =>
+        categoryActive
+          ? togglePracticeTypeSelection(selection, typeId)
+          : addPracticeTypeSelection(selection, typeId),
+      `${type.label} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
+      'Keep at least one matching exact form, or relax a quick filter first.',
+    );
+  }
 
   function speakJapaneseLocal(text, rateVal = 0.85) {
     // Prefer a recorded clip with TTS fallback (improvement #18).
@@ -1243,6 +1299,15 @@ export default function StudyView({ mode = 'practice' }) {
     const hasSessionFilter = !!(sessionFilterWord || sessionFilterFormGroupId);
     return (
       <div className="space-y-4">
+        {!transformationMode && (
+          <PracticeSelector
+            selection={state.practiceSelection}
+            onToggleCategory={togglePracticeCategory}
+            onSetFilter={setPracticeSelectionFilter}
+            onToggleType={togglePracticeSelectionType}
+            statusMessage={selectionStatus}
+          />
+        )}
         {hasSessionFilter && (
           <StudyFocusBar
             allWords={verbs}
@@ -1274,8 +1339,8 @@ export default function StudyView({ mode = 'practice' }) {
             <>
               <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
               <p className="text-xs text-stone-600 dark:text-stone-500 mb-4">
-                No words or forms are active in the Practice map right now. Turn on forms in the
-                map, or restore words from Tools.
+                No words are available for this selection. Choose another practice topic or restore
+                words from Tools.
               </p>
               <button
                 onClick={() => setTab('tools')}
@@ -1292,6 +1357,9 @@ export default function StudyView({ mode = 'practice' }) {
 
   const expected = reverseDrill ? current.verb.reading : sourceForm;
   const practicedType = reverseDrill ? sourceTypeForReading : current.type;
+  const contextualPracticeStats = transformationMode
+    ? null
+    : contextualStatsForType(state.practiceStats, practicedType);
   const promptView = reverseDrill
     ? formDisplay(sourceForm, practicePrefs, current.verb, practicedType)
     : promptDisplay(current.verb, promptType, practicePrefs);
@@ -1368,68 +1436,11 @@ export default function StudyView({ mode = 'practice' }) {
     ? minimalPairFeedbackForCard(minimalPairSetForCurrent, current.verb, current.type)
     : null;
   const reviewLimit = activeReviewLimitFromPrefs(practicePrefs);
-  const reviewLimitSource = practicePrefs.reviewLimitSource || '';
-  const introReviewActive = reviewLimitSource === FAMILY_INTRO_REVIEW_LIMIT_SOURCE;
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const runStats = sessionRunStats(state.session, runBase);
-  const runAccuracy = runStats.reviewed
-    ? Math.round((runStats.correct / runStats.reviewed) * 100)
-    : 0;
-  const runCardsLabel = `${runStats.reviewed} ${runStats.reviewed === 1 ? 'card' : 'cards'}`;
-  const runStatsLabel = `${runCardsLabel} · ${runStats.correct} right / ${runStats.missed} wrong · ${runStats.streak} streak`;
-  const runSummaryMetrics = [
-    {
-      label: 'Cards',
-      value: runCardsLabel,
-      valueClass: 'text-stone-950 dark:text-stone-50',
-    },
-    {
-      label: 'Missed',
-      value: `${runStats.missed} missed`,
-      valueClass: runStats.missed
-        ? 'text-rose-700 dark:text-rose-300'
-        : 'text-stone-700 dark:text-stone-300',
-    },
-    {
-      label: 'Streak',
-      value: `${runStats.streak} streak`,
-      valueClass: runStats.streak
-        ? 'text-amber-700 dark:text-amber-300'
-        : 'text-stone-700 dark:text-stone-300',
-    },
-  ];
-  const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit && !recommendationFocus;
+  const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
   const wordSweepComplete = !!wordSweep?.complete;
   const reviewComplete = wordSweepComplete;
-  const workoutProgress = wordSweep
-    ? {
-        now: Math.min(wordSweep.completedTypeIds?.length || 0, wordSweep.allTypeIds?.length || 1),
-        max: Math.max(1, wordSweep.allTypeIds?.length || 0),
-        label: wordSweep.repeatPass ? 'Repeating missed forms' : 'Enabled forms progress',
-      }
-    : reviewLimit > 0
-      ? {
-          now: Math.min(reviewsDone, reviewLimit),
-          max: reviewLimit,
-          label:
-            reviewLimitSource === 'recommendation'
-              ? 'Recommended progress'
-              : introReviewActive
-                ? 'Intro progress'
-                : 'Drill progress',
-        }
-      : {
-          now: reviewsDone,
-          max: 0,
-          label: bonusMode ? 'Bonus practice' : 'Continuous practice',
-          continuous: true,
-        };
-  const workoutProgressPct =
-    workoutProgress.max && !workoutProgress.continuous
-      ? Math.min(100, Math.round((workoutProgress.now / workoutProgress.max) * 100))
-      : 0;
-  const showBoundedProgress =
-    !!wordSweep || !!recommendationFocus || !!familyIntroFocus || !!focus?.recommendation;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishMeaning = englishHintsHidden && phase === 'answering';
   // Guided kana is now an in-box "reveal next" action, not a separate mode.
@@ -1488,28 +1499,32 @@ export default function StudyView({ mode = 'practice' }) {
         ? 'text-emerald-700 dark:text-emerald-400'
         : 'text-stone-600 dark:text-stone-400';
 
-  function nextMinimalPairProgress(correct) {
+  function nextMinimalPairProgress(correct, baseState, gradedAt, eventId) {
     return recordMinimalPairResult(
-      state.minimalPairs,
+      baseState.minimalPairs,
       minimalPairSetForCurrent?.id,
       current?.verb,
       current?.type,
       correct,
+      { now: gradedAt, eventId },
     );
   }
 
-  function nextTransformationStats(correct) {
-    if (!transformationMode) return state.transformation;
-    return gradeTransformationStats(state.transformation, {
+  function nextTransformationStats(correct, baseState, gradedAt, eventId) {
+    if (!transformationMode) return baseState.transformation;
+    return gradeTransformationStats(baseState.transformation, {
       correct,
       sourceType: sourceTypeId,
       targetType: targetTypeId,
       direction: reverseDrill ? 'reverse' : 'forward',
+      now: gradedAt,
+      eventId,
     });
   }
 
-  function mistakeRecordOptions() {
+  function mistakeRecordOptions(eventId) {
     return {
+      eventId,
       ...(minimalPairSetForCurrent?.id ? { minimalPairSetId: minimalPairSetForCurrent.id } : {}),
       ...(transformationMode
         ? {
@@ -1522,62 +1537,99 @@ export default function StudyView({ mode = 'practice' }) {
     };
   }
 
-  function nextGradedState({
-    correct,
-    rid,
-    responseMs,
-    nextMistakes,
-    mistakeDiagnosis,
-    verbStats,
-    daily,
-  }) {
+  function nextGradedState(
+    { correct, eventId, gradedAt, rid, responseMs, nextMistakes, mistakeDiagnosis },
+    baseState = state,
+  ) {
+    if (
+      baseState.practiceStats?.recent?.some((attempt) => attempt.id === eventId) ||
+      (transformationMode && baseState.transformation?.lastAttemptId === eventId)
+    )
+      return baseState;
     if (transformationMode) {
       return {
-        ...state,
-        transformation: nextTransformationStats(correct),
+        ...baseState,
+        transformation: nextTransformationStats(correct, baseState, gradedAt, eventId),
       };
     }
     const progressTypeId = reverseDrill ? sourceTypeForReading : current.type;
     const readinessRuleId = reverseDrill ? cardIdFor(current.verb, progressTypeId) : rid;
-    const gradedAt = Date.now();
-    const gradedCard = gradeCard(state.cards[rid], correct, gradedAt);
+    const gradedCard = {
+      ...gradeCard(baseState.cards[rid], correct, gradedAt),
+      lastAttemptId: eventId,
+    };
     const storedCard = reverseDrill
-      ? withReadingSourceTypeStat(gradedCard, progressTypeId, correct, gradedAt)
+      ? withReadingSourceTypeStat(gradedCard, progressTypeId, correct, gradedAt, eventId)
       : gradedCard;
+    const submittedMistake = nextMistakes?.[0];
+    const mistakes = correct
+      ? resolveMistakesForCurrentCard(baseState.mistakes, gradedAt)
+      : recordMistake(
+          baseState.mistakes,
+          current.verb,
+          current.type,
+          reverseDrill ? sourceTypeForReading : promptType,
+          submittedMistake.userAnswer,
+          expected,
+          { ...mistakeRecordOptions(eventId), now: gradedAt },
+        );
+    const dict = current.verb.dict;
+    const priorWordStats = baseState.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
+    const verbStats = {
+      ...baseState.verbStats,
+      [dict]: {
+        ...(baseState.verbStats?.[dict] || {}),
+        [rid]: {
+          seen: priorWordStats.seen + 1,
+          incorrect: priorWordStats.incorrect + (correct ? 0 : 1),
+        },
+      },
+    };
     const graded = {
-      ...state,
-      mistakes: nextMistakes,
-      minimalPairs: nextMinimalPairProgress(correct),
-      transformation: nextTransformationStats(correct),
-      session: sessionAfterAnswer(state.session, {
+      ...baseState,
+      mistakes,
+      minimalPairs: nextMinimalPairProgress(correct, baseState, gradedAt, eventId),
+      transformation: nextTransformationStats(correct, baseState, gradedAt, eventId),
+      session: sessionAfterAnswer(baseState.session, {
         card: current,
         correct,
         mistakeDiagnosis,
+        eventId,
+        now: gradedAt,
       }),
     };
     return {
       ...graded,
-      cards: { ...state.cards, [rid]: storedCard },
+      cards: { ...baseState.cards, [rid]: storedCard },
       retryQueue: correct
-        ? (state.retryQueue || []).filter((id) => id !== rid)
-        : [...new Set([...(state.retryQueue || []), rid])].slice(-20),
+        ? (baseState.retryQueue || []).filter((id) => id !== rid)
+        : [...new Set([...(baseState.retryQueue || []), rid])].slice(-20),
       verbStats,
-      readiness: recordReadinessAttempt(state.readiness, readinessRuleId, {
+      readiness: recordReadinessAttempt(baseState.readiness, readinessRuleId, {
         correct,
         responseMs,
         answerMode,
         kanaAssist: readinessKanaAssist,
         reverseDrill,
         now: gradedAt,
+        eventId,
       }),
-      weakness: recordWeaknessAttempt(state.weakness, {
+      weakness: recordWeaknessAttempt(baseState.weakness, {
         word: current.verb,
         typeId: progressTypeId,
         correct,
         responseMs,
         now: gradedAt,
+        eventId,
       }),
-      daily,
+      practiceStats: recordPracticeAnswer(baseState.practiceStats, {
+        id: eventId,
+        typeId: progressTypeId,
+        correct,
+        responseMs,
+        mode: listeningPrompt ? 'listening' : answerMode,
+        at: gradedAt,
+      }),
     };
   }
 
@@ -1627,19 +1679,7 @@ export default function StudyView({ mode = 'practice' }) {
     };
   }
 
-  function appendRunAnswerRecord(record) {
-    if (!record) return;
-    setRunAnswerHistory((previous) => [
-      ...previous,
-      {
-        ...record,
-        id: `${record.cardId || 'card'}-${record.answeredAt}-${previous.length}`,
-        number: previous.length + 1,
-      },
-    ]);
-  }
-
-  function resolveMistakesForCurrentCard(mistakes = []) {
+  function resolveMistakesForCurrentCard(mistakes = [], now) {
     const matches = (mistakes || []).filter(
       (mistake) =>
         !mistake.resolved &&
@@ -1648,7 +1688,10 @@ export default function StudyView({ mode = 'practice' }) {
         mistake.type === current?.type,
     );
     if (!matches.length) return mistakes;
-    return matches.reduce((next, mistake) => markMistakeResolved(next, mistake.key), mistakes);
+    return matches.reduce(
+      (next, mistake) => markMistakeResolved(next, mistake.key, { now }),
+      mistakes,
+    );
   }
 
   function stopSpeechRecognition() {
@@ -1683,6 +1726,7 @@ export default function StudyView({ mode = 'practice' }) {
     }
     try {
       const recognition = new SpeechRecognition();
+      const recognitionCard = current;
       speechRecognitionRef.current = recognition;
       speechSubmittedRef.current = false;
       recognition.lang = 'ja-JP';
@@ -1702,6 +1746,14 @@ export default function StudyView({ mode = 'practice' }) {
         setSpeechListening(false);
       };
       recognition.onresult = (event) => {
+        const latest = latestSpeechAttemptRef.current;
+        if (
+          speechRecognitionRef.current !== recognition ||
+          latest?.card !== recognitionCard ||
+          latest.phase !== 'answering' ||
+          latest.answerMode !== 'speak'
+        )
+          return;
         const { transcripts, isFinal } = speechAlternativesFromEvent(event);
         const transcript = bestSpeechAlternative(transcripts, spokenAnswerTargets);
         if (!transcript) return;
@@ -1709,7 +1761,7 @@ export default function StudyView({ mode = 'practice' }) {
         setSpeechError('');
         if (isFinal && !speechSubmittedRef.current) {
           speechSubmittedRef.current = true;
-          submit(transcript, { spoken: true });
+          latest.submit(transcript, { spoken: true });
         }
       };
       recognition.start();
@@ -1848,9 +1900,6 @@ export default function StudyView({ mode = 'practice' }) {
     if (word) {
       setState((prev) => includeWordInReviewState(prev, word));
     }
-    setFamilyIntroFocus(null);
-    setPracticeCategoryFocus(null);
-    setRecommendationFocus(null);
     setWordSweep(null);
     onFocusConsumed?.();
     setSessionFilterWord(word);
@@ -1859,83 +1908,15 @@ export default function StudyView({ mode = 'practice' }) {
 
   function chooseFocusFormGroup(groupId) {
     const group = FORM_GROUPS.find((item) => item.id === groupId);
-    setState((prev) => {
-      const restored = groupId ? includeFormFamilyInReviewState(prev, groupId) : prev;
-      if (!group?.typeIds?.length) return restored;
-      return updateStatePracticeScope(restored, { type: 'enable-family', familyId: groupId });
-    });
-    setFamilyIntroFocus(null);
-    setPracticeCategoryFocus(null);
-    setRecommendationFocus(null);
-    setWordSweep(null);
-    onFocusConsumed?.();
-    setSessionFilterFormGroupId(groupId);
-    setCurrent(null);
-  }
-
-  function togglePracticeDimension(optionId) {
-    if (!optionId) return;
-    setState((prev) => updateStatePracticeScope(prev, { type: 'toggle-filter', optionId }));
-  }
-
-  function togglePracticeFamily(family) {
-    if (!family?.typeIds?.length) return;
-    setState((prev) =>
-      updateStatePracticeScope(prev, { type: 'toggle-family', familyId: family.id }),
-    );
-  }
-
-  function practiceFamilyNow(family, typeIds = []) {
-    const matchingTypeIds = [...new Set(typeIds)].filter((typeId) =>
-      family?.typeIds?.includes(typeId),
-    );
-    if (!family?.id || !matchingTypeIds.length) return;
-    setPracticeCategoryFocus({ familyId: family.id, typeIds: matchingTypeIds });
-    setFamilyIntroFocus(null);
-    setRecommendationFocus(null);
-    setFocusWordLock(null);
-    setWordSweep(null);
-    setSessionFilterWord(null);
-    setSessionFilterFormGroupId(family.id);
-    setLaunchContext(null);
-    onFocusConsumed?.();
-    clearPersistedCurrent();
-    resetActiveAttempt();
-    setCurrent(null);
-  }
-
-  function exitPracticeCategoryFocus() {
-    setPracticeCategoryFocus(null);
-    setSessionFilterFormGroupId(null);
-    resetActiveAttempt();
-    setCurrent(null);
-  }
-
-  function togglePracticeType(typeId) {
-    if (!typeId) return;
-    setState((prev) => updateStatePracticeScope(prev, { type: 'toggle-form', typeId }));
-  }
-
-  function togglePracticeMapFamilyOpen(familyId) {
-    setOpenPracticeMapFamilyIds((current) => {
-      const next = new Set(current);
-      if (next.has(familyId)) next.delete(familyId);
-      else next.add(familyId);
-      return next;
-    });
-  }
-
-  function openPracticeFamilyLesson(family) {
-    const lesson = LESSON_BY_GROUP_ID.get(family?.id);
-    if (!lesson) return false;
-    if (typeof window !== 'undefined') {
-      window.location.hash = `lesson-${lesson.groupId}`;
+    if (group) {
+      setState((prev) =>
+        updateStatePracticeSelection(prev, practiceSelectionForTypeIds(group.typeIds)),
+      );
     }
-    return openLearnFocus?.({
-      source: 'practice-map',
-      lessonGroupId: lesson.groupId,
-      lessonTitle: lesson.title,
-    });
+    setWordSweep(null);
+    onFocusConsumed?.();
+    setSessionFilterFormGroupId(null);
+    setCurrent(null);
   }
 
   // Deterministic, offline step coach — no API key required. Irregular forms
@@ -2012,6 +1993,9 @@ export default function StudyView({ mode = 'practice' }) {
     }
     const raw = choiceValue !== undefined ? choiceValue : answer;
     if (!raw.trim()) return;
+    if (committedAttemptRef.current) return;
+    const eventId = createSyncEventId();
+    committedAttemptRef.current = eventId;
     const spoken = !!options.spoken;
     const fromTypedInput = !!options.fromTypedInput || (choiceValue === undefined && !spoken);
     const normalized = !spoken && fromTypedInput ? toHiragana(raw) : raw;
@@ -2024,19 +2008,11 @@ export default function StudyView({ mode = 'practice' }) {
         : normalized === expected;
     const ok = finalOk && (spoken || (!hadKanaMistakeRef.current && !usedAnswerHelpRef.current));
     if (choiceValue !== undefined) setAnswer(raw);
-    const dict = current.verb.dict,
-      rid = current.id;
-    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
-    const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
-    const newVerbStats = {
-      ...state.verbStats,
-      [dict]: {
-        ...(state.verbStats?.[dict] || {}),
-        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
-      },
-    };
+    const rid = current.id;
+    const gradedAt = Date.now();
+    const responseMs = Math.max(0, gradedAt - answerStartedAtRef.current);
     const nextMistakes = ok
-      ? resolveMistakesForCurrentCard(state.mistakes)
+      ? resolveMistakesForCurrentCard(state.mistakes, gradedAt)
       : recordMistake(
           state.mistakes,
           current.verb,
@@ -2044,21 +2020,21 @@ export default function StudyView({ mode = 'practice' }) {
           reverseDrill ? sourceTypeForReading : promptType,
           spoken || reverseDrill ? raw.trim() : normalized,
           expected,
-          mistakeRecordOptions(),
+          { ...mistakeRecordOptions(eventId), now: gradedAt },
         );
-    const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
     const submittedForReview =
       finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw;
-    const nextState = nextGradedState({
+    const grading = {
       correct: ok,
+      eventId,
+      gradedAt,
       rid,
       responseMs,
       nextMistakes,
       mistakeDiagnosis,
-      verbStats: newVerbStats,
-      daily: newDaily,
-    });
+    };
+    const nextState = nextGradedState(grading);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
@@ -2069,16 +2045,14 @@ export default function StudyView({ mode = 'practice' }) {
       mistakeDiagnosis,
       wasCorrected: finalOk && !ok,
     });
-    appendRunAnswerRecord(runRecord);
     setReviewRecord(runRecord);
-    setState(nextState);
+    setState((previous) => nextGradedState(grading, previous));
     setSelfCheckOpen(false);
     setWasCorrected(finalOk && !ok);
     setWasCorrect(ok);
     setPhase('reviewing');
     const reviewWillComplete =
-      sweepStep?.sweep?.complete ||
-      (reviewLimit > 0 && !recommendationFocus && reviewsDone + 1 >= reviewLimit);
+      sweepStep?.sweep?.complete || (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit);
     const likelyNextCard = reviewWillComplete
       ? null
       : prepareLikelyNextCard(nextState, current.id, sweepStep);
@@ -2112,6 +2086,8 @@ export default function StudyView({ mode = 'practice' }) {
 
   function skipCurrent() {
     if (!current) return;
+    const eventId = createSyncEventId();
+    const now = Date.now();
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
@@ -2121,14 +2097,18 @@ export default function StudyView({ mode = 'practice' }) {
       ? state
       : {
           ...state,
-          session: sessionAfterSkip(state.session, current),
+          session: sessionAfterSkip(state.session, current, { eventId, now }),
         };
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, false)
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
     const likelyNextCard = prepareLikelyNextCard(nextState, current.id, sweepStep);
-    if (!transformationMode) setState(nextState);
+    if (!transformationMode)
+      setState((previous) => ({
+        ...previous,
+        session: sessionAfterSkip(previous.session, current, { eventId, now }),
+      }));
     setAnswer('');
     setCoachRevealed(0);
     setSelfCheckOpen(false);
@@ -2164,24 +2144,18 @@ export default function StudyView({ mode = 'practice' }) {
   }
 
   function gradeSelfCheck(ok, label) {
-    if (!current || phase !== 'answering') return;
+    if (!current || phase !== 'answering' || committedAttemptRef.current) return;
+    const eventId = createSyncEventId();
+    committedAttemptRef.current = eventId;
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
-    const dict = current.verb.dict,
-      rid = current.id;
-    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
-    const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
-    const newVerbStats = {
-      ...state.verbStats,
-      [dict]: {
-        ...(state.verbStats?.[dict] || {}),
-        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
-      },
-    };
+    const rid = current.id;
+    const gradedAt = Date.now();
+    const responseMs = Math.max(0, gradedAt - answerStartedAtRef.current);
     const nextMistakes = ok
-      ? resolveMistakesForCurrentCard(state.mistakes)
+      ? resolveMistakesForCurrentCard(state.mistakes, gradedAt)
       : recordMistake(
           state.mistakes,
           current.verb,
@@ -2189,19 +2163,19 @@ export default function StudyView({ mode = 'practice' }) {
           reverseDrill ? sourceTypeForReading : promptType,
           `self-check: ${label}`,
           expected,
-          mistakeRecordOptions(),
+          { ...mistakeRecordOptions(eventId), now: gradedAt },
         );
-    const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
-    const nextState = nextGradedState({
+    const grading = {
       correct: ok,
+      eventId,
+      gradedAt,
       rid,
       responseMs,
       nextMistakes,
       mistakeDiagnosis,
-      verbStats: newVerbStats,
-      daily: newDaily,
-    });
+    };
+    const nextState = nextGradedState(grading);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
@@ -2213,16 +2187,14 @@ export default function StudyView({ mode = 'practice' }) {
       revealedMiss: !ok,
       mistakeDiagnosis,
     });
-    appendRunAnswerRecord(runRecord);
     setReviewRecord(runRecord);
-    setState(nextState);
+    setState((previous) => nextGradedState(grading, previous));
     setAnswer('');
     setSelfCheckOpen(false);
     setWasCorrect(ok);
     setPhase('reviewing');
     const reviewWillComplete =
-      sweepStep?.sweep?.complete ||
-      (reviewLimit > 0 && !recommendationFocus && reviewsDone + 1 >= reviewLimit);
+      sweepStep?.sweep?.complete || (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit);
     const likelyNextCard = reviewWillComplete
       ? null
       : prepareLikelyNextCard(nextState, current.id, sweepStep);
@@ -2255,23 +2227,17 @@ export default function StudyView({ mode = 'practice' }) {
   }
 
   function revealAnswer() {
-    if (!current || phase !== 'answering') return;
+    if (!current || phase !== 'answering' || committedAttemptRef.current) return;
+    const eventId = createSyncEventId();
+    committedAttemptRef.current = eventId;
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
     stopSpeechRecognition();
-    const dict = current.verb.dict,
-      rid = current.id;
-    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
-    const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
-    const newVerbStats = {
-      ...state.verbStats,
-      [dict]: {
-        ...(state.verbStats?.[dict] || {}),
-        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + 1 },
-      },
-    };
+    const rid = current.id;
+    const gradedAt = Date.now();
+    const responseMs = Math.max(0, gradedAt - answerStartedAtRef.current);
     const nextMistakes = recordMistake(
       state.mistakes,
       current.verb,
@@ -2279,25 +2245,25 @@ export default function StudyView({ mode = 'practice' }) {
       reverseDrill ? sourceTypeForReading : promptType,
       '(revealed)',
       expected,
-      mistakeRecordOptions(),
+      { ...mistakeRecordOptions(eventId), now: gradedAt },
     );
     const mistakeDiagnosis = nextMistakes[0]?.diagnosis || null;
-    const nextState = nextGradedState({
+    const grading = {
       correct: false,
+      eventId,
+      gradedAt,
       rid,
       responseMs,
       nextMistakes,
       mistakeDiagnosis,
-      verbStats: newVerbStats,
-      daily: bumpDaily(state.daily, false, dailyGoalTarget),
-    });
+    };
+    const nextState = nextGradedState(grading);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, false, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
     const reviewWillComplete =
-      sweepStep?.sweep?.complete ||
-      (reviewLimit > 0 && !recommendationFocus && reviewsDone + 1 >= reviewLimit);
+      sweepStep?.sweep?.complete || (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit);
     if (!reviewWillComplete) prepareLikelyNextCard(nextState, current.id, sweepStep);
     const runRecord = buildRunAnswerRecord({
       correct: false,
@@ -2306,9 +2272,8 @@ export default function StudyView({ mode = 'practice' }) {
       revealedMiss: true,
       mistakeDiagnosis,
     });
-    appendRunAnswerRecord(runRecord);
     setReviewRecord(runRecord);
-    setState(nextState);
+    setState((previous) => nextGradedState(grading, previous));
     setAnswer('');
     setSelfCheckOpen(false);
     setWasCorrect(false);
@@ -2419,26 +2384,6 @@ export default function StudyView({ mode = 'practice' }) {
     openLabTool?.(tool);
   }
 
-  if (runReviewOpen) {
-    return (
-      <PracticeRunReviewPage
-        answers={runAnswerHistory}
-        runStatsLabel={runStatsLabel}
-        onBack={() => setRunReviewOpen(false)}
-        geminiKey={geminiKey}
-        onOpenGuide={openGuideForReviewRule}
-        onOpenLab={openLabForReviewRoute}
-        onOpenLearn={(groupId, rowShiftVisual) => {
-          window.location.hash = groupId
-            ? `lesson-${groupId}`
-            : buildFormationKeysHash(rowShiftVisual);
-          setTab('learn');
-        }}
-        onOpenLearnFocus={openLearnForRuleRecord}
-      />
-    );
-  }
-
   // Focused word-form sweeps can complete; default Practice keeps going.
   if (reviewComplete && phase === 'answering') {
     const sessionCorrect = runStats.correct;
@@ -2524,8 +2469,6 @@ export default function StudyView({ mode = 'practice' }) {
           onClick={() => {
             setWordSweep(null);
             setBonusMode(true);
-            setRunAnswerHistory([]);
-            setRunReviewOpen(false);
             setCurrent(selectNextReviewCard(state, current?.id, { bonusMode: true, wordLists }));
             setPhase('answering');
           }}
@@ -2541,17 +2484,13 @@ export default function StudyView({ mode = 'practice' }) {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
-          {reviewLimitSource === 'recommendation'
-            ? 'Recommended practice complete'
-            : introReviewActive
-              ? 'Family intro complete'
-              : 'Drill complete'}
+          Drill complete
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
           {state.session.correct}/{state.session.reviewed}
         </div>
         <div className="text-sm text-stone-600 mb-1">
-          {introReviewActive ? 'Intro accuracy:' : 'Drill accuracy:'}{' '}
+          Drill accuracy:{' '}
           {state.session.reviewed
             ? Math.round((state.session.correct / state.session.reviewed) * 100)
             : 0}
@@ -2559,8 +2498,7 @@ export default function StudyView({ mode = 'practice' }) {
         </div>
         {reviewLimit > 0 && (
           <div className="text-xs text-stone-600 mb-5">
-            {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this{' '}
-            {introReviewActive ? 'intro' : 'drill'}
+            {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this drill
           </div>
         )}
         {sessionMistakePatterns.length > 0 ? (
@@ -2603,16 +2541,8 @@ export default function StudyView({ mode = 'practice' }) {
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
             setRunBase(sessionBaseFrom(state.session));
-            setRunAnswerHistory([]);
-            setRunReviewOpen(false);
-            if (introReviewActive) {
-              setPracticePrefs((prev) => clearBoundedReviewPrefs(prev));
-              setFamilyIntroFocus(null);
-              setSessionFilterFormGroupId(null);
-              setCurrent(null);
-            } else {
-              setCurrent(selectNextReviewCard(state, current.id));
-            }
+            setPracticePrefs((prev) => clearBoundedReviewPrefs(prev));
+            setCurrent(selectNextReviewCard(state, current.id));
             setAnswer('');
             setPhase('answering');
           }}
@@ -2670,11 +2600,8 @@ export default function StudyView({ mode = 'practice' }) {
 
   function returnToReference() {
     setLaunchContext(null);
-    setFamilyIntroFocus(null);
-    setPracticeCategoryFocus(null);
     setFocusWordLock(null);
     setWordSweep(null);
-    setRecommendationFocus(null);
     onFocusConsumed?.();
     setTab('tools');
   }
@@ -2693,16 +2620,7 @@ export default function StudyView({ mode = 'practice' }) {
     return next;
   }
 
-  function restoreRecommendationEnabledTypes() {
-    const returnEnabledTypes = Array.isArray(recommendationFocus?.returnEnabledTypes)
-      ? recommendationFocus.returnEnabledTypes.filter(Boolean)
-      : null;
-    if (!returnEnabledTypes) return;
-    setState((prev) => ({ ...prev, enabledTypes: returnEnabledTypes }));
-  }
-
-  // Universal escape hatch back to Stats. Exits whatever focused practice is
-  // active (minimal-pair contrast, bounded drill, or a focus-word lock).
+  // Exit a word or drill focus back into the learner's persistent Practice mix.
   function returnToOverview() {
     if (activeMinimalPairSet) {
       const restoreTypes = minimalPairReturnEnabledTypes(practicePrefs) || [];
@@ -2710,172 +2628,55 @@ export default function StudyView({ mode = 'practice' }) {
         const cleared = clearMinimalPairPrefs(prev);
         return clearBoundedReviewPrefs(cleared);
       });
-      if (restoreTypes.length) setState((prev) => ({ ...prev, enabledTypes: restoreTypes }));
+      if (restoreTypes.length) {
+        setState((prev) =>
+          updateStatePracticeSelection(
+            prev,
+            practiceSelectionForTypeIds(restoreTypes, prev.practiceSelection),
+          ),
+        );
+      }
     } else {
       setPracticePrefs((prev) => clearBoundedReviewPrefs(prev));
-      restoreRecommendationEnabledTypes();
     }
     setLaunchContext(null);
-    setFamilyIntroFocus(null);
-    setPracticeCategoryFocus(null);
     setFocusWordLock(null);
     setWordSweep(null);
-    setRecommendationFocus(null);
     setSessionFilterWord(null);
     setSessionFilterFormGroupId(null);
     onFocusConsumed?.();
     resetActiveAttempt();
     setCurrent(null);
-    setTab('stats');
+    setTab('practice');
   }
 
-  function introducePracticeFamily(family) {
-    const typeIds = familyIntroTypeIds(family, state.enabledTypes);
-    if (!family?.id || !typeIds.length) return;
-    setState((prev) => {
-      const restored = includeFormFamilyInReviewState(prev, family.id);
-      const scoped = updateStatePracticeScope(restored, {
-        type: 'enable-family',
-        familyId: family.id,
-        typeIds,
-      });
-      return {
-        ...scoped,
-        session: { ...(restored.session || {}), mistakePatterns: {} },
-      };
-    });
-    setPracticePrefs((prev) => ({
-      ...clearBoundedReviewPrefs(prev),
-      minimalPairSetId: '',
-      minimalPairReturn: null,
-      practicePath: '',
-      wordListIds: [],
-      reviewLimit: typeIds.length,
-      reviewLimitSource: FAMILY_INTRO_REVIEW_LIMIT_SOURCE,
-    }));
-    setSessionFilterFormGroupId(family.id);
-    setPracticeCategoryFocus(null);
-    setFamilyIntroFocus({ familyId: family.id, typeIds });
-    setSessionFilterWord(null);
-    setFocusWordLock(null);
-    setWordSweep(null);
-    setRecommendationFocus(null);
-    setLaunchContext(null);
-    onFocusConsumed?.();
-    clearPersistedCurrent();
-    resetActiveAttempt();
-    setCurrent(null);
-    setAnswer('');
-    setPhase('answering');
-  }
-
-  // Title banner for a focused "Practice this" launch. Generalizes the older
-  // reference-drill banner so every targeted entry (a Check/Library word, a
-  // reference drill, or a form family) leads the active practice with a clear
-  // title of what is being studied plus a single exit affordance.
-  const focusBannerGroup = sessionFilterFormGroupId
-    ? FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId)
-    : null;
-  const familyIntroActive =
-    !!familyIntroFocus && familyIntroFocus.familyId === focusBannerGroup?.id;
-  const practiceCategoryFocusActive =
-    !!practiceCategoryFocus && practiceCategoryFocus.familyId === focusBannerGroup?.id;
-  const familyIntroLesson = familyIntroActive
-    ? LESSON_BY_GROUP_ID.get(familyIntroFocus.familyId)
-    : null;
-  const familyIntroTypes = familyIntroActive
-    ? (familyIntroFocus.typeIds || []).map((typeId) => CARD_TYPE_BY_ID.get(typeId)).filter(Boolean)
-    : [];
+  // Word-level launches remain focused until the learner exits the banner.
   const focusBannerWord = sessionFilterWord || focusWordLock;
-  const showFocusedSentenceMode =
-    recommendationFocus?.source === 'lesson' &&
-    !BEGINNER_RECOMMENDATION_PREFIXES.some((prefix) => recommendationFocus.id?.startsWith(prefix));
-  const recommendationCountParts = recommendationFocus
-    ? [
-        recommendationFocus.suggestedCount
-          ? `${recommendationFocus.suggestedCount} recommended cards`
-          : '',
-        recommendationFocus.wordCount ? `${recommendationFocus.wordCount} focused words` : '',
-        recommendationFocus.typeCount ? `${recommendationFocus.typeCount} focused form types` : '',
-      ].filter(Boolean)
-    : [];
-  const recommendationSubtitle = recommendationFocus
-    ? [
-        recommendationFocus.detail,
-        recommendationCountParts.join(' · '),
-        'Continuous practice',
-        'exit anytime',
-        'Default Practice unchanged',
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : '';
   function toggleSentenceMode() {
     setPracticePrefs((prev) => ({ ...prev, sentenceMode: !prev.sentenceMode }));
   }
-  const focusBanner = recommendationFocus
+  const focusBanner = focusBannerWord
     ? {
-        kicker:
-          recommendationFocus.source === 'lesson'
-            ? 'Learn focus'
-            : recommendationFocus.source === 'lab'
-              ? 'Drills focus'
-              : 'Tools focus',
-        title: recommendationFocus.label || 'Recommended practice',
-        reading: '',
-        subtitle: recommendationSubtitle,
-        showSentenceMode: showFocusedSentenceMode,
-        exitLabel: 'Exit focus',
-        onExit: returnToOverview,
+        kicker: wordSweep
+          ? 'Word form sweep'
+          : referenceLaunch
+            ? 'Reference drill'
+            : 'Focused practice',
+        title: focusBannerWord.dict,
+        lang: 'ja',
+        reading: focusBannerWord.reading || '',
+        subtitle: [
+          exerciseMeaningForWord(focusBannerWord),
+          wordSweep
+            ? `${wordSweep.allTypeIds?.length || 0} enabled form types`
+            : referenceLaunch?.referenceLabel || typeInfo.label,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        exitLabel: referenceLaunch ? 'Back to reference' : 'Exit focus',
+        onExit: referenceLaunch ? returnToReference : returnToOverview,
       }
-    : focusBannerGroup
-      ? {
-          kicker: familyIntroActive
-            ? 'Family primer'
-            : practiceCategoryFocusActive
-              ? 'Category focus'
-              : 'Form family practice',
-          title: focusBannerGroup.label,
-          reading: '',
-          subtitle: familyIntroActive
-            ? `${familyIntroTypes.length || familyIntroFocus?.typeIds?.length || 0}-card guided set`
-            : practiceCategoryFocusActive
-              ? `${practiceCategoryFocus.typeIds.length} form types matching filters · Continuous practice · exit anytime · Default Practice unchanged`
-              : focusBannerGroup.typeIds?.length
-                ? `${focusBannerGroup.typeIds.length} form types in this family · Continuous practice · exit anytime`
-                : 'Focused form practice',
-          exitLabel: 'Exit focus',
-          onExit: practiceCategoryFocusActive ? exitPracticeCategoryFocus : returnToOverview,
-        }
-      : focusBannerWord
-        ? {
-            kicker: wordSweep
-              ? 'Word form sweep'
-              : referenceLaunch
-                ? 'Reference drill'
-                : 'Focused practice',
-            title: focusBannerWord.dict,
-            lang: 'ja',
-            reading: focusBannerWord.reading || '',
-            subtitle: [
-              exerciseMeaningForWord(focusBannerWord),
-              wordSweep
-                ? `${wordSweep.allTypeIds?.length || 0} enabled form types`
-                : referenceLaunch?.referenceLabel || typeInfo.label,
-            ]
-              .filter(Boolean)
-              .join(' · '),
-            exitLabel: referenceLaunch ? 'Back to reference' : 'Exit focus',
-            onExit: referenceLaunch ? returnToReference : returnToOverview,
-          }
-        : null;
-  const topSessionMistake = sessionMistakePatterns[0] || null;
-  const guideInsight =
-    mode === 'practice' ? buildGuideDiagnosticInsight(state.guide, { minAttempts: 2 }) : null;
-  const guideInsightLabel = guideInsight ? `Guide: ${guideInsightChipLabel(guideInsight)}` : '';
-  const guideInsightAriaLabel = guideInsight
-    ? `${guideInsightLabel}. ${[guideInsight.message, guideInsight.detail].filter(Boolean).join(' ')}`
-    : '';
+    : null;
   const currentOrigin = cardOriginForStudyCard(current);
   const currentSelectionReason = wordSweep?.repeatPass
     ? 'Repeating missed forms'
@@ -2893,43 +2694,9 @@ export default function StudyView({ mode = 'practice' }) {
     currentSelectionReason.startsWith('Strengthening ')
       ? currentSelectionReason
       : currentOriginMeta.label;
-  const currentSourceDetail =
-    currentSourceChipLabel === currentSelectionReason ? '' : currentSelectionReason;
-  const recentOutcomes = Array.isArray(state.session?.recentOutcomes)
-    ? state.session.recentOutcomes
-    : [];
-  const previousMissCoachSentence =
-    currentOrigin === 'missed'
-      ? runStats.reviewed > 0 && runStats.missed === 0
-        ? 'Clean run so far. This card was missed in an earlier practice run.'
-        : 'This card was missed earlier.'
-      : '';
-  const coachSentence = topSessionMistake
-    ? previousMissCoachSentence
-      ? `${previousMissCoachSentence} Watch ${topSessionMistake.label}.`
-      : `${currentSelectionReason}. Watch ${topSessionMistake.label}.`
-    : previousMissCoachSentence ||
-      (runStats.reviewed > 0 && runStats.missed === 0
-        ? `${currentSelectionReason}. Clean run so far.`
-        : `${currentSelectionReason}.`);
-
-  function adjustPracticeFocus() {
-    setPracticeMapMobileOpen(true);
-    window.requestAnimationFrame?.(() => {
-      const map = document.getElementById('practice-map');
-      map?.scrollIntoView?.({ block: 'start' });
-      map?.querySelector('button')?.focus({ preventScroll: true });
-    });
-  }
 
   return (
-    <div
-      className={
-        transformationMode
-          ? 'mx-auto max-w-3xl'
-          : 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] xl:justify-center xl:grid-cols-[minmax(0,42rem)_minmax(0,20rem)]'
-      }
-    >
+    <div className={transformationMode ? 'mx-auto max-w-3xl' : 'mx-auto max-w-3xl'}>
       <div className="order-1 min-w-0 space-y-4 xl:w-full">
         {focusBanner && (
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 px-5 py-4 dark:border-indigo-800 dark:bg-indigo-950/20">
@@ -2991,52 +2758,6 @@ export default function StudyView({ mode = 'practice' }) {
             </div>
           </div>
         )}
-        {familyIntroActive && (
-          <section
-            aria-label={`${focusBannerGroup.label} primer`}
-            className="rounded-2xl border border-sky-200 bg-sky-50/70 px-5 py-4 dark:border-sky-900/60 dark:bg-sky-950/20"
-          >
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 rounded-lg bg-sky-600 p-2 text-white dark:bg-sky-400 dark:text-stone-950">
-                <IconBook className="h-4 w-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-300">
-                  Primer
-                </div>
-                <h3 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
-                  {familyIntroLesson?.title || focusBannerGroup.label}
-                </h3>
-                <p className="mt-1 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
-                  {familyIntroLesson?.summary || 'Start with the core forms in this family.'}
-                </p>
-                {familyIntroLesson?.build && (
-                  <p className="mt-2 text-xs leading-relaxed text-stone-600 dark:text-stone-400">
-                    {familyIntroLesson.build}
-                  </p>
-                )}
-                {familyIntroTypes.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {familyIntroTypes.map((type) => (
-                      <span
-                        key={type.id}
-                        className="rounded-lg border border-sky-200 bg-white px-2.5 py-1 text-xs font-semibold text-sky-800 dark:border-sky-900 dark:bg-stone-950/60 dark:text-sky-200"
-                      >
-                        {type.label}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {familyIntroLesson?.watch && (
-                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-200">
-                    <span className="font-semibold">Watch: </span>
-                    {familyIntroLesson.watch}
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        )}
         {undoReviewScopeAction && (
           <div
             role="status"
@@ -3057,347 +2778,98 @@ export default function StudyView({ mode = 'practice' }) {
           </div>
         )}
         {!transformationMode && (
-          <section
-            aria-labelledby="practice-run-heading"
-            className="rounded-xl border border-stone-200 bg-white px-3 py-2.5 shadow-sm shadow-stone-950/5 dark:border-stone-800 dark:bg-stone-900 dark:shadow-black/20 sm:px-4 sm:py-3"
-          >
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2
-                    id="practice-run-heading"
-                    className="text-xs font-semibold uppercase tracking-wider text-stone-600"
-                  >
-                    Practice run
-                  </h2>
-                  {runStats.reviewed > 0 && (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/70">
-                      {runAccuracy}% right
-                    </span>
-                  )}
-                  {guideInsight && (
+          <PracticeSelector
+            selection={state.practiceSelection}
+            onToggleCategory={togglePracticeCategory}
+            onSetFilter={setPracticeSelectionFilter}
+            onToggleType={togglePracticeSelectionType}
+            statusMessage={selectionStatus}
+          />
+        )}
+        {!transformationMode && (
+          <details className="rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-stone-700 dark:text-stone-200">
+              <span>Answer settings</span>
+              <span className="text-xs font-medium text-stone-500">
+                {ANSWER_STYLE_OPTIONS.find((option) => option.id === answerMode)?.label || 'Type'} ·
+                Kana {liveKanaHelpEnabled ? 'on' : 'off'} · Sentence {sentenceMode ? 'on' : 'off'}
+              </span>
+            </summary>
+            <div className="flex flex-col gap-3 border-t border-stone-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-stone-800">
+              <div
+                role="group"
+                aria-label="Answer style"
+                className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
+              >
+                <span className="px-1.5 text-xs font-medium text-stone-600">Answer</span>
+                {ANSWER_STYLE_OPTIONS.map((option) => {
+                  const active = answerMode === option.id;
+                  return (
                     <button
+                      key={option.id}
                       type="button"
-                      onClick={() => setTab('guide')}
-                      aria-label={guideInsightAriaLabel}
-                      title={guideInsight.message}
-                      className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100 active:scale-[0.97] dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/40"
+                      onClick={() => setAnswerStyle(option.id)}
+                      aria-pressed={active}
+                      className={`min-h-8 rounded-md px-2 py-1 text-xs font-medium transition ${
+                        active
+                          ? 'bg-stone-800 text-white dark:bg-indigo-600'
+                          : 'text-stone-600 hover:bg-white dark:text-stone-400 dark:hover:bg-stone-800'
+                      }`}
                     >
-                      <IconBook className="h-3 w-3" />
-                      <span>{guideInsightLabel}</span>
+                      {option.label}
                     </button>
-                  )}
-                </div>
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className="mt-1 max-w-2xl text-sm leading-snug text-stone-600 dark:text-stone-300"
-                >
-                  {coachSentence}
-                </div>
+                  );
+                })}
               </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <details className="relative" open={practiceSettingsOpen}>
-                  <summary
-                    role="button"
-                    aria-label="Practice run settings"
-                    aria-expanded={practiceSettingsOpen}
-                    title="Practice run settings"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setPracticeSettingsOpen((open) => !open);
-                    }}
-                    className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg border border-stone-200 text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+              <div className="flex flex-wrap gap-1.5">
+                {typedAnswerMode && !reverseDrill && (
+                  <button
+                    type="button"
+                    onClick={toggleKanaHelp}
+                    aria-pressed={liveKanaHelpEnabled}
+                    className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                      liveKanaHelpEnabled
+                        ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                        : 'border-stone-200 text-stone-600 dark:border-stone-800 dark:text-stone-400'
+                    }`}
                   >
-                    <IconSettings className="h-3.5 w-3.5" />
-                  </summary>
-                  {practiceSettingsOpen && (
-                    <div
-                      role="group"
-                      aria-label="Practice run settings"
-                      className="absolute left-0 right-auto z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-xl border border-stone-200 bg-white p-3 text-left shadow-xl dark:border-stone-800 dark:bg-stone-900 sm:left-auto sm:right-0 sm:max-w-[calc(100vw-2rem)]"
-                    >
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
-                          Practice settings
-                        </div>
-                        <div className="text-[11px] font-medium text-stone-600">
-                          {reverseDrill ? 'Reading' : 'Form'}
-                        </div>
-                      </div>
-                      <div
-                        role="group"
-                        aria-label="Answer style"
-                        className="mb-3 inline-flex w-full flex-wrap items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
-                      >
-                        <span className="px-1.5 text-xs font-medium text-stone-600">Answer</span>
-                        {ANSWER_STYLE_OPTIONS.map((option) => {
-                          const active = answerMode === option.id;
-                          return (
-                            <button
-                              key={option.id}
-                              type="button"
-                              onClick={() => setAnswerStyle(option.id)}
-                              aria-pressed={active}
-                              className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-                                active
-                                  ? 'bg-stone-800 text-white dark:bg-indigo-600'
-                                  : 'text-stone-600 hover:bg-white hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200'
-                              }`}
-                            >
-                              {option.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="space-y-2">
-                        {typedAnswerMode && !reverseDrill && (
-                          <button
-                            type="button"
-                            onClick={toggleKanaHelp}
-                            aria-pressed={liveKanaHelpEnabled}
-                            aria-label={`Kana help ${liveKanaHelpEnabled ? 'on' : 'off'}`}
-                            title={liveKanaHelpEnabled ? 'Turn kana help off' : 'Turn kana help on'}
-                            className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
-                              liveKanaHelpEnabled
-                                ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                                : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-                            }`}
-                          >
-                            <span className="inline-flex items-center gap-1.5">
-                              {liveKanaHelpEnabled ? (
-                                <IconEye className="h-3.5 w-3.5" />
-                              ) : (
-                                <IconEyeOff className="h-3.5 w-3.5" />
-                              )}
-                              Kana help
-                            </span>
-                            <span>{liveKanaHelpEnabled ? 'on' : 'off'}</span>
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={toggleAutoNext}
-                          aria-pressed={autoAdvanceCorrect}
-                          aria-label={`Auto next ${autoAdvanceCorrect ? 'on' : 'off'}`}
-                          title={`Auto next for ${autoAdvanceFormKey}`}
-                          className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
-                            autoAdvanceCorrect
-                              ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                              : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-                          }`}
-                        >
-                          <span className="inline-flex items-center gap-1.5">
-                            <IconRefresh className="h-3.5 w-3.5" />
-                            Auto next
-                          </span>
-                          <span>{autoAdvanceCorrect ? 'on' : 'off'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={toggleSentenceMode}
-                          aria-pressed={sentenceMode}
-                          aria-label={`Sentence ${sentenceMode ? 'on' : 'off'}`}
-                          title="Show each prompt inside an example sentence (stays on until you turn it off)"
-                          className={`flex w-full items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-xs font-medium transition ${
-                            sentenceMode
-                              ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                              : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-                          }`}
-                        >
-                          <span>Sentence</span>
-                          <span>{sentenceMode ? 'on' : 'off'}</span>
-                        </button>
-                      </div>
-                      <div className="mt-3 border-t border-stone-200 pt-3 dark:border-stone-800">
-                        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400">
-                          Adjust scope
-                        </div>
-                        <p className="mb-2 text-[11px] leading-snug text-stone-600 dark:text-stone-400">
-                          Removes this word from automatic Practice. Restore words from Tools. To
-                          move on without changing scope, use Skip.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            removeCurrentWordFromReviews();
-                            setPracticeSettingsOpen(false);
-                          }}
-                          className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-stone-700 transition hover:bg-rose-50 hover:text-rose-700 dark:text-stone-200 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
-                        >
-                          Remove this word from Practice
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </details>
+                    Kana help {liveKanaHelpEnabled ? 'on' : 'off'}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => setRunReviewOpen(true)}
-                  disabled={!runAnswerHistory.length}
-                  className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-stone-200 px-3 text-xs font-semibold text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100 max-[359px]:hidden"
+                  onClick={toggleSentenceMode}
+                  aria-pressed={sentenceMode}
+                  className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                    sentenceMode
+                      ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                      : 'border-stone-200 text-stone-600 dark:border-stone-800 dark:text-stone-400'
+                  }`}
                 >
-                  <IconList className="h-3.5 w-3.5" />
-                  Review answers
+                  Sentence {sentenceMode ? 'on' : 'off'}
                 </button>
                 <button
                   type="button"
-                  onClick={adjustPracticeFocus}
-                  className="inline-flex min-h-10 items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 active:scale-[0.96] dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300 dark:hover:bg-indigo-950/50"
+                  onClick={toggleAutoNext}
+                  aria-pressed={autoAdvanceCorrect}
+                  className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                    autoAdvanceCorrect
+                      ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                      : 'border-stone-200 text-stone-600 dark:border-stone-800 dark:text-stone-400'
+                  }`}
                 >
-                  Adjust focus
+                  Auto next {autoAdvanceCorrect ? 'on' : 'off'}
+                </button>
+                <button
+                  type="button"
+                  onClick={removeCurrentWordFromReviews}
+                  className="min-h-9 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-stone-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 dark:border-stone-800 dark:text-stone-400 dark:hover:border-rose-800 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
+                >
+                  Remove this word
                 </button>
               </div>
             </div>
-            <dl
-              aria-label={`Practice run summary: ${runStatsLabel}`}
-              className={`mt-3 max-[359px]:hidden grid-cols-3 gap-2 border-t border-stone-100 pt-3 text-xs dark:border-stone-800 ${runStats.reviewed > 0 ? 'hidden sm:grid' : 'grid'}`}
-            >
-              {runSummaryMetrics.map((metric) => (
-                <div key={metric.label} className="min-w-0">
-                  <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-600 dark:text-stone-500">
-                    {metric.label}
-                  </dt>
-                  <dd
-                    className={`mt-0.5 truncate text-sm font-semibold tabular-nums ${metric.valueClass}`}
-                  >
-                    {metric.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            {runStats.reviewed === 0 && (
-              <div className="mt-2 hidden items-center gap-2 rounded-lg bg-stone-50 px-3 py-2 text-[11px] font-semibold tabular-nums text-stone-600 dark:bg-stone-950 dark:text-stone-300 max-[359px]:flex">
-                <span>{runCardsLabel}</span>
-                <span aria-hidden="true">·</span>
-                <span>{runStats.missed} missed</span>
-                <span aria-hidden="true">·</span>
-                <span>{runStats.streak} streak</span>
-              </div>
-            )}
-            {runStats.reviewed > 0 && (
-              <details className="mt-2 sm:hidden">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-700 dark:bg-stone-950 dark:text-stone-300">
-                  <span className="truncate font-semibold tabular-nums">{runStatsLabel}</span>
-                  <span className="shrink-0 text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
-                    Show run summary
-                  </span>
-                </summary>
-                <div className="mt-2 space-y-2 rounded-lg border border-stone-100 p-2.5 text-xs text-stone-600 dark:border-stone-800 dark:text-stone-400">
-                  <div>
-                    <span className="font-semibold text-stone-700 dark:text-stone-200">
-                      Why this card:{' '}
-                    </span>
-                    {currentSelectionReason}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-stone-700 dark:text-stone-200">
-                      Top miss:{' '}
-                    </span>
-                    {topSessionMistake
-                      ? `${topSessionMistake.label} (${topSessionMistake.count}x)`
-                      : 'No pattern yet'}
-                  </div>
-                </div>
-              </details>
-            )}
-            {!workoutProgress.continuous && showBoundedProgress && (
-              <div className="mt-3 space-y-1.5">
-                <div className="flex items-center justify-between gap-3 text-xs text-stone-600 dark:text-stone-400">
-                  <span className="font-semibold">{workoutProgress.label}</span>
-                  <span className="tabular-nums">
-                    {workoutProgress.now}/{workoutProgress.max}
-                  </span>
-                </div>
-                <div
-                  role="progressbar"
-                  aria-label={workoutProgress.label}
-                  aria-valuemin={0}
-                  aria-valuemax={workoutProgress.max}
-                  aria-valuenow={workoutProgress.now}
-                  className="h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
-                >
-                  <span
-                    className="block h-full rounded-full bg-indigo-600 dark:bg-indigo-400"
-                    style={{ width: `${workoutProgressPct}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            <details className="mt-3 hidden sm:block">
-              <summary className="cursor-pointer list-none text-xs font-semibold text-stone-600 transition hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200">
-                Run details
-              </summary>
-              <div className="mt-2 grid gap-2 text-xs text-stone-600 dark:text-stone-400 sm:grid-cols-3">
-                <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
-                  <div className="font-semibold text-stone-700 dark:text-stone-200">
-                    Why this card
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5 leading-snug">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${currentOriginMeta.chipClass}`}
-                    >
-                      {currentSourceChipLabel}
-                    </span>
-                    {currentSourceDetail && <span>{currentSourceDetail}</span>}
-                  </div>
-                </div>
-                <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
-                  <div className="font-semibold text-stone-700 dark:text-stone-200">Top miss</div>
-                  <div className="mt-1 leading-snug">
-                    {topSessionMistake
-                      ? `${topSessionMistake.label} (${topSessionMistake.count}x)`
-                      : 'No pattern yet'}
-                  </div>
-                </div>
-                <div className="rounded-lg bg-stone-50 px-3 py-2 dark:bg-stone-950">
-                  <div className="font-semibold text-stone-700 dark:text-stone-200">
-                    Recent answers
-                  </div>
-                  {recentOutcomes.length ? (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {recentOutcomes.map((outcome, index) => (
-                        <span
-                          key={`${outcome.at || 0}-${outcome.cardId || outcome.label}-${index}`}
-                          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                            outcome.kind === 'correct'
-                              ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
-                              : outcome.kind === 'skipped'
-                                ? 'border-stone-200 text-stone-600 dark:border-stone-800 dark:text-stone-400'
-                                : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-300'
-                          }`}
-                        >
-                          {outcome.kind}: {outcome.label}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-1 leading-snug">No answers yet</div>
-                  )}
-                  {runStats.skipped > 0 && (
-                    <div className="mt-1 text-[11px] text-stone-600">
-                      {runStats.skipped} skipped
-                    </div>
-                  )}
-                </div>
-                {guideInsight && (
-                  <div className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-950/20 dark:text-amber-200 sm:col-span-3">
-                    <div className="font-semibold text-amber-950 dark:text-amber-100">
-                      Guide insight
-                    </div>
-                    <div className="mt-1 leading-snug">
-                      <span>{guideInsight.message}</span>
-                      {guideInsight.detail && (
-                        <span className="block text-amber-800 dark:text-amber-200/90">
-                          {guideInsight.detail}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </details>
-          </section>
+          </details>
         )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
           <div className="relative px-4 pb-3 pt-14 text-center sm:px-6 sm:pb-8 sm:pt-16">
@@ -3424,53 +2896,33 @@ export default function StudyView({ mode = 'practice' }) {
                 )}
               </span>
             </div>
+            {sentenceUnavailable && (
+              <p className="mx-auto mb-3 max-w-md text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                No reviewed sentence for this word and form yet. Practice the word below.
+              </p>
+            )}
             {sentencePrompt && !hidePromptText && (
-              <>
-                <div
-                  className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 max-[359px]:hidden"
-                  data-sentence-mode={sentencePrompt.mode}
-                >
-                  <ScriptDisplay
-                    view={sentencePromptView}
-                    className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
-                    subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
-                    colorHighlight={false}
-                  />
-                  {sentencePrompt.cue && (
-                    <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
-                      {sentencePrompt.cue}
-                    </div>
-                  )}
-                  {!hideEnglishMeaning && sentencePrompt.note && (
-                    <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
-                      {sentencePrompt.note}
-                    </div>
-                  )}
-                </div>
-                <details className="mx-auto mb-2 hidden max-w-md rounded-xl border border-indigo-200 bg-indigo-50/70 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 max-[359px]:block">
-                  <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-                    Sentence context
-                  </summary>
-                  <div className="border-t border-indigo-100 px-3 py-2 dark:border-indigo-900/50">
-                    <ScriptDisplay
-                      view={sentencePromptView}
-                      className="text-base leading-relaxed text-stone-900 dark:text-stone-100"
-                      subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
-                      colorHighlight={false}
-                    />
-                    {sentencePrompt.cue && (
-                      <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
-                        {sentencePrompt.cue}
-                      </div>
-                    )}
-                    {!hideEnglishMeaning && sentencePrompt.note && (
-                      <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
-                        {sentencePrompt.note}
-                      </div>
-                    )}
+              <div
+                className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-3 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 sm:px-4"
+                data-sentence-mode={sentencePrompt.mode}
+              >
+                <ScriptDisplay
+                  view={sentencePromptView}
+                  className="break-words text-base leading-relaxed text-stone-900 dark:text-stone-100 sm:text-lg"
+                  subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
+                  colorHighlight={false}
+                />
+                {sentencePrompt.cue && (
+                  <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
+                    {sentencePrompt.cue}
                   </div>
-                </details>
-              </>
+                )}
+                {!hideEnglishMeaning && sentencePrompt.note && (
+                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
+                    {sentencePrompt.note}
+                  </div>
+                )}
+              </div>
             )}
             {hidePromptText ? (
               <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
@@ -3598,6 +3050,7 @@ export default function StudyView({ mode = 'practice' }) {
                 wasCorrect={wasCorrect}
                 wasCorrected={wasCorrected}
                 reviewRecord={reviewRecord}
+                contextStats={contextualPracticeStats}
                 geminiKey={geminiKey}
                 nextButtonRef={nextButtonRef}
                 wordSweep={wordSweep}
@@ -3618,24 +3071,6 @@ export default function StudyView({ mode = 'practice' }) {
           , or press Esc to skip without penalty.
         </div>
       </div>
-      {!transformationMode && (
-        <PracticeScopeSidebar
-          className="order-2"
-          state={state}
-          weaknessFamilies={weaknessFamilies}
-          sessionFamilyStats={sessionFamilyStats}
-          openFamilyIds={openPracticeMapFamilyIds}
-          mobileOpen={practiceMapMobileOpen}
-          onToggleMobileOpen={() => setPracticeMapMobileOpen((open) => !open)}
-          onToggleFamilyOpen={togglePracticeMapFamilyOpen}
-          onToggleFamily={togglePracticeFamily}
-          onPracticeFamilyNow={practiceFamilyNow}
-          onLearnFamily={openPracticeFamilyLesson}
-          onIntroduceFamily={introducePracticeFamily}
-          onToggleType={togglePracticeType}
-          onToggleDimension={togglePracticeDimension}
-        />
-      )}
     </div>
   );
 }

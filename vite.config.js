@@ -51,7 +51,7 @@ export default defineConfig({
               url.pathname === '/JapaneseConjugation/data/sentences/manifest.json',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'sentence-corpus-manifest-v1',
+              cacheName: 'sentence-corpus-manifest-v2',
               expiration: {
                 maxEntries: 1,
                 maxAgeSeconds: 60 * 60 * 24 * 30,
@@ -68,7 +68,7 @@ export default defineConfig({
               url.pathname.endsWith('.json'),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'sentence-corpus-v1',
+              cacheName: 'sentence-corpus-v2',
               expiration: {
                 maxEntries: 140,
                 maxAgeSeconds: 60 * 60 * 24 * 365,

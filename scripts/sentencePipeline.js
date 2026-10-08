@@ -101,6 +101,7 @@ export function buildPair(word, type) {
     word_key: wordKey(word),
     dict: word.dict,
     reading: word.reading,
+    meaning: String(word.meaning || ''),
     group: word.group,
     jlpt: word.jlpt || '',
     type,
@@ -149,8 +150,14 @@ export function englishQualityIssue(en, type) {
   const semanticIssue = sentenceSemanticQualityIssue({ en: text, type });
   if (semanticIssue) return semanticIssue;
   const label = String(getTypeInfo(type)?.label || '').trim();
-  if (label && text.toLowerCase().includes(label.toLowerCase())) return 'en-echoes-form';
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (
+    escapedLabel &&
+    new RegExp(`\\b${escapedLabel}\\s+(?:form|conjugation|tense|pattern|voice)\\b`, 'i').test(text)
+  )
+    return 'en-echoes-form';
   const words = text.split(/\s+/).filter(Boolean);
+  if (['imperative', 'command-nasai'].includes(type) && /^[A-Za-z]{2,}[.!]?$/.test(text)) return '';
   if (text.length < 4 || (words.length < 2 && text.length < 8)) return 'en-too-short';
   return '';
 }

@@ -149,6 +149,8 @@ adjectives with Textbook Core forms enabled.
 
 ## Getting Started
 
+Use Node.js 24 LTS, matching pull-request validation and deployment.
+
 ```bash
 npm install
 npm run dev
@@ -165,6 +167,13 @@ The deterministic dev page listens at
 `http://127.0.0.1:5173/JapaneseConjugation/`.
 
 ## Scripts
+
+Every pull request targeting `main` runs the **Validate changes** check: production
+dependency audit, formatting, lint, typechecks, unit tests, Chromium/Firefox/WebKit
+browser tests, build and bundle budgets. It also runs on `main` pushes and can be
+started manually. PR jobs have read-only repository access and no deployment
+secrets. Main's required-status protection uses this stable check name; Pages
+deployment separately validates the production-configured build after merging.
 
 | Command | Description |
 | --- | --- |
