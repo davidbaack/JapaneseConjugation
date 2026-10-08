@@ -22,7 +22,10 @@ beforeEach(() => {
     },
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 function baseline() {
   return adoptSyncMetadata(
     {
@@ -66,6 +69,72 @@ function save(parts) {
 }
 
 describe('coordinated local learner persistence', () => {
+  it('reclaims disposable cache space before staging and persists the answer through reload', async () => {
+    const original = baseline();
+    save(original);
+    localStorage.setItem('katachiya_ai_sentence_cache', JSON.stringify({ fixture: 'large cache' }));
+    localStorage.setItem('jp-backup-recovery:fixture', 'irreplaceable recovery copy');
+    const setItem = window.Storage.prototype.setItem;
+    vi.spyOn(window.Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      // Model quota occupied by regenerable cache, at the real staging boundary.
+      if (key.includes(':pending:') && this.getItem('katachiya_ai_sentence_cache'))
+        throw Object.assign(new Error('Cache occupies the remaining quota'), {
+          name: 'QuotaExceededError',
+        });
+      return setItem.call(this, key, value);
+    });
+    await persistLocalSnapshot(answer(original, 'quota-writer', true));
+    expect(loadAll().state.practiceStats.lifetime).toMatchObject({ attempted: 1, correct: 1 });
+    expect(localStorage.getItem('katachiya_ai_sentence_cache')).toBeNull();
+    expect(localStorage.getItem('jp-backup-recovery:fixture')).toBe('irreplaceable recovery copy');
+    expect(
+      [...Array(localStorage.length)]
+        .map((_, i) => localStorage.key(i))
+        .filter((key) => key.includes(':pending:')),
+    ).toEqual([]);
+  });
+
+  it('retains the saved snapshot and abandoned answer when staging still exceeds quota after eviction', async () => {
+    const original = baseline();
+    save(original);
+    navigator.locks.request.mockImplementationOnce(() => new Promise(() => {}));
+    void persistLocalSnapshot(answer(original, 'abandoned-writer', false));
+    localStorage.setItem('katachiya_ai_sentence_cache', JSON.stringify({ fixture: 'cache' }));
+    localStorage.setItem('jp-backup-recovery:fixture', 'recovery bytes');
+    const mainBefore = localStorage.getItem(STORAGE_KEY);
+    const pendingBefore = JSON.parse(serializeSavedRecoveryData()).pending;
+    const setItem = window.Storage.prototype.setItem;
+    vi.spyOn(window.Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (key.includes(':pending:'))
+        throw Object.assign(new Error('Learner data fills quota'), { name: 'QuotaExceededError' });
+      return setItem.call(this, key, value);
+    });
+    await expect(persistLocalSnapshot(answer(original, 'new-writer', true))).rejects.toMatchObject({
+      isQuotaError: true,
+      message: expect.stringContaining('Storage full'),
+    });
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(mainBefore);
+    expect(JSON.parse(serializeSavedRecoveryData()).pending).toEqual(pendingBefore);
+    expect(loadAll().state.practiceStats.lifetime).toMatchObject({ attempted: 1, correct: 0 });
+    expect(localStorage.getItem('jp-backup-recovery:fixture')).toBe('recovery bytes');
+    expect(navigator.locks.request).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not evict caches or change saved learner data on a non-quota staging failure', async () => {
+    const original = baseline();
+    save(original);
+    localStorage.setItem('katachiya_ai_sentence_cache', 'cache bytes');
+    const mainBefore = localStorage.getItem(STORAGE_KEY);
+    vi.spyOn(window.Storage.prototype, 'setItem').mockImplementation(() => {
+      throw Object.assign(new Error('Storage access denied'), { name: 'SecurityError' });
+    });
+    await expect(
+      persistLocalSnapshot(answer(original, 'denied-writer', true)),
+    ).rejects.toMatchObject({ name: 'SecurityError' });
+    expect(localStorage.getItem('katachiya_ai_sentence_cache')).toBe('cache bytes');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(mainBefore);
+    expect(navigator.locks.request).not.toHaveBeenCalled();
+  });
   it('serializes two independent candidates and keeps both contributions after reload', async () => {
     const original = baseline();
     save(original);

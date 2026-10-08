@@ -79,6 +79,10 @@ with every answer. They are not discarded based on time: doing so could lose
 or resurrect work on offline devices. Browser quota failures preserve the saved
 snapshot and pending journal and surface an error. Download backups remain
 necessary; clearing browser storage removes its local recovery data too.
+Both pending staging and main-snapshot writes evict only regenerable AI caches
+and retry once on quota exhaustion. If that is insufficient, the saved learner
+snapshot, earlier pending answers and recovery copies remain intact, and the app
+reports that new changes are not saved in this browser.
 
 ## Validation
 

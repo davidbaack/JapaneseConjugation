@@ -1,7 +1,7 @@
 import { STORAGE_KEY } from '../data/defaults.js';
 import { getProgressWriterId } from './progressContributions.js';
 import { progressEpoch } from './syncMetadata.js';
-import { mergeSyncPayload } from './storage.js';
+import { mergeSyncPayload, writeWithQuotaRecovery } from './storage.js';
 import { learnerDataError, validateLearnerBundle } from './learnerStateValidation.js';
 
 const PREFIX = `${STORAGE_KEY}:pending:`;
@@ -30,7 +30,7 @@ export function stageLocalSnapshot(parts) {
     lastSyncedAt: parts.lastSyncedAt,
   });
   const key = `${PREFIX}${getProgressWriterId()}:${++stagingSequence}`;
-  localStorage.setItem(key, raw);
+  writeWithQuotaRecovery(() => localStorage.setItem(key, raw));
   return { key, raw };
 }
 

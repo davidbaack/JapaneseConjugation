@@ -205,6 +205,29 @@ export function isQuotaExceeded(e) {
   );
 }
 
+// Both the pending journal and main snapshot must be able to reclaim disposable
+// AI cache space. Never evict learner snapshots or recovery copies to save one.
+export function writeWithQuotaRecovery(write) {
+  try {
+    return write();
+  } catch (error) {
+    if (!isQuotaExceeded(error)) throw error;
+    pruneAICache();
+    clearAICache();
+    try {
+      return write();
+    } catch (retryError) {
+      if (isQuotaExceeded(retryError)) {
+        throw Object.assign(
+          new Error('Storage full — export your data in Settings to free up space.'),
+          { isQuotaError: true },
+        );
+      }
+      throw retryError;
+    }
+  }
+}
+
 export function saveAll(
   state,
   customVerbs,
@@ -237,27 +260,7 @@ export function saveAll(
     syncMeta,
     ...(recoveryBackupKey ? { recoveryBackupKey } : {}),
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, payload);
-  } catch (e) {
-    if (!isQuotaExceeded(e)) throw e;
-    // Quota hit: the regenerable AI cache is the safest thing to drop. Evict it
-    // and retry once before surfacing an error, so the user's actual progress
-    // is never lost to a full cache (improvement #15).
-    pruneAICache();
-    clearAICache();
-    try {
-      localStorage.setItem(STORAGE_KEY, payload);
-    } catch (e2) {
-      if (isQuotaExceeded(e2)) {
-        throw Object.assign(
-          new Error('Storage full — export your data in Settings to free up space.'),
-          { isQuotaError: true },
-        );
-      }
-      throw e2;
-    }
-  }
+  writeWithQuotaRecovery(() => localStorage.setItem(STORAGE_KEY, payload));
   storageBaselines.set(localStorage, payload);
   return payload;
 }
