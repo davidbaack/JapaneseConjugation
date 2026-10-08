@@ -78,9 +78,6 @@ export function mergePracticePrefs(prefs) {
       : source.promptForm === 'polite-present' || source.promptForm === 'masu'
         ? 'masu'
         : DEFAULT_PREFS.sourceFormStrategy;
-  const rawNewCardsPerDay = Number(source.newCardsPerDay || 0);
-  const newCardsPerDay =
-    Number.isFinite(rawNewCardsPerDay) && rawNewCardsPerDay > 0 ? Math.round(rawNewCardsPerDay) : 0;
   delete source.kanaMatchDisplay;
   delete source.durationSec;
   delete source.skipDuplicateForms;
@@ -156,6 +153,9 @@ export function mergePracticePrefs(prefs) {
   ) {
     wordGroups = [...wordGroups, 'irregular-adjective'];
   }
+  for (const key of Object.keys(source)) {
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_PREFS, key)) delete source[key];
+  }
   return {
     ...DEFAULT_PREFS,
     ...source,
@@ -167,7 +167,6 @@ export function mergePracticePrefs(prefs) {
     autoAdvanceCorrectByAnswerForm,
     reviewStyle,
     sourceFormStrategy,
-    newCardsPerDay,
     promptForm:
       sourceFormStrategy === 'mixed'
         ? 'random'
@@ -280,6 +279,34 @@ export function cleanEnglishAction(meaning = '') {
       .split(';')[0]
       .trim()
       .replace(/^to\s+/i, '') || 'do it'
+  );
+}
+
+function firstTopLevelSense(meaning = '') {
+  const source = String(meaning || '').trim();
+  if (!source) return '';
+
+  let depth = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '(') depth += 1;
+    if (char === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (char === ';' || char === ',' || char === '/')) {
+      return source.slice(0, index).trim();
+    }
+  }
+  return source;
+}
+
+// Exercises need one stable, scannable sense while Lookup remains the place for
+// complete dictionary coverage. Starter vocabulary can provide a curated
+// exerciseMeaning; imported and custom words fall back to their first sense.
+export function exerciseMeaningForWord(item) {
+  if (!item) return '';
+  return (
+    String(item.exerciseMeaning || '').trim() ||
+    firstTopLevelSense(item.meaning) ||
+    String(item.meaning || '').trim()
   );
 }
 
@@ -520,6 +547,7 @@ const GERUND_WORDS = {
   lie: 'lying',
   make: 'making',
   ride: 'riding',
+  run: 'running',
   take: 'taking',
   tie: 'tying',
   use: 'using',
@@ -855,6 +883,11 @@ export function englishForForm(item, type) {
     obligation: `must ${action}`,
   };
   return M[type] || item.meaning;
+}
+
+export function exerciseEnglishForForm(item, type) {
+  if (!item) return '';
+  return englishForForm({ ...item, meaning: exerciseMeaningForWord(item) }, type);
 }
 
 export function editDistance(a, b) {

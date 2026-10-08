@@ -8,7 +8,7 @@
 // The output dir receives corrected out-XXXX.jsonl files only.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { loadSentenceWordMap, sentenceEnglish } from './sentenceEnglish.js';
+import { loadSentenceWordMap } from './sentenceEnglish.js';
 
 const inputDir = process.argv[2] || join('tmp', 'sentence-batches');
 const outputDir = process.argv[3] || join('tmp', 'sentence-natural-english');
@@ -88,9 +88,12 @@ for (const batchFile of batchFiles) {
     assertSamePair(batchItem, outItem, outFile, index);
     const word = words.get(outItem.word_key);
     if (!word) throw new Error(`${outFile}:${index + 1} unknown word ${outItem.word_key}`);
-    const en = needsEnglishRepair(outItem.en) ? sentenceEnglish(word, outItem.type) : outItem.en;
-    if (en !== outItem.en) changed += 1;
-    return { ...outItem, en, segments: fallbackSegments(batchItem, outItem, outFile, index) };
+    if (needsEnglishRepair(outItem.en)) {
+      throw new Error(
+        `${outFile}:${index + 1} needs bilingual review: translate the actual Japanese sentence and supply a new review; English cannot be synthesized from word/form metadata.`,
+      );
+    }
+    return { ...outItem, segments: fallbackSegments(batchItem, outItem, outFile, index) };
   });
 
   writeFileSync(

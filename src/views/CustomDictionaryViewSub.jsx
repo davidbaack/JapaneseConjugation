@@ -55,10 +55,12 @@ export default function CustomDictionaryViewSub({
   // tablist's keyboard activation so the two paths behave identically.
   const selectDictTab = (id) => {
     setDictTab(id);
+    setShowBuiltIns(false);
     resetAdd();
   };
   const { tabProps, panelProps } = useTablist(['verbs', 'adjectives'], dictTab, selectDictTab);
   const [showAdd, setShowAdd] = useState(false);
+  const [showBuiltIns, setShowBuiltIns] = useState(false);
   const [query, setQuery] = useState('');
   const [addPhase, setAddPhase] = useState('idle');
   const [suggestion, setSuggestion] = useState(null);
@@ -77,23 +79,24 @@ export default function CustomDictionaryViewSub({
   const starterWords = isAdj ? STARTER_ADJECTIVES : STARTER_VERBS;
   const customWords = isAdj ? customAdjectives : customVerbs;
   const setCustomWords = isAdj ? setCustomAdjectives : setCustomVerbs;
-  const allWords = useMemo(() => [...starterWords, ...customWords], [customWords, starterWords]);
+  const corpusWords = useMemo(() => [...starterWords, ...customWords], [customWords, starterWords]);
+  const displayedWords = showBuiltIns ? corpusWords : customWords;
 
   // Window the table once the list gets long so a large dictionary stays smooth
   // (improvement #12). Below the threshold we render everything (no windowing).
-  const virtualize = allWords.length > VIRTUAL_THRESHOLD;
+  const virtualize = displayedWords.length > VIRTUAL_THRESHOLD;
   const { start, end, padTop, padBottom, onScroll } = useVirtualRows({
-    count: allWords.length,
+    count: displayedWords.length,
     rowHeight: ROW_HEIGHT,
     viewportHeight: LIST_VIEWPORT,
     enabled: virtualize,
   });
-  const visibleWords = virtualize ? allWords.slice(start, end) : allWords;
+  const visibleWords = virtualize ? displayedWords.slice(start, end) : displayedWords;
 
   async function fetchSugg(wordsList) {
     if (!geminiAvailable) return;
     const gen = ++suggGen.current;
-    const wlist = wordsList || allWords;
+    const wlist = wordsList || corpusWords;
     setSuggLoading(true);
     setSuggErr('');
     setSugg(null);
@@ -161,7 +164,7 @@ export default function CustomDictionaryViewSub({
       reading: sanitizeField(rawWord.reading, FIELD_LIMITS.reading),
       meaning: sanitizeField(rawWord.meaning, FIELD_LIMITS.meaning),
     };
-    if (allWords.some((v) => v.dict === word.dict)) {
+    if (corpusWords.some((v) => v.dict === word.dict)) {
       setAddError(`${word.dict} is already in your list`);
       setAddPhase('error');
       return;
@@ -205,7 +208,7 @@ export default function CustomDictionaryViewSub({
       <div
         role="tablist"
         aria-label="Custom dictionary type"
-        className="flex gap-2 p-1 bg-stone-100 dark:bg-stone-950 rounded-xl border border-stone-200 dark:border-stone-850"
+        className="flex gap-2 p-1 bg-stone-100 dark:bg-stone-950 rounded-xl border border-stone-200 dark:border-stone-800"
       >
         <button
           {...tabProps('verbs')}
@@ -233,17 +236,27 @@ export default function CustomDictionaryViewSub({
 
       <div {...panelProps(dictTab)} className="space-y-4">
         <div className="flex justify-between items-center">
-          <div className="text-sm text-stone-605 dark:text-stone-400">
-            {starterWords.length} starter + {customWords.length} custom ={' '}
-            {starterWords.length + customWords.length} {isAdj ? 'adjectives' : 'verbs'}
+          <div className="text-sm text-stone-600 dark:text-stone-400">
+            {customWords.length} custom {isAdj ? 'adjective' : 'verb'}
+            {customWords.length === 1 ? '' : 's'}
           </div>
-          <button
-            onClick={() => setShowAdd(!showAdd)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition"
-          >
-            <IconPlus className="w-4 h-4" />
-            Add {isAdj ? 'adjective' : 'verb'}
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowBuiltIns((current) => !current)}
+              aria-pressed={showBuiltIns}
+              className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-200 dark:hover:bg-stone-800"
+            >
+              {showBuiltIns ? 'Hide built-ins' : `Show ${starterWords.length} built-ins`}
+            </button>
+            <button
+              onClick={() => setShowAdd(!showAdd)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition"
+            >
+              <IconPlus className="w-4 h-4" />
+              Add {isAdj ? 'adjective' : 'verb'}
+            </button>
+          </div>
         </div>
 
         {geminiAvailable && (
@@ -273,7 +286,7 @@ export default function CustomDictionaryViewSub({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span
-                      className="text-2xl font-medium text-stone-850 dark:text-stone-100"
+                      className="text-2xl font-medium text-stone-800 dark:text-stone-100"
                       lang="ja"
                     >
                       {sugg.dict}
@@ -287,7 +300,7 @@ export default function CustomDictionaryViewSub({
                   <div className="text-sm text-stone-600 dark:text-stone-400 italic">
                     {sugg.meaning}
                   </div>
-                  <div className="text-xs text-stone-500 dark:text-stone-450 mt-1 leading-relaxed">
+                  <div className="text-xs text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
                     {sugg.reason}
                   </div>
                 </div>
@@ -334,7 +347,7 @@ export default function CustomDictionaryViewSub({
                       autoCorrect="off"
                       autoCapitalize="off"
                       spellCheck="false"
-                      className="flex-1 px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none disabled:opacity-50"
+                      className="flex-1 px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none disabled:opacity-50"
                     />
                     <button
                       onClick={lookup}
@@ -355,7 +368,7 @@ export default function CustomDictionaryViewSub({
                   </p>
                   <div className="bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-xl p-4">
                     <div
-                      className="text-3xl font-medium mb-1 text-stone-850 dark:text-stone-105"
+                      className="text-3xl font-medium mb-1 text-stone-800 dark:text-stone-100"
                       lang="ja"
                     >
                       {suggestion.dict}
@@ -385,7 +398,7 @@ export default function CustomDictionaryViewSub({
                         setSuggestion(null);
                         setQuery('');
                       }}
-                      className="px-3 py-2 border border-stone-200 dark:border-stone-800 text-stone-705 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-850 rounded-lg text-sm"
+                      className="px-3 py-2 border border-stone-200 dark:border-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg text-sm"
                     >
                       Try again
                     </button>
@@ -396,47 +409,65 @@ export default function CustomDictionaryViewSub({
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-stone-500 block mb-1">Dictionary form</label>
+                    <label
+                      htmlFor="custom-word-dictionary"
+                      className="text-xs text-stone-500 block mb-1"
+                    >
+                      Dictionary form
+                    </label>
                     <input
+                      id="custom-word-dictionary"
                       type="text"
                       value={mf.dict}
                       onChange={(e) => setMf({ ...mf, dict: e.target.value })}
                       placeholder={isAdj ? '美味しい' : '食べる'}
                       lang="ja"
-                      className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-855 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+                      className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-stone-500 block mb-1">
+                    <label
+                      htmlFor="custom-word-reading"
+                      className="text-xs text-stone-500 block mb-1"
+                    >
                       Reading (kana/romaji)
                     </label>
                     <input
+                      id="custom-word-reading"
                       type="text"
                       value={mf.reading}
                       onChange={(e) => setMf({ ...mf, reading: e.target.value })}
                       placeholder={isAdj ? 'oishii' : 'taberu'}
                       lang="ja"
-                      className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-855 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+                      className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-stone-500 block mb-1">Meaning</label>
+                  <label
+                    htmlFor="custom-word-meaning"
+                    className="text-xs text-stone-500 block mb-1"
+                  >
+                    Meaning
+                  </label>
                   <input
+                    id="custom-word-meaning"
                     type="text"
                     value={mf.meaning}
                     onChange={(e) => setMf({ ...mf, meaning: e.target.value })}
                     placeholder={isAdj ? 'delicious' : 'to eat'}
-                    className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-855 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
+                    className="w-full px-3 py-2 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-200 rounded-lg focus:border-indigo-500 focus:outline-none"
                   />
                 </div>
-                <div>
-                  <label className="text-xs text-stone-500 block mb-1">Group</label>
+                <fieldset>
+                  <legend className="text-xs text-stone-500 block mb-1">Group</legend>
                   <div className={`grid gap-2 ${isAdj ? 'grid-cols-2' : 'grid-cols-2'}`}>
                     {manualGroupOptions.map((g) => (
                       <button
+                        type="button"
                         key={g.id}
                         onClick={() => setMf({ ...mf, group: g.id })}
+                        aria-pressed={mf.group === g.id}
                         className={`px-3 py-2 rounded-lg text-sm border transition ${
                           mf.group === g.id
                             ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:border-indigo-600'
@@ -452,7 +483,7 @@ export default function CustomDictionaryViewSub({
                       </button>
                     ))}
                   </div>
-                </div>
+                </fieldset>
                 <div role="status" aria-live="polite">
                   {mErr && <div className="text-sm text-rose-600">{mErr}</div>}
                 </div>
@@ -492,13 +523,19 @@ export default function CustomDictionaryViewSub({
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+                {displayedWords.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-stone-500">
+                      No custom {isAdj ? 'adjectives' : 'verbs'} yet. Add one or show the built-ins.
+                    </td>
+                  </tr>
+                )}
                 {virtualize && padTop > 0 && (
                   <tr aria-hidden="true" style={{ height: padTop }}>
                     <td colSpan={5} className="p-0" />
                   </tr>
                 )}
-                {visibleWords.map((v, localI) => {
-                  const i = virtualize ? start + localI : localI;
+                {visibleWords.map((v) => {
                   const vvs = state?.verbStats?.[v.dict] || {};
                   const totalSeen = Object.values(vvs).reduce((s, x) => s + x.seen, 0);
                   const totalIncorrect = Object.values(vvs).reduce((s, x) => s + x.incorrect, 0);
@@ -509,7 +546,7 @@ export default function CustomDictionaryViewSub({
                   return (
                     <tr
                       key={v.dict}
-                      className="border-t border-stone-100 dark:border-stone-800 hover:bg-stone-50/50 dark:hover:bg-stone-850/50"
+                      className="border-t border-stone-100 dark:border-stone-800 hover:bg-stone-50/50 dark:hover:bg-stone-800/50"
                     >
                       <td
                         className="px-4 py-2 font-medium text-stone-900 dark:text-stone-100"
@@ -517,26 +554,26 @@ export default function CustomDictionaryViewSub({
                       >
                         {v.dict}
                       </td>
-                      <td className="px-4 py-2 text-stone-605 dark:text-stone-300" lang="ja">
+                      <td className="px-4 py-2 text-stone-600 dark:text-stone-300" lang="ja">
                         {v.reading}
                       </td>
                       <td className="px-4 py-2 text-stone-500 dark:text-stone-400 hidden sm:table-cell">
                         {v.meaning}
                       </td>
                       <td className="px-4 py-2 text-xs">
-                        <div className="text-stone-505 dark:text-stone-405">
+                        <div className="text-stone-500 dark:text-stone-400">
                           {groupLabelFor(v.group)}
                         </div>
                         {acc !== null && (
                           <div
-                            className={`mt-0.5 ${acc >= 80 ? 'text-emerald-600 dark:text-emerald-400' : acc >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-450'}`}
+                            className={`mt-0.5 ${acc >= 80 ? 'text-emerald-600 dark:text-emerald-400' : acc >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}
                           >
                             {totalSeen} seen · {acc}%
                           </div>
                         )}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {i >= starterWords.length &&
+                        {customWords.some((customWord) => customWord.dict === v.dict) &&
                           (confirmDelete === v.dict ? (
                             <span className="flex items-center gap-1 justify-end">
                               <button

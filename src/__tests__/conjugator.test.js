@@ -540,6 +540,9 @@ describe('visual conjugation debugger metadata', () => {
     expect(mistake.userRule).toContain('う/つ/る -> って');
     expect(mistake.expectedRule).toContain('く -> いて');
     expect(mistake.expectedResult).toBe('かいて');
+    expect(mistake.detail).toContain('which produced かって');
+    expect(mistake.detail).toContain('This verb needs く -> いて');
+    expect(mistake.detail).toContain(': かいて');
   });
 
   it('infers when a learner used a different valid target form', () => {
@@ -548,6 +551,7 @@ describe('visual conjugation debugger metadata', () => {
     expect(mistake.kind).toBe('form');
     expect(mistake.userRule).toContain('Plain Negative');
     expect(mistake.expectedResult).toBe('たべた');
+    expect(mistake.detail).toContain('You made the plain negative form たべない');
   });
 
   it('infers when a learner keeps a godan dictionary ending before a row-shift suffix', () => {
@@ -557,6 +561,18 @@ describe('visual conjugation debugger metadata', () => {
     expect(mistake.userRule).toBe('Kept dictionary ending む + ない');
     expect(mistake.expectedRule).toBe('む -> ま + ない');
     expect(mistake.detail).toContain('change む to ま first');
+  });
+
+  it('explains 帰る entered with the ichidan negative pattern', () => {
+    const kaeru = { dict: '帰る', reading: 'かえる', meaning: 'to return', group: 'godan' };
+    const mistake = getConjugationDebugInfo(kaeru, 'plain-negative', 'かえない').mistake;
+
+    expect(mistake.kind).toBe('group');
+    expect(mistake.userResult).toBe('かえない');
+    expect(mistake.expectedResult).toBe('かえらない');
+    expect(mistake.detail).toBe(
+      'You used the ichidan drop る pattern, which produced かえない. 帰る is godan row-shift, so use る -> ら + ない: かえらない.',
+    );
   });
 });
 

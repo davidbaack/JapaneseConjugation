@@ -5,6 +5,7 @@ import {
   formRows,
   adHocReferenceCandidates,
   formLookupCandidates,
+  hasAmbiguousExactLookup,
   findFavoritesList,
   favoriteListHasWord,
   toggleFavoriteInLists,
@@ -297,6 +298,78 @@ describe('formLookupCandidates', () => {
       group: 'ichidan',
     }));
     expect(formLookupCandidates('verbた', manyWords).length).toBeLessThanOrEqual(12);
+  });
+
+  it('ranks itta by learner level and lets explicit history override the default', () => {
+    const iu = {
+      dict: '言う',
+      reading: 'いう',
+      meaning: 'to say',
+      group: 'godan',
+      jlpt: 'N5',
+      lesson: 8,
+      common: true,
+    };
+    const iku = {
+      dict: '行く',
+      reading: 'いく',
+      meaning: 'to go',
+      group: 'godan',
+      jlpt: 'N5',
+      lesson: 3,
+      common: true,
+    };
+
+    const ranked = formLookupCandidates('itta', [iu, iku]);
+    expect(ranked.slice(0, 2).map((match) => match.word.dict)).toEqual(['行く', '言う']);
+    expect(hasAmbiguousExactLookup(ranked)).toBe(true);
+
+    const personalized = formLookupCandidates('itta', [iu, iku], {
+      history: [{ ...iu, lastAt: 200, count: 2 }],
+    });
+    expect(personalized[0].word.dict).toBe('言う');
+  });
+
+  it('uses entered kanji to select the intended itta word', () => {
+    const words = [
+      { dict: '言う', reading: 'いう', meaning: 'to say', group: 'godan' },
+      { dict: '行く', reading: 'いく', meaning: 'to go', group: 'godan' },
+    ];
+
+    expect(formLookupCandidates('行った', words).map((match) => match.word.dict)).toEqual(['行く']);
+    expect(formLookupCandidates('言った', words).map((match) => match.word.dict)).toEqual(['言う']);
+  });
+
+  it('uses commonness and JLPT level before stable source order', () => {
+    const common = {
+      dict: '言う',
+      reading: 'いう',
+      meaning: 'to say',
+      group: 'godan',
+      jlpt: 'N4',
+      common: true,
+    };
+    const uncommon = {
+      dict: '謂う',
+      reading: 'いう',
+      meaning: 'to be called',
+      group: 'godan',
+      jlpt: 'N5',
+      common: false,
+    };
+    expect(formLookupCandidates('itta', [uncommon, common])[0].word.dict).toBe('言う');
+
+    const beginner = { ...uncommon, dict: '云う', jlpt: 'N5' };
+    const advanced = { ...uncommon, dict: '謂う', jlpt: 'N1' };
+    expect(formLookupCandidates('itta', [advanced, beginner])[0].word.dict).toBe('云う');
+  });
+
+  it('treats distinct forms of the same word as exact ambiguity', () => {
+    const hits = formLookupCandidates('食べられる', [TABERU]);
+    expect(hits.map((match) => match.type.id)).toEqual(
+      expect.arrayContaining(['potential', 'passive']),
+    );
+    expect(hasAmbiguousExactLookup(hits)).toBe(true);
   });
 });
 

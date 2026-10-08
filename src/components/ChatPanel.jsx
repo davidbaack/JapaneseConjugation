@@ -36,11 +36,11 @@ export function buildContext(
   const opener = gotItRight
     ? `I'm studying Japanese and just got this right.`
     : wasCorrected
-      ? `I'm studying Japanese. I reached the right answer after self-correcting or using a hint, and it still counted as wrong.`
+      ? `I'm studying Japanese. I reached the right answer after self-correcting or using revealed answer help, and it still counted as wrong.`
       : `I'm studying Japanese and just got this wrong.`;
   const answerLabel = wasCorrected ? 'My reviewed answer' : 'My answer';
   const correctedNote = wasCorrected
-    ? `\nAssisted correction: I either self-corrected or used a hint before the final answer, and the attempt counted as wrong.`
+    ? `\nAssisted correction: I either self-corrected or used revealed answer help before the final answer, and the attempt counted as wrong.`
     : '';
   const reviewRequest = gotItRight
     ? 'Help me understand why this answer is correct and how to remember this form.'
@@ -290,7 +290,7 @@ export function ChatPanel({
         className="space-y-2 max-h-96 overflow-y-auto pb-1"
       >
         {loading && !display.length && (
-          <div className="text-sm text-stone-400 italic px-3 py-2 animate-pulse">
+          <div className="text-sm text-stone-400 italic px-3 py-2 motion-safe:animate-pulse">
             Gemini is thinking…
           </div>
         )}
@@ -303,7 +303,7 @@ export function ChatPanel({
           </div>
         ))}
         {loading && display.length > 0 && (
-          <div className="text-sm text-stone-400 italic px-3 animate-pulse">
+          <div className="text-sm text-stone-400 italic px-3 motion-safe:animate-pulse">
             Gemini is thinking…
           </div>
         )}

@@ -91,6 +91,20 @@ test.describe('App page-load smoke tests', () => {
     );
   });
 
+  test('configured production build exposes cloud sign-in', async ({ page }) => {
+    test.skip(
+      !process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_ANON_KEY,
+      'Supabase build configuration is not present in this test environment',
+    );
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: 'Settings', exact: true }).click();
+
+    await expect(page.getByRole('button', { name: 'Sign In / Sign Up' })).toBeVisible();
+    await expect(page.getByText('Cloud sync is not configured')).toHaveCount(0);
+  });
+
   test('no network requests fail with 5xx errors', async ({ page }) => {
     const failedRequests = [];
     page.on('response', (response) => {

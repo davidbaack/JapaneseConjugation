@@ -23,6 +23,13 @@ const taberu = {
   group: 'ichidan',
 };
 
+const kaeru = {
+  dict: '\u5e30\u308b',
+  reading: '\u304b\u3048\u308b',
+  meaning: 'to return',
+  group: 'godan',
+};
+
 describe('diagnoseMistake', () => {
   it('classifies a godan ku te-form sound-change mix-up', () => {
     const result = diagnoseMistake({
@@ -73,6 +80,25 @@ describe('diagnoseMistake', () => {
       toolLabel: 'Groups',
       triggerLabel: 'Wrong verb group',
     });
+    expect(result.feedback).toContain('You used the godan row-shift pattern');
+    expect(result.feedback).toContain('the correct answer is \u305f\u3079\u305f');
+  });
+
+  it('identifies an ichidan-pattern answer for godan \u5e30\u308b', () => {
+    const result = diagnoseMistake({
+      item: kaeru,
+      type: 'plain-negative',
+      userAnswer: '\u304b\u3048\u306a\u3044',
+      expected: '\u304b\u3048\u3089\u306a\u3044',
+    });
+
+    expect(result).toMatchObject({
+      category: 'verb-group-confusion',
+      patternId: 'verb-group:godan:plain-negative',
+    });
+    expect(result.feedback).toBe(
+      'You used the ichidan drop \u308b pattern, which produced \u304b\u3048\u306a\u3044. \u5e30\u308b is godan row-shift, so the correct answer is \u304b\u3048\u3089\u306a\u3044.',
+    );
   });
 
   it('classifies a plain answer when polite negative was requested', () => {

@@ -129,6 +129,70 @@ describe('identifyConjugation', () => {
     expect(best.diff.summary).toBeTruthy();
   });
 
+  describe('learner-intent ranking', () => {
+    const godanNegativeCases = [
+      ['かうない', 'かう', 'かわない'],
+      ['かくない', 'かく', 'かかない'],
+      ['およぐない', 'およぐ', 'およがない'],
+      ['はなすない', 'はなす', 'はなさない'],
+      ['まつない', 'まつ', 'またない'],
+      ['しぬない', 'しぬ', 'しなない'],
+      ['あそぶない', 'あそぶ', 'あそばない'],
+      ['よむない', 'よむ', 'よまない'],
+      ['かえるない', 'かえる', 'かえらない'],
+    ];
+
+    for (const [input, reading, expectedKana] of godanNegativeCases) {
+      it(`promotes ${expectedKana} for the godan over-regularization ${input}`, () => {
+        const res = identifyConjugation(input, ALL);
+        expect(res.exact).toHaveLength(0);
+        expect(res.near[0]).toMatchObject({
+          word: { reading },
+          type: 'plain-negative',
+          kana: expectedKana,
+          intent: {
+            kind: 'godan-plain-negative-overregularization',
+            confidence: 'high',
+          },
+        });
+      });
+    }
+
+    it('keeps prohibition as the first literal alternative for よむない', () => {
+      const res = identifyConjugation('よむない', ALL);
+
+      expect(res.near[0]).toMatchObject({
+        word: { reading: 'よむ' },
+        type: 'plain-negative',
+        kana: 'よまない',
+        intent: {
+          explanation: 'Godan む shifts to ま before ない.',
+        },
+      });
+      expect(res.near[1]).toMatchObject({
+        word: { reading: 'よむ' },
+        type: 'prohibition',
+        kana: 'よむな',
+      });
+    });
+
+    it('uses preserved multi-kana endings as intent evidence', () => {
+      const pastNegative = identifyConjugation('よむなかった', ALL);
+      const politeNegative = identifyConjugation('よむません', ALL);
+
+      expect(pastNegative.near[0]).toMatchObject({
+        word: { reading: 'よむ' },
+        type: 'plain-past-negative',
+        kana: 'よまなかった',
+      });
+      expect(politeNegative.near[0]).toMatchObject({
+        word: { reading: 'よむ' },
+        type: 'polite-negative',
+        kana: 'よみません',
+      });
+    });
+  });
+
   it('returns no exact and no near for unrelated gibberish', () => {
     const res = identifyConjugation('ぱぴぷぺぽ', ALL);
     expect(res.exact).toHaveLength(0);

@@ -25,11 +25,13 @@ describe('sentence prompt model', () => {
       mode: 'forward-cloze',
       sentence: '昼に[______]。',
       audioText: '昼に買った。',
+      completedSentence: '昼に買った。',
       cue: '',
       note: 'I bought it at noon.',
       source: 'bundled',
     });
     expect(prompt.parts[2]).toEqual({ text: '[______]', ruby: '' });
+    expect(prompt.completedParts[2]).toEqual({ text: '買った', ruby: 'かった' });
   });
 
   it('builds a filled reverse sentence for dictionary recovery', () => {
@@ -60,15 +62,10 @@ describe('sentence prompt model', () => {
     expect(prompt.cue).toBe('');
   });
 
-  it('keeps custom words offline-safe with deterministic template entries', () => {
+  it('does not manufacture offline context for an unreviewed word', () => {
     const entry = buildOfflineSentenceEntry(WORD, 'plain-past');
-    const prompt = buildSentencePromptModel({ entry, word: WORD, type: 'plain-past' });
-
-    expect(prompt.mode).toBe('forward-cloze');
-    expect(prompt.sentence).toContain('[______]');
-    expect(prompt.audioText).toContain('買った');
-    expect(prompt.cue).toBe('');
-    expect(prompt.source).toBe('offline');
+    expect(entry).toBeNull();
+    expect(buildSentencePromptModel({ entry, word: WORD, type: 'plain-past' })).toBeNull();
   });
 });
 

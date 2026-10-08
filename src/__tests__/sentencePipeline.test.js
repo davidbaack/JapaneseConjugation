@@ -29,6 +29,16 @@ function validOut(overrides = {}) {
 }
 
 describe('isKana', () => {
+  it('does not mistake a natural becomes predicate for the Become grammar label', () => {
+    expect(englishQualityIssue('This teacher becomes polite.', 'adj-naru')).toBe('');
+    expect(englishQualityIssue('I become healthy.', 'adj-naru')).toBe('');
+    expect(englishQualityIssue('This is the Become form.', 'adj-naru')).toBe('en-echoes-form');
+  });
+  it('allows a complete short command while keeping the same fragment invalid as a past sentence', () => {
+    expect(englishQualityIssue('Sleep!', 'imperative')).toBe('');
+    expect(englishQualityIssue('Sleep!', 'command-nasai')).toBe('');
+    expect(englishQualityIssue('Sleep!', 'plain-past')).toBe('en-too-short');
+  });
   it('accepts kana and rejects kanji', () => {
     expect(isKana('きょう')).toBe(true);
     expect(isKana('')).toBe(true);
@@ -186,6 +196,31 @@ describe('englishQualityIssue', () => {
     expect(englishQualityIssue('This is the potential form of the verb.', 'potential')).toBe(
       'en-echoes-form',
     );
+  });
+
+  it('rejects generic adjective conditional results', () => {
+    expect(englishQualityIssue('If the room is good, I will use it.', 'adj-conditional')).toBe(
+      'en-generic-adjective-result',
+    );
+    expect(englishQualityIssue('If the explanation is good, I will use it.', 'adj-tara')).toBe(
+      'en-generic-adjective-result',
+    );
+    expect(
+      englishQualityIssue(
+        "If this temperature feels just right, let's rest here for a bit.",
+        'adj-conditional',
+      ),
+    ).toBe('');
+  });
+
+  it('rejects adjective contexts whose subject does not fit the adjective', () => {
+    expect(englishQualityIssue('If this task is itchy, I will add a break.', 'adj-tara')).toBe(
+      'en-adjective-body-context-mismatch',
+    );
+    expect(
+      englishQualityIssue("If today's mood is ticklish, I will lighten the plan.", 'adj-tara'),
+    ).toBe('en-adjective-body-context-mismatch');
+    expect(englishQualityIssue('If my skin is itchy, I will rest for a bit.', 'adj-tara')).toBe('');
   });
 
   it('rejects empty or letterless text', () => {
