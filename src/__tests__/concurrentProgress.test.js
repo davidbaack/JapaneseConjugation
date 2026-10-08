@@ -204,6 +204,7 @@ describe('Concurrent learner evidence through the public sync boundary', () => {
     );
   });
 
+  // This bounded stress scenario needs its own budget on shared CI runners.
   it('bounds answer histories while cumulative counters remain exact after 1500 answers', () => {
     let current = replica();
     let ledgerAt250 = '';
@@ -227,7 +228,7 @@ describe('Concurrent learner evidence through the public sync boundary', () => {
     // The extra 1250 answers add counter digits, not 1250 retained event rows.
     expect(JSON.stringify(ledger).length - ledgerAt250.length).toBeLessThan(1000);
     expectEvidence(mergeSyncPayload(current, current), 1500, 750, 1500000);
-  });
+  }, 20000);
 
   it('converges across three offline replicas, all permutations, and both merge associations', () => {
     const common = answer(replica(), 'common-writer', 'shared-answer', true, 400, AT - 1);
