@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import AuthModal from './components/AuthModal.jsx';
+import HorizontalTabList from './components/HorizontalTabList.jsx';
 import ViewSkeleton from './components/Skeleton.jsx';
 import UpdatePrompt from './components/UpdatePrompt.jsx';
 import { t } from './i18n/index.js';
@@ -23,7 +24,19 @@ const DevHistoryPanel = import.meta.env.DEV
 const TABS = ['practice', 'guide', 'stats', 'learn', 'drills', 'tools', 'settings'];
 
 function AppShell() {
-  const { tab, setTab, showAuthModal, setShowAuthModal, supabase } = useApp();
+  const {
+    tab,
+    setTab,
+    showAuthModal,
+    setShowAuthModal,
+    supabase,
+    supabaseConfigured,
+    supabaseStatus,
+    supabaseError,
+    retrySupabase,
+    dataRecoveryError,
+    localPersistenceBlocked,
+  } = useApp();
 
   const { tabProps, panelProps } = useTablist(TABS, tab, setTab);
   const shellWidthClass = tab === 'practice' ? 'max-w-[80rem]' : 'max-w-4xl';
@@ -34,27 +47,31 @@ function AppShell() {
       style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif' }}
     >
       <div className={`${shellWidthClass} mx-auto px-4 py-3 sm:py-6`}>
-        <header className="mb-4 sm:mb-6">
+        <header className="mb-2 min-[360px]:mb-4 sm:mb-6">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
               {t('app.title')}{' '}
               <span className="text-stone-500 dark:text-stone-400 font-normal">形屋</span>{' '}
-              <span className="text-stone-400 font-normal">·</span>{' '}
-              <span className="font-normal">{t('app.subtitle')}</span>
+              <span className="max-[359px]:hidden">
+                <span className="text-stone-400 font-normal">·</span>{' '}
+                <span className="font-normal">{t('app.subtitle')}</span>
+              </span>
             </h1>
           </div>
         </header>
-        <nav
-          role="tablist"
-          aria-label="App sections"
-          className="mb-3 flex flex-wrap gap-1 rounded-xl border border-stone-200 bg-white p-1 dark:border-stone-800 dark:bg-stone-900"
+        <HorizontalTabList
+          activeId={tab}
+          ariaLabel="App sections"
+          as="nav"
+          wrapperClassName="mb-3"
+          className="flex flex-nowrap gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-white p-1 [scrollbar-width:thin] dark:border-stone-800 dark:bg-stone-900"
         >
           {TABS.map((id) => (
             <button
               key={id}
               {...tabProps(id)}
               onClick={() => setTab(id)}
-              className={`flex-1 min-w-[5.25rem] py-2 px-3 rounded-lg text-sm transition ${
+              className={`min-w-[5.25rem] shrink-0 px-3 py-2 text-sm transition sm:flex-1 rounded-lg ${
                 tab === id
                   ? 'bg-stone-800 dark:bg-indigo-700 text-white font-semibold'
                   : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800'
@@ -63,7 +80,29 @@ function AppShell() {
               {t(`nav.${id}`)}
             </button>
           ))}
-        </nav>
+        </HorizontalTabList>
+        {dataRecoveryError && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200"
+          >
+            <p className="font-medium">
+              {localPersistenceBlocked ? 'Saved data needs recovery' : 'Cloud sync needs attention'}
+            </p>
+            <p className="mt-1">
+              {localPersistenceBlocked
+                ? 'Your saved learner data is preserved. Saving and cloud sync are paused because it could not be safely loaded. Any practice you do now will not be saved.'
+                : 'Your progress is saved in this browser. Cloud sync is paused; open backup and restore to review the recovery message.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setTab('settings')}
+              className="mt-3 rounded-lg border border-current px-3 py-2 font-medium"
+            >
+              Open backup &amp; restore
+            </button>
+          </div>
+        )}
         <Suspense fallback={<ViewSkeleton />}>
           <div {...panelProps(tab)}>
             {tab === 'practice' && <StudyView />}
@@ -80,6 +119,10 @@ function AppShell() {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         supabase={supabase}
+        configured={supabaseConfigured}
+        clientStatus={supabaseStatus}
+        clientError={supabaseError}
+        onRetryClient={retrySupabase}
       />
       <UpdatePrompt />
       {DevHistoryPanel && (

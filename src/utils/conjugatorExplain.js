@@ -21,6 +21,7 @@ import {
 import { buildOfflineCuedCloze } from './clozeSentences.js';
 import { englishForForm } from './display.js';
 import { GROUP_SENTENCE_LABELS, groupDisplayLabel, groupSentenceLabel } from './groupDisplay.js';
+import { groupConfusionFeedback } from './answerFeedbackCopy.js';
 
 export function getOfflineTemplateSentence(word, type) {
   return buildOfflineCuedCloze(word, type);
@@ -350,7 +351,7 @@ function learnerCategoryInfo(item) {
         polite &&
           negative &&
           `Tell-tale sign: ${polite} and ${negative} just drop る — no り / ら sound appears. A godan る-verb like 帰る would show 帰ります / 帰らない instead.`,
-        'Contrast: a る-ending godan verb (帰る, 入る, 走る) row-shifts to ら / り / れ / ろ instead of only dropping る.',
+        'Compare: a る-ending godan verb (帰る, 入る, 走る) row-shifts to ら / り / れ / ろ instead of only dropping る.',
       ].filter(Boolean),
     };
   }
@@ -480,6 +481,9 @@ function buildMasuStemBridge(item, type, expected) {
     return {
       title: 'From polite/masu stem',
       kind: 'direct-masu-stem',
+      source: polite,
+      stem: masuStem,
+      result,
       cells: [
         { label: 'Polite', value: polite },
         { label: 'Drop ます', value: masuStem },
@@ -518,6 +522,11 @@ function buildMasuStemBridge(item, type, expected) {
   return {
     title: 'From polite/masu stem',
     kind: 'te-ta-bridge',
+    source: polite,
+    stem: masuStem,
+    stemEnding: fromEnding,
+    bridgeEnding: toEnding,
+    result,
     cells,
     formula,
     detail:
@@ -677,7 +686,7 @@ function inferOnbinMistake(item, type, got, expected, expectedRule) {
     userResult: got,
     expectedRule: expectedRule.short,
     expectedResult: expected,
-    detail: 'The stem is right, but the sound-change ending comes from a different godan cluster.',
+    detail: `You used ${rules[gotTail]}, which produced ${got}. This verb needs ${expectedRule.short}: ${expected}.`,
   };
 }
 
@@ -842,7 +851,7 @@ export function inferMistakenConjugationPattern(item, type, userAnswer) {
         userResult: got,
         expectedRule: expectedRule.short,
         expectedResult: expected,
-        detail: `That is a valid ${candidate.label.toLowerCase()} form, but this card asks for ${typeLabel(type).toLowerCase()}.`,
+        detail: `You made the ${candidate.label.toLowerCase()} form ${got}, but this card asks for ${typeLabel(type).toLowerCase()}: ${expected}.`,
       };
     }
   }
@@ -862,7 +871,14 @@ export function inferMistakenConjugationPattern(item, type, userAnswer) {
           userResult: got,
           expectedRule: expectedRule.short,
           expectedResult: expected,
-          detail: `The answer follows the ${groupLabel(alt)} pattern, not ${groupLabel(item)}.`,
+          detail: groupConfusionFeedback({
+            usedGroup: group,
+            expectedGroup: item.group,
+            word: item.dict || item.reading,
+            userResult: got,
+            expectedRule: expectedRule.short,
+            expectedResult: expected,
+          }),
         };
       }
     } catch {}

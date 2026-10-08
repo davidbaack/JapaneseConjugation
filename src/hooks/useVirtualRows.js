@@ -6,7 +6,27 @@ import { useState, useCallback } from 'react';
 // near) the viewport, with spacer heights above/below so the scrollbar still
 // reflects the full list. The math lives in `computeWindow` so it can be unit
 // tested without a DOM.
+/**
+ * @typedef {object} WindowOptions
+ * @property {number} scrollTop
+ * @property {number} viewportHeight
+ * @property {number} rowHeight
+ * @property {number} count
+ * @property {number} [overscan]
+ */
 
+/**
+ * @typedef {object} RowWindow
+ * @property {number} start
+ * @property {number} end
+ * @property {number} padTop
+ * @property {number} padBottom
+ */
+
+/**
+ * @param {WindowOptions} options
+ * @returns {RowWindow}
+ */
 export function computeWindow({ scrollTop, viewportHeight, rowHeight, count, overscan = 6 }) {
   if (count <= 0 || rowHeight <= 0) {
     return { start: 0, end: 0, padTop: 0, padBottom: 0 };
@@ -26,9 +46,31 @@ export function computeWindow({ scrollTop, viewportHeight, rowHeight, count, ove
 // React wrapper: tracks the scroll container's scrollTop and returns the slice
 // to render plus an `onScroll` handler. When `enabled` is false it renders the
 // full list (no windowing) — useful below a size threshold.
+/**
+ * @typedef {WindowOptions & {
+ *   enabled?: boolean,
+ * }} VirtualRowsOptions
+ */
+
+/**
+ * @typedef {RowWindow & {
+ *   onScroll: (event: import('react').UIEvent<HTMLElement>) => void,
+ * }} VirtualRowsResult
+ */
+
+/**
+ * @param {VirtualRowsOptions} options
+ * @returns {VirtualRowsResult}
+ */
 export function useVirtualRows({ count, rowHeight, viewportHeight, overscan = 6, enabled = true }) {
   const [scrollTop, setScrollTop] = useState(0);
-  const onScroll = useCallback((e) => setScrollTop(e.currentTarget.scrollTop), []);
+  const onScroll = useCallback(
+    /**
+     * @param {import('react').UIEvent<HTMLElement>} e
+     */
+    (e) => setScrollTop(e.currentTarget.scrollTop),
+    [],
+  );
   if (!enabled) {
     return { start: 0, end: count, padTop: 0, padBottom: 0, onScroll };
   }

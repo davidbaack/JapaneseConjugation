@@ -17,6 +17,12 @@ import { promptDisplay, formDisplay, shuffled } from '../utils/display.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { playPronunciation } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
+import {
+  ANSWER_OUTCOME,
+  answerComparisonLabels,
+  answerOutcomeCopy,
+  answerResultCopy,
+} from '../utils/answerFeedbackCopy.js';
 
 const REGISTER_PAIRS = [
   { plain: 'plain-present', polite: 'polite-present', label: 'present' },
@@ -25,6 +31,7 @@ const REGISTER_PAIRS = [
   { plain: 'plain-past-negative', polite: 'polite-past-negative', label: 'past-negative' },
 ];
 const REGISTER_SUB_MODES = ['te-form', 'plain-past', 'masu', 'plain-register'];
+const ANSWER_COMPARISON_LABELS = answerComparisonLabels();
 
 const MODE_BUTTONS = [
   { id: 'te-form', label: 'て', lang: 'ja' },
@@ -126,7 +133,7 @@ export default function EndingsView() {
 
   if (!drillVerbs.length) {
     return (
-      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-8 text-center text-stone-500">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center text-stone-500">
         <p className="mb-4">No verbs match the current filters.</p>
         <button
           onClick={() => setTab('settings')}
@@ -185,6 +192,13 @@ export default function EndingsView() {
     : null;
   const expectedFormView = isRegisterMode
     ? formDisplay(expectedForm, practicePrefs, current, targetType)
+    : null;
+  const resultCopy = result
+    ? answerResultCopy({
+        outcome: result.ok ? ANSWER_OUTCOME.correct : ANSWER_OUTCOME.missed,
+        submitted: result.chosen || 'Revealed answer',
+        expected: isRegisterMode ? expectedForm : expectedTail,
+      })
     : null;
   const registerPatternStats = isRegisterMode
     ? registerStats.byPattern?.[activePair.label] || { attempted: 0, correct: 0 }
@@ -333,41 +347,9 @@ export default function EndingsView() {
 
   return (
     <div className="space-y-4">
-      {/* Stats header */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-850 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
-            {displayStats.correct || 0}/{displayStats.attempted || 0}
-          </div>
-          <div className="text-xs text-stone-500">Accuracy</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-850 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
-            {displayAcc}%
-          </div>
-          <div className="text-xs text-stone-500">Overall</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-850 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
-            {displayStats.streak || 0}
-          </div>
-          <div className="text-xs text-stone-500">Streak</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-850 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50 text-ellipsis overflow-hidden whitespace-nowrap">
-            {displayPatternStats
-              ? `${displayPatternStats.correct || 0}/${displayPatternStats.attempted || 0}`
-              : '—'}
-          </div>
-          <div className="text-xs text-stone-500 text-ellipsis overflow-hidden whitespace-nowrap">
-            {displayPatternLabel}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-[1fr_280px] gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px]">
         {/* Main card */}
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
           {/* Header + mode buttons */}
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
@@ -394,7 +376,7 @@ export default function EndingsView() {
                   className={`px-3 py-2 rounded-lg text-sm border transition ${
                     target === o.id
                       ? 'bg-stone-800 text-white border-stone-800 dark:bg-indigo-600 dark:text-white dark:border-indigo-600'
-                      : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-750 dark:text-stone-300'
+                      : 'border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
                   }`}
                 >
                   {o.label}
@@ -404,7 +386,7 @@ export default function EndingsView() {
           </div>
 
           {/* Question area */}
-          <div className="rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-850 p-5 text-center">
+          <div className="rounded-2xl bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 p-5 text-center">
             <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
               {isRegisterMode
                 ? effectiveTarget === 'masu'
@@ -439,13 +421,13 @@ export default function EndingsView() {
             <div className="mt-2 text-sm text-stone-500">{current.meaning}</div>
 
             {isRegisterMode ? (
-              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-850 px-3 py-1 text-xs text-stone-600 dark:text-stone-400">
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 px-3 py-1 text-xs text-stone-600 dark:text-stone-400">
                 <span>{activePair.label}</span>
                 <span className="text-stone-300 dark:text-stone-800">|</span>
                 <span>{effectiveTarget === 'masu' ? 'plain → polite' : 'polite → plain'}</span>
               </div>
             ) : (
-              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-850 px-3 py-1 text-xs text-stone-600 dark:text-stone-400">
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 px-3 py-1 text-xs text-stone-600 dark:text-stone-400">
                 <span>{pattern.label}</span>
                 <span className="text-stone-300 dark:text-stone-800">|</span>
                 <span>{pattern.cue}</span>
@@ -464,10 +446,10 @@ export default function EndingsView() {
                   lang="ja"
                   className={`min-h-14 px-3 py-3 rounded-xl border text-xl transition ${
                     result && form === expectedForm
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-850 dark:text-emerald-305'
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-800 dark:text-emerald-300'
                       : result && form === result.chosen && !result.ok
-                        ? 'bg-rose-50 border-rose-305 text-rose-800 dark:bg-rose-950/20 dark:border-rose-850 dark:text-rose-305'
-                        : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-805 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 text-stone-800 dark:text-stone-200'
+                        ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/20 dark:border-rose-800 dark:text-rose-300'
+                        : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 text-stone-800 dark:text-stone-200'
                   }`}
                 >
                   {form}
@@ -484,10 +466,10 @@ export default function EndingsView() {
                   lang="ja"
                   className={`min-h-14 px-3 py-3 rounded-xl border text-xl transition ${
                     result && c === expectedTail
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-850 dark:text-emerald-305'
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-800 dark:text-emerald-300'
                       : result && c === result.chosen && !result.ok
-                        ? 'bg-rose-50 border-rose-305 text-rose-800 dark:bg-rose-950/20 dark:border-rose-850 dark:text-rose-305'
-                        : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-805 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 text-stone-800 dark:text-stone-200'
+                        ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/20 dark:border-rose-800 dark:text-rose-300'
+                        : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 text-stone-800 dark:text-stone-200'
                   }`}
                 >
                   {c}
@@ -508,7 +490,7 @@ export default function EndingsView() {
                   }
                 }}
                 disabled={hintChars >= expected.length || !!result}
-                className="px-3 py-2 border border-stone-205 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 disabled:opacity-40 rounded-lg text-sm transition"
+                className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 disabled:opacity-40 rounded-lg text-sm transition"
               >
                 Hint kana
               </button>
@@ -537,30 +519,33 @@ export default function EndingsView() {
             <div
               className={`mt-4 rounded-xl border p-4 text-left ${
                 result.ok
-                  ? 'bg-emerald-50 dark:bg-emerald-950/15 border-emerald-250 dark:border-emerald-900/50'
-                  : 'bg-rose-50 dark:bg-rose-950/15 border-rose-250 dark:border-rose-900/50'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/15 border-emerald-200 dark:border-emerald-900/50'
+                  : 'bg-rose-50 dark:bg-rose-950/15 border-rose-200 dark:border-rose-900/50'
               }`}
             >
               <span role="status" aria-live="polite" className="sr-only">
-                {result.ok
-                  ? isRegisterMode
-                    ? 'Correct.'
-                    : 'Clean sound change.'
-                  : isRegisterMode
-                    ? 'Wrong form.'
-                    : 'Different ending pattern.'}
+                {resultCopy.announcement}
               </span>
               <div
                 className={`text-sm font-medium ${result.ok ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}
               >
                 {result.ok
-                  ? isRegisterMode
-                    ? 'Correct.'
-                    : 'Clean sound change.'
-                  : isRegisterMode
-                    ? 'Wrong form.'
-                    : 'Different ending pattern.'}
+                  ? answerOutcomeCopy(ANSWER_OUTCOME.correct)
+                  : answerOutcomeCopy(ANSWER_OUTCOME.missed)}
               </div>
+
+              {!result.ok && (
+                <div className="mt-2 grid gap-1 text-sm text-stone-700 dark:text-stone-300">
+                  <div>
+                    <span className="font-semibold">{ANSWER_COMPARISON_LABELS.submitted}:</span>{' '}
+                    <span lang="ja">{result.chosen || 'Revealed answer'}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold">{ANSWER_COMPARISON_LABELS.expected}:</span>{' '}
+                    <span lang="ja">{isRegisterMode ? expectedForm : expectedTail}</span>
+                  </div>
+                </div>
+              )}
 
               {isRegisterMode ? (
                 <>
@@ -597,7 +582,7 @@ export default function EndingsView() {
                     className="text-2xl mt-1 text-stone-900 dark:text-stone-100"
                     subClassName="text-xs text-stone-500 mt-1"
                   />
-                  <div className="text-sm text-stone-705 dark:text-stone-300 mt-2">
+                  <div className="text-sm text-stone-700 dark:text-stone-300 mt-2">
                     {pattern.cue}
                   </div>
                 </>
@@ -617,7 +602,7 @@ export default function EndingsView() {
               <button
                 onClick={() => next()}
                 autoFocus
-                className="w-full py-2.5 bg-stone-850 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-xl font-medium shadow-lg transition"
+                className="w-full py-2.5 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-100 text-white dark:text-stone-900 rounded-xl font-medium shadow-lg transition"
               >
                 Next
               </button>
@@ -626,7 +611,7 @@ export default function EndingsView() {
         </div>
 
         {/* Sidebar — adapts per mode family */}
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-850 p-5">
+        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
           {isRegisterMode || target === 'mix' ? (
             <>
               <h3 className="font-medium mb-3 text-stone-950 dark:text-stone-50">Register map</h3>
@@ -685,6 +670,37 @@ export default function EndingsView() {
               </div>
             </>
           )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Ending Lab results">
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+            {displayStats.correct || 0}/{displayStats.attempted || 0}
+          </div>
+          <div className="text-xs text-stone-500">Accuracy</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+            {displayAcc}%
+          </div>
+          <div className="text-xs text-stone-500">Overall</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+            {displayStats.streak || 0}
+          </div>
+          <div className="text-xs text-stone-500">Streak</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50 text-ellipsis overflow-hidden whitespace-nowrap">
+            {displayPatternStats
+              ? `${displayPatternStats.correct || 0}/${displayPatternStats.attempted || 0}`
+              : '—'}
+          </div>
+          <div className="text-xs text-stone-500 text-ellipsis overflow-hidden whitespace-nowrap">
+            {displayPatternLabel}
+          </div>
         </div>
       </div>
     </div>

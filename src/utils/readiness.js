@@ -1,4 +1,5 @@
 import { getTypeInfo, FORM_GROUPS } from '../data/conjugationTypes.js';
+import { createSyncEventId } from './syncMetadata.js';
 
 export const FAST_RESPONSE_MS = 8000;
 
@@ -47,6 +48,7 @@ function normalizeMetric(metric = {}) {
     fastestMs: fastestMs || null,
     lastMs: cleanNumber(metric.lastMs) || null,
     lastAt: cleanNumber(metric.lastAt) || null,
+    ...(metric.lastAttemptId ? { lastAttemptId: String(metric.lastAttemptId) } : {}),
   };
 }
 
@@ -54,7 +56,7 @@ function hasAttempts(metric) {
   return cleanNumber(metric?.attempted) > 0;
 }
 
-function metricWithAttempt(metric, correct, responseMs, now) {
+function metricWithAttempt(metric, correct, responseMs, now, eventId) {
   const base = normalizeMetric(metric);
   const ms = cleanNumber(responseMs);
   return {
@@ -65,10 +67,11 @@ function metricWithAttempt(metric, correct, responseMs, now) {
     correctResponseMs: base.correctResponseMs + (correct ? ms : 0),
     lastMs: ms || null,
     lastAt: now,
+    lastAttemptId: eventId,
   };
 }
 
-function speedWithAttempt(metric, correct, responseMs, now) {
+function speedWithAttempt(metric, correct, responseMs, now, eventId) {
   const base = normalizeMetric(metric);
   const ms = cleanNumber(responseMs);
   const fastestMs =
@@ -83,13 +86,48 @@ function speedWithAttempt(metric, correct, responseMs, now) {
     fastestMs: Number.isFinite(fastestMs) ? fastestMs : null,
     lastMs: ms || null,
     lastAt: now,
+    lastAttemptId: eventId,
   };
 }
 
-function mergeMetric(left, right) {
+function mergeMetricSnapshot(left, right) {
   const a = normalizeMetric(left);
   const b = normalizeMetric(right);
-  const lastFromRight = (b.lastAt || 0) > (a.lastAt || 0);
+  const tied = a.attempted === b.attempted && (a.lastAt || 0) === (b.lastAt || 0);
+  const preferred =
+    b.attempted > a.attempted || (b.attempted === a.attempted && (b.lastAt || 0) > (a.lastAt || 0))
+      ? b
+      : tied && JSON.stringify(b) > JSON.stringify(a)
+        ? b
+        : a;
+  const lastFromRight =
+    (b.lastAt || 0) > (a.lastAt || 0) ||
+    ((b.lastAt || 0) === (a.lastAt || 0) &&
+      String(b.lastAttemptId || '') > String(a.lastAttemptId || '')) ||
+    ((b.lastAt || 0) === (a.lastAt || 0) && b.lastAttemptId === a.lastAttemptId && preferred === b);
+  const latest = lastFromRight ? b : a;
+  const fastest = [a.fastestMs, b.fastestMs].filter(Boolean);
+  return {
+    attempted: preferred.attempted,
+    correct: preferred.correct,
+    totalResponseMs: preferred.totalResponseMs,
+    correctResponseMs: preferred.correctResponseMs,
+    fastCorrect: preferred.fastCorrect,
+    fastestMs: fastest.length ? Math.min(...fastest) : null,
+    lastMs: lastFromRight ? b.lastMs : a.lastMs,
+    lastAt: Math.max(a.lastAt || 0, b.lastAt || 0) || null,
+    ...(latest.lastAttemptId ? { lastAttemptId: latest.lastAttemptId } : {}),
+  };
+}
+
+function aggregateMetric(left, right) {
+  const a = normalizeMetric(left);
+  const b = normalizeMetric(right);
+  const lastFromRight =
+    (b.lastAt || 0) > (a.lastAt || 0) ||
+    ((b.lastAt || 0) === (a.lastAt || 0) &&
+      String(b.lastAttemptId || '') > String(a.lastAttemptId || ''));
+  const latest = lastFromRight ? b : a;
   const fastest = [a.fastestMs, b.fastestMs].filter(Boolean);
   return {
     attempted: a.attempted + b.attempted,
@@ -100,6 +138,7 @@ function mergeMetric(left, right) {
     fastestMs: fastest.length ? Math.min(...fastest) : null,
     lastMs: lastFromRight ? b.lastMs : a.lastMs,
     lastAt: Math.max(a.lastAt || 0, b.lastAt || 0) || null,
+    ...(latest.lastAttemptId ? { lastAttemptId: latest.lastAttemptId } : {}),
   };
 }
 
@@ -135,13 +174,21 @@ export function recordReadinessAttempt(readiness, ruleId, details = {}) {
   const responseMs = cleanNumber(details.responseMs);
   const dimension = readinessDimensionForAttempt(details);
   const ruleMetrics = normalized.byRule[ruleId] || {};
+  const eventId = String(details.eventId || details.id || createSyncEventId());
+  if (ruleMetrics.speed?.lastAttemptId === eventId) return normalized;
   return {
     byRule: {
       ...normalized.byRule,
       [ruleId]: {
         ...ruleMetrics,
-        [dimension]: metricWithAttempt(ruleMetrics[dimension], !!details.correct, responseMs, now),
-        speed: speedWithAttempt(ruleMetrics.speed, !!details.correct, responseMs, now),
+        [dimension]: metricWithAttempt(
+          ruleMetrics[dimension],
+          !!details.correct,
+          responseMs,
+          now,
+          eventId,
+        ),
+        speed: speedWithAttempt(ruleMetrics.speed, !!details.correct, responseMs, now, eventId),
       },
     },
   };
@@ -154,7 +201,7 @@ export function mergeReadinessState(local, cloud) {
   for (const [ruleId, ruleMetrics] of Object.entries(right.byRule)) {
     const mergedRule = { ...(byRule[ruleId] || {}) };
     for (const id of DIMENSION_IDS) {
-      mergedRule[id] = mergeMetric(mergedRule[id], ruleMetrics[id]);
+      mergedRule[id] = mergeMetricSnapshot(mergedRule[id], ruleMetrics[id]);
       if (!hasAttempts(mergedRule[id])) delete mergedRule[id];
     }
     if (Object.keys(mergedRule).length) byRule[ruleId] = mergedRule;
@@ -276,11 +323,11 @@ export function buildReadinessFamilyRows(state, families = FORM_GROUPS) {
       if (!typeIds.has(typeId)) continue;
       const typeMetrics = byType.get(typeId) || { recognition: {}, production: {}, speed: {} };
       for (const dimension of READINESS_DIMENSIONS) {
-        familyMetrics[dimension.id] = mergeMetric(
+        familyMetrics[dimension.id] = aggregateMetric(
           familyMetrics[dimension.id],
           ruleMetrics[dimension.id],
         );
-        typeMetrics[dimension.id] = mergeMetric(
+        typeMetrics[dimension.id] = aggregateMetric(
           typeMetrics[dimension.id],
           ruleMetrics[dimension.id],
         );

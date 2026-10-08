@@ -10,6 +10,10 @@
 import { conjugateItem, surfaceFormFor, wordKey } from '../src/utils/conjugator.js';
 import { getTypeInfo } from '../src/data/conjugationTypes.js';
 import { resolveTransitivity } from '../src/utils/clozeSentences.js';
+import {
+  sentenceRowQualityIssue,
+  sentenceSemanticQualityIssue,
+} from '../src/utils/sentenceQuality.js';
 
 // Hiragana (U+3040–309F), katakana (U+30A0–30FF, incl. the long-vowel mark),
 // and ASCII whitespace.
@@ -97,6 +101,7 @@ export function buildPair(word, type) {
     word_key: wordKey(word),
     dict: word.dict,
     reading: word.reading,
+    meaning: String(word.meaning || ''),
     group: word.group,
     jlpt: word.jlpt || '',
     type,
@@ -117,6 +122,11 @@ function fail(reason) {
 
 // Any kana or CJK ideograph — a real English translation should contain none.
 const JP_RE = /[぀-ヿ一-鿿豈-﫿]/;
+const GENERIC_ADJECTIVE_CONDITIONAL_RE = /^if\b.+,\s*i will use it\.$/i;
+
+function isAdjectiveConditionalType(type) {
+  return type === 'adj-conditional' || type === 'adj-tara';
+}
 
 /**
  * Return a reason string when `en` doesn't look like a genuine English
@@ -134,9 +144,20 @@ export function englishQualityIssue(en, type) {
   if (/practice sentence/i.test(text) || /\bin the\b[^.]*\bform\b/i.test(text)) {
     return 'en-boilerplate';
   }
+  if (isAdjectiveConditionalType(type) && GENERIC_ADJECTIVE_CONDITIONAL_RE.test(text)) {
+    return 'en-generic-adjective-result';
+  }
+  const semanticIssue = sentenceSemanticQualityIssue({ en: text, type });
+  if (semanticIssue) return semanticIssue;
   const label = String(getTypeInfo(type)?.label || '').trim();
-  if (label && text.toLowerCase().includes(label.toLowerCase())) return 'en-echoes-form';
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (
+    escapedLabel &&
+    new RegExp(`\\b${escapedLabel}\\s+(?:form|conjugation|tense|pattern|voice)\\b`, 'i').test(text)
+  )
+    return 'en-echoes-form';
   const words = text.split(/\s+/).filter(Boolean);
+  if (['imperative', 'command-nasai'].includes(type) && /^[A-Za-z]{2,}[.!]?$/.test(text)) return '';
   if (text.length < 4 || (words.length < 2 && text.length < 8)) return 'en-too-short';
   return '';
 }
@@ -214,6 +235,8 @@ export function validateGenerated(word, type, out) {
     seg && seg.w ? { w: true } : { t: String(seg?.t ?? ''), r: String(seg?.r ?? '') },
   );
   const jaTemplate = cleanSegments.map((seg) => (seg.w ? '{w}' : seg.t)).join('');
+  const rowIssue = sentenceRowQualityIssue({ en, type, jaTemplate });
+  if (rowIssue) return fail(rowIssue);
 
   return {
     ok: true,

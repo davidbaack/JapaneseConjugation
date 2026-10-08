@@ -44,6 +44,8 @@ describe('static coverage configuration', () => {
     expect(appStrict.include).toEqual(
       expect.arrayContaining([
         'src/data/defaults.js',
+        'src/hooks/useFocusTrap.js',
+        'src/hooks/useVirtualRows.js',
         'src/i18n/**/*.js',
         'src/utils/rateLimiter.js',
         'src/utils/retry.js',
@@ -90,15 +92,53 @@ describe('static coverage configuration', () => {
     expect(proxy).toContain('ALLOWED_ORIGIN=* requires GEMINI_ALLOW_PUBLIC_ORIGIN=true');
   });
 
+  it('pins the Gemini proxy to the generation its request schema targets', () => {
+    const proxy = readRepoText('supabase/functions/gemini-proxy/index.ts');
+
+    expect(proxy).toContain("const GEMINI_MODEL = 'gemini-3.5-flash-lite'");
+    expect(proxy).not.toContain('gemini-flash-lite-latest');
+    expect(proxy).toContain("thinkingConfig: { thinkingLevel: 'MINIMAL' }");
+    expect(proxy).not.toContain('temperature: clampNumber');
+  });
+
   it('runtime-caches the sentence corpus without precaching every chunk', () => {
     const config = readRepoText('vite.config.js');
 
-    expect(config).toContain(
-      "globIgnores: ['**/data/sentences/manifest.json', '**/data/sentences/by-type/*.json']",
-    );
-    expect(config).toContain("cacheName: 'sentence-corpus-manifest-v1'");
+    expect(config).toContain("'**/data/sentences/manifest.json'");
+    expect(config).toContain("'**/data/sentences/by-type/*.json'");
+    expect(config).toContain("'**/assets/vendor-supabase-*.js'");
+    expect(config).toContain("cacheName: 'sentence-corpus-manifest-v2'");
     expect(config).toContain("handler: 'NetworkFirst'");
-    expect(config).toContain("cacheName: 'sentence-corpus-v1'");
+    expect(config).toContain("cacheName: 'sentence-corpus-v2'");
     expect(config).toContain("handler: 'CacheFirst'");
+    expect(config).toContain("cacheName: 'supabase-sdk-v1'");
+    expect(config).toContain('manifest: true');
+  });
+
+  it('enforces separate eager, precache, total, and per-chunk bundle budgets', () => {
+    const budget = readRepoText('scripts/check-bundle-size.js');
+
+    expect(budget).toContain('EAGER_CRITICAL_GZIP_KB');
+    expect(budget).toContain('PRECACHE_GZIP_KB');
+    expect(budget).toContain('TOTAL_GZIP_KB = 330');
+    expect(budget).toContain('MAX_CHUNK_GZIP_KB');
+    expect(budget).toContain("'EAGER/CRITICAL'");
+    expect(budget).toContain("'PRECACHE'");
+    expect(budget).toContain("'TOTAL'");
+    expect(budget).toContain('sumPrecache(cachedPaths)');
+    expect(budget).toContain("gzipFile(join(DIST_DIR, 'index.html'))");
+  });
+
+  it('runs browser tests against the configured deploy artifact', () => {
+    const deploy = readRepoText('.github/workflows/deploy.yml');
+    const playwright = readRepoText('playwright.config.js');
+    const buildIndex = deploy.indexOf('- run: npm run build');
+    const e2eIndex = deploy.indexOf('- name: Run E2E tests against configured build');
+
+    expect(buildIndex).toBeGreaterThan(-1);
+    expect(e2eIndex).toBeGreaterThan(buildIndex);
+    expect(deploy).toContain("PW_USE_PREBUILT: '1'");
+    expect(playwright).toContain("process.env.PW_USE_PREBUILT === '1'");
+    expect(playwright).toContain("'npm run preview -- --host 127.0.0.1'");
   });
 });

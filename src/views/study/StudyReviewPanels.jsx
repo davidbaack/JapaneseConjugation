@@ -9,23 +9,24 @@ import {
   IconX,
 } from '../../components/Icons.jsx';
 import ScriptDisplay from '../../components/ScriptDisplay.jsx';
+import StickyAction from '../../components/StickyAction.jsx';
 import { ConjugationBreakdown } from '../../components/ConjugationBreakdown.jsx';
 import { ChatPanel } from '../../components/ChatPanel.jsx';
 import { lessonForType } from '../../data/lessonContent.js';
 import { DEFAULT_PREFS } from '../../data/defaults.js';
-import { englishForForm, formDisplay, promptDisplay } from '../../utils/display.js';
+import { exerciseEnglishForForm, formDisplay, promptDisplay } from '../../utils/display.js';
 import { toHiragana } from '../../utils/romaji.js';
 import { getConjugationDebugInfo } from '../../utils/conjugatorExplain.js';
 import { labRouteForMistakePattern } from '../../utils/mistakeDiagnosis.js';
 import { kanaCoachCells } from '../../utils/kanaCoach.js';
+import {
+  ANSWER_OUTCOME,
+  answerOutcomeCopy,
+  buildMistakeExplanation,
+} from '../../utils/answerFeedbackCopy.js';
+import { accuracyForTotals, evidenceLabelForTotals } from '../../utils/practiceStats.js';
 
-function ReviewDisclosure({
-  tone = 'stone',
-  summary,
-  children,
-  alwaysOpen = false,
-  hintLabel = 'More',
-}) {
+function ReviewDisclosure({ tone = 'stone', summary, children, hintLabel = 'More' }) {
   const toneClass =
     tone === 'rose'
       ? 'border-rose-200 dark:border-rose-900/60 bg-white/70 dark:bg-stone-950/50'
@@ -33,22 +34,13 @@ function ReviewDisclosure({
         ? 'border-emerald-200 dark:border-emerald-900/60 bg-white/70 dark:bg-stone-950/50'
         : 'border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-950/50';
 
-  if (alwaysOpen) {
-    return (
-      <section className={`rounded-xl border ${toneClass} px-3 py-2`}>
-        <div className="text-sm font-semibold text-stone-800 dark:text-stone-100">{summary}</div>
-        <div className="mt-3 space-y-2.5">{children}</div>
-      </section>
-    );
-  }
-
   return (
     <details className={`rounded-xl border ${toneClass} px-3 py-2`}>
       <summary className="cursor-pointer list-none text-sm font-semibold text-stone-800 dark:text-stone-100">
         <span className="inline-flex items-center gap-2">
           <span>{summary}</span>
           {hintLabel && (
-            <span className="text-xs font-medium text-stone-500 dark:text-stone-400">
+            <span className="text-xs font-medium text-stone-600 dark:text-stone-400">
               {hintLabel}
             </span>
           )}
@@ -68,7 +60,7 @@ function ReviewChatSection({ tone = 'stone', chatOpen, onOpen, children }) {
         : 'border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-950/50';
   const buttonClass =
     tone === 'rose'
-      ? 'border-rose-200 text-rose-700 hover:bg-rose-100/50 dark:border-rose-900 dark:text-rose-450 dark:hover:bg-rose-950/50'
+      ? 'border-rose-200 text-rose-700 hover:bg-rose-100/50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/50'
       : tone === 'emerald'
         ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-100/50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950/50'
         : 'border-stone-200 text-stone-700 hover:bg-stone-100/50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-900/60';
@@ -115,7 +107,7 @@ const CARD_ORIGIN_META = {
   },
   missed: {
     label: 'Previously missed',
-    detail: 'Recent miss',
+    detail: 'Missed earlier',
     chipClass:
       'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-300',
     detailClass: 'text-amber-700 dark:text-amber-300',
@@ -145,54 +137,58 @@ function withCardOrigin(card, origin) {
   return { ...card, selectionOrigin: origin || cardOriginForStudyCard(card) };
 }
 
-function buildMissedContrast({
-  record,
-  minimalPairFeedback,
-  diagnostic,
-  reviewSubmittedAnswer,
-  missedComparisonValue,
-}) {
+function PromotedRuleCard({ debug }) {
+  if (!debug?.rule?.short) return null;
+  const formula =
+    debug.formula?.expression && debug.formula.expression !== debug.result
+      ? debug.formula.expression
+      : '';
+
+  return (
+    <section className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-2.5 shadow-sm dark:border-indigo-900/60 dark:bg-indigo-950/20">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+        Rule to apply
+      </div>
+      <div className="mt-1 text-lg font-semibold text-indigo-950 dark:text-indigo-100" lang="ja">
+        {debug.rule.short}
+      </div>
+      {debug.rule.detail && (
+        <div className="mt-1 text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+          {debug.rule.detail}
+        </div>
+      )}
+      {formula && (
+        <div
+          className="mt-2 rounded-lg border border-white/70 bg-white/75 px-2 py-1.5 text-center font-mono text-sm text-stone-900 dark:border-stone-800 dark:bg-stone-900/75 dark:text-stone-100"
+          lang="ja"
+        >
+          {formula}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function buildMissedExplanation({ record, minimalPairFeedback, diagnostic, debug }) {
   if (!record || record.correct) return null;
 
   if (minimalPairFeedback) {
     const masu = minimalPairFeedback.masuDiagnostic;
     return {
-      title: 'Contrast check',
+      title: 'Why it missed',
       body: masu
         ? `${minimalPairFeedback.label}. ${masu.dict} -> ${masu.politeSurface}. ${masu.contrast}`
         : `${minimalPairFeedback.label}. ${minimalPairFeedback.intro}`,
     };
   }
 
-  if (diagnostic) {
-    return {
-      title: 'Contrast',
-      body: `${record.diagnosis?.label ? `${record.diagnosis.label}. ` : ''}${diagnostic}`,
-    };
-  }
-
   if (!record.revealedMiss) {
-    try {
-      const mistake = getConjugationDebugInfo(
-        record.word,
-        record.practicedType,
-        reviewSubmittedAnswer,
-      ).mistake;
-      if (mistake) {
-        return {
-          title: 'Contrast',
-          body: `${mistake.userRule} vs ${mistake.expectedRule}. ${mistake.detail}`,
-        };
-      }
-    } catch {}
+    const mistake = debug?.mistake;
+    const explanation = buildMistakeExplanation({ diagnostic, mistake });
+    if (explanation) return explanation;
   }
 
-  return {
-    title: 'Contrast',
-    body: `${record.expected} is the target; ${missedComparisonValue} does not match the requested ${
-      record.typeLabel || 'form'
-    }.`,
-  };
+  return null;
 }
 
 function debugInfoForReviewRecord(record, reviewSubmittedAnswer) {
@@ -247,7 +243,7 @@ export function reviewFeedbackActionForRecord(
   return { kind: 'try', label: 'Next card' };
 }
 
-function ReviewFeedbackAction({ action, buttonRef, onClick }) {
+function ReviewFeedbackAction({ action, onClick }) {
   if (!action?.label || !onClick) return null;
   const Icon =
     action.kind === 'lesson'
@@ -259,13 +255,12 @@ function ReviewFeedbackAction({ action, buttonRef, onClick }) {
           : IconArrowRight;
   const toneClass =
     action.kind === 'try'
-      ? 'border-stone-800 bg-stone-850 text-white hover:bg-stone-700 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150'
-      : 'border-indigo-200 bg-white text-indigo-750 hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-200 dark:hover:bg-indigo-950/30';
+      ? 'border-stone-800 bg-stone-800 text-white hover:bg-stone-700 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-100'
+      : 'border-indigo-200 bg-white text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-200 dark:hover:bg-indigo-950/30';
 
   return (
     <div className="mt-4 border-t border-stone-200/70 pt-3 text-left dark:border-stone-800/70">
       <button
-        ref={buttonRef}
         type="button"
         onClick={onClick}
         className={`inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-sm transition ${toneClass}`}
@@ -277,7 +272,7 @@ function ReviewFeedbackAction({ action, buttonRef, onClick }) {
   );
 }
 
-function GuideReviewPrompt({ buttonRef = null, onClick }) {
+function GuideReviewPrompt({ onClick }) {
   if (!onClick) return null;
 
   return (
@@ -285,11 +280,10 @@ function GuideReviewPrompt({ buttonRef = null, onClick }) {
       <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
         Walk through this form in Guide
       </div>
-      <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+      <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
         Drills this same word and target form: plain form, word group, final answer.
       </div>
       <button
-        ref={buttonRef}
         type="button"
         onClick={onClick}
         className="mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-900 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/30"
@@ -301,8 +295,26 @@ function GuideReviewPrompt({ buttonRef = null, onClick }) {
   );
 }
 
+function guideFocusOptionsForReview(record) {
+  const submittedAnswer = record.reviewChoiceLabel
+    ? record.reviewChoiceLabel
+    : record.revealedMiss
+      ? "I don't know"
+      : String(record.submittedAnswer || '').trim();
+  const sourceTypeId = record.promptType || 'dictionary';
+  return {
+    sourceTypeId,
+    sourceForm: record.promptForm || '',
+    submittedAnswer,
+    expectedAnswer: record.expected || '',
+    missed: !record.correct,
+    formToForm: sourceTypeId !== 'dictionary',
+  };
+}
+
 function RunAnswerReveal({
   record,
+  contextStats = null,
   geminiKey,
   onOpenLearn,
   onOpenLearnFocus = null,
@@ -341,19 +353,22 @@ function RunAnswerReveal({
     : formDisplay(record.expected, prefs, record.word, record.cardType);
   const reviewTypeId = record.practicedType || record.cardType;
   const targetEnglish = record.reverseDrill
-    ? englishForForm(record.word, null)
-    : englishForForm(record.word, record.cardType);
+    ? exerciseEnglishForForm(record.word, null)
+    : exerciseEnglishForForm(record.word, record.cardType);
   const explanation = record.explanation;
   const relatedLesson = lessonForType(reviewTypeId);
   const minimalPairFeedback = record.minimalPairFeedback;
+  const reviewDebug = !record.correct
+    ? debugInfoForReviewRecord(record, reviewSubmittedAnswer)
+    : null;
+  const promotedRuleDebug = reviewDebug?.rule ? reviewDebug : null;
   const diagnostic =
     !record.correct && !record.revealedMiss ? record.diagnosis?.feedback || '' : '';
-  const missedContrast = buildMissedContrast({
+  const missedExplanation = buildMissedExplanation({
     record,
     minimalPairFeedback,
     diagnostic,
-    reviewSubmittedAnswer,
-    missedComparisonValue,
+    debug: reviewDebug,
   });
   const reviewAction = reviewFeedbackActionForRecord(record, {
     canOpenGuide: !!onOpenGuide,
@@ -366,7 +381,7 @@ function RunAnswerReveal({
   const canOpenGuidePrompt =
     !!onOpenGuide && !!record.word && !!reviewTypeId && !record.reverseDrill;
   const canOpenRuleLesson = !!relatedLesson && !!(onOpenLearn || onOpenLearnFocus);
-  const ruleLessonLabel = record.correct ? 'Teach me this rule' : 'I forgot this';
+  const ruleLessonLabel = record.correct ? 'Teach me this rule' : 'Review grammar';
   const openFormationKeys = onOpenLearn
     ? (visual) => {
         onOpenLearn(null, visual);
@@ -376,9 +391,10 @@ function RunAnswerReveal({
     const handled = onOpenLearnFocus?.(record);
     if (!handled) onOpenLearn?.(relatedLesson.groupId);
   };
+  const guideFocusOptions = guideFocusOptionsForReview(record);
   const runReviewAction = () => {
     if (reviewAction.kind === 'guide') {
-      onOpenGuide?.(record.word, reviewTypeId);
+      onOpenGuide?.(record.word, reviewTypeId, guideFocusOptions);
       return;
     }
     if (reviewAction.kind === 'drill') {
@@ -393,7 +409,7 @@ function RunAnswerReveal({
     onTryAnother?.();
   };
   const openGuidePrompt = () => {
-    onOpenGuide?.(record.word, reviewTypeId);
+    onOpenGuide?.(record.word, reviewTypeId, guideFocusOptions);
   };
   const panelClass = record.correct
     ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
@@ -426,9 +442,9 @@ function RunAnswerReveal({
         <div
           className={`mt-0.5 flex-shrink-0 ${
             record.correct
-              ? 'text-emerald-600'
+              ? 'text-emerald-700'
               : record.wasCorrected
-                ? 'text-amber-600'
+                ? 'text-amber-700'
                 : 'text-rose-600'
           }`}
         >
@@ -445,17 +461,18 @@ function RunAnswerReveal({
             }`}
           >
             {record.correct
-              ? 'Correct!'
+              ? answerOutcomeCopy(ANSWER_OUTCOME.correct)
               : record.wasCorrected
-                ? 'Assisted correction.'
-                : 'Review this form.'}
+                ? answerOutcomeCopy(ANSWER_OUTCOME.assisted)
+                : answerOutcomeCopy(ANSWER_OUTCOME.missed)}
           </h3>
           {record.wasCorrected && (
             <div className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
-              You reached the right answer after self-correction or a hint, so this still counts for
-              review.
+              You reached the right answer after self-correction or revealed answer help. This is
+              marked as a miss so it can come back for practice.
             </div>
           )}
+          {!record.correct && <PromotedRuleCard debug={promotedRuleDebug} />}
 
           {record.correct ? (
             <>
@@ -465,9 +482,9 @@ function RunAnswerReveal({
                     {reviewKanaCells.map((cell, i) => {
                       const cls =
                         cell.state === 'correct'
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
                           : cell.state === 'wrong' || cell.state === 'extra'
-                            ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
+                            ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
                             : cell.state === 'hint'
                               ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
                               : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
@@ -489,7 +506,7 @@ function RunAnswerReveal({
                 type={record.practicedType}
                 colorHighlight={prefs.colorCodeConjugations !== false}
                 className="mt-2 text-xl text-emerald-900 dark:text-emerald-100"
-                subClassName="mt-1 text-xs text-stone-500"
+                subClassName="mt-1 text-xs text-stone-600"
               />
               <div className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">
                 {targetEnglish}
@@ -497,7 +514,7 @@ function RunAnswerReveal({
               {autoAdvanceHint && (
                 <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-100/80 px-3 py-2 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
                   <span className="relative flex h-5 w-5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                    <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400 opacity-60" />
                     <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
                       <IconCheck className="h-3 w-3" />
                     </span>
@@ -569,7 +586,7 @@ function RunAnswerReveal({
                                 ? 'border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-600 dark:bg-rose-950/40 dark:text-rose-100'
                                 : cell.state === 'hint'
                                   ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500 dark:bg-amber-950/40 dark:text-amber-100'
-                                  : 'border-stone-300 bg-stone-100 text-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400';
+                                  : 'border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400';
                           return (
                             <div
                               key={i}
@@ -589,7 +606,7 @@ function RunAnswerReveal({
                     ? `You chose: ${record.reviewChoiceLabel}`
                     : record.revealedMiss
                       ? "You chose: I don't know"
-                      : 'You wrote:'}{' '}
+                      : 'Your answer:'}{' '}
                   {!record.revealedMiss && !record.reviewChoiceLabel && (
                     <span lang="ja" className="font-semibold">
                       {record.reverseDrill
@@ -604,9 +621,71 @@ function RunAnswerReveal({
         </div>
       </div>
 
+      {contextStats?.type && (
+        <section
+          aria-label={`Stats for ${contextStats.type.label}`}
+          className="mt-4 rounded-xl border border-stone-200 bg-white/75 p-3 text-left dark:border-stone-800 dark:bg-stone-950/45"
+        >
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
+            Your progress
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-lg bg-indigo-50 px-3 py-2 dark:bg-indigo-950/30">
+              <div className="text-xs font-semibold text-indigo-900 dark:text-indigo-100">
+                {contextStats.type.label}
+              </div>
+              <div className="mt-1 text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-100">
+                {contextStats.exact.correct} right / {contextStats.exact.attempted} attempts
+              </div>
+              <div className="mt-0.5 text-[11px] text-stone-600 dark:text-stone-400">
+                {evidenceLabelForTotals(contextStats.exact)}
+                {contextStats.recent.attempted >= 3
+                  ? ` · Recent ${contextStats.recent.correct}/${contextStats.recent.attempted}`
+                  : ''}
+              </div>
+            </div>
+            {contextStats.topic && (
+              <div className="rounded-lg bg-stone-100 px-3 py-2 dark:bg-stone-900">
+                <div className="text-xs font-semibold text-stone-700 dark:text-stone-200">
+                  {contextStats.topic.label} overall
+                </div>
+                <div className="mt-1 text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-100">
+                  {contextStats.topicTotals.correct} right / {contextStats.topicTotals.attempted}{' '}
+                  attempts
+                </div>
+                <div className="mt-0.5 text-[11px] text-stone-600 dark:text-stone-400">
+                  {contextStats.topicTotals.attempted >= 3
+                    ? `${accuracyForTotals(contextStats.topicTotals)}% right across this topic`
+                    : evidenceLabelForTotals(contextStats.topicTotals)}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {onTryAnother && (
+        <StickyAction
+          pad="-mx-3 px-3 sm:mx-0 sm:px-0"
+          className="mt-1 sm:static sm:z-auto sm:mt-4 sm:bg-none sm:pt-0 sm:pb-0"
+        >
+          <button
+            ref={actionButtonRef}
+            type="button"
+            onClick={onTryAnother}
+            aria-label="Next card"
+            className="group inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-stone-800 bg-stone-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-700 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-100"
+          >
+            <span className="inline-flex items-center gap-2">
+              <IconArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              <span aria-hidden="true">Next card</span>
+            </span>
+          </button>
+        </StickyAction>
+      )}
       {record.correct && explanation && (
         <div className="mt-4 space-y-2.5 border-t border-emerald-200 pt-4 text-left dark:border-emerald-900/50">
-          <ReviewDisclosure tone="emerald" summary="Answer breakdown" alwaysOpen>
+          <ReviewDisclosure tone="emerald" summary="Explain the rule" hintLabel="">
             <ConjugationBreakdown
               word={record.word}
               type={record.practicedType}
@@ -669,21 +748,21 @@ function RunAnswerReveal({
               </div>
             </>
           )}
-          {explanation.rule && (
+          {!promotedRuleDebug && explanation.rule && (
             <div className="rounded-lg bg-white/70 px-3 py-2 text-sm leading-relaxed text-stone-700 dark:bg-stone-900/70 dark:text-stone-300">
               <span className="font-semibold text-stone-900 dark:text-stone-100">Rule: </span>
               {explanation.rule}
             </div>
           )}
-          {missedContrast && (
+          {missedExplanation && (
             <div className="rounded-lg bg-white/70 px-3 py-2 text-sm leading-relaxed text-stone-700 dark:bg-stone-900/70 dark:text-stone-300">
               <span className="font-semibold text-stone-900 dark:text-stone-100">
-                {missedContrast.title}:{' '}
+                {missedExplanation.title}:{' '}
               </span>
-              {missedContrast.body}
+              {missedExplanation.body}
             </div>
           )}
-          <ReviewDisclosure tone="rose" summary="Full breakdown" alwaysOpen>
+          <ReviewDisclosure tone="rose" summary="Explain the rule" hintLabel="">
             {!minimalPairFeedback && (
               <div className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
                 {explanation.intro}
@@ -704,6 +783,7 @@ function RunAnswerReveal({
               practicePrefs={prefs}
               onOpenFormationKeys={openFormationKeys}
               onOpenLearn={onOpenLearn}
+              suppressRuleSummary={!!promotedRuleDebug}
             />
             {minimalPairFeedback && (
               <section className="space-y-2">
@@ -760,155 +840,20 @@ function RunAnswerReveal({
             <IconBook className="h-4 w-4" />
             {ruleLessonLabel}
           </button>
-          <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+          <div className="mt-1 text-xs text-stone-600 dark:text-stone-400">
             Opens {relatedLesson.title}, then returns to this form.
           </div>
         </div>
       )}
-      {canOpenGuidePrompt && (
-        <GuideReviewPrompt
-          buttonRef={reviewAction.kind === 'guide' ? actionButtonRef : null}
-          onClick={openGuidePrompt}
-        />
-      )}
-      {reviewAction.kind !== 'guide' && (
-        <ReviewFeedbackAction
-          action={reviewAction}
-          buttonRef={actionButtonRef}
-          onClick={runReviewAction}
-        />
+      {canOpenGuidePrompt && <GuideReviewPrompt onClick={openGuidePrompt} />}
+      {reviewAction.kind !== 'guide' && reviewAction.kind !== 'try' && (
+        <ReviewFeedbackAction action={reviewAction} onClick={runReviewAction} />
       )}
     </div>
   );
 }
 
-function RunAnswerReviewItem({
-  record,
-  geminiKey,
-  onOpenGuide,
-  onOpenLab,
-  onOpenLearn,
-  onOpenLearnFocus,
-  onTryAnother,
-}) {
-  const answerText =
-    record.reviewChoiceLabel ||
-    (record.revealedMiss ? "I don't know" : record.submittedAnswer?.trim() || '(empty)');
-  const toneClass = record.correct
-    ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-300'
-    : record.wasCorrected
-      ? 'border-amber-200 text-amber-700 dark:border-amber-900 dark:text-amber-300'
-      : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-300';
-  const statusLabel = record.correct ? 'Correct' : record.wasCorrected ? 'Assisted' : 'Missed';
-
-  return (
-    <details className="group rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
-      <summary className="cursor-pointer list-none px-4 py-3 transition hover:bg-stone-50 dark:hover:bg-stone-950/40">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-stone-400">
-                Answer #{record.number}
-              </span>
-              <span lang="ja" className="text-base font-semibold text-stone-900 dark:text-stone-50">
-                {record.word?.dict}
-              </span>
-              <span className="text-xs text-stone-500 dark:text-stone-400">{record.typeLabel}</span>
-            </div>
-            <div className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">
-              Your answer: <span lang="ja">{answerText}</span>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span
-              className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${toneClass}`}
-            >
-              {statusLabel}
-            </span>
-            <span className="text-xs font-semibold text-stone-400 group-open:hidden">Expand</span>
-            <span className="hidden text-xs font-semibold text-stone-400 group-open:inline">
-              Collapse
-            </span>
-          </div>
-        </div>
-      </summary>
-      <div className="border-t border-stone-100 p-3 dark:border-stone-800">
-        <RunAnswerReveal
-          record={record}
-          geminiKey={geminiKey}
-          onOpenGuide={onOpenGuide}
-          onOpenLab={onOpenLab}
-          onOpenLearn={onOpenLearn}
-          onOpenLearnFocus={onOpenLearnFocus}
-          onTryAnother={onTryAnother}
-        />
-      </div>
-    </details>
-  );
-}
-
-function PracticeRunReviewPage({
-  answers,
-  runStatsLabel,
-  onBack,
-  geminiKey,
-  onOpenGuide,
-  onOpenLab,
-  onOpenLearn,
-  onOpenLearnFocus,
-}) {
-  return (
-    <section className="mx-auto max-w-3xl space-y-4" aria-label="Practice run review">
-      <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-              Practice run review
-            </div>
-            <h2 className="mt-0.5 text-xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
-              Answers from this run
-            </h2>
-            <div className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-              {answers.length
-                ? `${answers.length} answer${answers.length === 1 ? '' : 's'} captured - ${runStatsLabel}`
-                : 'No answers captured yet.'}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center justify-center rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-600 transition hover:bg-stone-50 hover:text-stone-800 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
-          >
-            Back to Practice
-          </button>
-        </div>
-      </div>
-      {answers.length ? (
-        <div className="space-y-2">
-          {answers.map((record) => (
-            <RunAnswerReviewItem
-              key={record.id}
-              record={record}
-              geminiKey={geminiKey}
-              onOpenGuide={onOpenGuide}
-              onOpenLab={onOpenLab}
-              onOpenLearn={onOpenLearn}
-              onOpenLearnFocus={onOpenLearnFocus}
-              onTryAnother={onBack}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-dashed border-stone-300 bg-white px-4 py-8 text-center text-sm text-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-400">
-          Answer a card, then come back here to expand the reveal details.
-        </div>
-      )}
-    </section>
-  );
-}
-
 export {
-  PracticeRunReviewPage,
   RunAnswerReveal,
   cardOriginForStudyCard,
   cardOriginMeta,

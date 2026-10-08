@@ -1,0 +1,23 @@
+{
+  "verifiedAt": "2026-10-08T05:00:34.044Z",
+  "verificationHashVersion": 2,
+  "publicationDigest": "e9cc615561d6a7dcb0fe3c6491f6bc98c29fe8cef0b0e7eedf833791063d5c1c",
+  "bundleRevision": "c3bb6f119dbba22e62ce0792f61f2154cd451e3ac90af1c980320191ae88060b",
+  "migration": "20261007160000",
+  "counts": {
+    "sourceRows": 153764,
+    "expectedPairs": 153764,
+    "accepted": 23075,
+    "repaired": 23075,
+    "retained": 0,
+    "needsReview": 128961,
+    "unsuitable": 1728,
+    "stale": 0,
+    "concreteSourceIssues": 117
+  },
+  "anonymousRead": {
+    "visibleSentences": 23075,
+    "unapprovedVisible": 0
+  },
+  "humanEditorialReview": false
+}
