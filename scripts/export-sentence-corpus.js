@@ -10,11 +10,13 @@ import { createClient } from '@supabase/supabase-js';
 import { inflateVerbRows, mergeBuiltInWords } from '../src/data/verbLexicon.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../src/data/starterWords.js';
 import { ALL_CARD_TYPES } from '../src/data/conjugationTypes.js';
-import { practiceTypesForItem } from '../src/utils/conjugator.js';
+import { practiceTypesForItem, wordKey } from '../src/utils/conjugator.js';
 import { sentenceRowQualityIssue } from '../src/utils/sentenceQuality.js';
 import { buildPair, englishQualityIssue } from './sentencePipeline.js';
+import { sha256, verifiedReview } from './sentenceReview.js';
+import { parseSentenceReview } from '../src/utils/sentenceTrust.js';
 
-export const CORPUS_SCHEMA_VERSION = 1;
+export const CORPUS_SCHEMA_VERSION = 2;
 export const DEFAULT_CORPUS_DIR = join('public', 'data', 'sentences');
 const LEXICON_PATH = join('public', 'data', 'verb-lexicon.json');
 const PAGE_SIZE = 1000;
@@ -27,7 +29,7 @@ function targetTypeIds() {
   return ALL_CARD_TYPES.map((type) => type.id);
 }
 
-function loadWords() {
+export function loadSentenceWords() {
   const data = JSON.parse(readFileSync(LEXICON_PATH, 'utf8'));
   const verbs = mergeBuiltInWords(inflateVerbRows(data.verbs || []), STARTER_VERBS);
   const adjectives = mergeBuiltInWords(inflateVerbRows(data.adjectives || []), STARTER_ADJECTIVES);
@@ -61,15 +63,21 @@ function normalizeDbRow(row) {
     ja_template: String(row.ja_template || ''),
     en: String(row.en || ''),
     segments: row.segments,
+    review: parseSentenceReview(row.review || row.model),
   };
 }
 
-export function buildCorpusChunks(expectedPairs, dbRows) {
+export function buildCorpusChunks(expectedPairs, dbRows, words = loadSentenceWords()) {
   const expected = new Map(expectedPairs.map((pair) => [pairKey(pair), pair]));
+  const wordMap = new Map(words.map((word) => [wordKey(word), word]));
+  const encountered = new Set();
   const seen = new Set();
   const stale = [];
   const invalid = [];
+  const pending = [];
+  const quarantined = [];
   const byType = new Map();
+  for (const pair of expectedPairs) if (!byType.has(pair.type)) byType.set(pair.type, []);
 
   for (const rawRow of dbRows) {
     const row = normalizeDbRow(rawRow);
@@ -80,6 +88,18 @@ export function buildCorpusChunks(expectedPairs, dbRows) {
     const key = pairKey(row);
     if (!expected.has(key)) {
       stale.push(key);
+      continue;
+    }
+    if (encountered.has(key)) {
+      invalid.push({ key, reason: 'duplicate-word-form' });
+      continue;
+    }
+    encountered.add(key);
+    if (row.review?.status !== 'accepted') {
+      (row.review?.status === 'unsuitable' || row.review?.status === 'quarantined'
+        ? quarantined
+        : pending
+      ).push(key);
       continue;
     }
     if (!row.ja_template || !Array.isArray(row.segments)) {
@@ -100,8 +120,14 @@ export function buildCorpusChunks(expectedPairs, dbRows) {
       invalid.push({ key, reason: rowIssue });
       continue;
     }
+    const word = wordMap.get(row.word_key);
+    const review = word && verifiedReview(word, row.type, row);
+    if (!review) {
+      invalid.push({ key, reason: 'invalid-or-stale-review' });
+      continue;
+    }
     if (!byType.has(row.type)) byType.set(row.type, []);
-    byType.get(row.type).push([row.word_key, row.ja_template, row.en, row.segments]);
+    byType.get(row.type).push([row.word_key, row.ja_template, row.en, row.segments, review]);
     seen.add(key);
   }
 
@@ -118,16 +144,19 @@ export function buildCorpusChunks(expectedPairs, dbRows) {
     }))
     .sort((a, b) => a.type.localeCompare(b.type));
 
-  return { chunks, missing, stale, invalid };
+  return { chunks, missing, stale, invalid, pending, quarantined };
 }
 
 function corpusChunkJson(chunk) {
-  return `${JSON.stringify({ schema: CORPUS_SCHEMA_VERSION, type: chunk.type, rows: chunk.rows })}\n`;
+  return `${JSON.stringify({ schema: CORPUS_SCHEMA_VERSION, type: chunk.type, revision: sha256(JSON.stringify(chunk.rows)), rows: chunk.rows })}\n`;
 }
 
 function manifestJson(chunks, stats) {
   return `${JSON.stringify({
     schema: CORPUS_SCHEMA_VERSION,
+    revision: sha256(
+      JSON.stringify(chunks.map((chunk) => [chunk.type, sha256(JSON.stringify(chunk.rows))])),
+    ),
     source: 'supabase.public.sentences',
     totalRows: stats.totalRows,
     rawBytes: stats.rawBytes,
@@ -135,13 +164,22 @@ function manifestJson(chunks, stats) {
     types: chunks.map((chunk) => ({
       type: chunk.type,
       count: chunk.rows.length,
+      revision: sha256(JSON.stringify(chunk.rows)),
       path: `by-type/${chunk.type}.json`,
     })),
   })}\n`;
 }
 
 export function buildCorpusFileBodies(chunks) {
+  chunks = [...chunks].sort((a, b) => a.type.localeCompare(b.type));
   const files = new Map();
+  const types = new Set();
+  for (const chunk of chunks) {
+    if (!/^[a-z0-9-]+$/.test(String(chunk.type || '')) || types.has(chunk.type)) {
+      throw new Error('Invalid or duplicate sentence type path');
+    }
+    types.add(chunk.type);
+  }
   let rawBytes = 0;
   let gzipBytes = 0;
   for (const chunk of chunks) {
@@ -241,8 +279,10 @@ export async function fetchSentenceRowsFromSupabase({ url, key, typeIds = target
     for (let from = 0; ; from += PAGE_SIZE) {
       const { data, error } = await supabase
         .from('sentences')
-        .select('word_key, type, ja_template, segments, en')
+        .select('word_key, type, ja_template, segments, en, model, review')
         .eq('type', type)
+        .eq('review->>status', 'accepted')
+        .order('word_key')
         .range(from, from + PAGE_SIZE - 1);
       if (error) throw error;
       if (!data?.length) break;
@@ -266,11 +306,14 @@ export async function exportSentenceCorpus({
   key = process.env.SUPABASE_SERVICE_ROLE_KEY,
 } = {}) {
   const typeIds = targetTypeIds();
-  const expectedPairs = expectedSentencePairs(loadWords(), typeIds);
+  const expectedPairs = expectedSentencePairs(loadSentenceWords(), typeIds);
   const dbRows = await fetchSentenceRowsFromSupabase({ url, key, typeIds });
-  const { chunks, missing, stale, invalid } = buildCorpusChunks(expectedPairs, dbRows);
+  const { chunks, missing, stale, invalid, pending, quarantined } = buildCorpusChunks(
+    expectedPairs,
+    dbRows,
+  );
 
-  if (missing.length || invalid.length) {
+  if (invalid.length) {
     const details = [
       missing.length ? `${missing.length} missing expected pair(s):\n${sampleLines(missing)}` : '',
       invalid.length
@@ -281,7 +324,7 @@ export async function exportSentenceCorpus({
     ]
       .filter(Boolean)
       .join('\n\n');
-    throw new Error(`Cannot export complete offline sentence corpus.\n${details}`);
+    throw new Error(`Cannot export invalid accepted sentence rows.\n${details}`);
   }
 
   const stats = writeCorpusFiles(chunks, outDir);
@@ -289,6 +332,9 @@ export async function exportSentenceCorpus({
     ...stats,
     expectedRows: expectedPairs.length,
     staleRowsIgnored: stale.length,
+    unavailableRows: missing.length,
+    pendingRows: pending.length,
+    quarantinedRows: quarantined.length,
     outDir,
   };
 }
@@ -299,16 +345,17 @@ export async function checkSentenceCorpus({
   key = process.env.SUPABASE_SERVICE_ROLE_KEY,
 } = {}) {
   const typeIds = targetTypeIds();
-  const expectedPairs = expectedSentencePairs(loadWords(), typeIds);
+  const expectedPairs = expectedSentencePairs(loadSentenceWords(), typeIds);
   const dbRows = await fetchSentenceRowsFromSupabase({ url, key, typeIds });
   const { chunks, missing, stale, invalid } = buildCorpusChunks(expectedPairs, dbRows);
   const result = checkCorpusFiles(chunks, outDir);
   return {
     ...result,
-    ok: result.ok && !missing.length && !invalid.length,
+    ok: result.ok && !invalid.length,
     expectedRows: expectedPairs.length,
     staleRowsIgnored: stale.length,
     missingExpectedPairs: missing,
+    unavailableRows: missing.length,
     invalidExpectedRows: invalid,
   };
 }
@@ -327,6 +374,7 @@ export function formatCorpusCheckResult(result) {
     return [
       `Sentence corpus is fresh: ${result.totalRows} row(s) across ${result.typeCount} type file(s).`,
       `Corpus size: ${fmtBytes(result.rawBytes)} raw, ${fmtBytes(result.gzipBytes)} gzip.`,
+      `${result.unavailableRows || 0} word/form pair(s) have no approved context; ordinary Practice remains available.`,
       result.staleRowsIgnored ? `Ignored ${result.staleRowsIgnored} stale DB row(s).` : '',
     ]
       .filter(Boolean)

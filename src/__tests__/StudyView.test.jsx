@@ -12,6 +12,7 @@ import { buildReadinessFamilyRows } from '../utils/readiness.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
 const mockedSpeech = vi.hoisted(() => ({ playPronunciation: vi.fn() }));
+const mockedSentences = vi.hoisted(() => ({ bundled: vi.fn(), tailored: vi.fn() }));
 let originalScrollIntoView;
 
 vi.mock('../state/AppStateContext.jsx', () => ({
@@ -26,10 +27,22 @@ vi.mock('../utils/speech.js', async () => {
   };
 });
 
+vi.mock('../utils/sentenceCorpus.js', async () => ({
+  ...(await vi.importActual('../utils/sentenceCorpus.js')),
+  fetchBundledSentence: mockedSentences.bundled,
+}));
+
+vi.mock('../utils/sentenceLibrary.js', async () => ({
+  ...(await vi.importActual('../utils/sentenceLibrary.js')),
+  fetchTailoredSentence: mockedSentences.tailored,
+}));
+
 import StudyView, { reviewFeedbackActionForRecord } from '../views/StudyView.jsx';
 import { RunAnswerReveal } from '../views/study/StudyReviewPanels.jsx';
 
 beforeEach(() => {
+  mockedSentences.bundled.mockReset().mockResolvedValue(null);
+  mockedSentences.tailored.mockReset().mockResolvedValue(null);
   originalScrollIntoView = window.Element.prototype.scrollIntoView;
   window.Element.prototype.scrollIntoView = vi.fn();
 });
@@ -98,28 +111,17 @@ async function waitForPracticeCard() {
   return screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
 }
 
-function sentenceResponse(payload, ok = true) {
+// Loader tests validate approval metadata and content hashes. These view tests
+// supply the already accepted, hydrated entries returned by those loaders.
+function approvedSentenceEntry(word, type, jaTemplate = '昼に{w}。', en = 'I ate at noon.') {
+  const [before, after] = jaTemplate.split('{w}');
   return {
-    ok,
-    json: () => Promise.resolve(payload),
-  };
-}
-
-function sentenceManifestPayload(types) {
-  return {
-    schema: 1,
-    totalRows: types.length,
-    rawBytes: 100,
-    gzipBytes: 50,
-    types: types.map((type) => ({ type, rows: 1 })),
-  };
-}
-
-function sentenceChunkPayload(type, rows) {
-  return {
-    schema: 1,
-    type,
-    rows,
+    jaTemplate,
+    en,
+    segments: [{ t: before, r: '' }, { w: true }, { t: after, r: '' }],
+    surface: surfaceFormFor(word, type),
+    kanaSurface: conjugateItem(word, type),
+    source: 'bundled',
   };
 }
 
@@ -713,22 +715,15 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
   });
 
-  it('shows sentence context for reverse reading practice when Sentence mode is on', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.resolve({ ok: false })),
-    );
+  it('shows the reviewed source sentence for reverse reading practice', async () => {
     const target = STARTER_VERBS[0];
     const sourceType = 'plain-past';
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, sourceType));
     persistStudyCard(target, 'dictionary', { sourceType });
     mockedApp.value = makeApp({
       state: { ...defaultState(), enabledTypes: [sourceType] },
       allWords: [target],
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        reviewStyle: 'reading',
-        sentenceMode: true,
-      },
+      practicePrefs: { ...DEFAULT_PREFS, reviewStyle: 'reading', sentenceMode: true },
     });
 
     render(<StudyView />);
@@ -743,267 +738,292 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByText('Answer with the dictionary form.')).toBeTruthy();
   });
 
-  it('waits briefly and shows the bundled sentence without flashing the offline fallback', async () => {
+  it('waits briefly for reviewed context without generating an unchecked fallback', async () => {
     vi.useFakeTimers();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
-    const row = [
-      wordKey(target),
-      '\u663c\u306b{w}\u3002',
-      'I ate at noon.',
-      [
-        { t: '\u663c', r: '\u3072\u308b' },
-        { t: '\u306b', r: '' },
-        { w: true },
-        { t: '\u3002', r: '' },
-      ],
-    ];
-    const fetchMock = vi.fn((url) => {
-      const text = String(url);
-      if (text.endsWith('/manifest.json')) {
-        return Promise.resolve(sentenceResponse(sentenceManifestPayload([type])));
-      }
-      if (text.includes(`/by-type/${type}.json`)) {
-        return new Promise((resolve) => {
-          setTimeout(() => resolve(sentenceResponse(sentenceChunkPayload(type, [row]))), 100);
-        });
-      }
-      return Promise.resolve(sentenceResponse({}, false));
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    mockedSentences.bundled.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve(approvedSentenceEntry(target, type)), 100),
+        ),
+    );
     mockedApp.value = makeApp({
-      studyFocus: {
-        word: target,
-        type,
-      },
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        sentenceMode: true,
-      },
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
     });
 
     render(<StudyView />);
-
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
     expect(document.querySelector('[data-sentence-mode="forward-cloze"]')).toBeNull();
+    expect(screen.queryByText(/No reviewed sentence/)).toBeNull();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(100);
     });
-
     const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
     expect(sentenceCard).toBeTruthy();
-    expect(sentenceCard.textContent).toContain('\u663c');
+    expect(sentenceCard.textContent).toContain('昼');
+    expect(sentenceCard.textContent).toContain('[______]');
+    expect(sentenceCard.closest('details')).toBeNull();
+    expect(sentenceCard.className).not.toContain('hidden');
   });
 
-  it('freezes the offline sentence when the bundled sentence arrives after the grace window', async () => {
+  it('freezes ordinary Practice if reviewed context arrives after the grace window', async () => {
     vi.useFakeTimers();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
-    let resolveChunk;
-    const row = [
-      wordKey(target),
-      '\u663c\u306b{w}\u3002',
-      'I ate at noon.',
-      [
-        { t: '\u663c', r: '\u3072\u308b' },
-        { t: '\u306b', r: '' },
-        { w: true },
-        { t: '\u3002', r: '' },
-      ],
-    ];
-    const fetchMock = vi.fn((url) => {
-      const text = String(url);
-      if (text.endsWith('/manifest.json')) {
-        return Promise.resolve(sentenceResponse(sentenceManifestPayload([type])));
-      }
-      if (text.includes(`/by-type/${type}.json`)) {
-        return new Promise((resolve) => {
-          resolveChunk = resolve;
-        });
-      }
-      return Promise.resolve(sentenceResponse({}, false));
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    let resolveEntry;
+    mockedSentences.bundled.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveEntry = resolve;
+        }),
+    );
     mockedApp.value = makeApp({
-      studyFocus: {
-        word: target,
-        type,
-      },
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        sentenceMode: true,
-      },
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
     });
 
     render(<StudyView />);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(document.querySelector('[data-sentence-mode="forward-cloze"]')).toBeNull();
-
     await act(async () => {
       await vi.advanceTimersByTimeAsync(250);
     });
-
-    const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
-    expect(sentenceCard).toBeTruthy();
-    const frozenText = sentenceCard.textContent;
-    expect(frozenText).not.toContain('\u663c');
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    expect(screen.getByText(/No reviewed sentence for this word and form yet/)).toBeTruthy();
+    const input = screen.getByPlaceholderText(/Type romaji or kana/i);
+    fireEvent.change(input, { target: { value: 'a' } });
 
     await act(async () => {
-      resolveChunk(sentenceResponse(sentenceChunkPayload(type, [row])));
-      await Promise.resolve();
+      resolveEntry(approvedSentenceEntry(target, type));
     });
-
-    expect(sentenceCard.textContent).toBe(frozenText);
-    expect(sentenceCard.textContent).not.toContain('\u663c');
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    expect(input.value).toBe('あ');
+    expect(mockedApp.value.setPracticePrefs).not.toHaveBeenCalled();
   });
 
-  it('preloads the likely next word-sweep sentence during review', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    const nextType = 'plain-negative';
-    const fetchMock = vi.fn((url) => {
-      const text = String(url);
-      if (text.endsWith('/manifest.json')) {
-        return Promise.resolve(sentenceResponse(sentenceManifestPayload([type, nextType])));
-      }
-      if (text.includes(`/by-type/${type}.json`)) {
-        return Promise.resolve(
-          sentenceResponse(
-            sentenceChunkPayload(type, [
-              [
-                wordKey(target),
-                '\u304d\u3087\u3046{w}\u3002',
-                'I did it today.',
-                [{ t: '\u304d\u3087\u3046', r: '' }, { w: true }, { t: '\u3002', r: '' }],
-              ],
-            ]),
-          ),
-        );
-      }
-      if (text.includes(`/by-type/${nextType}.json`)) {
-        return Promise.resolve(
-          sentenceResponse(
-            sentenceChunkPayload(nextType, [
-              [
-                wordKey(target),
-                '\u3042\u3057\u305f{w}\u3002',
-                'I will not do it tomorrow.',
-                [{ t: '\u3042\u3057\u305f', r: '' }, { w: true }, { t: '\u3002', r: '' }],
-              ],
-            ]),
-          ),
-        );
-      }
-      return Promise.resolve(sentenceResponse({}, false));
-    });
-    vi.stubGlobal('fetch', fetchMock);
+  it('continues a custom word exercise without reviewed context or recording a result', async () => {
+    const target = { dict: '試す', reading: 'ためす', meaning: 'to try', group: 'godan' };
     mockedApp.value = makeApp({
-      state: { ...defaultState(), enabledTypes: [type, nextType] },
       allWords: [target],
-      studyFocus: {
-        word: target,
-        type,
-        launchMode: 'word-sweep',
-      },
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        sentenceMode: true,
-      },
+      studyFocus: { word: target, type: 'plain-past' },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
     });
 
     render(<StudyView />);
-
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    await screen.findByText(/No reviewed sentence for this word and form yet/);
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    expect(mockedApp.value.setPracticePrefs).not.toHaveBeenCalled();
+    expect(mockedApp.value.state.session.reviewed).toBe(0);
+    expect(screen.queryByText('Not quite.')).toBeNull();
+    fireEvent.change(input, { target: { value: 'zzzz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    expect(await screen.findByRole('heading', { name: 'Not quite.' })).toBeTruthy();
+  });
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining(`/data/sentences/by-type/${nextType}.json`),
-        { cache: 'force-cache' },
+  it('shows the correct completed sentence and translation after a wrong answer', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+
+    render(<StudyView />);
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitFor(() => expect(document.querySelector('[data-sentence-mode]')).toBeTruthy());
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+    expect(screen.queryByText('I ate at noon.')).toBeNull();
+    fireEvent.change(input, { target: { value: 'zzzz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+
+    await screen.findByRole('heading', { name: 'Not quite.' });
+    const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
+    expect(sentenceCard.textContent).toContain(surfaceFormFor(target, type));
+    expect(sentenceCard.textContent).not.toContain('[______]');
+    expect(sentenceCard.textContent).not.toContain('zzzz');
+    expect(within(sentenceCard).getByText('I ate at noon.')).toBeTruthy();
+  });
+
+  it('preloads the next word-sweep reviewed sentence during review', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const nextType = 'plain-negative';
+    mockedSentences.bundled.mockImplementation((word, requestedType) =>
+      Promise.resolve(
+        approvedSentenceEntry(
+          word,
+          requestedType,
+          requestedType === type ? 'きょう{w}。' : 'あした{w}。',
+        ),
       ),
     );
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [type, nextType] },
+      allWords: [target],
+      studyFocus: { word: target, type, launchMode: 'word-sweep' },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
 
+    render(<StudyView />);
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitFor(() => expect(document.querySelector('[data-sentence-mode]')).toBeTruthy());
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    await waitFor(() => expect(mockedSentences.bundled).toHaveBeenCalledWith(target, nextType));
     await clickTopReviewNext();
-
     await waitFor(() => {
       const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
       expect(sentenceCard).toBeTruthy();
-      expect(sentenceCard.textContent).toContain('\u3042\u3057\u305f');
+      expect(sentenceCard.textContent).toContain('あした');
     });
   });
 
-  it('uses a bundled filled sentence for listening Sentence mode after Show text', async () => {
+  it('refreshes expired entries for exact retries while keeping the active sentence frozen', async () => {
+    vi.useFakeTimers();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
-    const surface = surfaceFormFor(target, type);
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [type] },
+      allWords: [target],
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+
+    render(<StudyView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(59_999);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+
+    mockedSentences.bundled.mockResolvedValue(
+      approvedSentenceEntry(target, type, '夜に{w}。', 'I ate at night.'),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2);
+    });
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(2);
+    // Prefetch refreshed the cache, while review keeps the original sentence.
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+    expect(document.querySelector('[data-sentence-mode]').textContent).not.toContain('夜');
+    fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('夜');
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(2);
+  });
+
+  it('hides and replays reviewed listening context on an exact-word/form retry', async () => {
     vi.stubGlobal('speechSynthesis', {
       cancel: vi.fn(),
       getVoices: vi.fn(() => []),
       speak: vi.fn(),
     });
-    const fetchMock = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            schema: 1,
-            type,
-            rows: [
-              [
-                wordKey(target),
-                `昼に{w}。`,
-                'I ate at noon.',
-                [{ t: '昼', r: 'ひる' }, { t: 'に', r: '' }, { w: true }, { t: '。', r: '' }],
-              ],
-            ],
-          }),
-      }),
-    );
-    vi.stubGlobal('fetch', fetchMock);
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
     mockedApp.value = makeApp({
-      studyFocus: {
-        word: target,
-        type,
-      },
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        sentenceMode: true,
-        listeningPrompt: true,
-      },
+      state: { ...defaultState(), enabledTypes: [type] },
+      allWords: [target],
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true, listeningPrompt: true },
     });
 
     render(<StudyView />);
+    await screen.findByText('Sentence listening prompt');
+    await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
+    expect(document.querySelector('[data-sentence-mode]')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+    await clickTopReviewNext();
+    await screen.findByText('Sentence listening prompt');
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(2));
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
+  });
 
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    expect(
-      await screen.findByText('Sentence listening prompt', {}, { timeout: 5000 }),
-    ).toBeTruthy();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/data/sentences/manifest.json', {
-      cache: 'no-cache',
+  it('keeps a reviewed listening sentence hidden until Show text and plays it once', async () => {
+    vi.stubGlobal('speechSynthesis', {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+      speak: vi.fn(),
     });
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/data/sentences/by-type/plain-past.json', {
-      cache: 'force-cache',
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const surface = surfaceFormFor(target, type);
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true, listeningPrompt: true },
     });
+
+    render(<StudyView />);
+    await screen.findByText('Sentence listening prompt', {}, { timeout: 5000 });
     await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1));
     expect(document.body.textContent).not.toContain(`昼に${surface}。`);
-
     fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
-
-    await waitFor(() => {
-      const sentenceCard = document.querySelector('[data-sentence-mode="listening-recognition"]');
-      expect(sentenceCard).toBeTruthy();
-      expect(sentenceCard.textContent).toContain('昼');
-      expect(sentenceCard.textContent).toContain(surface);
-    });
+    const sentenceCard = document.querySelector('[data-sentence-mode="listening-recognition"]');
+    expect(sentenceCard.textContent).toContain('昼');
+    expect(sentenceCard.textContent).toContain(surface);
     expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1);
+  });
+
+  it('plays ordinary word audio only after missing listening context resolves', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('speechSynthesis', {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+      speak: vi.fn(),
+    });
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockImplementation(() => new Promise(() => {}));
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true, listeningPrompt: true },
+    });
+
+    render(<StudyView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockedSpeech.playPronunciation).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(screen.getByText('Listening prompt')).toBeTruthy();
+    expect(screen.getByText(/No reviewed sentence/)).toBeTruthy();
+    expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1);
+    expect(mockedSpeech.playPronunciation.mock.calls[0][0]).not.toContain('昼');
+    fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
+    expect(screen.queryByText('Listening prompt')).toBeNull();
+    expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
   });
 
   it('credits reading practice to the source form without changing the dictionary SRS card', async () => {

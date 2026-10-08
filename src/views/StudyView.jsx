@@ -60,7 +60,7 @@ import {
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
 import { fetchBundledSentence } from '../utils/sentenceCorpus.js';
 import { fetchTailoredSentence } from '../utils/sentenceLibrary.js';
-import { buildOfflineSentenceEntry, buildSentencePromptModel } from '../utils/sentencePrompt.js';
+import { buildSentencePromptModel } from '../utils/sentencePrompt.js';
 import {
   bumpSessionMistakePattern,
   labRouteForMistakePattern,
@@ -119,6 +119,7 @@ const CARD_TYPE_BY_ID = new Map(ALL_CARD_TYPES.map((type) => [type.id, type]));
 const REVIEW_SESSION_HISTORY_SIZE = 4;
 const CORRECT_AUTO_ADVANCE_MS = 850;
 const SENTENCE_PROMPT_GRACE_MS = 250;
+const SENTENCE_ENTRY_FRESH_MS = 60_000;
 const SESSION_RECENT_OUTCOME_LIMIT = 6;
 const ANSWER_STYLE_OPTIONS = [
   { id: 'input', label: 'Type' },
@@ -156,7 +157,25 @@ function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
 }
 
 function sentenceEntryKey(word, type) {
-  return word?.dict && type ? `${wordKey(word)}|${type}` : '';
+  return word?.dict && type
+    ? JSON.stringify([
+        wordKey(word),
+        type,
+        word.reading || '',
+        word.meaning || '',
+        word.exerciseMeaning || '',
+      ])
+    : '';
+}
+
+function freshSentenceEntry(cache, key) {
+  const cached = cache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.loadedAt >= SENTENCE_ENTRY_FRESH_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return cached.entry;
 }
 
 function transformationRouteText(sourceInfo, targetInfo) {
@@ -489,7 +508,14 @@ export default function StudyView({ mode = 'practice' }) {
     if (!transformationMode) return rawPracticePrefs;
     return clearBoundedReviewPrefs(rawFocus?.returnPracticePrefs || rawPracticePrefs);
   }, [rawFocus?.returnPracticePrefs, rawPracticePrefs, transformationMode]);
-  const [current, setCurrent] = useState(null);
+  const [current, setCurrentState] = useState(null);
+  const setCurrent = useCallback((next) => {
+    // Every direct card launch is a new exercise, including an exact-word/form
+    // retry. Keep the initialization updater's existing-card behavior intact.
+    setCurrentState((previous) =>
+      typeof next === 'function' ? next(previous) : next ? { ...next } : null,
+    );
+  }, []);
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');
   const [wasCorrect, setWasCorrect] = useState(false);
@@ -700,9 +726,8 @@ export default function StudyView({ mode = 'practice' }) {
   const loadSentenceEntry = useCallback((word, type) => {
     const key = sentenceEntryKey(word, type);
     if (!key) return Promise.resolve(null);
-    if (sentenceEntryCacheRef.current.has(key)) {
-      return Promise.resolve(sentenceEntryCacheRef.current.get(key));
-    }
+    const cached = freshSentenceEntry(sentenceEntryCacheRef.current, key);
+    if (cached) return Promise.resolve(cached);
     const existing = sentenceEntryInFlightRef.current.get(key);
     if (existing) return existing;
 
@@ -711,7 +736,7 @@ export default function StudyView({ mode = 'practice' }) {
       .then((res) => res || fetchTailoredSentence(word, type))
       .then((entry) => {
         if (entry?.jaTemplate) {
-          sentenceEntryCacheRef.current.set(key, entry);
+          sentenceEntryCacheRef.current.set(key, { entry, loadedAt: Date.now() });
           return entry;
         }
         return null;
@@ -744,29 +769,13 @@ export default function StudyView({ mode = 'practice' }) {
         listeningPrompt ? 'listening' : 'visible'
       }`
     : '';
-  const offlineSentencePrompt = useMemo(() => {
-    if (!sentencePromptEligible) return null;
-    try {
-      const entry = buildOfflineSentenceEntry(current.verb, sentenceType);
-      return buildSentencePromptModel({
-        entry,
-        word: current.verb,
-        type: sentenceType,
-        reverseDrill,
-        listeningPrompt,
-      });
-    } catch {
-      return null;
-    }
-  }, [current, sentencePromptEligible, sentenceType, reverseDrill, listeningPrompt]);
   const [finalizedSentencePrompt, setFinalizedSentencePrompt] = useState(null);
   useEffect(() => {
     if (
       !sentencePromptEligible ||
       !sentenceWord ||
       !sentencePromptEntryKey ||
-      !sentencePromptStateKey ||
-      !offlineSentencePrompt
+      !sentencePromptStateKey
     ) {
       setFinalizedSentencePrompt(null);
       return undefined;
@@ -789,16 +798,16 @@ export default function StudyView({ mode = 'practice' }) {
     const finalizePrompt = (entry) => {
       if (ignore || finalized) return;
       finalized = true;
-      const prompt = buildPrompt(entry) || offlineSentencePrompt;
-      setFinalizedSentencePrompt({ key: sentencePromptStateKey, prompt });
+      const prompt = buildPrompt(entry);
+      setFinalizedSentencePrompt({ key: sentencePromptStateKey, card: current, prompt });
     };
-    const cached = sentenceEntryCacheRef.current.get(sentencePromptEntryKey);
+    const cached = freshSentenceEntry(sentenceEntryCacheRef.current, sentencePromptEntryKey);
     if (cached?.jaTemplate) {
       finalizePrompt(cached);
       return undefined;
     }
 
-    setFinalizedSentencePrompt((prev) => (prev?.key === sentencePromptStateKey ? prev : null));
+    setFinalizedSentencePrompt(null);
     const fallbackTimer = setTimeout(() => finalizePrompt(null), SENTENCE_PROMPT_GRACE_MS);
     loadSentenceEntry(word, type).then((entry) => {
       if (finalized || ignore) return;
@@ -810,9 +819,9 @@ export default function StudyView({ mode = 'practice' }) {
       clearTimeout(fallbackTimer);
     };
   }, [
+    current,
     loadSentenceEntry,
     listeningPrompt,
-    offlineSentencePrompt,
     reverseDrill,
     sentencePromptEligible,
     sentencePromptEntryKey,
@@ -821,17 +830,29 @@ export default function StudyView({ mode = 'practice' }) {
     sentenceWord,
   ]);
   const sentencePrompt =
-    finalizedSentencePrompt?.key === sentencePromptStateKey ? finalizedSentencePrompt.prompt : null;
+    finalizedSentencePrompt?.key === sentencePromptStateKey &&
+    finalizedSentencePrompt?.card === current
+      ? finalizedSentencePrompt.prompt
+      : null;
+  const sentencePromptResolved =
+    sentencePromptEligible &&
+    finalizedSentencePrompt?.key === sentencePromptStateKey &&
+    finalizedSentencePrompt?.card === current;
+  const sentenceUnavailable = sentencePromptResolved && !sentencePrompt;
   const sentencePromptView = useMemo(
     () =>
       sentencePrompt
-        ? sentenceDisplay(sentencePrompt.sentence, practicePrefs, sentencePrompt.parts)
+        ? sentenceDisplay(
+            phase === 'reviewing' ? sentencePrompt.completedSentence : sentencePrompt.sentence,
+            practicePrefs,
+            phase === 'reviewing' ? sentencePrompt.completedParts : sentencePrompt.parts,
+          )
         : null,
-    [sentencePrompt, practicePrefs],
+    [sentencePrompt, practicePrefs, phase],
   );
   const promptAudioText = listeningPrompt
     ? sentencePromptEligible
-      ? sentencePrompt?.audioText || ''
+      ? sentencePrompt?.audioText || (sentencePromptResolved ? basePromptAudioText : '')
       : basePromptAudioText
     : basePromptAudioText;
 
@@ -1002,7 +1023,7 @@ export default function StudyView({ mode = 'practice' }) {
       setWasCorrected(false);
       setWasCorrect(false);
     }
-  }, [practiceWords, enabledTypes, practicePrefs, current, transformationMode]);
+  }, [practiceWords, enabledTypes, practicePrefs, current, transformationMode, setCurrent]);
 
   useEffect(() => {
     if (!current || !activeMinimalPairSet) return;
@@ -1012,7 +1033,7 @@ export default function StudyView({ mode = 'practice' }) {
     setPhase('answering');
     setStepHint('');
     setWasCorrect(false);
-  }, [current, activeMinimalPairSet]);
+  }, [current, activeMinimalPairSet, setCurrent]);
 
   useEffect(() => {
     const nextSetId = practicePrefs.minimalPairSetId || '';
@@ -1023,7 +1044,7 @@ export default function StudyView({ mode = 'practice' }) {
     setPhase('answering');
     setStepHint('');
     setWasCorrect(false);
-  }, [practicePrefs.minimalPairSetId]);
+  }, [practicePrefs.minimalPairSetId, setCurrent]);
 
   useLayoutEffect(() => {
     if (phase === 'answering' && inputRef.current) {
@@ -1042,7 +1063,8 @@ export default function StudyView({ mode = 'practice' }) {
 
   useEffect(() => {
     setShowPromptText(!listeningPrompt);
-  }, [current?.id, listeningPrompt]);
+    listeningPromptSpokenKeyRef.current = '';
+  }, [current, listeningPrompt]);
 
   useEffect(() => {
     if (stepHint && typingHintRef.current) {
@@ -1075,10 +1097,11 @@ export default function StudyView({ mode = 'practice' }) {
       listeningPromptSpokenKeyRef.current = promptKey;
       speakJapaneseLocal(promptAudioText, 0.85);
     }
-    // current?.id used intentionally instead of current to avoid re-triggering on unrelated state changes
+    // The card reference also distinguishes exact-word/form retries. The
+    // spoken-key guard keeps unrelated changes from replaying the same prompt.
     // speakJapaneseLocal is defined inline and omitted to avoid infinite re-runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id, phase, listeningPrompt, promptAudioText, practicePrefs.voiceURI]);
+  }, [current, phase, listeningPrompt, promptAudioText, practicePrefs.voiceURI]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2812,53 +2835,33 @@ export default function StudyView({ mode = 'practice' }) {
                 )}
               </span>
             </div>
+            {sentenceUnavailable && (
+              <p className="mx-auto mb-3 max-w-md text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                No reviewed sentence for this word and form yet. Practice the word below.
+              </p>
+            )}
             {sentencePrompt && !hidePromptText && (
-              <>
-                <div
-                  className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 max-[359px]:hidden"
-                  data-sentence-mode={sentencePrompt.mode}
-                >
-                  <ScriptDisplay
-                    view={sentencePromptView}
-                    className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
-                    subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
-                    colorHighlight={false}
-                  />
-                  {sentencePrompt.cue && (
-                    <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
-                      {sentencePrompt.cue}
-                    </div>
-                  )}
-                  {!hideEnglishMeaning && sentencePrompt.note && (
-                    <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
-                      {sentencePrompt.note}
-                    </div>
-                  )}
-                </div>
-                <details className="mx-auto mb-2 hidden max-w-md rounded-xl border border-indigo-200 bg-indigo-50/70 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 max-[359px]:block">
-                  <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-                    Sentence context
-                  </summary>
-                  <div className="border-t border-indigo-100 px-3 py-2 dark:border-indigo-900/50">
-                    <ScriptDisplay
-                      view={sentencePromptView}
-                      className="text-base leading-relaxed text-stone-900 dark:text-stone-100"
-                      subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
-                      colorHighlight={false}
-                    />
-                    {sentencePrompt.cue && (
-                      <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
-                        {sentencePrompt.cue}
-                      </div>
-                    )}
-                    {!hideEnglishMeaning && sentencePrompt.note && (
-                      <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
-                        {sentencePrompt.note}
-                      </div>
-                    )}
+              <div
+                className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-3 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 sm:px-4"
+                data-sentence-mode={sentencePrompt.mode}
+              >
+                <ScriptDisplay
+                  view={sentencePromptView}
+                  className="break-words text-base leading-relaxed text-stone-900 dark:text-stone-100 sm:text-lg"
+                  subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
+                  colorHighlight={false}
+                />
+                {sentencePrompt.cue && (
+                  <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
+                    {sentencePrompt.cue}
                   </div>
-                </details>
-              </>
+                )}
+                {!hideEnglishMeaning && sentencePrompt.note && (
+                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
+                    {sentencePrompt.note}
+                  </div>
+                )}
+              </div>
             )}
             {hidePromptText ? (
               <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">

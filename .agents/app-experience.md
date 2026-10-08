@@ -93,14 +93,20 @@ confirms the new direction, update this document in the same change.
 - Exercise surfaces use one concise, deterministic exercise meaning. Curated
   starter meanings take priority and imported words fall back to their first
   sense. Lookup retains the complete dictionary meaning and alternate senses.
-- Sentence mode remains an active-card presentation toggle. It uses bundled
-  sentence chunks first when available or cached, then the shared Supabase
-  sentence table, then deterministic local templates for custom, missing, or
-  cold-offline rows. Forward production cards show a cued cloze with a blank,
-  reverse cards show the source form in a sentence context while the learner
-  recovers the dictionary form, and listening Sentence cards play the filled
-  sentence as a recognition prompt with text hidden until the learner reveals
-  it. Minimal-pair cards keep their normal prompt.
+- Sentence mode remains an active-card presentation toggle. It uses reviewed
+  bundled sentence chunks first, then reviewed shared Supabase rows. Approval
+  binds the Japanese, English, readings, intended sense, and current conjugated
+  form; changed content or lexical identity must be reviewed again. Generic
+  unreviewed templates never fill a missing context. When no reviewed context
+  is available, keep Sentence enabled and continue ordinary word Practice with
+  an explanation; record no skip, miss, or progress event for this fallback.
+  Forward production cards show a visible cloze even on narrow screens and the
+  correctly completed sentence after grading or Reveal. Reverse cards show the
+  source form in context while the learner recovers the dictionary form.
+  Listening cards play the reviewed filled sentence, or ordinary word audio
+  when context is unavailable; sentence text stays hidden until revealed or
+  graded. Keep each active context stable; revalidate later exercises when
+  content publication changes. Minimal-pair cards keep their normal prompt.
 - A word-level "Practice this" launch from Check or Lookup may lock Practice to
   that word until the learner exits. A form, lesson, track, recommendation, or
   Stats launch updates the persistent Practice selection directly; it does not

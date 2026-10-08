@@ -29,6 +29,16 @@ function validOut(overrides = {}) {
 }
 
 describe('isKana', () => {
+  it('does not mistake a natural becomes predicate for the Become grammar label', () => {
+    expect(englishQualityIssue('This teacher becomes polite.', 'adj-naru')).toBe('');
+    expect(englishQualityIssue('I become healthy.', 'adj-naru')).toBe('');
+    expect(englishQualityIssue('This is the Become form.', 'adj-naru')).toBe('en-echoes-form');
+  });
+  it('allows a complete short command while keeping the same fragment invalid as a past sentence', () => {
+    expect(englishQualityIssue('Sleep!', 'imperative')).toBe('');
+    expect(englishQualityIssue('Sleep!', 'command-nasai')).toBe('');
+    expect(englishQualityIssue('Sleep!', 'plain-past')).toBe('en-too-short');
+  });
   it('accepts kana and rejects kanji', () => {
     expect(isKana('きょう')).toBe(true);
     expect(isKana('')).toBe(true);
