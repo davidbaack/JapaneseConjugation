@@ -5,6 +5,7 @@ import {
   cloudUpsert,
   buildSyncPayload,
   mergeSyncPayload,
+  assertCurrentStorageEpoch,
 } from '../utils/storage.js';
 import {
   assertPendingSyncResetOwner,
@@ -13,6 +14,7 @@ import {
   rebaseSyncReset,
 } from '../utils/syncMetadata.js';
 import { logWarn } from '../utils/logger.js';
+import { validateLearnerBundle } from '../utils/learnerStateValidation.js';
 
 // How long to wait after the last change before pushing to the cloud. Rapid
 // edits (e.g. grading several cards in a row) keep resetting this timer so they
@@ -47,9 +49,20 @@ export async function commitCloudWithRetry(payload, userId, options = {}) {
   const ownerSafePayload = bindPendingSyncReset(payload, userId);
   const pendingReset = assertPendingSyncResetOwner(ownerSafePayload, userId);
   const resetDomains = pendingReset?.domains || options.resetDomains || [];
+  const assertCurrent = () => {
+    assertCurrentStorageEpoch();
+    if (options.shouldCommit && !options.shouldCommit()) {
+      throw Object.assign(new Error('This sync was superseded by a newer restore or account.'), {
+        code: 'SYNC_SUPERSEDED',
+      });
+    }
+  };
   for (let attempt = 0; attempt < attempts; attempt += 1) {
+    assertCurrent();
     const cloud = initialCloud === undefined ? await fetchCloud(userId) : initialCloud;
     initialCloud = undefined;
+    assertCurrent();
+    if (cloud?.data) validateLearnerBundle(cloud.data);
     const candidate =
       cloud?.data && resetDomains.length
         ? rebaseSyncReset(ownerSafePayload, cloud.data, resetDomains)
@@ -64,6 +77,7 @@ export async function commitCloudWithRetry(payload, userId, options = {}) {
       ? clearPendingSyncReset(merged, pendingReset.eventId)
       : merged;
     try {
+      assertCurrent();
       const row = await writeCloud(writePayload, userId, cloud?.revision ?? null);
       return { payload: writePayload, row };
     } catch (error) {
@@ -89,6 +103,9 @@ export function useCloudAutoSync({
   practicePrefs,
   syncMeta,
   syncOwnerUserId = '',
+  persistenceEnabled = true,
+  syncGenerationRef,
+  onDataRecoveryError,
   lastSyncedAtRef,
   setSyncStatus,
   applySyncPayload,
@@ -97,14 +114,18 @@ export function useCloudAutoSync({
   const baselineUserIdRef = useRef('');
   const applyPayloadRef = useRef(applySyncPayload);
   const acknowledgedPayloadRef = useRef(null);
+  const recoveryErrorRef = useRef(onDataRecoveryError);
 
   useEffect(() => {
     applyPayloadRef.current = applySyncPayload;
-  }, [applySyncPayload]);
+    recoveryErrorRef.current = onDataRecoveryError;
+  }, [applySyncPayload, onDataRecoveryError]);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !persistenceEnabled) return;
     let active = true;
+    const generation = syncGenerationRef?.current;
+    const stillCurrent = () => active && generation === syncGenerationRef?.current;
     const sessionUserId = session?.user?.id || '';
     const dummySync = { enabled: !!session, userId: syncOwnerUserId };
     const syncPayload = buildSyncPayload({
@@ -115,16 +136,30 @@ export function useCloudAutoSync({
       practicePrefs,
       syncMeta,
     });
-    saveAll(
-      syncPayload.state,
-      syncPayload.customVerbs,
-      syncPayload.customAdjectives,
-      syncPayload.wordLists,
-      dummySync,
-      lastSyncedAtRef.current,
-      syncPayload.practicePrefs,
-      syncPayload.syncMeta,
-    );
+    try {
+      saveAll(
+        syncPayload.state,
+        syncPayload.customVerbs,
+        syncPayload.customAdjectives,
+        syncPayload.wordLists,
+        dummySync,
+        lastSyncedAtRef.current,
+        syncPayload.practicePrefs,
+        syncPayload.syncMeta,
+      );
+    } catch (error) {
+      if (['STALE_LEARNER_SNAPSHOT', 'LEARNER_DATA_INVALID'].includes(error?.code)) {
+        recoveryErrorRef.current?.(error);
+      }
+      setSyncStatus({
+        kind: 'error',
+        message: 'Changes are not saved in this browser',
+        detail:
+          error?.message || 'Browser storage is unavailable. Export your data before closing.',
+        at: null,
+      });
+      return;
+    }
 
     const canPush = !!(cloudPushEnabled && sessionUserId);
     if (!canPush) {
@@ -149,21 +184,17 @@ export function useCloudAutoSync({
       if (pushTimer.current) clearTimeout(pushTimer.current);
       pushTimer.current = setTimeout(async () => {
         pushTimer.current = null;
-        if (!active) return;
+        if (!stillCurrent()) return;
         acknowledgedPayloadRef.current = null;
         setSyncStatus((s) => ({ ...s, kind: 'syncing', message: 'Saving to cloud…' }));
+        let cloudWritten = false;
         try {
-          const committed = await commitCloudWithRetry(syncPayload, sessionUserId);
-          if (!active) return;
-          if (syncPayloadSignature(committed.payload) !== signature) {
-            const applied = applyPayloadRef.current?.(committed.payload);
-            acknowledgedPayloadRef.current = {
-              userId: sessionUserId,
-              signature: syncPayloadSignature(applied?.payload || committed.payload),
-            };
-          }
+          const committed = await commitCloudWithRetry(syncPayload, sessionUserId, {
+            shouldCommit: stillCurrent,
+          });
+          if (!stillCurrent()) return;
           const now = cloudCommitTimestamp(committed);
-          lastSyncedAtRef.current = now;
+          cloudWritten = true;
           saveAll(
             committed.payload.state,
             committed.payload.customVerbs,
@@ -174,13 +205,26 @@ export function useCloudAutoSync({
             committed.payload.practicePrefs,
             committed.payload.syncMeta,
           );
+          if (syncPayloadSignature(committed.payload) !== signature) {
+            const applied = applyPayloadRef.current?.(committed.payload);
+            acknowledgedPayloadRef.current = {
+              userId: sessionUserId,
+              signature: syncPayloadSignature(applied?.payload || committed.payload),
+            };
+          }
+          lastSyncedAtRef.current = now;
           setSyncStatus({ kind: 'ok', message: 'Saved to cloud', at: now });
         } catch (e) {
-          if (!active) return;
+          if (!stillCurrent()) return;
+          if (['STALE_LEARNER_SNAPSHOT', 'LEARNER_DATA_INVALID'].includes(e?.code)) {
+            recoveryErrorRef.current?.(e);
+          }
           logWarn(e, { source: 'useCloudAutoSync.push' });
           setSyncStatus({
             kind: 'error',
-            message: 'Saved locally; cloud sync needs retry',
+            message: cloudWritten
+              ? 'Cloud saved; browser storage needs retry'
+              : 'Saved locally; cloud sync needs retry',
             detail: e.message || 'Push failed',
             at: null,
           });
@@ -206,6 +250,8 @@ export function useCloudAutoSync({
     syncMeta,
     syncOwnerUserId,
     hydrated,
+    persistenceEnabled,
+    syncGenerationRef,
     lastSyncedAtRef,
     setSyncStatus,
   ]);

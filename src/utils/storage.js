@@ -4,6 +4,7 @@ import { RULES, wordKey, wordKind, getWordMeta, enabledTypeIdsFor } from './conj
 import { filterWordsForStudyScope } from './vocabularyProgression.js';
 import { diagnoseMistake } from './mistakeDiagnosis.js';
 import { retryWithBackoff } from './retry.js';
+import { abortableQuery, withCloudDeadline } from './cloudDeadline.js';
 import {
   defaultReadinessState,
   mergeReadinessState,
@@ -42,6 +43,12 @@ import {
 } from './practiceStats.js';
 import { reconcileDerivedProgressState } from './derivedProgress.js';
 import {
+  isRecord,
+  learnerDataError,
+  validateLearnerBundle,
+  validateLearnerState,
+} from './learnerStateValidation.js';
+import {
   adoptSyncMetadata,
   assertPendingSyncResetOwner,
   bindPendingSyncReset,
@@ -72,6 +79,35 @@ const BEGINNER_LADDER_STAGES = [
 const SIMPLE_GODAN_ENDINGS = /[うくぐすつぬぶむ]$/;
 
 const RETIRED_REPAIR_DRILL_LIST_ID = 'repair-drill';
+const storageBaselines = new WeakMap();
+
+export function getRecoveryBackup() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return null;
+  const key = JSON.parse(raw).recoveryBackupKey;
+  return typeof key === 'string' && key.startsWith('jp-backup-recovery:')
+    ? localStorage.getItem(key)
+    : null;
+}
+
+export function acceptCurrentStorageSnapshot() {
+  storageBaselines.set(localStorage, localStorage.getItem(STORAGE_KEY));
+}
+
+export function assertCurrentStorageEpoch() {
+  if (typeof localStorage === 'undefined') return;
+  if (
+    storageBaselines.has(localStorage) &&
+    storageBaselines.get(localStorage) !== localStorage.getItem(STORAGE_KEY)
+  ) {
+    throw Object.assign(
+      new Error(
+        'Learner data changed in another tab. Reload before saving or restoring; the newer saved data is preserved.',
+      ),
+      { code: 'STALE_LEARNER_SNAPSHOT' },
+    );
+  }
+}
 
 export function wordSrsKey(word) {
   if (!word) return '';
@@ -130,9 +166,17 @@ export function normalizeWordLists(wordLists = []) {
 export function loadAll() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
+    storageBaselines.set(localStorage, raw);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return parsed;
+    if (!isRecord(parsed)) throw learnerDataError('Saved learner data is not an object.');
+    if (!isRecord(parsed.state?.cards))
+      throw learnerDataError('Saved learner card data is missing.');
+    validateLearnerBundle(parsed);
+    for (const key of ['customVerbs', 'customAdjectives', 'wordLists']) {
+      if (Object.hasOwn(parsed, key) && !Array.isArray(parsed[key]))
+        throw learnerDataError(`Saved ${key} is not an array.`);
+    }
     return adoptSyncMetadata(
       {
         ...parsed,
@@ -143,8 +187,10 @@ export function loadAll() {
       },
       getLocalSyncDeviceId(),
     );
-  } catch {
-    return null;
+  } catch (error) {
+    throw error?.code === 'LEARNER_DATA_INVALID'
+      ? error
+      : learnerDataError(`Saved learner data could not be read: ${error.message}`);
   }
 }
 
@@ -165,7 +211,18 @@ export function saveAll(
   lastSyncedAt,
   practicePrefs = DEFAULT_PREFS,
   syncMeta = null,
+  options = {},
 ) {
+  assertCurrentStorageEpoch();
+  // The recovery pointer belongs to this browser, never to synced learner data.
+  const previousRaw = localStorage.getItem(STORAGE_KEY);
+  let previousRecoveryKey;
+  try {
+    previousRecoveryKey = JSON.parse(previousRaw || '{}').recoveryBackupKey;
+  } catch {
+    /* A confirmed restore may replace unreadable data. */
+  }
+  const recoveryBackupKey = options.recoveryBackupKey ?? previousRecoveryKey;
   const payload = JSON.stringify({
     state,
     customVerbs,
@@ -175,11 +232,12 @@ export function saveAll(
     lastSyncedAt,
     practicePrefs: mergePracticePrefs(practicePrefs),
     syncMeta,
+    ...(recoveryBackupKey ? { recoveryBackupKey } : {}),
   });
   try {
     localStorage.setItem(STORAGE_KEY, payload);
   } catch (e) {
-    if (!isQuotaExceeded(e)) return;
+    if (!isQuotaExceeded(e)) throw e;
     // Quota hit: the regenerable AI cache is the safest thing to drop. Evict it
     // and retry once before surfacing an error, so the user's actual progress
     // is never lost to a full cache (improvement #15).
@@ -194,8 +252,11 @@ export function saveAll(
           { isQuotaError: true },
         );
       }
+      throw e2;
     }
   }
+  storageBaselines.set(localStorage, payload);
+  return payload;
 }
 
 // ============================================================================
@@ -325,27 +386,30 @@ function assertExpectedCloudUser(session, expectedUserId) {
 
 /** @param {string} [expectedUserId] */
 export async function cloudFetch(expectedUserId = '') {
-  const supabase = await requireSupabaseClient();
+  return withCloudDeadline(async (signal) => {
+    const supabase = await requireSupabaseClient();
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      assertExpectedCloudUser(session, expectedUserId);
+      return null;
+    }
     assertExpectedCloudUser(session, expectedUserId);
-    return null;
-  }
-  assertExpectedCloudUser(session, expectedUserId);
 
-  // Retry transient network/5xx failures so a flaky connection doesn't abort
-  // the read; auth/RLS errors fail fast (non-transient) (improvement #14).
-  return retryWithBackoff(async () => {
-    const { data, error } = await supabase
-      .from('srs_sync')
-      .select('data, updated_at, revision')
-      .eq('id', session.user.id)
-      .maybeSingle();
-    if (error) throw error;
-    return data?.data ? { ...data, data: stripPendingSyncReset(data.data) } : data;
+    // Retry transient network/5xx failures so a flaky connection doesn't abort
+    // the read; auth/RLS errors fail fast (non-transient) (improvement #14).
+    return retryWithBackoff(async () => {
+      const query = supabase
+        .from('srs_sync')
+        .select('data, updated_at, revision')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      const { data, error } = await abortableQuery(query, signal);
+      if (error) throw error;
+      return data?.data ? { ...data, data: stripPendingSyncReset(data.data) } : data;
+    });
   });
 }
 
@@ -354,46 +418,49 @@ export async function cloudFetch(expectedUserId = '') {
  * @param {string} [expectedUserId]
  */
 export async function cloudUpsert(payload, expectedUserId = '', expectedRevision = undefined) {
-  const supabase = await requireSupabaseClient();
-  if (expectedRevision === undefined) {
-    throw new Error('Cloud compare-and-set revision is required');
-  }
+  return withCloudDeadline(async (signal) => {
+    const supabase = await requireSupabaseClient();
+    if (expectedRevision === undefined) {
+      throw new Error('Cloud compare-and-set revision is required');
+    }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) throw new Error('User is not authenticated');
-  assertExpectedCloudUser(session, expectedUserId);
-  if (!expectedUserId) throw new Error('Expected cloud user is required');
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('User is not authenticated');
+    assertExpectedCloudUser(session, expectedUserId);
+    if (!expectedUserId) throw new Error('Expected cloud user is required');
 
-  return retryWithBackoff(async () => {
-    const { data, error } = await supabase.rpc('cas_srs_sync', {
-      expected_revision: expectedRevision,
-      next_data: payload,
-      expected_user_id: expectedUserId,
-    });
-    if (error) {
-      if (
-        error.code === '40001' ||
-        String(error.message || '').includes('sync_revision_conflict')
-      ) {
-        const conflict = Object.assign(
-          new Error('Cloud changed while saving; retrying is required'),
-          { code: 'SYNC_REVISION_CONFLICT' },
-        );
-        throw conflict;
+    return retryWithBackoff(async () => {
+      const query = supabase.rpc('cas_srs_sync', {
+        expected_revision: expectedRevision,
+        next_data: payload,
+        expected_user_id: expectedUserId,
+      });
+      const { data, error } = await abortableQuery(query, signal);
+      if (error) {
+        if (
+          error.code === '40001' ||
+          String(error.message || '').includes('sync_revision_conflict')
+        ) {
+          const conflict = Object.assign(
+            new Error('Cloud changed while saving; retrying is required'),
+            { code: 'SYNC_REVISION_CONFLICT' },
+          );
+          throw conflict;
+        }
+        throw error;
       }
-      throw error;
-    }
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!row || typeof row.sync_revision !== 'number') {
-      throw new Error('Cloud compare-and-set did not return a revision');
-    }
-    return {
-      data: row.sync_data,
-      updated_at: row.sync_updated_at,
-      revision: row.sync_revision,
-    };
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row || typeof row.sync_revision !== 'number') {
+        throw new Error('Cloud compare-and-set did not return a revision');
+      }
+      return {
+        data: row.sync_data,
+        updated_at: row.sync_updated_at,
+        revision: row.sync_revision,
+      };
+    });
   });
 }
 
@@ -1296,21 +1363,17 @@ export function defaultState() {
 
 export function mergeState(saved, sessionOverride) {
   const base = defaultState();
-  const oldSrsSchema = !saved || saved.schemaVersion !== SRS_SCHEMA_VERSION;
-  if (oldSrsSchema) {
+  if (!saved) {
     return { ...base, session: sessionOverride || base.session };
   }
+  validateLearnerState(saved);
   const merged = {
     ...base,
     ...(saved || {}),
     schemaVersion: SRS_SCHEMA_VERSION,
-    cards: oldSrsSchema ? {} : (saved && saved.cards) || {},
-    verbStats: oldSrsSchema ? {} : (saved && saved.verbStats) || {},
-    retryQueue: oldSrsSchema
-      ? []
-      : Array.isArray(saved && saved.retryQueue)
-        ? saved.retryQueue
-        : [],
+    cards: saved.cards || {},
+    verbStats: saved.verbStats || {},
+    retryQueue: Array.isArray(saved.retryQueue) ? saved.retryQueue : [],
     mistakes: Array.isArray(saved && saved.mistakes) ? saved.mistakes : [],
     shadow: (saved && saved.shadow) || base.shadow,
     ambient: (saved && saved.ambient) || base.ambient,
@@ -1322,12 +1385,8 @@ export function mergeState(saved, sessionOverride) {
     },
     onbin: (saved && saved.onbin) || base.onbin,
     register: (saved && saved.register) || base.register,
-    readiness: oldSrsSchema
-      ? defaultReadinessState()
-      : normalizeReadinessState((saved && saved.readiness) || base.readiness),
-    weakness: oldSrsSchema
-      ? defaultWeaknessState()
-      : normalizeWeaknessState((saved && saved.weakness) || base.weakness),
+    readiness: normalizeReadinessState(saved.readiness || base.readiness),
+    weakness: normalizeWeaknessState(saved.weakness || base.weakness),
     meaning: (saved && saved.meaning) || base.meaning,
     mock: (saved && saved.mock) || base.mock,
     reader: {
@@ -1347,16 +1406,14 @@ export function mergeState(saved, sessionOverride) {
         ? saved.guide.recent.slice(0, 20)
         : [],
     },
-    transformation: oldSrsSchema
-      ? emptyTransformationStats()
-      : mergeTransformationStats(base.transformation, saved && saved.transformation),
+    transformation: mergeTransformationStats(base.transformation, saved.transformation),
     minimalPairs: mergeMinimalPairProgress(base.minimalPairs, saved && saved.minimalPairs),
     reference: normalizeReferenceState(saved && saved.reference ? saved.reference : null),
     reviewScope: normalizeReviewScope(saved && saved.reviewScope ? saved.reviewScope : null),
     practiceSelection: normalizePracticeSelection(saved && saved.practiceSelection),
     practiceStats: normalizePracticeStats(saved && saved.practiceStats),
     classify: (saved && saved.classify) || base.classify,
-    session: sessionOverride || base.session,
+    session: sessionOverride || saved.session || base.session,
   };
   merged.enabledTypes = effectiveTypeIdsForPracticeSelection(merged.practiceSelection);
 

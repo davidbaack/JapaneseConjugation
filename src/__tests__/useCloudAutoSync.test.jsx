@@ -24,7 +24,8 @@ import {
   useCloudAutoSync,
   PUSH_DEBOUNCE_MS,
 } from '../hooks/useCloudAutoSync.js';
-import { buildSyncPayload, defaultState } from '../utils/storage.js';
+import { buildSyncPayload, defaultState, acceptCurrentStorageSnapshot } from '../utils/storage.js';
+import { STORAGE_KEY } from '../data/defaults.js';
 import { adoptSyncMetadata } from '../utils/syncMetadata.js';
 
 const SESSION = { user: { id: 'user-123' } };
@@ -66,6 +67,8 @@ function props(overrides = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
+  acceptCurrentStorageSnapshot();
   cloudFetch.mockResolvedValue(null);
   cloudUpsert.mockResolvedValue({ updated_at: '2026-08-15T12:00:00.000Z', revision: 1 });
   vi.useFakeTimers();
@@ -106,6 +109,78 @@ describe('useCloudAutoSync', () => {
     // Local save is immediate, not debounced.
     expect(saveAll).toHaveBeenCalledTimes(1);
     expect(cloudUpsert).not.toHaveBeenCalled();
+  });
+
+  it('surfaces browser write errors and does not push unsaved changes', async () => {
+    saveAll.mockImplementationOnce(() => {
+      throw new Error('Storage denied');
+    });
+    expect(() => renderHook((p) => useCloudAutoSync(p), { initialProps: props() })).not.toThrow();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+    expect(cloudUpsert).not.toHaveBeenCalled();
+    expect(setSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'error',
+        message: 'Changes are not saved in this browser',
+        detail: 'Storage denied',
+      }),
+    );
+  });
+
+  it('does not overwrite saved data while recovery has paused persistence', async () => {
+    renderHook((p) => useCloudAutoSync(p), {
+      initialProps: props({ persistenceEnabled: false }),
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+    expect(saveAll).not.toHaveBeenCalled();
+    expect(cloudUpsert).not.toHaveBeenCalled();
+  });
+
+  it('does not retry an obsolete reset after a restore supersedes its CAS', async () => {
+    const pending = deferred();
+    const shouldCommit = vi.fn(() => true);
+    const writeCloud = vi.fn(() => pending.promise);
+    const fetchCloud = vi.fn(() => Promise.resolve(null));
+    const result = commitCloudWithRetry({ state: defaultState() }, 'user-123', {
+      fetchCloud,
+      writeCloud,
+      shouldCommit,
+    });
+    await Promise.resolve();
+    shouldCommit.mockReturnValue(false);
+    pending.reject(Object.assign(new Error('race'), { code: 'SYNC_REVISION_CONFLICT' }));
+    await expect(result).rejects.toMatchObject({ code: 'SYNC_SUPERSEDED' });
+    expect(writeCloud).toHaveBeenCalledTimes(1);
+    expect(fetchCloud).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects unsupported cloud schemas before any write', async () => {
+    const writeCloud = vi.fn();
+    await expect(
+      commitCloudWithRetry({ state: defaultState() }, 'user-123', {
+        fetchCloud: () =>
+          Promise.resolve({ data: { state: { ...defaultState(), schemaVersion: 99 } } }),
+        writeCloud,
+      }),
+    ).rejects.toMatchObject({ code: 'LEARNER_DATA_INVALID' });
+    expect(writeCloud).not.toHaveBeenCalled();
+  });
+
+  it('rejects a cloud write after durable local data changes before the storage event arrives', async () => {
+    const pending = deferred();
+    const writeCloud = vi.fn();
+    const result = commitCloudWithRetry({ state: defaultState() }, 'user-123', {
+      fetchCloud: () => pending.promise,
+      writeCloud,
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: defaultState(), anotherTab: true }));
+    pending.resolve(null);
+    await expect(result).rejects.toMatchObject({ code: 'STALE_LEARNER_SNAPSHOT' });
+    expect(writeCloud).not.toHaveBeenCalled();
   });
 
   it('debounces rapid changes into a single cloud upsert with the latest payload', async () => {

@@ -660,3 +660,52 @@ describe('when Supabase is not configured', () => {
     vi.resetModules();
   });
 });
+
+describe('cloud recovery deadlines', () => {
+  it('aborts an unresponsive read, then allows a successful retry', async () => {
+    vi.useFakeTimers();
+    try {
+      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
+      let signal;
+      const hanging = {
+        abortSignal: vi.fn((nextSignal) => {
+          signal = nextSignal;
+          return new Promise(() => {});
+        }),
+      };
+      mockSupabase.from.mockReturnValue({
+        select: () => ({ eq: () => ({ maybeSingle: () => hanging }) }),
+      });
+      const read = cloudFetch('user-123');
+      const rejected = expect(read).rejects.toMatchObject({ code: 'CLOUD_REQUEST_TIMEOUT' });
+      await vi.advanceTimersByTimeAsync(15000);
+      await rejected;
+      expect(signal.aborted).toBe(true);
+      const row = { data: { state: defaultState() }, revision: 1 };
+      mockSupabase.from.mockReturnValue(selectBuilder({ data: row, error: null }));
+      await expect(cloudFetch('user-123')).resolves.toEqual(row);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('bounds a stalled compare-and-set write without reporting success', async () => {
+    vi.useFakeTimers();
+    try {
+      mockSupabase.auth.getSession.mockResolvedValue({ data: { session: SESSION } });
+      let signal;
+      mockSupabase.rpc.mockReturnValue({
+        abortSignal: (nextSignal) => {
+          signal = nextSignal;
+          return new Promise(() => {});
+        },
+      });
+      const write = cloudUpsert({ state: defaultState() }, 'user-123', 1);
+      const rejected = expect(write).rejects.toMatchObject({ code: 'CLOUD_REQUEST_TIMEOUT' });
+      await vi.advanceTimersByTimeAsync(15000);
+      await rejected;
+      expect(signal.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

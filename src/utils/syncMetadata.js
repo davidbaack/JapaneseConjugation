@@ -337,6 +337,7 @@ export function createSyncMeta(deviceId = getLocalSyncDeviceId()) {
     resetEpochs: {},
     guideCounters: {},
     guideCounterClocks: {},
+    guideCounterEpochs: {},
     pendingReset: null,
     legacyAdopted: false,
   };
@@ -344,6 +345,12 @@ export function createSyncMeta(deviceId = getLocalSyncDeviceId()) {
 
 function normalizeMeta(meta, deviceId) {
   const base = createSyncMeta(deviceId || meta?.deviceId || getLocalSyncDeviceId());
+  const reset = newerClock(meta?.resetEpochs?.progress, meta?.resetEpochs?.factory);
+  const guideCounterEpochs =
+    meta?.guideCounterEpochs ||
+    Object.fromEntries(
+      Object.keys(meta?.guideCounters || {}).map((id) => [id, reset?.eventId || '']),
+    );
   return {
     ...base,
     ...(meta || {}),
@@ -354,6 +361,7 @@ function normalizeMeta(meta, deviceId) {
     resetEpochs: { ...(meta?.resetEpochs || {}) },
     guideCounters: { ...(meta?.guideCounters || {}) },
     guideCounterClocks: { ...(meta?.guideCounterClocks || {}) },
+    guideCounterEpochs: { ...guideCounterEpochs },
     pendingReset: normalizePendingReset(meta?.pendingReset),
   };
 }
@@ -441,9 +449,21 @@ export function stampSyncChanges(metaValue, before = {}, after = {}, options = {
   const resetsGuide = resetDomains.includes('progress') || resetDomains.includes('factory');
   const guideCounters = resetsGuide ? {} : { ...meta.guideCounters };
   const guideCounterClocks = resetsGuide ? {} : { ...meta.guideCounterClocks };
+  const guideCounterEpochs = resetsGuide ? {} : { ...meta.guideCounterEpochs };
   if (hasGuideDelta(guideChange)) {
-    guideCounters[meta.deviceId] = addGuideTotals(guideCounters[meta.deviceId], guideChange);
+    const epoch = resetsGuide
+      ? clock.eventId
+      : resetClockForDomain(meta, 'progress')?.eventId || '';
+    // Suppressed components can remain in merged metadata. Seeing the new
+    // reset does not make their old totals valid again: this replica starts a
+    // fresh component in the observed epoch before recording its next answer.
+    const previousCounter =
+      (guideCounterEpochs[meta.deviceId] || '') === epoch
+        ? guideCounters[meta.deviceId]
+        : undefined;
+    guideCounters[meta.deviceId] = addGuideTotals(previousCounter, guideChange);
     guideCounterClocks[meta.deviceId] = clock;
+    guideCounterEpochs[meta.deviceId] = epoch;
   }
   const resetEpochs = { ...meta.resetEpochs };
   for (const domain of resetDomains) resetEpochs[domain] = clock;
@@ -474,8 +494,45 @@ export function stampSyncChanges(metaValue, before = {}, after = {}, options = {
     resetEpochs,
     guideCounters,
     guideCounterClocks,
+    guideCounterEpochs,
     pendingReset,
     legacyAdopted: true,
+  };
+}
+
+// A backup is an intentional replacement, so existing replica counters cannot
+// be reused. Seed the complete restored Guide totals after the replacement
+// epoch, including when they are lower than the browser's previous totals.
+export function buildRestoreSyncPayload(currentValue, restoredValue, ownerUserId = '') {
+  const current = adoptSyncMetadata(currentValue, getLocalSyncDeviceId());
+  const restored = { ...restoredValue, syncMeta: current.syncMeta };
+  const stamped = stampSyncChanges(current.syncMeta, current, restored, {
+    resetDomains: resetDomainsForKind('factory'),
+    pendingResetOwnerUserId: ownerUserId,
+  });
+  const clock = {
+    deviceId: stamped.deviceId,
+    revision: stamped.revision + 1,
+    eventId: createSyncEventId(),
+  };
+  const totals = guideTotals(restored.state?.guide);
+  const hasGuide = !!(
+    totals.attempted ||
+    totals.correct ||
+    totals.assisted ||
+    Object.values(totals.byStep).some((step) => step.attempted || step.correct || step.assisted)
+  );
+  return {
+    ...restored,
+    syncMeta: {
+      ...stamped,
+      revision: clock.revision,
+      guideCounters: hasGuide ? { [clock.deviceId]: totals } : {},
+      guideCounterClocks: hasGuide ? { [clock.deviceId]: clock } : {},
+      guideCounterEpochs: hasGuide
+        ? { [clock.deviceId]: resetClockForDomain(stamped, 'progress')?.eventId || '' }
+        : {},
+    },
   };
 }
 
@@ -522,6 +579,24 @@ export function mergeSyncMetadata(leftValue, rightValue, deviceId = '') {
   };
   const clocks = {};
   const tombstones = {};
+  const guideCounterEpochs = {};
+  for (const id of new Set([
+    ...Object.keys(left.guideCounters || {}),
+    ...Object.keys(right.guideCounters || {}),
+  ])) {
+    const comparison = compareSyncClocks(
+      left.guideCounterClocks?.[id],
+      right.guideCounterClocks?.[id],
+    );
+    guideCounterEpochs[id] =
+      comparison > 0
+        ? left.guideCounterEpochs?.[id] || ''
+        : comparison < 0
+          ? right.guideCounterEpochs?.[id] || ''
+          : [left.guideCounterEpochs?.[id] || '', right.guideCounterEpochs?.[id] || '']
+              .sort()
+              .at(-1);
+  }
   const paths = new Set([
     ...Object.keys(left.clocks || {}),
     ...Object.keys(left.tombstones || {}),
@@ -555,6 +630,7 @@ export function mergeSyncMetadata(leftValue, rightValue, deviceId = '') {
     resetEpochs: mergeClockMap(left.resetEpochs, right.resetEpochs),
     guideCounters: mergeCounterMaps(left, right),
     guideCounterClocks: mergeClockMap(left.guideCounterClocks, right.guideCounterClocks),
+    guideCounterEpochs,
     legacyAdopted: !!(left.legacyAdopted || right.legacyAdopted),
   };
 }
@@ -844,6 +920,9 @@ function guideFromMeta(meta, localGuide, cloudGuide, progressWinner = '') {
   const resetClock = newerClock(meta.resetEpochs?.progress, meta.resetEpochs?.factory);
   for (const [deviceId, value] of Object.entries(meta.guideCounters || {})) {
     const counterClock = meta.guideCounterClocks?.[deviceId];
+    // A high Lamport revision does not prove that a device saw this reset.
+    // Pre-restore replicas must not contribute their entire old totals again.
+    if ((meta.guideCounterEpochs?.[deviceId] || '') !== (resetClock?.eventId || '')) continue;
     if (resetClock && compareSyncClocks(counterClock, resetClock) <= 0) continue;
     totals = addGuideTotals(totals, value);
   }

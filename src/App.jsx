@@ -34,6 +34,7 @@ function AppShell() {
     supabaseStatus,
     supabaseError,
     retrySupabase,
+    dataRecoveryError,
   } = useApp();
 
   const { tabProps, panelProps } = useTablist(TABS, tab, setTab);
@@ -79,6 +80,25 @@ function AppShell() {
             </button>
           ))}
         </HorizontalTabList>
+        {dataRecoveryError && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200"
+          >
+            <p className="font-medium">Saved data needs recovery</p>
+            <p className="mt-1">
+              Your saved learner data is preserved. Saving and cloud sync are paused because it
+              could not be safely loaded. Any practice you do now will not be saved.
+            </p>
+            <button
+              type="button"
+              onClick={() => setTab('settings')}
+              className="mt-3 rounded-lg border border-current px-3 py-2 font-medium"
+            >
+              Open backup &amp; restore
+            </button>
+          </div>
+        )}
         <Suspense fallback={<ViewSkeleton />}>
           <div {...panelProps(tab)}>
             {tab === 'practice' && <StudyView />}

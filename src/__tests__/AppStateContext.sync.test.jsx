@@ -3,23 +3,32 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-library/react';
 
-const { mockSupabase, authCallbacks, cloudFetch, cloudUpsert, loadAll, saveAll, pruneAICache } =
-  vi.hoisted(() => ({
-    mockSupabase: {
-      auth: {
-        getSession: vi.fn(),
-        onAuthStateChange: vi.fn(),
-      },
+const {
+  mockSupabase,
+  authCallbacks,
+  cloudFetch,
+  cloudUpsert,
+  loadAll,
+  saveAll,
+  pruneAICache,
+  getRecoveryBackup,
+} = vi.hoisted(() => ({
+  mockSupabase: {
+    auth: {
+      getSession: vi.fn(),
+      onAuthStateChange: vi.fn(),
     },
-    authCallbacks: [],
-    cloudFetch: vi.fn(),
-    cloudUpsert: vi.fn(() =>
-      Promise.resolve({ updated_at: '2026-08-15T12:00:00.000Z', revision: 1 }),
-    ),
-    loadAll: vi.fn(() => null),
-    saveAll: vi.fn(),
-    pruneAICache: vi.fn(),
-  }));
+  },
+  authCallbacks: [],
+  cloudFetch: vi.fn(),
+  cloudUpsert: vi.fn(() =>
+    Promise.resolve({ updated_at: '2026-08-15T12:00:00.000Z', revision: 1 }),
+  ),
+  loadAll: vi.fn(() => null),
+  saveAll: vi.fn(),
+  pruneAICache: vi.fn(),
+  getRecoveryBackup: vi.fn(() => null),
+}));
 
 vi.mock('../utils/supabase.js', () => ({
   getSupabaseClientState: () => ({
@@ -34,14 +43,32 @@ vi.mock('../utils/supabase.js', () => ({
 }));
 vi.mock('../utils/storage.js', async () => {
   const actual = await vi.importActual('../utils/storage.js');
-  return { ...actual, cloudFetch, cloudUpsert, loadAll, saveAll, pruneAICache };
+  return { ...actual, cloudFetch, cloudUpsert, loadAll, saveAll, pruneAICache, getRecoveryBackup };
 });
 
 import { AppStateProvider, useApp } from '../state/AppStateContext.jsx';
 import { PUSH_DEBOUNCE_MS } from '../hooks/useCloudAutoSync.js';
-import { cardIdFor, defaultState } from '../utils/storage.js';
+import {
+  cardIdFor,
+  defaultState,
+  buildSyncPayload,
+  acceptCurrentStorageSnapshot,
+} from '../utils/storage.js';
 import { weaknessLaneForCard } from '../utils/subcategoryWeakness.js';
-import { DEFAULT_PREFS } from '../data/defaults.js';
+import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
+import { buildRestoreSyncPayload } from '../utils/syncMetadata.js';
+import { serializeBackup } from '../utils/backup.js';
+import { makeLearnerSnapshot, makeLegacyV42Backup } from './fixtures/learnerSnapshot.js';
+import { persistBackupRestore } from '../utils/restorePersistence.js';
+
+vi.mock('../utils/restorePersistence.js', () => ({
+  persistBackupRestore: vi.fn((payload, beforeBackup) => ({
+    payload,
+    recoveryBackup: beforeBackup,
+  })),
+}));
+
+let restoreInput;
 
 const SESSION_A = { user: { id: 'user-a', email: 'a@example.com' } };
 const SESSION_B = { user: { id: 'user-b', email: 'b@example.com' } };
@@ -112,12 +139,23 @@ function Probe() {
     syncStatus,
     syncNow,
     resetLearnerData,
+    restoreBackup,
+    restoreStatus,
+    recoveryBackup,
+    dataRecoveryError,
   } = useApp();
   return (
     <div>
       <output data-testid="cards">{Object.keys(state.cards || {}).join(',')}</output>
       <output data-testid="auto-speak">{String(practicePrefs.autoSpeak)}</output>
       <output data-testid="sync">{syncStatus.message}</output>
+      <output data-testid="snapshot">{JSON.stringify(state)}</output>
+      <output data-testid="restore-status">{restoreStatus.kind}</output>
+      <output data-testid="recovery">{recoveryBackup || ''}</output>
+      <output data-testid="recovery-error">{dataRecoveryError}</output>
+      <button type="button" onClick={() => void restoreBackup(restoreInput).catch(() => {})}>
+        Restore backup
+      </button>
       <button type="button" onClick={() => void resetLearnerData('factory').catch(() => {})}>
         Reset learner
       </button>
@@ -158,6 +196,15 @@ function renderProvider() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
+  acceptCurrentStorageSnapshot();
+  cloudFetch.mockResolvedValue(null);
+  restoreInput = serializeBackup(makeLearnerSnapshot());
+  persistBackupRestore.mockImplementation((payload, beforeBackup) => ({
+    payload,
+    recoveryBackup: beforeBackup,
+  }));
+  getRecoveryBackup.mockReturnValue(null);
   cloudUpsert.mockResolvedValue({ updated_at: '2026-08-15T12:00:00.000Z', revision: 1 });
   authCallbacks.length = 0;
   mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null } });
@@ -173,6 +220,292 @@ afterEach(() => {
 });
 
 describe('AppStateProvider cloud session races', () => {
+  it('restores the full snapshot before applying it and retains an independent recovery copy', async () => {
+    renderProvider();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+    });
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('ok'));
+    expect(JSON.parse(screen.getByTestId('snapshot').textContent)).toEqual(
+      makeLearnerSnapshot().state,
+    );
+    const [persisted, previous] = persistBackupRestore.mock.calls[0];
+    expect(persisted.state.session.reviewed).toBe(8);
+    expect(persisted.syncMeta.pendingReset.domains).toContain('factory');
+    expect(screen.getByTestId('recovery').textContent).toBe(previous);
+    expect(JSON.parse(previous).state.guide.attempted).toBe(0);
+  });
+
+  it('commits only one replacement when two confirmations race while restore helpers load', async () => {
+    renderProvider();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+    });
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('ok'));
+    expect(persistBackupRestore).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers the app-produced schema-less v42 backup without zeroing Guide or cards', async () => {
+    restoreInput = JSON.stringify(makeLegacyV42Backup());
+    renderProvider();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+    });
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('ok'));
+    const restored = JSON.parse(screen.getByTestId('snapshot').textContent);
+    expect(restored.guide.attempted).toBe(7);
+    expect(Object.keys(restored.cards)).toHaveLength(2);
+    expect(restored.practiceStats.lifetime.attempted).toBe(8);
+  });
+
+  it('leaves live data unchanged when the strict local replacement cannot be saved', async () => {
+    loadAll.mockReturnValueOnce(makeLearnerSnapshot());
+    persistBackupRestore.mockImplementationOnce(() => {
+      throw new Error('Storage denied');
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('cards').textContent).toContain('食べる'));
+    const previous = screen.getByTestId('snapshot').textContent;
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+    });
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('error'));
+    expect(screen.getByTestId('snapshot').textContent).toBe(previous);
+    expect(cloudUpsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unsupported saved schema untouched and pauses automatic persistence', async () => {
+    loadAll.mockReturnValueOnce({
+      ...makeLearnerSnapshot(),
+      state: { ...defaultState(), schemaVersion: 99 },
+    });
+    renderProvider();
+    await waitFor(() =>
+      expect(screen.getByTestId('recovery-error').textContent).toMatch(/kept unchanged/),
+    );
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    expect(saveAll).not.toHaveBeenCalled();
+    expect(cloudFetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps a durable local restore when cloud fails, then retries without resurrecting old progress', async () => {
+    cloudFetch.mockResolvedValue(null);
+    renderProvider();
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Synced to cloud'));
+    cloudUpsert.mockClear();
+    const stale = makeLearnerSnapshot();
+    stale.state.cards = { 'older-cloud-card': { reps: 9 } };
+    stale.state.guide = { ...stale.state.guide, attempted: 20 };
+    cloudFetch.mockResolvedValue({ data: stale, revision: 1 });
+    cloudUpsert.mockRejectedValueOnce(new Error('network down'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+    });
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('pending'));
+    expect(JSON.parse(screen.getByTestId('snapshot').textContent).guide.attempted).toBe(7);
+    expect(persistBackupRestore.mock.calls[0][0].syncMeta.pendingReset.ownerUserId).toBe('user-a');
+    expect(screen.getByTestId('cards').textContent).not.toContain('older-cloud-card');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
+    });
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('ok'));
+    expect(JSON.parse(screen.getByTestId('snapshot').textContent).guide.attempted).toBe(7);
+    expect(screen.getByTestId('cards').textContent).not.toContain('older-cloud-card');
+    expect(saveAll.mock.calls.at(-1)[7].pendingReset).toBeNull();
+  });
+
+  it('preserves answers made while the restored snapshot is being acknowledged by cloud', async () => {
+    cloudFetch.mockResolvedValue(null);
+    renderProvider();
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Synced to cloud'));
+    const pending = deferred();
+    cloudUpsert.mockClear();
+    cloudUpsert.mockReturnValueOnce(pending.promise);
+    fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+    await waitFor(() => expect(cloudUpsert).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Change learner data' }));
+    await act(async () => {
+      pending.resolve({ updated_at: '2026-10-07T12:00:00.000Z', revision: 2 });
+      await pending.promise;
+    });
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('ok'));
+    expect(screen.getByTestId('cards').textContent).toContain('local-change');
+    expect(cloudUpsert).toHaveBeenCalledTimes(2);
+    expect(cloudUpsert.mock.calls[1][0].state.cards['local-change']).toEqual({ reps: 1 });
+  });
+
+  it('saves new answers locally while cloud restoration remains in flight', async () => {
+    cloudFetch.mockResolvedValue(null);
+    renderProvider();
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Synced to cloud'));
+    const pending = deferred();
+    cloudUpsert.mockReturnValueOnce(pending.promise);
+    fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('pending'));
+    saveAll.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Change learner data' }));
+    await waitFor(() =>
+      expect(saveAll.mock.calls.at(-1)[0].cards['local-change']).toEqual({ reps: 1 }),
+    );
+    await act(async () => {
+      pending.resolve({ updated_at: '2026-10-07T12:00:00.000Z', revision: 2 });
+      await pending.promise;
+    });
+  });
+
+  it('keeps answers made during manual retry of a pending replacement', async () => {
+    cloudFetch.mockResolvedValue(null);
+    renderProvider();
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Synced to cloud'));
+    cloudUpsert.mockRejectedValueOnce(new Error('offline'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+    });
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('pending'));
+    const pending = deferred();
+    cloudUpsert.mockClear();
+    cloudUpsert.mockReturnValueOnce(pending.promise);
+    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
+    await waitFor(() => expect(cloudUpsert).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Change learner data' }));
+    await act(async () => {
+      pending.resolve({ updated_at: '2026-10-07T12:00:00.000Z', revision: 2 });
+      await pending.promise;
+    });
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('ok'));
+    expect(screen.getByTestId('cards').textContent).toContain('local-change');
+    expect(cloudUpsert.mock.calls.at(-1)[0].state.cards['local-change']).toEqual({ reps: 1 });
+  });
+
+  it('keeps answers made during reload and login of a pending replacement', async () => {
+    const replacement = buildRestoreSyncPayload(
+      buildSyncPayload(),
+      buildSyncPayload(makeLearnerSnapshot()),
+      'user-a',
+    );
+    loadAll.mockReturnValueOnce({ ...replacement, syncConfig: { userId: 'user-a' } });
+    getRecoveryBackup.mockReturnValue(serializeBackup({ state: defaultState() }));
+    const pending = deferred();
+    cloudFetch.mockResolvedValue(null);
+    cloudUpsert.mockReturnValueOnce(pending.promise);
+    renderProvider();
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(cloudUpsert).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Change learner data' }));
+    await act(async () => {
+      pending.resolve({ updated_at: '2026-10-07T12:00:00.000Z', revision: 2 });
+      await pending.promise;
+    });
+    await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('ok'));
+    expect(screen.getByTestId('cards').textContent).toContain('local-change');
+    expect(JSON.parse(screen.getByTestId('snapshot').textContent).guide.attempted).toBe(7);
+  });
+
+  it('pauses a stale tab and refuses restore after another tab changes saved data', async () => {
+    renderProvider();
+    saveAll.mockClear();
+    const external = JSON.stringify(makeLearnerSnapshot());
+    localStorage.setItem(STORAGE_KEY, external);
+    await act(async () => {
+      window.dispatchEvent(
+        new window.StorageEvent('storage', {
+          key: STORAGE_KEY,
+          oldValue: null,
+          newValue: external,
+          storageArea: localStorage,
+        }),
+      );
+    });
+    expect(screen.getByTestId('recovery-error').textContent).toMatch(/another tab/);
+    fireEvent.click(screen.getByRole('button', { name: 'Change learner data' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+    await act(async () => Promise.resolve());
+    expect(saveAll).not.toHaveBeenCalled();
+    expect(persistBackupRestore).not.toHaveBeenCalled();
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(external);
+  });
+
+  it('rechecks healthy account B after unsupported cloud data in account A', async () => {
+    cloudFetch.mockResolvedValueOnce({ data: { state: { ...defaultState(), schemaVersion: 99 } } });
+    renderProvider();
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('recovery-error').textContent).toMatch(/Cloud data needs recovery/),
+    );
+    cloudFetch.mockResolvedValueOnce(cloudRow('healthy-b-card'));
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_B);
+    });
+    await waitFor(() => expect(screen.getByTestId('cards').textContent).toBe('healthy-b-card'));
+    expect(screen.getByTestId('recovery-error').textContent).toBe('');
+  });
+
+  it('rejects malformed cloud custom content before applying or uploading learner data', async () => {
+    loadAll.mockReturnValueOnce(makeLearnerSnapshot());
+    cloudFetch.mockResolvedValueOnce({
+      data: { state: defaultState(), customVerbs: [null] },
+      updated_at: '2030-01-01T00:00:00.000Z',
+      revision: 5,
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('cards').textContent).toContain('食べる'));
+    const before = screen.getByTestId('snapshot').textContent;
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('recovery-error').textContent).toMatch(/Cloud data needs recovery/),
+    );
+    expect(screen.getByTestId('snapshot').textContent).toBe(before);
+    expect(cloudUpsert).not.toHaveBeenCalled();
+  });
+
+  it('ignores an old restore acknowledgement after switching signed-in accounts', async () => {
+    cloudFetch.mockResolvedValue(null);
+    renderProvider();
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Synced to cloud'));
+    const pending = deferred();
+    cloudUpsert.mockClear();
+    cloudUpsert.mockReturnValueOnce(pending.promise);
+    fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+    await waitFor(() => expect(cloudUpsert).toHaveBeenCalledTimes(1));
+    cloudFetch.mockResolvedValueOnce(cloudRow('account-b-only'));
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_B);
+    });
+    await waitFor(() => expect(cloudFetch).toHaveBeenCalledWith('user-b'));
+    await act(async () => {
+      pending.resolve({ updated_at: '2026-10-07T12:00:00.000Z', revision: 2 });
+      await pending.promise;
+    });
+    // The active account restore may proceed after the local replacement's
+    // operation ends; the old account's acknowledgement must never apply.
+    expect(screen.getByTestId('snapshot').textContent).not.toContain('older-cloud-card');
+    expect(cloudUpsert.mock.calls.filter((call) => call[1] === 'user-b')).toHaveLength(0);
+  });
+
   it('hydrates an unchanged metadata snapshot without a render loop', async () => {
     const renderProbe = vi.fn();
     loadAll.mockReturnValueOnce({
@@ -304,7 +637,7 @@ describe('AppStateProvider cloud session races', () => {
         customVerbs: [],
         customAdjectives: [],
         wordLists: [],
-        practicePrefs: null,
+        practicePrefs: DEFAULT_PREFS,
       },
       updated_at: '2030-01-01T00:00:00.000Z',
     });
@@ -744,7 +1077,7 @@ describe('AppStateProvider cloud session races', () => {
       customVerbs: [],
       customAdjectives: [],
       wordLists: [],
-      practicePrefs: null,
+      practicePrefs: DEFAULT_PREFS,
       lastSyncedAt: 0,
     });
     cloudFetch.mockResolvedValue(null);

@@ -27,11 +27,8 @@ import { conjugateItem } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import {
   ALL_CARD_TYPES,
-  CONJ_TYPES,
   EVERYDAY_TYPE_IDS,
-  INTRODUCED_DEFAULT_TYPE_IDS,
   LEGACY_BROAD_DEFAULT_TYPE_IDS,
-  RETIRED_STANDALONE_TYPE_IDS,
   TEXTBOOK_CORE_TYPE_IDS,
 } from '../data/conjugationTypes.js';
 import {
@@ -485,28 +482,6 @@ describe('mergeState', () => {
     expect(state.enabledTypes).not.toContain('short-causative-passive-polite-past-negative');
   });
 
-  it('migrates the old broad default scope to the new Core default', () => {
-    const state = mergeState({ enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS }, null);
-    expect(state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
-  });
-
-  it('migrates old verb-only broad scopes with retired forms to the new Core default', () => {
-    const oldVerbDefault = [
-      ...CONJ_TYPES.filter((type) => type.id !== 'plain-present').map((type) => type.id),
-      ...RETIRED_STANDALONE_TYPE_IDS,
-    ];
-    const state = mergeState({ enabledTypes: oldVerbDefault }, null);
-    expect(state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
-  });
-
-  it('migrates pre-introduced broad default scopes to the new Core default', () => {
-    const preIntroducedIds = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
-      (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
-    );
-    const state = mergeState({ enabledTypes: preIntroducedIds }, null);
-    expect(state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
-  });
-
   it('preserves an explicit all-forms scope', () => {
     const allTypeIds = ALL_CARD_TYPES.map((t) => t.id);
     const practiceSelection = practiceSelectionForTypeIds(allTypeIds, defaultPracticeSelection());
@@ -563,24 +538,12 @@ describe('mergeState', () => {
     expect(state.cards[cardId].reps).toBe(3);
   });
 
-  it('resets legacy rule-keyed cards during the word-form migration', () => {
-    const state = mergeState(
-      {
-        cards: {
-          'ichidan|plain-past': {
-            reps: 3,
-            interval: 8,
-            ease: 2.5,
-            nextReview: 9999999999999,
-            correct: 3,
-            incorrect: 0,
-            lastSeen: 1,
-          },
-        },
-      },
-      null,
-    );
-    expect(state.cards).toEqual({});
+  it('rejects unsupported saved schemas without mutating the source', () => {
+    for (const schemaVersion of [undefined, 3, 99]) {
+      const saved = { schemaVersion, cards: { 'ichidan|plain-past': { reps: 3 } } };
+      expect(() => mergeState(saved)).toThrow(/schema/);
+      expect(saved.cards['ichidan|plain-past'].reps).toBe(3);
+    }
   });
 
   it('uses sessionOverride for session', () => {
@@ -589,16 +552,16 @@ describe('mergeState', () => {
     expect(state.session).toEqual(override);
   });
 
-  it('migrates old saves to the Core default without forcing adjective forms', () => {
-    const saved = { enabledTypes: ['plain-past', 'te-form'] }; // no adj- types
-    const state = mergeState(saved, null);
-    expect(state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
-    expect(state.enabledTypes.some((id) => id.startsWith('adj-'))).toBe(false);
-  });
-
-  it('backfills readiness for old saves', () => {
-    const state = mergeState({ cards: {} }, null);
+  it('backfills optional current-schema areas without losing saved session totals', () => {
+    const saved = {
+      schemaVersion: SRS_SCHEMA_VERSION,
+      cards: {},
+      session: { ...defaultState().session, reviewed: 12, correct: 9 },
+    };
+    const state = mergeState(saved);
     expect(state.readiness).toEqual({ byRule: {} });
+    expect(state.session.reviewed).toBe(12);
+    expect(state.session.correct).toBe(9);
   });
 });
 

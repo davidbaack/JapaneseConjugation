@@ -411,7 +411,8 @@ export function normalizeWeaknessState(weakness = null) {
   const byLane = {};
   for (const [key, row] of Object.entries(weakness?.byLane || {})) {
     const normalized = normalizeLane(row, key);
-    if (normalized.key && normalized.attempted > 0) byLane[normalized.key] = normalized;
+    if (normalized.key && normalized.attempted > 0)
+      byLane[normalized.key] = { ...row, ...normalized };
   }
   return { byLane };
 }

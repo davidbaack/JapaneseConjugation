@@ -183,6 +183,11 @@ confirms the new direction, update this document in the same change.
 - Display and audio controls remain immediately available. Backup, restore,
   cleanup, and reset controls are grouped under the view-local Data & account
   disclosure; destructive actions retain an additional explicit confirmation.
+- Backup exports the complete learner snapshot. Restore checks and previews the
+  file before explicit replacement, secures a before-restore recovery copy,
+  confirms durable local saving, then reports cloud completion separately.
+  Invalid or unsupported saved data pauses writes and displays recovery guidance.
+  Editing pasted backup text invalidates its confirmation preview.
 
 ## Learning Defaults
 

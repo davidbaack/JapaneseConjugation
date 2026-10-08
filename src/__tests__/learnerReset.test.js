@@ -61,7 +61,14 @@ function populatedParts() {
   return {
     state,
     customVerbs: [CUSTOM_WORD],
-    customAdjectives: [{ dict: 'custom-adj', reading: 'custom-adj', group: 'i-adjective' }],
+    customAdjectives: [
+      {
+        dict: 'custom-adj',
+        reading: 'custom-adj',
+        meaning: 'custom adjective',
+        group: 'i-adjective',
+      },
+    ],
     wordLists: [{ id: 'list-1', name: 'Custom list', wordKeys: ['godan:custom'] }],
     practicePrefs: {
       ...DEFAULT_PREFS,

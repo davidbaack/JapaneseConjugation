@@ -35,6 +35,7 @@ test.describe('Rush mode', () => {
           JSON.stringify({
             state: {
               schemaVersion: 4,
+              cards: {},
               enabledTypes: ['plain-past'],
               practiceSelection: {
                 mixed: false,

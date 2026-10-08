@@ -8,6 +8,8 @@ import {
   clearPendingSyncReset,
   rebaseSyncReset,
   stampSyncChanges,
+  buildRestoreSyncPayload,
+  createSyncMeta,
 } from '../utils/syncMetadata.js';
 
 function payload(parts = {}) {
@@ -57,6 +59,81 @@ function canonical(value) {
 }
 
 describe('sync metadata convergence', () => {
+  it('starts a fresh replica component after observing a restore instead of reactivating old totals', () => {
+    const blank = payload({ syncMeta: createSyncMeta('offline-device') });
+    const seeded = payload({ state: guide(7), syncMeta: blank.syncMeta });
+    const old = { ...seeded, syncMeta: stampSyncChanges(blank.syncMeta, blank, seeded) };
+    expect(old.syncMeta.guideCounters['offline-device'].attempted).toBe(7);
+    const restored = buildRestoreSyncPayload(old, payload({ state: guide(7) }), 'user-a');
+    const rebased = rebaseSyncReset(restored, old, restored.syncMeta.pendingReset.domains);
+    const published = clearPendingSyncReset(
+      mergeSyncPayload(rebased, old, { userId: 'user-a', skipPendingResetRebase: true }),
+      restored.syncMeta.pendingReset.eventId,
+    );
+    expect(published.state.guide.attempted).toBe(7);
+    expect(published.syncMeta.guideCounters['offline-device'].attempted).toBe(7);
+    const informed = {
+      ...published,
+      syncMeta: { ...published.syncMeta, deviceId: 'offline-device' },
+    };
+    const next = change(informed, { state: guide(8) });
+
+    expect(next.syncMeta.guideCounters['offline-device'].attempted).toBe(1);
+    expect(mergeSyncPayload(published, next).state.guide.attempted).toBe(8);
+    expect(mergeSyncPayload(next, published).state.guide.attempted).toBe(8);
+  });
+  it('rejects high-clock Guide totals from a replica that never observed the restore epoch', () => {
+    const current = adopt({ state: guide(7) }, 'device-local');
+    const restored = buildRestoreSyncPayload(current, payload({ state: guide(7) }), 'user-a');
+    const published = clearPendingSyncReset(restored, restored.syncMeta.pendingReset.eventId);
+    const offline = adopt({ state: guide(7) }, 'device-offline');
+    offline.syncMeta.revision = 100;
+    const staleNewAnswer = change(offline, { state: guide(8) });
+
+    const merged = mergeSyncPayload(published, staleNewAnswer);
+    expect(merged.state.guide.attempted).toBe(7);
+    expect(mergeSyncPayload(staleNewAnswer, published).state.guide.attempted).toBe(7);
+
+    const informed = {
+      ...published,
+      syncMeta: { ...published.syncMeta, deviceId: 'device-offline' },
+    };
+    const informedNewAnswer = change(informed, { state: guide(8) });
+    expect(mergeSyncPayload(published, informedNewAnswer).state.guide.attempted).toBe(8);
+  });
+  it.each([0, 3, 7])(
+    'restores all %i Guide attempts against stale higher cloud totals',
+    (attempts) => {
+      const current = adopt({ state: guide(7) }, 'device-local');
+      const remote = adopt({ state: guide(50) }, 'device-cloud');
+      const resetClock = { deviceId: 'device-cloud', revision: 80, eventId: 'older-cloud-reset' };
+      remote.syncMeta.revision = 81;
+      remote.syncMeta.resetEpochs = { factory: resetClock, progress: resetClock };
+      remote.syncMeta.guideCounterClocks.legacy = { ...resetClock, revision: 81 };
+      const replacement = buildRestoreSyncPayload(
+        current,
+        payload({ state: guide(attempts) }),
+        'user-a',
+      );
+      const rebased = rebaseSyncReset(
+        replacement,
+        remote,
+        replacement.syncMeta.pendingReset.domains,
+      );
+      const merged = mergeSyncPayload(rebased, remote, {
+        userId: 'user-a',
+        skipPendingResetRebase: true,
+      });
+      const acknowledged = clearPendingSyncReset(merged, replacement.syncMeta.pendingReset.eventId);
+
+      expect(acknowledged.state.guide.attempted).toBe(attempts);
+      expect(acknowledged.state.guide.byStep.answer.attempted).toBe(attempts);
+      expect(mergeSyncPayload(acknowledged, remote).state.guide.attempted).toBe(attempts);
+      const nextAnswer = change(acknowledged, { state: guide(attempts + 1) });
+      expect(mergeSyncPayload(nextAnswer, acknowledged).state.guide.attempted).toBe(attempts + 1);
+    },
+  );
+
   it('adopts legacy Guide totals into one max-merged component', () => {
     const five = adopt({ state: guide(5) }, 'device-a');
     const seven = adopt({ state: guide(7) }, 'device-b');
