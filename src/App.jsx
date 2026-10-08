@@ -35,6 +35,7 @@ function AppShell() {
     supabaseError,
     retrySupabase,
     dataRecoveryError,
+    localPersistenceBlocked,
   } = useApp();
 
   const { tabProps, panelProps } = useTablist(TABS, tab, setTab);
@@ -85,10 +86,13 @@ function AppShell() {
             role="alert"
             className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200"
           >
-            <p className="font-medium">Saved data needs recovery</p>
+            <p className="font-medium">
+              {localPersistenceBlocked ? 'Saved data needs recovery' : 'Cloud sync needs attention'}
+            </p>
             <p className="mt-1">
-              Your saved learner data is preserved. Saving and cloud sync are paused because it
-              could not be safely loaded. Any practice you do now will not be saved.
+              {localPersistenceBlocked
+                ? 'Your saved learner data is preserved. Saving and cloud sync are paused because it could not be safely loaded. Any practice you do now will not be saved.'
+                : 'Your progress is saved in this browser. Cloud sync is paused; open backup and restore to review the recovery message.'}
             </p>
             <button
               type="button"

@@ -1,6 +1,15 @@
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { reconcileDerivedProgressState } from './derivedProgress.js';
+import {
+  getProgressWriterId,
+  materializeProgressContributions,
+  mergeProgressContributions,
+  seedProgressContributions,
+  stampProgressContributions,
+  validateProgressContributionsState,
+} from './progressContributions.js';
 
-const SYNC_META_VERSION = 1;
+const SYNC_META_VERSION = 2;
 const DEVICE_STORAGE_KEY = 'katachiya_sync_device_id';
 
 const TRACKED_PREFIXES = {
@@ -340,10 +349,16 @@ export function createSyncMeta(deviceId = getLocalSyncDeviceId()) {
     guideCounterEpochs: {},
     pendingReset: null,
     legacyAdopted: false,
+    progressContributions: seedProgressContributions(),
   };
 }
 
 function normalizeMeta(meta, deviceId) {
+  if (meta?.version !== undefined && ![1, SYNC_META_VERSION].includes(meta.version)) {
+    throw Object.assign(new Error('Unsupported learner sync metadata version.'), {
+      code: 'LEARNER_DATA_INVALID',
+    });
+  }
   const base = createSyncMeta(deviceId || meta?.deviceId || getLocalSyncDeviceId());
   const reset = newerClock(meta?.resetEpochs?.progress, meta?.resetEpochs?.factory);
   const guideCounterEpochs =
@@ -354,6 +369,7 @@ function normalizeMeta(meta, deviceId) {
   return {
     ...base,
     ...(meta || {}),
+    version: SYNC_META_VERSION,
     deviceId: deviceId || meta?.deviceId || base.deviceId,
     revision: Math.max(0, Number(meta?.revision) || 0),
     clocks: { ...(meta?.clocks || {}) },
@@ -372,15 +388,57 @@ function normalizeMeta(meta, deviceId) {
  * @returns {any}
  */
 export function adoptSyncMetadata(payload = {}, deviceId = '') {
-  if (payload.syncMeta?.version === SYNC_META_VERSION) {
+  if (payload.syncMeta && ![1, SYNC_META_VERSION].includes(payload.syncMeta.version)) {
+    throw Object.assign(new Error('Unsupported learner sync metadata version.'), {
+      code: 'LEARNER_DATA_INVALID',
+    });
+  }
+  if ([1, SYNC_META_VERSION].includes(payload.syncMeta?.version)) {
+    const isLegacy = payload.syncMeta.version === 1;
+    if (!isLegacy && !payload.syncMeta.progressContributions)
+      throw Object.assign(
+        new Error(
+          'Progress sync evidence is missing. Export this browser data and restore the intended backup in Settings.',
+        ),
+        { code: 'LEARNER_DATA_INVALID' },
+      );
+    if (isLegacy && payload.state?.practiceStats?.recent?.some((row) => row?.id && row?.day))
+      throw Object.assign(
+        new Error(
+          'An older app copied newer progress without its sync evidence. Export this browser data, reload every app tab, then restore the intended backup in Settings.',
+        ),
+        { code: 'LEARNER_DATA_INVALID' },
+      );
     const meta = normalizeMeta(payload.syncMeta, deviceId || payload.syncMeta.deviceId);
-    const guide = payload.state?.guide
-      ? { ...payload.state.guide, recent: normalizeRecent(payload.state.guide.recent) }
-      : payload.state?.guide;
+    const repair = isLegacy
+      ? reconcileDerivedProgressState(payload.state)
+      : { state: payload.state, repaired: false };
+    const state = repair.state;
+    const contributions = isLegacy
+      ? seedProgressContributions(state, progressEpoch(meta), { legacyBaseline: true })
+      : validateProgressContributionsState(
+          state,
+          payload.syncMeta.progressContributions,
+          progressEpoch(meta),
+        );
+    if (!isLegacy)
+      validateProgressContributionsState(
+        reconcileDerivedProgressState(state).state,
+        contributions,
+        progressEpoch(meta),
+      );
+    const guide = state?.guide
+      ? { ...state.guide, recent: normalizeRecent(state.guide.recent) }
+      : state?.guide;
     return {
       ...payload,
-      state: { ...(payload.state || {}), ...(guide ? { guide } : {}) },
-      syncMeta: meta,
+      state: { ...(state || {}), ...(guide ? { guide } : {}) },
+      ...(repair.repaired ? { diagnosticRepairNeeded: true } : {}),
+      syncMeta: {
+        ...meta,
+        version: SYNC_META_VERSION,
+        progressContributions: contributions,
+      },
     };
   }
 
@@ -402,12 +460,14 @@ export function adoptSyncMetadata(payload = {}, deviceId = '') {
       stableStringify(defaultPrefValues.get(path)) === stableStringify(value);
     if (!isUnchangedDefaultPref) clocks[path] = clock;
   }
-  const guide = payload.state?.guide
-    ? { ...payload.state.guide, recent: normalizeRecent(payload.state.guide.recent) }
-    : payload.state?.guide;
+  const repair = reconcileDerivedProgressState(payload.state);
+  const guide = repair.state?.guide
+    ? { ...repair.state.guide, recent: normalizeRecent(repair.state.guide.recent) }
+    : repair.state?.guide;
   return {
     ...payload,
-    state: { ...(payload.state || {}), ...(guide ? { guide } : {}) },
+    state: { ...(repair.state || {}), ...(guide ? { guide } : {}) },
+    ...(repair.repaired ? { diagnosticRepairNeeded: true } : {}),
     syncMeta: {
       ...createSyncMeta(deviceId || getLocalSyncDeviceId()),
       revision: 1,
@@ -415,6 +475,7 @@ export function adoptSyncMetadata(payload = {}, deviceId = '') {
       guideCounters: (Number(guide?.attempted) || 0) > 0 ? { legacy: guideTotals(guide) } : {},
       guideCounterClocks: (Number(guide?.attempted) || 0) > 0 ? { legacy: clock } : {},
       legacyAdopted: true,
+      progressContributions: seedProgressContributions(repair.state, '', { legacyBaseline: true }),
     },
   };
 }
@@ -429,7 +490,24 @@ export function stampSyncChanges(metaValue, before = {}, after = {}, options = {
   );
   const guideChange = guideDelta(before.state?.guide, after.state?.guide);
   const resetDomains = [...new Set(options.resetDomains || [])];
-  if (!changed.length && !hasGuideDelta(guideChange) && !resetDomains.length) {
+  const previousContributions =
+    meta.progressContributions || seedProgressContributions(before.state, progressEpoch(meta));
+  validateProgressContributionsState(before.state, previousContributions, progressEpoch(meta));
+  const progressContributions = stampProgressContributions(
+    previousContributions,
+    before.state,
+    after.state,
+    {
+      epoch: progressEpoch(meta),
+      writerId: options.writerId || `${meta.deviceId}:${getProgressWriterId()}`,
+    },
+  );
+  if (
+    !changed.length &&
+    !hasGuideDelta(guideChange) &&
+    !resetDomains.length &&
+    progressContributions === previousContributions
+  ) {
     return metaValue || meta;
   }
 
@@ -497,6 +575,9 @@ export function stampSyncChanges(metaValue, before = {}, after = {}, options = {
     guideCounterEpochs,
     pendingReset,
     legacyAdopted: true,
+    progressContributions: resetsGuide
+      ? seedProgressContributions(after.state, clock.eventId)
+      : progressContributions,
   };
 }
 
@@ -532,6 +613,7 @@ export function buildRestoreSyncPayload(currentValue, restoredValue, ownerUserId
       guideCounterEpochs: hasGuide
         ? { [clock.deviceId]: resetClockForDomain(stamped, 'progress')?.eventId || '' }
         : {},
+      progressContributions: seedProgressContributions(restored.state, progressEpoch(stamped)),
     },
   };
 }
@@ -620,6 +702,7 @@ export function mergeSyncMetadata(leftValue, rightValue, deviceId = '') {
     if (winner.kind === 'deleted') tombstones[path] = winner.clock;
     else if (winner.kind === 'live') clocks[path] = winner.clock;
   }
+  const resetEpochs = mergeClockMap(left.resetEpochs, right.resetEpochs);
   return {
     ...left,
     version: SYNC_META_VERSION,
@@ -627,11 +710,16 @@ export function mergeSyncMetadata(leftValue, rightValue, deviceId = '') {
     revision: Math.max(left.revision, right.revision),
     clocks,
     tombstones,
-    resetEpochs: mergeClockMap(left.resetEpochs, right.resetEpochs),
+    resetEpochs,
     guideCounters: mergeCounterMaps(left, right),
     guideCounterClocks: mergeClockMap(left.guideCounterClocks, right.guideCounterClocks),
     guideCounterEpochs,
     legacyAdopted: !!(left.legacyAdopted || right.legacyAdopted),
+    progressContributions: mergeProgressContributions(
+      left.progressContributions,
+      right.progressContributions,
+      progressEpoch({ resetEpochs }),
+    ),
   };
 }
 
@@ -655,6 +743,10 @@ function domainForPath(path) {
 
 function resetClockForDomain(meta, domain) {
   return newerClock(meta?.resetEpochs?.[domain], meta?.resetEpochs?.factory);
+}
+
+export function progressEpoch(meta) {
+  return resetClockForDomain(meta, 'progress')?.eventId || '';
 }
 
 function clockRevision(clock) {
@@ -749,6 +841,11 @@ export function rebaseSyncReset(payloadValue, observedValue, resetDomains = []) 
 
   const resetEpochs = { ...meta.resetEpochs };
   for (const domain of domains) resetEpochs[domain] = resetClock;
+  const rebasedProgressEpoch = progressEpoch({ resetEpochs });
+  const changesProgressLineage = rebasedProgressEpoch !== progressEpoch(meta);
+  if (changesProgressLineage) hasPostResetMutation = true;
+  const guideTotalsAfterReset = guideTotals(payload.state?.guide);
+  const rebasedGuideClock = { [meta.deviceId]: postResetClock };
   return {
     ...payload,
     syncMeta: {
@@ -757,7 +854,16 @@ export function rebaseSyncReset(payloadValue, observedValue, resetDomains = []) 
       clocks,
       tombstones,
       resetEpochs,
-      guideCounterClocks,
+      guideCounterClocks: changesProgressLineage ? rebasedGuideClock : guideCounterClocks,
+      guideCounters: changesProgressLineage
+        ? { [meta.deviceId]: guideTotalsAfterReset }
+        : meta.guideCounters,
+      guideCounterEpochs: changesProgressLineage
+        ? { [meta.deviceId]: rebasedProgressEpoch }
+        : meta.guideCounterEpochs,
+      progressContributions: changesProgressLineage
+        ? seedProgressContributions(payload.state, rebasedProgressEpoch)
+        : meta.progressContributions,
       pendingReset: pendingReset
         ? {
             ...pendingReset,
@@ -966,6 +1072,7 @@ export function mergeSyncSidecar(localValue, cloudValue, mergedBase, deviceId = 
     ...next.state,
     guide: guideFromMeta(syncMeta, local.state?.guide, cloud.state?.guide, progressWinner),
   };
+  next.state = materializeProgressContributions(next.state, syncMeta.progressContributions);
   return { ...next, syncMeta };
 }
 

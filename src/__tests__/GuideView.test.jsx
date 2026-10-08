@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
@@ -176,7 +176,11 @@ describe('Guide gated walkthrough', () => {
     expect(setState).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Submit guide card' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Finish card' }));
+    const finish = screen.getByRole('button', { name: 'Finish card' });
+    act(() => {
+      fireEvent.click(finish);
+      fireEvent.click(finish);
+    });
     expect(await screen.findByRole('heading', { name: 'Path complete.' })).toBeTruthy();
     expect(setState).toHaveBeenCalledTimes(1);
 
@@ -184,6 +188,10 @@ describe('Guide gated walkthrough', () => {
     expect(recorded.guide.attempted).toBe(1);
     expect(recorded.guide.byStep.group.correct).toBe(0);
     expect(recorded.guide.recent[0].steps.group.correct).toBe(false);
+    const repeatEvaluation = setState.mock.calls[0][0](state);
+    expect(repeatEvaluation).toEqual(recorded);
+    expect(recorded.practiceStats.recent[0].id).toBe(recorded.guide.recent[0].id);
+    expect(setState.mock.calls[0][0](recorded)).toBe(recorded);
   });
 
   it('makes Skip reveal the answer and require an active correction', async () => {

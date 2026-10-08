@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { seedProgressContributions } from '../utils/progressContributions.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { PRACTICE_CATEGORIES } from '../data/practiceTaxonomy.js';
 import { buildSyncPayload, cardIdFor, defaultState } from '../utils/storage.js';
@@ -121,6 +122,7 @@ function highClockRemotePayload() {
         settings: remoteResetClock,
         'custom-content': remoteResetClock,
       },
+      progressContributions: seedProgressContributions(remote.state, remoteResetClock.eventId),
     },
   };
 }

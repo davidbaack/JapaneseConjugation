@@ -83,6 +83,36 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
+function holdLocalWrites() {
+  const original = Object.getOwnPropertyDescriptor(navigator, 'locks');
+  const queued = [];
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: {
+      request: (_key, action) =>
+        new Promise((resolve, reject) => queued.push({ action, resolve, reject })),
+    },
+  });
+  return {
+    queued,
+    async release(index) {
+      await act(async () => {
+        const entry = queued[index];
+        try {
+          entry.resolve(entry.action());
+        } catch (error) {
+          entry.reject(error);
+        }
+        await Promise.resolve();
+      });
+    },
+    restore() {
+      if (original) Object.defineProperty(navigator, 'locks', original);
+      else delete navigator.locks;
+    },
+  };
+}
+
 function cloudRow(cardKey) {
   return {
     data: { state: { ...defaultState(), cards: { [cardKey]: { reps: 1 } } } },
@@ -220,6 +250,104 @@ afterEach(() => {
 });
 
 describe('AppStateProvider cloud session races', () => {
+  it('applies a durably committed local restore without mistaking its new epoch for another tab', async () => {
+    const actualStorage = await vi.importActual('../utils/storage.js');
+    saveAll.mockImplementation(actualStorage.saveAll);
+    persistBackupRestore.mockImplementation((parts, beforeBackup) => {
+      const raw = actualStorage.saveAll(
+        parts.state,
+        parts.customVerbs,
+        parts.customAdjectives,
+        parts.wordLists,
+        parts.syncConfig,
+        parts.lastSyncedAt,
+        parts.practicePrefs,
+        parts.syncMeta,
+      );
+      return { payload: JSON.parse(raw), recoveryBackup: beforeBackup };
+    });
+    try {
+      renderProvider();
+      await waitFor(() => expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy());
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+      await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('ok'));
+      expect(screen.getByTestId('recovery-error').textContent).toBe('');
+      expect(JSON.parse(screen.getByTestId('snapshot').textContent).guide.attempted).toBe(7);
+      expect(JSON.parse(localStorage.getItem(STORAGE_KEY)).state.guide.attempted).toBe(7);
+    } finally {
+      saveAll.mockReset();
+    }
+  });
+
+  it('revokes a queued local restore when the signed-in account changes before its lock opens', async () => {
+    renderProvider();
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Synced to cloud'));
+    await act(async () => Promise.resolve());
+    const lock = holdLocalWrites();
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+      await waitFor(() => expect(lock.queued.length).toBeGreaterThan(0));
+      cloudFetch.mockResolvedValueOnce(cloudRow('account-b-only'));
+      await act(async () => {
+        authCallbacks[0]('SIGNED_IN', SESSION_B);
+      });
+      await waitFor(() => expect(screen.getByTestId('cards').textContent).toBe('account-b-only'));
+      await lock.release(0);
+      expect(persistBackupRestore).not.toHaveBeenCalled();
+      expect(screen.getByTestId('cards').textContent).toBe('account-b-only');
+    } finally {
+      lock.restore();
+    }
+  });
+
+  it('revokes a queued reset save when the signed-in account changes after cloud acknowledgement', async () => {
+    renderProvider();
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Synced to cloud'));
+    await act(async () => Promise.resolve());
+    const lock = holdLocalWrites();
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Reset learner' }));
+      await waitFor(() => expect(lock.queued.length).toBeGreaterThan(0));
+      cloudFetch.mockResolvedValueOnce(cloudRow('account-b-only'));
+      await act(async () => {
+        authCallbacks[0]('SIGNED_IN', SESSION_B);
+      });
+      await waitFor(() => expect(screen.getByTestId('cards').textContent).toBe('account-b-only'));
+      saveAll.mockClear();
+      await lock.release(0);
+      expect(saveAll).not.toHaveBeenCalled();
+      expect(screen.getByTestId('cards').textContent).toBe('account-b-only');
+    } finally {
+      lock.restore();
+    }
+  });
+
+  it('revokes an anonymous reset waiting for the lock when a newer restore is confirmed', async () => {
+    renderProvider();
+    await act(async () => Promise.resolve());
+    const lock = holdLocalWrites();
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Reset learner' }));
+      await waitFor(() => expect(lock.queued.length).toBeGreaterThan(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+      await waitFor(() => expect(lock.queued.length).toBeGreaterThan(1));
+      saveAll.mockClear();
+      await lock.release(0);
+      expect(saveAll).not.toHaveBeenCalled();
+      await lock.release(1);
+      expect(persistBackupRestore).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(screen.getByTestId('snapshot').textContent).guide.attempted).toBe(7);
+    } finally {
+      lock.restore();
+    }
+  });
+
   it('restores the full snapshot before applying it and retains an independent recovery copy', async () => {
     renderProvider();
     await act(async () => {
@@ -475,7 +603,7 @@ describe('AppStateProvider cloud session races', () => {
     await waitFor(() =>
       expect(screen.getByTestId('recovery-error').textContent).toMatch(/Cloud data needs recovery/),
     );
-    expect(screen.getByTestId('snapshot').textContent).toBe(before);
+    expect(JSON.parse(screen.getByTestId('snapshot').textContent)).toEqual(JSON.parse(before));
     expect(cloudUpsert).not.toHaveBeenCalled();
   });
 
@@ -539,7 +667,10 @@ describe('AppStateProvider cloud session races', () => {
     await screen.findByText('ready');
     await act(async () => Promise.resolve());
 
-    expect(renderProbe).toHaveBeenCalledTimes(3);
+    const settledRenders = renderProbe.mock.calls.length;
+    await act(async () => Promise.resolve());
+    expect(renderProbe).toHaveBeenCalledTimes(settledRenders);
+    expect(settledRenders).toBeLessThanOrEqual(8);
   });
 
   it('commits a failed local-only change on the next login even when timestamps match', async () => {

@@ -29,6 +29,10 @@ confirms the new direction, update this document in the same change.
   recommendation. It does not frame progress around daily goals, scheduled
   reviews, or completed sessions. Accuracy always appears with its attempt
   count, and one or two attempts are explicitly labeled as an early estimate.
+- Each distinct answer counts once across tabs and devices. Retried uploads do
+  not add attempts. Ordinary tab activity merges automatically; a stale tab
+  pauses after a restore, reset, or account replacement. Existing historical
+  counts are preserved conservatively rather than inventing missing answers.
 - Learn teaches forms and verb/adjective groups from start to finish through
   three collapsed tracks and one searchable lesson index. Practice topics and
   Learn lessons use the same exact-form taxonomy. Semantically related lessons
@@ -187,7 +191,7 @@ confirms the new direction, update this document in the same change.
   file before explicit replacement, secures a before-restore recovery copy,
   confirms durable local saving, then reports cloud completion separately.
   Invalid or unsupported saved data pauses writes and displays recovery guidance.
-  Editing pasted backup text invalidates its confirmation preview.
+  Editing pasted backup text invalidates its confirmation preview. Unreadable saved data can be downloaded with its pending saves for recovery before choosing a replacement; valid local data can still be exported while cloud sync needs recovery.
 
 ## Learning Defaults
 

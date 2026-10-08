@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { buildBackup, serializeBackup, parseBackup, BACKUP_VERSION } from '../utils/backup.js';
-import { cardIdFor, defaultState, gradeCard, mergeState } from '../utils/storage.js';
+import {
+  cardIdFor,
+  defaultState,
+  gradeCard,
+  gradeTransformationStats,
+  mergeState,
+} from '../utils/storage.js';
+import { mergeMinimalPairProgress, recordMinimalPairResult } from '../utils/minimalPairs.js';
 import { makeLearnerSnapshot, makeLegacyV42Backup } from './fixtures/learnerSnapshot.js';
 
 const roundTrip = () => parseBackup(serializeBackup(makeLearnerSnapshot()));
@@ -32,6 +39,32 @@ describe('complete versioned backup', () => {
     });
     expect(restored.warnings).toEqual([]);
   });
+  it('round trips committed Transform and Minimal Pair identities without dropping replay evidence', () => {
+    const parts = makeLearnerSnapshot();
+    parts.state.transformation = gradeTransformationStats(parts.state.transformation, {
+      correct: true,
+      sourceType: 'dictionary',
+      targetType: 'plain-past',
+      eventId: 'transform-answer',
+      now: 1000,
+    });
+    parts.state.minimalPairs = recordMinimalPairResult(
+      parts.state.minimalPairs,
+      'ichidan-godan-ru',
+      { dict: '食べる', reading: 'たべる', group: 'ichidan', meaning: 'eat' },
+      'plain-past',
+      true,
+      { eventId: 'minimal-pair-answer', now: 1000 },
+    );
+    const restored = parseBackup(serializeBackup(parts));
+    expect(restored.ok, restored.error).toBe(true);
+    expect(restored.data.state.transformation.lastAttemptId).toBe('transform-answer');
+    expect(
+      mergeMinimalPairProgress({}, restored.data.state.minimalPairs).bySet['ichidan-godan-ru']
+        .lastAttemptId,
+    ).toBe('minimal-pair-answer');
+  });
+
   it('round trips current adjective and noun word identities in both supported formats', () => {
     const parts = makeLearnerSnapshot();
     for (const word of [

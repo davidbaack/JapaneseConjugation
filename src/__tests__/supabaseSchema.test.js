@@ -25,6 +25,46 @@ function compactSql(sql) {
   return sql.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
+describe('concurrent progress protocol rollout', () => {
+  const sql = compactSql(
+    readFileSync(
+      new URL(
+        '../../supabase/migrations/20261008123000_return_sync_conflicts_promptly.sql',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  it('returns business conflicts promptly without the PostgREST serialization retry code', () => {
+    expect(sql).toContain("raise exception 'sync_revision_conflict' using errcode = 'pt409'");
+    expect(sql).toContain("raise exception 'sync_revision_must_advance' using errcode = 'pt409'");
+    expect(sql).not.toContain("errcode = '40001'");
+    expect(sql).toContain('security invoker');
+    expect(sql).toContain('learner_id::text <> expected_user_id');
+    expect(sql).toContain('where id = learner_id and revision = expected_revision');
+  });
+  it('retains protocol downgrade and required evidence guards for inserted and updated rows', () => {
+    const rollout = compactSql(
+      readFileSync(
+        new URL(
+          '../../supabase/migrations/20261008120000_protect_progress_contributions.sql',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    );
+    expect(rollout).toContain('before insert or update on public.srs_sync');
+    for (const message of [
+      'sync_client_upgrade_required',
+      'sync_progress_metadata_required',
+      'sync_protocol_downgrade_rejected',
+    ])
+      expect(sql).toContain(message);
+    expect(sql).toContain("'{syncmeta,progresscontributions,version}' is distinct from '1'::jsonb");
+    expect(sql).toContain("if tg_op = 'insert' then return new;");
+  });
+});
+
 describe('Supabase cloud sync schema', () => {
   const migrationSql = loadSyncMigration();
   const sql = compactSql(migrationSql);

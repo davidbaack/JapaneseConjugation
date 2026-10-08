@@ -18,10 +18,9 @@ import {
   mergeState,
   buildSyncPayload,
   mergeSyncPayload,
-  saveAll,
   pruneAICache,
   normalizeWordLists,
-  assertCurrentStorageEpoch,
+  acceptCurrentStorageSnapshot,
   getRecoveryBackup,
 } from '../utils/storage.js';
 import {
@@ -33,7 +32,14 @@ import {
   stripPendingSyncReset,
   buildRestoreSyncPayload,
   pendingSyncResetIntent,
+  progressEpoch,
 } from '../utils/syncMetadata.js';
+import {
+  assertCompatibleLocalSnapshot,
+  persistLocalSnapshot,
+  sameLocalLineage,
+  withLearnerStorageLock,
+} from '../utils/localPersistence.js';
 import { validateLearnerBundle } from '../utils/learnerStateValidation.js';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
 import { getJapaneseVoices } from '../utils/speech.js';
@@ -118,7 +124,9 @@ function useAppController() {
     message: '',
   });
   const [practicePrefs, setPracticePrefs] = useState(DEFAULT_PREFS);
-  const [syncMeta, setSyncMeta] = useState(() => createSyncMeta(getLocalSyncDeviceId()));
+  const [syncMeta, setSyncMeta] = useState(
+    () => adoptSyncMetadata({ state: defaultState() }, getLocalSyncDeviceId()).syncMeta,
+  );
   const [session, setSession] = useState(null);
   // A focused Practice launch requested by another view; consumed by Study.
   const [studyFocus, setStudyFocus] = useState(null);
@@ -150,6 +158,7 @@ function useAppController() {
   const latestSyncPayloadRef = useRef(null);
   const previousLocalPayloadRef = useRef(null);
   const incomingSyncMetaRef = useRef(null);
+  const incomingSyncBaseRef = useRef(null);
   const diagnosticRepairPendingRef = useRef(false);
   const authEventVersionRef = useRef(0);
   const activeAuthUserIdRef = useRef('');
@@ -157,22 +166,31 @@ function useAppController() {
   const restoreInFlightRef = useRef(false);
   const staleTabRef = useRef(false);
   const cloudRecoveryUserIdRef = useRef('');
+  const replacementEpochRef = useRef(null);
+  const storageEventHandlerRef = useRef(null);
+  const forceCloudPushRef = useRef(false);
 
   useLayoutEffect(() => {
-    const payload = buildSyncPayload({
-      state,
-      customVerbs,
-      customAdjectives,
-      wordLists,
-      practicePrefs,
-      syncMeta,
-    });
+    const payload = {
+      ...buildSyncPayload({
+        state,
+        customVerbs,
+        customAdjectives,
+        wordLists,
+        practicePrefs,
+        syncMeta,
+      }),
+      localOwnerUserId: syncOwnerUserId,
+    };
     if (incomingSyncMetaRef.current) {
       const incoming = incomingSyncMetaRef.current;
+      const incomingBase = incomingSyncBaseRef.current;
       incomingSyncMetaRef.current = null;
-      previousLocalPayloadRef.current = { ...payload, syncMeta: incoming };
-      latestSyncPayloadRef.current = { ...payload, syncMeta: incoming };
-      if (incoming !== syncMeta) setSyncMeta(incoming);
+      incomingSyncBaseRef.current = null;
+      const stamped = incomingBase ? stampSyncChanges(incoming, incomingBase, payload) : incoming;
+      previousLocalPayloadRef.current = { ...payload, syncMeta: stamped };
+      latestSyncPayloadRef.current = { ...payload, syncMeta: stamped };
+      if (stamped !== syncMeta) setSyncMeta(stamped);
       return;
     }
     const previous = previousLocalPayloadRef.current;
@@ -180,7 +198,7 @@ function useAppController() {
     previousLocalPayloadRef.current = { ...payload, syncMeta: nextMeta };
     latestSyncPayloadRef.current = { ...payload, syncMeta: nextMeta };
     if (nextMeta !== syncMeta) setSyncMeta(nextMeta);
-  }, [state, customVerbs, customAdjectives, wordLists, practicePrefs, syncMeta]);
+  }, [state, customVerbs, customAdjectives, wordLists, practicePrefs, syncMeta, syncOwnerUserId]);
 
   function currentSyncPayload() {
     return (
@@ -197,13 +215,19 @@ function useAppController() {
   }
 
   function learnerPayloadSignature(payload) {
-    return JSON.stringify([
-      payload.state,
-      payload.customVerbs,
-      payload.customAdjectives,
-      payload.wordLists,
-      payload.practicePrefs,
-    ]);
+    return JSON.stringify(
+      [
+        payload.state,
+        payload.customVerbs,
+        payload.customAdjectives,
+        payload.wordLists,
+        payload.practicePrefs,
+      ],
+      (_key, value) =>
+        value && typeof value === 'object' && !Array.isArray(value)
+          ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+          : value,
+    );
   }
 
   async function commitCloudWithRetry(payload, userId, options = {}) {
@@ -302,7 +326,8 @@ function useAppController() {
   function currentTabCanWrite() {
     if (staleTabRef.current) return false;
     try {
-      assertCurrentStorageEpoch();
+      if (persistenceBlocked && !staleTabRef.current) return true;
+      assertCompatibleLocalSnapshot(currentSyncPayload(), syncOwnerUserId);
       return true;
     } catch {
       blockStaleTab();
@@ -313,6 +338,47 @@ function useAppController() {
   function applySyncPayload(payload) {
     if (!payload) return { payload, repaired: false };
     validateLearnerBundle(payload);
+    const incomingSignature = learnerPayloadSignature(payload);
+    const incomingNeedsRepair =
+      !!payload.diagnosticRepairNeeded ||
+      (payload.syncMeta?.version !== 2 &&
+        !!payload.state &&
+        reconcileDerivedProgressState(payload.state).repaired);
+    const current = currentSyncPayload();
+    const targetOwner = activeAuthUserIdRef.current || syncOwnerUserId;
+    const ownerMatches = !syncOwnerUserId || syncOwnerUserId === targetOwner;
+    if (ownerMatches && current?.state && current.syncMeta) {
+      const incoming = payload;
+      payload = mergeSyncPayload(current, incoming, {
+        userId: targetOwner,
+        skipPendingResetRebase: true,
+      });
+      const pending = pendingSyncResetIntent(current);
+      const incomingPending = pendingSyncResetIntent(incoming);
+      if (
+        pending &&
+        incomingPending?.eventId === pending.eventId &&
+        incomingPending.ownerUserId &&
+        !pending.ownerUserId
+      ) {
+        payload = { ...payload, syncMeta: { ...payload.syncMeta, pendingReset: incomingPending } };
+      }
+      if (
+        pending &&
+        !pendingSyncResetIntent(incoming) &&
+        progressEpoch(current.syncMeta) === progressEpoch(incoming.syncMeta) &&
+        learnerPayloadSignature(payload) === learnerPayloadSignature(incoming)
+      ) {
+        payload = incoming;
+      }
+    }
+    const from = progressEpoch(current?.syncMeta);
+    const to = progressEpoch(payload.syncMeta);
+    if (from !== to || !ownerMatches) {
+      replacementEpochRef.current = { from, to, owner: syncOwnerUserId };
+      if (!ownerMatches) setSyncOwnerUserId(targetOwner);
+    }
+    validateLearnerBundle(payload);
     const localPayload = adoptSyncMetadata(payload, getLocalSyncDeviceId());
     const repair = localPayload.state
       ? reconcileDerivedProgressState(localPayload.state)
@@ -321,7 +387,8 @@ function useAppController() {
       ? { ...localPayload, state: repair.state }
       : localPayload;
     if (normalizedPayload.syncMeta) incomingSyncMetaRef.current = normalizedPayload.syncMeta;
-    if (repair.repaired) diagnosticRepairPendingRef.current = true;
+    if (repair.repaired || localPayload.diagnosticRepairNeeded || incomingNeedsRepair)
+      diagnosticRepairPendingRef.current = true;
     let appliedState = normalizedPayload.state;
     if (normalizedPayload.state) {
       appliedState = mergeState(normalizedPayload.state);
@@ -354,19 +421,30 @@ function useAppController() {
       customAdjectives: appliedCustomAdjectives,
       wordLists: appliedWordLists,
       practicePrefs: appliedPracticePrefs,
+      localOwnerUserId: targetOwner,
     };
     latestSyncPayloadRef.current = appliedPayload;
+    if (
+      activeAuthUserIdRef.current &&
+      learnerPayloadSignature(appliedPayload) !== incomingSignature
+    )
+      forceCloudPushRef.current = true;
+    incomingSyncBaseRef.current = appliedPayload;
     return {
       payload: appliedPayload,
-      repaired: repair.repaired,
+      repaired: repair.repaired || !!localPayload.diagnosticRepairNeeded || incomingNeedsRepair,
     };
   }
 
   function applyLearnerResetPayload(payload, syncedAt = null) {
     if (!payload) return;
-    latestSyncPayloadRef.current = payload;
+    latestSyncPayloadRef.current = {
+      ...payload,
+      localOwnerUserId: activeAuthUserIdRef.current || syncOwnerUserId,
+    };
     previousLocalPayloadRef.current = payload;
     if (payload.syncMeta) incomingSyncMetaRef.current = payload.syncMeta;
+    incomingSyncBaseRef.current = payload;
     if (typeof syncedAt === 'number') lastSyncedAtRef.current = syncedAt;
     setState(payload.state || defaultState());
     setCustomVerbs(Array.isArray(payload.customVerbs) ? payload.customVerbs : []);
@@ -382,17 +460,26 @@ function useAppController() {
     } catch {}
   }
 
-  function saveResetPayload(payload, syncedAt = null, ownerUserId = syncOwnerUserId) {
+  async function saveResetPayload(payload, syncedAt = null, ownerUserId = syncOwnerUserId) {
     const nextSyncedAt = typeof syncedAt === 'number' ? syncedAt : lastSyncedAtRef.current;
-    saveAll(
-      payload.state,
-      payload.customVerbs,
-      payload.customAdjectives,
-      payload.wordLists,
-      { enabled: !!session, userId: ownerUserId },
-      nextSyncedAt,
-      payload.practicePrefs,
-      payload.syncMeta,
+    const expectedEpoch = progressEpoch(currentSyncPayload()?.syncMeta);
+    const generation = syncGenerationRef.current;
+    const authOwner = activeAuthUserIdRef.current;
+    return persistLocalSnapshot(
+      {
+        ...payload,
+        syncConfig: { enabled: !!session, userId: ownerUserId },
+        lastSyncedAt: nextSyncedAt,
+      },
+      {
+        replace: true,
+        expectedEpoch,
+        expectedOwnerUserId: currentSyncPayload()?.localOwnerUserId || '',
+        shouldCommit: () =>
+          generation === syncGenerationRef.current &&
+          activeAuthUserIdRef.current === authOwner &&
+          !staleTabRef.current,
+      },
     );
   }
 
@@ -409,7 +496,7 @@ function useAppController() {
         if (local.syncMeta) incomingSyncMetaRef.current = local.syncMeta;
         if (local.state) {
           const repair = reconcileDerivedProgressState(local.state);
-          diagnosticRepairPendingRef.current = repair.repaired;
+          diagnosticRepairPendingRef.current = repair.repaired || !!local.diagnosticRepairNeeded;
           setState(mergeState(repair.state));
         }
         if (Array.isArray(local.customVerbs)) setCustomVerbs(local.customVerbs);
@@ -438,15 +525,38 @@ function useAppController() {
     setHydrated(true);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onStorage = (event) => {
       if (event.storageArea && event.storageArea !== localStorage) return;
-      if (event.key === null || (event.key === STORAGE_KEY && event.oldValue !== event.newValue)) {
+      if (event.key === null) {
         blockStaleTab();
+        return;
+      }
+      const ordinary = event.key === STORAGE_KEY && event.oldValue !== event.newValue;
+      const pending = event.key?.startsWith(`${STORAGE_KEY}:pending:`) && event.newValue;
+      if (!ordinary && !pending) return;
+      try {
+        const external = loadAll();
+        const current = { ...currentSyncPayload(), syncConfig: { userId: syncOwnerUserId } };
+        if (!external || !sameLocalLineage(current, external)) {
+          if (ordinary) blockStaleTab();
+          return;
+        }
+        acceptCurrentStorageSnapshot();
+        applySyncPayload(external);
+      } catch (error) {
+        setPersistenceBlocked(true);
+        setDataRecoveryError(
+          `Saved data needs recovery. It has been kept unchanged. ${error.message}`,
+        );
       }
     };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    storageEventHandlerRef.current = onStorage;
+  });
+  useEffect(() => {
+    const listener = (event) => storageEventHandlerRef.current?.(event);
+    window.addEventListener('storage', listener);
+    return () => window.removeEventListener('storage', listener);
   }, []);
 
   // Keep the SDK out of local-only startup. A stored auth session (or OAuth
@@ -717,6 +827,9 @@ function useAppController() {
     lastSyncedAtRef,
     setSyncStatus,
     applySyncPayload,
+    getCurrentSyncPayload: currentSyncPayload,
+    replacementEpochRef,
+    forceCloudPushRef,
   });
 
   useEffect(() => {
@@ -850,6 +963,8 @@ function useAppController() {
     ) {
       throw new Error("Wait for this account's cloud restore before resetting learner data.");
     }
+    const resetGeneration = ++syncGenerationRef.current;
+    const resetAuthOwner = activeAuthUserIdRef.current;
     const payload = buildLearnerResetPayload(
       { state, customVerbs, customAdjectives, wordLists, practicePrefs, syncMeta },
       kind,
@@ -858,7 +973,10 @@ function useAppController() {
     const writesCloud = !!(session?.user && supabase);
     const resetUserId = writesCloud ? session.user.id : '';
     const resetStillCurrent = () =>
-      currentTabCanWrite() && (!writesCloud || activeAuthUserIdRef.current === resetUserId);
+      resetGeneration === syncGenerationRef.current &&
+      activeAuthUserIdRef.current === resetAuthOwner &&
+      !staleTabRef.current &&
+      (!writesCloud || activeAuthUserIdRef.current === resetUserId);
     if (writesCloud) {
       setSyncStatus({ kind: 'syncing', message: 'Saving reset to cloud...', at: null });
     }
@@ -933,10 +1051,11 @@ function useAppController() {
     );
     const beforeBackupJson = persistenceBlocked ? null : serializeBackup(before);
     const generation = ++syncGenerationRef.current;
-    const restoreStillCurrent = () =>
+    const restoreOwnsOperation = () =>
       generation === syncGenerationRef.current &&
       activeAuthUserIdRef.current === userId &&
-      currentTabCanWrite();
+      !staleTabRef.current;
+    const restoreStillCurrent = () => restoreOwnsOperation() && currentTabCanWrite();
     restoreInFlightRef.current = true;
     setRestoreBusy(true);
     setRestoreStatus({
@@ -946,14 +1065,21 @@ function useAppController() {
     });
 
     try {
-      const persisted = persistBackupRestore(
-        {
-          ...replacement,
-          syncConfig: { enabled: !!userId, userId: userId || syncOwnerUserId },
-          lastSyncedAt: 0,
-        },
-        beforeBackupJson,
-      );
+      const persisted = await withLearnerStorageLock(() => {
+        if (!restoreStillCurrent())
+          throw Object.assign(new Error('A newer account or operation superseded this restore.'), {
+            code: 'SYNC_SUPERSEDED',
+          });
+        return persistBackupRestore(
+          {
+            ...replacement,
+            syncConfig: { enabled: !!userId, userId: userId || syncOwnerUserId },
+            lastSyncedAt: 0,
+          },
+          beforeBackupJson,
+        );
+      });
+      if (!restoreOwnsOperation()) return { cloud: false, pending: true, stale: true };
       const recovery = persisted.recoveryBackup;
       setRecoveryBackup(recovery);
       lastSyncedAtRef.current = 0;
@@ -978,8 +1104,11 @@ function useAppController() {
         });
         if (!restoreStillCurrent()) return { cloud: false, pending: true, stale: true };
         const at = cloudCommitTimestamp(committed);
-        saveResetPayload(committed.payload, at, userId);
-        applyLearnerResetPayload(committed.payload, at);
+        const saved = await saveResetPayload(committed.payload, at, userId);
+        if (!restoreOwnsOperation()) return { cloud: false, pending: true, stale: true };
+        if (learnerPayloadSignature(saved) !== learnerPayloadSignature(committed.payload))
+          forceCloudPushRef.current = true;
+        applyLearnerResetPayload(saved, at);
         markCloudReady(userId);
         setRestoreStatus({
           kind: 'ok',
@@ -1179,6 +1308,7 @@ function useAppController() {
     restoreBackup,
     recoveryBackup,
     dataRecoveryError,
+    localPersistenceBlocked: persistenceBlocked,
     restoreBusy,
     restoreStatus,
     activeGeminiKey,

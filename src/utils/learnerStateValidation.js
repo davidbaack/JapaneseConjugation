@@ -1,5 +1,7 @@
 import { ALL_CARD_TYPES } from '../data/conjugationTypes.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { validateProgressContributionsState } from './progressContributions.js';
+import { progressEpoch } from './syncMetadata.js';
 
 const TYPE_IDS = new Set(['dictionary', ...ALL_CARD_TYPES.map((type) => type.id)]);
 const STRING_KEYS = new Set([
@@ -494,6 +496,15 @@ export function validateBackupContent(data, options = {}) {
 export function validateLearnerBundle(data) {
   requireValue(isRecord(data), 'Saved learner data', 'an object');
   validateLearnerState(data.state);
+  if (data.syncMeta) {
+    requireValue([1, 2].includes(data.syncMeta.version), 'Sync metadata', 'a supported protocol');
+    if (data.syncMeta.version === 2)
+      validateProgressContributionsState(
+        data.state,
+        data.syncMeta.progressContributions,
+        progressEpoch(data.syncMeta),
+      );
+  }
   validateBackupContent(
     {
       ...data,

@@ -1,9 +1,10 @@
 import { ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
 import { topicForPracticeType } from './practiceSelection.js';
+import { createSyncEventId } from './syncMetadata.js';
 
 const TYPE_BY_ID = new Map(ALL_CARD_TYPES.map((type) => [type.id, type]));
 
-function dateKey(timestamp = Date.now()) {
+export function practiceDateKey(timestamp = Date.now()) {
   const date = new Date(timestamp);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -83,7 +84,9 @@ export function recordPracticeAnswer(stats, answer) {
   const mode = String(answer?.mode || 'input');
   const correct = !!answer?.correct;
   const responseMs = Math.max(0, Number(answer?.responseMs) || 0);
-  const day = dateKey(at);
+  const day = String(answer?.day || practiceDateKey(at));
+  const id = String(answer?.id || answer?.eventId || createSyncEventId());
+  if (current.recent.some((row) => row.id === id)) return current;
   return {
     ...current,
     startedAt: current.startedAt || at,
@@ -98,7 +101,9 @@ export function recordPracticeAnswer(stats, answer) {
     },
     recent: [
       {
+        id,
         at,
+        day,
         typeId,
         topicId: topicForPracticeType(typeId)?.id || '',
         correct,
@@ -131,8 +136,10 @@ export function mergePracticeStats(local, cloud) {
   const days = new Set([...Object.keys(left.byDate), ...Object.keys(right.byDate)]);
   const recentByKey = new Map();
   for (const row of [...left.recent, ...right.recent]) {
-    const key = `${row.at}|${row.typeId}|${row.mode}|${row.correct}`;
-    if (!recentByKey.has(key)) recentByKey.set(key, row);
+    const key =
+      row.id || `${row.at}|${row.typeId}|${row.mode}|${row.correct}|${row.responseMs || 0}`;
+    const previous = recentByKey.get(key);
+    if (!previous || JSON.stringify(row) > JSON.stringify(previous)) recentByKey.set(key, row);
   }
   const starts = [left.startedAt, right.startedAt].filter((value) => value > 0);
   return {
@@ -147,7 +154,9 @@ export function mergePracticeStats(local, cloud) {
     byDate: Object.fromEntries(
       [...days].map((day) => [day, mergeTotals(left.byDate[day], right.byDate[day])]),
     ),
-    recent: [...recentByKey.values()].sort((a, b) => b.at - a.at).slice(0, 120),
+    recent: [...recentByKey.values()]
+      .sort((a, b) => b.at - a.at || String(b.id || '').localeCompare(String(a.id || '')))
+      .slice(0, 120),
   };
 }
 
@@ -213,7 +222,7 @@ export function practiceTrendDays(stats, count = 14, now = Date.now()) {
     const date = new Date(now);
     date.setHours(12, 0, 0, 0);
     date.setDate(date.getDate() - offset);
-    const key = dateKey(date.getTime());
+    const key = practiceDateKey(date.getTime());
     const totals = normalizeTotals(normalized.byDate[key]);
     rows.push({
       key,

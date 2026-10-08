@@ -431,6 +431,8 @@ export function buildGuideDiagnosticInsight(guide = null, options = {}) {
 
 export function recordGuideAttempt(guide, card, result, options = {}) {
   const current = normalizeGuideState(guide);
+  const eventId = String(options.eventId || options.id || createSyncEventId());
+  if (current.recent.some((attempt) => attempt.id === eventId)) return current;
   const byStep = { ...current.byStep };
   for (const id of GUIDE_STEP_IDS) {
     const step = result.steps[id];
@@ -448,7 +450,7 @@ export function recordGuideAttempt(guide, card, result, options = {}) {
     byStep,
     recent: [
       {
-        id: options.eventId || createSyncEventId(),
+        id: eventId,
         at: options.now || Date.now(),
         wordKey: wordKey(card.word),
         group: card.word?.group || '',
@@ -473,6 +475,8 @@ export function recordGuideAttempt(guide, card, result, options = {}) {
 }
 
 export function applyGuideAttemptToState(state, card, result, options = {}) {
+  const eventId = String(options.eventId || options.id || createSyncEventId());
+  if ((state.guide?.recent || []).some((attempt) => attempt.id === eventId)) return state;
   const rid = cardIdFor(card.word, card.typeId);
   const responseMs = Math.max(0, Number(options.responseMs) || 0);
   const gradedAt = Number(options.now) || Date.now();
@@ -480,14 +484,28 @@ export function applyGuideAttemptToState(state, card, result, options = {}) {
     ...state,
     cards: {
       ...(state.cards || {}),
-      [rid]: gradeCard((state.cards || {})[rid], result.correct, gradedAt),
+      [rid]: {
+        ...gradeCard((state.cards || {})[rid], result.correct, gradedAt),
+        lastAttemptId: eventId,
+      },
     },
     session: {
       ...(state.session || defaultState().session),
       reviewed: (state.session?.reviewed || 0) + 1,
       correct: (state.session?.correct || 0) + (result.correct ? 1 : 0),
+      recentOutcomes: [
+        {
+          id: eventId,
+          at: gradedAt,
+          cardId: rid,
+          kind: result.correct ? 'correct' : 'missed',
+          label: getTypeInfo(card.typeId).label || 'Practice card',
+        },
+        ...(state.session?.recentOutcomes || []),
+      ].slice(0, 6),
     },
     practiceStats: recordPracticeAnswer(state.practiceStats, {
+      id: eventId,
       typeId: card.typeId,
       correct: result.correct,
       responseMs,
@@ -498,14 +516,18 @@ export function applyGuideAttemptToState(state, card, result, options = {}) {
       correct: result.correct,
       responseMs,
       answerMode: result.assisted ? 'self-check' : 'input',
+      now: gradedAt,
+      eventId,
     }),
     weakness: recordWeaknessAttempt(state.weakness, {
       word: card.word,
       typeId: card.typeId,
       correct: result.correct,
       responseMs,
+      now: gradedAt,
+      eventId,
     }),
-    guide: recordGuideAttempt(state.guide, card, result, { now: gradedAt }),
+    guide: recordGuideAttempt(state.guide, card, result, { now: gradedAt, eventId }),
   };
   if (!result.correct) {
     next.mistakes = recordMistake(
@@ -516,6 +538,8 @@ export function applyGuideAttemptToState(state, card, result, options = {}) {
       result.steps.answer.submitted,
       card.expectedAnswer,
       {
+        now: gradedAt,
+        eventId,
         dimension: 'guide',
         sourceType: card.sourceTypeId,
         targetType: card.typeId,

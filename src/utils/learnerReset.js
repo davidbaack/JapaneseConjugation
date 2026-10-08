@@ -103,7 +103,7 @@ export function buildLearnerResetPayload(parts = {}, kind, options = {}) {
  *   writeCloud?: ((payload: any, options?: any) => Promise<any>) | null,
  *   shouldCommit?: (() => boolean) | null,
  *   applyLocal?: ((payload: any, syncedAt: number | null) => void) | null,
- *   saveLocal?: ((payload: any, syncedAt: number | null) => void) | null,
+ *   saveLocal?: ((payload: any, syncedAt: number | null) => any) | null,
  * }} [options]
  */
 export async function commitLearnerResetPayload({
@@ -135,8 +135,12 @@ export async function commitLearnerResetPayload({
     }
   }
 
-  if (saveLocal) saveLocal(committedPayload, syncedAt);
-  if (applyLocal) applyLocal(committedPayload, syncedAt);
+  if (saveLocal) {
+    const saved = await saveLocal(committedPayload, syncedAt);
+    if (saved?.state) committedPayload = saved;
+  }
+  if (shouldCommit && !shouldCommit()) return { cloud: writesCloud, at: syncedAt, stale: true };
+  if (applyLocal) await applyLocal(committedPayload, syncedAt);
 
   return { cloud: writesCloud, at: syncedAt };
 }

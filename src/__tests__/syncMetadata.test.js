@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { seedProgressContributions } from '../utils/progressContributions.js';
 import { buildLearnerResetPayload } from '../utils/learnerReset.js';
 import { buildSyncPayload, defaultState, mergeSyncPayload } from '../utils/storage.js';
 import {
@@ -109,6 +110,10 @@ describe('sync metadata convergence', () => {
       const resetClock = { deviceId: 'device-cloud', revision: 80, eventId: 'older-cloud-reset' };
       remote.syncMeta.revision = 81;
       remote.syncMeta.resetEpochs = { factory: resetClock, progress: resetClock };
+      remote.syncMeta.progressContributions = seedProgressContributions(
+        remote.state,
+        resetClock.eventId,
+      );
       remote.syncMeta.guideCounterClocks.legacy = { ...resetClock, revision: 81 };
       const replacement = buildRestoreSyncPayload(
         current,
@@ -391,11 +396,15 @@ describe('sync metadata convergence', () => {
     const baselineA = adopt({}, 'device-a');
     const baselineB = { ...baselineA, syncMeta: { ...baselineA.syncMeta, deviceId: 'device-b' } };
     const a = change(baselineA, {
-      customVerbs: [{ kind: 'verb', group: 'ichidan', dict: '食べる', reading: 'たべる' }],
+      customVerbs: [
+        { kind: 'verb', group: 'ichidan', dict: '食べる', reading: 'たべる', meaning: 'to eat' },
+      ],
       wordLists: [{ id: 'mine', name: 'Mine', wordKeys: ['word-a'] }],
     });
     const b = change(baselineB, {
-      customVerbs: [{ kind: 'verb', group: 'godan', dict: '書く', reading: 'かく' }],
+      customVerbs: [
+        { kind: 'verb', group: 'godan', dict: '書く', reading: 'かく', meaning: 'to write' },
+      ],
       wordLists: [{ id: 'mine', name: 'Mine', wordKeys: ['word-b'] }],
     });
     const merged = mergeSyncPayload(a, b);

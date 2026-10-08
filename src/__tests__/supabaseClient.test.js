@@ -101,3 +101,41 @@ describe('deferred Supabase client facade', () => {
     });
   });
 });
+
+it('passes cancellation to the real REST read and CAS transports', async () => {
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+  vi.stubGlobal('fetch', fetchMock);
+  const client = createSupabaseClient('https://project-ref.supabase.co', 'anon-key');
+  const controller = new AbortController();
+  await client
+    .from('srs_sync')
+    .select('data')
+    .eq('id', 'fixture')
+    .maybeSingle()
+    .abortSignal(controller.signal);
+  await client.rpc('cas_srs_sync', { expected_revision: 1 }).abortSignal(controller.signal);
+  expect(fetchMock.mock.calls.map((call) => call[1].signal)).toEqual([
+    controller.signal,
+    controller.signal,
+  ]);
+});
+
+it('never begins a late write if auth resolves after its request was cancelled', async () => {
+  let resolveAuth;
+  auth.getSession.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveAuth = resolve;
+    }),
+  );
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+  const client = createSupabaseClient('https://project-ref.supabase.co', 'anon-key');
+  const controller = new AbortController();
+  const write = Promise.resolve(client.rpc('cas_srs_sync', {}).abortSignal(controller.signal));
+  const rejected = expect(write).rejects.toThrow('Cancelled fixture');
+  await Promise.resolve();
+  controller.abort(new Error('Cancelled fixture'));
+  resolveAuth({ data: { session: { access_token: 'fixture-only' } } });
+  await rejected;
+  expect(fetchMock).not.toHaveBeenCalled();
+});

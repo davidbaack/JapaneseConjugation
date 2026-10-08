@@ -319,7 +319,11 @@ describe('mergeSyncPayload', () => {
       state: {
         ...defaultState(),
         cards: { 'godan|plain-past': { reps: 2, interval: 3, nextReview: 10 } },
-        shadow: { attempted: 4, totalRating: 12, byScenario: { te: 4 } },
+        shadow: {
+          attempted: 4,
+          totalRating: 12,
+          byScenario: { te: { attempted: 4, totalRating: 12 } },
+        },
       },
       customVerbs: [{ dict: 'cloud', reading: 'cloud', meaning: 'cloud word', group: 'godan' }],
       customAdjectives: [
@@ -447,7 +451,11 @@ describe('mergeSyncPayload', () => {
     local.cards = { local: { reps: 1, interval: 1, nextReview: 10, lastSeen: 5 } };
     const cloud = defaultState();
     cloud.cards = { cloud: { reps: 2, interval: 3, nextReview: 20, lastSeen: 10 } };
-    cloud.shadow = { attempted: 4, totalRating: 12, byScenario: { te: 4 } };
+    cloud.shadow = {
+      attempted: 4,
+      totalRating: 12,
+      byScenario: { te: { attempted: 4, totalRating: 12 } },
+    };
     cloud.ambient = { sessions: 2, played: 7, lastAt: 100 };
     cloud.register = {
       attempted: 5,
@@ -592,7 +600,11 @@ describe('mergeSyncPayload', () => {
       bySkill: { conjugation: { attempted: 4, correct: 4 } },
     };
     local.shadow = { attempted: 5, totalRating: 10, byScenario: { te: 3 } };
-    cloud.shadow = { attempted: 4, totalRating: 14, byScenario: { te: 4 } };
+    cloud.shadow = {
+      attempted: 4,
+      totalRating: 14,
+      byScenario: { te: { attempted: 4, totalRating: 12 } },
+    };
     local.reader = { sessions: 5, chars: 100, encounters: 8, wordSeen: { taberu: 5 }, lastAt: 100 };
     cloud.reader = { sessions: 4, chars: 200, encounters: 7, wordSeen: { taberu: 4 }, lastAt: 200 };
     local.session = {

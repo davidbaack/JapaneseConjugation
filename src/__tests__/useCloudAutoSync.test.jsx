@@ -13,6 +13,30 @@ const { saveAll, cloudFetch, cloudUpsert } = vi.hoisted(() => ({
   ),
 }));
 
+vi.mock('../utils/localPersistence.js', async () => {
+  const actual = await vi.importActual('../utils/localPersistence.js');
+  return {
+    ...actual,
+    persistLocalSnapshot: (parts) => {
+      try {
+        saveAll(
+          parts.state,
+          parts.customVerbs,
+          parts.customAdjectives,
+          parts.wordLists,
+          parts.syncConfig,
+          parts.lastSyncedAt,
+          parts.practicePrefs,
+          parts.syncMeta,
+        );
+        return Promise.resolve(parts);
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    },
+  };
+});
+
 vi.mock('../utils/supabase.js', () => ({ supabase: { _fake: true } }));
 vi.mock('../utils/storage.js', async () => {
   const actual = await vi.importActual('../utils/storage.js');
@@ -81,6 +105,21 @@ afterEach(() => {
 });
 
 describe('useCloudAutoSync', () => {
+  it('publishes new local work when the preceding cloud acknowledgement did not cover it', async () => {
+    const forceCloudPushRef = { current: true };
+    renderHook((parameters) => useCloudAutoSync(parameters), {
+      initialProps: props({ forceCloudPushRef, state: { newestAnswer: 'retained' } }),
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PUSH_DEBOUNCE_MS);
+    });
+    expect(cloudUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ state: { newestAnswer: 'retained' } }),
+      'user-123',
+      null,
+    );
+    expect(forceCloudPushRef.current).toBe(false);
+  });
   it('refetches and retries after a compare-and-set race', async () => {
     const conflict = Object.assign(new Error('revision conflict'), {
       code: 'SYNC_REVISION_CONFLICT',
@@ -104,9 +143,10 @@ describe('useCloudAutoSync', () => {
     expect(committed.row.revision).toBe(5);
   });
 
-  it('saves to localStorage synchronously on every change', () => {
+  it('saves each changed snapshot through the coordinated persistence adapter', async () => {
     renderHook((p) => useCloudAutoSync(p), { initialProps: props() });
     // Local save is immediate, not debounced.
+    await act(async () => Promise.resolve());
     expect(saveAll).toHaveBeenCalledTimes(1);
     expect(cloudUpsert).not.toHaveBeenCalled();
   });

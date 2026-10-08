@@ -18,6 +18,7 @@ import { exerciseMeaningForWord, formDisplay } from '../utils/display.js';
 import { conjugateItem, isTypeCompatible, wordKey } from '../utils/conjugator.js';
 import { ANSWER_OUTCOME, answerOutcomeCopy } from '../utils/answerFeedbackCopy.js';
 import { groupDisplayLabel } from '../utils/groupDisplay.js';
+import { createSyncEventId } from '../utils/syncMetadata.js';
 
 function pct(correct, attempted) {
   return attempted ? Math.round((correct / attempted) * 100) : 0;
@@ -185,6 +186,7 @@ export default function GuideView() {
   const [completed, setCompleted] = useState(0);
   const [correct, setCorrect] = useState(0);
   const startedAtRef = useRef(0);
+  const committedAttemptRef = useRef(null);
   const completedFocusRef = useRef('');
   const textInputRefs = useRef({});
   const groupChoicesRef = useRef(null);
@@ -219,6 +221,7 @@ export default function GuideView() {
   );
 
   function resetForCard(nextCard) {
+    committedAttemptRef.current = null;
     setCard(nextCard);
     setAnswers({ base: '', group: '', answer: '' });
     setAssistedSteps({});
@@ -363,15 +366,26 @@ export default function GuideView() {
   }
 
   function completeCard() {
-    if (!card || result || !GUIDE_STEP_IDS.every((id) => stepResults[id])) return;
+    if (
+      !card ||
+      result ||
+      committedAttemptRef.current ||
+      !GUIDE_STEP_IDS.every((id) => stepResults[id])
+    )
+      return;
+    const eventId = createSyncEventId();
+    committedAttemptRef.current = eventId;
     const graded = guideResultFromSteps(stepResults);
-    const responseMs = Math.max(0, Date.now() - startedAtRef.current);
+    const gradedAt = Date.now();
+    const responseMs = Math.max(0, gradedAt - startedAtRef.current);
     setResult(graded);
     setCompleted((value) => value + 1);
     setCorrect((value) => value + (graded.correct ? 1 : 0));
     setState((prev) =>
       applyGuideAttemptToState(prev, card, graded, {
         responseMs,
+        eventId,
+        now: gradedAt,
       }),
     );
   }

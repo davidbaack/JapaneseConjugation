@@ -1,4 +1,5 @@
 import { getTypeInfo, FORM_GROUPS } from '../data/conjugationTypes.js';
+import { createSyncEventId } from './syncMetadata.js';
 
 export const FAST_RESPONSE_MS = 8000;
 
@@ -47,6 +48,7 @@ function normalizeMetric(metric = {}) {
     fastestMs: fastestMs || null,
     lastMs: cleanNumber(metric.lastMs) || null,
     lastAt: cleanNumber(metric.lastAt) || null,
+    ...(metric.lastAttemptId ? { lastAttemptId: String(metric.lastAttemptId) } : {}),
   };
 }
 
@@ -54,7 +56,7 @@ function hasAttempts(metric) {
   return cleanNumber(metric?.attempted) > 0;
 }
 
-function metricWithAttempt(metric, correct, responseMs, now) {
+function metricWithAttempt(metric, correct, responseMs, now, eventId) {
   const base = normalizeMetric(metric);
   const ms = cleanNumber(responseMs);
   return {
@@ -65,10 +67,11 @@ function metricWithAttempt(metric, correct, responseMs, now) {
     correctResponseMs: base.correctResponseMs + (correct ? ms : 0),
     lastMs: ms || null,
     lastAt: now,
+    lastAttemptId: eventId,
   };
 }
 
-function speedWithAttempt(metric, correct, responseMs, now) {
+function speedWithAttempt(metric, correct, responseMs, now, eventId) {
   const base = normalizeMetric(metric);
   const ms = cleanNumber(responseMs);
   const fastestMs =
@@ -83,6 +86,7 @@ function speedWithAttempt(metric, correct, responseMs, now) {
     fastestMs: Number.isFinite(fastestMs) ? fastestMs : null,
     lastMs: ms || null,
     lastAt: now,
+    lastAttemptId: eventId,
   };
 }
 
@@ -96,7 +100,12 @@ function mergeMetricSnapshot(left, right) {
       : tied && JSON.stringify(b) > JSON.stringify(a)
         ? b
         : a;
-  const lastFromRight = (b.lastAt || 0) > (a.lastAt || 0) || (tied && preferred === b);
+  const lastFromRight =
+    (b.lastAt || 0) > (a.lastAt || 0) ||
+    ((b.lastAt || 0) === (a.lastAt || 0) &&
+      String(b.lastAttemptId || '') > String(a.lastAttemptId || '')) ||
+    ((b.lastAt || 0) === (a.lastAt || 0) && b.lastAttemptId === a.lastAttemptId && preferred === b);
+  const latest = lastFromRight ? b : a;
   const fastest = [a.fastestMs, b.fastestMs].filter(Boolean);
   return {
     attempted: preferred.attempted,
@@ -107,13 +116,18 @@ function mergeMetricSnapshot(left, right) {
     fastestMs: fastest.length ? Math.min(...fastest) : null,
     lastMs: lastFromRight ? b.lastMs : a.lastMs,
     lastAt: Math.max(a.lastAt || 0, b.lastAt || 0) || null,
+    ...(latest.lastAttemptId ? { lastAttemptId: latest.lastAttemptId } : {}),
   };
 }
 
 function aggregateMetric(left, right) {
   const a = normalizeMetric(left);
   const b = normalizeMetric(right);
-  const lastFromRight = (b.lastAt || 0) > (a.lastAt || 0);
+  const lastFromRight =
+    (b.lastAt || 0) > (a.lastAt || 0) ||
+    ((b.lastAt || 0) === (a.lastAt || 0) &&
+      String(b.lastAttemptId || '') > String(a.lastAttemptId || ''));
+  const latest = lastFromRight ? b : a;
   const fastest = [a.fastestMs, b.fastestMs].filter(Boolean);
   return {
     attempted: a.attempted + b.attempted,
@@ -124,6 +138,7 @@ function aggregateMetric(left, right) {
     fastestMs: fastest.length ? Math.min(...fastest) : null,
     lastMs: lastFromRight ? b.lastMs : a.lastMs,
     lastAt: Math.max(a.lastAt || 0, b.lastAt || 0) || null,
+    ...(latest.lastAttemptId ? { lastAttemptId: latest.lastAttemptId } : {}),
   };
 }
 
@@ -159,13 +174,21 @@ export function recordReadinessAttempt(readiness, ruleId, details = {}) {
   const responseMs = cleanNumber(details.responseMs);
   const dimension = readinessDimensionForAttempt(details);
   const ruleMetrics = normalized.byRule[ruleId] || {};
+  const eventId = String(details.eventId || details.id || createSyncEventId());
+  if (ruleMetrics.speed?.lastAttemptId === eventId) return normalized;
   return {
     byRule: {
       ...normalized.byRule,
       [ruleId]: {
         ...ruleMetrics,
-        [dimension]: metricWithAttempt(ruleMetrics[dimension], !!details.correct, responseMs, now),
-        speed: speedWithAttempt(ruleMetrics.speed, !!details.correct, responseMs, now),
+        [dimension]: metricWithAttempt(
+          ruleMetrics[dimension],
+          !!details.correct,
+          responseMs,
+          now,
+          eventId,
+        ),
+        speed: speedWithAttempt(ruleMetrics.speed, !!details.correct, responseMs, now, eventId),
       },
     },
   };

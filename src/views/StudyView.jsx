@@ -105,6 +105,7 @@ import {
   updateStatePracticeSelection,
 } from '../utils/practiceSelection.js';
 import { contextualStatsForType, recordPracticeAnswer } from '../utils/practiceStats.js';
+import { createSyncEventId } from '../utils/syncMetadata.js';
 export { kanaCoachCells, explainReversePrompt };
 export { reviewFeedbackActionForRecord };
 
@@ -297,7 +298,7 @@ function sessionOutcomeLabel(card) {
   return getTypeInfo(card.type).label || 'Practice card';
 }
 
-function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now()) {
+function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now(), eventId) {
   if (!typeId || typeId === DICTIONARY_TYPE_ID) return card;
   const current = card.sourceTypeStats?.[typeId] || {};
   return {
@@ -308,6 +309,7 @@ function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now())
         correct: (Number(current.correct) || 0) + (correct ? 1 : 0),
         incorrect: (Number(current.incorrect) || 0) + (correct ? 0 : 1),
         lastAt: now,
+        ...(eventId ? { lastAttemptId: eventId } : {}),
       },
     },
   };
@@ -316,7 +318,8 @@ function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now())
 function appendSessionOutcome(session = {}, outcome) {
   const recentOutcomes = Array.isArray(session.recentOutcomes) ? session.recentOutcomes : [];
   const nextOutcome = {
-    at: Date.now(),
+    id: outcome.id || createSyncEventId(),
+    at: outcome.at || Date.now(),
     cardId: outcome.cardId || '',
     kind: outcome.kind,
     label: outcome.label || 'Practice card',
@@ -327,7 +330,7 @@ function appendSessionOutcome(session = {}, outcome) {
   };
 }
 
-function sessionAfterAnswer(session = {}, { card, correct, mistakeDiagnosis }) {
+function sessionAfterAnswer(session = {}, { card, correct, mistakeDiagnosis, eventId, now }) {
   const currentStreak = correct ? (session.currentStreak || 0) + 1 : 0;
   const nextSession = bumpSessionMistakePattern(
     {
@@ -338,21 +341,29 @@ function sessionAfterAnswer(session = {}, { card, correct, mistakeDiagnosis }) {
       bestStreak: Math.max(session.bestStreak || 0, currentStreak),
     },
     mistakeDiagnosis,
+    { now },
   );
   return appendSessionOutcome(nextSession, {
+    id: eventId,
+    at: now,
     cardId: card?.id,
     kind: correct ? 'correct' : 'missed',
     label: sessionOutcomeLabel(card),
   });
 }
 
-function sessionAfterSkip(session = {}, card) {
+/** @param {{ eventId?: string, now?: number }} [options] */
+function sessionAfterSkip(session = {}, card, options = {}) {
+  const { eventId, now } = options;
+  if (eventId && session.recentOutcomes?.some((outcome) => outcome.id === eventId)) return session;
   return appendSessionOutcome(
     {
       ...session,
       skipped: (session.skipped || 0) + 1,
     },
     {
+      id: eventId,
+      at: now,
       cardId: card?.id,
       kind: 'skipped',
       label: sessionOutcomeLabel(card),
@@ -569,8 +580,10 @@ export default function StudyView({ mode = 'practice' }) {
   const autoAdvanceRef = useRef(null);
   const refocusAfterAutoAdvanceRef = useRef(false);
   const answerStartedAtRef = useRef(0);
+  const committedAttemptRef = useRef(null);
   const hadKanaMistakeRef = useRef(false);
   const speechRecognitionRef = useRef(null);
+  const latestSpeechAttemptRef = useRef(null);
   const speechSubmittedRef = useRef(false);
   const speechAutoStartKeyRef = useRef('');
   const listeningPromptSpokenKeyRef = useRef('');
@@ -1047,11 +1060,16 @@ export default function StudyView({ mode = 'practice' }) {
   }, [practicePrefs.minimalPairSetId, setCurrent]);
 
   useLayoutEffect(() => {
+    if (phase === 'answering') committedAttemptRef.current = null;
     if (phase === 'answering' && inputRef.current) {
       focusWithoutScroll(inputRef.current);
       refocusAfterAutoAdvanceRef.current = false;
     }
   }, [current, phase]);
+
+  useLayoutEffect(() => {
+    latestSpeechAttemptRef.current = { card: current, phase, answerMode, submit };
+  });
 
   useEffect(() => {
     if (phase === 'answering') answerStartedAtRef.current = Date.now();
@@ -1481,28 +1499,32 @@ export default function StudyView({ mode = 'practice' }) {
         ? 'text-emerald-700 dark:text-emerald-400'
         : 'text-stone-600 dark:text-stone-400';
 
-  function nextMinimalPairProgress(correct) {
+  function nextMinimalPairProgress(correct, baseState, gradedAt, eventId) {
     return recordMinimalPairResult(
-      state.minimalPairs,
+      baseState.minimalPairs,
       minimalPairSetForCurrent?.id,
       current?.verb,
       current?.type,
       correct,
+      { now: gradedAt, eventId },
     );
   }
 
-  function nextTransformationStats(correct) {
-    if (!transformationMode) return state.transformation;
-    return gradeTransformationStats(state.transformation, {
+  function nextTransformationStats(correct, baseState, gradedAt, eventId) {
+    if (!transformationMode) return baseState.transformation;
+    return gradeTransformationStats(baseState.transformation, {
       correct,
       sourceType: sourceTypeId,
       targetType: targetTypeId,
       direction: reverseDrill ? 'reverse' : 'forward',
+      now: gradedAt,
+      eventId,
     });
   }
 
-  function mistakeRecordOptions() {
+  function mistakeRecordOptions(eventId) {
     return {
+      eventId,
       ...(minimalPairSetForCurrent?.id ? { minimalPairSetId: minimalPairSetForCurrent.id } : {}),
       ...(transformationMode
         ? {
@@ -1515,61 +1537,93 @@ export default function StudyView({ mode = 'practice' }) {
     };
   }
 
-  function nextGradedState({
-    correct,
-    rid,
-    responseMs,
-    nextMistakes,
-    mistakeDiagnosis,
-    verbStats,
-  }) {
+  function nextGradedState(
+    { correct, eventId, gradedAt, rid, responseMs, nextMistakes, mistakeDiagnosis },
+    baseState = state,
+  ) {
+    if (
+      baseState.practiceStats?.recent?.some((attempt) => attempt.id === eventId) ||
+      (transformationMode && baseState.transformation?.lastAttemptId === eventId)
+    )
+      return baseState;
     if (transformationMode) {
       return {
-        ...state,
-        transformation: nextTransformationStats(correct),
+        ...baseState,
+        transformation: nextTransformationStats(correct, baseState, gradedAt, eventId),
       };
     }
     const progressTypeId = reverseDrill ? sourceTypeForReading : current.type;
     const readinessRuleId = reverseDrill ? cardIdFor(current.verb, progressTypeId) : rid;
-    const gradedAt = Date.now();
-    const gradedCard = gradeCard(state.cards[rid], correct, gradedAt);
+    const gradedCard = {
+      ...gradeCard(baseState.cards[rid], correct, gradedAt),
+      lastAttemptId: eventId,
+    };
     const storedCard = reverseDrill
-      ? withReadingSourceTypeStat(gradedCard, progressTypeId, correct, gradedAt)
+      ? withReadingSourceTypeStat(gradedCard, progressTypeId, correct, gradedAt, eventId)
       : gradedCard;
+    const submittedMistake = nextMistakes?.[0];
+    const mistakes = correct
+      ? resolveMistakesForCurrentCard(baseState.mistakes, gradedAt)
+      : recordMistake(
+          baseState.mistakes,
+          current.verb,
+          current.type,
+          reverseDrill ? sourceTypeForReading : promptType,
+          submittedMistake.userAnswer,
+          expected,
+          { ...mistakeRecordOptions(eventId), now: gradedAt },
+        );
+    const dict = current.verb.dict;
+    const priorWordStats = baseState.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
+    const verbStats = {
+      ...baseState.verbStats,
+      [dict]: {
+        ...(baseState.verbStats?.[dict] || {}),
+        [rid]: {
+          seen: priorWordStats.seen + 1,
+          incorrect: priorWordStats.incorrect + (correct ? 0 : 1),
+        },
+      },
+    };
     const graded = {
-      ...state,
-      mistakes: nextMistakes,
-      minimalPairs: nextMinimalPairProgress(correct),
-      transformation: nextTransformationStats(correct),
-      session: sessionAfterAnswer(state.session, {
+      ...baseState,
+      mistakes,
+      minimalPairs: nextMinimalPairProgress(correct, baseState, gradedAt, eventId),
+      transformation: nextTransformationStats(correct, baseState, gradedAt, eventId),
+      session: sessionAfterAnswer(baseState.session, {
         card: current,
         correct,
         mistakeDiagnosis,
+        eventId,
+        now: gradedAt,
       }),
     };
     return {
       ...graded,
-      cards: { ...state.cards, [rid]: storedCard },
+      cards: { ...baseState.cards, [rid]: storedCard },
       retryQueue: correct
-        ? (state.retryQueue || []).filter((id) => id !== rid)
-        : [...new Set([...(state.retryQueue || []), rid])].slice(-20),
+        ? (baseState.retryQueue || []).filter((id) => id !== rid)
+        : [...new Set([...(baseState.retryQueue || []), rid])].slice(-20),
       verbStats,
-      readiness: recordReadinessAttempt(state.readiness, readinessRuleId, {
+      readiness: recordReadinessAttempt(baseState.readiness, readinessRuleId, {
         correct,
         responseMs,
         answerMode,
         kanaAssist: readinessKanaAssist,
         reverseDrill,
         now: gradedAt,
+        eventId,
       }),
-      weakness: recordWeaknessAttempt(state.weakness, {
+      weakness: recordWeaknessAttempt(baseState.weakness, {
         word: current.verb,
         typeId: progressTypeId,
         correct,
         responseMs,
         now: gradedAt,
+        eventId,
       }),
-      practiceStats: recordPracticeAnswer(state.practiceStats, {
+      practiceStats: recordPracticeAnswer(baseState.practiceStats, {
+        id: eventId,
         typeId: progressTypeId,
         correct,
         responseMs,
@@ -1625,7 +1679,7 @@ export default function StudyView({ mode = 'practice' }) {
     };
   }
 
-  function resolveMistakesForCurrentCard(mistakes = []) {
+  function resolveMistakesForCurrentCard(mistakes = [], now) {
     const matches = (mistakes || []).filter(
       (mistake) =>
         !mistake.resolved &&
@@ -1634,7 +1688,10 @@ export default function StudyView({ mode = 'practice' }) {
         mistake.type === current?.type,
     );
     if (!matches.length) return mistakes;
-    return matches.reduce((next, mistake) => markMistakeResolved(next, mistake.key), mistakes);
+    return matches.reduce(
+      (next, mistake) => markMistakeResolved(next, mistake.key, { now }),
+      mistakes,
+    );
   }
 
   function stopSpeechRecognition() {
@@ -1669,6 +1726,7 @@ export default function StudyView({ mode = 'practice' }) {
     }
     try {
       const recognition = new SpeechRecognition();
+      const recognitionCard = current;
       speechRecognitionRef.current = recognition;
       speechSubmittedRef.current = false;
       recognition.lang = 'ja-JP';
@@ -1688,6 +1746,14 @@ export default function StudyView({ mode = 'practice' }) {
         setSpeechListening(false);
       };
       recognition.onresult = (event) => {
+        const latest = latestSpeechAttemptRef.current;
+        if (
+          speechRecognitionRef.current !== recognition ||
+          latest?.card !== recognitionCard ||
+          latest.phase !== 'answering' ||
+          latest.answerMode !== 'speak'
+        )
+          return;
         const { transcripts, isFinal } = speechAlternativesFromEvent(event);
         const transcript = bestSpeechAlternative(transcripts, spokenAnswerTargets);
         if (!transcript) return;
@@ -1695,7 +1761,7 @@ export default function StudyView({ mode = 'practice' }) {
         setSpeechError('');
         if (isFinal && !speechSubmittedRef.current) {
           speechSubmittedRef.current = true;
-          submit(transcript, { spoken: true });
+          latest.submit(transcript, { spoken: true });
         }
       };
       recognition.start();
@@ -1927,6 +1993,9 @@ export default function StudyView({ mode = 'practice' }) {
     }
     const raw = choiceValue !== undefined ? choiceValue : answer;
     if (!raw.trim()) return;
+    if (committedAttemptRef.current) return;
+    const eventId = createSyncEventId();
+    committedAttemptRef.current = eventId;
     const spoken = !!options.spoken;
     const fromTypedInput = !!options.fromTypedInput || (choiceValue === undefined && !spoken);
     const normalized = !spoken && fromTypedInput ? toHiragana(raw) : raw;
@@ -1939,19 +2008,11 @@ export default function StudyView({ mode = 'practice' }) {
         : normalized === expected;
     const ok = finalOk && (spoken || (!hadKanaMistakeRef.current && !usedAnswerHelpRef.current));
     if (choiceValue !== undefined) setAnswer(raw);
-    const dict = current.verb.dict,
-      rid = current.id;
-    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
-    const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
-    const newVerbStats = {
-      ...state.verbStats,
-      [dict]: {
-        ...(state.verbStats?.[dict] || {}),
-        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
-      },
-    };
+    const rid = current.id;
+    const gradedAt = Date.now();
+    const responseMs = Math.max(0, gradedAt - answerStartedAtRef.current);
     const nextMistakes = ok
-      ? resolveMistakesForCurrentCard(state.mistakes)
+      ? resolveMistakesForCurrentCard(state.mistakes, gradedAt)
       : recordMistake(
           state.mistakes,
           current.verb,
@@ -1959,19 +2020,21 @@ export default function StudyView({ mode = 'practice' }) {
           reverseDrill ? sourceTypeForReading : promptType,
           spoken || reverseDrill ? raw.trim() : normalized,
           expected,
-          mistakeRecordOptions(),
+          { ...mistakeRecordOptions(eventId), now: gradedAt },
         );
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
     const submittedForReview =
       finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw;
-    const nextState = nextGradedState({
+    const grading = {
       correct: ok,
+      eventId,
+      gradedAt,
       rid,
       responseMs,
       nextMistakes,
       mistakeDiagnosis,
-      verbStats: newVerbStats,
-    });
+    };
+    const nextState = nextGradedState(grading);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
@@ -1983,7 +2046,7 @@ export default function StudyView({ mode = 'practice' }) {
       wasCorrected: finalOk && !ok,
     });
     setReviewRecord(runRecord);
-    setState(nextState);
+    setState((previous) => nextGradedState(grading, previous));
     setSelfCheckOpen(false);
     setWasCorrected(finalOk && !ok);
     setWasCorrect(ok);
@@ -2023,6 +2086,8 @@ export default function StudyView({ mode = 'practice' }) {
 
   function skipCurrent() {
     if (!current) return;
+    const eventId = createSyncEventId();
+    const now = Date.now();
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
@@ -2032,14 +2097,18 @@ export default function StudyView({ mode = 'practice' }) {
       ? state
       : {
           ...state,
-          session: sessionAfterSkip(state.session, current),
+          session: sessionAfterSkip(state.session, current, { eventId, now }),
         };
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, false)
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
     const likelyNextCard = prepareLikelyNextCard(nextState, current.id, sweepStep);
-    if (!transformationMode) setState(nextState);
+    if (!transformationMode)
+      setState((previous) => ({
+        ...previous,
+        session: sessionAfterSkip(previous.session, current, { eventId, now }),
+      }));
     setAnswer('');
     setCoachRevealed(0);
     setSelfCheckOpen(false);
@@ -2075,24 +2144,18 @@ export default function StudyView({ mode = 'practice' }) {
   }
 
   function gradeSelfCheck(ok, label) {
-    if (!current || phase !== 'answering') return;
+    if (!current || phase !== 'answering' || committedAttemptRef.current) return;
+    const eventId = createSyncEventId();
+    committedAttemptRef.current = eventId;
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
-    const dict = current.verb.dict,
-      rid = current.id;
-    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
-    const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
-    const newVerbStats = {
-      ...state.verbStats,
-      [dict]: {
-        ...(state.verbStats?.[dict] || {}),
-        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
-      },
-    };
+    const rid = current.id;
+    const gradedAt = Date.now();
+    const responseMs = Math.max(0, gradedAt - answerStartedAtRef.current);
     const nextMistakes = ok
-      ? resolveMistakesForCurrentCard(state.mistakes)
+      ? resolveMistakesForCurrentCard(state.mistakes, gradedAt)
       : recordMistake(
           state.mistakes,
           current.verb,
@@ -2100,17 +2163,19 @@ export default function StudyView({ mode = 'practice' }) {
           reverseDrill ? sourceTypeForReading : promptType,
           `self-check: ${label}`,
           expected,
-          mistakeRecordOptions(),
+          { ...mistakeRecordOptions(eventId), now: gradedAt },
         );
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
-    const nextState = nextGradedState({
+    const grading = {
       correct: ok,
+      eventId,
+      gradedAt,
       rid,
       responseMs,
       nextMistakes,
       mistakeDiagnosis,
-      verbStats: newVerbStats,
-    });
+    };
+    const nextState = nextGradedState(grading);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
@@ -2123,7 +2188,7 @@ export default function StudyView({ mode = 'practice' }) {
       mistakeDiagnosis,
     });
     setReviewRecord(runRecord);
-    setState(nextState);
+    setState((previous) => nextGradedState(grading, previous));
     setAnswer('');
     setSelfCheckOpen(false);
     setWasCorrect(ok);
@@ -2162,23 +2227,17 @@ export default function StudyView({ mode = 'practice' }) {
   }
 
   function revealAnswer() {
-    if (!current || phase !== 'answering') return;
+    if (!current || phase !== 'answering' || committedAttemptRef.current) return;
+    const eventId = createSyncEventId();
+    committedAttemptRef.current = eventId;
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
     stopSpeechRecognition();
-    const dict = current.verb.dict,
-      rid = current.id;
-    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
-    const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
-    const newVerbStats = {
-      ...state.verbStats,
-      [dict]: {
-        ...(state.verbStats?.[dict] || {}),
-        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + 1 },
-      },
-    };
+    const rid = current.id;
+    const gradedAt = Date.now();
+    const responseMs = Math.max(0, gradedAt - answerStartedAtRef.current);
     const nextMistakes = recordMistake(
       state.mistakes,
       current.verb,
@@ -2186,17 +2245,19 @@ export default function StudyView({ mode = 'practice' }) {
       reverseDrill ? sourceTypeForReading : promptType,
       '(revealed)',
       expected,
-      mistakeRecordOptions(),
+      { ...mistakeRecordOptions(eventId), now: gradedAt },
     );
     const mistakeDiagnosis = nextMistakes[0]?.diagnosis || null;
-    const nextState = nextGradedState({
+    const grading = {
       correct: false,
+      eventId,
+      gradedAt,
       rid,
       responseMs,
       nextMistakes,
       mistakeDiagnosis,
-      verbStats: newVerbStats,
-    });
+    };
+    const nextState = nextGradedState(grading);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, false, { holdNext: true })
       : null;
@@ -2212,7 +2273,7 @@ export default function StudyView({ mode = 'practice' }) {
       mistakeDiagnosis,
     });
     setReviewRecord(runRecord);
-    setState(nextState);
+    setState((previous) => nextGradedState(grading, previous));
     setAnswer('');
     setSelfCheckOpen(false);
     setWasCorrect(false);

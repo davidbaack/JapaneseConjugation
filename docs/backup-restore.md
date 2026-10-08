@@ -72,5 +72,6 @@ Mocked cloud tests verify request deadlines, revision retries, account/race
 protection and pending-restore recovery. These are not evidence of a live
 signed-in two-account or two-device Supabase recovery run.
 
-General concurrent Practice event accounting is a separate concern; this fix
-does not claim to make distinct simultaneous Practice counters additive.
+Concurrent progress now uses protocol 2 writer contributions. See
+[Concurrent learner progress](concurrent-progress.md) for counting, local tab
+coordination, upgrade limits and the authenticated convergence regression.

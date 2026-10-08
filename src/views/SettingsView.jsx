@@ -61,6 +61,7 @@ export default function SettingsView() {
     restoreBusy,
     restoreStatus,
     dataRecoveryError,
+    localPersistenceBlocked,
     practicePrefs,
     setPracticePrefs,
     speechVoices,
@@ -71,6 +72,7 @@ export default function SettingsView() {
     supabaseError,
     showAuth: onShowAuth,
   } = useApp();
+  const exportBlocked = localPersistenceBlocked ?? !!dataRecoveryError;
   const [pendingReset, setPendingReset] = useState(null);
   const [factoryConfirm, setFactoryConfirm] = useState('');
   const [resetBusy, setResetBusy] = useState('');
@@ -100,10 +102,10 @@ export default function SettingsView() {
 
   const exportData = useMemo(
     () =>
-      dataRecoveryError
+      exportBlocked
         ? ''
         : serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
-    [state, customVerbs, customAdjectives, wordLists, practicePrefs, dataRecoveryError],
+    [state, customVerbs, customAdjectives, wordLists, practicePrefs, exportBlocked],
   );
   const recoveryIsBackup = useMemo(
     () => !!recoveryBackup && parseBackup(recoveryBackup).ok,
@@ -137,13 +139,13 @@ export default function SettingsView() {
     }
   }
 
-  function downloadBackup(text, recovery = false) {
+  function downloadBackup(text, recovery = false, savedRecovery = false) {
     let url;
     try {
       url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = `katachiya-${recovery ? 'before-restore-' : 'backup-'}${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `katachiya-${savedRecovery ? 'saved-recovery-' : recovery ? 'before-restore-' : 'backup-'}${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -557,9 +559,27 @@ export default function SettingsView() {
               >
                 <p>{dataRecoveryError}</p>
                 <p className="mt-1">
-                  Export is unavailable while saved data cannot be read. Import can replace it after
-                  securing a recovery copy of the original saved data.
+                  {exportBlocked
+                    ? 'Export is unavailable while saved data cannot be read. Download the saved recovery data before choosing a replacement; this file may need repair before import.'
+                    : 'Your local progress can be exported. Download a backup before choosing which learner snapshot to restore.'}
                 </p>
+                <button
+                  type="button"
+                  className="mt-2 rounded border border-current px-3 py-2"
+                  onClick={async () => {
+                    try {
+                      const { serializeSavedRecoveryData } =
+                        await import('../utils/localJournal.js');
+                      downloadBackup(serializeSavedRecoveryData(), true, true);
+                    } catch {
+                      setTransferNotice(
+                        'Saved recovery data could not be read. Keep this browser open.',
+                      );
+                    }
+                  }}
+                >
+                  Download saved recovery data
+                </button>
               </div>
             )}
             {restoreStatus?.kind && restoreStatus.kind !== 'idle' && (
@@ -602,7 +622,7 @@ export default function SettingsView() {
                   setImportOpen(false);
                   setStagedBackup(null);
                 }}
-                disabled={restoreBusy || !!dataRecoveryError}
+                disabled={restoreBusy || exportBlocked}
                 aria-expanded={exportOpen}
                 className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
                   exportOpen
@@ -630,7 +650,7 @@ export default function SettingsView() {
                 Import
               </button>
             </div>
-            {exportOpen && !dataRecoveryError && (
+            {exportOpen && !exportBlocked && (
               <div className="mt-3 space-y-2">
                 <textarea
                   aria-label="Backup export JSON"

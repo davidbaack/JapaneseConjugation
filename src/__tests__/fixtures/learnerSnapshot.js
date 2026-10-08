@@ -34,13 +34,18 @@ export function makeLearnerSnapshot() {
   state.enabledTypes = ['plain-past', 'te-form'];
 
   for (let index = 0; index < 7; index += 1) {
+    const eventId = `snapshot-${index}`;
     const at = SNAPSHOT_AT + index * 1000;
     const correct = index % 3 !== 0;
     const responseMs = 1500 + index * 100;
     const assisted = index === 2;
     const mode = assisted ? 'self-check' : 'input';
-    state.cards[cardId] = gradeCard(state.cards[cardId], correct, at);
+    state.cards[cardId] = {
+      ...gradeCard(state.cards[cardId], correct, at),
+      lastAttemptId: eventId,
+    };
     state.practiceStats = recordPracticeAnswer(state.practiceStats, {
+      id: eventId,
       typeId: 'plain-past',
       correct,
       responseMs,
@@ -52,6 +57,7 @@ export function makeLearnerSnapshot() {
       responseMs,
       answerMode: mode,
       now: at,
+      eventId,
     });
     state.weakness = recordWeaknessAttempt(state.weakness, {
       word: SNAPSHOT_WORD,
@@ -59,6 +65,7 @@ export function makeLearnerSnapshot() {
       correct,
       responseMs,
       now: at,
+      eventId,
     });
     state.guide = recordGuideAttempt(
       state.guide,
@@ -77,17 +84,19 @@ export function makeLearnerSnapshot() {
           answer: { correct, assisted },
         },
       },
-      { now: at, eventId: `snapshot-guide-${index}` },
+      { now: at, eventId },
     );
   }
 
   const reverseId = cardIdFor(SNAPSHOT_OTHER_WORD, 'dictionary');
   state.cards[reverseId] = {
     ...gradeCard(null, true, SNAPSHOT_AT + 8000),
+    lastAttemptId: 'snapshot-reverse',
     sourceType: 'te-form',
     sourceTypeStats: { 'te-form': { correct: 1, incorrect: 0, lastSeen: SNAPSHOT_AT + 8000 } },
   };
   state.practiceStats = recordPracticeAnswer(state.practiceStats, {
+    id: 'snapshot-reverse',
     typeId: 'te-form',
     correct: true,
     responseMs: 2100,
@@ -102,6 +111,7 @@ export function makeLearnerSnapshot() {
       responseMs: 2100,
       answerMode: 'choice',
       now: SNAPSHOT_AT + 8000,
+      eventId: 'snapshot-reverse',
     },
   );
   state.weakness = recordWeaknessAttempt(state.weakness, {
@@ -110,6 +120,7 @@ export function makeLearnerSnapshot() {
     correct: true,
     responseMs: 2100,
     now: SNAPSHOT_AT + 8000,
+    eventId: 'snapshot-reverse',
   });
 
   state.verbStats = { 食べる: { [cardId]: { seen: 7, incorrect: 3 } } };

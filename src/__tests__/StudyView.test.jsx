@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
@@ -9,6 +10,8 @@ import { englishForForm } from '../utils/display.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
 import { clearSentenceCorpusCache } from '../utils/sentenceCorpus.js';
 import { buildReadinessFamilyRows } from '../utils/readiness.js';
+import { recordPracticeAnswer } from '../utils/practiceStats.js';
+import { applyGuideAttemptToState } from '../utils/guidePractice.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
 const mockedSpeech = vi.hoisted(() => ({ playPronunciation: vi.fn() }));
@@ -69,6 +72,10 @@ function makeApp(overrides = {}) {
   return {
     ...base,
   };
+}
+
+function resolveStateUpdate(update, previous = mockedApp.value.state) {
+  return typeof update === 'function' ? update(previous) : update;
 }
 
 function goalHitState() {
@@ -638,7 +645,7 @@ describe('StudyView continuous Practice startup', () => {
     });
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
     expect(nextState.session.currentStreak).toBe(1);
@@ -647,7 +654,132 @@ describe('StudyView continuous Practice startup', () => {
       kind: 'correct',
       label: 'Plain Past',
     });
+    const eventId = nextState.practiceStats.recent[0].id;
+    expect(eventId).toEqual(expect.any(String));
+    expect(nextState.session.recentOutcomes[0].id).toBe(eventId);
+    expect(nextState.cards[cardIdFor(target, type)].lastAttemptId).toBe(eventId);
+    expect(nextState.readiness.byRule[cardIdFor(target, type)].speed.lastAttemptId).toBe(eventId);
+    expect(Object.values(nextState.weakness.byLane)[0].recent[0].id).toBe(eventId);
     expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
+  });
+
+  it('preserves synced progress received while the current spoken answer is being recognized', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const app = makeApp({
+      setState,
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+    mockedApp.value = app;
+    const view = render(<StudyView />);
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
+    const remote = {
+      ...app.state,
+      session: { ...app.state.session, reviewed: 1, correct: 0 },
+      practiceStats: recordPracticeAnswer(app.state.practiceStats, {
+        id: 'remote-answer',
+        typeId: type,
+        correct: false,
+        at: 1000,
+        mode: 'input',
+      }),
+    };
+    mockedApp.value = { ...app, state: remote };
+    view.rerender(<StudyView />);
+    act(() => {
+      FakeSpeechRecognition.instance.emitFinal(conjugateItem(target, type));
+    });
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    const next = resolveStateUpdate(setState.mock.calls.at(-1)[0]);
+    expect(next.practiceStats.lifetime).toMatchObject({ attempted: 2, correct: 1 });
+    expect(next.session).toMatchObject({ reviewed: 2, correct: 1 });
+    expect(next.practiceStats.recent.some((row) => row.id === 'remote-answer')).toBe(true);
+  });
+
+  it('ignores a final result from a microphone belonging to the previous exercise', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      setState,
+      studyFocus: { word: target, type: 'plain-past' },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+    render(<StudyView />);
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
+    const previousRecognition = FakeSpeechRecognition.instance;
+    fireEvent.click(screen.getByRole('button', { name: 'Skip', exact: true }));
+    await waitFor(() => expect(FakeSpeechRecognition.instance).not.toBe(previousRecognition));
+    setState.mockClear();
+    act(() => {
+      previousRecognition.emitFinal(conjugateItem(target, 'plain-past'));
+    });
+    expect(setState).not.toHaveBeenCalled();
+  });
+
+  it('credits speech against a remote answer queued in the same React batch', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const rid = cardIdFor(target, type);
+    const app = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+    let receiveRemote;
+    let submittedUpdate;
+    function ConcurrentStudy() {
+      const [learnerState, updateLearnerState] = useState(app.state);
+      receiveRemote = updateLearnerState;
+      mockedApp.value = {
+        ...app,
+        state: learnerState,
+        setState: (update) => {
+          submittedUpdate = update;
+          updateLearnerState(update);
+        },
+      };
+      return <StudyView />;
+    }
+    render(<ConcurrentStudy />);
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
+    const remote = applyGuideAttemptToState(
+      app.state,
+      {
+        word: target,
+        typeId: type,
+        sourceTypeId: 'dictionary',
+        expectedGroup: target.group,
+        expectedAnswer: conjugateItem(target, type),
+      },
+      {
+        correct: false,
+        assisted: false,
+        steps: {
+          base: { correct: true, assisted: false },
+          group: { correct: true, assisted: false },
+          answer: { correct: false, assisted: false, submitted: 'wrong' },
+        },
+      },
+      { eventId: 'queued-remote-answer', now: 1000, responseMs: 1000 },
+    );
+    act(() => {
+      receiveRemote(remote);
+      FakeSpeechRecognition.instance.emitFinal(conjugateItem(target, type));
+    });
+    const next = mockedApp.value.state;
+    expect(next.practiceStats.lifetime).toMatchObject({ attempted: 2, correct: 1 });
+    expect(next.session).toMatchObject({ reviewed: 2, correct: 1 });
+    expect(next.cards[rid]).toMatchObject({ correct: 1, incorrect: 1 });
+    expect(next.readiness.byRule[rid].production).toMatchObject({ attempted: 2, correct: 1 });
+    expect(Object.values(next.weakness.byLane)[0]).toMatchObject({ attempted: 2, correct: 1 });
+    expect(next.guide.attempted).toBe(1);
+    expect(next.practiceStats.recent.some((row) => row.id === 'queued-remote-answer')).toBe(true);
+    expect(submittedUpdate(remote)).toEqual(submittedUpdate(remote));
+    expect(submittedUpdate(next)).toBe(next);
   });
 
   it('reveals kana directly into the Study answer box', async () => {
@@ -1056,7 +1188,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
-      .map(([arg]) => arg)
+      .map(([arg]) => resolveStateUpdate(arg))
       .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
 
     expect(nextState).toBeTruthy();
@@ -1105,7 +1237,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
-      .map(([arg]) => arg)
+      .map(([arg]) => resolveStateUpdate(arg))
       .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
 
     expect(nextState).toBeTruthy();
@@ -1159,7 +1291,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
-      .map(([arg]) => arg)
+      .map(([arg]) => resolveStateUpdate(arg))
       .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
 
     expect(nextState.transformation.attempted).toBe(1);
@@ -1246,7 +1378,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
-      .map(([arg]) => arg)
+      .map(([arg]) => resolveStateUpdate(arg))
       .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
     expect(nextState.transformation.correct).toBe(1);
     expect(screen.queryByRole('button', { name: 'Exit focus' })).toBeNull();
@@ -1287,7 +1419,7 @@ describe('StudyView continuous Practice startup', () => {
       }
       await waitFor(() => expect(setState).toHaveBeenCalled());
       const nextState = setState.mock.calls
-        .map(([arg]) => arg)
+        .map(([arg]) => resolveStateUpdate(arg))
         .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
 
       expect(nextState.transformation.correct).toBe(0);
@@ -1375,7 +1507,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
     expect(nextState.session.currentStreak).toBe(1);
@@ -1409,7 +1541,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
     expect(nextState.cards[cardId].correct).toBe(1);
@@ -1439,7 +1571,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
     expect(nextState.session.currentStreak).toBe(1);
@@ -1483,7 +1615,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
@@ -1523,7 +1655,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
     expect(nextState.session.recentOutcomes[0]).toMatchObject({
@@ -1559,7 +1691,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
@@ -1596,7 +1728,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.recentOutcomes[0]).toMatchObject({
@@ -1631,7 +1763,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
@@ -1691,7 +1823,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reveal' }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
@@ -1722,7 +1854,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(await screen.findByRole('button', { name: "I don't know" }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
@@ -1755,7 +1887,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(0);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.skipped).toBe(1);
@@ -2062,7 +2194,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
   });

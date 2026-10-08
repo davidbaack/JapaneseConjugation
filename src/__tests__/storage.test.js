@@ -611,6 +611,7 @@ describe('mergeCloudState', () => {
             reps: 1,
             interval: 1,
             nextReview: 1000,
+            lastSeen: 1000,
             correct: 1,
             incorrect: 0,
             sourceTypeStats: {
@@ -629,6 +630,7 @@ describe('mergeCloudState', () => {
             reps: 2,
             interval: 3,
             nextReview: 2000,
+            lastSeen: 2000,
             correct: 2,
             incorrect: 0,
             sourceTypeStats: {

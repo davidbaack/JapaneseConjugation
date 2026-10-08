@@ -4,6 +4,7 @@ import { RULES, wordKey, wordKind, getWordMeta, enabledTypeIdsFor } from './conj
 import { filterWordsForStudyScope } from './vocabularyProgression.js';
 import { diagnoseMistake } from './mistakeDiagnosis.js';
 import { retryWithBackoff } from './retry.js';
+import { mergeStagedLocalSnapshots } from './localJournal.js';
 import { abortableQuery, withCloudDeadline } from './cloudDeadline.js';
 import {
   defaultReadinessState,
@@ -167,7 +168,7 @@ export function loadAll() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     storageBaselines.set(localStorage, raw);
-    if (!raw) return null;
+    if (!raw) return mergeStagedLocalSnapshots(null);
     const parsed = JSON.parse(raw);
     if (!isRecord(parsed)) throw learnerDataError('Saved learner data is not an object.');
     if (!isRecord(parsed.state?.cards))
@@ -177,15 +178,17 @@ export function loadAll() {
       if (Object.hasOwn(parsed, key) && !Array.isArray(parsed[key]))
         throw learnerDataError(`Saved ${key} is not an array.`);
     }
-    return adoptSyncMetadata(
-      {
-        ...parsed,
-        wordLists: normalizeWordLists(parsed.wordLists),
-        ...(parsed.practicePrefs
-          ? { practicePrefs: mergePracticePrefs(parsed.practicePrefs) }
-          : {}),
-      },
-      getLocalSyncDeviceId(),
+    return mergeStagedLocalSnapshots(
+      adoptSyncMetadata(
+        {
+          ...parsed,
+          wordLists: normalizeWordLists(parsed.wordLists),
+          ...(parsed.practicePrefs
+            ? { practicePrefs: mergePracticePrefs(parsed.practicePrefs) }
+            : {}),
+        },
+        getLocalSyncDeviceId(),
+      ),
     );
   } catch (error) {
     throw error?.code === 'LEARNER_DATA_INVALID'
@@ -713,15 +716,18 @@ export function mergeSyncPayload(localPayload, cloudPayload, options = {}) {
     practicePrefs: mergeSyncPracticePrefs(local.practicePrefs, cloud.practicePrefs),
   };
   const merged = mergeSyncSidecar(local, cloud, mergedBase, local.syncMeta.deviceId);
-  return {
+  const result = {
     ...merged,
+    state: reconcileDerivedProgressState(merged.state).state,
     wordLists: normalizeWordLists(merged.wordLists),
     practicePrefs: mergePracticePrefs(merged.practicePrefs),
   };
+  validateLearnerBundle(result);
+  return result;
 }
 
-// Merge two SRS card maps: for each card key, keep the card with more reps;
-// break ties by taking the later nextReview.
+// Scheduling follows the latest graded answer, including a newer miss. Evidence
+// counts are materialized separately from idempotent writer contributions.
 function mergeCardSourceTypeStats(local = {}, cloud = {}) {
   const merged = {};
   for (const typeId of new Set([...Object.keys(local || {}), ...Object.keys(cloud || {})])) {
@@ -730,11 +736,26 @@ function mergeCardSourceTypeStats(local = {}, cloud = {}) {
     const correct = maxNum(left.correct, right.correct);
     const incorrect = maxNum(left.incorrect, right.incorrect);
     const lastAt = maxNum(left.lastAt, right.lastAt);
-    if (correct || incorrect || lastAt) {
+    const latest =
+      maxNum(right.lastAt, right.lastSeen) > maxNum(left.lastAt, left.lastSeen) ||
+      (maxNum(right.lastAt, right.lastSeen) === maxNum(left.lastAt, left.lastSeen) &&
+        String(right.lastAttemptId || '') > String(left.lastAttemptId || ''))
+        ? right
+        : left;
+    if (Object.keys(left).length || Object.keys(right).length) {
       merged[typeId] = {
+        ...left,
+        ...right,
+        ...deterministicSyncValue(left, right),
         correct,
         incorrect,
-        lastAt: lastAt || null,
+        ...(Object.hasOwn(left, 'lastAt') || Object.hasOwn(right, 'lastAt')
+          ? { lastAt: lastAt || null }
+          : {}),
+        ...(Object.hasOwn(left, 'lastSeen') || Object.hasOwn(right, 'lastSeen')
+          ? { lastSeen: maxNum(left.lastSeen, right.lastSeen) }
+          : {}),
+        ...(latest.lastAttemptId ? { lastAttemptId: latest.lastAttemptId } : {}),
       };
     }
   }
@@ -751,9 +772,8 @@ export function mergeCards(local = {}, cloud = {}) {
     const candidates = [lc, cc].filter(Boolean);
     const preferred = candidates.sort(
       (a, b) =>
-        maxNum(b.reps, 0) - maxNum(a.reps, 0) ||
-        maxNum(b.nextReview, 0) - maxNum(a.nextReview, 0) ||
         maxNum(b.lastSeen, 0) - maxNum(a.lastSeen, 0) ||
+        compareSyncText(String(b.lastAttemptId || ''), String(a.lastAttemptId || '')) ||
         compareSyncText(stableSyncStringify(a), stableSyncStringify(b)),
     )[0];
     merged[key] = hasSourceTypeStats ? { ...preferred, sourceTypeStats } : preferred;
@@ -930,7 +950,10 @@ function mergeReferenceProgress(local, cloud) {
           compareSyncText(stableSyncStringify(a), stableSyncStringify(b)),
       )
       .slice(0, 24),
-    selected: selected ? { ...selected, selectedAt: Number(selected.selectedAt) || 1 } : null,
+    selected:
+      selected?.dict && selected?.reading && selected?.group
+        ? { ...selected, selectedAt: Number(selected.selectedAt) || 1 }
+        : null,
     weakRules: [...weakRuleByKey.values()]
       .sort(
         (a, b) =>
@@ -1000,10 +1023,17 @@ export function emptyTransformationStats() {
 function mergeProgressBucket(local = {}, cloud = {}) {
   local = local || {};
   cloud = cloud || {};
+  const latest =
+    maxNum(cloud.lastAt, 0) > maxNum(local.lastAt, 0) ||
+    (maxNum(cloud.lastAt, 0) === maxNum(local.lastAt, 0) &&
+      String(cloud.lastAttemptId || '') > String(local.lastAttemptId || ''))
+      ? cloud
+      : local;
   return {
     attempted: maxNum(local.attempted, cloud.attempted),
     correct: maxNum(local.correct, cloud.correct),
     lastAt: maxNum(local.lastAt, cloud.lastAt) || null,
+    ...(latest.lastAttemptId ? { lastAttemptId: latest.lastAttemptId } : {}),
   };
 }
 
@@ -1069,7 +1099,7 @@ export function gradeTransformationStats(stats = null, attempt = {}) {
   const sourceType = attempt.sourceType || 'dictionary';
   const targetType = attempt.targetType || 'dictionary';
   const direction = attempt.direction || 'forward';
-  const now = Date.now();
+  const now = Number(attempt.now) || Date.now();
   const bump = (bucket = {}) => ({
     attempted: (bucket.attempted || 0) + 1,
     correct: (bucket.correct || 0) + (ok ? 1 : 0),
@@ -1081,6 +1111,7 @@ export function gradeTransformationStats(stats = null, attempt = {}) {
     attempted: (base.attempted || 0) + 1,
     correct: (base.correct || 0) + (ok ? 1 : 0),
     lastAt: now,
+    ...(attempt.eventId ? { lastAttemptId: String(attempt.eventId) } : {}),
     bySource: { ...(base.bySource || {}), [sourceType]: bump(base.bySource?.[sourceType]) },
     byTarget: { ...(base.byTarget || {}), [targetType]: bump(base.byTarget?.[targetType]) },
     byPair: { ...(base.byPair || {}), [pairKey]: bump(base.byPair?.[pairKey]) },
@@ -1094,6 +1125,7 @@ export function gradeTransformationStats(stats = null, attempt = {}) {
 export function mergeCloudState(local, cloud) {
   if (!local) return cloud;
   if (!cloud) return local;
+  if (sameJSON(local, cloud)) return local;
   const normalizedLocal =
     local.schemaVersion === SRS_SCHEMA_VERSION
       ? local
@@ -1241,7 +1273,7 @@ export function mergeCloudState(local, cloud) {
     session: mergeSessionProgress(local.session, cloud.session),
     reviewScope: mergeReviewScopeProgress(local.reviewScope, cloud.reviewScope),
   };
-  return reconcileDerivedProgressState(merged).state;
+  return merged;
 }
 
 // ============================================================================
@@ -1435,7 +1467,7 @@ export function recordMistake(
   const key = dimension
     ? `${item.group}|${item.dict}|${type}|${promptType || 'dictionary'}|${dimension}|${sourceType || 'dictionary'}|${targetType}`
     : `${item.group}|${item.dict}|${type}|${promptType || 'dictionary'}`;
-  const now = Date.now();
+  const now = Number(options.now) || Date.now();
   const prior = (mistakes || []).find((m) => m.key === key);
   const mistakeDiagnosis = diagnoseMistake({ item, type, promptType, userAnswer, expected });
   const fresh = {
@@ -1450,6 +1482,7 @@ export function recordMistake(
     expected,
     diagnosis: mistakeDiagnosis,
     at: now,
+    ...(options.eventId ? { lastAttemptId: String(options.eventId) } : {}),
     count: (prior?.count || 0) + 1,
     resolved: false,
     minimalPairSetId: options.minimalPairSetId || null,
@@ -1465,9 +1498,9 @@ export function recordMistake(
   return [fresh, ...(mistakes || []).filter((m) => m.key !== key)].slice(0, 50);
 }
 
-export function markMistakeResolved(mistakes, key) {
+export function markMistakeResolved(mistakes, key, options = {}) {
   return (mistakes || []).map((m) =>
-    m.key === key ? { ...m, resolved: true, resolvedAt: Date.now() } : m,
+    m.key === key ? { ...m, resolved: true, resolvedAt: Number(options.now) || Date.now() } : m,
   );
 }
 
