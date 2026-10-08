@@ -26,13 +26,43 @@ describe('static coverage configuration', () => {
     expect(pkg.scripts['ci:fast']).toContain('npm run typecheck');
   });
 
-  it('keeps strict checkJs coverage enabled for new typecheck surfaces', () => {
+  it('keeps strict seed coverage and broad app-surface coverage enabled', () => {
     const base = readRepoJson('tsconfig.json');
+    const app = readRepoJson('tsconfig.app.json');
+    const appStrict = readRepoJson('tsconfig.app.strict.json');
     const tooling = readRepoJson('tsconfig.tooling.json');
     const supabase = readRepoJson('tsconfig.supabase.json');
+    const pkg = readRepoJson('package.json');
 
     expect(base.compilerOptions.checkJs).toBe(true);
     expect(base.compilerOptions.strict).toBe(true);
+    expect(pkg.scripts['typecheck:app']).toContain('tsconfig.app.strict.json');
+    expect(pkg.scripts['typecheck:app']).toContain('tsconfig.app.json');
+    expect(appStrict.compilerOptions.checkJs).not.toBe(false);
+    expect(appStrict.compilerOptions.strict).not.toBe(false);
+    expect(appStrict.compilerOptions.noImplicitAny).not.toBe(false);
+    expect(appStrict.include).toEqual(
+      expect.arrayContaining([
+        'src/data/defaults.js',
+        'src/hooks/useFocusTrap.js',
+        'src/hooks/useVirtualRows.js',
+        'src/i18n/**/*.js',
+        'src/utils/rateLimiter.js',
+        'src/utils/retry.js',
+      ]),
+    );
+    expect(app.compilerOptions.checkJs).not.toBe(false);
+    expect(app.include).toEqual(
+      expect.arrayContaining([
+        'src/data/defaults.js',
+        'src/i18n/**/*.js',
+        'src/state/AppStateContext.jsx',
+        'src/utils/rateLimiter.js',
+        'src/utils/retry.js',
+        'src/utils/storage.js',
+        'src/views/StudyView.jsx',
+      ]),
+    );
     expect(tooling.compilerOptions.checkJs).not.toBe(false);
     expect(tooling.compilerOptions.strict).not.toBe(false);
     expect(supabase.compilerOptions.checkJs).not.toBe(false);
@@ -45,15 +75,12 @@ describe('static coverage configuration', () => {
     );
   });
 
-  it('allows every browser API origin used by visible import features', () => {
+  it('keeps browser API origins limited to current visible features', () => {
     const html = readRepoText('index.html');
-    const wanikani = readRepoText('src/utils/wanikani.js');
-    const wanikaniBase = wanikani.match(/WANIKANI_API_BASE = '([^']+)'/)?.[1];
-    expect(wanikaniBase).toBeTruthy();
 
     const connectSrc = html.match(/connect-src ([^;"]+)/)?.[1] || '';
     expect(connectSrc).toContain('https://*.supabase.co');
-    expect(connectSrc).toContain(new URL(wanikaniBase).origin);
+    expect(connectSrc).not.toContain('api.wanikani.com');
   });
 
   it('keeps the Gemini proxy fail-closed unless public origins are explicit', () => {
@@ -63,5 +90,55 @@ describe('static coverage configuration', () => {
     expect(proxy).toContain('MISSING_ALLOWED_ORIGIN_ERROR');
     expect(proxy).toContain('GEMINI_ALLOW_PUBLIC_ORIGIN');
     expect(proxy).toContain('ALLOWED_ORIGIN=* requires GEMINI_ALLOW_PUBLIC_ORIGIN=true');
+  });
+
+  it('pins the Gemini proxy to the generation its request schema targets', () => {
+    const proxy = readRepoText('supabase/functions/gemini-proxy/index.ts');
+
+    expect(proxy).toContain("const GEMINI_MODEL = 'gemini-3.5-flash-lite'");
+    expect(proxy).not.toContain('gemini-flash-lite-latest');
+    expect(proxy).toContain("thinkingConfig: { thinkingLevel: 'MINIMAL' }");
+    expect(proxy).not.toContain('temperature: clampNumber');
+  });
+
+  it('runtime-caches the sentence corpus without precaching every chunk', () => {
+    const config = readRepoText('vite.config.js');
+
+    expect(config).toContain("'**/data/sentences/manifest.json'");
+    expect(config).toContain("'**/data/sentences/by-type/*.json'");
+    expect(config).toContain("'**/assets/vendor-supabase-*.js'");
+    expect(config).toContain("cacheName: 'sentence-corpus-manifest-v2'");
+    expect(config).toContain("handler: 'NetworkFirst'");
+    expect(config).toContain("cacheName: 'sentence-corpus-v2'");
+    expect(config).toContain("handler: 'CacheFirst'");
+    expect(config).toContain("cacheName: 'supabase-sdk-v1'");
+    expect(config).toContain('manifest: true');
+  });
+
+  it('enforces separate eager, precache, total, and per-chunk bundle budgets', () => {
+    const budget = readRepoText('scripts/check-bundle-size.js');
+
+    expect(budget).toContain('EAGER_CRITICAL_GZIP_KB');
+    expect(budget).toContain('PRECACHE_GZIP_KB');
+    expect(budget).toContain('TOTAL_GZIP_KB = 330');
+    expect(budget).toContain('MAX_CHUNK_GZIP_KB');
+    expect(budget).toContain("'EAGER/CRITICAL'");
+    expect(budget).toContain("'PRECACHE'");
+    expect(budget).toContain("'TOTAL'");
+    expect(budget).toContain('sumPrecache(cachedPaths)');
+    expect(budget).toContain("gzipFile(join(DIST_DIR, 'index.html'))");
+  });
+
+  it('runs browser tests against the configured deploy artifact', () => {
+    const deploy = readRepoText('.github/workflows/deploy.yml');
+    const playwright = readRepoText('playwright.config.js');
+    const buildIndex = deploy.indexOf('- run: npm run build');
+    const e2eIndex = deploy.indexOf('- name: Run E2E tests against configured build');
+
+    expect(buildIndex).toBeGreaterThan(-1);
+    expect(e2eIndex).toBeGreaterThan(buildIndex);
+    expect(deploy).toContain("PW_USE_PREBUILT: '1'");
+    expect(playwright).toContain("process.env.PW_USE_PREBUILT === '1'");
+    expect(playwright).toContain("'npm run preview -- --host 127.0.0.1'");
   });
 });

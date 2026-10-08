@@ -67,7 +67,7 @@ const sharedRules = {
 
 export default [
   {
-    ignores: ['dist/', 'node_modules/', 'public/', 'temp-vite/', 'test-results/'],
+    ignores: ['dist/', 'node_modules/', 'public/', 'temp-vite/', 'test-results/', 'tmp/'],
   },
   js.configs.recommended,
   {

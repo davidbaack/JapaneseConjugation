@@ -22,7 +22,9 @@ test.describe('Classification drill', () => {
     await expect(page.getByText(/Correct\.|Not quite\./).first()).toBeVisible();
 
     // The verdict teaches the clue, an example, and a trap to remember.
-    await expect(page.getByText(/It is /).first()).toBeVisible();
+    await expect(
+      page.locator('div.font-medium').filter({ hasText: 'Correct group:' }),
+    ).toBeVisible();
     await expect(page.getByText('Recognition clue:')).toBeVisible();
     await expect(page.getByText('Example:')).toBeVisible();
 

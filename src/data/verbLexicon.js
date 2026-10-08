@@ -1,9 +1,14 @@
 import { STARTER_ADJECTIVES, STARTER_VERBS } from './starterWords.js';
 import { isLexiconArtifactRow, normalizeLexiconRow } from '../utils/lexiconArtifacts.js';
+import { inflatePitchAccent } from '../utils/pitchAccent.js';
 
-const BASE_URL = import.meta.env?.BASE_URL || '/';
+const BASE_URL = /** @type {any} */ (import.meta).env?.BASE_URL || '/';
 
 export const VERB_LEXICON_URL = `${BASE_URL}data/verb-lexicon.json`;
+
+// Lexicon rows encode JMdict transitivity compactly (see build-verb-lexicon.js):
+// 't' transitive, 'i' intransitive, 'b' both. Inflate to a readable field.
+const TRANSITIVITY_BY_CODE = { t: 'transitive', i: 'intransitive', b: 'both' };
 
 export function isGeneratedPracticeArtifactRow(row = []) {
   return isLexiconArtifactRow(row);
@@ -12,10 +17,22 @@ export function isGeneratedPracticeArtifactRow(row = []) {
 export function inflateVerbRow(row) {
   const cleanRow = normalizeLexiconRow(row);
   if (!cleanRow) return null;
-  const [dict, reading, meaning, group, jlpt, genkiLessons, minnaLessons, common] = cleanRow;
+  const [
+    dict,
+    reading,
+    meaning,
+    group,
+    jlpt,
+    genkiLessons,
+    minnaLessons,
+    common,
+    transitive,
+    pitchAccent,
+  ] = cleanRow;
   if (!dict || !reading || !group) return null;
   const cleanGenki = Array.isArray(genkiLessons) ? genkiLessons : [];
   const cleanMinna = Array.isArray(minnaLessons) ? minnaLessons : [];
+  const cleanPitchAccent = inflatePitchAccent(pitchAccent);
   return {
     dict,
     reading,
@@ -25,6 +42,8 @@ export function inflateVerbRow(row) {
     ...(cleanGenki.length ? { lessons: cleanGenki, lesson: cleanGenki[0] } : {}),
     ...(cleanMinna.length ? { minnaLessons: cleanMinna, minnaLesson: cleanMinna[0] } : {}),
     ...(common ? { common: true } : {}),
+    ...(transitive ? { transitive: TRANSITIVITY_BY_CODE[transitive] || undefined } : {}),
+    ...(cleanPitchAccent ? { pitchAccent: cleanPitchAccent } : {}),
   };
 }
 
@@ -62,6 +81,12 @@ function mergeVerbMetadata(target, source) {
   );
   if (source.jlpt && !target.jlpt) target.jlpt = source.jlpt;
   if (source.common && !target.common) target.common = true;
+  if (!target.exerciseMeaning) {
+    if (source.exerciseMeaning) target.exerciseMeaning = source.exerciseMeaning;
+    else if (source.meaning && source.meaning !== target.meaning) {
+      target.exerciseMeaning = source.meaning;
+    }
+  }
   if (lessons.length) {
     target.lessons = lessons;
     target.lesson = lessons[0];

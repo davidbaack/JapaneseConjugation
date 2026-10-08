@@ -22,6 +22,7 @@ import {
   rushWaveForCleared,
 } from '../utils/rush.js';
 import { useApp } from '../state/AppStateContext.jsx';
+import { ANSWER_OUTCOME, answerResultCopy } from '../utils/answerFeedbackCopy.js';
 
 export default function RushView() {
   const {
@@ -227,10 +228,18 @@ export default function RushView() {
       advanceRef.current = setTimeout(() => active && launchRound(nextCleared), 520);
     } else {
       setCombo(0);
+      const resultCopy = answerResultCopy({
+        outcome: reason === 'timeout' ? ANSWER_OUTCOME.timeout : ANSWER_OUTCOME.missed,
+        submitted: normalizeRushAnswer(raw),
+        expected: current.expected,
+      });
       setFeedback({
         kind: 'bad',
-        title: reason === 'timeout' ? 'Time' : 'Miss',
-        detail: `${current.expected} · ${current.type.label}`,
+        title: resultCopy.headline,
+        detail:
+          reason === 'timeout'
+            ? `${resultCopy.expected}: ${resultCopy.expectedValue} · ${current.type.label}`
+            : `${resultCopy.submitted}: ${resultCopy.submittedValue} · ${resultCopy.expected}: ${resultCopy.expectedValue}`,
       });
       setRecent((r) =>
         [
@@ -295,33 +304,7 @@ export default function RushView() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-            {score}
-          </div>
-          <div className="text-xs text-stone-500">Score</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-            {combo}
-          </div>
-          <div className="text-xs text-stone-500">Combo</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-            {wave}
-          </div>
-          <div className="text-xs text-stone-500">Wave</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-            {game.bestScore || 0}
-          </div>
-          <div className="text-xs text-stone-500">Best</div>
-        </div>
-      </div>
-      <div className="grid lg:grid-cols-[1fr_260px] gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]">
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5">
           <div className="flex items-center justify-between gap-3 mb-4">
             <div>
@@ -337,7 +320,7 @@ export default function RushView() {
               {!active ? (
                 <button
                   onClick={startGame}
-                  className="px-3 py-2 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-150 text-white dark:text-stone-900 rounded-lg text-sm font-medium transition"
+                  className="px-3 py-2 bg-stone-800 hover:bg-stone-900 dark:bg-stone-200 dark:hover:bg-stone-100 text-white dark:text-stone-900 rounded-lg text-sm font-medium transition"
                 >
                   Start
                 </button>
@@ -352,7 +335,7 @@ export default function RushView() {
               {active && (
                 <button
                   onClick={endGame}
-                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-750 dark:text-stone-300 rounded-lg text-sm transition"
+                  className="px-3 py-2 border border-stone-200 dark:border-stone-800 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 rounded-lg text-sm transition"
                 >
                   End
                 </button>
@@ -366,13 +349,13 @@ export default function RushView() {
             />
           </div>
           <div className="relative h-80 overflow-hidden rounded-2xl bg-stone-900 border border-stone-800 text-white">
-            <div className="absolute inset-x-5 bottom-10 h-px bg-rose-450/70" />
+            <div className="absolute inset-x-5 bottom-10 h-px bg-rose-400/70" />
             {round && (
               <div
                 className="absolute left-5 right-5 transition-transform duration-100"
                 style={{ transform: `translateY(${fall}px)` }}
               >
-                <div className="rounded-2xl bg-white dark:bg-stone-905 text-stone-900 dark:text-stone-100 shadow-xl p-5 border border-stone-200 dark:border-stone-800">
+                <div className="rounded-2xl bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 shadow-xl p-5 border border-stone-200 dark:border-stone-800">
                   <div className="flex items-center justify-between gap-3 text-xs text-stone-500 mb-3">
                     <span>
                       {promptLabel} → {round.type.label}
@@ -399,8 +382,8 @@ export default function RushView() {
                   <div
                     className={`rounded-2xl px-5 py-4 border ${
                       feedback.kind === 'ok'
-                        ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-350 border-emerald-200 dark:border-emerald-900/50'
-                        : 'bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-350 border-rose-200 dark:border-rose-900/50'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/50'
+                        : 'bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-900/50'
                     }`}
                   >
                     <span role="status" aria-live="polite" className="sr-only">
@@ -495,28 +478,54 @@ export default function RushView() {
                   key={i}
                   className={`rounded-xl border px-3 py-2 ${
                     r.ok
-                      ? 'border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/20 text-stone-850 dark:text-stone-200'
-                      : 'border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/20 text-stone-850 dark:text-stone-200'
+                      ? 'border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/20 text-stone-800 dark:text-stone-200'
+                      : 'border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/20 text-stone-800 dark:text-stone-200'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-stone-550 dark:text-stone-400">{r.type}</span>
+                    <span className="text-xs text-stone-500 dark:text-stone-400">{r.type}</span>
                     <span
                       className={`text-xs font-semibold ${r.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}
                     >
-                      {r.ok ? 'OK' : 'MISS'}
+                      {r.ok ? 'Correct' : 'Not quite'}
                     </span>
                   </div>
                   <div className="mt-1 text-sm" lang="ja">
                     {r.prompt} → {r.expected}
                   </div>
                   <div className="text-xs text-stone-500 mt-1">
-                    You: <span lang="ja">{r.answer}</span>
+                    Your answer: <span lang="ja">{r.answer}</span>
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Rush results">
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {score}
+          </div>
+          <div className="text-xs text-stone-500">Score</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {combo}
+          </div>
+          <div className="text-xs text-stone-500">Combo</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {wave}
+          </div>
+          <div className="text-xs text-stone-500">Wave</div>
+        </div>
+        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+          <div className="text-2xl font-semibold tabular-nums text-stone-950 dark:text-stone-50">
+            {game.bestScore || 0}
+          </div>
+          <div className="text-xs text-stone-500">Best</div>
         </div>
       </div>
     </div>

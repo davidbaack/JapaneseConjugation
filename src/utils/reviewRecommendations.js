@@ -331,3 +331,32 @@ export function buildLessonReviewRecommendation(lesson, words = [], options = {}
     suggestedCount: options.suggestedCount || suggestedCount(selected, typeIds, 16),
   });
 }
+
+export function buildRuleReviewRecommendation(focus = {}, words = [], options = {}) {
+  const typeId = focus?.typeId || focus?.type;
+  const preferredKey = focus?.word ? wordKey(focus.word) : '';
+  const pool = [...(words || [])];
+  if (focus?.word && preferredKey && !pool.some((word) => wordKey(word) === preferredKey)) {
+    pool.push(focus.word);
+  }
+  const typeIds = typeIdsForWords([typeId], pool);
+  const selected = wordsForTypes(pool, typeIds, options.wordLimit || 10);
+  const preferredWord = preferredKey
+    ? selected.find((word) => wordKey(word) === preferredKey)
+    : null;
+  const ordered = preferredWord
+    ? [preferredWord, ...selected.filter((word) => wordKey(word) !== preferredKey)]
+    : selected;
+  const typeLabel = focus?.typeLabel || getTypeInfo(typeId).label || 'this form';
+  const lessonTitle = focus?.lessonTitle || 'the lesson';
+
+  return makeRecommendation({
+    id: `lesson-${safeId(focus?.lessonGroupId || 'rule')}-${safeId(typeId)}`,
+    source: 'lesson',
+    label: `${typeLabel} Practice`,
+    detail: `Focused recall for ${typeLabel} from ${lessonTitle}.`,
+    wordKeys: ordered.slice(0, options.wordLimit || 10).map(wordKey),
+    typeIds,
+    suggestedCount: options.suggestedCount || suggestedCount(ordered, typeIds, 8),
+  });
+}

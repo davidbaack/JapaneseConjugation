@@ -18,10 +18,67 @@ export default defineConfig({
       includeAssets: ['apple-touch-icon.png'],
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,json}'],
+        globIgnores: [
+          '**/data/sentences/manifest.json',
+          '**/data/sentences/by-type/*.json',
+          '**/assets/vendor-supabase-*.js',
+        ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         navigateFallback: '/JapaneseConjugation/index.html',
         navigateFallbackDenylist: [/\.[^/?]+$/],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.origin === globalThis.location.origin &&
+              url.pathname.includes('/JapaneseConjugation/assets/vendor-supabase-') &&
+              url.pathname.endsWith('.js'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'supabase-sdk-v1',
+              expiration: {
+                maxEntries: 2,
+                maxAgeSeconds: 60 * 60 * 24 * 365,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            urlPattern: ({ url }) =>
+              url.origin === globalThis.location.origin &&
+              url.pathname === '/JapaneseConjugation/data/sentences/manifest.json',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'sentence-corpus-manifest-v2',
+              expiration: {
+                maxEntries: 1,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            urlPattern: ({ url }) =>
+              url.origin === globalThis.location.origin &&
+              url.pathname.startsWith('/JapaneseConjugation/data/sentences/by-type/') &&
+              url.pathname.endsWith('.json'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'sentence-corpus-v2',
+              expiration: {
+                maxEntries: 140,
+                maxAgeSeconds: 60 * 60 * 24 * 365,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+        ],
       },
       manifest: {
         id: '/JapaneseConjugation/',
@@ -66,14 +123,17 @@ export default defineConfig({
     },
   },
   build: {
+    manifest: true,
     rollupOptions: {
       output: {
+        chunkFileNames(chunk) {
+          return chunk.facadeModuleId?.endsWith('/src/utils/supabaseClient.js')
+            ? 'assets/vendor-supabase-[hash].js'
+            : 'assets/[name]-[hash].js';
+        },
         manualChunks(id) {
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor-react';
-          }
-          if (id.includes('node_modules/@supabase')) {
-            return 'vendor-supabase';
           }
         },
       },

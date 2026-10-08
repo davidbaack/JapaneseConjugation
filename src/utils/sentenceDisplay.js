@@ -166,9 +166,16 @@ function sentenceKana(parts) {
   return parts.map((part) => part.ruby || part.text).join('');
 }
 
-export function sentenceDisplay(sentence, prefs = DEFAULT_PREFS) {
+// `precomputedParts` (array of { text, ruby }) lets callers supply readings for
+// sentences whose kanji aren't in the local SENTENCE_READING_ENTRIES map — e.g.
+// tailored sentences from the database, which ship per-token furigana segments.
+// When omitted, readings are derived from the local map exactly as before.
+export function sentenceDisplay(sentence, prefs = DEFAULT_PREFS, precomputedParts = null) {
   const ds = resolveDisplayScripts(prefs);
-  const parts = sentenceReadingParts(sentence);
+  const parts =
+    Array.isArray(precomputedParts) && precomputedParts.length
+      ? precomputedParts
+      : sentenceReadingParts(sentence);
   const kana = sentenceKana(parts);
   const rom = kanaToRomaji(kana);
 

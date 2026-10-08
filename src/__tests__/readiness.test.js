@@ -3,6 +3,8 @@ import {
   buildReadinessFamilyRows,
   defaultReadinessState,
   launchPrefsForReadinessDimension,
+  mergeReadinessState,
+  normalizeReadinessState,
   recordReadinessAttempt,
   weakestReadinessSkill,
 } from '../utils/readiness.js';
@@ -12,6 +14,41 @@ const ICHIDAN_TE_FORM_ID = 'verb:ichidan:\u898b\u308b:\u307f\u308b|te-form';
 const GODAN_PLAIN_PAST_ID = 'verb:godan:\u66f8\u304f:\u304b\u304f|plain-past';
 
 describe('readiness tracking', () => {
+  it('keeps the committed identity through normalization and skips an immediate replay', () => {
+    const details = { correct: true, responseMs: 5200, now: 1000, eventId: 'attempt-a' };
+    const first = recordReadinessAttempt(defaultReadinessState(), ICHIDAN_PLAIN_PAST_ID, details);
+    const reloaded = normalizeReadinessState(JSON.parse(JSON.stringify(first)));
+    expect(reloaded.byRule[ICHIDAN_PLAIN_PAST_ID].production.lastAttemptId).toBe('attempt-a');
+    expect(reloaded.byRule[ICHIDAN_PLAIN_PAST_ID].speed.lastAttemptId).toBe('attempt-a');
+    expect(recordReadinessAttempt(reloaded, ICHIDAN_PLAIN_PAST_ID, details)).toEqual(reloaded);
+    const second = recordReadinessAttempt(reloaded, ICHIDAN_PLAIN_PAST_ID, {
+      ...details,
+      eventId: 'attempt-b',
+    });
+    expect(second.byRule[ICHIDAN_PLAIN_PAST_ID].production.attempted).toBe(2);
+  });
+
+  it('chooses latest timing deterministically for simultaneous attempt identities', () => {
+    const first = recordReadinessAttempt(defaultReadinessState(), ICHIDAN_PLAIN_PAST_ID, {
+      correct: true,
+      responseMs: 5200,
+      now: 1000,
+      eventId: 'attempt-a',
+    });
+    const second = recordReadinessAttempt(defaultReadinessState(), ICHIDAN_PLAIN_PAST_ID, {
+      correct: false,
+      responseMs: 7000,
+      now: 1000,
+      eventId: 'attempt-b',
+    });
+    const merged = mergeReadinessState(first, second);
+    expect(merged).toEqual(mergeReadinessState(second, first));
+    expect(merged.byRule[ICHIDAN_PLAIN_PAST_ID].speed).toMatchObject({
+      lastAttemptId: 'attempt-b',
+      lastMs: 7000,
+    });
+  });
+
   it('records production attempts and speed metrics together', () => {
     const readiness = recordReadinessAttempt(defaultReadinessState(), ICHIDAN_PLAIN_PAST_ID, {
       correct: true,

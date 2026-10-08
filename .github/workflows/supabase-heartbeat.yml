@@ -1,0 +1,32 @@
+name: Supabase Heartbeat
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Keep Katachiya's Free Supabase project active with tiny read-only DB hits.
+    # GitHub schedules use UTC; this runs every day at 10:37 UTC.
+    - cron: '37 10 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  heartbeat:
+    name: Read public sentence row
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # Uses only Node built-ins and tracked source/data; npm install is unnecessary.
+      - name: Verify three distinct approved public sentences
+        run: node scripts/supabase-heartbeat.js

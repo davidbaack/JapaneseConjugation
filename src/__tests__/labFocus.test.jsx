@@ -1,8 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-vi.mock('../utils/supabase.js', () => ({ supabase: null }));
+vi.mock('../utils/supabase.js', () => ({
+  getSupabaseClientState: () => ({
+    configured: false,
+    status: 'unconfigured',
+    error: null,
+    client: null,
+  }),
+  subscribeSupabaseClient: () => () => {},
+  shouldRestoreSupabaseSession: () => false,
+}));
 
 import { AppStateProvider, useApp } from '../state/AppStateContext.jsx';
 
@@ -20,6 +29,30 @@ function LabProbe() {
       </button>
       <output data-testid="tab">{app.tab}</output>
       <output data-testid="lab-focus">{JSON.stringify(app.labFocus)}</output>
+    </div>
+  );
+}
+
+function RecommendationProbe() {
+  const app = useApp();
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() =>
+          app.startReviewRecommendation({
+            id: 'lab-test-review',
+            source: 'lab',
+            label: 'Lab test review',
+            typeIds: ['te-form'],
+            suggestedCount: 6,
+          })
+        }
+      >
+        start recommendation
+      </button>
+      <output data-testid="enabled-types">{JSON.stringify(app.state.enabledTypes)}</output>
+      <output data-testid="study-focus">{JSON.stringify(app.studyFocus)}</output>
     </div>
   );
 }
@@ -49,5 +82,22 @@ describe('openLabTool', () => {
     // The consumer clears the request so a later manual visit lands on default.
     fireEvent.click(screen.getByRole('button', { name: 'clear focus' }));
     expect(screen.getByTestId('lab-focus').textContent).toBe('null');
+  });
+});
+
+describe('startReviewRecommendation', () => {
+  it('updates the persistent Practice selection without creating a temporary focus', async () => {
+    render(
+      <AppStateProvider>
+        <RecommendationProbe />
+      </AppStateProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'start recommendation' }));
+
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId('enabled-types').textContent)).toEqual(['te-form']),
+    );
+    expect(screen.getByTestId('study-focus').textContent).toBe('null');
   });
 });

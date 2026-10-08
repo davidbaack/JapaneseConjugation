@@ -1,3 +1,4 @@
+// @ts-check
 import { useEffect, useRef } from 'react';
 
 const FOCUSABLE_SELECTOR = [
@@ -17,8 +18,18 @@ const FOCUSABLE_SELECTOR = [
 //
 // Returns a ref to attach to the dialog container. No-op while `isOpen` is
 // false so it's safe to call unconditionally.
+/**
+ * @typedef {object} FocusTrapOptions
+ * @property {boolean} isOpen
+ * @property {() => void} [onClose]
+ */
+
+/**
+ * @param {FocusTrapOptions} options
+ * @returns {import('react').RefObject<HTMLElement | null>}
+ */
 export function useFocusTrap({ isOpen, onClose }) {
-  const ref = useRef(null);
+  const ref = useRef(/** @type {HTMLElement | null} */ (null));
 
   // Keep the latest onClose without re-running the trap effect on every render.
   const onCloseRef = useRef(onClose);
@@ -32,15 +43,26 @@ export function useFocusTrap({ isOpen, onClose }) {
     if (!dialog) return;
     const previouslyFocused = document.activeElement;
 
-    const getFocusable = () =>
-      Array.from(dialog.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
-        (el) => el.offsetParent !== null,
-      );
+    const getFocusable = () => {
+      /** @type {HTMLElement[]} */
+      const focusable = [];
+      dialog.querySelectorAll(FOCUSABLE_SELECTOR).forEach((el) => {
+        if (el instanceof window.HTMLElement && el.offsetParent !== null) {
+          focusable.push(el);
+        }
+      });
+      return focusable;
+    };
 
     // Prefer the first form field; fall back to first focusable / the dialog.
     const firstField = dialog.querySelector('input:not([disabled]), textarea, select');
-    (firstField || getFocusable()[0] || dialog).focus();
+    const initialFocusTarget =
+      firstField instanceof window.HTMLElement ? firstField : getFocusable()[0] || dialog;
+    initialFocusTarget.focus();
 
+    /**
+     * @param {KeyboardEvent} e
+     */
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
@@ -67,7 +89,7 @@ export function useFocusTrap({ isOpen, onClose }) {
     dialog.addEventListener('keydown', onKeyDown);
     return () => {
       dialog.removeEventListener('keydown', onKeyDown);
-      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+      if (previouslyFocused instanceof window.HTMLElement) {
         previouslyFocused.focus();
       }
     };

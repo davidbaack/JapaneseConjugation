@@ -1,22 +1,11 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
+import { IconVolume, IconChat, IconFlame } from '../components/Icons.jsx';
+import { ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
 import {
-  IconCheck,
-  IconX,
-  IconVolume,
-  IconSpark,
-  IconChat,
-  IconEye,
-  IconEyeOff,
-  IconFlame,
-  IconMic,
-  IconPlus,
-  IconRefresh,
-} from '../components/Icons.jsx';
-import {
-  ALL_CARD_TYPES,
-  FORM_GROUPS,
-  TE_TA_SOUND_CHANGE_FAMILY_ID,
-} from '../data/conjugationTypes.js';
+  PRACTICE_CATEGORIES,
+  PRACTICE_FILTERS,
+  practiceCategoryForType,
+} from '../data/practiceTaxonomy.js';
 import {
   getSpeechRecognitionConstructor,
   playPronunciation,
@@ -24,8 +13,7 @@ import {
 } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
-import { ContextExamplePanel } from '../components/ContextExamplePanel.jsx';
-import { ConjugationBreakdown } from '../components/ConjugationBreakdown.jsx';
+import { lessonForType } from '../data/lessonContent.js';
 import { ChatPanel } from '../components/ChatPanel.jsx';
 import { toHiragana, toHiraganaProgress, toKanaInputValue } from '../utils/romaji.js';
 import {
@@ -38,13 +26,10 @@ import {
   isRedundantPracticeType,
   practiceTypesForItem,
   surfaceFormFor,
+  wordKey,
 } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
-import {
-  explainItem,
-  getOfflineTemplateSentence,
-  stepCoachHint,
-} from '../utils/conjugatorExplain.js';
+import { explainItem, stepCoachHint } from '../utils/conjugatorExplain.js';
 import { groupAliasText, groupDisplayLabel } from '../utils/groupDisplay.js';
 import {
   selectNext,
@@ -52,14 +37,15 @@ import {
   recordMistake,
   markMistakeResolved,
   gradeCard,
-  bumpDaily,
-  typeIdFromCardId,
+  gradeTransformationStats,
+  cardIdFor,
 } from '../utils/storage.js';
-import { READINESS_DIMENSIONS, recordReadinessAttempt } from '../utils/readiness.js';
+import { recordReadinessAttempt } from '../utils/readiness.js';
 import {
   formDisplay,
   promptDisplay,
-  englishForForm,
+  exerciseEnglishForForm,
+  exerciseMeaningForWord,
   answerPhaseTaskDetails,
   makeChoices,
   makeReverseChoices,
@@ -69,10 +55,12 @@ import {
   autoAdvanceAnswerFormKey,
   resolveAutoAdvanceCorrect,
   kanaMatchDisplayForPrefs,
-  typoGuardForAnswer,
   spokenAnswerResult,
 } from '../utils/display.js';
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
+import { fetchBundledSentence } from '../utils/sentenceCorpus.js';
+import { fetchTailoredSentence } from '../utils/sentenceLibrary.js';
+import { buildSentencePromptModel } from '../utils/sentencePrompt.js';
 import {
   bumpSessionMistakePattern,
   labRouteForMistakePattern,
@@ -87,17 +75,39 @@ import {
   recordMinimalPairResult,
 } from '../utils/minimalPairs.js';
 import { buildRuleCandidates } from '../utils/ruleCandidates.js';
-import { buildWeaknessFamilyRows, recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
+import { recordWeaknessAttempt } from '../utils/subcategoryWeakness.js';
 import {
   excludeWordFromReviewState,
-  includeFormFamilyInReviewState,
   includeWordInReviewState,
   reviewTypeIdsForState,
 } from '../utils/reviewScope.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import StickyAction from '../components/StickyAction.jsx';
 import { kanaCoachCells, explainReversePrompt } from '../utils/kanaCoach.js';
+import {
+  cardOriginForStudyCard,
+  cardOriginMeta,
+  reviewFeedbackActionForRecord,
+  snapshotPracticePrefs,
+  withCardOrigin,
+} from './study/StudyReviewPanels.jsx';
+import { StudyFocusBar } from './study/StudyFocusBar.jsx';
+import { AnswerInputPanel } from './study/AnswerInputPanel.jsx';
+import PracticeSelector from './study/PracticeSelector.jsx';
+import {
+  addPracticeTypeSelection,
+  matchingPracticeTypeIdsForCategory,
+  normalizePracticeSelection,
+  practiceFilterConflictsForType,
+  practiceSelectionForTypeIds,
+  setPracticeFilterSelection,
+  togglePracticeCategorySelection,
+  togglePracticeTypeSelection,
+  updateStatePracticeSelection,
+} from '../utils/practiceSelection.js';
+import { contextualStatsForType, recordPracticeAnswer } from '../utils/practiceStats.js';
+import { createSyncEventId } from '../utils/syncMetadata.js';
 export { kanaCoachCells, explainReversePrompt };
+export { reviewFeedbackActionForRecord };
 
 // Keep the active card across a page refresh so reloading Study resumes the
 // same word/form rather than drawing a fresh one. Scoped to sessionStorage so
@@ -105,9 +115,13 @@ export { kanaCoachCells, explainReversePrompt };
 const STUDY_CURRENT_KEY = 'jp-study-current';
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
-const REVIEW_LIMIT_SOURCES = new Set(['lab', 'recommendation']);
+const REVIEW_LIMIT_SOURCES = new Set(['lab']);
+const CARD_TYPE_BY_ID = new Map(ALL_CARD_TYPES.map((type) => [type.id, type]));
 const REVIEW_SESSION_HISTORY_SIZE = 4;
 const CORRECT_AUTO_ADVANCE_MS = 850;
+const SENTENCE_PROMPT_GRACE_MS = 250;
+const SENTENCE_ENTRY_FRESH_MS = 60_000;
+const SESSION_RECENT_OUTCOME_LIMIT = 6;
 const ANSWER_STYLE_OPTIONS = [
   { id: 'input', label: 'Type' },
   { id: 'choice', label: 'Choose' },
@@ -125,10 +139,44 @@ function focusWithoutScroll(element) {
   }
 }
 
+function MistakeRouteHint({ route }) {
+  if (!route) return null;
+  return (
+    <div className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs dark:border-indigo-900/60 dark:bg-indigo-950/20">
+      <div className="font-semibold text-indigo-800 dark:text-indigo-200">
+        {route.triggerLabel} -&gt; {route.toolLabel}
+      </div>
+      <div className="mt-0.5 text-stone-600 dark:text-stone-300">{route.detail}</div>
+    </div>
+  );
+}
+
 function activeReviewLimitFromPrefs(prefs = DEFAULT_PREFS) {
   if (!REVIEW_LIMIT_SOURCES.has(prefs.reviewLimitSource)) return 0;
   const limit = Number(prefs.reviewLimit || 0);
   return Number.isFinite(limit) && limit > 0 ? limit : 0;
+}
+
+function sentenceEntryKey(word, type) {
+  return word?.dict && type
+    ? JSON.stringify([
+        wordKey(word),
+        type,
+        word.reading || '',
+        word.meaning || '',
+        word.exerciseMeaning || '',
+      ])
+    : '';
+}
+
+function freshSentenceEntry(cache, key) {
+  const cached = cache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.loadedAt >= SENTENCE_ENTRY_FRESH_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return cached.entry;
 }
 
 function transformationRouteText(sourceInfo, targetInfo) {
@@ -219,67 +267,107 @@ function cardMatchesPractice(card, words, enabledTypes, prefs = DEFAULT_PREFS) {
   return !isRedundantPracticeType(card.verb, card.type, activeTypes, prefs);
 }
 
-function ReviewDisclosure({ tone = 'stone', summary, children, alwaysOpen = false }) {
-  const toneClass =
-    tone === 'rose'
-      ? 'border-rose-200 dark:border-rose-900/60 bg-white/70 dark:bg-stone-950/50'
-      : tone === 'emerald'
-        ? 'border-emerald-200 dark:border-emerald-900/60 bg-white/70 dark:bg-stone-950/50'
-        : 'border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-950/50';
-
-  if (alwaysOpen) {
-    return (
-      <section className={`rounded-xl border ${toneClass} px-3 py-2`}>
-        <div className="text-sm font-semibold text-stone-800 dark:text-stone-100">{summary}</div>
-        <div className="mt-3 space-y-2.5">{children}</div>
-      </section>
-    );
-  }
-
-  return (
-    <details className={`rounded-xl border ${toneClass} px-3 py-2`}>
-      <summary className="cursor-pointer list-none text-sm font-semibold text-stone-800 dark:text-stone-100">
-        <span className="inline-flex items-center gap-2">
-          <span>{summary}</span>
-          <span className="text-xs font-medium text-stone-500 dark:text-stone-400">More</span>
-        </span>
-      </summary>
-      <div className="mt-3 space-y-2.5">{children}</div>
-    </details>
-  );
+function isReadingPracticeCard(card) {
+  return card?.type === DICTIONARY_TYPE_ID || card?.sourceType === DICTIONARY_TYPE_ID;
 }
 
-function ReviewChatSection({ tone = 'stone', chatOpen, onOpen, children }) {
-  const toneClass =
-    tone === 'rose'
-      ? 'border-rose-200 dark:border-rose-900/60 bg-white/70 dark:bg-stone-950/50'
-      : tone === 'emerald'
-        ? 'border-emerald-200 dark:border-emerald-900/60 bg-white/70 dark:bg-stone-950/50'
-        : 'border-stone-200 dark:border-stone-800 bg-white/70 dark:bg-stone-950/50';
-  const buttonClass =
-    tone === 'rose'
-      ? 'border-rose-200 text-rose-700 hover:bg-rose-100/50 dark:border-rose-900 dark:text-rose-450 dark:hover:bg-rose-950/50'
-      : tone === 'emerald'
-        ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-100/50 dark:border-emerald-900 dark:text-emerald-400 dark:hover:bg-emerald-950/50'
-        : 'border-stone-200 text-stone-700 hover:bg-stone-100/50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-900/60';
+function sessionBaseFrom(session = {}) {
+  return {
+    reviewed: session.reviewed || 0,
+    correct: session.correct || 0,
+    skipped: session.skipped || 0,
+  };
+}
 
-  return (
-    <section className={`rounded-xl border ${toneClass} px-3 py-2`}>
-      <div className="text-sm font-semibold text-stone-800 dark:text-stone-100">
-        3. Follow-up chat with AI
-      </div>
-      {!chatOpen ? (
-        <button
-          onClick={onOpen}
-          aria-expanded={chatOpen}
-          className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border py-2 text-sm transition ${buttonClass}`}
-        >
-          <IconChat className="h-4 w-4" /> Chat about this
-        </button>
-      ) : (
-        <div className="mt-3">{children}</div>
-      )}
-    </section>
+function sessionRunStats(session = {}, base = {}) {
+  const reviewed = Math.max(0, (session.reviewed || 0) - (base.reviewed || 0));
+  const correct = Math.max(0, (session.correct || 0) - (base.correct || 0));
+  const skipped = Math.max(0, (session.skipped || 0) - (base.skipped || 0));
+  return {
+    reviewed,
+    correct,
+    missed: Math.max(0, reviewed - correct),
+    skipped,
+    streak: session.currentStreak || 0,
+  };
+}
+
+function sessionOutcomeLabel(card) {
+  if (!card) return 'Practice card';
+  if (isReadingPracticeCard(card)) return 'Reading';
+  return getTypeInfo(card.type).label || 'Practice card';
+}
+
+function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now(), eventId) {
+  if (!typeId || typeId === DICTIONARY_TYPE_ID) return card;
+  const current = card.sourceTypeStats?.[typeId] || {};
+  return {
+    ...card,
+    sourceTypeStats: {
+      ...(card.sourceTypeStats || {}),
+      [typeId]: {
+        correct: (Number(current.correct) || 0) + (correct ? 1 : 0),
+        incorrect: (Number(current.incorrect) || 0) + (correct ? 0 : 1),
+        lastAt: now,
+        ...(eventId ? { lastAttemptId: eventId } : {}),
+      },
+    },
+  };
+}
+
+function appendSessionOutcome(session = {}, outcome) {
+  const recentOutcomes = Array.isArray(session.recentOutcomes) ? session.recentOutcomes : [];
+  const nextOutcome = {
+    id: outcome.id || createSyncEventId(),
+    at: outcome.at || Date.now(),
+    cardId: outcome.cardId || '',
+    kind: outcome.kind,
+    label: outcome.label || 'Practice card',
+  };
+  return {
+    ...session,
+    recentOutcomes: [nextOutcome, ...recentOutcomes].slice(0, SESSION_RECENT_OUTCOME_LIMIT),
+  };
+}
+
+function sessionAfterAnswer(session = {}, { card, correct, mistakeDiagnosis, eventId, now }) {
+  const currentStreak = correct ? (session.currentStreak || 0) + 1 : 0;
+  const nextSession = bumpSessionMistakePattern(
+    {
+      ...session,
+      reviewed: (session.reviewed || 0) + 1,
+      correct: (session.correct || 0) + (correct ? 1 : 0),
+      currentStreak,
+      bestStreak: Math.max(session.bestStreak || 0, currentStreak),
+    },
+    mistakeDiagnosis,
+    { now },
+  );
+  return appendSessionOutcome(nextSession, {
+    id: eventId,
+    at: now,
+    cardId: card?.id,
+    kind: correct ? 'correct' : 'missed',
+    label: sessionOutcomeLabel(card),
+  });
+}
+
+/** @param {{ eventId?: string, now?: number }} [options] */
+function sessionAfterSkip(session = {}, card, options = {}) {
+  const { eventId, now } = options;
+  if (eventId && session.recentOutcomes?.some((outcome) => outcome.id === eventId)) return session;
+  return appendSessionOutcome(
+    {
+      ...session,
+      skipped: (session.skipped || 0) + 1,
+    },
+    {
+      id: eventId,
+      at: now,
+      cardId: card?.id,
+      kind: 'skipped',
+      label: sessionOutcomeLabel(card),
+    },
   );
 }
 
@@ -312,7 +400,13 @@ function loadPersistedCurrent(state, words, enabledTypes, prefs) {
       clearPersistedCurrent();
       return null;
     }
-    return saved.sourceType ? { ...card, sourceType: saved.sourceType } : card;
+    return {
+      ...card,
+      ...(saved.sourceType ? { sourceType: saved.sourceType } : {}),
+      ...(saved.selectionBucket ? { selectionBucket: saved.selectionBucket } : {}),
+      ...(saved.selectionOrigin ? { selectionOrigin: saved.selectionOrigin } : {}),
+      ...(saved.selectionReason ? { selectionReason: saved.selectionReason } : {}),
+    };
   } catch {
     clearPersistedCurrent();
     return null;
@@ -330,6 +424,7 @@ function snapshotStudyWord(word) {
     ...(word.lessons ? { lessons: word.lessons } : {}),
     ...(word.minnaLesson ? { minnaLesson: word.minnaLesson } : {}),
     ...(word.minnaLessons ? { minnaLessons: word.minnaLessons } : {}),
+    ...(word.pitchAccent ? { pitchAccent: word.pitchAccent } : {}),
   };
 }
 
@@ -346,6 +441,9 @@ function persistCurrent(card) {
         group: card.verb.group,
         type: card.type,
         sourceType: card.sourceType || null,
+        selectionBucket: card.selectionBucket || null,
+        selectionOrigin: cardOriginForStudyCard(card),
+        selectionReason: card.selectionReason || null,
         word: snapshotStudyWord(card.verb),
       }),
     );
@@ -391,882 +489,7 @@ function clearPersistedCurrent() {
   } catch {}
 }
 
-function StudyFocusBar({
-  allWords,
-  sessionFilterWord,
-  onWordChange,
-  sessionFilterFormGroupId,
-  onFormGroupChange,
-}) {
-  const [wordQuery, setWordQuery] = useState('');
-  const [mode, setMode] = useState(null); // null | 'word' | 'form'
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (mode === 'word') inputRef.current?.focus();
-  }, [mode]);
-
-  const searchResults = useMemo(() => {
-    if (!wordQuery.trim()) return [];
-    const q = wordQuery.trim().toLowerCase();
-    return allWords
-      .filter(
-        (w) =>
-          w.dict?.includes(wordQuery) ||
-          w.reading?.includes(wordQuery) ||
-          w.meaning?.toLowerCase().includes(q),
-      )
-      .slice(0, 8);
-  }, [wordQuery, allWords]);
-
-  const hasFilter = !!sessionFilterWord || !!sessionFilterFormGroupId;
-  const activeFormGroup = sessionFilterFormGroupId
-    ? FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId)
-    : null;
-
-  return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-          Focus practice
-        </span>
-        {sessionFilterWord && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-700 dark:text-indigo-300">
-            <span lang="ja">{sessionFilterWord.dict}</span>
-            <span className="text-indigo-300 dark:text-indigo-600">·</span>
-            <span>{sessionFilterWord.meaning}</span>
-            <button
-              onClick={() => {
-                onWordChange(null);
-                setWordQuery('');
-              }}
-              className="ml-0.5 text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-200"
-              aria-label="Remove word filter"
-            >
-              <IconX className="w-3 h-3" />
-            </button>
-          </span>
-        )}
-        {activeFormGroup && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 text-xs text-violet-700 dark:text-violet-300">
-            {activeFormGroup.label}
-            <button
-              onClick={() => onFormGroupChange(null)}
-              className="ml-0.5 text-violet-400 hover:text-violet-600 dark:hover:text-violet-200"
-              aria-label="Remove form filter"
-            >
-              <IconX className="w-3 h-3" />
-            </button>
-          </span>
-        )}
-        {!sessionFilterWord && (
-          <button
-            onClick={() => setMode(mode === 'word' ? null : 'word')}
-            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition ${
-              mode === 'word'
-                ? 'border-indigo-300 bg-indigo-50 text-indigo-600 dark:border-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300'
-                : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-700 dark:hover:text-indigo-300'
-            }`}
-          >
-            <IconPlus className="h-3 w-3" />
-            Word
-          </button>
-        )}
-        {!sessionFilterFormGroupId && (
-          <button
-            onClick={() => setMode(mode === 'form' ? null : 'form')}
-            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition ${
-              mode === 'form'
-                ? 'border-violet-300 bg-violet-50 text-violet-600 dark:border-violet-700 dark:bg-violet-950/30 dark:text-violet-300'
-                : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-violet-300 hover:text-violet-600 dark:hover:border-violet-700 dark:hover:text-violet-300'
-            }`}
-          >
-            <IconPlus className="h-3 w-3" />
-            Form
-          </button>
-        )}
-        {hasFilter && (
-          <button
-            onClick={() => {
-              onWordChange(null);
-              onFormGroupChange(null);
-              setMode(null);
-              setWordQuery('');
-            }}
-            className="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition ml-auto"
-          >
-            Clear all
-          </button>
-        )}
-        {!hasFilter && mode !== null && (
-          <button
-            onClick={() => setMode(null)}
-            className="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition ml-auto"
-          >
-            Cancel
-          </button>
-        )}
-      </div>
-
-      {mode === 'word' && (
-        <div>
-          <input
-            ref={inputRef}
-            type="text"
-            value={wordQuery}
-            onChange={(e) => setWordQuery(e.target.value)}
-            placeholder="Search by word, reading, or meaning…"
-            className="w-full rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 px-3 py-2 text-sm text-stone-800 dark:text-stone-200 placeholder-stone-400 outline-none focus:border-indigo-300 dark:focus:border-indigo-600"
-          />
-          {searchResults.length > 0 && (
-            <div className="mt-1 rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 divide-y divide-stone-100 dark:divide-stone-800 max-h-48 overflow-y-auto">
-              {searchResults.map((word) => (
-                <button
-                  key={`${word.dict}-${word.group}`}
-                  onClick={() => {
-                    onWordChange(word);
-                    setWordQuery('');
-                    setMode(null);
-                  }}
-                  className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-stone-50 dark:hover:bg-stone-800 transition"
-                >
-                  <span lang="ja" className="font-medium text-stone-900 dark:text-stone-100">
-                    {word.dict}
-                  </span>
-                  <span className="text-stone-400 text-xs" lang="ja">
-                    {word.reading}
-                  </span>
-                  <span className="text-stone-500 text-xs ml-auto truncate max-w-[120px]">
-                    {word.meaning}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-          {wordQuery.trim() && !searchResults.length && (
-            <div className="mt-1 text-xs text-stone-400 px-1">No matches</div>
-          )}
-        </div>
-      )}
-
-      {mode === 'form' && (
-        <div className="flex flex-wrap gap-1.5">
-          {FORM_GROUPS.map((group) => (
-            <button
-              key={group.id}
-              onClick={() => {
-                onFormGroupChange(group.id);
-                setMode(null);
-              }}
-              className="px-2.5 py-1 rounded-full border text-xs transition border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:hover:border-violet-700 dark:hover:bg-violet-950/20 dark:hover:text-violet-300"
-            >
-              {group.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const WEAKNESS_ROW_TONE = {
-  strong: 'bg-emerald-500',
-  developing: 'bg-amber-500',
-  weak: 'bg-rose-500',
-};
-
-const FAMILY_SKILL_TONE = {
-  strong: 'bg-emerald-500',
-  developing: 'bg-amber-500',
-  weak: 'bg-rose-500',
-  untested: 'bg-stone-300 dark:bg-stone-700',
-};
-
-function PracticeScopeSidebar({
-  state,
-  weaknessFamilies = [],
-  openFamilyIds,
-  onToggleFamilyOpen,
-  onToggleFamily,
-  onToggleType,
-  className = '',
-}) {
-  const enabled = new Set(state.enabledTypes || []);
-  const weaknessByFamily = new Map(weaknessFamilies.map((family) => [family.id, family]));
-  const activeCount = (state.enabledTypes || []).length;
-
-  return (
-    <aside
-      className={`space-y-3 lg:sticky lg:top-4 lg:self-start ${className}`}
-      aria-label="Practice map"
-    >
-      <section className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-              Practice map
-            </div>
-            <h2 className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-50">
-              Category progress
-            </h2>
-            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              Toggle categories for continuous Practice.
-            </p>
-          </div>
-          <span className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold tabular-nums text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
-            {activeCount} saved forms
-          </span>
-        </div>
-        <div className="mt-3 space-y-2">
-          {FORM_GROUPS.map((family) => {
-            const enabledInFamily = family.typeIds.filter((typeId) => enabled.has(typeId));
-            const allEnabled = enabledInFamily.length === family.typeIds.length;
-            const progress = weaknessByFamily.get(family.id) || {};
-            const weaknessRows = progress.rows || [];
-            const attempted = progress.attempted || 0;
-            const correct = progress.correct || 0;
-            const incorrect = progress.incorrect || 0;
-            const skillStatus = progress.skillStatus || 'untested';
-            const skillLabel = progress.skillLabel || (attempted ? 'Gathering data' : 'Untested');
-            const skillScore = progress.skillScore || 0;
-            const correctPct = attempted ? Math.round((correct / attempted) * 100) : 0;
-            const wrongPct = attempted ? Math.max(0, 100 - correctPct) : 0;
-            const skillWidth = skillStatus === 'untested' ? 8 : Math.max(6, skillScore);
-            const open = openFamilyIds.has(family.id);
-            const contentId = `practice-map-family-${family.id}`;
-            return (
-              <div
-                key={family.id}
-                className="rounded-xl border border-stone-200 bg-stone-50/80 dark:border-stone-800 dark:bg-stone-950/70"
-              >
-                <div className="flex items-start justify-between gap-3 px-3 py-3">
-                  <button
-                    type="button"
-                    onClick={() => onToggleFamilyOpen(family.id)}
-                    aria-expanded={open}
-                    aria-controls={contentId}
-                    className="min-w-0 flex-1 cursor-pointer rounded-lg bg-transparent p-0 text-left"
-                  >
-                    <span className="block text-sm font-semibold text-stone-900 dark:text-stone-100">
-                      {family.label}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-stone-500">
-                      {enabledInFamily.length}/{family.typeIds.length} saved
-                    </span>
-                    <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-stone-500">
-                      <span>
-                        {attempted ? `${correct} right / ${incorrect} wrong` : 'No reps yet'}
-                      </span>
-                      <span className="font-semibold text-stone-700 dark:text-stone-300">
-                        {skillStatus === 'untested' ? skillLabel : `${skillScore}% skill`}
-                      </span>
-                    </span>
-                    <span className="mt-2 block space-y-1.5">
-                      <span
-                        className="block h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
-                        aria-label={`${family.label} lifetime right and wrong`}
-                      >
-                        {attempted ? (
-                          <>
-                            <span
-                              className="inline-block h-full bg-emerald-500 align-top"
-                              style={{ width: `${correctPct}%` }}
-                            />
-                            <span
-                              className="inline-block h-full bg-rose-400 align-top"
-                              style={{ width: `${wrongPct}%` }}
-                            />
-                          </>
-                        ) : (
-                          <span className="block h-full w-[8%] bg-stone-300 dark:bg-stone-700" />
-                        )}
-                      </span>
-                      <span
-                        className="block h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
-                        aria-label={`${family.label} skill`}
-                      >
-                        <span
-                          className={`block h-full ${FAMILY_SKILL_TONE[skillStatus] || FAMILY_SKILL_TONE.untested}`}
-                          style={{ width: `${skillWidth}%` }}
-                        />
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onToggleFamily(family)}
-                    className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-                      allEnabled
-                        ? 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300'
-                        : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400'
-                    }`}
-                    aria-label={`${allEnabled ? 'Disable' : 'Enable'} all ${family.label} forms`}
-                  >
-                    {allEnabled ? 'Disable all' : 'Enable all'}
-                  </button>
-                </div>
-                {open && (
-                  <div
-                    id={contentId}
-                    className="border-t border-stone-200 px-3 py-3 dark:border-stone-800"
-                  >
-                    {weaknessRows.length > 0 && (
-                      <div className="mb-3 space-y-1.5">
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
-                          Recent weak spots
-                        </div>
-                        {weaknessRows.slice(0, 4).map((row) => (
-                          <div
-                            key={row.key}
-                            className="rounded-lg border border-stone-200 bg-white px-2.5 py-2 dark:border-stone-800 dark:bg-stone-900"
-                          >
-                            <div className="flex items-center justify-between gap-2 text-xs">
-                              <span className="truncate font-medium text-stone-700 dark:text-stone-200">
-                                {row.typeLabel} - {row.subcategoryLabel}
-                              </span>
-                              <span className="tabular-nums text-stone-500">
-                                {row.correct}/{row.attempted}
-                              </span>
-                            </div>
-                            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
-                              <span
-                                className={`block h-full ${WEAKNESS_ROW_TONE[row.status] || 'bg-stone-300'}`}
-                                style={{ width: `${Math.max(8, row.accuracy)}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="grid gap-1.5">
-                      {family.typeIds.map((typeId) => {
-                        const type = ALL_CARD_TYPES.find((item) => item.id === typeId);
-                        if (!type) return null;
-                        const checked = enabled.has(typeId);
-                        return (
-                          <button
-                            key={typeId}
-                            type="button"
-                            aria-pressed={checked}
-                            onClick={() => onToggleType(typeId)}
-                            className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${
-                              checked
-                                ? 'border-indigo-200 bg-indigo-50 text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100'
-                                : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800'
-                            }`}
-                          >
-                            <span
-                              className={`mt-0.5 h-3.5 w-3.5 rounded border ${
-                                checked
-                                  ? 'border-indigo-600 bg-indigo-600 dark:border-indigo-400 dark:bg-indigo-400'
-                                  : 'border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-950'
-                              }`}
-                            />
-                            <span className="min-w-0">
-                              <span className="block text-xs font-semibold">{type.label}</span>
-                              {type.sub && (
-                                <span className="block truncate text-[11px] opacity-70">
-                                  {type.sub}
-                                </span>
-                              )}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-    </aside>
-  );
-}
-
-function reviewForecastRows(forecast) {
-  return [
-    ['1h', forecast?.in1h || 0],
-    ['4h', forecast?.in4h || 0],
-    ['Today', forecast?.today || 0],
-    ['Tomorrow', forecast?.tomorrow || 0],
-    ['Week', forecast?.week || 0],
-  ];
-}
-
-function formFamilyStrengthRows(state = {}) {
-  return FORM_GROUPS.map((family) => {
-    const typeIds = new Set(family.typeIds || []);
-    let correct = 0;
-    let incorrect = 0;
-    for (const [cardId, card] of Object.entries(state.cards || {})) {
-      if (!typeIds.has(typeIdFromCardId(cardId))) continue;
-      correct += card?.correct || 0;
-      incorrect += card?.incorrect || 0;
-    }
-    const mistakeCount = (state.mistakes || []).filter(
-      (mistake) => !mistake.resolved && typeIds.has(mistake.type),
-    ).length;
-    const attempted = correct + incorrect;
-    const accuracy = attempted ? Math.round((correct / attempted) * 100) : 0;
-    const status =
-      attempted >= 3 && accuracy >= 85
-        ? 'strong'
-        : attempted > 0 && (accuracy < 60 || mistakeCount > 0)
-          ? 'weak'
-          : attempted > 0
-            ? 'developing'
-            : 'new';
-    return {
-      ...family,
-      attempted,
-      correct,
-      incorrect,
-      accuracy,
-      mistakeCount,
-      status,
-      sortScore:
-        status === 'weak'
-          ? -1000 - mistakeCount * 50 + accuracy
-          : status === 'new'
-            ? 500
-            : status === 'developing'
-              ? 100 + accuracy
-              : 1000 + accuracy,
-    };
-  }).sort((a, b) => a.sortScore - b.sortScore || a.label.localeCompare(b.label));
-}
-
-// Onbin (te/ta sound-change) practice lives in this family; when the learner's
-// misses cluster as godan sound-change errors its drill routes to Ending Lab.
-const TE_TA_FAMILY_ID = TE_TA_SOUND_CHANGE_FAMILY_ID;
-
-const READINESS_TONE = {
-  strong: 'bg-emerald-500',
-  developing: 'bg-amber-500',
-  weak: 'bg-rose-500',
-  untested: 'bg-stone-300 dark:bg-stone-700',
-};
-// Exported for unit tests of the Practice-to-Drills routing nudge ladder; the app
-// renders it through StudyView's default export.
-export function ReviewsDashboard({
-  daily,
-  srsQueue,
-  state,
-  todayPlan,
-  todayDrillActive,
-  onStart,
-  onStartRecommendation,
-  onRetestMisses,
-  retestCount = 0,
-  mistakeRoute = null,
-  readinessFamilies = [],
-  weakestSkill = null,
-  onDrillReadiness,
-  onbinWeakness = false,
-  onDrillEndingLab,
-  groupConfusion = false,
-  onDrillClassify,
-  onDrillRush,
-}) {
-  const dueTotal = srsQueue?.dueRuleIds?.length || 0;
-  const dueDone = srsQueue?.completedDueRuleIds?.length || 0;
-  const dashboardDue = todayPlan?.sourceCounts?.due || dueTotal;
-  const practiceTypeCount = Array.isArray(todayPlan?.typeIds) ? todayPlan.typeIds.length : 0;
-  const progressPct = dueTotal ? Math.min(100, Math.round((dueDone / dueTotal) * 100)) : 100;
-  const progressNow = dueTotal ? dueDone : 1;
-  const progressMax = dueTotal || 1;
-  const recommendations = state.reviewScope?.recommendations || [];
-  const mistakeHistoryCount = (state.mistakes || []).length;
-  const strengthRows = formFamilyStrengthRows(state);
-  const highlightedRows = strengthRows.filter((row) => row.attempted > 0).slice(0, 4);
-  const rowsToShow = highlightedRows.length ? highlightedRows : strengthRows.slice(0, 4);
-  const readinessById = new Map(readinessFamilies.map((row) => [row.id, row]));
-  const weakestToEndingLab =
-    !!weakestSkill &&
-    weakestSkill.familyId === TE_TA_FAMILY_ID &&
-    onbinWeakness &&
-    !!onDrillEndingLab;
-  const weakestToRush = !!weakestSkill && weakestSkill.dimension === 'speed' && !!onDrillRush;
-  // One prioritized "do this next" nudge that routes a detected weakness to the
-  // matching Drills exercise: group confusion (foundational) > onbin sound
-  // changes > slow recall > generic scoped practice of the weakest skill.
-  const primaryNudge =
-    groupConfusion && onDrillClassify
-      ? {
-          onClick: onDrillClassify,
-          lead: 'You keep mixing up ',
-          emphasis: 'verb groups',
-          tail: ' — drill them in Groups',
-          action: 'Groups',
-        }
-      : weakestSkill && weakestToEndingLab
-        ? {
-            onClick: onDrillEndingLab,
-            lead: 'You keep missing ',
-            emphasis: 'sound changes',
-            tail: ' — drill them in Ending Lab',
-            action: 'Ending Lab',
-          }
-        : weakestSkill && weakestToRush
-          ? {
-              onClick: onDrillRush,
-              lead: 'Your ',
-              emphasis: 'recall is slow',
-              tail: ' — build speed in Rush',
-              action: 'Rush',
-            }
-          : weakestSkill && onDrillReadiness
-            ? {
-                onClick: () =>
-                  onDrillReadiness({
-                    familyId: weakestSkill.familyId,
-                    dimension: weakestSkill.dimension,
-                  }),
-                lead: 'Sharpen ',
-                emphasis: weakestSkill.label,
-                tail: ` — ${weakestSkill.dimensionLabel.toLowerCase()} is ${weakestSkill.status}`,
-                action: 'Drill',
-              }
-            : null;
-  const weakCount = strengthRows.filter((row) => row.status === 'weak').length;
-  // Progressive disclosure: the forecast, form-family strength, and stat tiles
-  // are returning-user signals. A brand-new learner with no history sees only a
-  // clean hero and a single Start action — not a wall of zeros.
-  const hasHistory =
-    strengthRows.some((row) => row.attempted > 0) ||
-    (daily.count || 0) > 0 ||
-    dueTotal > 0 ||
-    recommendations.length > 0 ||
-    mistakeHistoryCount > 0;
-
-  return (
-    <section className="space-y-4" aria-label="Practice dashboard">
-      <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm dark:border-stone-800 dark:bg-stone-900 sm:p-5">
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-              Practice
-            </div>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-stone-950 dark:text-stone-50">
-              {hasHistory ? 'Continue continuous Practice.' : 'Begin with practical forms.'}
-            </h2>
-            <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">
-              {hasHistory
-                ? 'Practice starts with your lowest-skill enabled categories, with recent misses returning after a short delay.'
-                : 'Start continuous Practice from your Practice map. The map will learn what to repeat as you answer.'}
-            </p>
-            {hasHistory && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {[
-                  ['Ready now', dashboardDue],
-                  ['Today', `${daily.count || 0} cards`],
-                  ['Recent misses', weakCount],
-                ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-950"
-                  >
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
-                      {label}
-                    </div>
-                    <div className="mt-0.5 text-lg font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-                      {value}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/20">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                  Continuous Practice
-                </div>
-                <div className="mt-1 text-sm text-stone-600 dark:text-stone-300">
-                  {dueTotal ? `${dueDone}/${dueTotal} ready cards practiced` : 'Practice is ready'}
-                </div>
-                {!!practiceTypeCount && (
-                  <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-indigo-100 bg-white/70 px-2.5 py-1.5 text-xs dark:border-indigo-900/60 dark:bg-stone-950/30">
-                    <span className="font-medium text-stone-600 dark:text-stone-300">
-                      Form types selected
-                    </span>
-                    <span className="font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                      {practiceTypeCount}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="text-xl font-semibold tabular-nums text-indigo-800 dark:text-indigo-200">
-                {progressPct}%
-              </div>
-            </div>
-            <div
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={progressMax}
-              aria-valuenow={progressNow}
-              className="mt-3 h-2 overflow-hidden rounded-full bg-white dark:bg-stone-800"
-            >
-              <span className="block h-full bg-indigo-600" style={{ width: `${progressPct}%` }} />
-            </div>
-            <button
-              type="button"
-              onClick={onStart}
-              disabled={!todayPlan.available && !todayDrillActive}
-              className="mt-4 w-full rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-indigo-500 dark:text-stone-950 dark:hover:bg-indigo-400"
-            >
-              Open Practice
-            </button>
-            {retestCount > 0 && (
-              <button
-                type="button"
-                onClick={onRetestMisses}
-                className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-stone-800"
-              >
-                {mistakeRoute
-                  ? `${mistakeRoute.triggerLabel} -> ${mistakeRoute.toolLabel}`
-                  : `Practice ${retestCount} miss${retestCount === 1 ? '' : 'es'}`}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {recommendations.length > 0 && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                Recommended practice
-              </div>
-              <div className="text-sm text-stone-600 dark:text-stone-300">
-                Learn and Drills can send focused work back into Practice.
-              </div>
-            </div>
-          </div>
-          <div className="grid gap-2">
-            {recommendations.map((rec) => (
-              <button
-                key={rec.id}
-                type="button"
-                onClick={() => onStartRecommendation(rec)}
-                className="rounded-xl border border-emerald-200 bg-white px-3 py-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-stone-950 dark:hover:bg-emerald-950/30"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                      {rec.source === 'lesson'
-                        ? 'Learn'
-                        : rec.source === 'lab'
-                          ? 'Drills'
-                          : 'Tools'}
-                    </div>
-                    <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
-                      {rec.label}
-                    </div>
-                    {rec.detail && (
-                      <div className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
-                        {rec.detail}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                    Start
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {hasHistory && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
-              Upcoming reviews
-            </div>
-            <div className="grid grid-cols-5 gap-2">
-              {reviewForecastRows(todayPlan.upcomingForecast).map(([label, value]) => (
-                <div
-                  key={label}
-                  className="rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-center dark:border-stone-800 dark:bg-stone-950"
-                >
-                  <div className="text-base font-semibold tabular-nums text-stone-950 dark:text-stone-50">
-                    {value}
-                  </div>
-                  <div className="mt-0.5 text-[10px] uppercase tracking-wider text-stone-500">
-                    {label}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="rounded-2xl border border-stone-200 bg-white p-4 dark:border-stone-800 dark:bg-stone-900">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">
-              Form families
-            </div>
-            {primaryNudge && (
-              <button
-                type="button"
-                onClick={primaryNudge.onClick}
-                className="mb-3 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs text-amber-900 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200 dark:hover:bg-amber-950/40"
-              >
-                <span>
-                  {primaryNudge.lead}
-                  <span className="font-semibold">{primaryNudge.emphasis}</span>
-                  {primaryNudge.tail}
-                </span>
-                <span className="shrink-0 font-semibold">{primaryNudge.action} →</span>
-              </button>
-            )}
-            <div className="space-y-1">
-              {rowsToShow.map((row) => {
-                const tone =
-                  row.status === 'strong'
-                    ? 'bg-emerald-500'
-                    : row.status === 'weak'
-                      ? 'bg-rose-500'
-                      : row.status === 'developing'
-                        ? 'bg-amber-500'
-                        : 'bg-stone-300';
-                const readiness = readinessById.get(row.id);
-                const weakest = readiness?.weakest;
-                const rowToEndingLab =
-                  row.id === TE_TA_FAMILY_ID && onbinWeakness && !!onDrillEndingLab;
-                const rowToRush = !rowToEndingLab && weakest?.id === 'speed' && !!onDrillRush;
-                const accuracyLabel = row.attempted ? `${row.accuracy}%` : 'new';
-                const bar = (
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
-                    <span
-                      className={`block h-full ${tone}`}
-                      style={{ width: `${row.attempted ? row.accuracy : 8}%` }}
-                    />
-                  </div>
-                );
-
-                // No readiness reps yet — show the plain accuracy row, nothing to expand.
-                if (!readiness || readiness.practiced === 0) {
-                  return (
-                    <div key={row.id} className="px-1 py-1">
-                      <div className="flex items-center justify-between gap-3 text-xs">
-                        <span className="font-medium text-stone-700 dark:text-stone-200">
-                          {row.label}
-                        </span>
-                        <span className="tabular-nums text-stone-500">{accuracyLabel}</span>
-                      </div>
-                      {bar}
-                    </div>
-                  );
-                }
-
-                return (
-                  <details key={row.id} className="group rounded-md px-1 py-1">
-                    <summary className="cursor-pointer list-none rounded-md transition hover:bg-stone-50 dark:hover:bg-stone-950/60">
-                      <div className="flex items-center justify-between gap-3 text-xs">
-                        <span className="flex items-center gap-1.5 font-medium text-stone-700 dark:text-stone-200">
-                          <span className="text-[10px] text-stone-400 transition group-open:rotate-90">
-                            ▸
-                          </span>
-                          {row.label}
-                        </span>
-                        <span className="tabular-nums text-stone-500">{accuracyLabel}</span>
-                      </div>
-                      {bar}
-                    </summary>
-                    <div className="mt-2 space-y-1.5 border-t border-stone-100 pl-4 pt-2 dark:border-stone-800">
-                      {READINESS_DIMENSIONS.map((dimension) => {
-                        const cell = readiness.cells[dimension.id];
-                        const tested = cell.status !== 'untested';
-                        return (
-                          <div
-                            key={dimension.id}
-                            className="flex items-center justify-between gap-3 text-[11px]"
-                          >
-                            <span className="flex items-center gap-1.5 text-stone-600 dark:text-stone-300">
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full ${READINESS_TONE[cell.status]}`}
-                              />
-                              {dimension.label}
-                            </span>
-                            <span
-                              className={
-                                tested
-                                  ? 'font-medium text-stone-600 dark:text-stone-300'
-                                  : 'text-stone-400 dark:text-stone-500'
-                              }
-                            >
-                              {tested
-                                ? `${cell.label}${cell.detail ? ` · ${cell.detail}` : ''}`
-                                : dimension.id === 'recognition'
-                                  ? 'Not tested — try a choice round'
-                                  : 'Not yet tested'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                      {readiness.types.length > 0 && (
-                        <div className="truncate text-[11px] text-stone-400 dark:text-stone-500">
-                          {readiness.types.map((type) => type.label).join(' · ')}
-                        </div>
-                      )}
-                      {weakest && rowToEndingLab && (
-                        <button
-                          type="button"
-                          onClick={onDrillEndingLab}
-                          className="mt-1 w-full rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1.5 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-950/60"
-                        >
-                          Drill sound changes in Ending Lab →
-                        </button>
-                      )}
-                      {weakest && rowToRush && (
-                        <button
-                          type="button"
-                          onClick={onDrillRush}
-                          className="mt-1 w-full rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1.5 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-950/60"
-                        >
-                          Drill speed in Rush →
-                        </button>
-                      )}
-                      {weakest && !rowToEndingLab && !rowToRush && onDrillReadiness && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onDrillReadiness({ familyId: row.id, dimension: weakest.id })
-                          }
-                          className="mt-1 w-full rounded-md border border-stone-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200 dark:hover:bg-stone-800"
-                        >
-                          Drill {weakest.label.toLowerCase()} in {row.label}
-                        </button>
-                      )}
-                    </div>
-                  </details>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function MistakeRouteHint({ route }) {
-  if (!route) return null;
-  return (
-    <div className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs dark:border-indigo-900/60 dark:bg-indigo-950/20">
-      <div className="font-semibold text-indigo-800 dark:text-indigo-200">
-        {route.triggerLabel} -&gt; {route.toolLabel}
-      </div>
-      <div className="mt-0.5 text-stone-600 dark:text-stone-350">{route.detail}</div>
-    </div>
-  );
-}
-
-export default function StudyView() {
+export default function StudyView({ mode = 'practice' }) {
   const {
     state,
     setState,
@@ -1274,19 +497,40 @@ export default function StudyView() {
     allWords: verbs,
     builtInWords,
     activeGeminiKey: geminiKey,
-    practicePrefs,
+    practicePrefs: rawPracticePrefs,
     setPracticePrefs,
     wordLists,
-    studyFocus: focus,
+    studyFocus: rawFocus,
     clearStudyFocus: onFocusConsumed,
+    learnFocus: rawLearnFocus,
+    openLearnFocus,
+    clearLearnFocus,
+    openGuideForRule,
+    openLabTool,
     hydrated,
   } = useApp();
-  const [current, setCurrent] = useState(null);
+  const transformationMode = mode === 'transform';
+  // Transform is a Drills surface. A pending Practice/Learn launch may remain
+  // in the provider while the learner visits it, but it must not seed, narrow,
+  // consume, or clear that launch.
+  const focus = transformationMode ? null : rawFocus;
+  const learnFocus = transformationMode ? null : rawLearnFocus;
+  const practicePrefs = useMemo(() => {
+    if (!transformationMode) return rawPracticePrefs;
+    return clearBoundedReviewPrefs(rawFocus?.returnPracticePrefs || rawPracticePrefs);
+  }, [rawFocus?.returnPracticePrefs, rawPracticePrefs, transformationMode]);
+  const [current, setCurrentState] = useState(null);
+  const setCurrent = useCallback((next) => {
+    // Every direct card launch is a new exercise, including an exact-word/form
+    // retry. Keep the initialization updater's existing-card behavior intact.
+    setCurrentState((previous) =>
+      typeof next === 'function' ? next(previous) : next ? { ...next } : null,
+    );
+  }, []);
   const [answer, setAnswer] = useState('');
   const [phase, setPhase] = useState('answering');
   const [wasCorrect, setWasCorrect] = useState(false);
   const [wasCorrected, setWasCorrected] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   const [showPromptText, setShowPromptText] = useState(false);
   const [stepHint, setStepHint] = useState('');
   const [hintMasked, setHintMasked] = useState(false);
@@ -1295,15 +539,16 @@ export default function StudyView() {
   const [coachSeedAnswer, setCoachSeedAnswer] = useState('');
   const [coachRevealed, setCoachRevealed] = useState(0);
   const [greenRevealed, setGreenRevealed] = useState(0);
-  const [revealedMiss, setRevealedMiss] = useState(false);
-  const [reviewChoiceLabel, setReviewChoiceLabel] = useState('');
-  const [submittedAnswer, setSubmittedAnswer] = useState('');
-  const [lastDiagnosis, setLastDiagnosis] = useState(null);
+  // Snapshot of the just-graded answer for the in-session review panel, set by
+  // the submit handlers (the only entries into the reviewing phase) so the
+  // shared RunAnswerReveal renders from a stable reference instead of rebuilding
+  // a record every render.
+  const [reviewRecord, setReviewRecord] = useState(null);
   const [selfCheckOpen, setSelfCheckOpen] = useState(false);
-  const [typoGuard, setTypoGuard] = useState(null);
   const [speechListening, setSpeechListening] = useState(false);
   const [speechError, setSpeechError] = useState('');
   const [reviewBase, setReviewBase] = useState(state.session.reviewed || 0);
+  const [runBase, setRunBase] = useState(() => sessionBaseFrom(state.session));
   const [bonusMode, setBonusMode] = useState(false);
   const [undoReviewScopeAction, setUndoReviewScopeAction] = useState(null);
   const [focusWordLock, setFocusWordLock] = useState(() => focus?.word || null);
@@ -1316,6 +561,7 @@ export default function StudyView() {
           missedTypeIds: [],
           completedTypeIds: [],
           repeatPass: false,
+          nextTypeId: null,
           complete: false,
         }
       : null,
@@ -1327,25 +573,33 @@ export default function StudyView() {
   const [launchContext, setLaunchContext] = useState(() =>
     focus?.returnTo === 'reference' ? focus : null,
   );
-  const [recommendationFocus, setRecommendationFocus] = useState(
-    () => focus?.recommendation || null,
-  );
-  const [openPracticeMapFamilyIds, setOpenPracticeMapFamilyIds] = useState(() => new Set());
+  const [selectionStatus, setSelectionStatus] = useState('');
   const inputRef = useRef(null);
   const nextButtonRef = useRef(null);
   const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
+  const refocusAfterAutoAdvanceRef = useRef(false);
   const answerStartedAtRef = useRef(0);
+  const committedAttemptRef = useRef(null);
   const hadKanaMistakeRef = useRef(false);
   const speechRecognitionRef = useRef(null);
+  const latestSpeechAttemptRef = useRef(null);
   const speechSubmittedRef = useRef(false);
   const speechAutoStartKeyRef = useRef('');
+  const listeningPromptSpokenKeyRef = useRef('');
+  const answerComposingRef = useRef(false);
   const minimalPairSetIdRef = useRef(practicePrefs.minimalPairSetId || '');
   const recentCardIdsRef = useRef([]);
+  const sentenceEntryCacheRef = useRef(new Map());
+  const sentenceEntryInFlightRef = useRef(new Map());
+  const preparedNextCardRef = useRef(null);
   // Snapshots the typed answer the moment a kana mistake first occurs, so the
   // review panel can show what was actually entered when it went wrong rather
   // than the live (possibly self-corrected) input.
   const wrongSnapshotRef = useRef(null);
+  // Answer-revealing help keeps a later exact answer in the assisted bucket
+  // instead of counting it fully correct. Coaching-only hints are free.
+  const usedAnswerHelpRef = useRef(false);
   const typingHintRef = useRef(null);
 
   const enabledTypes = useMemo(() => {
@@ -1353,9 +607,26 @@ export default function StudyView() {
       const group = FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId);
       if (group?.typeIds?.length) return group.typeIds;
     }
-    const baseTypes = state.enabledTypes?.length ? state.enabledTypes : ['plain-past'];
+    const returnEnabledTypes = Array.isArray(
+      rawFocus?.returnEnabledTypes || rawFocus?.recommendation?.returnEnabledTypes,
+    )
+      ? (rawFocus.returnEnabledTypes || rawFocus.recommendation.returnEnabledTypes).filter(Boolean)
+      : [];
+    const baseTypes =
+      transformationMode && returnEnabledTypes.length
+        ? returnEnabledTypes
+        : state.enabledTypes?.length
+          ? state.enabledTypes
+          : ['plain-past'];
     return reviewTypeIdsForState(state, baseTypes);
-  }, [state, sessionFilterFormGroupId]);
+  }, [
+    state,
+    sessionFilterFormGroupId,
+    rawFocus?.recommendation?.returnEnabledTypes,
+    rawFocus?.returnEnabledTypes,
+    transformationMode,
+  ]);
+  const enabledTypesKey = enabledTypes.join('|');
   const practiceWords = useMemo(() => {
     const base = filterWordsForStudyScope(
       verbs,
@@ -1399,14 +670,14 @@ export default function StudyView() {
   ]);
 
   const answerMode = normalizeAnswerMode(practicePrefs.answerMode);
-  const autoAdvanceFormKey = autoAdvanceAnswerFormKey(practicePrefs);
   const autoAdvanceCorrect = resolveAutoAdvanceCorrect(practicePrefs);
   const speechRecognitionAvailable = !!getSpeechRecognitionConstructor();
   const typedAnswerMode = answerMode === 'input';
-  const transformationMode = false;
   const listeningPrompt = !!practicePrefs.listeningPrompt;
-  const sentenceMode = !!practicePrefs.sentenceMode;
-  const activeMinimalPairSet = getMinimalPairSet(practicePrefs.minimalPairSetId);
+  const sentenceMode = !transformationMode && !!practicePrefs.sentenceMode;
+  const activeMinimalPairSet = transformationMode
+    ? null
+    : getMinimalPairSet(practicePrefs.minimalPairSetId);
   const practiceRuleCandidates = useMemo(
     () =>
       buildRuleCandidates(practiceWords, enabledTypes, practicePrefs, {
@@ -1422,16 +693,10 @@ export default function StudyView() {
       : conjugateItem(current.verb, current.type)
     : '';
   const sourceStrategyPrefs = useMemo(() => {
-    const strategy = practicePrefs.sourceFormStrategy || DEFAULT_PREFS.sourceFormStrategy;
-    if (strategy === 'mixed') return { ...practicePrefs, promptForm: 'random' };
-    if (strategy === 'masu') return { ...practicePrefs, promptForm: 'polite-present' };
-    if (strategy === 'dictionary') return { ...practicePrefs, promptForm: 'dictionary' };
-    const reps = current?.card?.reps || 0;
-    return {
-      ...practicePrefs,
-      promptForm: reps >= 2 ? 'random' : reps >= 1 ? 'dict-masu' : 'dictionary',
-    };
-  }, [current?.card?.reps, practicePrefs]);
+    // Main Practice is dictionary -> target only; form-to-form work lives in Drills > Transform.
+    if (!transformationMode) return { ...practicePrefs, promptForm: 'dictionary' };
+    return { ...practicePrefs, promptForm: 'random' };
+  }, [practicePrefs, transformationMode]);
   const configuredPromptType =
     current && !reverseDrill
       ? pickPromptType(current.verb, current.type, sourceStrategyPrefs)
@@ -1444,16 +709,13 @@ export default function StudyView() {
         ? conjugateItem(current.verb, promptType)
         : current.verb.reading
     : '';
-  const promptAudioText = current ? promptSourceForm : '';
+  const basePromptAudioText = current ? promptSourceForm : '';
 
   const sessionMistakePatterns = useMemo(
     () => rankSessionMistakePatterns(state.session?.mistakePatterns),
     [state.session?.mistakePatterns],
   );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const weaknessFamilies = useMemo(() => buildWeaknessFamilyRows(state), [state.weakness]);
   const daily = state.daily || {};
-  const dailyGoalTarget = practicePrefs.dailyGoal || DEFAULT_PREFS.dailyGoal;
   const boundedReviewLaunchActive = activeReviewLimitFromPrefs(practicePrefs) > 0;
   const specialLaunchActive =
     !!focus?.word ||
@@ -1463,7 +725,6 @@ export default function StudyView() {
     !!wordSweep ||
     !!sessionFilterWord ||
     !!sessionFilterFormGroupId ||
-    !!recommendationFocus ||
     !!launchContext ||
     boundedReviewLaunchActive ||
     !!activeMinimalPairSet;
@@ -1475,35 +736,194 @@ export default function StudyView() {
     }),
     [bonusMode, wordLists, specialLaunchActive],
   );
+  const loadSentenceEntry = useCallback((word, type) => {
+    const key = sentenceEntryKey(word, type);
+    if (!key) return Promise.resolve(null);
+    const cached = freshSentenceEntry(sentenceEntryCacheRef.current, key);
+    if (cached) return Promise.resolve(cached);
+    const existing = sentenceEntryInFlightRef.current.get(key);
+    if (existing) return existing;
+
+    let request;
+    request = fetchBundledSentence(word, type)
+      .then((res) => res || fetchTailoredSentence(word, type))
+      .then((entry) => {
+        if (entry?.jaTemplate) {
+          sentenceEntryCacheRef.current.set(key, { entry, loadedAt: Date.now() });
+          return entry;
+        }
+        return null;
+      })
+      .catch(() => null)
+      .finally(() => {
+        if (sentenceEntryInFlightRef.current.get(key) === request) {
+          sentenceEntryInFlightRef.current.delete(key);
+        }
+      });
+    sentenceEntryInFlightRef.current.set(key, request);
+    return request;
+  }, []);
   const minimalPairSetForCurrent = activeMinimalPairSet;
-  // Cued cloze: when Sentence mode is on, wrap a normal forward production card
-  // in an example sentence with a blank. Only the Japanese frame + grammar cue
-  // are shown (never the "Fill in: word (reading)" prefix, which would leak the
-  // reading regardless of script settings). Null for reverse/listening/minimal
-  // -pair cards, which keep their normal prompt.
-  const clozePrompt = useMemo(() => {
-    if (!current || !sentenceMode) return null;
-    if (reverseDrill || listeningPrompt || minimalPairSetForCurrent) return null;
-    try {
-      const built = getOfflineTemplateSentence(current.verb, current.type);
-      return built?.sentence ? { sentence: built.sentence, cue: built.cue } : null;
-    } catch {
-      return null;
-    }
-  }, [current, sentenceMode, reverseDrill, listeningPrompt, minimalPairSetForCurrent]);
-  const clozePromptView = useMemo(
-    () => (clozePrompt ? sentenceDisplay(clozePrompt.sentence, practicePrefs) : null),
-    [clozePrompt, practicePrefs],
+  const preloadSentenceForCard = useCallback(
+    (card) => {
+      if (!card || !sentenceMode || transformationMode || activeMinimalPairSet) return;
+      const type = card.type === DICTIONARY_TYPE_ID ? card.sourceType || 'plain-past' : card.type;
+      loadSentenceEntry(card.verb, type);
+    },
+    [activeMinimalPairSet, loadSentenceEntry, sentenceMode, transformationMode],
   );
+  const sentenceType = current ? (reverseDrill ? sourceTypeForReading : current.type) : '';
+  const sentencePromptEligible =
+    !!current && sentenceMode && !transformationMode && !minimalPairSetForCurrent;
+  const sentenceWord = sentencePromptEligible ? current.verb : null;
+  const sentencePromptEntryKey = sentenceEntryKey(sentenceWord, sentenceType);
+  const sentencePromptStateKey = sentencePromptEligible
+    ? `${sentencePromptEntryKey}|${reverseDrill ? 'reverse' : 'forward'}|${
+        listeningPrompt ? 'listening' : 'visible'
+      }`
+    : '';
+  const [finalizedSentencePrompt, setFinalizedSentencePrompt] = useState(null);
+  useEffect(() => {
+    if (
+      !sentencePromptEligible ||
+      !sentenceWord ||
+      !sentencePromptEntryKey ||
+      !sentencePromptStateKey
+    ) {
+      setFinalizedSentencePrompt(null);
+      return undefined;
+    }
+
+    let ignore = false;
+    let finalized = false;
+    const word = sentenceWord;
+    const type = sentenceType;
+    const buildPrompt = (entry) =>
+      entry?.jaTemplate
+        ? buildSentencePromptModel({
+            entry,
+            word,
+            type,
+            reverseDrill,
+            listeningPrompt,
+          })
+        : null;
+    const finalizePrompt = (entry) => {
+      if (ignore || finalized) return;
+      finalized = true;
+      const prompt = buildPrompt(entry);
+      setFinalizedSentencePrompt({ key: sentencePromptStateKey, card: current, prompt });
+    };
+    const cached = freshSentenceEntry(sentenceEntryCacheRef.current, sentencePromptEntryKey);
+    if (cached?.jaTemplate) {
+      finalizePrompt(cached);
+      return undefined;
+    }
+
+    setFinalizedSentencePrompt(null);
+    const fallbackTimer = setTimeout(() => finalizePrompt(null), SENTENCE_PROMPT_GRACE_MS);
+    loadSentenceEntry(word, type).then((entry) => {
+      if (finalized || ignore) return;
+      clearTimeout(fallbackTimer);
+      finalizePrompt(entry);
+    });
+    return () => {
+      ignore = true;
+      clearTimeout(fallbackTimer);
+    };
+  }, [
+    current,
+    loadSentenceEntry,
+    listeningPrompt,
+    reverseDrill,
+    sentencePromptEligible,
+    sentencePromptEntryKey,
+    sentencePromptStateKey,
+    sentenceType,
+    sentenceWord,
+  ]);
+  const sentencePrompt =
+    finalizedSentencePrompt?.key === sentencePromptStateKey &&
+    finalizedSentencePrompt?.card === current
+      ? finalizedSentencePrompt.prompt
+      : null;
+  const sentencePromptResolved =
+    sentencePromptEligible &&
+    finalizedSentencePrompt?.key === sentencePromptStateKey &&
+    finalizedSentencePrompt?.card === current;
+  const sentenceUnavailable = sentencePromptResolved && !sentencePrompt;
+  const sentencePromptView = useMemo(
+    () =>
+      sentencePrompt
+        ? sentenceDisplay(
+            phase === 'reviewing' ? sentencePrompt.completedSentence : sentencePrompt.sentence,
+            practicePrefs,
+            phase === 'reviewing' ? sentencePrompt.completedParts : sentencePrompt.parts,
+          )
+        : null,
+    [sentencePrompt, practicePrefs, phase],
+  );
+  const promptAudioText = listeningPrompt
+    ? sentencePromptEligible
+      ? sentencePrompt?.audioText || (sentencePromptResolved ? basePromptAudioText : '')
+      : basePromptAudioText
+    : basePromptAudioText;
+
+  useEffect(() => {
+    preparedNextCardRef.current = null;
+  }, [
+    activeMinimalPairSet?.id,
+    bonusMode,
+    current?.id,
+    sentenceMode,
+    sessionFilterFormGroupId,
+    sessionFilterWord?.dict,
+    sessionFilterWord?.group,
+    transformationMode,
+    enabledTypesKey,
+  ]);
 
   useLayoutEffect(() => {
     if (!hydrated) return;
+    if (learnFocus?.source === 'practice-result' && learnFocus.reviewRecord) {
+      const record = learnFocus.reviewRecord;
+      const card = buildFocusCard(
+        state,
+        record.word,
+        record.cardType || learnFocus.typeId || record.practicedType,
+      );
+      if (card) {
+        focusSeededRef.current = true;
+        setWordSweep(null);
+        setSessionFilterWord(null);
+        setSessionFilterFormGroupId(null);
+        setLaunchContext(null);
+        setCurrent({
+          ...card,
+          selectionOrigin: record.cardOrigin || cardOriginForStudyCard(card),
+          selectionReason: record.selectionReason || card.selectionReason || null,
+        });
+        setReviewRecord(record);
+        setAnswer(record.submittedAnswer || '');
+        setWasCorrect(!!record.correct);
+        setWasCorrected(!!record.wasCorrected);
+        setCoachRevealed(record.coachRevealed || 0);
+        setSelfCheckOpen(false);
+        setStepHint('');
+        setHintMasked(false);
+        setHintRevealed(false);
+        setCoachChatOpen(false);
+        setPhase('reviewing');
+        clearLearnFocus?.();
+        return;
+      }
+      clearLearnFocus?.();
+    }
     // When arriving from Check's "Practice this verb", seed that exact word/form
     // once. If no rule covers it, fall through to normal selection.
     if (focus?.word && !focusSeededRef.current) {
       focusSeededRef.current = true;
       setFocusWordLock(focus.word);
-      setRecommendationFocus(null);
       // Lock Practice to this word so every follow-up card stays on it until
       // the learner exits the focus banner (rather than mixing back into the
       // general queue after the first seeded card).
@@ -1519,9 +939,9 @@ export default function StudyView() {
           missedTypeIds: [],
           completedTypeIds: [],
           repeatPass: false,
+          nextTypeId,
           complete: !nextTypeId,
         });
-        onFocusConsumed?.();
         clearPersistedCurrent();
         setAnswer('');
         setPhase('answering');
@@ -1529,7 +949,6 @@ export default function StudyView() {
         return;
       }
       const card = buildFocusCard(state, focus.word, focus.type);
-      onFocusConsumed?.();
       if (card) {
         setAnswer('');
         setPhase('answering');
@@ -1542,23 +961,10 @@ export default function StudyView() {
       setSessionFilterFormGroupId(focus.formGroupId);
       setFocusWordLock(null);
       setWordSweep(null);
-      setRecommendationFocus(null);
-      onFocusConsumed?.();
-    }
-    if (focus?.recommendation && !focusSeededRef.current) {
-      focusSeededRef.current = true;
-      setRecommendationFocus(focus.recommendation);
-      setFocusWordLock(null);
-      setWordSweep(null);
-      setSessionFilterWord(null);
-      setSessionFilterFormGroupId(null);
-      setLaunchContext(null);
-      onFocusConsumed?.();
-      resetActiveAttempt();
     }
     if (current !== null) return;
     const persisted =
-      focus?.word || focus?.formGroupId || focus?.recommendation
+      transformationMode || focus?.word || focus?.formGroupId || focus?.recommendation
         ? null
         : loadPersistedCurrent(state, practiceWords, enabledTypes, practicePrefs);
     if (persisted) {
@@ -1588,22 +994,49 @@ export default function StudyView() {
     practiceRuleCandidates,
     reviewSelectionOptions,
     focus,
+    learnFocus,
+    clearLearnFocus,
     specialLaunchActive,
+    transformationMode,
   ]);
 
   // Persist the active card so a refresh resumes it instead of drawing fresh.
   useEffect(() => {
-    if (current) persistCurrent(current);
-  }, [current]);
+    if (current && !transformationMode) persistCurrent(current);
+  }, [current, transformationMode]);
 
   useEffect(() => {
-    if (current && !cardMatchesPractice(current, practiceWords, enabledTypes, practicePrefs)) {
+    if (
+      !transformationMode &&
+      current &&
+      !cardMatchesPractice(current, practiceWords, enabledTypes, practicePrefs)
+    ) {
       clearPersistedCurrent();
+      setSelectionStatus('Card changed to match your practice selection.');
+      preparedNextCardRef.current = null;
+      recentCardIdsRef.current = [];
+      try {
+        speechRecognitionRef.current?.abort?.();
+      } catch {}
+      speechRecognitionRef.current = null;
+      setSpeechListening(false);
       setCurrent(null);
       setAnswer('');
       setPhase('answering');
+      setCoachRevealed(0);
+      setGreenRevealed(0);
+      setSelfCheckOpen(false);
+      setStepHint('');
+      setHintMasked(false);
+      setHintRevealed(false);
+      setCoachChatOpen(false);
+      hadKanaMistakeRef.current = false;
+      wrongSnapshotRef.current = null;
+      usedAnswerHelpRef.current = false;
+      setWasCorrected(false);
+      setWasCorrect(false);
     }
-  }, [practiceWords, enabledTypes, practicePrefs, current]);
+  }, [practiceWords, enabledTypes, practicePrefs, current, transformationMode, setCurrent]);
 
   useEffect(() => {
     if (!current || !activeMinimalPairSet) return;
@@ -1611,12 +1044,9 @@ export default function StudyView() {
     setCurrent(null);
     setAnswer('');
     setPhase('answering');
-    setChatOpen(false);
     setStepHint('');
-    setTypoGuard(null);
     setWasCorrect(false);
-    setLastDiagnosis(null);
-  }, [current, activeMinimalPairSet]);
+  }, [current, activeMinimalPairSet, setCurrent]);
 
   useEffect(() => {
     const nextSetId = practicePrefs.minimalPairSetId || '';
@@ -1625,26 +1055,34 @@ export default function StudyView() {
     setCurrent(null);
     setAnswer('');
     setPhase('answering');
-    setChatOpen(false);
     setStepHint('');
-    setTypoGuard(null);
     setWasCorrect(false);
-    setLastDiagnosis(null);
-  }, [practicePrefs.minimalPairSetId]);
+  }, [practicePrefs.minimalPairSetId, setCurrent]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (phase === 'answering') committedAttemptRef.current = null;
     if (phase === 'answering' && inputRef.current) {
       focusWithoutScroll(inputRef.current);
+      refocusAfterAutoAdvanceRef.current = false;
     }
   }, [current, phase]);
+
+  useLayoutEffect(() => {
+    latestSpeechAttemptRef.current = { card: current, phase, answerMode, submit };
+  });
 
   useEffect(() => {
     if (phase === 'answering') answerStartedAtRef.current = Date.now();
   }, [current?.id, phase]);
 
   useEffect(() => {
+    answerComposingRef.current = false;
+  }, [current?.id, phase]);
+
+  useEffect(() => {
     setShowPromptText(!listeningPrompt);
-  }, [current?.id, listeningPrompt]);
+    listeningPromptSpokenKeyRef.current = '';
+  }, [current, listeningPrompt]);
 
   useEffect(() => {
     if (stepHint && typingHintRef.current) {
@@ -1654,10 +1092,11 @@ export default function StudyView() {
 
   useEffect(() => {
     if (phase !== 'reviewing') return;
+    if (wasCorrect && autoAdvanceCorrect && autoAdvanceRef.current) return;
     const button = nextButtonRef.current;
     if (!button || typeof window === 'undefined') return;
     focusWithoutScroll(button);
-  }, [current?.id, phase]);
+  }, [autoAdvanceCorrect, current?.id, phase, wasCorrect]);
 
   // Handle TTS speech synthesis inside StudyView
   useEffect(() => {
@@ -1667,12 +1106,20 @@ export default function StudyView() {
     if (!synth) return;
 
     if (current && phase === 'answering' && listeningPrompt && promptAudioText) {
+      const promptKey =
+        current.id ||
+        `${current.verb?.dict || ''}|${current.verb?.group || ''}|${current.type || ''}|${
+          current.sourceType || ''
+        }`;
+      if (listeningPromptSpokenKeyRef.current === promptKey) return;
+      listeningPromptSpokenKeyRef.current = promptKey;
       speakJapaneseLocal(promptAudioText, 0.85);
     }
-    // current?.id used intentionally instead of current to avoid re-triggering on unrelated state changes
+    // The card reference also distinguishes exact-word/form retries. The
+    // spoken-key guard keeps unrelated changes from replaying the same prompt.
     // speakJapaneseLocal is defined inline and omitted to avoid infinite re-runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id, phase, listeningPrompt, promptAudioText, practicePrefs.voiceURI]);
+  }, [current, phase, listeningPrompt, promptAudioText, practicePrefs.voiceURI]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1689,9 +1136,8 @@ export default function StudyView() {
   }, [current?.id, answerMode]);
 
   useEffect(() => {
-    if (!current) return;
-    submitIfCompleteTypedAnswer(answer);
-  }, [answer]); // eslint-disable-line react-hooks/exhaustive-deps
+    usedAnswerHelpRef.current = false;
+  }, [current?.id]);
 
   // Remember how many leading kana have turned green so they stay green through
   // a backspace and reappear as green immediately when re-typed.
@@ -1708,13 +1154,6 @@ export default function StudyView() {
     }
     setGreenRevealed((prev) => (committed > prev ? committed : prev));
   }, [answer, phase]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (phase === 'answering') {
-      setRevealedMiss(false);
-      setReviewChoiceLabel('');
-    }
-  }, [current?.id, phase]);
 
   useEffect(() => {
     setSelfCheckOpen(false);
@@ -1747,14 +1186,11 @@ export default function StudyView() {
   }, [current?.id, phase, answerMode, speechRecognitionAvailable, speechListening]);
 
   useEffect(() => {
-    setTypoGuard(null);
-  }, [current?.id, phase]);
-
-  useEffect(() => {
     setReviewBase(state.session.reviewed || 0);
+    setRunBase(sessionBaseFrom(state.session));
     // state.session.reviewed intentionally omitted — only reset baseline when limit setting changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [practicePrefs.reviewLimit, practicePrefs.reviewLimitSource]);
+  }, [mode, practicePrefs.reviewLimit, practicePrefs.reviewLimitSource]);
 
   useEffect(() => {
     return () => {
@@ -1768,6 +1204,84 @@ export default function StudyView() {
     };
   }, []);
 
+  function applyPracticeSelection(nextSelection, message, blockedMessage) {
+    const currentSelection = normalizePracticeSelection(state.practiceSelection);
+    const resolvedSelection = nextSelection(currentSelection);
+    if (JSON.stringify(resolvedSelection) === JSON.stringify(currentSelection)) {
+      setSelectionStatus(blockedMessage || message);
+      return;
+    }
+    clearPersistedCurrent();
+    preparedNextCardRef.current = null;
+    setState((prev) => updateStatePracticeSelection(prev, resolvedSelection));
+    setSelectionStatus(message);
+  }
+
+  function togglePracticeCategory(categoryId) {
+    const category = PRACTICE_CATEGORIES.find((item) => item.id === categoryId);
+    if (!category) return;
+    const normalized = normalizePracticeSelection(state.practiceSelection);
+    const wasSelected = normalized.selectedCategoryIds.includes(categoryId);
+    if (!wasSelected && !matchingPracticeTypeIdsForCategory(normalized, categoryId).length) {
+      const activeFilters = PRACTICE_FILTERS.flatMap((filter) => {
+        const value = normalized.filters[filter.id];
+        if (value === 'all') return [];
+        const option = filter.options.find((item) => item.id === value);
+        return [`${filter.label}: ${option?.label || value}`];
+      });
+      setSelectionStatus(
+        `No ${category.label} forms match ${activeFilters.join(' and ')}. Set one or more of those filters to All first.`,
+      );
+      return;
+    }
+    applyPracticeSelection(
+      (selection) => togglePracticeCategorySelection(selection, categoryId),
+      `${category.label} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
+      'Keep at least one category on, or choose another category first.',
+    );
+  }
+
+  function setPracticeSelectionFilter(filterId, value) {
+    const filter = PRACTICE_FILTERS.find((item) => item.id === filterId);
+    const option = filter?.options.find((item) => item.id === value);
+    if (!filter || !option) return;
+    applyPracticeSelection(
+      (selection) => setPracticeFilterSelection(selection, filterId, value),
+      `${filter.label} filter set to ${option.label}.`,
+      `No forms match ${option.label} with the current categories and filters.`,
+    );
+  }
+
+  function togglePracticeSelectionType(typeId) {
+    const type = CARD_TYPE_BY_ID.get(typeId);
+    if (!type) return;
+    const category = practiceCategoryForType(typeId);
+    if (!category) return;
+    const normalized = normalizePracticeSelection(state.practiceSelection);
+    const categoryActive = normalized.selectedCategoryIds.includes(category.id);
+    const wasSelected =
+      categoryActive && normalized.selectedTypeIdsByCategory[category.id]?.includes(typeId);
+    const conflicts = practiceFilterConflictsForType(typeId, normalized.filters);
+    if (!wasSelected && conflicts.length) {
+      const currentFilters = conflicts
+        .map((conflict) => `${conflict.label}: ${conflict.valueLabel}`)
+        .join(' and ');
+      const resetFilters = conflicts.map((conflict) => conflict.label).join(' and ');
+      setSelectionStatus(
+        `${type.label} does not match ${currentFilters}. Set ${resetFilters} to All first.`,
+      );
+      return;
+    }
+    applyPracticeSelection(
+      (selection) =>
+        categoryActive
+          ? togglePracticeTypeSelection(selection, typeId)
+          : addPracticeTypeSelection(selection, typeId),
+      `${type.label} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
+      'Keep at least one matching exact form, or relax a quick filter first.',
+    );
+  }
+
   function speakJapaneseLocal(text, rateVal = 0.85) {
     // Prefer a recorded clip with TTS fallback (improvement #18).
     playPronunciation(text, rateVal, practicePrefs.voiceURI);
@@ -1775,7 +1289,7 @@ export default function StudyView() {
 
   if (!hydrated) {
     return (
-      <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-8 text-center text-sm text-stone-500 dark:text-stone-400">
+      <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-8 text-center text-sm text-stone-600 dark:text-stone-400">
         Loading Practice...
       </div>
     );
@@ -1785,6 +1299,15 @@ export default function StudyView() {
     const hasSessionFilter = !!(sessionFilterWord || sessionFilterFormGroupId);
     return (
       <div className="space-y-4">
+        {!transformationMode && (
+          <PracticeSelector
+            selection={state.practiceSelection}
+            onToggleCategory={togglePracticeCategory}
+            onSetFilter={setPracticeSelectionFilter}
+            onToggleType={togglePracticeSelectionType}
+            statusMessage={selectionStatus}
+          />
+        )}
         {hasSessionFilter && (
           <StudyFocusBar
             allWords={verbs}
@@ -1798,13 +1321,14 @@ export default function StudyView() {
           {hasSessionFilter ? (
             <>
               <p className="text-stone-600 dark:text-stone-300 mb-2">No cards for this focus</p>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
+              <p className="text-xs text-stone-600 dark:text-stone-500 mb-4">
                 Try a different word or form type.
               </p>
               <button
                 onClick={() => {
                   setSessionFilterWord(null);
                   setSessionFilterFormGroupId(null);
+                  onFocusConsumed?.();
                 }}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
               >
@@ -1814,9 +1338,9 @@ export default function StudyView() {
           ) : (
             <>
               <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
-              <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
-                No words or forms are active in the Practice map right now. Turn on forms in the
-                map, or restore words from Tools.
+              <p className="text-xs text-stone-600 dark:text-stone-500 mb-4">
+                No words are available for this selection. Choose another practice topic or restore
+                words from Tools.
               </p>
               <button
                 onClick={() => setTab('tools')}
@@ -1833,6 +1357,9 @@ export default function StudyView() {
 
   const expected = reverseDrill ? current.verb.reading : sourceForm;
   const practicedType = reverseDrill ? sourceTypeForReading : current.type;
+  const contextualPracticeStats = transformationMode
+    ? null
+    : contextualStatsForType(state.practiceStats, practicedType);
   const promptView = reverseDrill
     ? formDisplay(sourceForm, practicePrefs, current.verb, practicedType)
     : promptDisplay(current.verb, promptType, practicePrefs);
@@ -1840,11 +1367,11 @@ export default function StudyView() {
     ? promptDisplay(current.verb, null, practicePrefs)
     : formDisplay(expected, practicePrefs, current.verb, current.type);
   const promptEnglish = reverseDrill
-    ? englishForForm(current.verb, practicedType)
-    : englishForForm(current.verb, promptType);
+    ? exerciseEnglishForForm(current.verb, practicedType)
+    : exerciseEnglishForForm(current.verb, promptType);
   const targetEnglish = reverseDrill
-    ? englishForForm(current.verb, null)
-    : englishForForm(current.verb, current.type);
+    ? exerciseEnglishForForm(current.verb, null)
+    : exerciseEnglishForForm(current.verb, current.type);
   const spokenAnswerTargets = reverseDrill
     ? [current.verb.reading, current.verb.dict]
     : [expected, surfaceFormFor(current.verb, current.type)];
@@ -1867,28 +1394,22 @@ export default function StudyView() {
   const targetTypeInfo =
     targetTypeId === DICTIONARY_TYPE_ID ? DICTIONARY_TYPE_INFO : getTypeInfo(targetTypeId);
   const transformationRoute = transformationRouteText(sourceTypeInfo, targetTypeInfo);
-  const reviewExplanation =
-    phase === 'reviewing'
-      ? transformationReviewExplanation({
-          item: current.verb,
-          type: reverseDrill ? sourceTypeForReading : current.type,
-          reverseDrill,
-          sourceInfo: sourceTypeInfo,
-          targetInfo: targetTypeInfo,
-          sourceForm: promptSourceForm,
-          expected,
-        })
-      : null;
-  const explanation = !wasCorrect ? reviewExplanation : null;
-  const diagnostic =
-    phase === 'reviewing' && !wasCorrect && !revealedMiss ? lastDiagnosis?.feedback || '' : '';
   const choices = reverseDrill
     ? makeReverseChoices(current, practiceWords)
     : makeChoices(current, practiceWords);
   const wordType = isAdjective(current.verb) ? 'Adjective' : 'Verb';
+  const currentWordMeta = getWordMeta(current.verb);
+  const lessonMetaText = [
+    currentWordMeta.lesson && `Genki L${currentWordMeta.lesson}`,
+    currentWordMeta.minnaLesson && `Minna L${currentWordMeta.minnaLesson}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const noChangePrompt = !reverseDrill && promptType === current.type;
   const taskLabel = reverseDrill ? `Recover dictionary form` : typeInfo.label;
-  const transformationActionLabel = reverseDrill ? 'Answer with' : 'Conjugate to';
+  const transformationActionLabel = reverseDrill
+    ? 'Recover the dictionary word'
+    : 'Change to the target form';
   const taskHint = reverseDrill
     ? 'answer with dictionary form'
     : noChangePrompt
@@ -1902,6 +1423,8 @@ export default function StudyView() {
     taskSub,
   });
   const transformationSupportText = answerTaskDetails.supportText;
+  const transformationContractText =
+    'Use the same dictionary word. Build the named target form; grammar from the starting form is not carried over unless the target names it.';
   const taskOverride = reverseDrill
     ? transformationMode
       ? `Reading: recover the dictionary form from ${typeInfo.label} (${sourceForm})`
@@ -1913,34 +1436,11 @@ export default function StudyView() {
     ? minimalPairFeedbackForCard(minimalPairSetForCurrent, current.verb, current.type)
     : null;
   const reviewLimit = activeReviewLimitFromPrefs(practicePrefs);
-  const reviewLimitSource = practicePrefs.reviewLimitSource || '';
   const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
-  const sessionSkipped = state.session?.skipped || 0;
-  const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit && !recommendationFocus;
+  const runStats = sessionRunStats(state.session, runBase);
+  const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
   const wordSweepComplete = !!wordSweep?.complete;
   const reviewComplete = wordSweepComplete;
-  const workoutProgress = wordSweep
-    ? {
-        now: Math.min(wordSweep.completedTypeIds?.length || 0, wordSweep.allTypeIds?.length || 1),
-        max: Math.max(1, wordSweep.allTypeIds?.length || 0),
-        label: wordSweep.repeatPass ? 'Repeating missed forms' : 'Enabled forms progress',
-      }
-    : reviewLimit > 0
-      ? {
-          now: Math.min(reviewsDone, reviewLimit),
-          max: reviewLimit,
-          label: reviewLimitSource === 'recommendation' ? 'Recommended progress' : 'Drill progress',
-        }
-      : {
-          now: reviewsDone,
-          max: 0,
-          label: bonusMode ? 'Bonus practice' : 'Continuous practice',
-          continuous: true,
-        };
-  const workoutProgressPct =
-    workoutProgress.max && !workoutProgress.continuous
-      ? Math.min(100, Math.round((workoutProgress.now / workoutProgress.max) * 100))
-      : 0;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishMeaning = englishHintsHidden && phase === 'answering';
   // Guided kana is now an in-box "reveal next" action, not a separate mode.
@@ -1961,7 +1461,7 @@ export default function StudyView() {
     coachWrongIndex >= 0
       ? `Kana ${coachWrongIndex + 1} should be ${coachCells[coachWrongIndex].expected}.`
       : coachPreview === expected
-        ? 'Complete match. Press Enter.'
+        ? ''
         : coachTypedCount > expectedKanaCount
           ? 'Extra kana after the answer.'
           : '';
@@ -1975,7 +1475,7 @@ export default function StudyView() {
         ? 'Extra kana after the answer.'
         : `Expected ${liveCells[liveWrongIndex].expected} at kana ${liveWrongIndex + 1}.`
       : preview === expected
-        ? 'Complete match. Press Enter.'
+        ? ''
         : '';
   const liveAnswerTone =
     liveKana && phase === 'answering'
@@ -1990,37 +1490,196 @@ export default function StudyView() {
       ? 'border-rose-400 dark:border-rose-700 focus:border-rose-500 dark:focus:border-rose-600'
       : liveAnswerTone === 'correct'
         ? 'border-emerald-400 dark:border-emerald-700 focus:border-emerald-500 dark:focus:border-emerald-600'
-        : 'border-stone-200 dark:border-stone-805 focus:border-indigo-500';
-  const answerInputClassName = `flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 ${answerInputBorderClass} rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 caret-stone-850 dark:caret-stone-150 focus:outline-none transition`;
+        : 'border-stone-200 dark:border-stone-800 focus:border-indigo-500';
+  const answerInputClassName = `flex-1 min-w-0 px-4 py-3 text-xl text-center border-2 ${answerInputBorderClass} rounded-xl bg-white dark:bg-stone-950 text-stone-800 dark:text-stone-100 caret-stone-800 dark:caret-stone-100 focus:outline-none transition`;
   const answerFeedbackClassName =
     liveAnswerTone === 'wrong'
       ? 'text-rose-700 dark:text-rose-400'
       : liveAnswerTone === 'correct'
         ? 'text-emerald-700 dark:text-emerald-400'
-        : 'text-stone-500 dark:text-stone-400';
-  const reviewAnswerSource = phase === 'reviewing' && submittedAnswer ? submittedAnswer : answer;
-  const reviewKanaCells =
-    typedAnswerMode && !reverseDrill
-      ? kanaCoachCells(expected, reviewAnswerSource, coachRevealed)
-      : [];
+        : 'text-stone-600 dark:text-stone-400';
 
-  function nextMinimalPairProgress(correct) {
+  function nextMinimalPairProgress(correct, baseState, gradedAt, eventId) {
     return recordMinimalPairResult(
-      state.minimalPairs,
+      baseState.minimalPairs,
       minimalPairSetForCurrent?.id,
       current?.verb,
       current?.type,
       correct,
+      { now: gradedAt, eventId },
     );
   }
 
-  function mistakeRecordOptions() {
+  function nextTransformationStats(correct, baseState, gradedAt, eventId) {
+    if (!transformationMode) return baseState.transformation;
+    return gradeTransformationStats(baseState.transformation, {
+      correct,
+      sourceType: sourceTypeId,
+      targetType: targetTypeId,
+      direction: reverseDrill ? 'reverse' : 'forward',
+      now: gradedAt,
+      eventId,
+    });
+  }
+
+  function mistakeRecordOptions(eventId) {
     return {
+      eventId,
       ...(minimalPairSetForCurrent?.id ? { minimalPairSetId: minimalPairSetForCurrent.id } : {}),
+      ...(transformationMode
+        ? {
+            dimension: 'transformation',
+            sourceType: sourceTypeId,
+            targetType: targetTypeId,
+            direction: reverseDrill ? 'reverse' : 'forward',
+          }
+        : {}),
     };
   }
 
-  function resolveMistakesForCurrentCard(mistakes = []) {
+  function nextGradedState(
+    { correct, eventId, gradedAt, rid, responseMs, nextMistakes, mistakeDiagnosis },
+    baseState = state,
+  ) {
+    if (
+      baseState.practiceStats?.recent?.some((attempt) => attempt.id === eventId) ||
+      (transformationMode && baseState.transformation?.lastAttemptId === eventId)
+    )
+      return baseState;
+    if (transformationMode) {
+      return {
+        ...baseState,
+        transformation: nextTransformationStats(correct, baseState, gradedAt, eventId),
+      };
+    }
+    const progressTypeId = reverseDrill ? sourceTypeForReading : current.type;
+    const readinessRuleId = reverseDrill ? cardIdFor(current.verb, progressTypeId) : rid;
+    const gradedCard = {
+      ...gradeCard(baseState.cards[rid], correct, gradedAt),
+      lastAttemptId: eventId,
+    };
+    const storedCard = reverseDrill
+      ? withReadingSourceTypeStat(gradedCard, progressTypeId, correct, gradedAt, eventId)
+      : gradedCard;
+    const submittedMistake = nextMistakes?.[0];
+    const mistakes = correct
+      ? resolveMistakesForCurrentCard(baseState.mistakes, gradedAt)
+      : recordMistake(
+          baseState.mistakes,
+          current.verb,
+          current.type,
+          reverseDrill ? sourceTypeForReading : promptType,
+          submittedMistake.userAnswer,
+          expected,
+          { ...mistakeRecordOptions(eventId), now: gradedAt },
+        );
+    const dict = current.verb.dict;
+    const priorWordStats = baseState.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
+    const verbStats = {
+      ...baseState.verbStats,
+      [dict]: {
+        ...(baseState.verbStats?.[dict] || {}),
+        [rid]: {
+          seen: priorWordStats.seen + 1,
+          incorrect: priorWordStats.incorrect + (correct ? 0 : 1),
+        },
+      },
+    };
+    const graded = {
+      ...baseState,
+      mistakes,
+      minimalPairs: nextMinimalPairProgress(correct, baseState, gradedAt, eventId),
+      transformation: nextTransformationStats(correct, baseState, gradedAt, eventId),
+      session: sessionAfterAnswer(baseState.session, {
+        card: current,
+        correct,
+        mistakeDiagnosis,
+        eventId,
+        now: gradedAt,
+      }),
+    };
+    return {
+      ...graded,
+      cards: { ...baseState.cards, [rid]: storedCard },
+      retryQueue: correct
+        ? (baseState.retryQueue || []).filter((id) => id !== rid)
+        : [...new Set([...(baseState.retryQueue || []), rid])].slice(-20),
+      verbStats,
+      readiness: recordReadinessAttempt(baseState.readiness, readinessRuleId, {
+        correct,
+        responseMs,
+        answerMode,
+        kanaAssist: readinessKanaAssist,
+        reverseDrill,
+        now: gradedAt,
+        eventId,
+      }),
+      weakness: recordWeaknessAttempt(baseState.weakness, {
+        word: current.verb,
+        typeId: progressTypeId,
+        correct,
+        responseMs,
+        now: gradedAt,
+        eventId,
+      }),
+      practiceStats: recordPracticeAnswer(baseState.practiceStats, {
+        id: eventId,
+        typeId: progressTypeId,
+        correct,
+        responseMs,
+        mode: listeningPrompt ? 'listening' : answerMode,
+        at: gradedAt,
+      }),
+    };
+  }
+
+  function buildRunAnswerRecord({
+    correct,
+    submittedAnswer: answerSnapshot = '',
+    reviewChoiceLabel: choiceLabel = '',
+    revealedMiss: wasRevealed = false,
+    wasCorrected: corrected = false,
+    mistakeDiagnosis = null,
+  }) {
+    if (!current) return null;
+    const explanationSnapshot = transformationReviewExplanation({
+      item: current.verb,
+      type: practicedType,
+      reverseDrill,
+      sourceInfo: sourceTypeInfo,
+      targetInfo: targetTypeInfo,
+      sourceForm: promptSourceForm,
+      expected,
+    });
+    return {
+      answeredAt: Date.now(),
+      cardId: current.id,
+      word: { ...current.verb },
+      cardType: current.type,
+      practicedType,
+      promptType: sourceTypeId,
+      promptForm: promptSourceForm,
+      typeLabel: typeInfo.label || sessionOutcomeLabel(current),
+      reverseDrill,
+      expected,
+      answerMode,
+      cardOrigin: cardOriginForStudyCard(current),
+      selectionReason: current.selectionReason || null,
+      submittedAnswer: answerSnapshot,
+      reviewChoiceLabel: choiceLabel,
+      revealedMiss: wasRevealed,
+      correct,
+      wasCorrected: corrected,
+      diagnosis: mistakeDiagnosis ? { ...mistakeDiagnosis } : null,
+      explanation: explanationSnapshot,
+      minimalPairFeedback,
+      taskOverride,
+      practicePrefs: snapshotPracticePrefs(practicePrefs),
+      coachRevealed,
+    };
+  }
+
+  function resolveMistakesForCurrentCard(mistakes = [], now) {
     const matches = (mistakes || []).filter(
       (mistake) =>
         !mistake.resolved &&
@@ -2029,7 +1688,10 @@ export default function StudyView() {
         mistake.type === current?.type,
     );
     if (!matches.length) return mistakes;
-    return matches.reduce((next, mistake) => markMistakeResolved(next, mistake.key), mistakes);
+    return matches.reduce(
+      (next, mistake) => markMistakeResolved(next, mistake.key, { now }),
+      mistakes,
+    );
   }
 
   function stopSpeechRecognition() {
@@ -2064,6 +1726,7 @@ export default function StudyView() {
     }
     try {
       const recognition = new SpeechRecognition();
+      const recognitionCard = current;
       speechRecognitionRef.current = recognition;
       speechSubmittedRef.current = false;
       recognition.lang = 'ja-JP';
@@ -2083,6 +1746,14 @@ export default function StudyView() {
         setSpeechListening(false);
       };
       recognition.onresult = (event) => {
+        const latest = latestSpeechAttemptRef.current;
+        if (
+          speechRecognitionRef.current !== recognition ||
+          latest?.card !== recognitionCard ||
+          latest.phase !== 'answering' ||
+          latest.answerMode !== 'speak'
+        )
+          return;
         const { transcripts, isFinal } = speechAlternativesFromEvent(event);
         const transcript = bestSpeechAlternative(transcripts, spokenAnswerTargets);
         if (!transcript) return;
@@ -2090,7 +1761,7 @@ export default function StudyView() {
         setSpeechError('');
         if (isFinal && !speechSubmittedRef.current) {
           speechSubmittedRef.current = true;
-          submit(transcript, { spoken: true });
+          latest.submit(transcript, { spoken: true });
         }
       };
       recognition.start();
@@ -2126,6 +1797,28 @@ export default function StudyView() {
     );
   }
 
+  function prepareLikelyNextCard(nextState, lastCardId, sweepStep = null, optionOverrides = {}) {
+    if (sweepStep?.nextCard) {
+      preparedNextCardRef.current = null;
+      preloadSentenceForCard(sweepStep.nextCard);
+      return sweepStep.nextCard;
+    }
+    const nextCard = selectNextReviewCard(nextState, lastCardId, optionOverrides);
+    if (nextCard) {
+      preparedNextCardRef.current = { lastCardId, card: nextCard };
+      preloadSentenceForCard(nextCard);
+    } else {
+      preparedNextCardRef.current = null;
+    }
+    return nextCard;
+  }
+
+  function consumePreparedNextCard(lastCardId) {
+    const prepared = preparedNextCardRef.current;
+    preparedNextCardRef.current = null;
+    return prepared?.lastCardId === lastCardId ? prepared.card : null;
+  }
+
   function nextWordSweepStep(sweep, nextState, typeId, correct, { holdNext = false } = {}) {
     if (!sweep?.word || !typeId) return { sweep, nextCard: null };
     const completed = new Set(sweep.completedTypeIds || []);
@@ -2155,13 +1848,21 @@ export default function StudyView() {
       nextTypeId: holdNext ? nextTypeId : null,
       complete: !nextTypeId && missed.size === 0,
     };
-    const nextCard = nextTypeId ? buildFocusCard(nextState, sweep.word, nextTypeId) : null;
+    const nextCard = nextTypeId
+      ? withCardOrigin(
+          buildFocusCard(nextState, sweep.word, nextTypeId),
+          repeatPass ? 'missed' : null,
+        )
+      : null;
     return { sweep: nextSweep, nextCard };
   }
 
   function consumeHeldWordSweepCard(nextState = state) {
     if (!wordSweep?.word || !wordSweep.nextTypeId) return null;
-    const card = buildFocusCard(nextState, wordSweep.word, wordSweep.nextTypeId);
+    const card = withCardOrigin(
+      buildFocusCard(nextState, wordSweep.word, wordSweep.nextTypeId),
+      wordSweep.repeatPass ? 'missed' : null,
+    );
     setWordSweep((currentSweep) =>
       currentSweep?.nextTypeId === wordSweep.nextTypeId
         ? { ...currentSweep, nextTypeId: null }
@@ -2175,23 +1876,21 @@ export default function StudyView() {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
+    preparedNextCardRef.current = null;
     stopSpeechRecognition();
     recentCardIdsRef.current = [];
     setAnswer('');
     setPhase('answering');
-    setChatOpen(false);
     setCoachRevealed(0);
     setGreenRevealed(0);
-    setRevealedMiss(false);
-    setReviewChoiceLabel('');
     setSelfCheckOpen(false);
-    setTypoGuard(null);
     setStepHint('');
     setHintMasked(false);
     setHintRevealed(false);
     setCoachChatOpen(false);
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
+    usedAnswerHelpRef.current = false;
     setWasCorrected(false);
     setWasCorrect(false);
     setCurrent(null);
@@ -2201,66 +1900,23 @@ export default function StudyView() {
     if (word) {
       setState((prev) => includeWordInReviewState(prev, word));
     }
-    setRecommendationFocus(null);
     setWordSweep(null);
+    onFocusConsumed?.();
     setSessionFilterWord(word);
     setCurrent(null);
   }
 
   function chooseFocusFormGroup(groupId) {
     const group = FORM_GROUPS.find((item) => item.id === groupId);
-    setState((prev) => {
-      const restored = groupId ? includeFormFamilyInReviewState(prev, groupId) : prev;
-      if (!group?.typeIds?.length) return restored;
-      return {
-        ...restored,
-        enabledTypes: [...new Set([...(restored.enabledTypes || []), ...group.typeIds])],
-      };
-    });
-    setRecommendationFocus(null);
+    if (group) {
+      setState((prev) =>
+        updateStatePracticeSelection(prev, practiceSelectionForTypeIds(group.typeIds)),
+      );
+    }
     setWordSweep(null);
-    setSessionFilterFormGroupId(groupId);
+    onFocusConsumed?.();
+    setSessionFilterFormGroupId(null);
     setCurrent(null);
-  }
-
-  function togglePracticeType(typeId) {
-    if (!typeId) return;
-    setState((prev) => {
-      const currentTypes = new Set(prev.enabledTypes || []);
-      if (currentTypes.has(typeId)) {
-        if (currentTypes.size <= 1) return prev;
-        currentTypes.delete(typeId);
-      } else {
-        currentTypes.add(typeId);
-      }
-      return { ...prev, enabledTypes: [...currentTypes] };
-    });
-    setCurrent(null);
-  }
-
-  function togglePracticeFamily(family) {
-    if (!family?.typeIds?.length) return;
-    setState((prev) => {
-      const currentTypes = new Set(prev.enabledTypes || []);
-      const allEnabled = family.typeIds.every((typeId) => currentTypes.has(typeId));
-      if (allEnabled) {
-        for (const typeId of family.typeIds) currentTypes.delete(typeId);
-        if (!currentTypes.size) return prev;
-      } else {
-        for (const typeId of family.typeIds) currentTypes.add(typeId);
-      }
-      return { ...prev, enabledTypes: [...currentTypes] };
-    });
-    setCurrent(null);
-  }
-
-  function togglePracticeMapFamilyOpen(familyId) {
-    setOpenPracticeMapFamilyIds((current) => {
-      const next = new Set(current);
-      if (next.has(familyId)) next.delete(familyId);
-      else next.add(familyId);
-      return next;
-    });
   }
 
   // Deterministic, offline step coach — no API key required. Irregular forms
@@ -2268,6 +1924,7 @@ export default function StudyView() {
   function showStepHint() {
     if (!current) return;
     const reveal = hintRevealed || (!!stepHint && hintMasked);
+    if (reveal) usedAnswerHelpRef.current = true;
     const baseHint = stepCoachHint(current.verb, current.type, answer, reveal);
     const nextHint = transformationMode
       ? transformationHintFromBase(baseHint, {
@@ -2285,12 +1942,19 @@ export default function StudyView() {
     if (!current || reverseDrill || phase !== 'answering') return;
     const expectedChars = Array.from(expected);
     if (!expectedChars.length) return;
+    usedAnswerHelpRef.current = true;
     const typedCount = Array.from(toHiraganaProgress(answer)).length;
     const nextCount = Math.min(expectedChars.length, Math.max(coachRevealed, typedCount) + 1);
     setCoachRevealed(nextCount);
     setGreenRevealed((prev) => Math.max(prev, nextCount));
-    setAnswer(expectedChars.slice(0, nextCount).join(''));
+    updateTypedAnswer(expectedChars.slice(0, nextCount).join(''));
     focusAnswerInput();
+  }
+
+  function revealKanaHint() {
+    if (!current || reverseDrill || phase !== 'answering') return;
+    usedAnswerHelpRef.current = true;
+    setCoachRevealed(Math.min(expectedKanaCount, Math.max(coachRevealed, coachTypedCount) + 1));
   }
 
   // Opens a continuous AI chat for deeper help, seeded with the current
@@ -2308,30 +1972,30 @@ export default function StudyView() {
     }
     if (options.spoken) stopSpeechRecognition();
     if (phase === 'reviewing') {
-      setChatOpen(false);
       setAnswer('');
       setCoachRevealed(0);
-      setRevealedMiss(false);
-      setReviewChoiceLabel('');
       setSelfCheckOpen(false);
-      setTypoGuard(null);
       setStepHint('');
       setHintMasked(false);
       setHintRevealed(false);
       setCoachChatOpen(false);
-      setLastDiagnosis(null);
       hadKanaMistakeRef.current = false;
       wrongSnapshotRef.current = null;
+      usedAnswerHelpRef.current = false;
       setWasCorrected(false);
       setPhase('answering');
       if (!reviewSetComplete && !reviewComplete) {
         const sweepCard = consumeHeldWordSweepCard(state);
-        setCurrent(sweepCard || selectNextReviewCard(state, current.id));
+        const preparedCard = sweepCard ? null : consumePreparedNextCard(current.id);
+        setCurrent(sweepCard || preparedCard || selectNextReviewCard(state, current.id));
       }
       return;
     }
     const raw = choiceValue !== undefined ? choiceValue : answer;
     if (!raw.trim()) return;
+    if (committedAttemptRef.current) return;
+    const eventId = createSyncEventId();
+    committedAttemptRef.current = eventId;
     const spoken = !!options.spoken;
     const fromTypedInput = !!options.fromTypedInput || (choiceValue === undefined && !spoken);
     const normalized = !spoken && fromTypedInput ? toHiragana(raw) : raw;
@@ -2342,29 +2006,13 @@ export default function StudyView() {
       : spoken
         ? spokenAnswerResult(spokenAnswerTargets, raw).ok
         : normalized === expected;
-    const ok = finalOk && (spoken || !hadKanaMistakeRef.current);
-    const nearMiss =
-      choiceValue === undefined && !spoken && !ok
-        ? typoGuardForAnswer(raw, normalized, expected, current.verb, reverseDrill)
-        : null;
-    if (nearMiss && typoGuard?.key !== nearMiss.key) {
-      setTypoGuard(nearMiss);
-      return;
-    }
+    const ok = finalOk && (spoken || (!hadKanaMistakeRef.current && !usedAnswerHelpRef.current));
     if (choiceValue !== undefined) setAnswer(raw);
-    const dict = current.verb.dict,
-      rid = current.id;
-    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
-    const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
-    const newVerbStats = {
-      ...state.verbStats,
-      [dict]: {
-        ...(state.verbStats?.[dict] || {}),
-        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
-      },
-    };
+    const rid = current.id;
+    const gradedAt = Date.now();
+    const responseMs = Math.max(0, gradedAt - answerStartedAtRef.current);
     const nextMistakes = ok
-      ? resolveMistakesForCurrentCard(state.mistakes)
+      ? resolveMistakesForCurrentCard(state.mistakes, gradedAt)
       : recordMistake(
           state.mistakes,
           current.verb,
@@ -2372,83 +2020,56 @@ export default function StudyView() {
           reverseDrill ? sourceTypeForReading : promptType,
           spoken || reverseDrill ? raw.trim() : normalized,
           expected,
-          mistakeRecordOptions(),
+          { ...mistakeRecordOptions(eventId), now: gradedAt },
         );
-    const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
-    const nextState = {
-      ...state,
-      cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
-      retryQueue: ok
-        ? (state.retryQueue || []).filter((id) => id !== rid)
-        : [...new Set([...(state.retryQueue || []), rid])].slice(-20),
-      verbStats: newVerbStats,
-      mistakes: nextMistakes,
-      readiness: recordReadinessAttempt(state.readiness, rid, {
-        correct: ok,
-        responseMs,
-        answerMode,
-        kanaAssist: readinessKanaAssist,
-        reverseDrill,
-      }),
-      weakness: recordWeaknessAttempt(state.weakness, {
-        word: current.verb,
-        typeId: current.type,
-        correct: ok,
-        responseMs,
-      }),
-      minimalPairs: nextMinimalPairProgress(ok),
-      session: {
-        ...bumpSessionMistakePattern(
-          {
-            ...(state.session || {}),
-            reviewed: (state.session?.reviewed || 0) + 1,
-            correct: (state.session?.correct || 0) + (ok ? 1 : 0),
-          },
-          mistakeDiagnosis,
-        ),
-      },
-      daily: newDaily,
+    const submittedForReview =
+      finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw;
+    const grading = {
+      correct: ok,
+      eventId,
+      gradedAt,
+      rid,
+      responseMs,
+      nextMistakes,
+      mistakeDiagnosis,
     };
+    const nextState = nextGradedState(grading);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
-    setState(nextState);
-    setChatOpen(false);
-    setLastDiagnosis(mistakeDiagnosis);
-    setReviewChoiceLabel('');
-    setRevealedMiss(false);
+    const runRecord = buildRunAnswerRecord({
+      correct: ok,
+      submittedAnswer: submittedForReview,
+      mistakeDiagnosis,
+      wasCorrected: finalOk && !ok,
+    });
+    setReviewRecord(runRecord);
+    setState((previous) => nextGradedState(grading, previous));
     setSelfCheckOpen(false);
-    // When the final string matched but the card was still marked wrong (a kana
-    // mistake was made and then corrected mid-typing), show the snapshot from
-    // when it went wrong instead of the corrected text.
-    setSubmittedAnswer(
-      finalOk && !ok && wrongSnapshotRef.current != null ? wrongSnapshotRef.current : raw,
-    );
     setWasCorrected(finalOk && !ok);
     setWasCorrect(ok);
     setPhase('reviewing');
     const reviewWillComplete =
-      sweepStep?.sweep?.complete ||
-      (reviewLimit > 0 && !recommendationFocus && reviewsDone + 1 >= reviewLimit);
+      sweepStep?.sweep?.complete || (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit);
+    const likelyNextCard = reviewWillComplete
+      ? null
+      : prepareLikelyNextCard(nextState, current.id, sweepStep);
     if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
-        setChatOpen(false);
         setAnswer('');
         setCoachRevealed(0);
-        setRevealedMiss(false);
-        setReviewChoiceLabel('');
         setSelfCheckOpen(false);
-        setTypoGuard(null);
         setStepHint('');
         setHintMasked(false);
         setHintRevealed(false);
         setCoachChatOpen(false);
-        setLastDiagnosis(null);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
+        usedAnswerHelpRef.current = false;
+        refocusAfterAutoAdvanceRef.current = true;
         setWasCorrected(false);
         setPhase('answering');
         if (sweepStep?.nextCard) {
@@ -2458,45 +2079,50 @@ export default function StudyView() {
               : currentSweep,
           );
         }
-        setCurrent(sweepStep?.nextCard || selectNextReviewCard(nextState, current.id));
+        setCurrent(likelyNextCard || selectNextReviewCard(nextState, current.id));
       }, CORRECT_AUTO_ADVANCE_MS);
     }
   }
 
   function skipCurrent() {
     if (!current) return;
+    const eventId = createSyncEventId();
+    const now = Date.now();
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
     stopSpeechRecognition();
-    const nextState = {
-      ...state,
-      session: { ...(state.session || {}), skipped: (state.session?.skipped || 0) + 1 },
-    };
+    const nextState = transformationMode
+      ? state
+      : {
+          ...state,
+          session: sessionAfterSkip(state.session, current, { eventId, now }),
+        };
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, false)
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
-    setState(nextState);
-    setChatOpen(false);
+    const likelyNextCard = prepareLikelyNextCard(nextState, current.id, sweepStep);
+    if (!transformationMode)
+      setState((previous) => ({
+        ...previous,
+        session: sessionAfterSkip(previous.session, current, { eventId, now }),
+      }));
     setAnswer('');
     setCoachRevealed(0);
-    setRevealedMiss(false);
-    setReviewChoiceLabel('');
     setSelfCheckOpen(false);
-    setTypoGuard(null);
     setStepHint('');
     setHintMasked(false);
     setHintRevealed(false);
     setCoachChatOpen(false);
-    setLastDiagnosis(null);
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
+    usedAnswerHelpRef.current = false;
     setWasCorrected(false);
     setPhase('answering');
     setWasCorrect(false);
-    setCurrent(sweepStep?.nextCard || selectNextReviewCard(nextState, current.id));
+    setCurrent(likelyNextCard || selectNextReviewCard(nextState, current.id));
   }
 
   function removeCurrentWordFromReviews() {
@@ -2518,24 +2144,18 @@ export default function StudyView() {
   }
 
   function gradeSelfCheck(ok, label) {
-    if (!current || phase !== 'answering') return;
+    if (!current || phase !== 'answering' || committedAttemptRef.current) return;
+    const eventId = createSyncEventId();
+    committedAttemptRef.current = eventId;
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
-    const dict = current.verb.dict,
-      rid = current.id;
-    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
-    const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
-    const newVerbStats = {
-      ...state.verbStats,
-      [dict]: {
-        ...(state.verbStats?.[dict] || {}),
-        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + (ok ? 0 : 1) },
-      },
-    };
+    const rid = current.id;
+    const gradedAt = Date.now();
+    const responseMs = Math.max(0, gradedAt - answerStartedAtRef.current);
     const nextMistakes = ok
-      ? resolveMistakesForCurrentCard(state.mistakes)
+      ? resolveMistakesForCurrentCard(state.mistakes, gradedAt)
       : recordMistake(
           state.mistakes,
           current.verb,
@@ -2543,78 +2163,55 @@ export default function StudyView() {
           reverseDrill ? sourceTypeForReading : promptType,
           `self-check: ${label}`,
           expected,
-          mistakeRecordOptions(),
+          { ...mistakeRecordOptions(eventId), now: gradedAt },
         );
-    const newDaily = bumpDaily(state.daily, ok, dailyGoalTarget);
     const mistakeDiagnosis = ok ? null : nextMistakes[0]?.diagnosis || null;
-    const nextState = {
-      ...state,
-      cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], ok) },
-      retryQueue: ok
-        ? (state.retryQueue || []).filter((id) => id !== rid)
-        : [...new Set([...(state.retryQueue || []), rid])].slice(-20),
-      verbStats: newVerbStats,
-      mistakes: nextMistakes,
-      readiness: recordReadinessAttempt(state.readiness, rid, {
-        correct: ok,
-        responseMs,
-        answerMode,
-        kanaAssist: readinessKanaAssist,
-        reverseDrill,
-      }),
-      weakness: recordWeaknessAttempt(state.weakness, {
-        word: current.verb,
-        typeId: current.type,
-        correct: ok,
-        responseMs,
-      }),
-      minimalPairs: nextMinimalPairProgress(ok),
-      session: {
-        ...bumpSessionMistakePattern(
-          {
-            ...(state.session || {}),
-            reviewed: (state.session?.reviewed || 0) + 1,
-            correct: (state.session?.correct || 0) + (ok ? 1 : 0),
-          },
-          mistakeDiagnosis,
-        ),
-      },
-      daily: newDaily,
+    const grading = {
+      correct: ok,
+      eventId,
+      gradedAt,
+      rid,
+      responseMs,
+      nextMistakes,
+      mistakeDiagnosis,
     };
+    const nextState = nextGradedState(grading);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, ok, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
-    setState(nextState);
+    const runRecord = buildRunAnswerRecord({
+      correct: ok,
+      submittedAnswer: '',
+      reviewChoiceLabel: label,
+      revealedMiss: !ok,
+      mistakeDiagnosis,
+    });
+    setReviewRecord(runRecord);
+    setState((previous) => nextGradedState(grading, previous));
     setAnswer('');
-    setTypoGuard(null);
-    setReviewChoiceLabel(label);
-    setRevealedMiss(!ok);
     setSelfCheckOpen(false);
-    setChatOpen(false);
-    setLastDiagnosis(mistakeDiagnosis);
     setWasCorrect(ok);
     setPhase('reviewing');
     const reviewWillComplete =
-      sweepStep?.sweep?.complete ||
-      (reviewLimit > 0 && !recommendationFocus && reviewsDone + 1 >= reviewLimit);
+      sweepStep?.sweep?.complete || (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit);
+    const likelyNextCard = reviewWillComplete
+      ? null
+      : prepareLikelyNextCard(nextState, current.id, sweepStep);
     if (ok && autoAdvanceCorrect && !reviewWillComplete) {
       autoAdvanceRef.current = setTimeout(() => {
         autoAdvanceRef.current = null;
-        setChatOpen(false);
         setAnswer('');
         setCoachRevealed(0);
-        setRevealedMiss(false);
-        setReviewChoiceLabel('');
         setSelfCheckOpen(false);
-        setTypoGuard(null);
         setStepHint('');
         setHintMasked(false);
         setHintRevealed(false);
         setCoachChatOpen(false);
-        setLastDiagnosis(null);
         hadKanaMistakeRef.current = false;
         wrongSnapshotRef.current = null;
+        usedAnswerHelpRef.current = false;
+        refocusAfterAutoAdvanceRef.current = true;
         setWasCorrected(false);
         setPhase('answering');
         if (sweepStep?.nextCard) {
@@ -2624,29 +2221,23 @@ export default function StudyView() {
               : currentSweep,
           );
         }
-        setCurrent(sweepStep?.nextCard || selectNextReviewCard(nextState, current.id));
+        setCurrent(likelyNextCard || selectNextReviewCard(nextState, current.id));
       }, CORRECT_AUTO_ADVANCE_MS);
     }
   }
 
   function revealAnswer() {
-    if (!current || phase !== 'answering') return;
+    if (!current || phase !== 'answering' || committedAttemptRef.current) return;
+    const eventId = createSyncEventId();
+    committedAttemptRef.current = eventId;
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
       autoAdvanceRef.current = null;
     }
     stopSpeechRecognition();
-    const dict = current.verb.dict,
-      rid = current.id;
-    const responseMs = Math.max(0, Date.now() - answerStartedAtRef.current);
-    const prevVS = state.verbStats?.[dict]?.[rid] || { seen: 0, incorrect: 0 };
-    const newVerbStats = {
-      ...state.verbStats,
-      [dict]: {
-        ...(state.verbStats?.[dict] || {}),
-        [rid]: { seen: prevVS.seen + 1, incorrect: prevVS.incorrect + 1 },
-      },
-    };
+    const rid = current.id;
+    const gradedAt = Date.now();
+    const responseMs = Math.max(0, gradedAt - answerStartedAtRef.current);
     const nextMistakes = recordMistake(
       state.mistakes,
       current.verb,
@@ -2654,53 +2245,37 @@ export default function StudyView() {
       reverseDrill ? sourceTypeForReading : promptType,
       '(revealed)',
       expected,
-      mistakeRecordOptions(),
+      { ...mistakeRecordOptions(eventId), now: gradedAt },
     );
     const mistakeDiagnosis = nextMistakes[0]?.diagnosis || null;
-    const nextState = {
-      ...state,
-      cards: { ...state.cards, [rid]: gradeCard(state.cards[rid], false) },
-      retryQueue: [...new Set([...(state.retryQueue || []), rid])].slice(-20),
-      verbStats: newVerbStats,
-      mistakes: nextMistakes,
-      readiness: recordReadinessAttempt(state.readiness, rid, {
-        correct: false,
-        responseMs,
-        answerMode,
-        kanaAssist: readinessKanaAssist,
-        reverseDrill,
-      }),
-      weakness: recordWeaknessAttempt(state.weakness, {
-        word: current.verb,
-        typeId: current.type,
-        correct: false,
-        responseMs,
-      }),
-      minimalPairs: nextMinimalPairProgress(false),
-      session: {
-        ...bumpSessionMistakePattern(
-          {
-            ...(state.session || {}),
-            reviewed: (state.session?.reviewed || 0) + 1,
-            correct: state.session?.correct || 0,
-          },
-          mistakeDiagnosis,
-        ),
-      },
-      daily: bumpDaily(state.daily, false, dailyGoalTarget),
+    const grading = {
+      correct: false,
+      eventId,
+      gradedAt,
+      rid,
+      responseMs,
+      nextMistakes,
+      mistakeDiagnosis,
     };
+    const nextState = nextGradedState(grading);
     const sweepStep = wordSweep
       ? nextWordSweepStep(wordSweep, nextState, current.type, false, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
-    setState(nextState);
+    const reviewWillComplete =
+      sweepStep?.sweep?.complete || (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit);
+    if (!reviewWillComplete) prepareLikelyNextCard(nextState, current.id, sweepStep);
+    const runRecord = buildRunAnswerRecord({
+      correct: false,
+      submittedAnswer: '',
+      reviewChoiceLabel: "I don't know",
+      revealedMiss: true,
+      mistakeDiagnosis,
+    });
+    setReviewRecord(runRecord);
+    setState((previous) => nextGradedState(grading, previous));
     setAnswer('');
-    setTypoGuard(null);
-    setChatOpen(false);
-    setLastDiagnosis(mistakeDiagnosis);
-    setReviewChoiceLabel("I don't know");
     setSelfCheckOpen(false);
-    setRevealedMiss(true);
     setWasCorrect(false);
     setPhase('reviewing');
   }
@@ -2721,7 +2296,6 @@ export default function StudyView() {
     }));
     hadKanaMistakeRef.current = false;
     wrongSnapshotRef.current = null;
-    setTypoGuard(null);
   }
 
   function toggleAutoNext() {
@@ -2740,18 +2314,6 @@ export default function StudyView() {
     });
   }
 
-  function submitIfCompleteTypedAnswer(nextAnswer) {
-    if (!current) return false;
-    if (phase !== 'answering') return false;
-    if (reverseDrill) return false;
-    if (!typedAnswerMode) return false;
-    if (expected && toHiragana(nextAnswer) === expected) {
-      submit(nextAnswer, { fromTypedInput: true });
-      return true;
-    }
-    return false;
-  }
-
   function rememberKanaMistake(nextAnswer, enabled) {
     if (!enabled) return;
     const cells = kanaCoachCells(expected, nextAnswer, coachRevealed, true);
@@ -2762,10 +2324,17 @@ export default function StudyView() {
   }
 
   function updateTypedAnswer(nextAnswer, options = {}) {
-    setTypoGuard(null);
     rememberKanaMistake(nextAnswer, options.trackKanaMistake !== false);
     setAnswer(nextAnswer);
-    return submitIfCompleteTypedAnswer(nextAnswer);
+    if (
+      !answerComposingRef.current &&
+      liveKana &&
+      phase === 'answering' &&
+      !!expected &&
+      toHiragana(nextAnswer) === expected
+    ) {
+      submit(nextAnswer, { fromTypedInput: true });
+    }
   }
 
   function updateAnswerFromInput(event, options = {}) {
@@ -2776,14 +2345,51 @@ export default function StudyView() {
   }
 
   function commitAnswerComposition(event, options = {}) {
-    updateTypedAnswer(toKanaInputValue(event.currentTarget.value), options);
+    const nextAnswer = toKanaInputValue(event.currentTarget.value);
+    answerComposingRef.current = false;
+    updateTypedAnswer(nextAnswer, options);
+  }
+
+  function openLearnForRuleRecord(record) {
+    if (!record) return false;
+    const typeId = record?.practicedType || record?.cardType;
+    const lesson = lessonForType(typeId);
+    if (!lesson) return false;
+    if (typeof window !== 'undefined') {
+      window.location.hash = `lesson-${lesson.groupId}`;
+    }
+    const typeLabel = record?.typeLabel || getTypeInfo(typeId).label || '';
+    return openLearnFocus?.({
+      source: 'practice-result',
+      lessonGroupId: lesson.groupId,
+      lessonTitle: lesson.title,
+      typeId,
+      typeLabel,
+      word: record.word ? { ...record.word } : null,
+      reviewRecord: record,
+      answeredAt: record.answeredAt || Date.now(),
+    });
+  }
+
+  function openGuideForReviewRule(word, type, options = {}) {
+    if (openGuideForRule) {
+      openGuideForRule(word, type, { ...options, source: 'practice-result' });
+      return;
+    }
+    setTab('guide');
+  }
+
+  function openLabForReviewRoute(tool) {
+    if (!tool) return;
+    openLabTool?.(tool);
   }
 
   // Focused word-form sweeps can complete; default Practice keeps going.
   if (reviewComplete && phase === 'answering') {
-    const sessionCorrect = state.session.correct || 0;
-    const sessionReviewed = state.session.reviewed || 0;
-    const sessionWrong = sessionReviewed - sessionCorrect;
+    const sessionCorrect = runStats.correct;
+    const sessionReviewed = runStats.reviewed;
+    const sessionWrong = runStats.missed;
+    const sessionSkipped = runStats.skipped;
     const sessionAccuracy = sessionReviewed
       ? Math.round((sessionCorrect / sessionReviewed) * 100)
       : 0;
@@ -2795,9 +2401,9 @@ export default function StudyView() {
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-1">
           {sessionReviewed}
         </div>
-        <div className="text-sm text-stone-400 mb-3">cards practiced</div>
+        <div className="text-sm text-stone-600 mb-3">cards practiced</div>
         <div className="flex justify-center gap-2 mb-2">
-          <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
             {sessionCorrect} correct
           </span>
           <span className="text-stone-300 dark:text-stone-600">·</span>
@@ -2807,13 +2413,13 @@ export default function StudyView() {
           {sessionSkipped > 0 && (
             <>
               <span className="text-stone-300 dark:text-stone-600">·</span>
-              <span className="text-sm text-stone-500">{sessionSkipped} skipped</span>
+              <span className="text-sm text-stone-600">{sessionSkipped} skipped</span>
             </>
           )}
         </div>
-        <div className="text-sm text-stone-500 mb-1">{sessionAccuracy}% accuracy</div>
+        <div className="text-sm text-stone-600 mb-1">{sessionAccuracy}% accuracy</div>
         {(daily.bestAnswerStreak || 0) >= 5 && (
-          <div className="text-xs text-stone-400 mb-1">
+          <div className="text-xs text-stone-600 mb-1">
             Best streak: {daily.bestAnswerStreak} in a row
           </div>
         )}
@@ -2854,7 +2460,7 @@ export default function StudyView() {
         ) : (
           sessionWrong === 0 &&
           sessionReviewed > 0 && (
-            <div className="text-xs text-emerald-600 dark:text-emerald-400 mb-4">
+            <div className="text-xs text-emerald-700 dark:text-emerald-400 mb-4">
               No missed answers in this drill.
             </div>
           )
@@ -2878,14 +2484,12 @@ export default function StudyView() {
     return (
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-8 text-center">
         <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-medium mb-2">
-          {reviewLimitSource === 'recommendation'
-            ? 'Recommended practice complete'
-            : 'Drill complete'}
+          Drill complete
         </div>
         <div className="text-4xl font-semibold text-stone-900 dark:text-stone-100 mb-2">
           {state.session.correct}/{state.session.reviewed}
         </div>
-        <div className="text-sm text-stone-500 mb-1">
+        <div className="text-sm text-stone-600 mb-1">
           Drill accuracy:{' '}
           {state.session.reviewed
             ? Math.round((state.session.correct / state.session.reviewed) * 100)
@@ -2893,7 +2497,7 @@ export default function StudyView() {
           %
         </div>
         {reviewLimit > 0 && (
-          <div className="text-xs text-stone-400 mb-5">
+          <div className="text-xs text-stone-600 mb-5">
             {Math.min(reviewsDone, reviewLimit)}/{reviewLimit} cards in this drill
           </div>
         )}
@@ -2936,6 +2540,8 @@ export default function StudyView() {
         <button
           onClick={() => {
             setReviewBase(state.session.reviewed || 0);
+            setRunBase(sessionBaseFrom(state.session));
+            setPracticePrefs((prev) => clearBoundedReviewPrefs(prev));
             setCurrent(selectNextReviewCard(state, current.id));
             setAnswer('');
             setPhase('answering');
@@ -2950,8 +2556,9 @@ export default function StudyView() {
 
   // Shared hint disclosure for both answer modes: the deterministic step-coach
   // text, an optional "Discuss further" AI chat trigger, and the chat itself.
-  // Each mode supplies its own "Hint" button (styled to fit its layout) that
+  // Each mode supplies its own step-coach button (styled to fit its layout) that
   // calls showStepHint().
+  const stepHintButtonLabel = hintMasked || hintRevealed ? 'Reveal steps' : 'Hint';
   const hintDisclosure =
     !reverseDrill && (stepHint || (geminiKey && (stepHint || coachChatOpen))) ? (
       <div className="mt-2 flex flex-col items-center gap-1">
@@ -2968,7 +2575,7 @@ export default function StudyView() {
           <button
             onClick={openCoachChat}
             aria-expanded={coachChatOpen}
-            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
+            className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
           >
             <IconChat className="w-3 h-3" />
             Discuss further
@@ -2995,13 +2602,16 @@ export default function StudyView() {
     setLaunchContext(null);
     setFocusWordLock(null);
     setWordSweep(null);
-    setRecommendationFocus(null);
     onFocusConsumed?.();
     setTab('tools');
   }
 
   function clearBoundedReviewPrefs(prefs = {}) {
-    const next = { ...prefs, reviewLimitSource: '', reviewLimit: 0 };
+    const next = /** @type {Record<string, any>} */ ({
+      ...prefs,
+      reviewLimitSource: '',
+      reviewLimit: 0,
+    });
     if (Array.isArray(next.wordListIds)) {
       next.wordListIds = next.wordListIds.filter(
         (id) => id !== 'repair-drill' && !String(id || '').startsWith('list-review-rec-'),
@@ -3010,8 +2620,7 @@ export default function StudyView() {
     return next;
   }
 
-  // Universal escape hatch back to Stats. Exits whatever focused practice is
-  // active (minimal-pair contrast, bounded drill, or a focus-word lock).
+  // Exit a word or drill focus back into the learner's persistent Practice mix.
   function returnToOverview() {
     if (activeMinimalPairSet) {
       const restoreTypes = minimalPairReturnEnabledTypes(practicePrefs) || [];
@@ -3019,104 +2628,76 @@ export default function StudyView() {
         const cleared = clearMinimalPairPrefs(prev);
         return clearBoundedReviewPrefs(cleared);
       });
-      if (restoreTypes.length) setState((prev) => ({ ...prev, enabledTypes: restoreTypes }));
-    } else if (practicePrefs.reviewLimitSource || practicePrefs.reviewLimit > 0) {
+      if (restoreTypes.length) {
+        setState((prev) =>
+          updateStatePracticeSelection(
+            prev,
+            practiceSelectionForTypeIds(restoreTypes, prev.practiceSelection),
+          ),
+        );
+      }
+    } else {
       setPracticePrefs((prev) => clearBoundedReviewPrefs(prev));
     }
     setLaunchContext(null);
     setFocusWordLock(null);
     setWordSweep(null);
-    setRecommendationFocus(null);
     setSessionFilterWord(null);
     setSessionFilterFormGroupId(null);
     onFocusConsumed?.();
     resetActiveAttempt();
     setCurrent(null);
-    setTab('stats');
+    setTab('practice');
   }
 
-  // Title banner for a focused "Practice this" launch. Generalizes the older
-  // reference-drill banner so every targeted entry (a Check/Library word, a
-  // reference drill, or a form family) leads the active practice with a clear
-  // title of what is being studied plus a single exit affordance.
-  const focusBannerGroup = sessionFilterFormGroupId
-    ? FORM_GROUPS.find((g) => g.id === sessionFilterFormGroupId)
-    : null;
+  // Word-level launches remain focused until the learner exits the banner.
   const focusBannerWord = sessionFilterWord || focusWordLock;
-  const recommendationCountParts = recommendationFocus
-    ? [
-        recommendationFocus.suggestedCount
-          ? `${recommendationFocus.suggestedCount}-card target`
-          : '',
-        recommendationFocus.wordCount ? `${recommendationFocus.wordCount} words` : '',
-        recommendationFocus.typeCount ? `${recommendationFocus.typeCount} form types` : '',
-      ].filter(Boolean)
-    : [];
-  const recommendationSubtitle = recommendationFocus
-    ? [recommendationFocus.detail, recommendationCountParts.join(' - '), 'Locked Practice set']
-        .filter(Boolean)
-        .join(' - ')
-    : '';
-  const focusBanner = recommendationFocus
+  function toggleSentenceMode() {
+    setPracticePrefs((prev) => ({ ...prev, sentenceMode: !prev.sentenceMode }));
+  }
+  const focusBanner = focusBannerWord
     ? {
-        kicker:
-          recommendationFocus.source === 'lesson'
-            ? 'Learn focus'
-            : recommendationFocus.source === 'lab'
-              ? 'Drills focus'
-              : 'Tools focus',
-        title: recommendationFocus.label || 'Recommended practice',
-        reading: '',
-        subtitle: recommendationSubtitle,
-        exitLabel: 'Exit focus',
-        onExit: returnToOverview,
+        kicker: wordSweep
+          ? 'Word form sweep'
+          : referenceLaunch
+            ? 'Reference drill'
+            : 'Focused practice',
+        title: focusBannerWord.dict,
+        lang: 'ja',
+        reading: focusBannerWord.reading || '',
+        subtitle: [
+          exerciseMeaningForWord(focusBannerWord),
+          wordSweep
+            ? `${wordSweep.allTypeIds?.length || 0} enabled form types`
+            : referenceLaunch?.referenceLabel || typeInfo.label,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        exitLabel: referenceLaunch ? 'Back to reference' : 'Exit focus',
+        onExit: referenceLaunch ? returnToReference : returnToOverview,
       }
-    : focusBannerGroup
-      ? {
-          kicker: 'Form family practice',
-          title: focusBannerGroup.label,
-          reading: '',
-          subtitle: focusBannerGroup.typeIds?.length
-            ? `${focusBannerGroup.typeIds.length} forms in this family`
-            : 'Focused form practice',
-          exitLabel: 'Exit focus',
-          onExit: returnToOverview,
-        }
-      : focusBannerWord
-        ? {
-            kicker: wordSweep
-              ? 'Word form sweep'
-              : referenceLaunch
-                ? 'Reference drill'
-                : 'Focused practice',
-            title: focusBannerWord.dict,
-            lang: 'ja',
-            reading: focusBannerWord.reading || '',
-            subtitle: [
-              focusBannerWord.meaning,
-              wordSweep
-                ? `${wordSweep.allTypeIds?.length || 0} enabled forms`
-                : referenceLaunch?.referenceLabel || typeInfo.label,
-            ]
-              .filter(Boolean)
-              .join(' · '),
-            exitLabel: referenceLaunch ? 'Back to reference' : 'Exit focus',
-            onExit: referenceLaunch ? returnToReference : returnToOverview,
-          }
-        : null;
+    : null;
+  const currentOrigin = cardOriginForStudyCard(current);
+  const currentSelectionReason = wordSweep?.repeatPass
+    ? 'Repeating missed forms'
+    : focusBanner
+      ? `${focusBanner.kicker}: ${focusBanner.title}`
+      : currentOrigin === 'missed'
+        ? 'Previously missed'
+        : current.selectionReason || 'Varied practice from enabled categories';
+  const currentOriginMeta = cardOriginMeta(currentOrigin);
+  const currentSourceChipLabel =
+    currentOrigin === 'missed' ||
+    currentSelectionReason === 'Due review' ||
+    currentSelectionReason === 'Repeating missed forms' ||
+    currentSelectionReason.startsWith('Introducing ') ||
+    currentSelectionReason.startsWith('Strengthening ')
+      ? currentSelectionReason
+      : currentOriginMeta.label;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-      <PracticeScopeSidebar
-        className="order-2 lg:order-1"
-        state={state}
-        weaknessFamilies={weaknessFamilies}
-        openFamilyIds={openPracticeMapFamilyIds}
-        onToggleFamilyOpen={togglePracticeMapFamilyOpen}
-        onToggleFamily={togglePracticeFamily}
-        onToggleType={togglePracticeType}
-      />
-      <div className="order-1 min-w-0 space-y-4 lg:order-2">
+    <div className={transformationMode ? 'mx-auto max-w-3xl' : 'mx-auto max-w-3xl'}>
+      <div className="order-1 min-w-0 space-y-4 xl:w-full">
         {focusBanner && (
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 px-5 py-4 dark:border-indigo-800 dark:bg-indigo-950/20">
             <div className="flex items-start justify-between gap-3">
@@ -3140,6 +2721,30 @@ export default function StudyView() {
                 {focusBanner.subtitle && (
                   <div className="mt-0.5 text-sm text-stone-600 dark:text-stone-300">
                     {focusBanner.subtitle}
+                  </div>
+                )}
+                {focusBanner.showSentenceMode && (
+                  <div className="mt-3 flex flex-col gap-2 rounded-xl border border-indigo-200/80 bg-white/70 p-3 text-left sm:flex-row sm:items-center sm:justify-between dark:border-indigo-800 dark:bg-stone-950/35">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-stone-800 dark:text-stone-100">
+                        Practice these forms in sentence context
+                      </div>
+                      <div className="mt-0.5 text-xs text-stone-600 dark:text-stone-400">
+                        Recommended for connected recall; you can switch it off at any time.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleSentenceMode}
+                      aria-pressed={sentenceMode}
+                      className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                        sentenceMode
+                          ? 'border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 dark:border-indigo-400 dark:bg-indigo-400 dark:text-stone-950 dark:hover:bg-indigo-300'
+                          : 'border-indigo-200 bg-white text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-800 dark:bg-stone-950 dark:text-indigo-300 dark:hover:bg-indigo-950/40'
+                      }`}
+                    >
+                      Sentence context {sentenceMode ? 'on' : 'off'}
+                    </button>
                   </div>
                 )}
               </div>
@@ -3172,197 +2777,159 @@ export default function StudyView() {
             </div>
           </div>
         )}
-        <div className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex w-full items-center gap-2.5 sm:w-auto">
-            {!focusBanner && (
-              <button
-                type="button"
-                onClick={returnToOverview}
-                aria-label="Back to Stats"
-                className="shrink-0 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 hover:text-stone-700 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"
+        {!transformationMode && (
+          <PracticeSelector
+            selection={state.practiceSelection}
+            onToggleCategory={togglePracticeCategory}
+            onSetFilter={setPracticeSelectionFilter}
+            onToggleType={togglePracticeSelectionType}
+            statusMessage={selectionStatus}
+          />
+        )}
+        {!transformationMode && (
+          <details className="rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-stone-700 dark:text-stone-200">
+              <span>Answer settings</span>
+              <span className="text-xs font-medium text-stone-500">
+                {ANSWER_STYLE_OPTIONS.find((option) => option.id === answerMode)?.label || 'Type'} ·
+                Kana {liveKanaHelpEnabled ? 'on' : 'off'} · Sentence {sentenceMode ? 'on' : 'off'}
+              </span>
+            </summary>
+            <div className="flex flex-col gap-3 border-t border-stone-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-stone-800">
+              <div
+                role="group"
+                aria-label="Answer style"
+                className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1 dark:border-stone-800 dark:bg-stone-950"
               >
-                &lt;- Stats
-              </button>
-            )}
-            <div className="text-left">
-              <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-300 font-semibold">
-                Practice
+                <span className="px-1.5 text-xs font-medium text-stone-600">Answer</span>
+                {ANSWER_STYLE_OPTIONS.map((option) => {
+                  const active = answerMode === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setAnswerStyle(option.id)}
+                      aria-pressed={active}
+                      className={`min-h-8 rounded-md px-2 py-1 text-xs font-medium transition ${
+                        active
+                          ? 'bg-stone-800 text-white dark:bg-indigo-600'
+                          : 'text-stone-600 hover:bg-white dark:text-stone-400 dark:hover:bg-stone-800'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="text-sm text-stone-600 dark:text-stone-300">
-                {reverseDrill ? 'Reading practice' : 'Form practice'}
-              </div>
-            </div>
-          </div>
-          <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
-            <div
-              role="group"
-              aria-label="Answer style"
-              className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-stone-200 bg-white p-1 dark:border-stone-800 dark:bg-stone-900"
-            >
-              <span className="px-1.5 text-xs font-medium text-stone-400">Answer</span>
-              {ANSWER_STYLE_OPTIONS.map((option) => {
-                const active = answerMode === option.id;
-                return (
+              <div className="flex flex-wrap gap-1.5">
+                {typedAnswerMode && !reverseDrill && (
                   <button
-                    key={option.id}
                     type="button"
-                    onClick={() => setAnswerStyle(option.id)}
-                    aria-pressed={active}
-                    className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-                      active
-                        ? 'bg-stone-800 text-white dark:bg-indigo-600'
-                        : 'text-stone-500 hover:bg-stone-50 hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200'
+                    onClick={toggleKanaHelp}
+                    aria-pressed={liveKanaHelpEnabled}
+                    className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                      liveKanaHelpEnabled
+                        ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                        : 'border-stone-200 text-stone-600 dark:border-stone-800 dark:text-stone-400'
                     }`}
                   >
-                    {option.label}
+                    Kana help {liveKanaHelpEnabled ? 'on' : 'off'}
                   </button>
-                );
-              })}
-            </div>
-            {typedAnswerMode && !reverseDrill && (
-              <button
-                type="button"
-                onClick={toggleKanaHelp}
-                aria-pressed={liveKanaHelpEnabled}
-                title={liveKanaHelpEnabled ? 'Turn kana help off' : 'Turn kana help on'}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                  liveKanaHelpEnabled
-                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                    : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-                }`}
-              >
-                {liveKanaHelpEnabled ? (
-                  <IconEye className="h-3.5 w-3.5" />
-                ) : (
-                  <IconEyeOff className="h-3.5 w-3.5" />
                 )}
-                Kana help {liveKanaHelpEnabled ? 'on' : 'off'}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={toggleAutoNext}
-              aria-pressed={autoAdvanceCorrect}
-              title={`Auto next for ${autoAdvanceFormKey}`}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                autoAdvanceCorrect
-                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                  : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-              }`}
-            >
-              <IconRefresh className="h-3.5 w-3.5" />
-              Auto next {autoAdvanceCorrect ? 'on' : 'off'}
-            </button>
-            <div className="text-xs text-stone-400 text-right">Practice</div>
-            <button
-              type="button"
-              onClick={() =>
-                setPracticePrefs((prev) => ({ ...prev, sentenceMode: !prev.sentenceMode }))
-              }
-              aria-pressed={sentenceMode}
-              title="Show each prompt inside an example sentence (stays on until you turn it off)"
-              className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                sentenceMode
-                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                  : 'border-stone-200 text-stone-500 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800'
-              }`}
-            >
-              Sentence{sentenceMode ? ' on' : ''}
-            </button>
-            <details className="relative">
-              <summary className="flex cursor-pointer list-none items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-500 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800">
-                Adjust scope
-              </summary>
-              <div className="absolute right-0 z-10 mt-1 w-64 rounded-lg border border-stone-200 bg-white p-2 text-left shadow-lg dark:border-stone-800 dark:bg-stone-900">
-                <p className="px-1 pb-1.5 text-[11px] leading-snug text-stone-500 dark:text-stone-400">
-                  Removes this word from automatic Practice. Restore words from Tools. To move on
-                  without changing scope, use Skip.
-                </p>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    removeCurrentWordFromReviews();
-                    e.currentTarget.closest('details')?.removeAttribute('open');
-                  }}
-                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-stone-700 transition hover:bg-rose-50 hover:text-rose-700 dark:text-stone-200 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
+                  onClick={toggleSentenceMode}
+                  aria-pressed={sentenceMode}
+                  className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                    sentenceMode
+                      ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                      : 'border-stone-200 text-stone-600 dark:border-stone-800 dark:text-stone-400'
+                  }`}
                 >
-                  Remove this word from Practice
+                  Sentence {sentenceMode ? 'on' : 'off'}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleAutoNext}
+                  aria-pressed={autoAdvanceCorrect}
+                  className={`min-h-9 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                    autoAdvanceCorrect
+                      ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                      : 'border-stone-200 text-stone-600 dark:border-stone-800 dark:text-stone-400'
+                  }`}
+                >
+                  Auto next {autoAdvanceCorrect ? 'on' : 'off'}
+                </button>
+                <button
+                  type="button"
+                  onClick={removeCurrentWordFromReviews}
+                  className="min-h-9 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-stone-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 dark:border-stone-800 dark:text-stone-400 dark:hover:border-rose-800 dark:hover:bg-rose-950/20 dark:hover:text-rose-300"
+                >
+                  Remove this word
                 </button>
               </div>
-            </details>
-          </div>
-        </div>
-        <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs font-semibold uppercase tracking-wider text-stone-500">
-              {workoutProgress.label}
             </div>
-            {workoutProgress.continuous ? (
-              <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
-                {workoutProgress.now} cards this run
-              </div>
-            ) : (
-              <div className="text-xs font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
-                {workoutProgress.now}/{workoutProgress.max} cards
-              </div>
-            )}
-          </div>
-          {workoutProgress.continuous ? (
-            <div
-              role="status"
-              className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-500 dark:bg-stone-950 dark:text-stone-400"
-            >
-              Practice keeps going until you leave this page.
-            </div>
-          ) : (
-            <div
-              role="progressbar"
-              aria-label={workoutProgress.label}
-              aria-valuemin={0}
-              aria-valuemax={workoutProgress.max}
-              aria-valuenow={workoutProgress.now}
-              className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800"
-            >
-              <span
-                className="block h-full rounded-full bg-indigo-600 dark:bg-indigo-400"
-                style={{ width: `${workoutProgressPct}%` }}
-              />
-            </div>
-          )}
-          {!!sessionSkipped && (
-            <div className="mt-1 text-right text-[11px] text-stone-400">
-              {sessionSkipped} skipped
-            </div>
-          )}
-        </div>
+          </details>
+        )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-          <div className="px-4 py-4 sm:px-6 sm:py-8 text-center relative">
-            <div className="absolute top-4 left-4 sm:top-8 sm:left-6 text-[9px] text-stone-400">
-              JLPT {getWordMeta(current.verb).jlpt}
+          <div className="relative px-4 pb-3 pt-14 text-center sm:px-6 sm:pb-8 sm:pt-16">
+            <div className="absolute left-4 right-4 top-4 grid grid-cols-2 items-start gap-x-2 gap-y-1 sm:left-6 sm:right-6 sm:top-8 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-y-0">
+              <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
+                Word level: {currentWordMeta.jlpt}
+              </span>
+              <span
+                aria-label="Current card source"
+                className="col-span-2 row-start-2 min-w-0 justify-self-center sm:col-span-1 sm:col-start-2 sm:row-start-1"
+              >
+                <span
+                  title={currentSourceChipLabel}
+                  className={`block max-w-64 truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold ${currentOriginMeta.chipClass} sm:max-w-[18rem]`}
+                >
+                  {currentSourceChipLabel}
+                </span>
+              </span>
+              <span className="col-start-2 row-start-1 min-w-0 justify-self-end text-right sm:col-start-3">
+                {lessonMetaText && (
+                  <span className="inline-block max-w-full truncate rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
+                    {lessonMetaText}
+                  </span>
+                )}
+              </span>
             </div>
-            <div className="absolute top-4 right-4 sm:top-8 sm:right-6 text-right text-[9px] text-stone-400">
-              {[
-                getWordMeta(current.verb).lesson && `Genki L${getWordMeta(current.verb).lesson}`,
-                getWordMeta(current.verb).minnaLesson &&
-                  `Minna L${getWordMeta(current.verb).minnaLesson}`,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </div>
-            {clozePrompt && (
-              <div className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20">
+            {sentenceUnavailable && (
+              <p className="mx-auto mb-3 max-w-md text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                No reviewed sentence for this word and form yet. Practice the word below.
+              </p>
+            )}
+            {sentencePrompt && !hidePromptText && (
+              <div
+                className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-3 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 sm:px-4"
+                data-sentence-mode={sentencePrompt.mode}
+              >
                 <ScriptDisplay
-                  view={clozePromptView}
-                  className="text-lg leading-relaxed text-stone-900 dark:text-stone-100"
-                  subClassName="mt-1 text-[11px] leading-snug text-stone-500 dark:text-stone-400"
+                  view={sentencePromptView}
+                  className="break-words text-base leading-relaxed text-stone-900 dark:text-stone-100 sm:text-lg"
+                  subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
                   colorHighlight={false}
                 />
+                {sentencePrompt.cue && (
+                  <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
+                    {sentencePrompt.cue}
+                  </div>
+                )}
+                {!hideEnglishMeaning && sentencePrompt.note && (
+                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
+                    {sentencePrompt.note}
+                  </div>
+                )}
               </div>
             )}
             {hidePromptText ? (
               <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
                 <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-3">
-                  Listening prompt
+                  {sentencePrompt?.mode === 'listening-recognition'
+                    ? 'Sentence listening prompt'
+                    : 'Listening prompt'}
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   <button
@@ -3374,18 +2941,25 @@ export default function StudyView() {
                   </button>
                   <button
                     onClick={() => setShowPromptText(true)}
-                    className="px-3 py-2 border border-indigo-250 bg-white/70 hover:bg-white text-indigo-700 rounded-lg text-sm dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300"
+                    className="px-3 py-2 border border-indigo-200 bg-white/70 hover:bg-white text-indigo-700 rounded-lg text-sm dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300"
                   >
                     Show text
                   </button>
                 </div>
               </div>
             ) : (
-              <ScriptDisplay
-                view={promptView}
-                className="text-4xl sm:text-5xl font-medium mb-2 text-stone-900 dark:text-stone-100"
-                subClassName="text-base text-stone-500"
-              />
+              <>
+                {transformationMode && (
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                    Starting form
+                  </div>
+                )}
+                <ScriptDisplay
+                  view={promptView}
+                  className="mb-1 text-3xl font-medium text-stone-900 dark:text-stone-100 sm:mb-2 sm:text-5xl"
+                  subClassName="text-base text-stone-600"
+                />
+              </>
             )}
             {noChangePrompt && !hidePromptText && (
               <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium">
@@ -3393,987 +2967,105 @@ export default function StudyView() {
               </div>
             )}
             {reverseDrill && !hidePromptText && (
-              <div className="text-xs text-stone-400">Answer with the dictionary form.</div>
+              <div className="text-xs text-stone-600">Answer with the dictionary form.</div>
             )}
 
             {!hideEnglishMeaning && (
-              <div className="text-sm text-stone-500 mt-2 italic">{promptEnglish}</div>
+              <div className="mt-2 text-sm italic text-stone-600 max-[359px]:hidden">
+                {promptEnglish}
+              </div>
             )}
 
             {phase === 'reviewing' && practicePrefs.showWordCategory && (
-              <div className="text-xs text-stone-400 mt-1">
+              <div className="text-xs text-stone-600 mt-1">
                 {groupDisplayLabel(current.verb.group)} · {wordType}
                 {groupAliasText(current.verb.group)
                   ? ` · ${groupAliasText(current.verb.group)}`
                   : ''}
               </div>
             )}
-            <div className="mt-4 flex flex-col gap-1">
-              {phase === 'answering' ? (
-                <>
-                  <div className="flex justify-center mb-4">
-                    {transformationMode ? (
-                      <div className="max-w-full px-2 text-center">
-                        <div className="text-[10px] font-semibold uppercase text-indigo-500 dark:text-indigo-300">
-                          {transformationActionLabel}
-                        </div>
-                        <div className="mt-1 inline-flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl bg-indigo-600 px-5 py-3 text-white shadow-lg shadow-indigo-950/20 dark:bg-indigo-500/95">
-                          <span className="text-xl sm:text-2xl font-bold leading-tight">
-                            {targetTypeInfo.label}
-                          </span>
-                          {answerTaskDetails.sub && (
-                            <span
-                              className="rounded-lg bg-white/15 px-2 py-1 text-base sm:text-lg font-semibold leading-tight"
-                              lang="ja"
-                            >
-                              {answerTaskDetails.sub}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
-                          <span>From {sourceTypeInfo.label}</span>
-                          <span aria-hidden="true" className="text-indigo-400">
-                            -&gt;
-                          </span>
-                          <span>{transformationSupportText}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="inline-flex max-w-full flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
-                        <span className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                          {taskLabel}
-                        </span>
-                        {answerTaskDetails.sub && (
-                          <span
-                            className="text-sm text-indigo-500 dark:text-indigo-400 font-medium"
-                            lang="ja"
-                          >
-                            {answerTaskDetails.sub}
-                          </span>
-                        )}
-                        {answerTaskDetails.supportText ? (
-                          <span className="text-xs text-indigo-400 dark:text-indigo-500">
-                            · {answerTaskDetails.supportText}
-                          </span>
-                        ) : null}
-                        {current.ruleLabel && practicePrefs.showWordCategory && (
-                          <span className="text-xs text-indigo-400 dark:text-indigo-500">
-                            · {current.ruleLabel}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <div className="sr-only">
-                      {transformationMode ? transformationRoute : taskLabel}
-                    </div>
-                  </div>
-                  {minimalPairSetForCurrent && (
-                    <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-250">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold uppercase tracking-wider">
-                          {activeMinimalPairSet ? 'Minimal pair' : 'Today contrast'}
-                        </span>
-                        <span>{minimalPairSetForCurrent.label}</span>
-                        {reviewsDone > 0 && (
-                          <span className="tabular-nums opacity-70">{reviewsDone} this run</span>
-                        )}
-                      </div>
-                      {activeMinimalPairSet && (
-                        <button
-                          onClick={() => {
-                            if (setPracticePrefs)
-                              setPracticePrefs(clearMinimalPairPrefs(practicePrefs));
-                            if (setState) {
-                              const enabledTypes = minimalPairReturnEnabledTypes(practicePrefs);
-                              setState((prev) => ({ ...prev, enabledTypes: enabledTypes || [] }));
-                            }
-                          }}
-                          className="ml-1 font-bold leading-none hover:text-emerald-950 dark:hover:text-emerald-100 transition"
-                          aria-label="End minimal pair drill"
-                          title="End drill"
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {typoGuard && (
-                    <div className="mb-3 rounded-xl border border-amber-250 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-                      <div className="font-medium">Almost - possible typo.</div>
-                      <div className="text-xs mt-0.5">{typoGuard.detail}</div>
-                    </div>
-                  )}
-
-                  {answerMode === 'self-check' ? (
-                    <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
-                      <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
-                        Self-check deck
-                      </div>
-                      {!selfCheckOpen ? (
-                        <>
-                          <p className="text-sm text-stone-600 dark:text-stone-400 mb-3">
-                            Say or write the answer on your own, then reveal it and grade honestly.
-                          </p>
-                          <div className="grid sm:grid-cols-2 gap-2">
-                            <button
-                              onClick={() => setSelfCheckOpen(true)}
-                              className="py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-xl font-medium transition"
-                            >
-                              Reveal answer
-                            </button>
-                            <button
-                              onClick={skipCurrent}
-                              className="py-2.5 border border-stone-250 bg-white hover:bg-stone-50 text-stone-600 rounded-xl font-medium dark:bg-stone-900 dark:border-stone-800 dark:text-stone-300 transition"
-                            >
-                              Skip without penalty
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="rounded-xl bg-white dark:bg-stone-900 border border-stone-205 dark:border-stone-800 px-3 py-3">
-                            <div className="text-[11px] uppercase tracking-wider text-stone-400 mb-1">
-                              Answer
-                            </div>
-                            <ScriptDisplay
-                              view={expectedView}
-                              word={current.verb}
-                              type={practicedType}
-                              colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                              className="text-2xl font-semibold text-stone-900 dark:text-stone-100"
-                              subClassName="text-xs text-stone-500 mt-1"
-                            />
-                            <div className="text-xs text-stone-500 mt-2">{targetEnglish}</div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 mt-3">
-                            <button
-                              onClick={() => gradeSelfCheck(true, 'Remembered')}
-                              className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition"
-                            >
-                              Remembered
-                            </button>
-                            <button
-                              onClick={() => gradeSelfCheck(false, 'Missed')}
-                              className="py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-xl text-sm font-medium transition"
-                            >
-                              Missed
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ) : answerMode === 'speak' ? (
-                    <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
-                      <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
-                        Speak answer
-                      </div>
-                      <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <input
-                              ref={inputRef}
-                              id="spoken-answer"
-                              type="text"
-                              value={answer}
-                              onChange={(e) => {
-                                setSpeechError('');
-                                setAnswer(e.target.value);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  if (answer.trim()) submit(answer, { spoken: true });
-                                } else if (e.key === 'Escape') {
-                                  e.preventDefault();
-                                  skipCurrent();
-                                }
-                              }}
-                              placeholder="Heard Japanese answer..."
-                              aria-label="Heard spoken answer"
-                              className="w-full min-w-0 px-4 py-3 text-xl text-center border-2 border-stone-200 dark:border-stone-805 rounded-xl bg-white dark:bg-stone-950 text-stone-850 dark:text-stone-150 focus:border-indigo-500 focus:outline-none transition"
-                              lang="ja"
-                              autoComplete="off"
-                              autoCapitalize="none"
-                              autoCorrect="off"
-                              enterKeyHint="done"
-                              spellCheck="false"
-                            />
-                          </div>
-                          <div className="mt-2 min-h-5 text-xs">
-                            {speechListening ? (
-                              <span role="status" className="text-indigo-600 dark:text-indigo-400">
-                                Listening for Japanese...
-                              </span>
-                            ) : speechMatch ? (
-                              <span
-                                className={
-                                  speechMatch.ok
-                                    ? 'text-emerald-700 dark:text-emerald-400'
-                                    : 'text-stone-500 dark:text-stone-400'
-                                }
-                              >
-                                {speechMatch.ok
-                                  ? 'Exact match heard.'
-                                  : speechMatch.score !== null
-                                    ? `Closest match ${speechMatch.score}%.`
-                                    : ''}
-                              </span>
-                            ) : speechRecognitionAvailable ? (
-                              <span className="text-stone-500 dark:text-stone-400">
-                                Microphone ready.
-                              </span>
-                            ) : (
-                              <span className="text-amber-700 dark:text-amber-400">
-                                Speech input is not available in this browser.
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => startSpeechAnswer()}
-                          disabled={!speechRecognitionAvailable}
-                          className={`min-h-12 px-4 py-3 rounded-xl font-medium transition inline-flex items-center justify-center gap-2 ${
-                            speechListening
-                              ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                              : 'bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 disabled:hover:bg-indigo-600'
-                          }`}
-                        >
-                          <IconMic className="w-4 h-4" />
-                          {speechListening ? 'Stop listening' : 'Speak answer'}
-                        </button>
-                      </div>
-                      {speechError && (
-                        <div
-                          role="alert"
-                          className="mt-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-800 dark:text-amber-300"
-                        >
-                          {speechError}
-                        </div>
-                      )}
-                      <StickyAction className="mt-3">
-                        <button
-                          onClick={() => submit(answer, { spoken: true })}
-                          disabled={!answer.trim()}
-                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
-                        >
-                          Check spoken answer
-                        </button>
-                      </StickyAction>
-                      <div className="grid sm:grid-cols-2 gap-2 mt-3">
-                        <button
-                          onClick={revealAnswer}
-                          className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
-                        >
-                          Reveal
-                        </button>
-                        <button
-                          onClick={skipCurrent}
-                          className="py-2.5 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-                        >
-                          Skip
-                        </button>
-                      </div>
-                    </div>
-                  ) : answerMode === 'choice' ? (
-                    <>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {reverseDrill
-                          ? choices.map((w) => {
-                              const cv = promptDisplay(w, null, practicePrefs);
-                              return (
-                                <button
-                                  key={w.dict + ':' + w.reading}
-                                  onClick={() => submit(w.dict)}
-                                  className="min-h-14 px-3 py-3 border-2 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-xl text-stone-800 dark:text-stone-200 transition"
-                                >
-                                  <ScriptDisplay
-                                    view={cv}
-                                    className="text-xl"
-                                    subClassName="text-xs text-stone-400 mt-1"
-                                  />
-                                  {!hideEnglishMeaning && (
-                                    <div className="mt-1 text-xs text-stone-500">{w.meaning}</div>
-                                  )}
-                                </button>
-                              );
-                            })
-                          : choices.map((c) => {
-                              const cv = formDisplay(c, practicePrefs);
-                              return (
-                                <button
-                                  key={c}
-                                  onClick={() => submit(c)}
-                                  className="min-h-14 px-3 py-3 border-2 border-stone-200 dark:border-stone-800 hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-xl text-stone-800 dark:text-stone-200 transition"
-                                >
-                                  <ScriptDisplay
-                                    view={cv}
-                                    className="text-xl"
-                                    subClassName="text-xs text-stone-400 mt-1"
-                                  />
-                                </button>
-                              );
-                            })}
-                      </div>
-                      <div className="grid sm:grid-cols-2 gap-2 mt-3">
-                        <button
-                          onClick={revealAnswer}
-                          className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
-                        >
-                          I don't know
-                        </button>
-                        <button
-                          onClick={skipCurrent}
-                          className="py-2.5 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-                        >
-                          Skip without penalty
-                        </button>
-                      </div>
-                    </>
-                  ) : guidedKana ? (
-                    <>
-                      <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3 mb-3">
-                        <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                          {visibleCoachCells.map((cell, i) => {
-                            const cls =
-                              kanaMatchDisplay === 'none'
-                                ? cell.state === 'empty'
-                                  ? 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300'
-                                  : 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
-                                : cell.state === 'correct'
-                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300'
-                                  : cell.state === 'wrong' || cell.state === 'extra'
-                                    ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
-                                    : cell.state === 'pending'
-                                      ? 'bg-white dark:bg-stone-900 border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300'
-                                      : cell.state === 'hint'
-                                        ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-805 dark:text-amber-300'
-                                        : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
-                            return (
-                              <div
-                                key={i}
-                                className={`w-10 h-11 sm:w-11 sm:h-12 rounded-xl border flex items-center justify-center text-xl font-medium tabular-nums transition ${cls}`}
-                              >
-                                {cell.shown || '·'}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {kanaMatchDisplay === 'color-count' && coachStatus && (
-                          <div
-                            className={`mt-2 text-xs text-center ${
-                              coachWrongIndex >= 0
-                                ? 'text-rose-700'
-                                : coachPreview === expected
-                                  ? 'text-emerald-700'
-                                  : 'text-stone-500'
-                            }`}
-                          >
-                            {coachStatus}
-                          </div>
-                        )}
-                        {!reverseDrill && (
-                          <div className="mt-2 flex flex-col items-center gap-1">
-                            <button
-                              onClick={showStepHint}
-                              className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 inline-flex items-center gap-1 transition"
-                            >
-                              <IconSpark className="w-3 h-3" />
-                              Hint
-                            </button>
-                            {hintDisclosure}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          ref={inputRef}
-                          type="text"
-                          value={answer}
-                          onChange={(e) =>
-                            updateAnswerFromInput(e, {
-                              trackKanaMistake: kanaMatchDisplay !== 'none',
-                            })
-                          }
-                          onCompositionEnd={(e) =>
-                            commitAnswerComposition(e, {
-                              trackKanaMistake: kanaMatchDisplay !== 'none',
-                            })
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              if (answer.trim()) submit();
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              skipCurrent();
-                            }
-                          }}
-                          placeholder={
-                            reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'
-                          }
-                          aria-label={
-                            reverseDrill
-                              ? 'Type the dictionary form'
-                              : 'Type your answer in romaji or kana'
-                          }
-                          className={answerInputClassName}
-                          lang="ja"
-                          autoComplete="off"
-                          autoCapitalize="none"
-                          autoCorrect="off"
-                          enterKeyHint="done"
-                          spellCheck="false"
-                        />
-                        {!reverseDrill && (
-                          <button
-                            type="button"
-                            onClick={revealNextKana}
-                            disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
-                            aria-label="Reveal next kana"
-                            title="Reveal next kana"
-                            className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-                          >
-                            <IconSpark className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                      {liveKana && liveStatus && (
-                        <div
-                          role="status"
-                          aria-live="polite"
-                          className={`mt-2 min-h-5 text-center text-xs ${answerFeedbackClassName}`}
-                        >
-                          {liveStatus}
-                        </div>
-                      )}
-                      <StickyAction className="mt-3">
-                        <button
-                          onClick={() => submit()}
-                          disabled={!answer.trim()}
-                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
-                        >
-                          Check (Enter)
-                        </button>
-                      </StickyAction>
-                      <div className="mt-2 grid grid-cols-3 gap-2">
-                        <button
-                          onClick={() =>
-                            setCoachRevealed(
-                              Math.min(
-                                expectedKanaCount,
-                                Math.max(coachRevealed, coachTypedCount) + 1,
-                              ),
-                            )
-                          }
-                          disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
-                          className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 disabled:opacity-40 rounded-xl text-sm"
-                        >
-                          Hint
-                        </button>
-                        <button
-                          onClick={revealAnswer}
-                          className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm text-amber-800"
-                        >
-                          Reveal
-                        </button>
-                        <button
-                          onClick={skipCurrent}
-                          className="py-2.5 border border-stone-205 dark:border-stone-800 hover:bg-white dark:hover:bg-stone-800 text-stone-605 dark:text-stone-300 rounded-xl text-sm"
-                        >
-                          Skip
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <input
-                          ref={inputRef}
-                          type="text"
-                          value={answer}
-                          onChange={(e) =>
-                            updateAnswerFromInput(e, {
-                              trackKanaMistake: liveKanaHelpEnabled,
-                            })
-                          }
-                          onCompositionEnd={(e) =>
-                            commitAnswerComposition(e, {
-                              trackKanaMistake: liveKanaHelpEnabled,
-                            })
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              if (answer.trim()) submit();
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              skipCurrent();
-                            }
-                          }}
-                          placeholder={
-                            reverseDrill ? 'Type dictionary form...' : 'Type romaji or kana...'
-                          }
-                          aria-label={
-                            reverseDrill
-                              ? 'Type the dictionary form'
-                              : 'Type your answer in romaji or kana'
-                          }
-                          className={answerInputClassName}
-                          lang="ja"
-                          autoComplete="off"
-                          autoCapitalize="none"
-                          autoCorrect="off"
-                          enterKeyHint="done"
-                          spellCheck="false"
-                        />
-                        {!reverseDrill && (
-                          <button
-                            type="button"
-                            onClick={revealNextKana}
-                            disabled={coachRevealed >= expectedKanaCount || phase !== 'answering'}
-                            aria-label="Reveal next kana"
-                            title="Reveal next kana"
-                            className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40 dark:border-indigo-900 dark:bg-stone-900 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
-                          >
-                            <IconSpark className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                      {liveKana && liveStatus && (
-                        <div
-                          role="status"
-                          aria-live="polite"
-                          className={`mt-2 min-h-5 text-center text-xs ${answerFeedbackClassName}`}
-                        >
-                          {liveStatus}
-                        </div>
-                      )}
-                      <StickyAction className="mt-3">
-                        <button
-                          onClick={() => submit()}
-                          disabled={!answer.trim()}
-                          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg transition disabled:opacity-40"
-                        >
-                          Check (Enter)
-                        </button>
-                      </StickyAction>
-                      <div
-                        className={`mt-2 grid gap-2 ${!reverseDrill ? 'grid-cols-3' : 'grid-cols-2'}`}
-                      >
-                        {!reverseDrill && (
-                          <button
-                            onClick={showStepHint}
-                            className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-                          >
-                            Hint
-                          </button>
-                        )}
-                        <button
-                          onClick={revealAnswer}
-                          className="py-2.5 border border-amber-205 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
-                        >
-                          Reveal
-                        </button>
-                        <button
-                          onClick={skipCurrent}
-                          className="py-2.5 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900 hover:bg-stone-105 text-stone-600 dark:text-stone-300 rounded-xl font-medium transition"
-                        >
-                          Skip
-                        </button>
-                      </div>
-                      {hintDisclosure}
-                    </>
-                  )}
-                </>
-              ) : (
-                <div
-                  className={`rounded-xl p-4 ${
-                    wasCorrect
-                      ? 'bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/50'
-                      : wasCorrected
-                        ? 'bg-amber-50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/50'
-                        : 'bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/50'
-                  }`}
-                >
-                  {/* Scoped to the short verdict so screen readers announce the
-                    result without re-reading the breakdown/chat below. */}
-                  <span role="status" aria-live="polite" className="sr-only">
-                    {wasCorrect ? 'Correct!' : wasCorrected ? 'Self-corrected.' : 'Not quite.'}
-                  </span>
-                  <div className="flex items-start gap-3 text-left">
-                    <div
-                      className={`mt-0.5 flex-shrink-0 ${wasCorrect ? 'text-emerald-600' : wasCorrected ? 'text-amber-600' : 'text-rose-600'}`}
-                    >
-                      {wasCorrect ? (
-                        <IconCheck className="w-5 h-5" />
-                      ) : (
-                        <IconX className="w-5 h-5" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h3
-                        className={`text-sm font-semibold ${wasCorrect ? 'text-emerald-800 dark:text-emerald-300' : wasCorrected ? 'text-amber-800 dark:text-amber-300' : 'text-rose-800 dark:text-rose-300'}`}
-                      >
-                        {wasCorrect
-                          ? 'Correct!'
-                          : wasCorrected
-                            ? 'Self-corrected.'
-                            : 'Review this form.'}
-                      </h3>
-                      {wasCorrected && (
-                        <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                          You fixed it mid-type, but the mistake still counts.
-                        </div>
-                      )}
-                      {wasCorrect ? (
-                        /* Correct answer case */
-                        <>
-                          {reviewKanaCells.length > 0 && (
-                            <div className="mt-2 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50 p-2">
-                              <div className="flex flex-wrap justify-center gap-1" lang="ja">
-                                {reviewKanaCells.map((cell, i) => {
-                                  const cls =
-                                    cell.state === 'correct'
-                                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-805 dark:text-emerald-300'
-                                      : cell.state === 'wrong' || cell.state === 'extra'
-                                        ? 'bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/30 dark:border-rose-805 dark:text-rose-300'
-                                        : cell.state === 'hint'
-                                          ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:border-amber-300 dark:text-amber-300'
-                                          : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-800 text-stone-300';
-                                  return (
-                                    <div
-                                      key={i}
-                                      className={`w-8 h-9 sm:w-9 sm:h-10 rounded-lg border flex items-center justify-center text-base font-medium tabular-nums ${cls}`}
-                                    >
-                                      {cell.shown || '·'}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        /* Incorrect answer case */
-                        <>
-                          {reviewKanaCells.length > 0 ? (
-                            <>
-                              {/* Correct Answer nice and clearly at the top */}
-                              <div className="mt-3">
-                                <div className="text-[11px] uppercase tracking-wider text-emerald-600 dark:text-emerald-455 font-semibold mb-1">
-                                  Correct Answer
-                                </div>
-                                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/10 p-2">
-                                  <div className="flex flex-wrap justify-center gap-1.5" lang="ja">
-                                    {Array.from(expected).map((char, i) => (
-                                      <div
-                                        key={i}
-                                        className="w-9 h-10 sm:w-10 sm:h-11 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-850 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300 flex items-center justify-center text-lg font-semibold tabular-nums shadow-sm"
-                                      >
-                                        {char}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                                <ScriptDisplay
-                                  view={expectedView}
-                                  word={current.verb}
-                                  type={practicedType}
-                                  colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                                  className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
-                                  subClassName="text-xs text-stone-500 mt-1"
-                                />
-                                <div className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
-                                  {targetEnglish}
-                                </div>
-                              </div>
-
-                              {/* Guessed answer below it */}
-                              <div className="mt-3">
-                                <div
-                                  className={`text-[11px] uppercase tracking-wider ${wasCorrected ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-rose-700/80 dark:text-rose-400/80'} mb-1`}
-                                >
-                                  {reviewChoiceLabel
-                                    ? 'You chose'
-                                    : revealedMiss
-                                      ? "You chose: I don't know"
-                                      : 'Your guess'}
-                                  {!revealedMiss && !reviewChoiceLabel && (
-                                    <span lang="ja" className="ml-1 font-medium">
-                                      (
-                                      {reverseDrill
-                                        ? submittedAnswer.trim() || 'empty'
-                                        : toHiragana(submittedAnswer) || 'empty'}
-                                      )
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="rounded-xl border border-stone-200/60 dark:border-stone-800/60 bg-stone-50/40 dark:bg-stone-900/20 p-2">
-                                  <div className="flex flex-wrap justify-center gap-1" lang="ja">
-                                    {reviewKanaCells.map((cell, i) => {
-                                      const cls =
-                                        cell.state === 'correct'
-                                          ? 'bg-emerald-50/50 border-emerald-350/40 text-emerald-800/80 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-300/80'
-                                          : cell.state === 'wrong' || cell.state === 'extra'
-                                            ? 'bg-rose-50/50 border-rose-350/40 text-rose-800/80 dark:bg-rose-950/20 dark:border-rose-800/30 dark:text-rose-300/80'
-                                            : cell.state === 'hint'
-                                              ? 'bg-amber-50/50 border-amber-350/40 text-amber-800/80 dark:bg-amber-950/20 dark:border-amber-300/30 dark:text-amber-300/80'
-                                              : 'bg-white/50 dark:bg-stone-900/50 border-stone-200/40 dark:border-stone-800/40 text-stone-300/85';
-                                      return (
-                                        <div
-                                          key={i}
-                                          className={`w-7 h-8 sm:w-8 sm:h-9 rounded-lg border flex items-center justify-center text-sm font-medium tabular-nums ${cls}`}
-                                        >
-                                          {cell.shown || '·'}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-xs text-rose-700 mt-1">
-                              {reviewChoiceLabel
-                                ? `You chose: ${reviewChoiceLabel}`
-                                : revealedMiss
-                                  ? "You chose: I don't know"
-                                  : 'You wrote:'}{' '}
-                              {!revealedMiss && !reviewChoiceLabel && (
-                                <span lang="ja" className="font-semibold">
-                                  {reverseDrill
-                                    ? submittedAnswer.trim() || '(empty)'
-                                    : toHiragana(submittedAnswer) || '(empty)'}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {wasCorrect && (
-                        <>
-                          <ScriptDisplay
-                            view={expectedView}
-                            word={current.verb}
-                            type={practicedType}
-                            colorHighlight={practicePrefs.colorCodeConjugations !== false}
-                            className="text-xl mt-2 text-emerald-900 dark:text-emerald-100"
-                            subClassName="text-xs text-stone-500 mt-1"
-                          />
-                          <div className="text-xs mt-1 text-emerald-700 dark:text-emerald-400">
-                            {targetEnglish}
-                          </div>
-                        </>
-                      )}
-                      {wasCorrect && autoAdvanceCorrect && (
-                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-emerald-100/80 px-3 py-2 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
-                          <span className="relative flex h-5 w-5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                            <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
-                              <IconCheck className="h-3 w-3" />
-                            </span>
-                          </span>
-                          Next card coming up...
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {wasCorrect && reviewExplanation && (
-                    <div className="mt-4 space-y-2.5 border-t border-emerald-200 pt-4 text-left dark:border-emerald-900/50">
-                      <ReviewDisclosure tone="emerald" summary="Answer breakdown" alwaysOpen>
-                        <ConjugationBreakdown
-                          word={current.verb}
-                          type={practicedType}
-                          practicePrefs={practicePrefs}
-                        />
-                      </ReviewDisclosure>
-                      {geminiKey && (
-                        <ReviewChatSection
-                          tone="emerald"
-                          chatOpen={chatOpen}
-                          onOpen={() => setChatOpen(true)}
-                        >
-                          {chatOpen && (
-                            <ChatPanel
-                              verb={current.verb}
-                              type={practicedType}
-                              userAnswer={expected}
-                              expected={expected}
-                              explanation={reviewExplanation}
-                              geminiKey={geminiKey}
-                              practicePrefs={practicePrefs}
-                              taskOverride={taskOverride}
-                              wasCorrect
-                              reviewTone="emerald"
-                            />
-                          )}
-                        </ReviewChatSection>
-                      )}
-                    </div>
-                  )}
-
-                  {!wasCorrect && explanation && (
-                    <div className="mt-4 pt-4 border-t border-rose-200 dark:border-rose-900/50 space-y-2.5 text-left">
-                      <div className="text-xs uppercase tracking-wider text-rose-700 dark:text-rose-400 font-medium">
-                        Why it's{' '}
-                        <span lang="ja" className="normal-case tracking-normal">
-                          {expected}
-                        </span>
-                      </div>
-                      {minimalPairFeedback && (
-                        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2">
-                          <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                            Contrast check: {minimalPairFeedback.label}
-                          </div>
-                          {minimalPairFeedback.masuDiagnostic && (
-                            <div className="mt-1 border-l-2 border-emerald-300 dark:border-emerald-700 pl-3 text-sm text-stone-700 dark:text-stone-300">
-                              <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                                Masu check
-                              </div>
-                              <div className="mt-0.5">
-                                <span
-                                  lang="ja"
-                                  className="font-semibold text-stone-900 dark:text-stone-100"
-                                >
-                                  {minimalPairFeedback.masuDiagnostic.dict}
-                                  {' -> '}
-                                  {minimalPairFeedback.masuDiagnostic.politeSurface}
-                                </span>
-                                <span className="ml-2">
-                                  {minimalPairFeedback.masuDiagnostic.contrast}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                          {!minimalPairFeedback.masuDiagnostic && (
-                            <div className="mt-1 text-sm text-stone-700 dark:text-stone-300">
-                              {minimalPairFeedback.intro}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {diagnostic && (
-                        <div className="text-sm text-rose-800 dark:text-rose-300 bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2">
-                          <span className="font-medium text-rose-900 dark:text-rose-200">
-                            Diagnosis:{' '}
-                          </span>
-                          {lastDiagnosis?.label ? `${lastDiagnosis.label}. ` : ''}
-                          {diagnostic}
-                        </div>
-                      )}
-                      {!minimalPairFeedback && (
-                        <div className="text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                          {explanation.intro}
-                        </div>
-                      )}
-                      {explanation.rule && (
-                        <div className="rounded-lg bg-white/70 dark:bg-stone-900/70 px-3 py-2 text-sm text-stone-700 dark:text-stone-300 leading-relaxed">
-                          <span className="font-semibold text-stone-900 dark:text-stone-100">
-                            Rule:{' '}
-                          </span>
-                          {explanation.rule}
-                        </div>
-                      )}
-                      {explanation.derivation && explanation.derivation !== expected && (
-                        <div
-                          className="text-base text-center bg-white/70 dark:bg-stone-900/70 rounded-lg px-3 py-2 text-stone-900 dark:text-stone-100"
-                          lang="ja"
-                        >
-                          {explanation.derivation}
-                        </div>
-                      )}
-                      {minimalPairFeedback && (
-                        <ReviewDisclosure tone="emerald" summary="Full contrast details">
-                          <div className="text-sm text-stone-700 dark:text-stone-300">
-                            {minimalPairFeedback.intro}
-                          </div>
-                          <div className="grid gap-1.5 sm:grid-cols-2">
-                            {minimalPairFeedback.contrasts.map((contrast) => (
-                              <div
-                                key={contrast.id}
-                                className={`rounded-lg border px-2.5 py-2 text-xs ${
-                                  contrast.id === minimalPairFeedback.active.id
-                                    ? 'border-emerald-300 bg-white/80 text-emerald-900 dark:border-emerald-800 dark:bg-stone-950/50 dark:text-emerald-200'
-                                    : 'border-stone-200 bg-white/60 text-stone-600 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-300'
-                                }`}
-                              >
-                                <div className="font-semibold">{contrast.label}</div>
-                                <div className="mt-0.5">{contrast.cue}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </ReviewDisclosure>
-                      )}
-                      <ReviewDisclosure tone="rose" summary="Answer breakdown" alwaysOpen>
-                        <ConjugationBreakdown
-                          word={current.verb}
-                          type={practicedType}
-                          userAnswer={revealedMiss ? '' : submittedAnswer}
-                          practicePrefs={practicePrefs}
-                        />
-                      </ReviewDisclosure>
-                      {geminiKey && (
-                        <ReviewChatSection
-                          tone="rose"
-                          chatOpen={chatOpen}
-                          onOpen={() => setChatOpen(true)}
-                        >
-                          {chatOpen && (
-                            <ChatPanel
-                              verb={current.verb}
-                              type={practicedType}
-                              userAnswer={revealedMiss ? '(revealed)' : submittedAnswer}
-                              expected={expected}
-                              explanation={explanation}
-                              geminiKey={geminiKey}
-                              practicePrefs={practicePrefs}
-                              taskOverride={taskOverride}
-                              wasCorrected={wasCorrected}
-                            />
-                          )}
-                        </ReviewChatSection>
-                      )}
-                    </div>
-                  )}
-
-                  <ContextExamplePanel
-                    item={current.verb}
-                    type={practicedType}
-                    geminiKey={geminiKey}
-                    practicePrefs={practicePrefs}
-                  />
-
-                  {wasCorrect ? (
-                    <StickyAction className="mt-3">
-                      <button
-                        ref={nextButtonRef}
-                        onClick={() => submit()}
-                        className="w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-lg transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150"
-                      >
-                        Next (Enter)
-                      </button>
-                    </StickyAction>
-                  ) : (
-                    <div className="mt-4">
-                      <button
-                        ref={nextButtonRef}
-                        onClick={() => submit()}
-                        className="w-full rounded-xl bg-stone-800 py-2.5 font-medium text-white shadow-sm transition hover:bg-stone-900 dark:bg-stone-200 dark:text-stone-900 dark:hover:bg-stone-150"
-                      >
-                        Next (Enter)
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+            <div className="mt-3 flex flex-col gap-1 sm:mt-4">
+              <AnswerInputPanel
+                phase={phase}
+                transformationMode={transformationMode}
+                transformationActionLabel={transformationActionLabel}
+                targetTypeInfo={targetTypeInfo}
+                answerTaskDetails={answerTaskDetails}
+                sourceTypeInfo={sourceTypeInfo}
+                transformationSupportText={transformationSupportText}
+                transformationContractText={transformationContractText}
+                taskLabel={taskLabel}
+                current={current}
+                practicePrefs={practicePrefs}
+                transformationRoute={transformationRoute}
+                minimalPairSetForCurrent={minimalPairSetForCurrent}
+                activeMinimalPairSet={activeMinimalPairSet}
+                reviewsDone={reviewsDone}
+                setPracticePrefs={setPracticePrefs}
+                setState={setState}
+                answerMode={answerMode}
+                selfCheckOpen={selfCheckOpen}
+                setSelfCheckOpen={setSelfCheckOpen}
+                skipCurrent={skipCurrent}
+                expectedView={expectedView}
+                practicedType={practicedType}
+                targetEnglish={targetEnglish}
+                gradeSelfCheck={gradeSelfCheck}
+                inputRef={inputRef}
+                answer={answer}
+                setAnswer={setAnswer}
+                setSpeechError={setSpeechError}
+                submit={submit}
+                speechListening={speechListening}
+                speechMatch={speechMatch}
+                speechRecognitionAvailable={speechRecognitionAvailable}
+                startSpeechAnswer={startSpeechAnswer}
+                speechError={speechError}
+                revealAnswer={revealAnswer}
+                reverseDrill={reverseDrill}
+                choices={choices}
+                hideEnglishMeaning={hideEnglishMeaning}
+                guidedKana={guidedKana}
+                visibleCoachCells={visibleCoachCells}
+                kanaMatchDisplay={kanaMatchDisplay}
+                coachStatus={coachStatus}
+                coachWrongIndex={coachWrongIndex}
+                coachPreview={coachPreview}
+                expected={expected}
+                showStepHint={showStepHint}
+                stepHintButtonLabel={stepHintButtonLabel}
+                hintDisclosure={hintDisclosure}
+                answerComposingRef={answerComposingRef}
+                updateAnswerFromInput={updateAnswerFromInput}
+                commitAnswerComposition={commitAnswerComposition}
+                answerInputClassName={answerInputClassName}
+                revealNextKana={revealNextKana}
+                coachRevealed={coachRevealed}
+                expectedKanaCount={expectedKanaCount}
+                liveKana={liveKana}
+                liveStatus={liveStatus}
+                answerFeedbackClassName={answerFeedbackClassName}
+                revealKanaHint={revealKanaHint}
+                liveKanaHelpEnabled={liveKanaHelpEnabled}
+                wasCorrect={wasCorrect}
+                wasCorrected={wasCorrected}
+                reviewRecord={reviewRecord}
+                contextStats={contextualPracticeStats}
+                geminiKey={geminiKey}
+                nextButtonRef={nextButtonRef}
+                wordSweep={wordSweep}
+                openGuideForReviewRule={openGuideForReviewRule}
+                openLabForReviewRoute={openLabForReviewRoute}
+                setTab={setTab}
+                openLearnForRuleRecord={openLearnForRuleRecord}
+                autoAdvanceCorrect={autoAdvanceCorrect}
+              />
             </div>
           </div>
         </div>
-        <div className="text-center text-xs text-stone-400">
-          Tip: type romaji like <span className="font-mono text-stone-500">tabeta</span>, use kana{' '}
-          <span lang="ja" className="text-stone-550 dark:text-stone-450">
+        <div className="text-center text-xs text-stone-600">
+          Tip: type romaji like <span className="font-mono text-stone-600">tabeta</span>, use kana{' '}
+          <span lang="ja" className="text-stone-600 dark:text-stone-400">
             たべた
           </span>
           , or press Esc to skip without penalty.

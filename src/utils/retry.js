@@ -6,9 +6,11 @@
 // error). Only *transient* failures are retried — auth/validation errors fail
 // fast so the user gets immediate, actionable feedback.
 
+/** @param {number} ms */
 const DEFAULT_SLEEP = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Pull an HTTP-ish status code out of an error if one is present.
+/** @param {any} error */
 function statusOf(error) {
   if (!error) return 0;
   if (typeof error.status === 'number') return error.status;
@@ -20,6 +22,7 @@ function statusOf(error) {
 // Heuristic: is this error worth retrying? Network blips, timeouts, rate limits
 // (429), and server errors (5xx) are transient; everything else (bad request,
 // auth, validation) is not and should fail immediately.
+/** @param {any} error */
 export function isTransientError(error) {
   if (!error) return false;
   const msg = String(error.message || error).toLowerCase();

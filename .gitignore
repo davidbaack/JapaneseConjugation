@@ -14,3 +14,7 @@ playwright-report
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Temporary files and directories
+tmp/
+

@@ -1,16 +1,17 @@
 # Katachiya - Japanese Conjugation Practice
 
 Katachiya is a React/Vite progressive web app for learning Japanese verb and
-adjective conjugation through Practice-first workouts. The app is still in
+adjective conjugation through a Practice-first continuous loop. The app is still in
 active product development, so this README describes the current learner-facing
 surface rather than preserving older navigation names.
 
 The current app shape is:
 
 - **Practice** - the landing page and main learner loop.
+- **Guide** - scaffolded step-by-step conjugation practice.
 - **Stats** - progress, recommendations, upcoming reviews, and readiness.
 - **Learn** - formation lessons and guided tracks for every app form.
-- **Drills** - focused exercises for endings, group recognition, and speed.
+- **Drills** - focused exercises for endings, transformations, groups, and speed.
 - **Tools** - lookup, word management, saved lists, and custom words.
 - **Settings** - durable display, audio, sync, backup, and reset preferences.
 
@@ -18,33 +19,44 @@ The current app shape is:
 
 ### Practice
 
-Practice opens directly into the default workout when cards are available. The
-active workout shows session-card progress, ready-card progress when cards are
-due, the current prompt, answer controls, and a persistent Practice map. Focused
-"Practice this" launches from Learn, Drills, or Tools route straight into their
-targeted cards and stay focused until the learner exits the banner.
+Practice opens directly into the next continuous card when cards are available.
+The active card shows the current prompt, answer controls, a compact Practice
+run strip with cards practiced, missed count, streak, and why the card appeared,
+plus access to the persistent Practice map. Focused "Practice this" launches
+from Learn, Drills, Guide, or Tools route straight into targeted cards and stay
+focused until the learner exits the banner.
 
-The workout stream prioritizes ready cards, then fills the session with recent
-misses and varied words in the same weak patterns. A normal workout target is 12
-cards, and completion leads with "Map updated" plus a next-workout action.
+Default Practice is continuous: it has no 12-card target, daily-goal stop, or
+completion summary. Selection favors the lowest-skill enabled families, delayed
+retry of recent misses, and varied words in the same weak patterns. SRS review
+data still exists for planning, but due cards do not drive the default queue.
 
 Practice has a persistent map for form scope. It shows every form family,
-expanded exact-form toggles, and recent weak spots once there is data. Word
-removal on the active card updates the same durable word-exclusion state managed
-from Tools, and removed words can be restored there.
+including disabled and untried families, expanded exact-form toggles, lifetime
+right/wrong counts, skill visualization, and subgroup weakness rows once there
+is data. Word removal on the active card updates the same durable word-exclusion
+state managed from Tools, and removed words can be restored there.
 
 Active cards support typed answers, multiple choice, self-check, and spoken
 answers; forward production, reading/reverse practice, and automatic mixing;
 inline romaji-to-kana conversion in the text field; live kana help with
 hide/show behavior and Reveal next kana controls; deterministic hints; optional
-sentence-mode cloze prompts; speech playback; and optional Gemini clue/chat
-support.
+sentence-mode context prompts backed by a bundled all-form corpus with local
+offline fallbacks; speech playback; and optional Gemini clue/chat support.
+
+### Guide
+
+Guide is a scaffolded practice mode for building one conjugation step by step.
+Each card asks the learner to recover the base form, identify the word group,
+and produce the target conjugation before one final submit. Hints and skips mark
+assisted steps, the guided set tracks accuracy, and completed guided cards can
+count toward Practice progress while recording step-level diagnostics.
 
 ### Stats
 
-Stats keeps progress and planning information out of the active workout. It
-shows the Practice pulse, ready cards, daily progress, recent misses,
-recommended practice from Learn and Drills, upcoming review timing, and
+Stats keeps progress and planning information out of active Practice. It
+shows the Practice pulse, ready cards, continuous cards practiced, recent
+misses, recommended practice from Learn and Drills, upcoming review timing, and
 form-family readiness once the learner has enough history. Readiness gaps can
 launch focused Practice or route the learner to the matching Drill, such as
 Ending Lab, Groups, or Rush.
@@ -52,19 +64,19 @@ Ending Lab, Groups, or Rush.
 ### Learn
 
 Learn is a searchable conjugation formation guide. It currently has 13 lesson
-sections covering all 127 app card types, including core verb families, godan
+sections covering all 126 app card types, including core verb families, godan
 row shifts, te/ta sound changes, ru-verb traps, potential, conditionals,
 passive, causative, causative-passive, keigo, special forms, and adjective
 forms.
 
 Learn has guided tracks, a formation-key reference, searchable lesson sections,
 and a Send all to Practice action. Individual lessons and tracks can hand a
-focused recommended set back to Practice, but Learn does not gate workouts.
+focused recommended set back to Practice, but Learn does not gate Practice.
 
 ### Tools
 
 Tools keeps lookup, durable word management, saved lists, custom vocabulary, and
-word-level targeted Practice outside the main workout.
+word-level targeted Practice outside the main Practice loop.
 
 - **Lookup / Check** searches dictionary words or real conjugated forms, accepts
   romaji/kana/kanji input, shows exact and near matches, displays form tables,
@@ -72,20 +84,21 @@ word-level targeted Practice outside the main workout.
 - **Words** removes or restores words from automatic Practice, shows excluded
   counts, searches the word inventory, and can launch "Practice now" for a
   selected word.
-- **Lists** manages study lists, built-in packs, WaniKani imports, Gemini-built
-  list suggestions, favorites, weak-form lists, CSV/TSV bulk import, vocab CSV
-  export, and Anki TSV export.
+- **Lists** manages study lists, built-in packs, Gemini-built list suggestions,
+  favorites, and weak-form lists as internal drill scopes.
 - **Custom words** adds and manages custom verbs and adjectives, including
   optional Gemini lookup/suggestion support when AI is configured.
 
 ### Drills
 
-Drills keeps specialized exercises outside the main workout while still allowing
+Drills keeps specialized exercises outside the main Practice loop while still allowing
 focused work to be sent back to Practice.
 
 - **Ending Lab** drills te-form/plain-past sound changes and plain/polite
   register switching with hints, pattern maps, register maps, streaks, and
   optional AI memory hooks.
+- **Transform** practices form-to-form transformations outside the main
+  dictionary-form Practice loop.
 - **Groups** drills group recognition before conjugation, including verb and
   adjective categories, decoder hints, per-group accuracy, and optional Gemini
   explanations.
@@ -109,11 +122,11 @@ than in global Settings.
 ## Practice Scope And Data
 
 - Starter data: 30 verbs and 25 adjectives.
-- Generated lexicon: 2,161 practiceable words in `public/data/verb-lexicon.json`
-  as of the current tracked build, including 1,374 verbs and 787 adjectives.
+- Generated lexicon: 2,162 practiceable words in `public/data/verb-lexicon.json`
+  as of the current tracked build, including 1,374 verbs and 788 adjectives.
 - Word filters: JLPT N5-N1, 23 Genki lessons, 50 Minna no Nihongo lessons, word
   types, word groups, and custom study lists.
-- Card coverage: 127 selectable card types across 13 form families.
+- Card coverage: 126 selectable card types across 13 form families.
 - Type packs: Textbook Core, Basics, Everyday Expansion, Advanced Patterns,
   Compound Challenge, All forms, Weak mix, and Custom.
 - Minimal-pair support covers contrasts such as ichidan vs godan ru-verbs,
@@ -136,6 +149,8 @@ adjectives with Textbook Core forms enabled.
 
 ## Getting Started
 
+Use Node.js 24 LTS, matching pull-request validation and deployment.
+
 ```bash
 npm install
 npm run dev
@@ -153,6 +168,13 @@ The deterministic dev page listens at
 
 ## Scripts
 
+Every pull request targeting `main` runs the **Validate changes** check: production
+dependency audit, formatting, lint, typechecks, unit tests, Chromium/Firefox/WebKit
+browser tests, build and bundle budgets. It also runs on `main` pushes and can be
+started manually. PR jobs have read-only repository access and no deployment
+secrets. Main's required-status protection uses this stable check name; Pages
+deployment separately validates the production-configured build after merging.
+
 | Command | Description |
 | --- | --- |
 | `npm run dev` | Start the Vite dev server with HMR. |
@@ -164,12 +186,17 @@ The deterministic dev page listens at
 | `npm run test:e2e` | Run Playwright E2E tests. Set `PW_PROJECT=chromium` in PowerShell to scope a run. |
 | `npm run lint` | Lint the project with ESLint. |
 | `npm run typecheck` | Run app, tooling, and Supabase TypeScript checks. |
-| `npm run typecheck:app` | Run TypeScript checking for the app config. |
+| `npm run typecheck:app` | Run strict TypeScript checking for the app seed surface. |
 | `npm run typecheck:tooling` | Run TypeScript checking for scripts/tooling. |
 | `npm run typecheck:supabase` | Run TypeScript checking for Supabase functions. |
 | `npm run format` | Format source JavaScript/JSX, E2E, scripts, Supabase functions, and root JS/TS files with Prettier. |
 | `npm run format:check` | Check source formatting. |
 | `npm run vocab:build` | Regenerate `public/data/verb-lexicon.json`. |
+| `npm run sentences:batches` | Emit batch files of pending `(word, conjugation)` pairs for the tailored sentence library. See [docs/sentence-library.md](docs/sentence-library.md). |
+| `npm run sentences:english` | Rewrite legacy generated sentence-library outputs with natural English glosses. See [docs/sentence-library.md](docs/sentence-library.md). |
+| `npm run sentences:import` | Validate generated sentences and upsert them to Supabase. See [docs/sentence-library.md](docs/sentence-library.md). |
+| `npm run sentences:check-corpus` | Verify the checked-in offline sentence corpus exactly matches the validated Supabase table. |
+| `npm run sentences:export-corpus` | Export the validated Supabase sentence table into chunked offline JSON under `public/data/sentences`. |
 | `npm run size` | Check bundle budget after a build. |
 | `npm run ci:fast` | Run format check, lint, typecheck, and unit tests. |
 | `npm run ci` | Run the full local pipeline: fast CI, E2E, build, and size check. |
@@ -208,15 +235,33 @@ an `srs_sync` table with:
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `id` | text | Primary key, set to the Supabase user id. |
+| `id` | uuid | Primary key, set to the Supabase user id. |
 | `data` | jsonb | Full app sync payload. |
 | `updated_at` | timestamptz | Updated on every sync write and used for merge/pull decisions. |
+| `revision` | bigint | Server-side compare-and-set revision for conflict-safe writes. |
 
-The tracked migration in
-`supabase/migrations/20260601133136_create_srs_sync.sql` creates this table,
-enables row-level security, grants access to authenticated users, and adds
-owner-only policies. Users can only select, insert, update, or delete the row
-whose `id` matches `auth.uid()::text`; anonymous users have no table policy.
+The tracked migrations create this table, enable row-level security, add
+owner-only policies, and install the revisioned `cas_srs_sync` function plus a
+protocol-downgrade guard. Users can only access the row whose `id` matches
+`auth.uid()`; anonymous users have no table policy. Apply every migration
+before deploying a client that uses revisioned sync. The CAS migration is safe
+to deploy first: while a row still contains legacy metadata, legacy direct
+upserts receive a server-incremented revision and timestamp. After an upgraded
+client writes `syncMeta.version >= 1`, direct legacy downgrades are rejected and
+all upgraded writes must advance the revision. If the CAS migration is missing,
+the upgraded app deliberately keeps changes local and asks the learner to retry
+instead of risking a blind overwrite.
+
+For a staging rollout probe, apply the migration, save once from the currently
+deployed legacy client, and verify both `revision` and `updated_at` advance. Then
+save from the upgraded client and verify `syncMeta.version >= 1`; a subsequent
+legacy save to that same row must fail with `sync_protocol_downgrade_rejected`,
+while an upgraded CAS save must advance `revision` again.
+
+The first upgraded sync adopts legacy payloads preservation-first, because an
+old missing item cannot be distinguished from a deletion that was never
+recorded. Once sync metadata version 1 is established, tombstones and scoped
+reset epochs prevent stale offline devices from resurrecting deleted data.
 
 To self-host cloud sync:
 
@@ -227,14 +272,16 @@ To self-host cloud sync:
 4. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for the app build. Never
    ship a service-role key to the browser.
 5. Sign in as a test user, complete one Practice card, then confirm `public.srs_sync`
-   contains exactly one row with that user's id, a JSON `data` payload, and a
-   fresh `updated_at`.
+   contains exactly one row with that user's id, a versioned JSON `data` payload,
+   a fresh `updated_at`, and an incremented `revision`.
 
 ## PWA / Deployment
 
 The app is configured for the `/JapaneseConjugation/` base path and uses
 `VitePWA` in `vite.config.js` for install prompts, update prompts, offline asset
-caching, app icons, iOS touch icon support, and navigation fallback.
+caching, app icons, iOS touch icon support, and navigation fallback. Large
+sentence-corpus chunks are runtime-cached on first use instead of precached
+during install.
 Service-worker behavior is configured through VitePWA; do not edit generated
 `dist/` output.
 
@@ -255,6 +302,11 @@ part-of-speech/commonness data to avoid guessing whether a row is a supported
 practice word. JLPT vocabulary levels are learner-study estimates; the JLPT
 organizers do not publish a complete official vocabulary list.
 
+Pitch accent data in the generated lexicon uses Kanjium's `accents.txt`, which
+is licensed under Creative Commons Attribution-ShareAlike 4.0 International.
+Kanjium requests attribution for Uros O.'s pitch accent notation and other
+additions to EDICT, KANJIDIC, and KRADFILE.
+
 ## Project Structure
 
 ```text
@@ -265,7 +317,7 @@ src/
   i18n/         String catalog and translation helper
   state/        Global app state provider and cloud/auth wiring
   utils/        Conjugation, scheduling, storage, display, romaji, AI, speech, backup, drill logic
-  views/        Practice, Stats, Learn, Drills, Tools, Settings, and nested surfaces
+  views/        Practice, Guide, Stats, Learn, Drills, Tools, Settings, and nested surfaces
   __tests__/    Vitest tests
 e2e/            Playwright E2E tests
 public/         PWA icons, Apple touch icon, and generated vocabulary data

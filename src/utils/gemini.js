@@ -1,6 +1,6 @@
 import { toHiragana, isAllKana } from './romaji.js';
 import { normalizeJlptLevel } from './conjugator.js';
-import { supabase } from './supabase.js';
+import * as supabaseClientModule from './supabase.js';
 import { retryWithBackoff } from './retry.js';
 import { guardAIRequest } from './rateLimiter.js';
 
@@ -114,6 +114,7 @@ async function readJsonResponse(response) {
 }
 
 async function getSupabaseAccessToken() {
+  const supabase = supabaseClientModule.getLoadedSupabaseClient?.() || null;
   if (!supabase?.auth?.getSession) return '';
   try {
     const {
@@ -149,7 +150,7 @@ async function executeGeminiRequestOnce(payload, apiKey) {
   // Prefer the server-side proxy so the Gemini API key never ships to browsers.
   // The proxy accepts anonymous learner requests and may include a bearer token
   // when the user is signed in, but sign-in is not required for AI coaching.
-  if (supabase && apiKey === 'proxy') {
+  if ((import.meta.env?.VITE_SUPABASE_URL || '') && apiKey === 'proxy') {
     return executeGeminiProxyRequest(payload);
   }
 

@@ -1,12 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   englishForForm,
+  exerciseEnglishForForm,
+  exerciseMeaningForWord,
   editDistance,
   normalizeJapaneseText,
   typoGuardForAnswer,
   cleanEnglishAction,
   gerund,
   pastParticiple,
+  simplePast,
   thirdPerson,
   resolveDisplayScripts,
   answerPhaseTaskDetails,
@@ -26,6 +30,19 @@ import {
   surfaceStemPair,
 } from '../utils/conjugator.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
+import { VOCAB_PACKS } from '../data/vocabPacks.js';
+
+const GENERATED_VERB_LEXICON = JSON.parse(
+  readFileSync(new URL('../../public/data/verb-lexicon.json', import.meta.url), 'utf8'),
+);
+
+function expectNoOldPastFallback(word) {
+  const action = cleanEnglishAction(word.meaning).toLowerCase();
+  expect(englishForForm(word, 'plain-past').toLowerCase()).not.toBe(`did ${action}`);
+  expect(englishForForm(word, 'conditional-tara').toLowerCase()).not.toBe(
+    `if/when someone did ${action}`,
+  );
+}
 
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
 const TAKAI = { dict: '高い', reading: 'たかい', meaning: 'expensive', group: 'i-adjective' };
@@ -84,6 +101,12 @@ describe('gerund', () => {
     expect(gerund('die')).toBe('dying');
     expect(gerund('lie')).toBe('lying');
   });
+
+  it('conjugates the head verb of phrasal meanings', () => {
+    expect(gerund('return home')).toBe('returning home');
+    expect(gerund('pick up')).toBe('picking up');
+    expect(gerund('take out')).toBe('taking out');
+  });
 });
 
 // ─── pastParticiple ───────────────────────────────────────────────────────────
@@ -104,9 +127,50 @@ describe('pastParticiple', () => {
     expect(pastParticiple('walk')).toBe('walked');
     expect(pastParticiple('play')).toBe('played');
   });
+
+  it('conjugates the head verb of phrasal meanings', () => {
+    expect(pastParticiple('return home')).toBe('returned home');
+    expect(pastParticiple('take out')).toBe('taken out');
+    expect(pastParticiple('get off')).toBe('gotten off');
+    expect(pastParticiple('wake up')).toBe('woken up');
+    expect(pastParticiple('look for')).toBe('looked for');
+  });
 });
 
 // ─── thirdPerson ──────────────────────────────────────────────────────────────
+describe('simplePast', () => {
+  it('uses natural simple-past forms for common learner verbs', () => {
+    expect(simplePast('eat')).toBe('ate');
+    expect(simplePast('sleep')).toBe('slept');
+    expect(simplePast('see')).toBe('saw');
+    expect(simplePast('watch')).toBe('watched');
+    expect(simplePast('go')).toBe('went');
+    expect(simplePast('write')).toBe('wrote');
+  });
+
+  it('handles stative and imported generated gloss shapes', () => {
+    expect(simplePast('be different')).toBe('was different');
+    expect(simplePast('Do shopping')).toBe('shopped');
+    expect(simplePast('Get married')).toBe('got married');
+    expect(simplePast('Wash (Clothes)')).toBe('washed (clothes)');
+    expect(simplePast('Phone')).toBe('phoned');
+    expect(simplePast('Jump')).toBe('jumped');
+    expect(simplePast('feel')).toBe('felt');
+  });
+
+  it('conjugates the head verb of phrasal meanings, not the last word', () => {
+    expect(simplePast('return home')).toBe('returned home');
+    expect(simplePast('arrive at')).toBe('arrived at');
+    expect(simplePast('pick up')).toBe('picked up');
+    expect(simplePast('pass away')).toBe('passed away');
+    expect(simplePast('cross over')).toBe('crossed over');
+    expect(simplePast('look for')).toBe('looked for');
+    expect(simplePast('go back')).toBe('went back');
+    expect(simplePast('take out')).toBe('took out');
+    expect(simplePast('get off')).toBe('got off');
+  });
+});
+
 describe('thirdPerson', () => {
   it('handles irregular verbs', () => {
     expect(thirdPerson('do')).toBe('does');
@@ -122,6 +186,12 @@ describe('thirdPerson', () => {
   it('adds -s to regular verbs', () => {
     expect(thirdPerson('eat')).toBe('eats');
     expect(thirdPerson('drink')).toBe('drinks');
+  });
+
+  it('conjugates the head verb of phrasal meanings', () => {
+    expect(thirdPerson('return home')).toBe('returns home');
+    expect(thirdPerson('go back')).toBe('goes back');
+    expect(thirdPerson('look for')).toBe('looks for');
   });
 });
 
@@ -175,14 +245,44 @@ describe('englishForForm', () => {
   });
 
   it('generates correct English for verb forms', () => {
-    expect(englishForForm(TABERU, 'plain-past')).toBe('did eat');
+    expect(englishForForm(TABERU, 'plain-past')).toBe('ate');
     expect(englishForForm(TABERU, 'plain-negative')).toBe('do not eat');
     expect(englishForForm(TABERU, 'polite-present')).toBe('eat (polite)');
+    expect(englishForForm(TABERU, 'polite-past')).toBe('ate (polite)');
+    expect(englishForForm(TABERU, 'conditional-tara')).toBe('if/when someone ate');
     expect(englishForForm(TABERU, 'te-form')).toBe('eat and... / eat for a helper pattern');
     expect(englishForForm(TABERU, 'desiderative')).toBe('want to eat');
     expect(englishForForm(TABERU, 'obligation')).toBe('must eat');
     expect(englishForForm(TABERU, 'permission')).toBe('may eat');
     expect(englishForForm(TABERU, 'request-kudasai')).toBe('please eat');
+  });
+
+  it('conjugates the head verb for phrasal verb meanings (return home → returned home)', () => {
+    const kaeru = { dict: '帰る', reading: 'かえる', meaning: 'to return home', group: 'godan' };
+    expect(englishForForm(kaeru, 'plain-past')).toBe('returned home');
+    expect(englishForForm(kaeru, 'polite-past')).toBe('returned home (polite)');
+  });
+
+  it('maps slash-separated action meanings before generating simple past', () => {
+    const miru = { dict: '見る', reading: 'みる', meaning: 'to see / watch', group: 'ichidan' };
+    expect(englishForForm(miru, 'plain-past')).toBe('saw / watched');
+    expect(englishForForm(miru, 'polite-past')).toBe('saw / watched (polite)');
+    expect(englishForForm(miru, 'conditional-tara')).toBe(
+      'if/when someone saw / if/when someone watched',
+    );
+  });
+
+  it('does not generate the old did-plus-action fallback for built-in verbs', () => {
+    const packVerbs = VOCAB_PACKS.flatMap((pack) => pack.words).filter((word) =>
+      ['ichidan', 'godan', 'suru', 'kuru'].includes(word.group),
+    );
+    const generatedVerbs = GENERATED_VERB_LEXICON.verbs
+      .map(([dict, reading, meaning, group]) => ({ dict, reading, meaning, group }))
+      .filter((word) => ['ichidan', 'godan', 'suru', 'kuru'].includes(word.group));
+
+    for (const word of [...STARTER_VERBS, ...packVerbs, ...generatedVerbs]) {
+      expectNoOldPastFallback(word);
+    }
   });
 
   it('uses natural wording for stative "to be" verb glosses', () => {
@@ -205,6 +305,28 @@ describe('englishForForm', () => {
 
   it('returns meaning for null item', () => {
     expect(englishForForm(null, 'plain-past')).toBe('');
+  });
+});
+
+describe('exercise English glosses', () => {
+  it('prefers a curated exercise meaning without changing the reference meaning', () => {
+    const suru = {
+      dict: 'する',
+      reading: 'する',
+      meaning: 'to do, to try; to wear small items',
+      exerciseMeaning: 'to do',
+      group: 'suru',
+    };
+    expect(exerciseMeaningForWord(suru)).toBe('to do');
+    expect(exerciseEnglishForForm(suru, 'plain-past')).toBe('did');
+    expect(suru.meaning).toBe('to do, to try; to wear small items');
+  });
+
+  it('uses the first complete top-level sense for imported words', () => {
+    expect(exerciseMeaningForWord({ meaning: 'to wear (on the body), to put on; to carry' })).toBe(
+      'to wear (on the body)',
+    );
+    expect(exerciseMeaningForWord({ meaning: 'to see / watch' })).toBe('to see');
   });
 });
 
@@ -636,6 +758,12 @@ describe('filterWordsForPrefs', () => {
 });
 
 describe('mergePracticePrefs', () => {
+  it('drops preference keys that are no longer part of the prototype schema', () => {
+    const prefs = mergePracticePrefs({ theme: 'dark', retiredSetting: 12 });
+    expect(prefs.theme).toBe('dark');
+    expect(prefs).not.toHaveProperty('retiredSetting');
+  });
+
   it('keeps review limits only for bounded review sessions', () => {
     expect(mergePracticePrefs({ reviewLimit: 10, reviewLimitSource: 'today' })).toMatchObject({
       reviewLimit: 0,

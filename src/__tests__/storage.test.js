@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import {
   gradeCard,
-  bumpDaily,
   recordMistake,
   markMistakeResolved,
   normalizeWordLists,
@@ -13,10 +12,12 @@ import {
   normalizeReferenceState,
   buildFocusCard,
   cardIdFor,
-  dailyNewCardLimit,
+  freshCardLimit,
   defaultState,
-  bonusNewCardLimit,
+  bonusFreshCardLimit,
   selectNext,
+  cardWeakScore,
+  ruleWeakScore,
   SRS_SCHEMA_VERSION,
   gradeTransformationStats,
   mergeTransformationStats,
@@ -26,11 +27,8 @@ import { conjugateItem } from '../utils/conjugator.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import {
   ALL_CARD_TYPES,
-  CONJ_TYPES,
   EVERYDAY_TYPE_IDS,
-  INTRODUCED_DEFAULT_TYPE_IDS,
   LEGACY_BROAD_DEFAULT_TYPE_IDS,
-  RETIRED_STANDALONE_TYPE_IDS,
   TEXTBOOK_CORE_TYPE_IDS,
 } from '../data/conjugationTypes.js';
 import {
@@ -40,6 +38,16 @@ import {
   includeWordInReviewState,
   reviewTypeIdsForState,
 } from '../utils/reviewScope.js';
+import {
+  defaultPracticeSelection,
+  practiceSelectionForTopic,
+  practiceSelectionForTypeIds,
+} from '../utils/practiceSelection.js';
+import { PRACTICE_CATEGORIES } from '../data/practiceTaxonomy.js';
+
+const CORE_FORM_TYPE_IDS = PRACTICE_CATEGORIES.find(
+  (category) => category.id === 'core-forms',
+).typeIds;
 
 // Mock localStorage for storage tests (mergeState etc. are pure but defaultState references CONJ_TYPES)
 // No localStorage calls in the functions we're testing — they're all pure.
@@ -116,6 +124,116 @@ describe('gradeCard', () => {
     expect(card.correct).toBe(2);
     expect(card.incorrect).toBe(1);
   });
+
+  it('accumulates recentMiss on misses and decays it with time and correct answers', () => {
+    const now = Date.now();
+    let card = gradeCard(null, false, now);
+    expect(card.recentMiss).toBe(1);
+    card = gradeCard(card, false, now);
+    expect(card.recentMiss).toBe(2);
+    // One half-life later the old misses count half before the new one lands.
+    card = gradeCard(card, false, now + 14 * DAY);
+    expect(card.recentMiss).toBeCloseTo(2, 5);
+    // A correct answer recovers faster than time alone.
+    card = gradeCard(card, true, now + 14 * DAY);
+    expect(card.recentMiss).toBeCloseTo(1.2, 5);
+  });
+
+  it('caps recentMiss so one card cannot dominate weighted sampling', () => {
+    const now = Date.now();
+    let card = null;
+    for (let i = 0; i < 12; i += 1) card = gradeCard(card, false, now);
+    expect(card.recentMiss).toBe(6);
+  });
+});
+
+describe('cardWeakScore', () => {
+  const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+  const cardId = cardIdFor(TABERU, 'plain-past');
+
+  it('scores a long-mastered card with old misses near zero', () => {
+    const now = Date.now();
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardId]: {
+          ease: 2.5,
+          interval: 30,
+          reps: 5,
+          nextReview: now + 30 * DAY,
+          correct: 20,
+          incorrect: 6,
+          lastSeen: now - 60 * DAY,
+        },
+      },
+    };
+    expect(cardWeakScore(state, cardId, TABERU, 'plain-past', { now })).toBeLessThan(1);
+  });
+
+  it('scores a card with fresh misses high', () => {
+    const now = Date.now();
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardId]: {
+          ease: 1.9,
+          interval: 0,
+          reps: 0,
+          nextReview: now + 60000,
+          correct: 1,
+          incorrect: 2,
+          recentMiss: 2,
+          lastSeen: now,
+        },
+      },
+    };
+    expect(cardWeakScore(state, cardId, TABERU, 'plain-past', { now })).toBeGreaterThan(5);
+  });
+
+  it('decays stored recentMiss as time passes', () => {
+    const now = Date.now();
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardId]: {
+          ease: 1.9,
+          interval: 0,
+          reps: 0,
+          nextReview: now + 60000,
+          correct: 1,
+          incorrect: 2,
+          recentMiss: 2,
+          lastSeen: now,
+        },
+      },
+    };
+    const fresh = cardWeakScore(state, cardId, TABERU, 'plain-past', { now });
+    const later = cardWeakScore(state, cardId, TABERU, 'plain-past', { now: now + 28 * DAY });
+    expect(later).toBeLessThan(fresh);
+  });
+
+  it('keeps ruleWeakScore consistent with cardWeakScore for an existing card', () => {
+    const now = Date.now();
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardId]: {
+          ease: 1.9,
+          interval: 0,
+          reps: 0,
+          nextReview: now + 60000,
+          correct: 1,
+          incorrect: 2,
+          recentMiss: 2,
+          lastSeen: now,
+        },
+      },
+    };
+    expect(ruleWeakScore(state, cardId, { now })).toBeCloseTo(
+      cardWeakScore(state, cardId, null, null, { now }),
+      5,
+    );
+  });
 });
 
 describe('getCardLevel', () => {
@@ -147,82 +265,6 @@ describe('getCardLevel', () => {
   it('returns 5 for interval >= 180', () => {
     expect(getCardLevel({ reps: 5, interval: 180 })).toBe(5);
     expect(getCardLevel({ reps: 5, interval: 365 })).toBe(5);
-  });
-});
-
-describe('bumpDaily', () => {
-  it('initialises a fresh daily state on first call', () => {
-    const today = localDateKey();
-    const result = bumpDaily(null, true, 10);
-    expect(result.date).toBe(today);
-    expect(result.count).toBe(1);
-    expect(result.goalHit).toBe(false);
-  });
-
-  it('marks goalHit when count reaches dailyGoal', () => {
-    const today = localDateKey();
-    let d = {
-      date: today,
-      count: 9,
-      goalHit: false,
-      goalStreak: 0,
-      bestGoalStreak: 0,
-      currentAnswerStreak: 0,
-      bestAnswerStreak: 0,
-    };
-    d = bumpDaily(d, true, 10);
-    expect(d.goalHit).toBe(true);
-    expect(d.goalStreak).toBe(1);
-  });
-
-  it('increments answer streak on correct', () => {
-    const today = localDateKey();
-    let d = {
-      date: today,
-      count: 0,
-      goalHit: false,
-      goalStreak: 0,
-      bestGoalStreak: 0,
-      currentAnswerStreak: 2,
-      bestAnswerStreak: 2,
-    };
-    d = bumpDaily(d, true, 10);
-    expect(d.currentAnswerStreak).toBe(3);
-    expect(d.bestAnswerStreak).toBe(3);
-  });
-
-  it('resets answer streak on incorrect', () => {
-    const today = localDateKey();
-    let d = {
-      date: today,
-      count: 5,
-      goalHit: false,
-      goalStreak: 0,
-      bestGoalStreak: 0,
-      currentAnswerStreak: 5,
-      bestAnswerStreak: 5,
-    };
-    d = bumpDaily(d, false, 10);
-    expect(d.currentAnswerStreak).toBe(0);
-    expect(d.bestAnswerStreak).toBe(5); // best preserved
-  });
-
-  it('resets count when date changes', () => {
-    const yesterday = localDateKey(-1);
-    let d = {
-      date: yesterday,
-      count: 99,
-      goalHit: true,
-      goalStreak: 3,
-      bestGoalStreak: 3,
-      currentAnswerStreak: 10,
-      bestAnswerStreak: 10,
-    };
-    d = bumpDaily(d, true, 10);
-    expect(d.date).toBe(localDateKey());
-    expect(d.count).toBe(1);
-    expect(d.goalHit).toBe(false);
-    expect(d.goalStreak).toBe(3); // kept because yesterday's goal was hit
   });
 });
 
@@ -416,21 +458,22 @@ describe('mergeState', () => {
     const state = mergeState(null, null);
     expect(state).toHaveProperty('cards');
     expect(state).toHaveProperty('enabledTypes');
-    expect(state).toHaveProperty('daily');
+    expect(state).toHaveProperty('practiceSelection');
+    expect(state).toHaveProperty('practiceStats');
     expect(state).toHaveProperty('mistakes');
     expect(Array.isArray(state.enabledTypes)).toBe(true);
     expect(state.enabledTypes.length).toBeGreaterThan(0);
   });
 
-  it('starts new learners on the Core plus Everyday conjugation scope', () => {
+  it('starts new learners on the Core forms category', () => {
     const state = defaultState();
-    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(state.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
     expect(state.enabledTypes).not.toContain('masu-stem');
     expect(state.enabledTypes).not.toContain('request-kudasai');
     expect(state.enabledTypes).not.toContain('permission');
     expect(state.enabledTypes).not.toContain('obligation');
-    expect(state.enabledTypes).toContain('progressive-past');
-    expect(state.enabledTypes).toContain('potential-polite-past');
+    expect(state.enabledTypes).not.toContain('progressive-past');
+    expect(state.enabledTypes).not.toContain('potential-polite-past');
     expect(state.enabledTypes).not.toContain('passive');
     expect(state.enabledTypes).not.toContain('causative');
     expect(state.enabledTypes).not.toContain('command-nasai');
@@ -439,45 +482,39 @@ describe('mergeState', () => {
     expect(state.enabledTypes).not.toContain('short-causative-passive-polite-past-negative');
   });
 
-  it('migrates the old broad default scope to Core plus Everyday', () => {
-    const state = mergeState({ enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS }, null);
-    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
-  });
-
-  it('migrates old verb-only broad scopes with retired forms to Core plus Everyday', () => {
-    const oldVerbDefault = [
-      ...CONJ_TYPES.filter((type) => type.id !== 'plain-present').map((type) => type.id),
-      ...RETIRED_STANDALONE_TYPE_IDS,
-    ];
-    const state = mergeState({ enabledTypes: oldVerbDefault }, null);
-    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
-  });
-
-  it('migrates pre-introduced broad default scopes to Core plus Everyday', () => {
-    const preIntroducedIds = LEGACY_BROAD_DEFAULT_TYPE_IDS.filter(
-      (id) => !INTRODUCED_DEFAULT_TYPE_IDS.includes(id),
-    );
-    const state = mergeState({ enabledTypes: preIntroducedIds }, null);
-    expect(state.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
-  });
-
   it('preserves an explicit all-forms scope', () => {
     const allTypeIds = ALL_CARD_TYPES.map((t) => t.id);
-    const state = mergeState({ schemaVersion: SRS_SCHEMA_VERSION, enabledTypes: allTypeIds }, null);
-    expect(state.enabledTypes).toEqual(allTypeIds);
+    const practiceSelection = practiceSelectionForTypeIds(allTypeIds, defaultPracticeSelection());
+    const state = mergeState({ schemaVersion: SRS_SCHEMA_VERSION, practiceSelection }, null);
+    expect(new Set(state.enabledTypes)).toEqual(new Set(allTypeIds));
     expect(state.enabledTypes).not.toContain('masu-stem');
   });
 
-  it('filters retired standalone practice forms from saved scopes', () => {
+  it('derives enabled forms from the canonical selection instead of a saved compatibility list', () => {
+    const practiceSelection = practiceSelectionForTypeIds(
+      ['plain-past', 'adj-plain-past'],
+      defaultPracticeSelection(),
+    );
     const state = mergeState(
       {
         schemaVersion: SRS_SCHEMA_VERSION,
         enabledTypes: ['plain-past', 'masu-stem', 'adj-plain-past'],
+        practiceSelection,
       },
       null,
     );
 
     expect(state.enabledTypes).toEqual(['plain-past', 'adj-plain-past']);
+  });
+
+  it('hydrates a persisted topic selection and its exact-form refinements', () => {
+    const practiceSelection = practiceSelectionForTypeIds(
+      ['conditional-tara', 'conditional-nara'],
+      practiceSelectionForTopic('conditional'),
+    );
+    const state = mergeState({ schemaVersion: SRS_SCHEMA_VERSION, practiceSelection }, null);
+    expect(state.practiceSelection.selectedCategoryIds).toEqual(['conditions-guesses']);
+    expect(state.enabledTypes).toEqual(['conditional-tara', 'conditional-nara']);
   });
 
   it('preserves saved cards from the current SRS schema', () => {
@@ -501,24 +538,12 @@ describe('mergeState', () => {
     expect(state.cards[cardId].reps).toBe(3);
   });
 
-  it('resets legacy rule-keyed cards during the word-form migration', () => {
-    const state = mergeState(
-      {
-        cards: {
-          'ichidan|plain-past': {
-            reps: 3,
-            interval: 8,
-            ease: 2.5,
-            nextReview: 9999999999999,
-            correct: 3,
-            incorrect: 0,
-            lastSeen: 1,
-          },
-        },
-      },
-      null,
-    );
-    expect(state.cards).toEqual({});
+  it('rejects unsupported saved schemas without mutating the source', () => {
+    for (const schemaVersion of [undefined, 3, 99]) {
+      const saved = { schemaVersion, cards: { 'ichidan|plain-past': { reps: 3 } } };
+      expect(() => mergeState(saved)).toThrow(/schema/);
+      expect(saved.cards['ichidan|plain-past'].reps).toBe(3);
+    }
   });
 
   it('uses sessionOverride for session', () => {
@@ -527,15 +552,16 @@ describe('mergeState', () => {
     expect(state.session).toEqual(override);
   });
 
-  it('backfills adj types for old saves without them', () => {
-    const saved = { enabledTypes: ['plain-past', 'te-form'] }; // no adj- types
-    const state = mergeState(saved, null);
-    expect(state.enabledTypes.some((id) => id.startsWith('adj-'))).toBe(true);
-  });
-
-  it('backfills readiness for old saves', () => {
-    const state = mergeState({ cards: {} }, null);
+  it('backfills optional current-schema areas without losing saved session totals', () => {
+    const saved = {
+      schemaVersion: SRS_SCHEMA_VERSION,
+      cards: {},
+      session: { ...defaultState().session, reviewed: 12, correct: 9 },
+    };
+    const state = mergeState(saved);
     expect(state.readiness).toEqual({ byRule: {} });
+    expect(state.session.reviewed).toBe(12);
+    expect(state.session.correct).toBe(9);
   });
 });
 
@@ -545,10 +571,10 @@ describe('mergeCloudState', () => {
       { cards: {}, verbStats: {}, mistakes: [], enabledTypes: EVERYDAY_TYPE_IDS },
       { cards: {}, verbStats: {}, mistakes: [], enabledTypes: LEGACY_BROAD_DEFAULT_TYPE_IDS },
     );
-    expect(merged.enabledTypes).toEqual(EVERYDAY_TYPE_IDS);
+    expect(merged.enabledTypes).toEqual(CORE_FORM_TYPE_IDS);
   });
 
-  it('preserves explicit all-forms cloud scopes', () => {
+  it('merges concurrent persistent selections deterministically', () => {
     const allTypeIds = ALL_CARD_TYPES.map((t) => t.id);
     const merged = mergeCloudState(
       {
@@ -556,18 +582,73 @@ describe('mergeCloudState', () => {
         cards: {},
         verbStats: {},
         mistakes: [],
-        enabledTypes: EVERYDAY_TYPE_IDS,
+        practiceSelection: practiceSelectionForTopic('volitional'),
       },
       {
         schemaVersion: SRS_SCHEMA_VERSION,
         cards: {},
         verbStats: {},
         mistakes: [],
-        enabledTypes: allTypeIds,
+        practiceSelection: practiceSelectionForTypeIds(allTypeIds),
       },
     );
     expect(new Set(merged.enabledTypes)).toEqual(new Set(allTypeIds));
-    expect(merged.enabledTypes).toHaveLength(allTypeIds.length);
+  });
+
+  it('merges reading source-form stats when choosing the newer SRS card', () => {
+    const word = {
+      dict: '\u66f8\u304f',
+      reading: '\u304b\u304f',
+      meaning: 'to write',
+      group: 'godan',
+    };
+    const cardId = cardIdFor(word, 'dictionary');
+    const merged = mergeCloudState(
+      {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        cards: {
+          [cardId]: {
+            reps: 1,
+            interval: 1,
+            nextReview: 1000,
+            lastSeen: 1000,
+            correct: 1,
+            incorrect: 0,
+            sourceTypeStats: {
+              'plain-past': { correct: 1, incorrect: 0, lastAt: 1000 },
+            },
+          },
+        },
+        verbStats: {},
+        mistakes: [],
+        enabledTypes: ['plain-past'],
+      },
+      {
+        schemaVersion: SRS_SCHEMA_VERSION,
+        cards: {
+          [cardId]: {
+            reps: 2,
+            interval: 3,
+            nextReview: 2000,
+            lastSeen: 2000,
+            correct: 2,
+            incorrect: 0,
+            sourceTypeStats: {
+              'te-form': { correct: 0, incorrect: 1, lastAt: 1500 },
+            },
+          },
+        },
+        verbStats: {},
+        mistakes: [],
+        enabledTypes: ['plain-past'],
+      },
+    );
+
+    expect(merged.cards[cardId].reps).toBe(2);
+    expect(merged.cards[cardId].sourceTypeStats).toMatchObject({
+      'plain-past': { correct: 1, incorrect: 0, lastAt: 1000 },
+      'te-form': { correct: 0, incorrect: 1, lastAt: 1500 },
+    });
   });
 
   it('merges readiness dimensions from both devices', () => {
@@ -843,6 +924,8 @@ describe('word-form SRS selection', () => {
     };
     const card = selectNext(state, [TABERU, KAKU], ['plain-past'], null, DEFAULT_PREFS);
     expect(card.id).toBe(cardIdFor(KAKU, 'plain-past'));
+    expect(card.selectionOrigin).toBe('new');
+    expect(card.selectionReason).toBe('Introducing Te/Ta Sound Changes');
   });
 
   it('can still schedule due cards by exact word-form card id when explicitly requested', () => {
@@ -867,6 +950,8 @@ describe('word-form SRS selection', () => {
     expect(card.id).toBe(dueCardId);
     expect(card.type).toBe('plain-past');
     expect(card.verb).toBe(TABERU);
+    expect(card.selectionOrigin).toBe('review');
+    expect(card.selectionReason).toBe('Due review');
   });
 
   it('surfaces retryQueue cards before fresh fallback until they are cleared', () => {
@@ -891,6 +976,8 @@ describe('word-form SRS selection', () => {
 
     expect(card.id).toBe(retryCardId);
     expect(card.verb).toBe(TABERU);
+    expect(card.selectionOrigin).toBe('missed');
+    expect(card.selectionReason).toBe('Previously missed');
   });
 
   it('uses dictionary target cards for reading practice without adding dictionary to core', () => {
@@ -926,6 +1013,7 @@ describe('word-form SRS selection', () => {
     );
 
     expect(card.verb).toBe(earlyWord);
+    expect(card.selectionReason).toBe('Introducing Te/Ta Sound Changes');
   });
 
   it('ladders fresh Core Warmup through regular ichidan and godan before irregulars', () => {
@@ -971,9 +1059,9 @@ describe('word-form SRS selection', () => {
     expect(seen.map((card) => card.verb.dict)).not.toContain(IKU.dict);
   });
 
-  it('uses a continuous fresh-card budget instead of the visible daily goal', () => {
-    expect(dailyNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(60);
-    expect(bonusNewCardLimit({ ...DEFAULT_PREFS, dailyGoal: 10 })).toBe(30);
+  it('uses a generous internal fresh-card budget for continuous variety', () => {
+    expect(freshCardLimit()).toBe(60);
+    expect(bonusFreshCardLimit()).toBe(30);
     const introduced = {};
     for (let i = 0; i < 60; i += 1) {
       introduced[`synthetic-${i}`] = {
@@ -991,7 +1079,7 @@ describe('word-form SRS selection', () => {
       [TABERU, KAKU],
       ['plain-past'],
       null,
-      { ...DEFAULT_PREFS, dailyGoal: 10 },
+      DEFAULT_PREFS,
     );
     expect(card).toBeNull();
   });
@@ -1033,9 +1121,36 @@ describe('word-form SRS selection', () => {
     );
 
     expect(card.type).toBe('plain-negative');
+    expect(card.selectionReason).toBe('Strengthening Core Verb Forms');
   });
 
-  it('avoids repeating the same family back-to-back when another enabled family is available', () => {
+  it('surfaces a neutral untested enabled family ahead of a higher-skill started family', () => {
+    const now = Date.now();
+    const strongTe = cardIdFor(KAKU, 'te-form');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [strongTe]: {
+          reps: 5,
+          interval: 8,
+          ease: 2.5,
+          nextReview: now + DAY,
+          correct: 5,
+          incorrect: 0,
+          lastSeen: now - DAY,
+        },
+      },
+    };
+
+    // 'volitional' (Volitional & Desire) is enabled but never attempted, so it is
+    // neutral (skill 50) and should beat the high-skill Te/Ta family.
+    const card = selectNext(state, [TABERU, KAKU], ['te-form', 'volitional'], null, DEFAULT_PREFS);
+
+    expect(card.type).toBe('volitional');
+    expect(card.selectionReason).toBe('Introducing Volitional');
+  });
+
+  it('avoids repeating the same family back-to-back when a comparable family is available', () => {
     const now = Date.now();
     const weakPast = cardIdFor(TABERU, 'plain-negative');
     const otherFamily = cardIdFor(KAKU, 'te-form');
@@ -1047,8 +1162,8 @@ describe('word-form SRS selection', () => {
           interval: 8,
           ease: 2.3,
           nextReview: now + DAY,
-          correct: 1,
-          incorrect: 4,
+          correct: 2,
+          incorrect: 3,
           lastSeen: now - DAY,
         },
         [otherFamily]: {
@@ -1078,6 +1193,174 @@ describe('word-form SRS selection', () => {
     expect(card.id).toBe(otherFamily);
   });
 
+  it('boosts a stubborn weak card ahead of a nearby higher-skill family', () => {
+    const now = Date.now();
+    const reviewed = (overrides) => ({
+      ease: 2.3,
+      interval: 8,
+      nextReview: now + DAY,
+      recentMiss: 0,
+      lastSeen: now - DAY,
+      ...overrides,
+    });
+    const weakCardId = cardIdFor(TABERU, 'te-form');
+    const state = {
+      ...defaultState(),
+      cards: {
+        // Te/Ta family ~83 skill overall, but this one card keeps missing.
+        [cardIdFor(KAKU, 'te-form')]: reviewed({ reps: 5, correct: 19, incorrect: 0 }),
+        [weakCardId]: reviewed({ reps: 0, correct: 1, incorrect: 4, recentMiss: 4 }),
+        // Basics & Politeness sits at 75 skill with no weak cards.
+        [cardIdFor(TABERU, 'plain-negative')]: reviewed({ reps: 3, correct: 3, incorrect: 1 }),
+        [cardIdFor(KAKU, 'plain-negative')]: reviewed({ reps: 3, correct: 3, incorrect: 1 }),
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU],
+      ['plain-negative', 'te-form'],
+      null,
+      DEFAULT_PREFS,
+    );
+
+    expect(card.id).toBe(weakCardId);
+  });
+
+  it('never lets card weakness outrank a genuinely weak family', () => {
+    const now = Date.now();
+    const reviewed = (overrides) => ({
+      ease: 2.3,
+      interval: 8,
+      nextReview: now + DAY,
+      recentMiss: 0,
+      lastSeen: now - DAY,
+      ...overrides,
+    });
+    const state = {
+      ...defaultState(),
+      cards: {
+        // Te/Ta family at 85 skill with a maxed-out weak card: the bounded
+        // boost (85 - 12 = 73) must not undercut a family at 60.
+        [cardIdFor(KAKU, 'te-form')]: reviewed({ reps: 5, correct: 21, incorrect: 1 }),
+        [cardIdFor(TABERU, 'te-form')]: reviewed({
+          reps: 0,
+          correct: 1,
+          incorrect: 2,
+          recentMiss: 6,
+        }),
+        [cardIdFor(TABERU, 'plain-negative')]: reviewed({ reps: 3, correct: 3, incorrect: 2 }),
+        [cardIdFor(KAKU, 'plain-negative')]: reviewed({ reps: 3, correct: 3, incorrect: 2 }),
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU],
+      ['plain-negative', 'te-form'],
+      null,
+      DEFAULT_PREFS,
+    );
+
+    expect(card.type).toBe('plain-negative');
+  });
+
+  it('repeats a severely weak family with a different word instead of deferring it', () => {
+    const now = Date.now();
+    const lastCardId = cardIdFor(TABERU, 'plain-negative');
+    const weakBasics = (overrides = {}) => ({
+      ease: 1.9,
+      interval: 0,
+      reps: 0,
+      nextReview: now + DAY,
+      correct: 1,
+      incorrect: 3,
+      recentMiss: 3,
+      lastSeen: now - DAY,
+      ...overrides,
+    });
+    const state = {
+      ...defaultState(),
+      cards: {
+        [lastCardId]: weakBasics(),
+        [cardIdFor(KAKU, 'plain-negative')]: weakBasics(),
+        [cardIdFor(KAKU, 'te-form')]: {
+          ease: 2.5,
+          interval: 8,
+          reps: 3,
+          nextReview: now + DAY,
+          correct: 3,
+          incorrect: 1,
+          recentMiss: 0,
+          lastSeen: now - DAY,
+        },
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU],
+      ['plain-negative', 'te-form'],
+      lastCardId,
+      DEFAULT_PREFS,
+      null,
+      { recentCardIds: [lastCardId] },
+    );
+
+    expect(card.id).toBe(cardIdFor(KAKU, 'plain-negative'));
+  });
+
+  it('caps severe-weakness family repeats at three consecutive cards', () => {
+    const now = Date.now();
+    const weakBasics = (overrides = {}) => ({
+      ease: 1.9,
+      interval: 0,
+      reps: 0,
+      nextReview: now + DAY,
+      correct: 1,
+      incorrect: 3,
+      recentMiss: 3,
+      lastSeen: now - DAY,
+      ...overrides,
+    });
+    const recentRun = [
+      cardIdFor(YOMU, 'plain-negative'),
+      cardIdFor(KAKU, 'plain-negative'),
+      cardIdFor(TABERU, 'plain-negative'),
+    ];
+    const state = {
+      ...defaultState(),
+      cards: {
+        [recentRun[0]]: weakBasics(),
+        [recentRun[1]]: weakBasics(),
+        [recentRun[2]]: weakBasics(),
+        [cardIdFor(KAU, 'plain-negative')]: weakBasics(),
+        [cardIdFor(KAU, 'te-form')]: {
+          ease: 2.5,
+          interval: 8,
+          reps: 3,
+          nextReview: now + DAY,
+          correct: 3,
+          incorrect: 1,
+          recentMiss: 0,
+          lastSeen: now - DAY,
+        },
+      },
+    };
+
+    const card = selectNext(
+      state,
+      [TABERU, KAKU, YOMU, KAU],
+      ['plain-negative', 'te-form'],
+      recentRun[0],
+      DEFAULT_PREFS,
+      null,
+      { recentCardIds: recentRun },
+    );
+
+    expect(card.id).toBe(cardIdFor(KAU, 'te-form'));
+  });
+
   it('moves to fresh material instead of looping recently reviewed weak cards', () => {
     const now = Date.now();
     const weakFutureCard = (lastSeen) => ({
@@ -1097,7 +1380,17 @@ describe('word-form SRS selection', () => {
       },
     };
 
-    const card = selectNext(state, [TABERU, KAKU, YOMU], ['plain-past'], null, DEFAULT_PREFS);
+    const card = selectNext(
+      state,
+      [TABERU, KAKU, YOMU],
+      ['plain-past'],
+      null,
+      DEFAULT_PREFS,
+      null,
+      {
+        recentCardIds: [cardIdFor(TABERU, 'plain-past'), cardIdFor(KAKU, 'plain-past')],
+      },
+    );
 
     expect(card.id).toBe(cardIdFor(YOMU, 'plain-past'));
   });
@@ -1131,7 +1424,17 @@ describe('word-form SRS selection', () => {
       },
     };
 
-    const card = selectNext(state, [TABERU, KAKU, YOMU], ['plain-past'], null, DEFAULT_PREFS);
+    const card = selectNext(
+      state,
+      [TABERU, KAKU, YOMU],
+      ['plain-past'],
+      null,
+      DEFAULT_PREFS,
+      null,
+      {
+        recentCardIds: [cardIdFor(TABERU, 'plain-past'), cardIdFor(KAKU, 'plain-past')],
+      },
+    );
 
     expect(card.id).toBe(cardIdFor(YOMU, 'plain-past'));
   });

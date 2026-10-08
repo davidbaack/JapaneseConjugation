@@ -6,8 +6,10 @@ import {
   isRedundantPracticeType,
   normalizePromptFormSetting,
   pickPromptType,
+  surfaceFormFor,
 } from '../utils/conjugator.js';
 import {
+  contextSentenceFor,
   getConjugationDebugInfo,
   inferMistakenConjugationPattern,
   stepCoachHint,
@@ -19,6 +21,7 @@ const KAKU = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'g
 const HANASU = { dict: '話す', reading: 'はなす', meaning: 'to speak', group: 'godan' };
 const MATSU = { dict: '待つ', reading: 'まつ', meaning: 'to wait', group: 'godan' };
 const NOMU = { dict: '飲む', reading: 'のむ', meaning: 'to drink', group: 'godan' };
+const YOMU = { dict: '読む', reading: 'よむ', meaning: 'to read', group: 'godan' };
 const KAEРУ = { dict: '買う', reading: 'かう', meaning: 'to buy', group: 'godan' };
 const OYOGU = { dict: '泳ぐ', reading: 'およぐ', meaning: 'to swim', group: 'godan' };
 const SHINU = { dict: '死ぬ', reading: 'しぬ', meaning: 'to die', group: 'godan' };
@@ -36,7 +39,20 @@ const II = {
   group: 'i-adjective',
   irregular: true,
 };
+const CHOSHI_GA_II = {
+  dict: '調子がいい',
+  reading: 'ちょうしがいい',
+  meaning: 'be in good condition',
+  group: 'i-adjective',
+};
 const SHIZUKA = { dict: '静か', reading: 'しずか', meaning: 'quiet', group: 'na-adjective' };
+
+describe('contextSentenceFor', () => {
+  it('uses natural past glosses in verb context sentence help', () => {
+    expect(contextSentenceFor(TABERU, 'plain-past').en).toBe('Plain past meaning: ate.');
+    expect(contextSentenceFor(TABERU, 'polite-past').en).toBe('Polite past meaning: ate (polite).');
+  });
+});
 
 // ─── Ichidan verb (食べる) ────────────────────────────────────────────────────
 describe('ichidan verb: 食べる', () => {
@@ -306,6 +322,15 @@ describe('irregular i-adjective: いい', () => {
     expect(conjugateAdjective(II, 'adj-te-form')).toBe('よくて');
     expect(conjugateAdjective(II, 'adj-adverb')).toBe('よく');
   });
+
+  it('uses the よ stem for fixed expressions ending in がいい', () => {
+    expect(conjugateAdjective(CHOSHI_GA_II, 'adj-plain-past')).toBe('ちょうしがよかった');
+    expect(surfaceFormFor(CHOSHI_GA_II, 'adj-plain-present')).toBe('調子がいい');
+    expect(surfaceFormFor(CHOSHI_GA_II, 'adj-plain-past')).toBe('調子がよかった');
+    expect(surfaceFormFor(CHOSHI_GA_II, 'adj-polite-present')).toBe('調子がいいです');
+    expect(surfaceFormFor(CHOSHI_GA_II, 'adj-polite-past-negative')).toBe('調子がよくなかったです');
+    expect(surfaceFormFor(CHOSHI_GA_II, 'adj-sou')).toBe('調子がよさそう');
+  });
 });
 
 // ─── Na-adjective (静か) ──────────────────────────────────────────────────────
@@ -357,8 +382,8 @@ describe('stepCoachHint (offline hint)', () => {
   const TYPE = 'potential-past-negative';
   const ANSWER = conjugateItem(MATSU, TYPE); // まてなかった
 
-  it('includes the multi-step build recipe', () => {
-    const { text } = stepCoachHint(MATSU, TYPE, '');
+  it('includes the multi-step build recipe once typing has started', () => {
+    const { text } = stepCoachHint(MATSU, TYPE, 'ま');
     expect(text).toContain('potential');
     expect(text).toContain('なかった');
   });
@@ -372,8 +397,22 @@ describe('stepCoachHint (offline hint)', () => {
     expect(stepCoachHint(MATSU, TYPE, '').masked).toBe(false);
   });
 
-  it('prompts to start when nothing is typed', () => {
-    expect(stepCoachHint(MATSU, TYPE, '').text).toMatch(/haven't typed/);
+  it('nudges the next thinking step when nothing is typed', () => {
+    const { text } = stepCoachHint(MATSU, TYPE, '');
+    expect(text).toMatch(/have not typed/);
+    expect(text).toContain('identify the verb group');
+    expect(text).toContain('final kana');
+    expect(text).not.toContain('potential');
+    expect(text).not.toContain('なかった');
+  });
+
+  it('does not give away the godan plain negative recipe before typing', () => {
+    const { text } = stepCoachHint(OYOGU, 'plain-negative', '');
+    expect(text).toContain('identify the verb group');
+    expect(text).toContain('final kana');
+    expect(text).not.toContain('あ-row');
+    expect(text).not.toContain('ない');
+    expect(text).not.toContain('およがない');
   });
 
   it('acknowledges a correct prefix and counts remaining kana', () => {
@@ -439,6 +478,46 @@ describe('visual conjugation debugger metadata', () => {
     expect(debug.formula.expression).toBe('か + いて = かいて');
     expect(debug.rule.family).toBe('godan sound change');
     expect(debug.rule.short).toContain('く -> いて');
+    expect(debug.rowShiftVisual).toBeNull();
+    expect(debug.soundChangeVisual).toMatchObject({
+      kind: 'sound-change',
+      ending: 'く',
+      targetLabel: 'いて',
+      formula: 'か + いて = かいて',
+    });
+    expect(debug.soundChangeVisual.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: 'く', kana: 'いて', active: true }),
+        expect.objectContaining({ label: 'う/つ/る', kana: 'って', active: false }),
+      ]),
+    );
+
+    const past = getConjugationDebugInfo(KAKU, 'plain-past');
+    expect(past.soundChangeVisual).toMatchObject({
+      kind: 'sound-change',
+      ending: 'く',
+      targetLabel: 'いた',
+      formula: 'か + いた = かいた',
+    });
+  });
+
+  it('keeps rule visuals scoped to their matching godan patterns', () => {
+    const rowShift = getConjugationDebugInfo(YOMU, 'plain-negative');
+    expect(rowShift.soundChangeVisual).toBeNull();
+    expect(rowShift.rowShiftVisual).toMatchObject({
+      ending: 'む',
+      targetRow: 'a-row',
+      formula: 'よ + ま + ない = よまない',
+    });
+
+    for (const debug of [
+      getConjugationDebugInfo(TABERU, 'plain-past'),
+      getConjugationDebugInfo(TAKAI, 'adj-plain-past'),
+      getConjugationDebugInfo(SURU, 'plain-past'),
+    ]) {
+      expect(debug.soundChangeVisual).toBeNull();
+      expect(debug.rowShiftVisual).toBeNull();
+    }
   });
 
   it('shows common adjective and irregular transformations as structured rules', () => {
@@ -461,6 +540,9 @@ describe('visual conjugation debugger metadata', () => {
     expect(mistake.userRule).toContain('う/つ/る -> って');
     expect(mistake.expectedRule).toContain('く -> いて');
     expect(mistake.expectedResult).toBe('かいて');
+    expect(mistake.detail).toContain('which produced かって');
+    expect(mistake.detail).toContain('This verb needs く -> いて');
+    expect(mistake.detail).toContain(': かいて');
   });
 
   it('infers when a learner used a different valid target form', () => {
@@ -469,6 +551,28 @@ describe('visual conjugation debugger metadata', () => {
     expect(mistake.kind).toBe('form');
     expect(mistake.userRule).toContain('Plain Negative');
     expect(mistake.expectedResult).toBe('たべた');
+    expect(mistake.detail).toContain('You made the plain negative form たべない');
+  });
+
+  it('infers when a learner keeps a godan dictionary ending before a row-shift suffix', () => {
+    const mistake = getConjugationDebugInfo(YOMU, 'plain-negative', 'よむない').mistake;
+
+    expect(mistake.kind).toBe('row-shift');
+    expect(mistake.userRule).toBe('Kept dictionary ending む + ない');
+    expect(mistake.expectedRule).toBe('む -> ま + ない');
+    expect(mistake.detail).toContain('change む to ま first');
+  });
+
+  it('explains 帰る entered with the ichidan negative pattern', () => {
+    const kaeru = { dict: '帰る', reading: 'かえる', meaning: 'to return', group: 'godan' };
+    const mistake = getConjugationDebugInfo(kaeru, 'plain-negative', 'かえない').mistake;
+
+    expect(mistake.kind).toBe('group');
+    expect(mistake.userResult).toBe('かえない');
+    expect(mistake.expectedResult).toBe('かえらない');
+    expect(mistake.detail).toBe(
+      'You used the ichidan drop る pattern, which produced かえない. 帰る is godan row-shift, so use る -> ら + ない: かえらない.',
+    );
   });
 });
 

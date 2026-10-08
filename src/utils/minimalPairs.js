@@ -205,6 +205,10 @@ function copyArray(value) {
   return Array.isArray(value) ? [...value] : undefined;
 }
 
+/**
+ * @param {Record<string, any>} [prefs]
+ * @param {{ enabledTypes?: any[] }} [options]
+ */
 function minimalPairReturnFromPrefs(prefs = {}, options = {}) {
   const snapshot = {};
   const wordListIds = copyArray(prefs.wordListIds);
@@ -218,6 +222,7 @@ function minimalPairReturnFromPrefs(prefs = {}, options = {}) {
   return snapshot;
 }
 
+/** @param {Record<string, any>} [prefs] */
 function restoreMinimalPairReturn(prefs = {}) {
   const saved = prefs.minimalPairReturn;
   if (!saved || typeof saved !== 'object') return { ...prefs };
@@ -228,6 +233,7 @@ function restoreMinimalPairReturn(prefs = {}) {
   return restored;
 }
 
+/** @param {Record<string, any>} [prefs] */
 export function minimalPairReturnEnabledTypes(prefs = {}) {
   const enabledTypes = prefs.minimalPairReturn?.enabledTypes;
   return Array.isArray(enabledTypes) ? [...enabledTypes] : null;
@@ -264,14 +270,14 @@ export function minimalPairFeedbackForCard(set, word, typeId) {
   };
 }
 
-export function recordMinimalPairResult(minimalPairs, setId, word, typeId, correct) {
+export function recordMinimalPairResult(minimalPairs, setId, word, typeId, correct, options = {}) {
   const set = getMinimalPairSet(setId);
   if (!minimalPairSetMatchesCard(set, word, typeId)) {
     return minimalPairs || { bySet: {} };
   }
   const contrast = contrastForMinimalPair(set, word, typeId);
   const contrastId = contrast?.id || 'mixed';
-  const now = Date.now();
+  const now = Number(options.now) || Date.now();
   const root = minimalPairs || { bySet: {} };
   const bySet = root.bySet || {};
   const previous = bySet[set.id] || {
@@ -288,6 +294,7 @@ export function recordMinimalPairResult(minimalPairs, setId, word, typeId, corre
     correct: 0,
     incorrect: 0,
   };
+  if (options.eventId && previous.lastAttemptId === options.eventId) return root;
   const nextStreak = correct ? (previous.streak || 0) + 1 : 0;
   const next = {
     ...previous,
@@ -297,6 +304,7 @@ export function recordMinimalPairResult(minimalPairs, setId, word, typeId, corre
     streak: nextStreak,
     bestStreak: Math.max(previous.bestStreak || 0, nextStreak),
     lastAt: now,
+    ...(options.eventId ? { lastAttemptId: String(options.eventId) } : {}),
     byContrast: {
       ...(previous.byContrast || {}),
       [contrastId]: {
@@ -321,6 +329,12 @@ export function mergeMinimalPairProgress(local = {}, cloud = {}) {
   for (const setId of new Set([...Object.keys(cloudBySet), ...Object.keys(localBySet)])) {
     const l = localBySet[setId] || {};
     const c = cloudBySet[setId] || {};
+    const latest =
+      maxNum(c.lastAt, 0) > maxNum(l.lastAt, 0) ||
+      (maxNum(c.lastAt, 0) === maxNum(l.lastAt, 0) &&
+        String(c.lastAttemptId || '') > String(l.lastAttemptId || ''))
+        ? c
+        : l;
     const byContrast = {};
     for (const contrastId of new Set([
       ...Object.keys(c.byContrast || {}),
@@ -341,6 +355,7 @@ export function mergeMinimalPairProgress(local = {}, cloud = {}) {
       streak: maxNum(l.streak, c.streak),
       bestStreak: maxNum(l.bestStreak, c.bestStreak),
       lastAt: maxNum(l.lastAt, c.lastAt) || null,
+      ...(latest.lastAttemptId ? { lastAttemptId: latest.lastAttemptId } : {}),
       byContrast,
     };
   }

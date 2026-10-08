@@ -78,9 +78,6 @@ export function mergePracticePrefs(prefs) {
       : source.promptForm === 'polite-present' || source.promptForm === 'masu'
         ? 'masu'
         : DEFAULT_PREFS.sourceFormStrategy;
-  const rawNewCardsPerDay = Number(source.newCardsPerDay || 0);
-  const newCardsPerDay =
-    Number.isFinite(rawNewCardsPerDay) && rawNewCardsPerDay > 0 ? Math.round(rawNewCardsPerDay) : 0;
   delete source.kanaMatchDisplay;
   delete source.durationSec;
   delete source.skipDuplicateForms;
@@ -156,6 +153,9 @@ export function mergePracticePrefs(prefs) {
   ) {
     wordGroups = [...wordGroups, 'irregular-adjective'];
   }
+  for (const key of Object.keys(source)) {
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_PREFS, key)) delete source[key];
+  }
   return {
     ...DEFAULT_PREFS,
     ...source,
@@ -167,7 +167,6 @@ export function mergePracticePrefs(prefs) {
     autoAdvanceCorrectByAnswerForm,
     reviewStyle,
     sourceFormStrategy,
-    newCardsPerDay,
     promptForm:
       sourceFormStrategy === 'mixed'
         ? 'random'
@@ -283,9 +282,321 @@ export function cleanEnglishAction(meaning = '') {
   );
 }
 
+function firstTopLevelSense(meaning = '') {
+  const source = String(meaning || '').trim();
+  if (!source) return '';
+
+  let depth = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '(') depth += 1;
+    if (char === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (char === ';' || char === ',' || char === '/')) {
+      return source.slice(0, index).trim();
+    }
+  }
+  return source;
+}
+
+// Exercises need one stable, scannable sense while Lookup remains the place for
+// complete dictionary coverage. Starter vocabulary can provide a curated
+// exerciseMeaning; imported and custom words fall back to their first sense.
+export function exerciseMeaningForWord(item) {
+  if (!item) return '';
+  return (
+    String(item.exerciseMeaning || '').trim() ||
+    firstTopLevelSense(item.meaning) ||
+    String(item.meaning || '').trim()
+  );
+}
+
 function beComplement(action) {
   const match = String(action || '').match(/^be\s+(.+)$/i);
   return match ? match[1] : '';
+}
+
+function regularPast(action) {
+  if (!action) return '';
+  if (/e$/.test(action)) return action + 'd';
+  if (/[bcdfghjklmnpqrstvwxyz]y$/.test(action)) return action.slice(0, -1) + 'ied';
+  return action + 'ed';
+}
+
+function splitTrailingParenthetical(action) {
+  const match = action.match(/^(.*?)(\s+\([^)]*\))$/);
+  if (!match) return { core: action, suffix: '' };
+  return { core: match[1].trim(), suffix: match[2] };
+}
+
+// English glosses derive tense by conjugating the *head verb* of the meaning
+// phrase and leaving the rest intact (e.g. "return home" → "returned home"),
+// rather than suffixing the final word ("return homed"). The word maps cover
+// irregular head verbs; the phrase maps override the rare cases where the head
+// verb alone would mislead (e.g. "do shopping" → "shopped", not "did shopping").
+const SIMPLE_PAST_WORDS = {
+  be: 'was',
+  become: 'became',
+  begin: 'began',
+  break: 'broke',
+  bring: 'brought',
+  build: 'built',
+  buy: 'bought',
+  catch: 'caught',
+  choose: 'chose',
+  come: 'came',
+  cut: 'cut',
+  deal: 'dealt',
+  do: 'did',
+  draw: 'drew',
+  drink: 'drank',
+  drive: 'drove',
+  eat: 'ate',
+  fall: 'fell',
+  feel: 'felt',
+  find: 'found',
+  fly: 'flew',
+  forget: 'forgot',
+  get: 'got',
+  give: 'gave',
+  go: 'went',
+  grow: 'grew',
+  hang: 'hung',
+  have: 'had',
+  hear: 'heard',
+  hit: 'hit',
+  hold: 'held',
+  hurt: 'hurt',
+  keep: 'kept',
+  know: 'knew',
+  lay: 'laid',
+  lead: 'led',
+  leave: 'left',
+  lend: 'lent',
+  let: 'let',
+  lose: 'lost',
+  make: 'made',
+  meet: 'met',
+  overturn: 'overturned',
+  panic: 'panicked',
+  pay: 'paid',
+  put: 'put',
+  read: 'read',
+  ride: 'rode',
+  rise: 'rose',
+  run: 'ran',
+  say: 'said',
+  see: 'saw',
+  seek: 'sought',
+  sell: 'sold',
+  send: 'sent',
+  set: 'set',
+  shine: 'shone',
+  shoot: 'shot',
+  shop: 'shopped',
+  show: 'showed',
+  sing: 'sang',
+  sit: 'sat',
+  sleep: 'slept',
+  speak: 'spoke',
+  spend: 'spent',
+  spread: 'spread',
+  stand: 'stood',
+  steal: 'stole',
+  stop: 'stopped',
+  submit: 'submitted',
+  swear: 'swore',
+  sweep: 'swept',
+  swim: 'swam',
+  take: 'took',
+  teach: 'taught',
+  tear: 'tore',
+  tell: 'told',
+  think: 'thought',
+  throw: 'threw',
+  understand: 'understood',
+  wake: 'woke',
+  wear: 'wore',
+  win: 'won',
+  write: 'wrote',
+};
+const SIMPLE_PAST_PHRASES = {
+  'do shopping': 'shopped',
+};
+
+const PAST_PARTICIPLE_WORDS = {
+  ask: 'asked',
+  become: 'become',
+  begin: 'begun',
+  borrow: 'borrowed',
+  break: 'broken',
+  bring: 'brought',
+  build: 'built',
+  buy: 'bought',
+  catch: 'caught',
+  choose: 'chosen',
+  close: 'closed',
+  come: 'come',
+  cook: 'cooked',
+  deal: 'dealt',
+  die: 'died',
+  do: 'done',
+  draw: 'drawn',
+  drink: 'drunk',
+  drive: 'driven',
+  eat: 'eaten',
+  end: 'ended',
+  enter: 'entered',
+  escort: 'escorted',
+  exit: 'exited',
+  explain: 'explained',
+  fall: 'fallen',
+  feel: 'felt',
+  fight: 'fought',
+  find: 'found',
+  fix: 'fixed',
+  fly: 'flown',
+  forget: 'forgotten',
+  freeze: 'frozen',
+  get: 'gotten',
+  give: 'given',
+  go: 'gone',
+  grow: 'grown',
+  hang: 'hung',
+  heal: 'healed',
+  hear: 'heard',
+  hide: 'hidden',
+  hit: 'hit',
+  hold: 'held',
+  hurry: 'hurried',
+  hurt: 'hurt',
+  investigate: 'investigated',
+  keep: 'kept',
+  know: 'known',
+  lay: 'laid',
+  lead: 'led',
+  leave: 'left',
+  lend: 'lent',
+  let: 'let',
+  listen: 'listened',
+  lose: 'lost',
+  make: 'made',
+  mean: 'meant',
+  meet: 'met',
+  open: 'opened',
+  pay: 'paid',
+  play: 'played',
+  practice: 'practiced',
+  read: 'read',
+  remember: 'remembered',
+  reserve: 'reserved',
+  return: 'returned',
+  ride: 'ridden',
+  ring: 'rung',
+  rise: 'risen',
+  run: 'run',
+  say: 'said',
+  see: 'seen',
+  seek: 'sought',
+  sell: 'sold',
+  send: 'sent',
+  set: 'set',
+  shake: 'shaken',
+  shine: 'shone',
+  shoot: 'shot',
+  show: 'shown',
+  sing: 'sung',
+  sink: 'sunk',
+  sit: 'sat',
+  sleep: 'slept',
+  speak: 'spoken',
+  spend: 'spent',
+  spread: 'spread',
+  stand: 'stood',
+  steal: 'stolen',
+  stop: 'stopped',
+  study: 'studied',
+  submit: 'submitted',
+  swear: 'sworn',
+  sweep: 'swept',
+  swim: 'swum',
+  take: 'taken',
+  teach: 'taught',
+  tear: 'torn',
+  tell: 'told',
+  think: 'thought',
+  throw: 'thrown',
+  understand: 'understood',
+  use: 'used',
+  wait: 'waited',
+  wake: 'woken',
+  walk: 'walked',
+  wash: 'washed',
+  watch: 'watched',
+  wear: 'worn',
+  win: 'won',
+  write: 'written',
+};
+const PAST_PARTICIPLE_PHRASES = {
+  'do shopping': 'shopped',
+};
+
+const GERUND_WORDS = {
+  come: 'coming',
+  die: 'dying',
+  drive: 'driving',
+  lie: 'lying',
+  make: 'making',
+  ride: 'riding',
+  run: 'running',
+  take: 'taking',
+  tie: 'tying',
+  use: 'using',
+  write: 'writing',
+};
+
+const THIRD_PERSON_WORDS = {
+  do: 'does',
+  go: 'goes',
+};
+
+// Conjugate only the first (head) word of a phrase, preserving the remainder.
+function conjugateHead(core, wordMap, regularFn) {
+  const [head, ...rest] = core.split(' ');
+  const conjugated = wordMap[head] ?? regularFn(head);
+  return rest.length ? `${conjugated} ${rest.join(' ')}` : conjugated;
+}
+
+function regularGerund(action) {
+  if (!action) return '';
+  if (/ie$/.test(action)) return action.slice(0, -2) + 'ying';
+  if (/e$/.test(action) && !/ee$/.test(action)) return action.slice(0, -1) + 'ing';
+  return action + 'ing';
+}
+
+function regularThirdPerson(action) {
+  if (!action) return '';
+  if (/(s|sh|ch|x|z|o)$/.test(action)) return action + 'es';
+  if (/[bcdfghjklmnpqrstvwxyz]y$/.test(action)) return action.slice(0, -1) + 'ies';
+  return action + 's';
+}
+
+function normalizeAction(action = '') {
+  return String(action || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .replace(/^\((?:be|something)\)\s+/, '');
+}
+
+export function simplePast(action = '') {
+  const { core, suffix } = splitTrailingParenthetical(normalizeAction(action));
+  if (!core) return '';
+  if (SIMPLE_PAST_PHRASES[core]) return `${SIMPLE_PAST_PHRASES[core]}${suffix}`;
+  const complement = beComplement(core);
+  if (complement) return `was ${complement}${suffix}`;
+  if (core === 'it takes') return `it took${suffix}`;
+  if (core.startsWith('it takes ')) return `it took ${core.slice('it takes '.length)}${suffix}`;
+  return `${conjugateHead(core, SIMPLE_PAST_WORDS, regularPast)}${suffix}`;
 }
 
 function presentPhrase(action) {
@@ -294,8 +605,7 @@ function presentPhrase(action) {
 }
 
 function pastPhrase(action) {
-  const complement = beComplement(action);
-  return complement ? `was ${complement}` : `did ${action}`;
+  return simplePast(action);
 }
 
 function negativePhrase(action) {
@@ -309,117 +619,22 @@ function pastNegativePhrase(action) {
 }
 
 export function pastParticiple(action) {
-  const map = {
-    eat: 'eaten',
-    see: 'seen',
-    watch: 'watched',
-    sleep: 'slept',
-    'wake up': 'woken up',
-    leave: 'left',
-    exit: 'exited',
-    teach: 'taught',
-    remember: 'remembered',
-    wear: 'worn',
-    open: 'opened',
-    close: 'closed',
-    go: 'gone',
-    write: 'written',
-    speak: 'spoken',
-    wait: 'waited',
-    die: 'died',
-    play: 'played',
-    drink: 'drunk',
-    take: 'taken',
-    buy: 'bought',
-    swim: 'swum',
-    read: 'read',
-    stand: 'stood',
-    run: 'run',
-    'return home': 'returned home',
-    listen: 'listened',
-    ask: 'asked',
-    hold: 'held',
-    use: 'used',
-    make: 'made',
-    do: 'done',
-    come: 'come',
-    walk: 'walked',
-    enter: 'entered',
-    'take out': 'taken out',
-    submit: 'submitted',
-    sit: 'sat',
-    stop: 'stopped',
-    ride: 'ridden',
-    'get off': 'gotten off',
-    meet: 'met',
-    send: 'sent',
-    escort: 'escorted',
-    hurry: 'hurried',
-    wash: 'washed',
-    borrow: 'borrowed',
-    lend: 'lent',
-    'return something': 'returned something',
-    forget: 'forgotten',
-    begin: 'begun',
-    end: 'ended',
-    study: 'studied',
-    practice: 'practiced',
-    cook: 'cooked',
-    choose: 'chosen',
-    fix: 'fixed',
-    heal: 'healed',
-    'make a mistake': 'made a mistake',
-    investigate: 'investigated',
-    'look up': 'looked up',
-    explain: 'explained',
-    reserve: 'reserved',
-    drive: 'driven',
-    'break something': 'broken something',
-    break: 'broken',
-  };
-  return (
-    map[action] ||
-    (/e$/.test(action)
-      ? action + 'd'
-      : /[bcdfghjklmnpqrstvwxyz]y$/.test(action)
-        ? action.slice(0, -1) + 'ied'
-        : action + 'ed')
-  );
+  const { core, suffix } = splitTrailingParenthetical(normalizeAction(action));
+  if (!core) return '';
+  if (PAST_PARTICIPLE_PHRASES[core]) return `${PAST_PARTICIPLE_PHRASES[core]}${suffix}`;
+  return `${conjugateHead(core, PAST_PARTICIPLE_WORDS, regularPast)}${suffix}`;
 }
 
 export function gerund(action) {
-  const map = {
-    die: 'dying',
-    lie: 'lying',
-    tie: 'tying',
-    use: 'using',
-    make: 'making',
-    come: 'coming',
-    write: 'writing',
-    take: 'taking',
-    ride: 'riding',
-    drive: 'driving',
-  };
-  return (
-    map[action] ||
-    (/ie$/.test(action)
-      ? action.slice(0, -2) + 'ying'
-      : /e$/.test(action) && !/ee$/.test(action)
-        ? action.slice(0, -1) + 'ing'
-        : action + 'ing')
-  );
+  const { core, suffix } = splitTrailingParenthetical(normalizeAction(action));
+  if (!core) return '';
+  return `${conjugateHead(core, GERUND_WORDS, regularGerund)}${suffix}`;
 }
 
 export function thirdPerson(action) {
-  const map = { do: 'does', go: 'goes' };
-  return (
-    map[action] ||
-    (/(s|sh|ch|x|z|o)$/.test(action)
-      ? action + 'es'
-      : /[bcdfghjklmnpqrstvwxyz]y$/.test(action)
-        ? action.slice(0, -1) + 'ies'
-        : action + 's')
-  );
+  const { core, suffix } = splitTrailingParenthetical(normalizeAction(action));
+  if (!core) return '';
+  return `${conjugateHead(core, THIRD_PERSON_WORDS, regularThirdPerson)}${suffix}`;
 }
 
 export function actionParts(meaning = '') {
@@ -431,6 +646,31 @@ export function actionParts(meaning = '') {
 
 export function mapActionMeaning(meaning, fn) {
   return actionParts(meaning).map(fn).join(' / ');
+}
+
+function splitPastActionParts(action = '') {
+  const text = cleanEnglishAction(action);
+  const parts = [];
+  let current = '';
+  let depth = 0;
+
+  for (const char of text) {
+    if (char === '(') depth += 1;
+    if (char === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (char === '/' || char === ',')) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  parts.push(current);
+
+  return parts.map((part) => part.trim().replace(/^to\s+/i, '')).filter(Boolean);
+}
+
+function mapPastActionMeaning(meaning, fn) {
+  return splitPastActionParts(meaning).map(fn).join(' / ');
 }
 
 export function answerPhaseTaskDetails({
@@ -480,9 +720,17 @@ export function englishForForm(item, type) {
   }
   const action = cleanEnglishAction(item.meaning);
   const present = presentPhrase(action);
-  const past = pastPhrase(action);
+  const past = mapPastActionMeaning(item.meaning, pastPhrase);
   const negative = negativePhrase(action);
   const pastNegative = pastNegativePhrase(action);
+  const conditionalPast = mapPastActionMeaning(
+    item.meaning,
+    (a) => `if/when someone ${pastPhrase(a)}`,
+  );
+  const conditionalPastPolite = mapPastActionMeaning(
+    item.meaning,
+    (a) => `if/when someone ${pastPhrase(a)} (polite)`,
+  );
   const M = {
     'plain-past': past,
     'plain-negative': negative,
@@ -494,7 +742,7 @@ export function englishForForm(item, type) {
     'masu-stem': `${action} stem`,
     'polite-volitional': `let's ${action} (polite)`,
     'polite-te': `${action} and... (polite)`,
-    'polite-conditional-tara': `if/when someone did ${action} (polite)`,
+    'polite-conditional-tara': conditionalPastPolite,
     honorific: `${action} (honorific, someone else's action)`,
     'honorific-polite': `${action} (honorific polite, someone else's action)`,
     humble: `${action} (humble, my/our action)`,
@@ -510,7 +758,7 @@ export function englishForForm(item, type) {
     'potential-past-negative': `could not ${action} / was not able to ${action}`,
     'potential-conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone can ${a}`),
     volitional: `let's ${action}`,
-    'conditional-tara': `if/when someone did ${action}`,
+    'conditional-tara': conditionalPast,
     'negative-conditional-tara': `if/when someone did not ${action}`,
     'conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone ${thirdPerson(a)}`),
     'negative-conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone does not ${a}`),
@@ -635,6 +883,11 @@ export function englishForForm(item, type) {
     obligation: `must ${action}`,
   };
   return M[type] || item.meaning;
+}
+
+export function exerciseEnglishForForm(item, type) {
+  if (!item) return '';
+  return englishForForm({ ...item, meaning: exerciseMeaningForWord(item) }, type);
 }
 
 export function editDistance(a, b) {

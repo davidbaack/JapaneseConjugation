@@ -1,6 +1,7 @@
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { EVERYDAY_TYPE_IDS, getTypeInfo } from '../data/conjugationTypes.js';
-import { cardIdFor, bumpDaily, defaultState, gradeCard, recordMistake } from './storage.js';
+import { cardIdFor, defaultState, gradeCard, recordMistake } from './storage.js';
+import { recordPracticeAnswer } from './practiceStats.js';
 import {
   conjugateItem,
   isAdjective,
@@ -18,9 +19,27 @@ import {
   recordWeaknessAttempt,
   weaknessScoreForCard,
 } from './subcategoryWeakness.js';
+import { createSyncEventId } from './syncMetadata.js';
 
 export const GUIDE_SESSION_TARGET = 8;
 export const GUIDE_STEP_IDS = ['base', 'group', 'answer'];
+
+const GUIDE_STEP_LABELS = {
+  base: 'plain form',
+  group: 'word group',
+  answer: 'final answer',
+};
+
+const GUIDE_GROUP_DIAGNOSTIC_LABELS = {
+  godan: 'godan verbs',
+  ichidan: 'ichidan verbs',
+  suru: 'suru verbs',
+  kuru: 'kuru verbs',
+  irregular: 'irregular verbs',
+  'i-adjective': 'i-adjectives',
+  'na-adjective': 'na-adjectives',
+  'irregular-adjective': 'irregular adjectives',
+};
 
 const VERB_SOURCE_TYPES = [
   'polite-present',
@@ -41,6 +60,49 @@ function cleanText(value) {
   return normalizeJapaneseText(String(value || '').trim());
 }
 
+function pct(correct, attempted) {
+  return attempted ? correct / attempted : 0;
+}
+
+function stepRate(guide, stepId) {
+  const row = guide?.byStep?.[stepId] || {};
+  const attempted = Number(row.attempted) || 0;
+  const correct = Number(row.correct) || 0;
+  const assisted = Number(row.assisted) || 0;
+  return {
+    attempted,
+    correct,
+    assisted,
+    misses: Math.max(0, attempted - correct),
+    accuracy: pct(correct, attempted),
+    unassistedCorrect: Math.max(0, correct - Math.min(correct, assisted)),
+  };
+}
+
+function diagnosticGroupLabel(groupId) {
+  if (!groupId) return 'word groups';
+  return GUIDE_GROUP_DIAGNOSTIC_LABELS[groupId] || groupDisplayLabel(groupId).toLowerCase();
+}
+
+function recentRowsWithSteps(guide) {
+  return (guide?.recent || []).filter(
+    (row) => row?.steps && GUIDE_STEP_IDS.some((id) => row.steps[id]),
+  );
+}
+
+function topMissedGroup(rows, stepId, options = {}) {
+  const counts = new Map();
+  for (const row of rows) {
+    const step = row?.steps?.[stepId];
+    if (!step || step.correct) continue;
+    if (options.requireAnswerCorrect && !row?.steps?.answer?.correct) continue;
+    const groupId = row.group || row.expectedGroup || '';
+    if (!groupId) continue;
+    counts.set(groupId, (counts.get(groupId) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0];
+}
+
 function answerMatches(value, targets = []) {
   const raw = String(value || '').trim();
   const compact = raw.toLowerCase().replace(/\s+/g, '');
@@ -59,6 +121,28 @@ function guideBaseForm(word) {
   return (
     surfaceFormFor(word, isAdjective(word) ? 'adj-plain-present' : 'plain-present') || word.dict
   );
+}
+
+function guideBaseTypeId(word) {
+  return isAdjective(word) ? 'adj-plain-present' : 'plain-present';
+}
+
+function focusedGuideSource(word, options = {}) {
+  if (!options.sourceTypeId) return null;
+  const requestedTypeId = options.sourceTypeId;
+  const sourceTypeId = requestedTypeId === 'dictionary' ? guideBaseTypeId(word) : requestedTypeId;
+  if (!isTypeCompatible(word, sourceTypeId)) return null;
+  const generatedForm = surfaceFormFor(word, sourceTypeId) || conjugateItem(word, sourceTypeId);
+  const sourceForm = options.sourceForm || generatedForm;
+  if (!sourceForm) return null;
+  return {
+    sourceTypeId,
+    sourceForm,
+    sourceLabel:
+      requestedTypeId === 'dictionary'
+        ? 'Dictionary Form'
+        : getTypeInfo(sourceTypeId).label || sourceTypeId,
+  };
 }
 
 export function guideGroupChoice(word) {
@@ -104,14 +188,21 @@ export function selectGuideSourceType(word, targetTypeId, options = {}) {
 function candidateRows(words, state = defaultState(), prefs = DEFAULT_PREFS, options = {}) {
   const enabled = state.enabledTypes?.length ? state.enabledTypes : EVERYDAY_TYPE_IDS;
   const blockedWordKey = options.previousWord ? wordKey(options.previousWord) : '';
-  return (words || [])
-    .flatMap((word) =>
-      practiceTypesForItem(word, enabled, prefs).map((type) => ({
+  const targetWordKey = options.targetWord ? wordKey(options.targetWord) : '';
+  const targetTypeId = options.targetTypeId || '';
+  const rows = (words || [])
+    .flatMap((word) => {
+      const focusedWord = targetWordKey && wordKey(word) === targetWordKey;
+      const types =
+        focusedWord && targetTypeId && isTypeCompatible(word, targetTypeId)
+          ? [{ id: targetTypeId }]
+          : practiceTypesForItem(word, enabled, prefs);
+      return types.map((type) => ({
         word,
         typeId: type.id,
         score: weaknessScoreForCard(state.weakness, word, type.id),
-      })),
-    )
+      }));
+    })
     .filter((row) => row.word && row.typeId && conjugateItem(row.word, row.typeId))
     .sort((a, b) => {
       const repeatA = blockedWordKey && wordKey(a.word) === blockedWordKey ? 1 : 0;
@@ -120,6 +211,15 @@ function candidateRows(words, state = defaultState(), prefs = DEFAULT_PREFS, opt
         repeatA - repeatB || b.score - a.score || wordKey(a.word).localeCompare(wordKey(b.word))
       );
     });
+  if (targetWordKey || targetTypeId) {
+    const focusedRows = rows.filter(
+      (row) =>
+        (!targetWordKey || wordKey(row.word) === targetWordKey) &&
+        (!targetTypeId || row.typeId === targetTypeId),
+    );
+    if (focusedRows.length) return focusedRows;
+  }
+  return rows;
 }
 
 export function buildGuideCard(words, state = defaultState(), prefs = DEFAULT_PREFS, options = {}) {
@@ -132,9 +232,13 @@ export function buildGuideCard(words, state = defaultState(), prefs = DEFAULT_PR
     : null;
   const row = weakMatch || rows[0];
   const seed = options.seed ?? Date.now();
-  const sourceTypeId = selectGuideSourceType(row.word, row.typeId, { seed });
+  const focusedSource = focusedGuideSource(row.word, options);
+  const sourceTypeId =
+    focusedSource?.sourceTypeId || selectGuideSourceType(row.word, row.typeId, { seed });
   const sourceForm =
-    surfaceFormFor(row.word, sourceTypeId) || conjugateItem(row.word, sourceTypeId);
+    focusedSource?.sourceForm ||
+    surfaceFormFor(row.word, sourceTypeId) ||
+    conjugateItem(row.word, sourceTypeId);
   const expectedAnswer =
     surfaceFormFor(row.word, row.typeId) || conjugateItem(row.word, row.typeId);
   return {
@@ -154,47 +258,57 @@ export function buildGuideCard(words, state = defaultState(), prefs = DEFAULT_PR
     expectedAnswer,
     expectedAnswerVariants: [expectedAnswer, conjugateItem(row.word, row.typeId)],
     targetLabel: getTypeInfo(row.typeId).label || row.typeId,
-    sourceLabel: getTypeInfo(sourceTypeId).label || sourceTypeId,
+    sourceLabel: focusedSource?.sourceLabel || getTypeInfo(sourceTypeId).label || sourceTypeId,
   };
 }
 
-export function gradeGuideSteps(card, answers = {}, assistedSteps = {}) {
-  const baseOk = answerMatches(answers.base, card.expectedBaseVariants || [card.expectedBase]);
-  const groupOk = String(answers.group || '') === card.expectedGroup;
-  const answerOk = answerMatches(
-    answers.answer,
-    card.expectedAnswerVariants || [card.expectedAnswer],
-  );
-  const steps = {
-    base: {
+export function gradeGuideStep(card, stepId, submitted = '', assisted = false) {
+  if (stepId === 'base') {
+    return {
       id: 'base',
-      label: 'Find the base',
-      correct: baseOk,
+      label: 'Find plain form',
+      correct: answerMatches(submitted, card.expectedBaseVariants || [card.expectedBase]),
       expected: card.expectedBase,
-      submitted: answers.base || '',
-      assisted: !!assistedSteps.base,
-    },
-    group: {
+      submitted: submitted || '',
+      assisted: !!assisted,
+    };
+  }
+  if (stepId === 'group') {
+    return {
       id: 'group',
       label: 'Choose the group',
-      correct: groupOk,
+      correct: String(submitted || '') === card.expectedGroup,
       expected: card.expectedGroup,
       expectedLabel: groupDisplayLabel(card.word.group),
-      submitted: answers.group || '',
-      assisted: !!assistedSteps.group,
-    },
-    answer: {
+      submitted: submitted || '',
+      assisted: !!assisted,
+    };
+  }
+  if (stepId === 'answer') {
+    return {
       id: 'answer',
       label: 'Build the answer',
-      correct: answerOk,
+      correct: answerMatches(submitted, card.expectedAnswerVariants || [card.expectedAnswer]),
       expected: card.expectedAnswer,
-      submitted: answers.answer || '',
-      assisted: !!assistedSteps.answer,
-    },
-  };
-  const assisted = Object.values(assistedSteps || {}).some(Boolean);
+      submitted: submitted || '',
+      assisted: !!assisted,
+    };
+  }
+  throw new Error(`Unknown Guide step: ${stepId}`);
+}
+
+export function guideResultFromSteps(steps = {}) {
   const correct = GUIDE_STEP_IDS.every((id) => steps[id].correct);
+  const assisted = GUIDE_STEP_IDS.some((id) => steps[id].assisted);
   return { correct, assisted, steps };
+}
+
+export function gradeGuideSteps(card, answers = {}, assistedSteps = {}) {
+  return guideResultFromSteps(
+    Object.fromEntries(
+      GUIDE_STEP_IDS.map((id) => [id, gradeGuideStep(card, id, answers[id], assistedSteps[id])]),
+    ),
+  );
 }
 
 export function defaultGuideState() {
@@ -232,8 +346,93 @@ export function normalizeGuideState(guide = null) {
   };
 }
 
+export function buildGuideDiagnosticInsight(guide = null, options = {}) {
+  const current = normalizeGuideState(guide);
+  const minAttempts = Math.max(1, Number(options.minAttempts) || 2);
+  if (current.attempted < minAttempts) return null;
+
+  const base = stepRate(current, 'base');
+  const group = stepRate(current, 'group');
+  const answer = stepRate(current, 'answer');
+  const recent = recentRowsWithSteps(current);
+  const recentAnswerKnown = recent.filter(
+    (row) => row.steps?.answer?.correct && !row.steps.answer.assisted,
+  ).length;
+  const recentGroupMissWithAnswer = recent.filter(
+    (row) => row.steps?.group && !row.steps.group.correct && row.steps?.answer?.correct,
+  ).length;
+  const answerLooksKnown =
+    answer.unassistedCorrect >= 2 ||
+    recentAnswerKnown >= 2 ||
+    (answer.attempted >= minAttempts && answer.accuracy >= 0.7);
+  const groupLooksWeak =
+    group.misses >= 2 ||
+    recentGroupMissWithAnswer >= 2 ||
+    (group.attempted >= minAttempts && group.accuracy <= 0.55);
+
+  if (answerLooksKnown && groupLooksWeak && group.accuracy + 0.2 < answer.accuracy) {
+    const groupId =
+      topMissedGroup(recent, 'group', { requireAnswerCorrect: true }) ||
+      topMissedGroup(recent, 'group') ||
+      '';
+    return {
+      id: 'guide-group-after-answer',
+      stepId: 'group',
+      message: `You know the ending but keep misclassifying ${diagnosticGroupLabel(groupId)}.`,
+      detail: 'Guide is seeing the final-answer step land more often than the group choice.',
+      actionLabel: 'Guide',
+    };
+  }
+
+  if (
+    base.misses >= 2 &&
+    base.accuracy + 0.2 < Math.min(group.accuracy || 0, answer.accuracy || 0)
+  ) {
+    return {
+      id: 'guide-base-gap',
+      stepId: 'base',
+      message:
+        'You can choose the group and build the ending, but recovering the plain form is still shaky.',
+      detail: 'Guide is catching misses before the final conjugation step.',
+      actionLabel: 'Guide',
+    };
+  }
+
+  if (
+    answer.misses >= 2 &&
+    answer.accuracy + 0.2 < Math.min(base.accuracy || 0, group.accuracy || 0)
+  ) {
+    return {
+      id: 'guide-answer-gap',
+      stepId: 'answer',
+      message: 'You can recover the plain form and group, but the final ending still needs reps.',
+      detail: 'Guide is seeing the setup work land before the final-answer step.',
+      actionLabel: 'Guide',
+    };
+  }
+
+  const weakest = [
+    { stepId: 'base', row: base },
+    { stepId: 'group', row: group },
+    { stepId: 'answer', row: answer },
+  ]
+    .filter(({ row }) => row.attempted >= minAttempts && row.misses > 0)
+    .sort((a, b) => a.row.accuracy - b.row.accuracy || b.row.misses - a.row.misses)[0];
+
+  if (!weakest) return null;
+  return {
+    id: `guide-${weakest.stepId}-weak`,
+    stepId: weakest.stepId,
+    message: `Guide is seeing ${GUIDE_STEP_LABELS[weakest.stepId]} as the weak step.`,
+    detail: 'Step-by-step practice can isolate that before it turns into a full-card miss.',
+    actionLabel: 'Guide',
+  };
+}
+
 export function recordGuideAttempt(guide, card, result, options = {}) {
   const current = normalizeGuideState(guide);
+  const eventId = String(options.eventId || options.id || createSyncEventId());
+  if (current.recent.some((attempt) => attempt.id === eventId)) return current;
   const byStep = { ...current.byStep };
   for (const id of GUIDE_STEP_IDS) {
     const step = result.steps[id];
@@ -251,12 +450,24 @@ export function recordGuideAttempt(guide, card, result, options = {}) {
     byStep,
     recent: [
       {
+        id: eventId,
         at: options.now || Date.now(),
         wordKey: wordKey(card.word),
+        group: card.word?.group || '',
+        expectedGroup: card.expectedGroup || '',
         typeId: card.typeId,
         sourceTypeId: card.sourceTypeId,
         correct: result.correct,
         assisted: result.assisted,
+        steps: Object.fromEntries(
+          GUIDE_STEP_IDS.map((id) => [
+            id,
+            {
+              correct: !!result.steps[id]?.correct,
+              assisted: !!result.steps[id]?.assisted,
+            },
+          ]),
+        ),
       },
       ...current.recent,
     ].slice(0, 20),
@@ -264,33 +475,59 @@ export function recordGuideAttempt(guide, card, result, options = {}) {
 }
 
 export function applyGuideAttemptToState(state, card, result, options = {}) {
+  const eventId = String(options.eventId || options.id || createSyncEventId());
+  if ((state.guide?.recent || []).some((attempt) => attempt.id === eventId)) return state;
   const rid = cardIdFor(card.word, card.typeId);
   const responseMs = Math.max(0, Number(options.responseMs) || 0);
-  const dailyGoal = Number(options.dailyGoal || DEFAULT_PREFS.dailyGoal);
+  const gradedAt = Number(options.now) || Date.now();
   const next = {
     ...state,
     cards: {
       ...(state.cards || {}),
-      [rid]: gradeCard((state.cards || {})[rid], result.correct),
+      [rid]: {
+        ...gradeCard((state.cards || {})[rid], result.correct, gradedAt),
+        lastAttemptId: eventId,
+      },
     },
     session: {
       ...(state.session || defaultState().session),
       reviewed: (state.session?.reviewed || 0) + 1,
       correct: (state.session?.correct || 0) + (result.correct ? 1 : 0),
+      recentOutcomes: [
+        {
+          id: eventId,
+          at: gradedAt,
+          cardId: rid,
+          kind: result.correct ? 'correct' : 'missed',
+          label: getTypeInfo(card.typeId).label || 'Practice card',
+        },
+        ...(state.session?.recentOutcomes || []),
+      ].slice(0, 6),
     },
-    daily: bumpDaily(state.daily, result.correct, dailyGoal),
+    practiceStats: recordPracticeAnswer(state.practiceStats, {
+      id: eventId,
+      typeId: card.typeId,
+      correct: result.correct,
+      responseMs,
+      mode: result.assisted ? 'self-check' : 'input',
+      at: gradedAt,
+    }),
     readiness: recordReadinessAttempt(state.readiness, rid, {
       correct: result.correct,
       responseMs,
       answerMode: result.assisted ? 'self-check' : 'input',
+      now: gradedAt,
+      eventId,
     }),
     weakness: recordWeaknessAttempt(state.weakness, {
       word: card.word,
       typeId: card.typeId,
       correct: result.correct,
       responseMs,
+      now: gradedAt,
+      eventId,
     }),
-    guide: recordGuideAttempt(state.guide, card, result, { now: options.now }),
+    guide: recordGuideAttempt(state.guide, card, result, { now: gradedAt, eventId }),
   };
   if (!result.correct) {
     next.mistakes = recordMistake(
@@ -301,6 +538,8 @@ export function applyGuideAttemptToState(state, card, result, options = {}) {
       result.steps.answer.submitted,
       card.expectedAnswer,
       {
+        now: gradedAt,
+        eventId,
         dimension: 'guide',
         sourceType: card.sourceTypeId,
         targetType: card.typeId,

@@ -1,0 +1,6 @@
+-- Historical linked-project migration marker.
+--
+-- The remote statement granted access to the retired `srs_state` table before
+-- this repository adopted the current `srs_sync` schema. Replaying that grant
+-- on a fresh database would fail because the retired table is intentionally
+-- absent, so the matching version remains a documented no-op here.

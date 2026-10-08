@@ -25,14 +25,17 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
 
-      # Non-blocking dependency vulnerability scan — surfaces high/critical
-      # advisories in the job log without failing the deploy.
-      - name: Audit dependencies
+      # Keep shipped dependencies release-blocking. Build/test tooling advisories
+      # remain visible below without suppressing an otherwise safe deployment.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Report development dependency advisories
         run: npm audit --audit-level=high
         continue-on-error: true
 
@@ -46,14 +49,18 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Run E2E tests
+      - name: Run E2E tests against configured build
         run: npm run test:e2e
-
-      - run: npm run build
         env:
+          PW_USE_PREBUILT: '1'
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 

@@ -1,0 +1,531 @@
+{
+  "policyVersion": 1,
+  "createdAt": "2026-10-08T04:29:35.186Z",
+  "reviewMethod": "explicit-lexical-sense-and-paired-frame-review; automated exhaustive composition verification",
+  "humanEditorialReview": false,
+  "counts": {
+    "sourceRows": 153764,
+    "expectedPairs": 153764,
+    "accepted": 23075,
+    "repaired": 23075,
+    "retained": 0,
+    "needsReview": 128961,
+    "unsuitable": 1728,
+    "stale": 0,
+    "concreteSourceIssues": 117
+  },
+  "wordReview": {
+    "supported": 508,
+    "unsuitable": 38,
+    "needs-review": 1616
+  },
+  "byType": {
+    "adj-adverb": {
+      "accepted": 31,
+      "unavailable": 757
+    },
+    "adj-attributive": {
+      "accepted": 136,
+      "unavailable": 652
+    },
+    "adj-conditional": {
+      "accepted": 164,
+      "unavailable": 624
+    },
+    "adj-naru": {
+      "accepted": 144,
+      "unavailable": 644
+    },
+    "adj-negative-conditional": {
+      "accepted": 164,
+      "unavailable": 624
+    },
+    "adj-negative-tara": {
+      "accepted": 164,
+      "unavailable": 624
+    },
+    "adj-negative-te-form": {
+      "accepted": 164,
+      "unavailable": 624
+    },
+    "adj-plain-negative": {
+      "accepted": 174,
+      "unavailable": 614
+    },
+    "adj-plain-past": {
+      "accepted": 174,
+      "unavailable": 614
+    },
+    "adj-plain-past-negative": {
+      "accepted": 174,
+      "unavailable": 614
+    },
+    "adj-plain-present": {
+      "accepted": 174,
+      "unavailable": 614
+    },
+    "adj-polite-negative": {
+      "accepted": 174,
+      "unavailable": 614
+    },
+    "adj-polite-past": {
+      "accepted": 174,
+      "unavailable": 614
+    },
+    "adj-polite-past-negative": {
+      "accepted": 174,
+      "unavailable": 614
+    },
+    "adj-polite-present": {
+      "accepted": 174,
+      "unavailable": 614
+    },
+    "adj-sou": {
+      "accepted": 149,
+      "unavailable": 639
+    },
+    "adj-sugiru": {
+      "accepted": 151,
+      "unavailable": 637
+    },
+    "adj-tara": {
+      "accepted": 164,
+      "unavailable": 624
+    },
+    "adj-te-form": {
+      "accepted": 164,
+      "unavailable": 624
+    },
+    "causative": {
+      "accepted": 220,
+      "unavailable": 1143
+    },
+    "causative-conditional-ba": {
+      "accepted": 220,
+      "unavailable": 1143
+    },
+    "causative-negative": {
+      "accepted": 220,
+      "unavailable": 1143
+    },
+    "causative-negative-conditional-ba": {
+      "accepted": 220,
+      "unavailable": 1143
+    },
+    "causative-passive": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "causative-passive-conditional-ba": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "causative-passive-negative": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "causative-passive-negative-conditional-ba": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "causative-passive-past": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "causative-passive-past-negative": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "causative-passive-polite": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "causative-passive-polite-negative": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "causative-passive-polite-past": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "causative-passive-polite-past-negative": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "causative-past": {
+      "accepted": 220,
+      "unavailable": 1143
+    },
+    "causative-past-negative": {
+      "accepted": 220,
+      "unavailable": 1143
+    },
+    "causative-polite": {
+      "accepted": 220,
+      "unavailable": 1143
+    },
+    "causative-polite-negative": {
+      "accepted": 220,
+      "unavailable": 1143
+    },
+    "causative-polite-past": {
+      "accepted": 220,
+      "unavailable": 1143
+    },
+    "causative-polite-past-negative": {
+      "accepted": 220,
+      "unavailable": 1143
+    },
+    "command-nasai": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "conditional-ba": {
+      "accepted": 220,
+      "unavailable": 1154
+    },
+    "conditional-nara": {
+      "accepted": 220,
+      "unavailable": 1154
+    },
+    "conditional-tara": {
+      "accepted": 220,
+      "unavailable": 1154
+    },
+    "conjectural": {
+      "accepted": 220,
+      "unavailable": 1154
+    },
+    "desiderative": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "desiderative-negative": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "desiderative-past": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "desiderative-past-negative": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "desiderative-polite": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "desiderative-polite-negative": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "desiderative-polite-past": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "desiderative-polite-past-negative": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "honorific": {
+      "accepted": 13,
+      "unavailable": 1349
+    },
+    "honorific-polite": {
+      "accepted": 13,
+      "unavailable": 1349
+    },
+    "humble": {
+      "accepted": 13,
+      "unavailable": 1342
+    },
+    "humble-polite": {
+      "accepted": 13,
+      "unavailable": 1342
+    },
+    "imperative": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "negative-conditional-ba": {
+      "accepted": 220,
+      "unavailable": 1154
+    },
+    "negative-conditional-tara": {
+      "accepted": 220,
+      "unavailable": 1154
+    },
+    "negative-request": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "negative-te": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "negative-te-connective": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "negative-zuni": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "obligation": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "passive": {
+      "accepted": 18,
+      "unavailable": 1343
+    },
+    "passive-conditional-ba": {
+      "accepted": 18,
+      "unavailable": 1343
+    },
+    "passive-negative": {
+      "accepted": 18,
+      "unavailable": 1343
+    },
+    "passive-negative-conditional-ba": {
+      "accepted": 18,
+      "unavailable": 1343
+    },
+    "passive-past": {
+      "accepted": 18,
+      "unavailable": 1343
+    },
+    "passive-past-negative": {
+      "accepted": 18,
+      "unavailable": 1343
+    },
+    "passive-polite": {
+      "accepted": 18,
+      "unavailable": 1343
+    },
+    "passive-polite-negative": {
+      "accepted": 18,
+      "unavailable": 1343
+    },
+    "passive-polite-past": {
+      "accepted": 18,
+      "unavailable": 1343
+    },
+    "passive-polite-past-negative": {
+      "accepted": 18,
+      "unavailable": 1343
+    },
+    "permission": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "plain-negative": {
+      "accepted": 334,
+      "unavailable": 1040
+    },
+    "plain-past": {
+      "accepted": 334,
+      "unavailable": 1040
+    },
+    "plain-past-negative": {
+      "accepted": 334,
+      "unavailable": 1040
+    },
+    "plain-present": {
+      "accepted": 334,
+      "unavailable": 1040
+    },
+    "polite-negative": {
+      "accepted": 334,
+      "unavailable": 1040
+    },
+    "polite-past": {
+      "accepted": 334,
+      "unavailable": 1040
+    },
+    "polite-past-negative": {
+      "accepted": 334,
+      "unavailable": 1040
+    },
+    "polite-present": {
+      "accepted": 334,
+      "unavailable": 1040
+    },
+    "polite-volitional": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "potential": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "potential-conditional-ba": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "potential-negative": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "potential-negative-conditional-ba": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "potential-past": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "potential-past-negative": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "potential-polite": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "potential-polite-negative": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "potential-polite-past": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "potential-polite-past-negative": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "progressive": {
+      "accepted": 188,
+      "unavailable": 1183
+    },
+    "progressive-negative": {
+      "accepted": 188,
+      "unavailable": 1183
+    },
+    "progressive-past": {
+      "accepted": 188,
+      "unavailable": 1183
+    },
+    "progressive-past-negative": {
+      "accepted": 188,
+      "unavailable": 1183
+    },
+    "progressive-polite": {
+      "accepted": 188,
+      "unavailable": 1183
+    },
+    "progressive-polite-negative": {
+      "accepted": 188,
+      "unavailable": 1183
+    },
+    "progressive-polite-past": {
+      "accepted": 188,
+      "unavailable": 1183
+    },
+    "progressive-polite-past-negative": {
+      "accepted": 188,
+      "unavailable": 1183
+    },
+    "prohibition": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "request-kudasai": {
+      "accepted": 220,
+      "unavailable": 1142
+    },
+    "short-causative": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "short-causative-conditional-ba": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "short-causative-negative": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "short-causative-negative-conditional-ba": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "short-causative-passive": {
+      "accepted": 94,
+      "unavailable": 552
+    },
+    "short-causative-passive-conditional-ba": {
+      "accepted": 94,
+      "unavailable": 552
+    },
+    "short-causative-passive-negative": {
+      "accepted": 94,
+      "unavailable": 552
+    },
+    "short-causative-passive-negative-conditional-ba": {
+      "accepted": 94,
+      "unavailable": 552
+    },
+    "short-causative-passive-past": {
+      "accepted": 94,
+      "unavailable": 552
+    },
+    "short-causative-passive-past-negative": {
+      "accepted": 94,
+      "unavailable": 552
+    },
+    "short-causative-passive-polite": {
+      "accepted": 94,
+      "unavailable": 552
+    },
+    "short-causative-passive-polite-negative": {
+      "accepted": 94,
+      "unavailable": 552
+    },
+    "short-causative-passive-polite-past": {
+      "accepted": 94,
+      "unavailable": 552
+    },
+    "short-causative-passive-polite-past-negative": {
+      "accepted": 94,
+      "unavailable": 552
+    },
+    "short-causative-past": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "short-causative-past-negative": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "short-causative-polite": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "short-causative-polite-negative": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "short-causative-polite-past": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "short-causative-polite-past-negative": {
+      "accepted": 220,
+      "unavailable": 1141
+    },
+    "te-form": {
+      "accepted": 220,
+      "unavailable": 1154
+    },
+    "volitional": {
+      "accepted": 220,
+      "unavailable": 1142
+    }
+  },
+  "sourceDigest": "5907c6251a3b55853fa8c51d426389213e5b1e9b79c2626d76bb852c4614ff1f",
+  "ledgerDigest": "b6252a4ae7f51be1ecf3b4e471fe540e278ad3ffc22c3ed6a852e6389cc3869d",
+  "publicationDigest": "e9cc615561d6a7dcb0fe3c6491f6bc98c29fe8cef0b0e7eedf833791063d5c1c"
+}

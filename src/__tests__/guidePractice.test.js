@@ -3,8 +3,11 @@ import { DEFAULT_PREFS } from '../data/defaults.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
 import {
   applyGuideAttemptToState,
+  buildGuideDiagnosticInsight,
   buildGuideCard,
+  gradeGuideStep,
   gradeGuideSteps,
+  guideResultFromSteps,
   guideGroupChoice,
   guideGroupOptions,
 } from '../utils/guidePractice.js';
@@ -21,6 +24,12 @@ const KAKU = {
   reading: '\u304b\u304f',
   meaning: 'to write',
   group: 'godan',
+};
+const NERU = {
+  dict: '\u5bdd\u308b',
+  reading: '\u306d\u308b',
+  meaning: 'to sleep',
+  group: 'ichidan',
 };
 const SHIZUKA = {
   dict: '\u9759\u304b',
@@ -39,6 +48,36 @@ describe('guide practice engine', () => {
     expect(card.expectedBase).toBe('\u98df\u3079\u308b');
     expect(card.expectedAnswer).toBe('\u98df\u3079\u305f');
     expect(card.sourceTypeId).not.toBe(card.typeId);
+  });
+
+  it('locks a focused dictionary-form miss to the original Practice route', () => {
+    const state = { ...defaultState(), enabledTypes: ['plain-negative'] };
+
+    for (const seed of [0, 1, 2, 3, 4, 5]) {
+      const card = buildGuideCard([NERU], state, DEFAULT_PREFS, {
+        targetWord: NERU,
+        targetTypeId: 'plain-negative',
+        sourceTypeId: 'dictionary',
+        seed,
+      });
+
+      expect(card.sourceTypeId).toBe('plain-present');
+      expect(card.sourceForm).toBe('\u5bdd\u308b');
+      expect(card.sourceLabel).toBe('Dictionary Form');
+      expect(card.expectedAnswer).toBe('\u5bdd\u306a\u3044');
+    }
+  });
+
+  it('keeps varied source forms for ordinary non-focused Guide cards', () => {
+    const state = { ...defaultState(), enabledTypes: ['plain-negative'] };
+    const sourceTypes = new Set(
+      [0, 1, 2, 3].map(
+        (seed) => buildGuideCard([NERU], state, DEFAULT_PREFS, { seed }).sourceTypeId,
+      ),
+    );
+
+    expect(sourceTypes.size).toBeGreaterThan(1);
+    expect(sourceTypes.has('plain-present')).toBe(false);
   });
 
   it('prefers weakness-prioritized cards before fallback cards', () => {
@@ -75,6 +114,30 @@ describe('guide practice engine', () => {
     expect(result.steps.base.correct).toBe(true);
     expect(result.steps.group.correct).toBe(true);
     expect(result.steps.answer.correct).toBe(true);
+  });
+
+  it('keeps a missed first response immutable after the correction matches', () => {
+    const card = buildGuideCard(
+      [NERU],
+      { ...defaultState(), enabledTypes: ['plain-negative'] },
+      DEFAULT_PREFS,
+      { sourceTypeId: 'dictionary' },
+    );
+    const missedBase = gradeGuideStep(card, 'base', 'taberu');
+    const correctedBase = gradeGuideStep(card, 'base', 'neru');
+    const steps = {
+      base: missedBase,
+      group: gradeGuideStep(card, 'group', 'ichidan'),
+      answer: gradeGuideStep(card, 'answer', 'nenai'),
+    };
+
+    expect(missedBase.correct).toBe(false);
+    expect(missedBase.submitted).toBe('taberu');
+    expect(correctedBase.correct).toBe(true);
+    expect(guideResultFromSteps(steps)).toMatchObject({
+      correct: false,
+      steps: { base: { correct: false, submitted: 'taberu' } },
+    });
   });
 
   it('grades all three steps correctly for adjectives', () => {
@@ -129,6 +192,47 @@ describe('guide practice engine', () => {
     expect(next.cards[beforeId].correct).toBe(1);
     expect(next.guide.attempted).toBe(1);
     expect(next.guide.byStep.answer.correct).toBe(1);
+    expect(next.guide.recent[0]).toMatchObject({
+      group: 'ichidan',
+      expectedGroup: 'ichidan',
+      steps: {
+        base: { correct: true, assisted: false },
+        group: { correct: true, assisted: false },
+        answer: { correct: true, assisted: false },
+      },
+    });
+  });
+
+  it('uses one persisted identity across every credited Guide projection and rejects replay', () => {
+    const state = { ...defaultState(), enabledTypes: ['plain-past'] };
+    const card = buildGuideCard([TABERU], state, DEFAULT_PREFS);
+    const result = gradeGuideSteps(card, {
+      base: 'taberu',
+      group: 'godan',
+      answer: 'tabeta',
+    });
+    const options = { responseMs: 1200, now: 1000, eventId: 'guide-answer-a' };
+    const next = applyGuideAttemptToState(state, card, result, options);
+    const rid = cardIdFor(TABERU, 'plain-past');
+    expect(next.cards[rid].lastAttemptId).toBe(options.eventId);
+    expect(next.practiceStats.recent[0].id).toBe(options.eventId);
+    expect(next.guide.recent[0].id).toBe(options.eventId);
+    expect(next.session.recentOutcomes[0].id).toBe(options.eventId);
+    expect(next.readiness.byRule[rid].speed.lastAttemptId).toBe(options.eventId);
+    expect(Object.values(next.weakness.byLane)[0].recent[0].id).toBe(options.eventId);
+    expect(next.guide.recent[0].steps.group.correct).toBe(false);
+    const reloaded = JSON.parse(JSON.stringify(next));
+    expect(applyGuideAttemptToState(reloaded, card, result, options)).toBe(reloaded);
+    const distinct = applyGuideAttemptToState(reloaded, card, result, {
+      ...options,
+      eventId: 'guide-answer-b',
+    });
+    expect(distinct.guide.attempted).toBe(2);
+    expect(distinct.practiceStats.lifetime.attempted).toBe(2);
+    expect(distinct.guide.recent.map((attempt) => attempt.id)).toEqual([
+      'guide-answer-b',
+      'guide-answer-a',
+    ]);
   });
 
   it('records an incorrect completed card without advancing the Practice interval', () => {
@@ -148,5 +252,43 @@ describe('guide practice engine', () => {
     expect(reviewCard.correct).toBe(0);
     expect(reviewCard.incorrect).toBe(1);
     expect(next.guide.byStep.group.correct).toBe(0);
+  });
+
+  it('turns separated Guide step results into a group-specific diagnostic', () => {
+    let state = { ...defaultState(), enabledTypes: ['plain-past'] };
+    const card = buildGuideCard([KAKU], state, DEFAULT_PREFS, { seed: 0 });
+    const result = gradeGuideSteps(card, {
+      base: 'kaku',
+      group: 'ichidan',
+      answer: 'kaita',
+    });
+
+    state = applyGuideAttemptToState(state, card, result, { now: 1000 });
+    state = applyGuideAttemptToState(state, card, result, { now: 2000 });
+
+    expect(buildGuideDiagnosticInsight(state.guide)).toMatchObject({
+      id: 'guide-group-after-answer',
+      stepId: 'group',
+      message: 'You know the ending but keep misclassifying godan verbs.',
+    });
+  });
+
+  it('falls back to generic Guide step diagnostics for older recent logs', () => {
+    const insight = buildGuideDiagnosticInsight({
+      attempted: 3,
+      correct: 1,
+      assisted: 0,
+      byStep: {
+        base: { attempted: 3, correct: 3, assisted: 0 },
+        group: { attempted: 3, correct: 1, assisted: 0 },
+        answer: { attempted: 3, correct: 3, assisted: 0 },
+      },
+      recent: [],
+    });
+
+    expect(insight).toMatchObject({
+      id: 'guide-group-after-answer',
+      message: 'You know the ending but keep misclassifying word groups.',
+    });
   });
 });

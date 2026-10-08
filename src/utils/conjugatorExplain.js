@@ -19,7 +19,9 @@ import {
   surfaceFormFor,
 } from './conjugator.js';
 import { buildOfflineCuedCloze } from './clozeSentences.js';
+import { englishForForm } from './display.js';
 import { GROUP_SENTENCE_LABELS, groupDisplayLabel, groupSentenceLabel } from './groupDisplay.js';
+import { groupConfusionFeedback } from './answerFeedbackCopy.js';
 
 export function getOfflineTemplateSentence(word, type) {
   return buildOfflineCuedCloze(word, type);
@@ -137,6 +139,22 @@ function continuationHint(expected, correct, compound) {
   return expectedNext
     ? `The next kana is ${quoteKana(expectedNext)}.`
     : 'Apply the next step above.';
+}
+
+function emptyAnswerNudge(item) {
+  if (item?.group === 'godan') {
+    return 'You have not typed anything yet. First identify the verb group, then look at the final kana of the dictionary form. Use those two facts to decide the first change before typing.';
+  }
+  if (item?.group === 'ichidan') {
+    return 'You have not typed anything yet. First confirm whether this is ichidan, then decide what happens to the final る before typing.';
+  }
+  if (item?.group === 'suru' || item?.group === 'kuru' || item?.irregular) {
+    return 'You have not typed anything yet. First recall the special base change for this irregular form before worrying about the ending.';
+  }
+  if (isAdjective(item)) {
+    return 'You have not typed anything yet. First identify the adjective type, then decide what part changes before the ending.';
+  }
+  return 'You have not typed anything yet. First identify the word type, then decide the next change before typing.';
 }
 
 // For compound forms (e.g. potential-past-negative), show the intermediate
@@ -294,62 +312,112 @@ function learnerCategoryInfo(item) {
   const ending = reading.slice(-1);
 
   if (group === 'godan') {
-    const rowExamples = slashList([
-      categoryExampleForm(item, 'plain-negative'),
-      categoryExampleForm(item, 'polite-present'),
-    ]);
-    const soundChangeExamples = slashList([
-      categoryExampleForm(item, 'te-form'),
-      categoryExampleForm(item, 'plain-past'),
-    ]);
-    const rowExampleText = rowExamples || 'row-shift forms';
-    const soundChangeExampleText = soundChangeExamples || 'te/ta forms';
-    const finalKana = ending ? `final dictionary kana ${ending}` : 'final dictionary kana';
+    const polite = categoryExampleForm(item, 'polite-present');
+    const negative = categoryExampleForm(item, 'plain-negative');
+    const rowShift = slashList([A_ROW[ending], I_ROW[ending], E_ROW[ending], O_ROW[ending]]);
+    const isRuTrap = ending === 'る';
+    const isIkuException = reading === 'いく' || dict === '行く';
     return {
       label: 'godan / u-verb',
-      why:
-        ending === 'る'
-          ? `${dict} ends in る, but it is still godan / u-verb: る changes to ら / り / れ / ろ or って / った instead of simply dropping. For this word, that gives forms like ${rowExampleText} and ${soundChangeExampleText}; it does not use the ichidan drop-る pattern.`
-          : `${dict} is godan / u-verb: the ${finalKana} changes instead of dropping. Use its row for forms like ${rowExampleText}, or its te/ta sound-change group for ${soundChangeExampleText}.`,
+      why: isRuTrap
+        ? `${dict} ends in る, so it looks like an ichidan (ru-verb) — but it is actually godan (u-verb). The giveaway: when it conjugates, the final る does not just drop. It shifts to the other sounds in its row (ら / り / れ / ろ), called row-shifting, instead of disappearing.`
+        : `${dict} is a godan (u-verb): its final kana ${ending} row-shifts — it changes to the other sounds in its row (${ending} → ${rowShift}) depending on the ending, instead of dropping. That row-shifting is the defining godan trait.`,
+      checks: [
+        isRuTrap
+          ? polite &&
+            negative &&
+            `Tell-tale sign: ${polite} and ${negative} keep a り / ら sound. A true ichidan verb would simply drop る (compare 食べる → 食べます / 食べない).`
+          : polite &&
+            negative &&
+            `Tell-tale sign: the polite form keeps an い-sound and the plain negative keeps an あ-sound — ${polite} shows ${I_ROW[ending]}, ${negative} shows ${A_ROW[ending]}. The final kana changes rather than vanishes.`,
+        isRuTrap &&
+          'Common る-trap verbs to memorize: 帰る, 入る, 走る, and 切る. They look ichidan but row-shift like godan.',
+        isIkuException &&
+          `Heads-up: ${dict} is still godan, but its te / past forms are an exception (行って / 行った), so memorize those separately.`,
+        !isRuTrap &&
+          'Watch for る-ending godan verbs too: words like 帰る, 入る, 走る, and 切る look ichidan at first but row-shift like godan.',
+      ].filter(Boolean),
     };
   }
 
   if (group === 'ichidan') {
     const stem = dictStemForFinal(item, 'る');
+    const negative = categoryExampleForm(item, 'plain-negative');
+    const polite = categoryExampleForm(item, 'polite-present');
     return {
       label: 'ichidan / ru-verb',
-      why: `${dict} is ichidan / ru-verb: drop the final る, then attach the requested ending to ${stem || 'the stem'}. The stem stays stable across forms.`,
+      why: `${dict} is an ichidan (ru-verb): the final る simply drops, and the stem ${stem || 'before る'} stays the same for every form. There is no row-shifting (sound change) like godan.`,
+      checks: [
+        polite &&
+          negative &&
+          `Tell-tale sign: ${polite} and ${negative} just drop る — no り / ら sound appears. A godan る-verb like 帰る would show 帰ります / 帰らない instead.`,
+        'Compare: a る-ending godan verb (帰る, 入る, 走る) row-shifts to ら / り / れ / ろ instead of only dropping る.',
+      ].filter(Boolean),
     };
   }
 
   if (group === 'suru') {
+    const stem = dictStemForFinal(item, 'する');
     return {
       label: 'irregular',
-      why: `${dict} belongs in the irregular bucket: keep the part before する, then change the する core to し, せ, さ, or でき depending on the form.`,
+      why: `${dict} is in the irregular bucket: it is ${stem || 'a noun'} + する, and the する part does not follow godan or ichidan rules. The ${stem || 'first'} part stays put while する is the irregular piece.`,
+      checks: [
+        `Recognize it by the する ending: anything built on する is irregular, so its forms are memorized, not derived from a verb-group rule.`,
+        `The ${stem || 'noun'} part never changes; only する does.`,
+      ].filter(Boolean),
     };
   }
 
   if (group === 'kuru') {
     return {
       label: 'irregular',
-      why: `${dict} belongs in the irregular bucket: 来る changes its root sound by form, with き, こ, and く all appearing.`,
+      why: `${dict} is in the irregular bucket: its root sound changes (き / こ / く) depending on the form, so no single godan or ichidan rule fits it.`,
+      checks: [
+        'Recognize 来る as its own pattern and memorize its forms rather than deriving them from a verb group.',
+      ],
     };
   }
 
   if (group === 'i-adjective') {
     const irregular = item?.irregular || reading === 'いい' || reading === 'かっこいい';
+    const attributive = categoryExampleForm(item, 'adj-attributive');
     return {
       label: irregular ? 'irregular' : 'い-adjective',
       why: irregular
-        ? `${dict} belongs in the irregular bucket because most forms use the よい stem, not the visible いい form.`
-        : `${dict} is an い-adjective: the final い changes or drops, then the adjective ending attaches.`,
+        ? `${dict} is in the irregular bucket: the visible いい is not the stem most forms use. They come from the older よい, so most non-present forms use a よ base instead of い.`
+        : `${dict} is an い-adjective, not a verb. The final い is the part that changes, and there is no verb stem before ます here.`,
+      checks: irregular
+        ? [
+            'Recognize いい (and かっこいい) as exceptions: the present stays いい, but other forms switch to a よ base, so memorize them rather than building from いい.',
+          ]
+        : [
+            'Tell-tale sign: it ends in い and describes a thing. The い itself is what changes — there is no ます-stem like a verb.',
+            attributive &&
+              `Before a noun, the dictionary form stays as-is: ${attributive} + noun (no な needed).`,
+          ].filter(Boolean),
     };
   }
 
   if (group === 'na-adjective') {
+    const attributive = categoryExampleForm(item, 'adj-attributive');
     return {
       label: 'な-adjective',
-      why: `${dict} is a な-adjective: the base ${dict} stays; the connector after it changes, like だ / です / ではない / な.`,
+      why: `${dict} is a な-adjective: the base stays the same, and the word after it (a copula like です / だ, or な before a noun) carries the grammar. It behaves more like a noun than like an い-adjective.`,
+      checks: [
+        attributive &&
+          `Tell-tale sign: it does not end in a changing い. It takes な before a noun (${attributive} + noun) and です / だ to act as a predicate.`,
+      ].filter(Boolean),
+    };
+  }
+
+  if (group === 'noun') {
+    return {
+      label: 'noun',
+      why: `${dict} is a noun, so the noun itself does not conjugate. Tense, politeness, and negativity live in the copula after it, such as だ, です, ではない, or でした.`,
+      checks: [
+        'Do not force a noun into ichidan or godan rules.',
+        'If a noun can become a verb, it should appear as a する entry, like 勉強する, before verb rules apply.',
+      ],
     };
   }
 
@@ -413,6 +481,9 @@ function buildMasuStemBridge(item, type, expected) {
     return {
       title: 'From polite/masu stem',
       kind: 'direct-masu-stem',
+      source: polite,
+      stem: masuStem,
+      result,
       cells: [
         { label: 'Polite', value: polite },
         { label: 'Drop ます', value: masuStem },
@@ -451,6 +522,11 @@ function buildMasuStemBridge(item, type, expected) {
   return {
     title: 'From polite/masu stem',
     kind: 'te-ta-bridge',
+    source: polite,
+    stem: masuStem,
+    stemEnding: fromEnding,
+    bridgeEnding: toEnding,
+    result,
     cells,
     formula,
     detail:
@@ -571,6 +647,9 @@ function groupRuleConnection(item, type, parts, expected) {
   }
 
   if (item.group === 'godan') {
+    if ((type === 'te-form' || type === 'plain-past') && replacement && type !== 'plain-present') {
+      return `Because this is ${label}, ${item.dict}'s final ${ending} uses the ${replacement} sound change here: ${surface}.`;
+    }
     if (parts.change) {
       return `Because this is ${label}, ${item.dict} uses the ${parts.change} row for ${target}: ${surface}.`;
     }
@@ -607,7 +686,141 @@ function inferOnbinMistake(item, type, got, expected, expectedRule) {
     userResult: got,
     expectedRule: expectedRule.short,
     expectedResult: expected,
-    detail: 'The stem is right, but the sound-change ending comes from a different godan cluster.',
+    detail: `You used ${rules[gotTail]}, which produced ${got}. This verb needs ${expectedRule.short}: ${expected}.`,
+  };
+}
+
+function godanRowShiftRecipe(item, type) {
+  if (!item || item.group !== 'godan') return null;
+  const ending = originalEndingFor(item);
+  const row = {
+    'plain-negative': A_ROW[ending],
+    'plain-past-negative': A_ROW[ending],
+    'polite-present': I_ROW[ending],
+    'polite-past': I_ROW[ending],
+    'polite-negative': I_ROW[ending],
+    'polite-past-negative': I_ROW[ending],
+    potential: E_ROW[ending],
+    'conditional-ba': E_ROW[ending],
+    imperative: E_ROW[ending],
+    passive: A_ROW[ending],
+    causative: A_ROW[ending],
+    'short-causative-passive': A_ROW[ending],
+    volitional: O_ROW[ending],
+  }[type];
+  const suffix = {
+    'plain-negative': 'ない',
+    'plain-past-negative': 'なかった',
+    'polite-present': 'ます',
+    'polite-past': 'ました',
+    'polite-negative': 'ません',
+    'polite-past-negative': 'ませんでした',
+    potential: 'る',
+    'conditional-ba': 'ば',
+    imperative: '',
+    passive: 'れる',
+    causative: 'せる',
+    'short-causative-passive': 'される',
+    volitional: 'う',
+  }[type];
+  if (!ending || !row || suffix === undefined) return null;
+  return { ending, row, suffix };
+}
+
+const ROW_SHIFT_LABELS = [
+  ['a-row', A_ROW],
+  ['i-row', I_ROW],
+  ['e-row', E_ROW],
+  ['o-row', O_ROW],
+];
+
+const SOUND_CHANGE_CLUSTERS = [
+  { label: 'く', endings: ['く'] },
+  { label: 'ぐ', endings: ['ぐ'] },
+  { label: 'す', endings: ['す'] },
+  { label: 'う/つ/る', endings: ['う', 'つ', 'る'] },
+  { label: 'む/ぶ/ぬ', endings: ['む', 'ぶ', 'ぬ'] },
+];
+
+function buildGodanRowShiftVisual(item, parts, expected) {
+  if (!item || item.group !== 'godan' || !parts?.change) return null;
+  const ending = originalEndingFor(item);
+  const stem = parts.stem || fallbackStem(item, ending);
+  const rows = ROW_SHIFT_LABELS.map(([label, map]) => ({
+    label,
+    kana: map[ending] || '',
+    active: map[ending] === parts.change,
+  })).filter((row) => row.kana);
+  const activeRow = rows.find((row) => row.active);
+  if (!ending || !stem || !activeRow) return null;
+  return {
+    ending,
+    stem,
+    rows,
+    targetRow: activeRow.label,
+    shiftedKana: parts.change,
+    suffix: parts.suffix || '',
+    result: expected,
+    formula: `${stem} + ${parts.change}${parts.suffix ? ` + ${parts.suffix}` : ''} = ${expected}`,
+  };
+}
+
+function buildGodanSoundChangeVisual(item, type, parts, expected) {
+  if (!item || item.group !== 'godan' || (type !== 'te-form' && type !== 'plain-past')) {
+    return null;
+  }
+  const ending = originalEndingFor(item);
+  const stem = parts.stem || fallbackStem(item, ending);
+  const replacement = replacementFromParts(parts, expected, stem);
+  const targetMap = type === 'te-form' ? TE_END : PAST_END;
+  const reading = item.reading || '';
+  const isIkuException = reading === 'いく' || reading.endsWith('いく');
+  if (!ending || !stem || !replacement || !targetMap[ending]) return null;
+
+  const rows = SOUND_CHANGE_CLUSTERS.map((cluster) => {
+    const active = cluster.endings.includes(ending);
+    const representative = cluster.endings[0];
+    return {
+      label: cluster.label,
+      kana: active && isIkuException ? replacement : targetMap[representative] || '',
+      active,
+    };
+  }).filter((row) => row.kana);
+  const activeCluster = rows.find((row) => row.active);
+  if (!activeCluster) return null;
+
+  return {
+    kind: 'sound-change',
+    ending,
+    targetLabel: isIkuException ? `${replacement} (行く exception)` : replacement,
+    rows,
+    formula: `${stem} + ${replacement} = ${expected}`,
+  };
+}
+
+function inferGodanRowShiftMistake(item, type, got, expected, expectedRule) {
+  if (!item || isAdjective(item) || item.group !== 'godan') return null;
+  const recipe = godanRowShiftRecipe(item, type);
+  if (!recipe) return null;
+  const source = item.reading || item.dict || '';
+  if (!source.endsWith(recipe.ending)) return null;
+  const stem = source.slice(0, -recipe.ending.length);
+  const keptDictionaryEnding = `${stem}${recipe.ending}${recipe.suffix}`;
+  const shiftedEnding = `${stem}${recipe.row}${recipe.suffix}`;
+  if (got !== keptDictionaryEnding || expected !== shiftedEnding) return null;
+
+  const mistakeIntro = recipe.suffix
+    ? `You added ${recipe.suffix}, but kept ${recipe.ending}.`
+    : `You kept ${recipe.ending}, but this form needs a row shift.`;
+  const suffixPhrase = recipe.suffix ? `, then add ${recipe.suffix}` : '';
+  return {
+    kind: 'row-shift',
+    userAnswer: got,
+    userRule: `Kept dictionary ending ${recipe.ending}${recipe.suffix ? ` + ${recipe.suffix}` : ''}`,
+    userResult: got,
+    expectedRule: expectedRule.short,
+    expectedResult: expected,
+    detail: `${mistakeIntro} For ${groupDisplayLabel(item.group)} ${typeLabel(type).toLowerCase()}, change ${recipe.ending} to ${recipe.row} first${suffixPhrase}: ${expected}.`,
   };
 }
 
@@ -620,6 +833,9 @@ export function inferMistakenConjugationPattern(item, type, userAnswer) {
 
   const expectedParts = getConjugationParts(item, type, expected);
   const expectedRule = ruleSummaryFor(item, type, expectedParts, expected);
+  const rowShift = inferGodanRowShiftMistake(item, type, got, expected, expectedRule);
+  if (rowShift) return rowShift;
+
   const onbin = inferOnbinMistake(item, type, got, expected, expectedRule);
   if (onbin) return onbin;
 
@@ -635,7 +851,7 @@ export function inferMistakenConjugationPattern(item, type, userAnswer) {
         userResult: got,
         expectedRule: expectedRule.short,
         expectedResult: expected,
-        detail: `That is a valid ${candidate.label.toLowerCase()} form, but this card asks for ${typeLabel(type).toLowerCase()}.`,
+        detail: `You made the ${candidate.label.toLowerCase()} form ${got}, but this card asks for ${typeLabel(type).toLowerCase()}: ${expected}.`,
       };
     }
   }
@@ -655,7 +871,14 @@ export function inferMistakenConjugationPattern(item, type, userAnswer) {
           userResult: got,
           expectedRule: expectedRule.short,
           expectedResult: expected,
-          detail: `The answer follows the ${groupLabel(alt)} pattern, not ${groupLabel(item)}.`,
+          detail: groupConfusionFeedback({
+            usedGroup: group,
+            expectedGroup: item.group,
+            word: item.dict || item.reading,
+            userResult: got,
+            expectedRule: expectedRule.short,
+            expectedResult: expected,
+          }),
         };
       }
     } catch {}
@@ -728,6 +951,8 @@ export function getConjugationDebugInfo(word, type, userAnswer = '') {
     result: ans,
     formula,
     rule,
+    soundChangeVisual: buildGodanSoundChangeVisual(word, type, parts, ans),
+    rowShiftVisual: buildGodanRowShiftVisual(word, parts, ans),
     routes: {
       plain: {
         title: 'From dictionary/plain form',
@@ -1143,8 +1368,9 @@ export function explainItem(item, type) {
 }
 
 // Deterministic, offline hint shown when the student clicks "Hint" while
-// answering. It states how the (possibly multi-step) form is built and where
-// the student currently is without printing the full final answer on first hint.
+// answering. Empty hints only nudge the next thinking step; once the learner
+// has typed something, the hint states how the form is built and where the
+// student currently is without printing the full final answer on first hint.
 //
 // Irregular forms (する, 来る, よい-based adjectives…) have no derivable rule —
 // their "rule" text spells out the answer. To keep the first hint spoiler-free,
@@ -1163,12 +1389,13 @@ export function stepCoachHint(item, type, typed, reveal = false) {
     masked = true;
   }
   const got = toHiragana(typed || '') || typed || '';
+  if (!got && !(wouldReveal && reveal)) return { text: emptyAnswerNudge(item), masked };
   let correct = 0;
   while (correct < got.length && correct < expected.length && got[correct] === expected[correct])
     correct++;
   let status;
   if (!got) {
-    status = `You haven't typed anything yet — start from the dictionary form ${item.reading}, then work through the steps above.`;
+    status = emptyAnswerNudge(item);
   } else if (correct === 0) {
     status = `The very beginning doesn't match yet. ${positionHint(type, got, expected, correct, compound)}`;
   } else if (correct < got.length) {
@@ -1261,15 +1488,25 @@ export function contextSentenceFor(item, type) {
     const picked = M[type] || [`${place}は${form}。`, `Short context using the ${label} form.`];
     return { ja: picked[0], en: picked[1], form, label };
   }
+  const plainPastMeaning = englishForForm(item, 'plain-past');
+  const plainPastNegativeMeaning = englishForForm(item, 'plain-past-negative');
+  const politePastMeaning = englishForForm(item, 'polite-past');
+  const politePastNegativeMeaning = englishForForm(item, 'polite-past-negative');
   const M = {
     'plain-present': [`毎日、${form}。`, 'I do this every day.'],
-    'plain-past': [`昨日、${form}。`, 'I did this yesterday.'],
+    'plain-past': [`昨日、${form}。`, `Plain past meaning: ${plainPastMeaning}.`],
     'plain-negative': [`今日は${form}。`, 'I will not do this today.'],
-    'plain-past-negative': [`昨日は${form}。`, 'I did not do this yesterday.'],
+    'plain-past-negative': [
+      `昨日は${form}。`,
+      `Plain past negative meaning: ${plainPastNegativeMeaning}.`,
+    ],
     'polite-present': [`毎日、${form}。`, 'Polite sentence for doing this every day.'],
-    'polite-past': [`昨日、${form}。`, 'Polite sentence for doing this yesterday.'],
+    'polite-past': [`昨日、${form}。`, `Polite past meaning: ${politePastMeaning}.`],
     'polite-negative': [`今日は${form}。`, 'Polite sentence for not doing this today.'],
-    'polite-past-negative': [`昨日は${form}。`, 'Polite sentence for not doing this yesterday.'],
+    'polite-past-negative': [
+      `昨日は${form}。`,
+      `Polite past negative meaning: ${politePastNegativeMeaning}.`,
+    ],
     'masu-stem': [
       `${form}ながら、音楽を聞きます。`,
       'Uses the stem with ながら for doing two things together.',

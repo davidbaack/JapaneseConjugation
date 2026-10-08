@@ -18,6 +18,7 @@ import { explainItem, GROUP_NAMES } from './conjugatorExplain.js';
 import { CONJ_TYPES, ADJ_TYPES, ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
 import { normalizeReferenceState, referenceProgressFor, defaultState } from './storage.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
+import { matchColloquialPotentialVariant } from './colloquialPotential.js';
 import {
   VERB_GROUP_IDS,
   groupAliasText,
@@ -193,7 +194,88 @@ function lookupVariantValues(value) {
   return [raw, compactLookupText(raw), kanaToRomaji(raw).toLowerCase()].filter(Boolean);
 }
 
-export function formLookupCandidates(query, words) {
+function lookupHistoryByWord(history = []) {
+  const byWord = new Map();
+  for (const row of history) {
+    if (!row?.dict || !row?.group) continue;
+    const key = wordKeyLocal(row);
+    const prior = byWord.get(key);
+    const next = {
+      lastAt: Number(row.lastAt) || 0,
+      count: Number(row.count) || 0,
+    };
+    if (
+      !prior ||
+      next.lastAt > prior.lastAt ||
+      (next.lastAt === prior.lastAt && next.count > prior.count)
+    ) {
+      byWord.set(key, next);
+    }
+  }
+  return byWord;
+}
+
+const JLPT_LOOKUP_RANK = { N5: 0, N4: 1, N3: 2, N2: 3, N1: 4 };
+
+function earliestLearnerLesson(meta) {
+  const lessons = [...(meta.lessons || []), ...(meta.minnaLessons || [])]
+    .map(Number)
+    .filter((lesson) => Number.isInteger(lesson) && lesson > 0);
+  return lessons.length ? Math.min(...lessons) : Number.POSITIVE_INFINITY;
+}
+
+function literalLookupRank(raw, match) {
+  const query = compactLookupText(raw);
+  if (!query) return 0;
+  if (query === compactLookupText(match.surface)) return 2;
+  if (query === compactLookupText(match.answer)) return 1;
+  return 0;
+}
+
+function rankLookupMatches(raw, matches, history = []) {
+  const historyByWord = lookupHistoryByWord(history);
+  return matches
+    .map((match, sourceIndex) => {
+      const meta = getWordMeta(match.word);
+      const wordHistory = historyByWord.get(wordKeyLocal(match.word));
+      return {
+        match,
+        sourceIndex,
+        literal: literalLookupRank(raw, match),
+        historyLastAt: wordHistory?.lastAt || 0,
+        historyCount: wordHistory?.count || 0,
+        common: meta.common ? 1 : 0,
+        jlpt: JLPT_LOOKUP_RANK[meta.jlpt] ?? Number.POSITIVE_INFINITY,
+        lesson: earliestLearnerLesson(meta),
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.literal - a.literal ||
+        b.historyLastAt - a.historyLastAt ||
+        b.historyCount - a.historyCount ||
+        b.common - a.common ||
+        a.jlpt - b.jlpt ||
+        a.lesson - b.lesson ||
+        a.sourceIndex - b.sourceIndex,
+    )
+    .map(({ match }) => match);
+}
+
+export function isExactLookupInterpretation(match) {
+  return match?.matchKind === 'exact' || match?.matchKind === 'variant';
+}
+
+export function hasAmbiguousExactLookup(matches = []) {
+  const interpretations = new Set(
+    matches.filter(isExactLookupInterpretation).map((match) => {
+      return `${wordKeyLocal(match.word)}|${match.type.id}|${match.answer}|${match.surface || ''}`;
+    }),
+  );
+  return interpretations.size > 1;
+}
+
+export function formLookupCandidates(query, words, options = {}) {
   const raw = String(query || '').trim();
   if (!raw) return [];
   const queryVariants = new Set(
@@ -214,16 +296,18 @@ export function formLookupCandidates(query, words) {
     for (const row of lookupRows(word)) {
       const key = `${wordKeyLocal(word)}|${row.type.id}|${row.answer}`;
       let exactHit = row.answerVariants.find((v) => queryVariants.has(v));
+      const colloquialVariant = matchColloquialPotentialVariant(raw, word, row.type.id);
       let contextHit =
         allowContext &&
         !exactHit &&
+        !colloquialVariant &&
         row.answerVariants.find((v) => {
           const min = /^[a-z]+$/.test(v) ? 4 : 2;
           return (
             v.length >= min && [...queryVariants].some((q) => q.length > v.length && q.includes(v))
           );
         });
-      if (!exactHit && !contextHit && includeSurfaceVariants) {
+      if (!exactHit && !contextHit && !colloquialVariant && includeSurfaceVariants) {
         lookupSurface(word, row);
         exactHit = row.surfaceVariants.find((v) => queryVariants.has(v));
         contextHit =
@@ -237,9 +321,25 @@ export function formLookupCandidates(query, words) {
             );
           });
       }
-      if ((exactHit || contextHit) && !seen.has(key)) {
+      if ((exactHit || contextHit || colloquialVariant) && !seen.has(key)) {
         seen.add(key);
         const surface = lookupSurface(word, row);
+        if (colloquialVariant) {
+          exact.push({
+            word,
+            type: row.type,
+            answer: colloquialVariant.kana,
+            surface: colloquialVariant.kanji || colloquialVariant.kana,
+            canonicalAnswer: colloquialVariant.canonicalKana,
+            canonicalSurface: colloquialVariant.canonicalKanji,
+            explanation: explainItem(word, row.type.id),
+            matchKind: 'variant',
+            variantKind: colloquialVariant.variantKind,
+            variantNote: colloquialVariant.variantNote,
+            hitText: colloquialVariant.hitText || colloquialVariant.kanji,
+          });
+          continue;
+        }
         (exactHit ? exact : context).push({
           word,
           type: row.type,
@@ -263,7 +363,7 @@ export function formLookupCandidates(query, words) {
               other.hitText.includes(m.hitText),
           ),
       );
-  return chosen
+  const matches = chosen
     .sort(
       (a, b) =>
         (a.matchKind === b.matchKind ? 0 : a.matchKind === 'exact' ? -1 : 1) ||
@@ -271,6 +371,7 @@ export function formLookupCandidates(query, words) {
         b.answer.length - a.answer.length,
     )
     .slice(0, 12);
+  return rankLookupMatches(raw, matches, options?.history);
 }
 
 export function adHocReferenceCandidates(query) {

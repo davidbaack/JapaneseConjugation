@@ -5,6 +5,7 @@ import {
   formRows,
   adHocReferenceCandidates,
   formLookupCandidates,
+  hasAmbiguousExactLookup,
   findFavoritesList,
   favoriteListHasWord,
   toggleFavoriteInLists,
@@ -18,14 +19,7 @@ import {
   referenceHasWeakRule,
   weakReferencePracticeTarget,
 } from '../views/ReferenceViewSub.jsx';
-import {
-  parseWordRows,
-  addUniqueWord,
-  sanitizeExportName,
-  wordsForList,
-  buildVocabularyCsv,
-  buildConjugationAnkiTsv,
-} from '../views/ListsViewSub.jsx';
+import { addUniqueWord, wordsForList } from '../views/ListsViewSub.jsx';
 
 // Test fixtures
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
@@ -269,6 +263,23 @@ describe('formLookupCandidates', () => {
     expect(hits.some((h) => h.word.dict === '食べる')).toBe(true);
   });
 
+  it('recognises conversational ら-dropping ichidan potential', () => {
+    const hits = formLookupCandidates('食べれる', [
+      ...words,
+      { dict: '滑る', reading: 'すべる', meaning: 'to slide', group: 'godan' },
+    ]);
+    expect(hits[0]).toMatchObject({
+      word: TABERU,
+      type: expect.objectContaining({ id: 'potential' }),
+      answer: 'たべれる',
+      surface: '食べれる',
+      canonicalAnswer: 'たべられる',
+      canonicalSurface: '食べられる',
+      matchKind: 'variant',
+      variantKind: 'colloquial-potential',
+    });
+  });
+
   it('result entries have word, type, answer, and matchKind', () => {
     const hits = formLookupCandidates('たべて', words);
     if (hits.length > 0) {
@@ -287,6 +298,78 @@ describe('formLookupCandidates', () => {
       group: 'ichidan',
     }));
     expect(formLookupCandidates('verbた', manyWords).length).toBeLessThanOrEqual(12);
+  });
+
+  it('ranks itta by learner level and lets explicit history override the default', () => {
+    const iu = {
+      dict: '言う',
+      reading: 'いう',
+      meaning: 'to say',
+      group: 'godan',
+      jlpt: 'N5',
+      lesson: 8,
+      common: true,
+    };
+    const iku = {
+      dict: '行く',
+      reading: 'いく',
+      meaning: 'to go',
+      group: 'godan',
+      jlpt: 'N5',
+      lesson: 3,
+      common: true,
+    };
+
+    const ranked = formLookupCandidates('itta', [iu, iku]);
+    expect(ranked.slice(0, 2).map((match) => match.word.dict)).toEqual(['行く', '言う']);
+    expect(hasAmbiguousExactLookup(ranked)).toBe(true);
+
+    const personalized = formLookupCandidates('itta', [iu, iku], {
+      history: [{ ...iu, lastAt: 200, count: 2 }],
+    });
+    expect(personalized[0].word.dict).toBe('言う');
+  });
+
+  it('uses entered kanji to select the intended itta word', () => {
+    const words = [
+      { dict: '言う', reading: 'いう', meaning: 'to say', group: 'godan' },
+      { dict: '行く', reading: 'いく', meaning: 'to go', group: 'godan' },
+    ];
+
+    expect(formLookupCandidates('行った', words).map((match) => match.word.dict)).toEqual(['行く']);
+    expect(formLookupCandidates('言った', words).map((match) => match.word.dict)).toEqual(['言う']);
+  });
+
+  it('uses commonness and JLPT level before stable source order', () => {
+    const common = {
+      dict: '言う',
+      reading: 'いう',
+      meaning: 'to say',
+      group: 'godan',
+      jlpt: 'N4',
+      common: true,
+    };
+    const uncommon = {
+      dict: '謂う',
+      reading: 'いう',
+      meaning: 'to be called',
+      group: 'godan',
+      jlpt: 'N5',
+      common: false,
+    };
+    expect(formLookupCandidates('itta', [uncommon, common])[0].word.dict).toBe('言う');
+
+    const beginner = { ...uncommon, dict: '云う', jlpt: 'N5' };
+    const advanced = { ...uncommon, dict: '謂う', jlpt: 'N1' };
+    expect(formLookupCandidates('itta', [advanced, beginner])[0].word.dict).toBe('云う');
+  });
+
+  it('treats distinct forms of the same word as exact ambiguity', () => {
+    const hits = formLookupCandidates('食べられる', [TABERU]);
+    expect(hits.map((match) => match.type.id)).toEqual(
+      expect.arrayContaining(['potential', 'passive']),
+    );
+    expect(hasAmbiguousExactLookup(hits)).toBe(true);
   });
 });
 
@@ -442,48 +525,6 @@ describe('referenceWithHistory', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// parseWordRows (ListsViewSub)
-// ─────────────────────────────────────────────────────────────────────────────
-describe('parseWordRows', () => {
-  it('parses a valid tab-separated row', () => {
-    const rows = parseWordRows('食べる\tたべる\tto eat\tichidan');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].dict).toBe('食べる');
-    expect(rows[0].group).toBe('ichidan');
-  });
-
-  it('parses a valid comma-separated row', () => {
-    const rows = parseWordRows('書く,かく,to write,godan');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].group).toBe('godan');
-  });
-
-  it('skips rows with fewer than 4 columns', () => {
-    expect(parseWordRows('食べる\tたべる\tto eat')).toHaveLength(0);
-  });
-
-  it('skips rows where reading is not kana', () => {
-    expect(parseWordRows('word\tabc\tmeaning\tichidan')).toHaveLength(0);
-  });
-
-  it('handles multiple rows', () => {
-    const text = '食べる\tたべる\tto eat\tichidan\n書く\tかく\tto write\tgodan';
-    expect(parseWordRows(text)).toHaveLength(2);
-  });
-
-  it('parses JLPT, Genki, and Minna lesson metadata', () => {
-    const rows = parseWordRows('書く,かく,to write,godan,verb,N5,3;6,6;7');
-    expect(rows[0]).toMatchObject({
-      jlpt: 'N5',
-      lesson: 3,
-      lessons: [3, 6],
-      minnaLesson: 6,
-      minnaLessons: [6, 7],
-    });
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 // addUniqueWord (ListsViewSub)
 // ─────────────────────────────────────────────────────────────────────────────
 describe('addUniqueWord', () => {
@@ -501,28 +542,6 @@ describe('addUniqueWord', () => {
     const sameDict = { dict: '食べる', reading: 'たべる', meaning: 'other', group: 'godan' };
     const result = addUniqueWord([TABERU], sameDict);
     expect(result).toHaveLength(2);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// sanitizeExportName (ListsViewSub)
-// ─────────────────────────────────────────────────────────────────────────────
-describe('sanitizeExportName', () => {
-  it('replaces illegal filename characters with dashes', () => {
-    expect(sanitizeExportName('My List/2024')).not.toMatch(/\//);
-  });
-
-  it('collapses spaces to dashes', () => {
-    expect(sanitizeExportName('My   List')).toBe('My-List');
-  });
-
-  it('falls back to "katachiya" for blank input', () => {
-    expect(sanitizeExportName('')).toBe('katachiya');
-    expect(sanitizeExportName(null)).toBe('katachiya');
-  });
-
-  it('truncates to 64 characters', () => {
-    expect(sanitizeExportName('a'.repeat(100)).length).toBeLessThanOrEqual(64);
   });
 });
 
@@ -547,62 +566,5 @@ describe('wordsForList', () => {
   it('ignores keys not found in the word pool', () => {
     const list = { wordKeys: ['ichidan:unknown'] };
     expect(wordsForList(list, words)).toHaveLength(0);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// buildVocabularyCsv (ListsViewSub)
-// ─────────────────────────────────────────────────────────────────────────────
-describe('buildVocabularyCsv', () => {
-  const key = `${TABERU.group}:${TABERU.dict}`;
-  const list = { name: 'Test', wordKeys: [key] };
-
-  it('starts with a header row', () => {
-    const csv = buildVocabularyCsv(list, [TABERU]);
-    expect(csv.startsWith('dictionary,')).toBe(true);
-  });
-
-  it('includes the word dict in the output', () => {
-    const csv = buildVocabularyCsv(list, [TABERU]);
-    expect(csv).toContain('食べる');
-  });
-
-  it('each row ends with a newline', () => {
-    const csv = buildVocabularyCsv(list, [TABERU]);
-    expect(csv.endsWith('\n')).toBe(true);
-  });
-
-  it('exports all Genki and Minna lesson tags', () => {
-    const tagged = {
-      ...TABERU,
-      lessons: [3, 6],
-      minnaLessons: [6, 7],
-      jlpt: 'N5',
-    };
-    const csv = buildVocabularyCsv(list, [tagged]);
-    expect(csv).toContain('3;6,6;7');
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// buildConjugationAnkiTsv (ListsViewSub)
-// ─────────────────────────────────────────────────────────────────────────────
-describe('buildConjugationAnkiTsv', () => {
-  const key = `${TABERU.group}:${TABERU.dict}`;
-  const list = { name: 'Test', wordKeys: [key] };
-
-  it('starts with Anki metadata lines', () => {
-    const tsv = buildConjugationAnkiTsv(list, [TABERU]);
-    expect(tsv.startsWith('#separator:Tab')).toBe(true);
-  });
-
-  it('includes the word dict in the output', () => {
-    const tsv = buildConjugationAnkiTsv(list, [TABERU]);
-    expect(tsv).toContain('食べる');
-  });
-
-  it('ends with a newline', () => {
-    const tsv = buildConjugationAnkiTsv(list, [TABERU]);
-    expect(tsv.endsWith('\n')).toBe(true);
   });
 });

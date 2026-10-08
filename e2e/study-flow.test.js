@@ -2,14 +2,15 @@ import { test, expect } from '@playwright/test';
 
 // Exercises the core practice loop on the default Practice tab with the default
 // answer mode ("input"): a card is shown, the learner submits an answer,
-// feedback appears, and advancing returns to the answering phase.
+// feedback appears, and the reveal ends with one primary next action plus a
+// focused Guide link for walking through the same form.
 test.describe('Study flow', () => {
-  test('answering a card shows feedback and advances', async ({ page }) => {
+  test('answering a card shows feedback with a next action and Guide link', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
     await expect(page.getByText('Sign in to save SRS progress')).toHaveCount(0);
-    await expect(page.getByText('Continuous practice')).toBeVisible();
+    await expect(page.getByLabel('Practice selection')).toBeVisible();
 
     // Forward (conjugate) drill renders a free-text answer box.
     const input = page.getByPlaceholder('Type romaji or kana...');
@@ -22,26 +23,33 @@ test.describe('Study flow', () => {
     await expect(checkBtn).toBeEnabled();
     await checkBtn.click();
 
-    // Review phase: verdict + the canonical advance control.
+    // Review phase: verdict + exactly one concrete next action, with Guide as
+    // an explicit focused repair link for the same form.
     await expect(page.getByText('Not quite.').last()).toBeVisible();
-    const next = page.getByRole('button', { name: 'Next (Enter)' });
-    await expect(next).toBeVisible();
-
-    // Advancing returns to the answering phase with a fresh input.
-    await next.click();
-    await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Check (Enter)' })).toBeVisible();
+    await expect(page.getByText('Walk through this form in Guide')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open Guide for this rule' })).toBeVisible();
+    const primaryNextAction = page.getByRole('button', {
+      name: /^(Next card|Drill the trap|Review lesson)$/,
+    });
+    await expect(primaryNextAction).toHaveCount(1);
+    await expect(primaryNextAction.first()).toBeVisible();
   });
 
-  test('Reveal exposes the answer and lets the learner continue', async ({ page }) => {
+  test('Reveal exposes the answer and shows a next action and Guide link', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Continuous practice')).toBeVisible();
+    await expect(page.getByLabel('Practice selection')).toBeVisible();
     await expect(page.getByPlaceholder('Type romaji or kana...')).toBeVisible();
     await page.getByRole('button', { name: 'Reveal', exact: true }).click();
 
     // Revealing grades the card as missed and drops into the review phase.
-    await expect(page.getByRole('button', { name: 'Next (Enter)' })).toBeVisible();
+    await expect(page.getByText('Walk through this form in Guide')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open Guide for this rule' })).toBeVisible();
+    const primaryNextAction = page.getByRole('button', {
+      name: /^(Next card|Drill the trap|Review lesson)$/,
+    });
+    await expect(primaryNextAction).toHaveCount(1);
+    await expect(primaryNextAction.first()).toBeVisible();
   });
 });

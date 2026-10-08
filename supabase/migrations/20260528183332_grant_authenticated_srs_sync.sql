@@ -1,0 +1,7 @@
+-- Historical linked-project migration marker.
+--
+-- The original remote grant is fully superseded by
+-- 20260601133136_create_srs_sync.sql, which creates the table, enables RLS,
+-- grants the authenticated role, and installs the owner-only policies. Keeping
+-- this version as a no-op reconciles migration history without duplicating the
+-- canonical schema definition on a fresh database.

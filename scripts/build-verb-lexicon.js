@@ -3,11 +3,14 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { isLexiconArtifactWord, normalizeLexiconWord } from '../src/utils/lexiconArtifacts.js';
+import { compactPitchAccentForWord, parseKanjiumAccentRows } from '../src/utils/pitchAccent.js';
 
 const JLPT_GENKI_URL = 'https://raw.githubusercontent.com/elzup/jlpt-word-list/master/out/all.csv';
 const MINNA_URL = 'https://www.astr.tohoku.ac.jp/~akhlaghi/blog/JapaneseVocab/MNNvocab.csv';
 const JMDICT_RELEASE_URL =
   'https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest';
+const KANJIUM_ACCENTS_URL =
+  'https://raw.githubusercontent.com/mifunetoshiro/kanjium/master/data/source_files/raw/accents.txt';
 const OUT_PATH = join('public', 'data', 'verb-lexicon.json');
 
 const LEVEL_RANK = { N5: 0, N4: 1, N3: 2, N2: 3, N1: 4 };
@@ -224,6 +227,20 @@ function posSet(entry) {
   return new Set((entry?.sense || []).flatMap((sense) => sense.partOfSpeech || []));
 }
 
+// JMdict tags verbs as transitive (vt) and/or intransitive (vi). Surface this as
+// 't' / 'i' / 'b' (both) / '' (unknown) so the offline cloze generator can pick
+// argument-structure-appropriate frames (e.g. suppress passive-by-agent frames
+// for intransitive verbs).
+function transitivityFromPos(entry) {
+  const pos = posSet(entry);
+  const vt = pos.has('vt');
+  const vi = pos.has('vi');
+  if (vt && vi) return 'b';
+  if (vt) return 't';
+  if (vi) return 'i';
+  return '';
+}
+
 function allowsSuru(row = {}) {
   const dict = cleanTerm(row.dict || row.expression);
   const reading = cleanTerm(row.reading);
@@ -329,6 +346,7 @@ function normalizeSupportedWord(row, jmdictIndex) {
     meaning: row.meaning,
     group,
     common: entryIsCommon(entry),
+    transitive: transitivityFromPos(entry),
   };
 }
 
@@ -352,12 +370,14 @@ function mergeWord(map, rawWord) {
       genkiLessons: uniqueSorted(word.genkiLessons || [], 1, 23),
       minnaLessons: uniqueSorted(word.minnaLessons || [], 1, 50),
       common: Boolean(word.common),
+      transitive: word.transitive || '',
     });
     return;
   }
   existing.jlpt = easierLevel(existing.jlpt, word.jlpt);
   existing.meaning = existing.meaning || normalizeMeaning(word.meaning);
   existing.common = existing.common || Boolean(word.common);
+  existing.transitive = existing.transitive || word.transitive || '';
   existing.genkiLessons = uniqueSorted(
     [...existing.genkiLessons, ...(word.genkiLessons || [])],
     1,
@@ -423,8 +443,25 @@ function dictFromPolite(row, lookup) {
   return null;
 }
 
-function rowFromVerb(word) {
-  return [
+/**
+ * @param {{
+ *   dict: string,
+ *   reading: string,
+ *   meaning: string,
+ *   group: string,
+ *   jlpt: string,
+ *   genkiLessons: number[],
+ *   minnaLessons: number[],
+ *   common?: boolean,
+ *   transitive?: string,
+ * }} word
+ * @param {Map<string, { accents: number[] }> | null} [accentRows]
+ * @returns {[string, string, string, string, string, number[], number[], boolean, string] | [string, string, string, string, string, number[], number[], boolean, string, number[]]}
+ */
+function rowFromVerb(word, accentRows = null) {
+  const pitchAccent = compactPitchAccentForWord(word, accentRows);
+  /** @type {[string, string, string, string, string, number[], number[], boolean, string] | [string, string, string, string, string, number[], number[], boolean, string, number[]]} */
+  const row = [
     word.dict,
     word.reading,
     word.meaning,
@@ -433,7 +470,10 @@ function rowFromVerb(word) {
     word.genkiLessons,
     word.minnaLessons,
     Boolean(word.common),
+    word.transitive || '',
   ];
+  if (pitchAccent?.length) row.push(pitchAccent);
+  return row;
 }
 
 function hasLessonCoverage(word) {
@@ -485,11 +525,13 @@ async function fetchJmdict() {
 }
 
 async function main() {
-  const [jlptGenkiCsv, minnaCsv, jmdict] = await Promise.all([
+  const [jlptGenkiCsv, minnaCsv, jmdict, kanjiumAccents] = await Promise.all([
     fetchText(JLPT_GENKI_URL),
     fetchText(MINNA_URL),
     fetchJmdict(),
+    fetchText(KANJIUM_ACCENTS_URL),
   ]);
+  const accentRows = parseKanjiumAccentRows(kanjiumAccents);
   const jmdictIndex = buildJmdictIndex(jmdict);
   const words = new Map();
   const jlptBySurface = new Map();
@@ -562,7 +604,7 @@ async function main() {
         levelDiff || a.reading.localeCompare(b.reading, 'ja') || a.dict.localeCompare(b.dict, 'ja')
       );
     })
-    .map(rowFromVerb);
+    .map((word) => rowFromVerb(word, accentRows));
   const verbs = rows.filter((row) => ['ichidan', 'godan', 'suru', 'kuru'].includes(row[3]));
   const adjectives = rows.filter((row) => ['i-adjective', 'na-adjective'].includes(row[3]));
   const trimmedLowUse = {
@@ -608,6 +650,12 @@ async function main() {
         license: 'JMdict/EDRDG license; used for part-of-speech and commonness signals',
         use: 'Verb/adjective classification and common priority markers',
       },
+      {
+        name: 'Kanjium pitch accent data',
+        url: KANJIUM_ACCENTS_URL,
+        license: 'CC BY-SA 4.0; attribution requested for Uros O. additions',
+        use: 'Dictionary-form pitch accent numbers for generated practice words',
+      },
     ],
     trimPolicy: {
       appliesTo: 'JLPT-tagged verbs/adjectives and known generated artifact rows',
@@ -629,6 +677,8 @@ async function main() {
       'genkiLessons',
       'minnaLessons',
       'common',
+      'transitive',
+      'pitchAccent',
     ],
     verbs,
     adjectives,

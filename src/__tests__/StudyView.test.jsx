@@ -1,0 +1,2234 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+
+import { DEFAULT_PREFS } from '../data/defaults.js';
+import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
+import { conjugateItem, surfaceFormFor, wordKey } from '../utils/conjugator.js';
+import { englishForForm } from '../utils/display.js';
+import { cardIdFor, defaultState } from '../utils/storage.js';
+import { clearSentenceCorpusCache } from '../utils/sentenceCorpus.js';
+import { buildReadinessFamilyRows } from '../utils/readiness.js';
+import { recordPracticeAnswer } from '../utils/practiceStats.js';
+import { applyGuideAttemptToState } from '../utils/guidePractice.js';
+
+const mockedApp = vi.hoisted(() => ({ value: null }));
+const mockedSpeech = vi.hoisted(() => ({ playPronunciation: vi.fn() }));
+const mockedSentences = vi.hoisted(() => ({ bundled: vi.fn(), tailored: vi.fn() }));
+let originalScrollIntoView;
+
+vi.mock('../state/AppStateContext.jsx', () => ({
+  useApp: () => mockedApp.value,
+}));
+
+vi.mock('../utils/speech.js', async () => {
+  const actual = await vi.importActual('../utils/speech.js');
+  return {
+    ...actual,
+    playPronunciation: mockedSpeech.playPronunciation,
+  };
+});
+
+vi.mock('../utils/sentenceCorpus.js', async () => ({
+  ...(await vi.importActual('../utils/sentenceCorpus.js')),
+  fetchBundledSentence: mockedSentences.bundled,
+}));
+
+vi.mock('../utils/sentenceLibrary.js', async () => ({
+  ...(await vi.importActual('../utils/sentenceLibrary.js')),
+  fetchTailoredSentence: mockedSentences.tailored,
+}));
+
+import StudyView, { reviewFeedbackActionForRecord } from '../views/StudyView.jsx';
+import { RunAnswerReveal } from '../views/study/StudyReviewPanels.jsx';
+
+beforeEach(() => {
+  mockedSentences.bundled.mockReset().mockResolvedValue(null);
+  mockedSentences.tailored.mockReset().mockResolvedValue(null);
+  originalScrollIntoView = window.Element.prototype.scrollIntoView;
+  window.Element.prototype.scrollIntoView = vi.fn();
+});
+
+function makeApp(overrides = {}) {
+  const base = {
+    state: defaultState(),
+    setState: vi.fn(),
+    setTab: vi.fn(),
+    allWords: [...STARTER_VERBS, ...STARTER_ADJECTIVES],
+    activeGeminiKey: '',
+    practicePrefs: DEFAULT_PREFS,
+    setPracticePrefs: vi.fn(),
+    wordLists: [],
+    setWordLists: vi.fn(),
+    studyFocus: null,
+    clearStudyFocus: vi.fn(),
+    openLabTool: vi.fn(),
+    session: { user: { id: 'test-user' } },
+    showAuth: vi.fn(),
+    hydrated: true,
+    ...overrides,
+  };
+  return {
+    ...base,
+  };
+}
+
+function resolveStateUpdate(update, previous = mockedApp.value.state) {
+  return typeof update === 'function' ? update(previous) : update;
+}
+
+function goalHitState() {
+  return defaultState();
+}
+
+function stateWithDueRule(ruleId) {
+  return {
+    ...defaultState(),
+    cards: {
+      [ruleId]: {
+        ease: 2.5,
+        interval: 1,
+        reps: 1,
+        nextReview: 1,
+        correct: 0,
+        incorrect: 0,
+        lastSeen: 0,
+      },
+    },
+  };
+}
+
+function persistStudyCard(word, type, options = {}) {
+  sessionStorage.setItem(
+    'jp-study-current',
+    JSON.stringify({
+      dict: word.dict,
+      reading: word.reading,
+      meaning: word.meaning,
+      group: word.group,
+      type,
+      sourceType: options.sourceType || null,
+      word,
+    }),
+  );
+}
+
+async function waitForPracticeCard() {
+  return screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+}
+
+// Loader tests validate approval metadata and content hashes. These view tests
+// supply the already accepted, hydrated entries returned by those loaders.
+function approvedSentenceEntry(word, type, jaTemplate = '昼に{w}。', en = 'I ate at noon.') {
+  const [before, after] = jaTemplate.split('{w}');
+  return {
+    jaTemplate,
+    en,
+    segments: [{ t: before, r: '' }, { w: true }, { t: after, r: '' }],
+    surface: surfaceFormFor(word, type),
+    kanaSurface: conjugateItem(word, type),
+    source: 'bundled',
+  };
+}
+
+function expectElementBefore(first, second) {
+  expect(
+    Boolean(first.compareDocumentPosition(second) & window.Node.DOCUMENT_POSITION_FOLLOWING),
+  ).toBe(true);
+}
+
+function openPracticeRunSettings() {
+  const summary = screen.getByText('Answer settings');
+  fireEvent.click(summary);
+  return within(summary.closest('details'));
+}
+
+async function clickTopReviewNext() {
+  fireEvent.click(await screen.findByRole('button', { name: 'Next card' }));
+}
+
+class FakeSpeechRecognition {
+  static instance = null;
+
+  constructor() {
+    FakeSpeechRecognition.instance = this;
+    this.continuous = false;
+    this.interimResults = false;
+    this.lang = '';
+    this.maxAlternatives = 1;
+  }
+
+  start() {
+    this.onstart?.();
+  }
+
+  stop() {
+    this.onend?.();
+  }
+
+  abort() {
+    this.onend?.();
+  }
+
+  emitFinal(transcript) {
+    const result = {
+      0: { transcript },
+      isFinal: true,
+      length: 1,
+    };
+    this.onresult?.({
+      resultIndex: 0,
+      results: {
+        0: result,
+        length: 1,
+      },
+    });
+  }
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+  cleanup();
+  localStorage.clear();
+  sessionStorage.clear();
+  clearSentenceCorpusCache();
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+  if (originalScrollIntoView) {
+    window.Element.prototype.scrollIntoView = originalScrollIntoView;
+  } else {
+    delete window.Element.prototype.scrollIntoView;
+  }
+  delete window.SpeechRecognition;
+  delete window.webkitSpeechRecognition;
+  FakeSpeechRecognition.instance = null;
+});
+
+describe('reviewFeedbackActionForRecord', () => {
+  it('chooses one concrete next action from the review context', () => {
+    const godan = STARTER_VERBS.find((word) => word.group === 'godan');
+    const ichidan = STARTER_VERBS.find((word) => word.group === 'ichidan');
+    expect(godan).toBeTruthy();
+    expect(ichidan).toBeTruthy();
+
+    expect(reviewFeedbackActionForRecord({ correct: true }).label).toBe('Next card');
+    expect(
+      reviewFeedbackActionForRecord({
+        correct: false,
+        diagnosis: {
+          category: 'godan-sound-change',
+          patternId: 'godan-onbin-ku',
+          targetType: 'plain-past',
+          repairTypeIds: ['plain-past'],
+        },
+        practicedType: 'plain-past',
+        word: godan,
+      }).label,
+    ).toBe('Drill the trap');
+    expect(
+      reviewFeedbackActionForRecord({
+        correct: false,
+        practicedType: 'plain-negative',
+        word: godan,
+      }).label,
+    ).toBe('Open Guide for this rule');
+    expect(
+      reviewFeedbackActionForRecord(
+        {
+          correct: false,
+          practicedType: 'plain-past',
+          word: ichidan,
+        },
+        { relatedLesson: { groupId: 'plain', title: 'Plain forms' } },
+      ).label,
+    ).toBe('Review lesson');
+  });
+});
+
+describe('RunAnswerReveal next action', () => {
+  it('keeps one primary Next card action alongside a recommended drill', () => {
+    const target = STARTER_VERBS.find((word) => word.group === 'godan');
+    const onNext = vi.fn();
+    expect(target).toBeTruthy();
+
+    render(
+      <RunAnswerReveal
+        record={{
+          id: 'sound-change-miss',
+          correct: false,
+          word: target,
+          practicedType: 'plain-past',
+          cardType: 'plain-past',
+          promptType: 'dictionary',
+          promptForm: target.dict,
+          expected: conjugateItem(target, 'plain-past'),
+          submittedAnswer: `${target.reading.slice(0, -1)}\u304d\u305f`,
+          answerMode: 'choice',
+          practicePrefs: DEFAULT_PREFS,
+          diagnosis: {
+            category: 'godan-sound-change',
+            patternId: 'godan-onbin-ku',
+            targetType: 'plain-past',
+            repairTypeIds: ['plain-past'],
+          },
+          explanation: {
+            intro: 'Use the godan sound change.',
+            rule: 'Change the final sound before adding the past ending.',
+          },
+        }}
+        onOpenGuide={vi.fn()}
+        onOpenLab={vi.fn()}
+        onTryAnother={onNext}
+      />,
+    );
+
+    const nextButtons = screen.getAllByRole('button', { name: 'Next card' });
+    expect(nextButtons).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Drill the trap' })).toBeTruthy();
+
+    fireEvent.click(nextButtons[0]);
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('StudyView continuous Practice startup', () => {
+  it('opens continuous Practice for signed-in learners', async () => {
+    const app = makeApp();
+    mockedApp.value = app;
+
+    render(<StudyView />);
+
+    expect(await waitForPracticeCard()).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Practice selection' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Core forms' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Practice categories' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Practice quick filters' })).toBeTruthy();
+    expect(screen.queryByText('Change', { exact: true })).toBeNull();
+    expect(screen.queryByText(/Mixed practice/)).toBeNull();
+    expect(screen.queryByText('Practice run')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Check (Enter)' }).closest('[data-action-dock="true"]'),
+    ).toBeTruthy();
+    expect(screen.getByText('Answer settings')).toBeTruthy();
+  });
+
+  it('opens continuous Practice while signed out', async () => {
+    const app = makeApp({
+      session: null,
+    });
+    mockedApp.value = app;
+
+    render(<StudyView />);
+
+    expect(await waitForPracticeCard()).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Practice selection' })).toBeTruthy();
+    expect(screen.queryByText('Practice run')).toBeNull();
+  });
+
+  it('does not surface a local Stats shortcut on an active card', async () => {
+    const target = STARTER_VERBS[0];
+    persistStudyCard(target, 'plain-past');
+    const app = makeApp();
+    mockedApp.value = app;
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+
+    expect(screen.queryByRole('button', { name: 'Back to Stats' })).toBeNull();
+    expect(app.setTab).not.toHaveBeenCalled();
+  });
+
+  it('keeps the compact selection controls before the active card in DOM order', async () => {
+    mockedApp.value = makeApp();
+
+    render(<StudyView />);
+
+    const answerInput = await waitForPracticeCard();
+    const selector = screen.getByRole('region', { name: 'Practice selection' });
+    expectElementBefore(selector, answerInput);
+  });
+
+  it('surfaces answer style and kana help controls beside the topic selector', async () => {
+    const setPracticePrefs = vi.fn();
+    mockedApp.value = makeApp({
+      setPracticePrefs,
+      studyFocus: {
+        word: STARTER_VERBS[0],
+        type: 'plain-past',
+      },
+    });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    const settings = openPracticeRunSettings();
+    const answerStyle = within(settings.getByRole('group', { name: 'Answer style' }));
+    expect(answerStyle.getByRole('button', { name: 'Type' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+
+    fireEvent.click(answerStyle.getByRole('button', { name: 'Choose' }));
+    const answerUpdater = setPracticePrefs.mock.calls.at(-1)[0];
+    expect(answerUpdater({ ...DEFAULT_PREFS }).answerMode).toBe('choice');
+
+    const kanaToggle = settings.getByRole('button', { name: 'Kana help on' });
+    expect(kanaToggle.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(kanaToggle);
+    const kanaUpdater = setPracticePrefs.mock.calls.at(-1)[0];
+    expect(kanaUpdater({ ...DEFAULT_PREFS }).kanaAssist).toBe('off');
+
+    const autoNextToggle = settings.getByRole('button', { name: 'Auto next off' });
+    expect(autoNextToggle.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(autoNextToggle);
+    const autoNextUpdater = setPracticePrefs.mock.calls.at(-1)[0];
+    expect(autoNextUpdater({ ...DEFAULT_PREFS })).toMatchObject({
+      autoAdvanceCorrect: true,
+      autoAdvanceCorrectUserSet: true,
+      autoAdvanceCorrectByAnswerForm: { 'input-live': true },
+    });
+
+    expect(settings.getByRole('button', { name: 'Sentence off' })).toBeTruthy();
+  });
+
+  it('returns from a focused word to the persistent Practice mix', async () => {
+    const app = makeApp({ studyFocus: { word: STARTER_VERBS[0], type: 'plain-past' } });
+    // Consuming the focus clears it in the real provider; mirror that so the
+    // dashboard can re-render once the focus lock is released.
+    app.clearStudyFocus = vi.fn(() => {
+      app.studyFocus = null;
+    });
+    mockedApp.value = app;
+
+    render(<StudyView />);
+
+    // Word-level focus remains explicit, while exiting returns to ordinary Practice.
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
+
+    expect(app.setTab).toHaveBeenCalledWith('practice');
+  });
+
+  it('keeps a focused word launch until the learner exits it', async () => {
+    const clearStudyFocus = vi.fn();
+    const app = makeApp({
+      clearStudyFocus,
+      studyFocus: {
+        word: STARTER_VERBS[0],
+        type: 'plain-past',
+      },
+    });
+    mockedApp.value = app;
+
+    render(<StudyView />);
+
+    const exitFocus = await screen.findByRole('button', { name: 'Exit focus' });
+    expect(clearStudyFocus).not.toHaveBeenCalled();
+    fireEvent.click(exitFocus);
+    expect(clearStudyFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a persisted launch from the empty-focus fallback', async () => {
+    const clearStudyFocus = vi.fn();
+    const word = { dict: '猫', reading: 'ねこ', meaning: 'cat', group: 'noun' };
+    mockedApp.value = makeApp({
+      allWords: [word],
+      clearStudyFocus,
+      studyFocus: { word, type: 'plain-past' },
+    });
+
+    render(<StudyView />);
+
+    const clearFocus = await screen.findByRole('button', { name: 'Clear focus' });
+    expect(clearStudyFocus).not.toHaveBeenCalled();
+    fireEvent.click(clearFocus);
+    expect(clearStudyFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores a persisted study card when vocabulary metadata changes', async () => {
+    const target = STARTER_VERBS[0];
+    const refreshedTarget = {
+      ...target,
+      meaning: `${target.meaning} (refreshed)`,
+      jlpt: 'N5',
+    };
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: target.dict,
+        reading: target.reading,
+        meaning: target.meaning,
+        group: target.group,
+        type: 'plain-past',
+        word: target,
+      }),
+    );
+    mockedApp.value = makeApp({ allWords: [refreshedTarget, STARTER_VERBS[1]] });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    const raw = sessionStorage.getItem('jp-study-current');
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw).dict).toBe(target.dict);
+  });
+
+  it('hides English meaning and reveal controls while answering by default', async () => {
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      activeGeminiKey: 'proxy',
+      studyFocus: {
+        word: target,
+        type: 'plain-past',
+      },
+    });
+
+    render(<StudyView />);
+
+    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    expect(screen.queryByText(englishForForm(target, 'plain-past'))).toBeNull();
+    expect(screen.queryByText('English hint hidden until review.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show hint', exact: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'AI clue', exact: true })).toBeNull();
+  });
+
+  it('shows English meaning after review even when default hidden', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
+    expect(screen.getByText(englishForForm(target, type))).toBeTruthy();
+  });
+
+  it('ignores a persisted card when its form is no longer enabled', async () => {
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: STARTER_VERBS[0].dict,
+        group: STARTER_VERBS[0].group,
+        type: 'short-causative-passive-polite-past-negative',
+      }),
+    );
+    mockedApp.value = makeApp({ state: goalHitState() });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    await waitFor(() => {
+      const raw = sessionStorage.getItem('jp-study-current');
+      expect(raw).toBeTruthy();
+      expect(JSON.parse(raw).type).not.toBe('short-causative-passive-polite-past-negative');
+    });
+    expect(screen.queryByText('No cards available')).toBeNull();
+  });
+
+  it('ignores a persisted card outside the current word list', async () => {
+    const staleWord = STARTER_VERBS[0];
+    const allowedWord = STARTER_VERBS[1];
+    const list = {
+      id: 'focused-list',
+      name: 'Focused List',
+      wordKeys: [`${allowedWord.group}:${allowedWord.dict}`],
+    };
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: staleWord.dict,
+        group: staleWord.group,
+        type: 'plain-past',
+      }),
+    );
+    mockedApp.value = makeApp({
+      state: goalHitState(),
+      allWords: [staleWord, allowedWord],
+      practicePrefs: { ...DEFAULT_PREFS, wordListIds: [list.id] },
+      wordLists: [list],
+    });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    await waitFor(() => {
+      const raw = sessionStorage.getItem('jp-study-current');
+      expect(raw).toBeTruthy();
+      expect(JSON.parse(raw).dict).toBe(allowedWord.dict);
+    });
+    expect(screen.queryByText('No cards available')).toBeNull();
+  });
+
+  it('restores the exact persisted word when duplicate dictionary entries exist', async () => {
+    const baseWord = {
+      dict: '開ける',
+      reading: 'あける',
+      meaning: 'to open',
+      group: 'ichidan',
+      jlpt: 'N5',
+    };
+    const exactWord = { ...baseWord, meaning: 'to open (v.t.)' };
+    sessionStorage.setItem(
+      'jp-study-current',
+      JSON.stringify({
+        dict: exactWord.dict,
+        reading: exactWord.reading,
+        meaning: exactWord.meaning,
+        group: exactWord.group,
+        type: 'polite-present',
+      }),
+    );
+    mockedApp.value = makeApp({
+      state: goalHitState(),
+      allWords: [baseWord, exactWord],
+      practicePrefs: { ...DEFAULT_PREFS, englishHints: 'show' },
+    });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    await screen.findByText('to open (v.t.)', {}, { timeout: 5000 });
+    expect(screen.queryByText('No cards available')).toBeNull();
+  });
+
+  it('does not treat a retired repair list as a persisted special launch', async () => {
+    // Retired repair-drill prefs can remain in older storage. They should not
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      state: defaultState(),
+      allWords: [target],
+      wordLists: [{ id: 'repair-drill', name: 'Repair', wordKeys: [wordKey(target)] }],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        englishHints: 'show',
+        reviewLimitSource: 'repair',
+        reviewLimit: 10,
+        wordListIds: ['repair-drill'],
+      },
+    });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    expect(screen.queryByText('No cards available')).toBeNull();
+  });
+
+  it('automatically checks a final spoken answer in speak answer mode', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const setState = vi.fn();
+    const clearStudyFocus = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      clearStudyFocus,
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+
+    render(<StudyView />);
+
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
+    expect(FakeSpeechRecognition.instance?.lang).toBe('ja-JP');
+
+    act(() => {
+      FakeSpeechRecognition.instance.emitFinal(conjugateItem(target, type));
+    });
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
+    expect(nextState.session.currentStreak).toBe(1);
+    expect(nextState.session.bestStreak).toBe(1);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'correct',
+      label: 'Plain Past',
+    });
+    const eventId = nextState.practiceStats.recent[0].id;
+    expect(eventId).toEqual(expect.any(String));
+    expect(nextState.session.recentOutcomes[0].id).toBe(eventId);
+    expect(nextState.cards[cardIdFor(target, type)].lastAttemptId).toBe(eventId);
+    expect(nextState.readiness.byRule[cardIdFor(target, type)].speed.lastAttemptId).toBe(eventId);
+    expect(Object.values(nextState.weakness.byLane)[0].recent[0].id).toBe(eventId);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
+  });
+
+  it('preserves synced progress received while the current spoken answer is being recognized', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const app = makeApp({
+      setState,
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+    mockedApp.value = app;
+    const view = render(<StudyView />);
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
+    const remote = {
+      ...app.state,
+      session: { ...app.state.session, reviewed: 1, correct: 0 },
+      practiceStats: recordPracticeAnswer(app.state.practiceStats, {
+        id: 'remote-answer',
+        typeId: type,
+        correct: false,
+        at: 1000,
+        mode: 'input',
+      }),
+    };
+    mockedApp.value = { ...app, state: remote };
+    view.rerender(<StudyView />);
+    act(() => {
+      FakeSpeechRecognition.instance.emitFinal(conjugateItem(target, type));
+    });
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    const next = resolveStateUpdate(setState.mock.calls.at(-1)[0]);
+    expect(next.practiceStats.lifetime).toMatchObject({ attempted: 2, correct: 1 });
+    expect(next.session).toMatchObject({ reviewed: 2, correct: 1 });
+    expect(next.practiceStats.recent.some((row) => row.id === 'remote-answer')).toBe(true);
+  });
+
+  it('ignores a final result from a microphone belonging to the previous exercise', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      setState,
+      studyFocus: { word: target, type: 'plain-past' },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+    render(<StudyView />);
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
+    const previousRecognition = FakeSpeechRecognition.instance;
+    fireEvent.click(screen.getByRole('button', { name: 'Skip', exact: true }));
+    await waitFor(() => expect(FakeSpeechRecognition.instance).not.toBe(previousRecognition));
+    setState.mockClear();
+    act(() => {
+      previousRecognition.emitFinal(conjugateItem(target, 'plain-past'));
+    });
+    expect(setState).not.toHaveBeenCalled();
+  });
+
+  it('credits speech against a remote answer queued in the same React batch', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const rid = cardIdFor(target, type);
+    const app = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+    let receiveRemote;
+    let submittedUpdate;
+    function ConcurrentStudy() {
+      const [learnerState, updateLearnerState] = useState(app.state);
+      receiveRemote = updateLearnerState;
+      mockedApp.value = {
+        ...app,
+        state: learnerState,
+        setState: (update) => {
+          submittedUpdate = update;
+          updateLearnerState(update);
+        },
+      };
+      return <StudyView />;
+    }
+    render(<ConcurrentStudy />);
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
+    const remote = applyGuideAttemptToState(
+      app.state,
+      {
+        word: target,
+        typeId: type,
+        sourceTypeId: 'dictionary',
+        expectedGroup: target.group,
+        expectedAnswer: conjugateItem(target, type),
+      },
+      {
+        correct: false,
+        assisted: false,
+        steps: {
+          base: { correct: true, assisted: false },
+          group: { correct: true, assisted: false },
+          answer: { correct: false, assisted: false, submitted: 'wrong' },
+        },
+      },
+      { eventId: 'queued-remote-answer', now: 1000, responseMs: 1000 },
+    );
+    act(() => {
+      receiveRemote(remote);
+      FakeSpeechRecognition.instance.emitFinal(conjugateItem(target, type));
+    });
+    const next = mockedApp.value.state;
+    expect(next.practiceStats.lifetime).toMatchObject({ attempted: 2, correct: 1 });
+    expect(next.session).toMatchObject({ reviewed: 2, correct: 1 });
+    expect(next.cards[rid]).toMatchObject({ correct: 1, incorrect: 1 });
+    expect(next.readiness.byRule[rid].production).toMatchObject({ attempted: 2, correct: 1 });
+    expect(Object.values(next.weakness.byLane)[0]).toMatchObject({ attempted: 2, correct: 1 });
+    expect(next.guide.attempted).toBe(1);
+    expect(next.practiceStats.recent.some((row) => row.id === 'queued-remote-answer')).toBe(true);
+    expect(submittedUpdate(remote)).toEqual(submittedUpdate(remote));
+    expect(submittedUpdate(next)).toBe(next);
+  });
+
+  it('reveals kana directly into the Study answer box', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'off',
+      },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    const expectedKana = Array.from(conjugateItem(target, type));
+    const firstKana = expectedKana[0];
+    const revealNext = await screen.findByRole(
+      'button',
+      { name: 'Reveal next kana' },
+      { timeout: 5000 },
+    );
+
+    fireEvent.click(revealNext);
+    await waitFor(() => expect(input.value).toBe(firstKana));
+
+    fireEvent.change(input, { target: { value: 'ta' } });
+    await waitFor(() => expect(input.value).toBe(firstKana));
+    fireEvent.click(revealNext);
+    await waitFor(() => expect(input.value).toBe(expectedKana.slice(0, 2).join('')));
+
+    expect(screen.queryByRole('group', { name: 'Live kana help' })).toBeNull();
+    expect(screen.queryByRole('status', { name: 'Kana preview' })).toBeNull();
+  });
+
+  it('auto-converts reading-practice answers in the text input', async () => {
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        reviewStyle: 'reading',
+      },
+      studyFocus: {
+        word: target,
+        type: 'dictionary',
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(
+      /Type dictionary form/i,
+      {},
+      { timeout: 5000 },
+    );
+    fireEvent.change(input, { target: { value: 'oki' } });
+
+    expect(input.value).toBe('\u304a\u304d');
+    expect(screen.queryByRole('status', { name: 'Kana preview' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Live kana help' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
+  });
+
+  it('shows the reviewed source sentence for reverse reading practice', async () => {
+    const target = STARTER_VERBS[0];
+    const sourceType = 'plain-past';
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, sourceType));
+    persistStudyCard(target, 'dictionary', { sourceType });
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [sourceType] },
+      allWords: [target],
+      practicePrefs: { ...DEFAULT_PREFS, reviewStyle: 'reading', sentenceMode: true },
+    });
+
+    render(<StudyView />);
+
+    await screen.findByPlaceholderText(/Type dictionary form/i, {}, { timeout: 5000 });
+    await waitFor(() => {
+      const sentenceCard = document.querySelector('[data-sentence-mode="reverse-context"]');
+      expect(sentenceCard).toBeTruthy();
+      expect(sentenceCard.textContent).toContain(surfaceFormFor(target, sourceType));
+      expect(sentenceCard.textContent).not.toContain('[______]');
+    });
+    expect(screen.getByText('Answer with the dictionary form.')).toBeTruthy();
+  });
+
+  it('waits briefly for reviewed context without generating an unchecked fallback', async () => {
+    vi.useFakeTimers();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve(approvedSentenceEntry(target, type)), 100),
+        ),
+    );
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+
+    render(<StudyView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
+    expect(document.querySelector('[data-sentence-mode="forward-cloze"]')).toBeNull();
+    expect(screen.queryByText(/No reviewed sentence/)).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
+    expect(sentenceCard).toBeTruthy();
+    expect(sentenceCard.textContent).toContain('昼');
+    expect(sentenceCard.textContent).toContain('[______]');
+    expect(sentenceCard.closest('details')).toBeNull();
+    expect(sentenceCard.className).not.toContain('hidden');
+  });
+
+  it('freezes ordinary Practice if reviewed context arrives after the grace window', async () => {
+    vi.useFakeTimers();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    let resolveEntry;
+    mockedSentences.bundled.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveEntry = resolve;
+        }),
+    );
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+
+    render(<StudyView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    expect(screen.getByText(/No reviewed sentence for this word and form yet/)).toBeTruthy();
+    const input = screen.getByPlaceholderText(/Type romaji or kana/i);
+    fireEvent.change(input, { target: { value: 'a' } });
+
+    await act(async () => {
+      resolveEntry(approvedSentenceEntry(target, type));
+    });
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    expect(input.value).toBe('あ');
+    expect(mockedApp.value.setPracticePrefs).not.toHaveBeenCalled();
+  });
+
+  it('continues a custom word exercise without reviewed context or recording a result', async () => {
+    const target = { dict: '試す', reading: 'ためす', meaning: 'to try', group: 'godan' };
+    mockedApp.value = makeApp({
+      allWords: [target],
+      studyFocus: { word: target, type: 'plain-past' },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+
+    render(<StudyView />);
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await screen.findByText(/No reviewed sentence for this word and form yet/);
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    expect(mockedApp.value.setPracticePrefs).not.toHaveBeenCalled();
+    expect(mockedApp.value.state.session.reviewed).toBe(0);
+    expect(screen.queryByText('Not quite.')).toBeNull();
+    fireEvent.change(input, { target: { value: 'zzzz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    expect(await screen.findByRole('heading', { name: 'Not quite.' })).toBeTruthy();
+  });
+
+  it('shows the correct completed sentence and translation after a wrong answer', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+
+    render(<StudyView />);
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitFor(() => expect(document.querySelector('[data-sentence-mode]')).toBeTruthy());
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+    expect(screen.queryByText('I ate at noon.')).toBeNull();
+    fireEvent.change(input, { target: { value: 'zzzz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+
+    await screen.findByRole('heading', { name: 'Not quite.' });
+    const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
+    expect(sentenceCard.textContent).toContain(surfaceFormFor(target, type));
+    expect(sentenceCard.textContent).not.toContain('[______]');
+    expect(sentenceCard.textContent).not.toContain('zzzz');
+    expect(within(sentenceCard).getByText('I ate at noon.')).toBeTruthy();
+  });
+
+  it('preloads the next word-sweep reviewed sentence during review', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const nextType = 'plain-negative';
+    mockedSentences.bundled.mockImplementation((word, requestedType) =>
+      Promise.resolve(
+        approvedSentenceEntry(
+          word,
+          requestedType,
+          requestedType === type ? 'きょう{w}。' : 'あした{w}。',
+        ),
+      ),
+    );
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [type, nextType] },
+      allWords: [target],
+      studyFocus: { word: target, type, launchMode: 'word-sweep' },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+
+    render(<StudyView />);
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitFor(() => expect(document.querySelector('[data-sentence-mode]')).toBeTruthy());
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    await waitFor(() => expect(mockedSentences.bundled).toHaveBeenCalledWith(target, nextType));
+    await clickTopReviewNext();
+    await waitFor(() => {
+      const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
+      expect(sentenceCard).toBeTruthy();
+      expect(sentenceCard.textContent).toContain('あした');
+    });
+  });
+
+  it('refreshes expired entries for exact retries while keeping the active sentence frozen', async () => {
+    vi.useFakeTimers();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [type] },
+      allWords: [target],
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+
+    render(<StudyView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(59_999);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+
+    mockedSentences.bundled.mockResolvedValue(
+      approvedSentenceEntry(target, type, '夜に{w}。', 'I ate at night.'),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2);
+    });
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(2);
+    // Prefetch refreshed the cache, while review keeps the original sentence.
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+    expect(document.querySelector('[data-sentence-mode]').textContent).not.toContain('夜');
+    fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('夜');
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(2);
+  });
+
+  it('hides and replays reviewed listening context on an exact-word/form retry', async () => {
+    vi.stubGlobal('speechSynthesis', {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+      speak: vi.fn(),
+    });
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [type] },
+      allWords: [target],
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true, listeningPrompt: true },
+    });
+
+    render(<StudyView />);
+    await screen.findByText('Sentence listening prompt');
+    await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
+    expect(document.querySelector('[data-sentence-mode]')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+    await clickTopReviewNext();
+    await screen.findByText('Sentence listening prompt');
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(2));
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a reviewed listening sentence hidden until Show text and plays it once', async () => {
+    vi.stubGlobal('speechSynthesis', {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+      speak: vi.fn(),
+    });
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const surface = surfaceFormFor(target, type);
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true, listeningPrompt: true },
+    });
+
+    render(<StudyView />);
+    await screen.findByText('Sentence listening prompt', {}, { timeout: 5000 });
+    await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1));
+    expect(document.body.textContent).not.toContain(`昼に${surface}。`);
+    fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
+    const sentenceCard = document.querySelector('[data-sentence-mode="listening-recognition"]');
+    expect(sentenceCard.textContent).toContain('昼');
+    expect(sentenceCard.textContent).toContain(surface);
+    expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1);
+  });
+
+  it('plays ordinary word audio only after missing listening context resolves', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('speechSynthesis', {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+      speak: vi.fn(),
+    });
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockImplementation(() => new Promise(() => {}));
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true, listeningPrompt: true },
+    });
+
+    render(<StudyView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockedSpeech.playPronunciation).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(screen.getByText('Listening prompt')).toBeTruthy();
+    expect(screen.getByText(/No reviewed sentence/)).toBeTruthy();
+    expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1);
+    expect(mockedSpeech.playPronunciation.mock.calls[0][0]).not.toContain('昼');
+    fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
+    expect(screen.queryByText('Listening prompt')).toBeNull();
+    expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
+  });
+
+  it('credits reading practice to the source form without changing the dictionary SRS card', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const sourceType = 'plain-past';
+    const dictionaryCardId = cardIdFor(target, 'dictionary');
+    const sourceCardId = cardIdFor(target, sourceType);
+    persistStudyCard(target, 'dictionary', { sourceType });
+
+    mockedApp.value = makeApp({
+      setState,
+      state: { ...defaultState(), enabledTypes: [sourceType] },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        reviewStyle: 'reading',
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(
+      /Type dictionary form/i,
+      {},
+      { timeout: 5000 },
+    );
+    fireEvent.change(input, { target: { value: target.reading } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
+    const nextState = setState.mock.calls
+      .map(([arg]) => resolveStateUpdate(arg))
+      .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
+
+    expect(nextState).toBeTruthy();
+    expect(nextState.practiceStats.byType[sourceType]).toMatchObject({ attempted: 1, correct: 1 });
+    expect(nextState.cards[dictionaryCardId]).toMatchObject({
+      correct: 1,
+      incorrect: 0,
+      sourceTypeStats: {
+        [sourceType]: { correct: 1, incorrect: 0 },
+      },
+    });
+    expect(nextState.cards[sourceCardId]).toBeUndefined();
+    expect(nextState.readiness.byRule[sourceCardId].recognition).toMatchObject({
+      attempted: 1,
+      correct: 1,
+    });
+    expect(nextState.weakness.byLane[`${sourceType}|ichidan`]).toMatchObject({
+      attempted: 1,
+      correct: 1,
+    });
+
+    const readinessRows = buildReadinessFamilyRows(nextState);
+    const sourceFamily = readinessRows.find((row) => (row.typeIds || []).includes(sourceType));
+    expect(sourceFamily.cells.recognition.attempted).toBe(1);
+  });
+
+  it('records a correct Practice answer without exposing a ready queue', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const dueCardId = cardIdFor(target, type);
+    const state = stateWithDueRule(dueCardId);
+    persistStudyCard(target, type);
+
+    mockedApp.value = makeApp({
+      state,
+      setState,
+      allWords: [target],
+    });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
+    const nextState = setState.mock.calls
+      .map(([arg]) => resolveStateUpdate(arg))
+      .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
+
+    expect(nextState).toBeTruthy();
+    expect(nextState.session.currentStreak).toBe(1);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'correct',
+      label: 'Plain Past',
+    });
+    expect(nextState.cards[dueCardId].correct).toBe(1);
+    expect(nextState.practiceStats.byType[type]).toMatchObject({ attempted: 1, correct: 1 });
+    expect(screen.queryByText(/ready queue/i)).toBeNull();
+    expect(nextState.transformation.attempted).toBe(0);
+  });
+
+  it('records Transform drill answers in transformation progress', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const initialState = {
+      ...defaultState(),
+      enabledTypes: [type],
+      cards: { preserved: { due: 123, correct: 4, incorrect: 2 } },
+      mistakes: [{ key: 'preserved-mistake', resolved: false }],
+      retryQueue: ['preserved'],
+      readiness: { preserved: { attempted: 2 } },
+      weakness: { preserved: { attempted: 3 } },
+      daily: { ...defaultState().daily, count: 4 },
+      session: { ...defaultState().session, reviewed: 7, correct: 5, skipped: 1 },
+    };
+    mockedApp.value = makeApp({
+      setState,
+      state: initialState,
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        sourceFormStrategy: 'dictionary',
+      },
+    });
+
+    render(<StudyView mode="transform" />);
+
+    expect(await screen.findByText('Change to the target form')).toBeTruthy();
+    expect(screen.getByText('Starting form')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Use the same dictionary word. Build the named target form; grammar from the starting form is not carried over unless the target names it.',
+      ),
+    ).toBeTruthy();
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
+    const nextState = setState.mock.calls
+      .map(([arg]) => resolveStateUpdate(arg))
+      .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
+
+    expect(nextState.transformation.attempted).toBe(1);
+    expect(nextState.transformation.correct).toBe(1);
+    expect(Object.keys(nextState.transformation.byPair)).toHaveLength(1);
+    for (const field of [
+      'cards',
+      'mistakes',
+      'retryQueue',
+      'readiness',
+      'weakness',
+      'daily',
+      'session',
+    ]) {
+      expect(nextState[field]).toEqual(initialState[field]);
+    }
+  });
+
+  it('leaves pending Practice and Learn focus untouched while Transform is open', async () => {
+    const clearStudyFocus = vi.fn();
+    const clearLearnFocus = vi.fn();
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      clearStudyFocus,
+      clearLearnFocus,
+      learnFocus: {
+        source: 'practice-result',
+        reviewRecord: { word: target, cardType: 'te-form', correct: false },
+      },
+      state: { ...defaultState(), enabledTypes: ['te-form'] },
+      studyFocus: {
+        source: 'lab',
+        launchMode: 'recommendation',
+        recommendation: {
+          id: 'pending-practice-focus',
+          source: 'lab',
+          label: 'Pending Practice focus',
+          returnEnabledTypes: ['plain-past'],
+        },
+      },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        reviewLimit: 6,
+        reviewLimitSource: 'recommendation',
+        wordListIds: ['list-review-rec-pending-practice-focus'],
+      },
+    });
+
+    render(<StudyView mode="transform" />);
+
+    expect(await screen.findByText('Change to the target form')).toBeTruthy();
+    expect(screen.queryByText('Pending Practice focus')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Exit focus' })).toBeNull();
+    expect(clearStudyFocus).not.toHaveBeenCalled();
+    expect(clearLearnFocus).not.toHaveBeenCalled();
+  });
+
+  it('uses the pre-focus scope while a direct form-family Practice launch is pending', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      setState,
+      state: { ...defaultState(), enabledTypes: ['te-form'] },
+      studyFocus: {
+        formGroupId: 'te-ta-sound-changes',
+        source: 'stats',
+        launchMode: 'form-group',
+        returnEnabledTypes: ['plain-past'],
+        returnPracticePrefs: { ...DEFAULT_PREFS },
+      },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        wordListIds: ['focused-list'],
+      },
+      wordLists: [],
+    });
+
+    render(<StudyView mode="transform" />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, 'plain-past') } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
+    const nextState = setState.mock.calls
+      .map(([arg]) => resolveStateUpdate(arg))
+      .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
+    expect(nextState.transformation.correct).toBe(1);
+    expect(screen.queryByRole('button', { name: 'Exit focus' })).toBeNull();
+  });
+
+  it('isolates Transform self-check and reveal misses from Practice progress', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const initialState = {
+      ...defaultState(),
+      enabledTypes: [type],
+      cards: { preserved: { due: 123, correct: 4, incorrect: 2 } },
+      mistakes: [{ key: 'preserved-mistake', resolved: false }],
+      retryQueue: ['preserved'],
+      readiness: { preserved: { attempted: 2 } },
+      weakness: { preserved: { attempted: 3 } },
+      daily: { ...defaultState().daily, count: 4 },
+      session: { ...defaultState().session, reviewed: 7, correct: 5, skipped: 1 },
+    };
+
+    for (const answerMode of ['self-check', 'input']) {
+      cleanup();
+      const setState = vi.fn();
+      mockedApp.value = makeApp({
+        setState,
+        state: initialState,
+        allWords: [target],
+        practicePrefs: { ...DEFAULT_PREFS, answerMode },
+      });
+      render(<StudyView mode="transform" />);
+
+      await screen.findByText('Change to the target form');
+      if (answerMode === 'self-check') {
+        fireEvent.click(screen.getByRole('button', { name: 'Reveal answer' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Missed' }));
+      } else {
+        fireEvent.click(screen.getByRole('button', { name: 'Reveal' }));
+      }
+      await waitFor(() => expect(setState).toHaveBeenCalled());
+      const nextState = setState.mock.calls
+        .map(([arg]) => resolveStateUpdate(arg))
+        .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
+
+      expect(nextState.transformation.correct).toBe(0);
+      for (const field of [
+        'cards',
+        'mistakes',
+        'retryQueue',
+        'readiness',
+        'weakness',
+        'daily',
+        'session',
+      ]) {
+        expect(nextState[field]).toEqual(initialState[field]);
+      }
+    }
+  });
+
+  it('keeps Transform skip entirely local', async () => {
+    const setState = vi.fn();
+    mockedApp.value = makeApp({
+      setState,
+      state: { ...defaultState(), enabledTypes: ['plain-past'] },
+      allWords: [STARTER_VERBS[0]],
+    });
+
+    render(<StudyView mode="transform" />);
+
+    await screen.findByText('Change to the target form');
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(setState).not.toHaveBeenCalled();
+  });
+
+  it('does not clear the suspended Practice card when Transform scope changes', async () => {
+    const practiceWord = STARTER_VERBS[0];
+    const transformWord = STARTER_VERBS[1];
+    persistStudyCard(practiceWord, 'plain-past');
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: ['plain-past'] },
+      allWords: [practiceWord],
+    });
+
+    const view = render(<StudyView mode="transform" />);
+    await screen.findByText('Change to the target form');
+
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: ['plain-past'] },
+      allWords: [transformWord],
+    });
+    view.rerender(<StudyView mode="transform" />);
+
+    await waitFor(() => expect(screen.getByText('Change to the target form')).toBeTruthy());
+    expect(JSON.parse(sessionStorage.getItem('jp-study-current')).dict).toBe(practiceWord.dict);
+  });
+
+  it('keeps an exact romaji answer unsubmitted until Check or Enter when kana help is off', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'off',
+      },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'tabet' } });
+    expect(input.value).toBe('\u305f\u3079t');
+    expect(setState).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: 'tabeta' } });
+    expect(input.value).toBe('\u305f\u3079\u305f');
+    expect(setState).not.toHaveBeenCalled();
+    expect(screen.queryByText('Correct.')).toBeNull();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
+    expect(nextState.session.currentStreak).toBe(1);
+    expect(nextState.session.bestStreak).toBe(1);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'correct',
+      label: 'Plain Past',
+    });
+    expect(nextState.cards[cardId].correct).toBe(1);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
+  });
+
+  it('auto-submits an exact answer when kana help is on', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'tabeta' } });
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
+    expect(nextState.cards[cardId].correct).toBe(1);
+    expect(screen.queryByText('Complete match. Press Enter.')).toBeNull();
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
+  });
+
+  it('counts a coaching-hinted exact answer as correct', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Hint' }));
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
+    expect(nextState.session.currentStreak).toBe(1);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'correct',
+      label: 'Plain Past',
+    });
+    expect(nextState.cards[cardId].correct).toBe(1);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/marked as a miss/)).toBeNull();
+  });
+
+  it('counts revealed kana followed by an exact answer as an assisted miss', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'off',
+      },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    const expected = conjugateItem(target, type);
+    const firstKana = Array.from(expected)[0];
+    fireEvent.click(await screen.findByRole('button', { name: 'Reveal next kana' }));
+    await waitFor(() => expect(input.value).toBe(firstKana));
+
+    fireEvent.change(input, { target: { value: expected } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.currentStreak).toBe(0);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Past',
+    });
+    expect(nextState.cards[cardId].incorrect).toBe(1);
+    expect(screen.getAllByText('Assisted correction.').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Next card' })).toHaveLength(1);
+    expect(screen.getByText(/revealed answer help/)).toBeTruthy();
+    expect(screen.getByText('Rule to apply')).toBeTruthy();
+    expect(screen.queryByText(/does not match the requested/)).toBeNull();
+  });
+
+  it('keeps the first masked irregular step hint non-penalizing', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS.find((word) => word.group === 'suru');
+    expect(target).toBeTruthy();
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Hint' }));
+    expect(await screen.findByRole('button', { name: 'Reveal steps' })).toBeTruthy();
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'correct',
+      label: 'Plain Past',
+    });
+    expect(nextState.cards[cardId].correct).toBe(1);
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/marked as a miss/)).toBeNull();
+  });
+
+  it('counts revealed irregular steps followed by an exact answer as assisted', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS.find((word) => word.group === 'suru');
+    expect(target).toBeTruthy();
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Hint' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Reveal steps' }));
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.currentStreak).toBe(0);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Past',
+    });
+    expect(screen.getAllByRole('button', { name: 'Next card' })).toHaveLength(1);
+    expect(nextState.cards[cardId].incorrect).toBe(1);
+    expect(screen.getAllByText('Assisted correction.').length).toBeGreaterThan(0);
+    expect(screen.getByText(/revealed answer help/)).toBeTruthy();
+  });
+
+  it('counts a near-miss answer submitted with Enter as wrong', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const cardId = cardIdFor(target, type);
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'tabete' } });
+    expect(setState).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Past',
+    });
+    expect(nextState.cards[cardId].incorrect).toBe(1);
+    expect(screen.queryByText('Almost - possible typo.')).toBeNull();
+  });
+
+  it('counts a typed wrong answer as missed and resets the current streak', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-negative';
+    mockedApp.value = makeApp({
+      setState,
+      state: {
+        ...defaultState(),
+        session: { ...defaultState().session, currentStreak: 3, bestStreak: 5 },
+      },
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'tabeta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.currentStreak).toBe(0);
+    expect(nextState.session.bestStreak).toBe(5);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Negative',
+    });
+  });
+
+  it('does not show Practice pitch cues while answering or reviewing', async () => {
+    const target = {
+      ...STARTER_VERBS[0],
+      pitchAccent: { accents: [2], source: 'kanjium' },
+    };
+    const type = 'plain-negative';
+    mockedApp.value = makeApp({
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await waitForPracticeCard();
+    expect(screen.queryByRole('img', { name: /Pitch accent for \u305f\u3079\u308b/ })).toBeNull();
+    expect(screen.queryByRole('img', { name: /Pitch accent for/ })).toBeNull();
+
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
+    expect(screen.queryByRole('img', { name: /Pitch accent for/ })).toBeNull();
+  });
+
+  it('counts Reveal as missed and resets the current streak', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      state: {
+        ...defaultState(),
+        session: { ...defaultState().session, currentStreak: 2, bestStreak: 4 },
+      },
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal' }));
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.currentStreak).toBe(0);
+    expect(nextState.session.bestStreak).toBe(4);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Past',
+    });
+    expect(screen.getAllByRole('button', { name: 'Next card' })).toHaveLength(1);
+  });
+
+  it("counts I don't know as missed in choice mode", async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      allWords: [target],
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'choice' },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    fireEvent.click(await screen.findByRole('button', { name: "I don't know" }));
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.currentStreak).toBe(0);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'missed',
+      label: 'Plain Past',
+    });
+  });
+
+  it('keeps Skip separate from missed and streak penalties', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      state: {
+        ...defaultState(),
+        session: { ...defaultState().session, currentStreak: 2, bestStreak: 4 },
+      },
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    await waitForPracticeCard();
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(0);
+    expect(nextState.session.correct).toBe(0);
+    expect(nextState.session.skipped).toBe(1);
+    expect(nextState.session.currentStreak).toBe(2);
+    expect(nextState.session.bestStreak).toBe(4);
+    expect(nextState.session.recentOutcomes[0]).toMatchObject({
+      kind: 'skipped',
+      label: 'Plain Past',
+    });
+  });
+
+  it('keeps the concise miss diagnosis visible and discloses the detailed rule on demand', async () => {
+    const target = STARTER_VERBS.find((word) => word.group === 'godan');
+    expect(target).toBeTruthy();
+    const type = 'plain-negative';
+    mockedApp.value = makeApp({
+      allWords: [target],
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: `${target.reading}\u306a\u3044` } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    await waitFor(() => expect(screen.getAllByText('Not quite.').length).toBeGreaterThan(0));
+
+    const reviewRegion = document.body;
+
+    expect(within(reviewRegion).getAllByText('Not quite.').length).toBeGreaterThan(0);
+    const ruleCard = within(reviewRegion).getByText('Rule to apply').closest('section');
+    const correctAnswer = within(reviewRegion).getByText('Correct Answer').closest('section');
+    expect(ruleCard).toBeTruthy();
+    expect(correctAnswer).toBeTruthy();
+    expect(
+      ruleCard.compareDocumentPosition(correctAnswer) & window.Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(ruleCard).getByText(/Shift the final/)).toBeTruthy();
+    expect(
+      Array.from(ruleCard.querySelectorAll('[lang="ja"]')).some((node) =>
+        node.textContent?.includes(' = '),
+      ),
+    ).toBe(true);
+    const explanationRow = within(reviewRegion).getByText('Why it missed:').closest('div');
+    expect(explanationRow.textContent).toMatch(/You added/);
+    expect(within(reviewRegion).queryByText(/does not match the requested/)).toBeNull();
+    const answerBreakdown = within(reviewRegion).getByText('Explain the rule').closest('details');
+    expect(answerBreakdown).toBeTruthy();
+    expect(answerBreakdown.open).toBe(false);
+    expect(within(answerBreakdown).queryByText('More')).toBeNull();
+    fireEvent.click(within(answerBreakdown).getByText('Explain the rule'));
+    expect(answerBreakdown.open).toBe(true);
+    expect(within(answerBreakdown).getByText('Visual Rule Path')).toBeTruthy();
+    expect(within(answerBreakdown).getByText('Row visual')).toBeTruthy();
+    expect(within(answerBreakdown).getByText('1. What category is this and why?')).toBeTruthy();
+    expect(within(answerBreakdown).queryByText('Rule')).toBeNull();
+    expect(within(reviewRegion).getByText('Walk through this form in Guide')).toBeTruthy();
+    expect(within(reviewRegion).getByText(/Drills this same word and target form/)).toBeTruthy();
+    expect(
+      within(reviewRegion).getByRole('button', { name: 'Open Guide for this rule' }),
+    ).toBeTruthy();
+    const nextButtons = within(reviewRegion).getAllByRole('button', { name: 'Next card' });
+    expect(nextButtons).toHaveLength(1);
+    expect(
+      nextButtons[0].compareDocumentPosition(answerBreakdown) &
+        window.Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('walks a word form sweep in order and repeats missed forms before completion', async () => {
+    const target = STARTER_VERBS[0];
+    const state = {
+      ...defaultState(),
+      enabledTypes: ['plain-past', 'plain-negative', 'polite-present'],
+    };
+    mockedApp.value = makeApp({
+      state,
+      allWords: [target],
+      practicePrefs: { ...DEFAULT_PREFS, autoAdvanceCorrect: false },
+      studyFocus: {
+        word: target,
+        launchMode: 'word-sweep',
+        returnTo: 'reference',
+      },
+    });
+
+    render(<StudyView />);
+
+    expect(await screen.findByText('Word form sweep')).toBeTruthy();
+    expect(screen.getByText(/3 enabled form types/)).toBeTruthy();
+    expect(screen.getAllByText('Plain Past').length).toBeGreaterThan(0);
+
+    fireEvent.change(await waitForPracticeCard(), { target: { value: 'wrong' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    await clickTopReviewNext();
+
+    await waitFor(() => expect(screen.getAllByText('Plain Negative').length).toBeGreaterThan(0));
+    fireEvent.change(await waitForPracticeCard(), {
+      target: { value: conjugateItem(target, 'plain-negative') },
+    });
+    await clickTopReviewNext();
+
+    await waitFor(() => expect(screen.getAllByText('Polite Present').length).toBeGreaterThan(0));
+    fireEvent.change(await waitForPracticeCard(), {
+      target: { value: conjugateItem(target, 'polite-present') },
+    });
+    await clickTopReviewNext();
+
+    expect((await screen.findAllByText(/Repeating missed forms/)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Plain Past').length).toBeGreaterThan(0);
+    fireEvent.change(await waitForPracticeCard(), {
+      target: { value: conjugateItem(target, 'plain-past') },
+    });
+    await clickTopReviewNext();
+
+    expect(await screen.findByText('Drill complete')).toBeTruthy();
+  });
+
+  it('auto-advances after a brief correct visual by default for guided kana', async () => {
+    const target = STARTER_VERBS[0];
+    const nextTarget = STARTER_VERBS[1];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      allWords: [target, nextTarget],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'guided',
+      },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    vi.useFakeTimers();
+
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
+    expect(screen.getByText('Next card coming up...')).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(850);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => expect(screen.queryByText('Correct.')).toBeNull());
+    const nextInput = screen.getByPlaceholderText(/Type romaji or kana/i);
+    expect(document.activeElement).toBe(nextInput);
+  });
+
+  it('does not auto-advance non-guided typed answers by default', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Next card coming up...')).toBeNull();
+    const nextButtons = screen.getAllByRole('button', { name: 'Next card' });
+    expect(nextButtons).toHaveLength(1);
+    const nextButton = nextButtons[0];
+    expect(nextButton.className).toContain('w-full');
+    expect(nextButton.className).not.toContain('sm:absolute');
+    expect(nextButton.textContent).toContain('Next card');
+    expect(nextButton.parentElement.className).toContain('sticky');
+    expect(nextButton.parentElement.style.paddingBottom).toContain('safe-area-inset-bottom');
+    const answerBreakdown = screen.getByText('Explain the rule').closest('details');
+    expect(answerBreakdown.open).toBe(false);
+    expect(
+      nextButton.compareDocumentPosition(answerBreakdown) & window.Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(nextButton));
+  });
+
+  it('auto-advances non-guided typed answers after enabling that answer form', async () => {
+    const target = STARTER_VERBS[0];
+    const nextTarget = STARTER_VERBS[1];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      allWords: [target, nextTarget],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        autoAdvanceCorrectByAnswerForm: { 'input-live': true },
+      },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    vi.useFakeTimers();
+
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    expect(screen.getByText('Next card coming up...')).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(850);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => expect(screen.queryByText('Correct.')).toBeNull());
+    const nextInput = screen.getByPlaceholderText(/Type romaji or kana/i);
+    expect(document.activeElement).toBe(nextInput);
+  });
+
+  it('offers Gemini review chat after a correct answer without opening it automatically', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      activeGeminiKey: 'proxy',
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('Chat about this').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Gemini is thinking…')).toBeNull();
+  });
+
+  it('keeps direct kana in the input and flags mismatches inline', async () => {
+    mockedApp.value = makeApp({
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'live',
+      },
+      studyFocus: {
+        word: STARTER_VERBS[0],
+        type: 'plain-past',
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: 'たべ' } });
+    await waitFor(() => expect(input.value).toBe('たべ'));
+    expect(screen.queryByText('Expected \u3079 at kana 2.')).toBeNull();
+
+    fireEvent.change(input, { target: { value: 'たなこ' } });
+    await waitFor(() => expect(screen.getByText('Expected \u3079 at kana 2.')).toBeTruthy());
+    expect(input.className).toContain('border-rose-400');
+
+    fireEvent.change(input, { target: { value: 'たべ' } });
+    await waitFor(() => expect(screen.queryByText('Expected \u3079 at kana 2.')).toBeNull());
+    expect(input.className).not.toContain('border-rose-400');
+  });
+
+  it('hides live kana mismatch feedback and penalty when kana help is off', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedApp.value = makeApp({
+      setState,
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        kanaAssist: 'off',
+      },
+      studyFocus: {
+        word: target,
+        type,
+      },
+    });
+
+    render(<StudyView />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    const settings = openPracticeRunSettings();
+    expect(
+      settings.getByRole('button', { name: 'Kana help off' }).getAttribute('aria-pressed'),
+    ).toBe('false');
+
+    fireEvent.change(input, { target: { value: '\u305f\u306a\u3053' } });
+    await waitFor(() => expect(input.value).toBe('\u305f\u306a\u3053'));
+    expect(screen.queryByText('Expected \u3079 at kana 2.')).toBeNull();
+    expect(input.className).not.toContain('border-rose-400');
+
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
+    expect(nextState.session.reviewed).toBe(1);
+    expect(nextState.session.correct).toBe(1);
+  });
+
+  it('focuses the review advance button without asking the browser to scroll', async () => {
+    const originalFocus = window.HTMLButtonElement.prototype.focus;
+    const focusSpy = vi.fn();
+    window.HTMLButtonElement.prototype.focus = focusSpy;
+    mockedApp.value = makeApp({
+      studyFocus: {
+        word: STARTER_VERBS[0],
+        type: 'plain-past',
+      },
+    });
+
+    try {
+      render(<StudyView />);
+
+      const input = await screen.findByPlaceholderText(
+        /Type romaji or kana/i,
+        {},
+        { timeout: 5000 },
+      );
+      fireEvent.change(input, { target: { value: 'tanako' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      await waitFor(() => expect(screen.getAllByText('Not quite.').length).toBeGreaterThan(0));
+      expect(screen.getAllByText('Your Answer').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('\u305f').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('\u306a').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('\u3053').length).toBeGreaterThan(0);
+      await waitFor(() => expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true }));
+    } finally {
+      window.HTMLButtonElement.prototype.focus = originalFocus;
+    }
+  });
+});

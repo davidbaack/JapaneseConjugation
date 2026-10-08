@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "react", "react-dom"]
+  },
+  "include": [
+    "src/data/defaults.js",
+    "src/hooks/useFocusTrap.js",
+    "src/hooks/useVirtualRows.js",
+    "src/i18n/**/*.js",
+    "src/utils/rateLimiter.js",
+    "src/utils/retry.js"
+  ],
+  "exclude": ["node_modules", "dist"]
+}
