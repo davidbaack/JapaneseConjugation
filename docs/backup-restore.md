@@ -4,6 +4,14 @@ Settings > Data & account > Backup & restore exports learner data as JSON.
 Keep a downloaded copy outside this browser: the automatic recovery copy is
 stored in the same browser and does not survive clearing browser storage.
 
+If the app crashes, its recovery screen offers **Reload app** and **Download saved
+recovery data**. The raw download preserves the saved snapshot and pending saves,
+including unreadable JSON, without clearing storage or unregistering service
+workers. It may need repair before import. If downloading fails, the screen
+offers the serialized JSON for manual copying. Storage read failures are reported
+without claiming an export succeeded. Destructive reset remains in Settings with
+its explicit confirmation; the crash screen cannot delete learner data.
+
 ## What the backup contains
 
 Version 43 exports the whole schema 4 learner state, custom words, word lists,

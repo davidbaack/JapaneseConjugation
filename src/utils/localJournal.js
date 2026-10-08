@@ -7,24 +7,7 @@ import { learnerDataError, validateLearnerBundle } from './learnerStateValidatio
 const PREFIX = `${STORAGE_KEY}:pending:`;
 let stagingSequence = 0;
 
-export function serializeSavedRecoveryData() {
-  const pending = [];
-  for (let index = 0; index < localStorage.length; index += 1) {
-    const key = localStorage.key(index);
-    if (key?.startsWith(PREFIX)) pending.push({ key, raw: localStorage.getItem(key) });
-  }
-  return JSON.stringify(
-    {
-      format: 'katachiya-saved-recovery',
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      saved: localStorage.getItem(STORAGE_KEY),
-      pending,
-    },
-    null,
-    2,
-  );
-}
+export { serializeSavedRecoveryData } from './savedRecovery.js';
 
 export function sameLocalLineage(left, right) {
   return (
