@@ -758,6 +758,12 @@ describe('filterWordsForPrefs', () => {
 });
 
 describe('mergePracticePrefs', () => {
+  it('drops preference keys that are no longer part of the prototype schema', () => {
+    const prefs = mergePracticePrefs({ theme: 'dark', retiredSetting: 12 });
+    expect(prefs.theme).toBe('dark');
+    expect(prefs).not.toHaveProperty('retiredSetting');
+  });
+
   it('keeps review limits only for bounded review sessions', () => {
     expect(mergePracticePrefs({ reviewLimit: 10, reviewLimitSource: 'today' })).toMatchObject({
       reviewLimit: 0,

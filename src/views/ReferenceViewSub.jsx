@@ -50,6 +50,10 @@ import {
   referenceHasWeakRule,
   weakReferencePracticeTarget,
 } from '../utils/referenceHelpers.js';
+import {
+  practiceSelectionForTypeIds,
+  updateStatePracticeSelection,
+} from '../utils/practiceSelection.js';
 
 function lookupMatchKey(match) {
   return match
@@ -330,11 +334,13 @@ export default function ReferenceViewSub({
       const remembered = sourceWord
         ? referenceWithSelected(referenceWithHistory(prev.reference, sourceWord), sourceWord)
         : normalizeReferenceState(prev.reference);
-      return {
-        ...prev,
-        enabledTypes: typeIds.length ? typeIds : prev.enabledTypes,
-        reference: remembered,
-      };
+      const withReference = { ...prev, reference: remembered };
+      return typeIds.length
+        ? updateStatePracticeSelection(
+            withReference,
+            practiceSelectionForTypeIds(typeIds, prev.practiceSelection),
+          )
+        : withReference;
     });
   }
 
@@ -597,7 +603,7 @@ export default function ReferenceViewSub({
           <span className="font-semibold text-stone-800 dark:text-stone-200" lang={wordView.lang}>
             {wordView.main}
           </span>
-          {wordView.sub && <span className="text-stone-600"> ({wordView.sub})</span>} Â·{' '}
+          {wordView.sub && <span className="text-stone-600"> ({wordView.sub})</span>} ·{' '}
           {match.word.meaning}
         </div>
         {match.variantNote && (

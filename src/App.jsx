@@ -24,7 +24,19 @@ const DevHistoryPanel = import.meta.env.DEV
 const TABS = ['practice', 'guide', 'stats', 'learn', 'drills', 'tools', 'settings'];
 
 function AppShell() {
-  const { tab, setTab, showAuthModal, setShowAuthModal, supabase } = useApp();
+  const {
+    tab,
+    setTab,
+    showAuthModal,
+    setShowAuthModal,
+    supabase,
+    supabaseConfigured,
+    supabaseStatus,
+    supabaseError,
+    retrySupabase,
+    dataRecoveryError,
+    localPersistenceBlocked,
+  } = useApp();
 
   const { tabProps, panelProps } = useTablist(TABS, tab, setTab);
   const shellWidthClass = tab === 'practice' ? 'max-w-[80rem]' : 'max-w-4xl';
@@ -69,6 +81,28 @@ function AppShell() {
             </button>
           ))}
         </HorizontalTabList>
+        {dataRecoveryError && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200"
+          >
+            <p className="font-medium">
+              {localPersistenceBlocked ? 'Saved data needs recovery' : 'Cloud sync needs attention'}
+            </p>
+            <p className="mt-1">
+              {localPersistenceBlocked
+                ? 'Your saved learner data is preserved. Saving and cloud sync are paused because it could not be safely loaded. Any practice you do now will not be saved.'
+                : 'Your progress is saved in this browser. Cloud sync is paused; open backup and restore to review the recovery message.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setTab('settings')}
+              className="mt-3 rounded-lg border border-current px-3 py-2 font-medium"
+            >
+              Open backup &amp; restore
+            </button>
+          </div>
+        )}
         <Suspense fallback={<ViewSkeleton />}>
           <div {...panelProps(tab)}>
             {tab === 'practice' && <StudyView />}
@@ -85,6 +119,10 @@ function AppShell() {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         supabase={supabase}
+        configured={supabaseConfigured}
+        clientStatus={supabaseStatus}
+        clientError={supabaseError}
+        onRetryClient={retrySupabase}
       />
       <UpdatePrompt />
       {DevHistoryPanel && (

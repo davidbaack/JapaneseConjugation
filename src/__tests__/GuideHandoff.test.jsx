@@ -4,13 +4,22 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../utils/supabase.js', () => ({ supabase: null }));
+vi.mock('../utils/supabase.js', () => ({
+  getSupabaseClientState: () => ({
+    configured: false,
+    status: 'unconfigured',
+    error: null,
+    client: null,
+  }),
+  subscribeSupabaseClient: () => () => {},
+  shouldRestoreSupabaseSession: () => false,
+}));
 
 globalThis.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 import App from '../App.jsx';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
-import { defaultState, localDateKey } from '../utils/storage.js';
+import { defaultState } from '../utils/storage.js';
 
 afterEach(() => {
   cleanup();
@@ -27,15 +36,6 @@ describe('Practice miss to focused Guide handoff', () => {
         state: {
           ...defaultState(),
           enabledTypes: ['plain-negative'],
-          daily: {
-            date: localDateKey(),
-            count: DEFAULT_PREFS.dailyGoal,
-            goalHit: true,
-            goalStreak: 1,
-            bestGoalStreak: 1,
-            currentAnswerStreak: 0,
-            bestAnswerStreak: 0,
-          },
         },
         customVerbs: [],
         customAdjectives: [],
@@ -87,10 +87,15 @@ describe('Practice miss to focused Guide handoff', () => {
     expectDictionaryPrompt();
 
     fireEvent.change(screen.getByLabelText('Plain form'), { target: { value: 'neru' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Next: choose the group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check plain form' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to group' }));
     fireEvent.click(screen.getByRole('button', { name: 'ichidan / ru-verb' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to answer' }));
     fireEvent.change(screen.getByLabelText('Final conjugation'), { target: { value: 'nenai' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Submit guide card' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check answer' }));
+    expect(screen.queryByRole('button', { name: 'Submit guide card' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Finish card' }));
     expect(screen.getByLabelText('Card 1 of 8')).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: 'Next card' }));
 

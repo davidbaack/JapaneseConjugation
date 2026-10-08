@@ -1,5 +1,4 @@
 import { conjugateItem, surfaceFormFor } from './conjugator.js';
-import { buildOfflineCuedCloze } from './clozeSentences.js';
 
 export const CLOZE_BLANK = '[______]';
 
@@ -44,19 +43,10 @@ export function hydrateSentenceValue(value, word, type, source = 'db') {
   };
 }
 
-export function buildOfflineSentenceEntry(word, type) {
-  const built = buildOfflineCuedCloze(word, type);
-  return hydrateSentenceValue(
-    {
-      jaTemplate: built.jaTemplate || String(built.sentence || '').replace(CLOZE_BLANK, '{w}'),
-      segments: null,
-      en: built.note,
-      cue: built.cue,
-    },
-    word,
-    type,
-    'offline',
-  );
+export function buildOfflineSentenceEntry() {
+  // A generic grammar template cannot establish that a word's sense fits its
+  // context. Offline learners use reviewed bundled entries or word practice.
+  return null;
 }
 
 /**
@@ -97,6 +87,11 @@ export function buildSentencePromptModel({
   const replacement = mode === 'forward-cloze' ? CLOZE_BLANK : surface;
   const sentence = fillSentenceTemplate(entry.jaTemplate, replacement);
   const audioText = fillSentenceTemplate(entry.jaTemplate, surface);
+  const completedParts = sentencePartsFromSegments(
+    entry.segments,
+    surface,
+    targetRuby(surface, kanaSurface),
+  );
   const parts = sentencePartsFromSegments(
     entry.segments,
     replacement,
@@ -108,6 +103,8 @@ export function buildSentencePromptModel({
     sentence,
     parts,
     audioText,
+    completedSentence: audioText,
+    completedParts,
     cue: '',
     note: entry.en || '',
     source: entry.source || '',

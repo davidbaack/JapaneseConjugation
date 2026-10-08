@@ -1,164 +1,212 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createHash, webcrypto } from 'node:crypto';
+import { TextEncoder } from 'node:util';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { sentenceContentSerialization } from '../utils/sentenceTrust.js';
 
 const WORD = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+const TYPE = 'plain-past';
+const CONFIG = { url: 'https://katachiya.example.supabase.co', anonKey: 'anon-key' };
+const REVISION = 'a'.repeat(64);
+const CACHE_STORE = 'katachiya_ai_sentence_cache';
+const cacheKey = (revision = REVISION) => `review-v1|${revision}|ichidan:食べる|${TYPE}`;
+let currentRevision;
 
-const ADJECTIVE = {
-  dict: '\u304b\u3086\u3044',
-  reading: '\u304b\u3086\u3044',
-  meaning: 'itchy',
-  group: 'i-adjective',
-};
-
-// Mirror the chainable Supabase query builder: from().select().eq().eq().maybeSingle().
-function selectChain(result) {
-  const maybeSingle = vi.fn(() => Promise.resolve(result));
-  const eqType = vi.fn(() => ({ maybeSingle }));
-  const eqWord = vi.fn(() => ({ eq: eqType }));
-  const select = vi.fn(() => ({ eq: eqWord }));
-  const from = vi.fn(() => ({ select }));
-  return { from, select, eqWord, eqType, maybeSingle };
+function response(rows, { ok = true, status = 200 } = {}) {
+  return { ok, status, json: vi.fn().mockResolvedValue(rows) };
 }
 
-// Load sentenceLibrary fresh with a specific (or null) Supabase client mock.
-async function load(client) {
+function validRow(overrides = {}, word = WORD, type = TYPE) {
+  const row = {
+    ja_template: '今日{w}。',
+    segments: [{ t: '今日', r: 'きょう' }, { w: true }, { t: '。', r: '' }],
+    en: 'I ate today.',
+    ...overrides,
+  };
+  const review = {
+    status: 'accepted',
+    version: 1,
+    sense: word.meaning,
+    basis: 'bilingual-fixture',
+  };
+  review.hash = createHash('sha256')
+    .update(sentenceContentSerialization(word, type, row, review))
+    .digest('hex');
+  row.model = JSON.stringify({ generator: 'codex-sentence-trust', review });
+  return row;
+}
+
+function seedCache(key, value) {
+  localStorage.setItem(CACHE_STORE, JSON.stringify({ [key]: { ts: Date.now(), v: value } }));
+}
+
+async function load(config = CONFIG) {
   vi.resetModules();
-  vi.doMock('../utils/supabase.js', () => ({ supabase: client }));
+  vi.doMock('../utils/supabase.js', () => ({ getSupabaseConfig: () => config }));
+  vi.doMock('../utils/sentenceCorpus.js', () => ({
+    getSentenceCorpusRevision: async () => currentRevision,
+  }));
   return import('../utils/sentenceLibrary.js');
 }
 
 beforeEach(() => {
+  currentRevision = REVISION;
   localStorage.clear();
   vi.clearAllMocks();
+  vi.stubGlobal('crypto', webcrypto);
+  vi.stubGlobal('TextEncoder', TextEncoder);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.doUnmock('../utils/supabase.js');
+  vi.doUnmock('../utils/sentenceCorpus.js');
+  vi.resetModules();
 });
 
 describe('fetchTailoredSentence', () => {
-  it('returns null when Supabase is unconfigured', async () => {
-    const { fetchTailoredSentence } = await load(null);
-    expect(await fetchTailoredSentence(WORD, 'plain-past')).toBeNull();
+  it('returns null without configuration and does not query the database', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load({ url: '', anonKey: '' });
+    expect(await fetchTailoredSentence(WORD, TYPE)).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('maps a row and derives the form locally from the engine', async () => {
-    const data = {
-      ja_template: '今日 {w}。',
-      segments: [{ t: '今日', r: 'きょう' }, { w: true }, { t: '。', r: '' }],
-      en: 'I ate today.',
-    };
-    const chain = selectChain({ data, error: null });
-    const { fetchTailoredSentence } = await load(chain);
-
-    const res = await fetchTailoredSentence(WORD, 'plain-past');
-    expect(res).toMatchObject({
-      jaTemplate: '今日 {w}。',
-      en: 'I ate today.',
+  it('accepts only the reviewed cache entry for the current corpus publication', async () => {
+    seedCache(cacheKey(), validRow());
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load({ url: '', anonKey: '' });
+    expect(await fetchTailoredSentence(WORD, TYPE)).toMatchObject({
       source: 'db',
+      surface: '食べた',
     });
-    expect(res.segments).toHaveLength(3);
-    // surface / kanaSurface come from the conjugation engine, not the DB.
-    expect(res.surface).toBe('食べた');
-    expect(res.kanaSurface).toBe('たべた');
-    expect(chain.eqWord).toHaveBeenCalledWith('word_key', 'ichidan:食べる');
-    expect(chain.eqType).toHaveBeenCalledWith('type', 'plain-past');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('caches a hit so a repeat lookup skips the query', async () => {
-    const chain = selectChain({
-      data: { ja_template: 'x {w}', segments: [{ w: true }], en: 'x' },
-      error: null,
-    });
-    const { fetchTailoredSentence } = await load(chain);
-
-    await fetchTailoredSentence(WORD, 'plain-past');
-    await fetchTailoredSentence(WORD, 'plain-past');
-    expect(chain.maybeSingle).toHaveBeenCalledTimes(1);
+  it('does not revive legacy or previous-publication caches', async () => {
+    for (const key of [`ichidan:食べる|${TYPE}`, cacheKey('b'.repeat(64))]) {
+      seedCache(key, validRow());
+      const { fetchTailoredSentence } = await load({ url: '', anonKey: '' });
+      expect(await fetchTailoredSentence(WORD, TYPE)).toBeNull();
+    }
   });
 
-  it('does not cache a table miss so later imports can appear', async () => {
-    const chain = selectChain({ data: null, error: null });
-    const { fetchTailoredSentence } = await load(chain);
-
-    expect(await fetchTailoredSentence(WORD, 'plain-negative')).toBeNull();
-    chain.maybeSingle.mockResolvedValueOnce({
-      data: {
-        ja_template: 'later {w}',
-        segments: [{ t: 'later ', r: '' }, { w: true }],
-        en: 'Later.',
-      },
-      error: null,
+  it('reads public review metadata over REST with anonymous headers and no HTTP cache', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response([validRow()]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
+    expect(await fetchTailoredSentence(WORD, TYPE)).toMatchObject({
+      jaTemplate: '今日{w}。',
+      source: 'db',
+      surface: '食べた',
+      kanaSurface: 'たべた',
     });
-
-    const res = await fetchTailoredSentence(WORD, 'plain-negative');
-    expect(res).toMatchObject({ jaTemplate: 'later {w}', source: 'db' });
-    expect(chain.maybeSingle).toHaveBeenCalledTimes(2);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toContain('/rest/v1/sentences?');
+    expect(decodeURIComponent(url)).toContain('select=ja_template,segments,en,model,review');
+    expect(decodeURIComponent(url)).toContain('word_key=eq.ichidan:食べる');
+    expect(decodeURIComponent(url)).toContain(`type=eq.${TYPE}`);
+    expect(options.headers).toEqual({
+      apikey: 'anon-key',
+      Authorization: 'Bearer anon-key',
+      Accept: 'application/json',
+    });
+    expect(options.cache).toBe('no-store');
   });
 
-  it('does not cache semantically awkward adjective rows', async () => {
-    const chain = selectChain({
-      data: {
-        ja_template: 'if {w}.',
-        segments: [{ w: true }],
-        en: 'If this task is itchy, I will add a break.',
-      },
-      error: null,
-    });
-    const { fetchTailoredSentence } = await load(chain);
-
-    expect(await fetchTailoredSentence(ADJECTIVE, 'adj-tara')).toBeNull();
-    chain.maybeSingle.mockResolvedValueOnce({
-      data: {
-        ja_template: 'if {w}.',
-        segments: [{ w: true }],
-        en: 'If my skin is itchy, I will rest for a bit.',
-      },
-      error: null,
-    });
-
-    const res = await fetchTailoredSentence(ADJECTIVE, 'adj-tara');
-    expect(res).toMatchObject({ jaTemplate: 'if {w}.', source: 'db' });
-    expect(chain.maybeSingle).toHaveBeenCalledTimes(2);
+  it('uses structured database review metadata as the authoritative approval', async () => {
+    const accepted = validRow();
+    accepted.review = JSON.parse(accepted.model).review;
+    accepted.model = 'legacy-generator';
+    const quarantined = validRow();
+    quarantined.review = { ...JSON.parse(quarantined.model).review, status: 'pending' };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response([quarantined]))
+      .mockResolvedValueOnce(response([accepted]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
+    expect(await fetchTailoredSentence(WORD, TYPE)).toBeNull();
+    expect(await fetchTailoredSentence(WORD, TYPE)).toMatchObject({ en: 'I ate today.' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('ignores semantically awkward cached adjective rows and retries the table', async () => {
-    localStorage.setItem(
-      'katachiya_ai_sentence_cache',
-      JSON.stringify({
-        ['i-adjective:\u304b\u3086\u3044|adj-tara']: {
-          ts: Date.now(),
-          v: {
-            jaTemplate: 'if {w}.',
-            segments: [{ w: true }],
-            en: 'If this task is itchy, I will add a break.',
-          },
-        },
-      }),
-    );
-    const chain = selectChain({
-      data: {
-        ja_template: 'if {w}.',
-        segments: [{ w: true }],
-        en: 'If my skin is itchy, I will rest for a bit.',
-      },
-      error: null,
-    });
-    const { fetchTailoredSentence } = await load(chain);
-
-    const res = await fetchTailoredSentence(ADJECTIVE, 'adj-tara');
-    expect(res).toMatchObject({ jaTemplate: 'if {w}.', source: 'db' });
-    expect(chain.maybeSingle).toHaveBeenCalledTimes(1);
+  it('caches an accepted hit and verifies it again before reuse', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response([validRow()]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
+    await fetchTailoredSentence(WORD, TYPE);
+    await fetchTailoredSentence(WORD, TYPE);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const store = JSON.parse(localStorage.getItem(CACHE_STORE));
+    expect(store[cacheKey()].v.review.status).toBe('accepted');
+    store[cacheKey()].v.en = 'I drank today.';
+    localStorage.setItem(CACHE_STORE, JSON.stringify(store));
+    expect((await fetchTailoredSentence(WORD, TYPE)).en).toBe('I ate today.');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('returns null on a query error without caching the miss', async () => {
-    // Non-transient (403) so retryWithBackoff fails fast.
-    const chain = selectChain({ data: null, error: { message: 'denied', status: 403 } });
-    const { fetchTailoredSentence } = await load(chain);
+  it('ignores a cached approval when the word meaning or reading changes', async () => {
+    seedCache(cacheKey(), validRow());
+    const { fetchTailoredSentence } = await load({ url: '', anonKey: '' });
+    expect(
+      await fetchTailoredSentence({ ...WORD, meaning: 'to live on a salary' }, TYPE),
+    ).toBeNull();
+    expect(await fetchTailoredSentence({ ...WORD, reading: 'くう' }, TYPE)).toBeNull();
+  });
 
-    expect(await fetchTailoredSentence(WORD, 'potential')).toBeNull();
-    // A later success for the same key must still query (miss not cached).
-    chain.maybeSingle.mockResolvedValueOnce({
-      data: { ja_template: 'y {w}', segments: [{ w: true }], en: 'y' },
-      error: null,
-    });
-    const res = await fetchTailoredSentence(WORD, 'potential');
-    expect(res?.source).toBe('db');
+  it('invalidates a cached sentence after corpus revision changes', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response([validRow()]))
+      .mockResolvedValueOnce(response([validRow({ en: 'Today I ate.' })]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
+    expect((await fetchTailoredSentence(WORD, TYPE)).en).toBe('I ate today.');
+    currentRevision = 'b'.repeat(64);
+    expect((await fetchTailoredSentence(WORD, TYPE)).en).toBe('Today I ate.');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('never reuses a cached row when the publication revision is unavailable', async () => {
+    seedCache(cacheKey(), validRow());
+    currentRevision = null;
+    const { fetchTailoredSentence } = await load({ url: '', anonKey: '' });
+    expect(await fetchTailoredSentence(WORD, TYPE)).toBeNull();
+  });
+
+  it('can use a fresh reviewed database row without a manifest but does not cache it', async () => {
+    currentRevision = null;
+    const fetchMock = vi.fn().mockResolvedValue(response([validRow()]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
+    expect(await fetchTailoredSentence(WORD, TYPE)).toMatchObject({ source: 'db' });
+    expect(localStorage.getItem(CACHE_STORE)).toBeNull();
+  });
+
+  it('does not cache misses, HTTP errors, or rows without valid content approval', async () => {
+    const pending = validRow();
+    const metadata = JSON.parse(pending.model);
+    metadata.review.status = 'pending';
+    pending.model = JSON.stringify(metadata);
+    const edited = validRow();
+    edited.en = 'I drank today.';
+    const legacy = validRow();
+    legacy.model = 'old-generator';
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response([]))
+      .mockResolvedValueOnce(response([], { ok: false, status: 403 }))
+      .mockResolvedValueOnce(response([pending]))
+      .mockResolvedValueOnce(response([edited]))
+      .mockResolvedValueOnce(response([legacy]))
+      .mockResolvedValueOnce(response([validRow({ segments: [{ w: true }] })]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
+    for (let i = 0; i < 6; i += 1) expect(await fetchTailoredSentence(WORD, TYPE)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(localStorage.getItem(CACHE_STORE)).toBeNull();
   });
 });

@@ -2,6 +2,29 @@ import { describe, expect, it } from 'vitest';
 import { sentenceRowQualityIssue, sentenceSemanticQualityIssue } from '../utils/sentenceQuality.js';
 
 describe('sentence row quality checks', () => {
+  it('allows a complete human anticipation predicate but rejects dangling gloss fragments', () => {
+    expect(
+      sentenceRowQualityIssue({
+        type: 'adj-plain-past',
+        jaTemplate: '私は旅行が{w}。',
+        en: 'I was looking forward to the trip.',
+      }),
+    ).toBe('');
+    expect(
+      sentenceRowQualityIssue({
+        type: 'adj-plain-past-negative',
+        jaTemplate: '私は旅行が{w}。',
+        en: 'I was not looking forward to the trip.',
+      }),
+    ).toBe('');
+    expect(
+      sentenceRowQualityIssue({
+        type: 'adj-plain-past',
+        jaTemplate: '予定は{w}。',
+        en: 'The plan was looking forward to.',
+      }),
+    ).toBe('en-adjective-bad-gloss-fragment');
+  });
   it('rejects corrupted Japanese templates with replacement question marks', () => {
     expect(
       sentenceRowQualityIssue({

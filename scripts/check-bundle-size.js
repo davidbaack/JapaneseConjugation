@@ -1,53 +1,37 @@
 #!/usr/bin/env node
-// Performance budget for the production bundle (improvement #20).
-//
-// Katachiya is a PWA, so payload size directly affects first load on the phones
-// it's mostly used on. This script measures the built assets' gzipped transfer
-// size and fails CI if the total — or any single chunk — exceeds budget, so a
-// careless dependency or un-split view can't silently bloat the app over time.
-//
-// Run after `vite build` (see the `size` npm script and the deploy workflow).
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+// Gzipped production budgets. TOTAL covers every JS/CSS chunk, including
+// deferred features. EAGER/CRITICAL follows the Vite entry manifest, while
+// PRECACHE follows the generated service worker's install-time asset list.
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
-const ASSET_DIR = 'dist/assets';
+const DIST_DIR = 'dist';
+const ASSET_DIR = join(DIST_DIR, 'assets');
+const MANIFEST_PATH = join(DIST_DIR, '.vite', 'manifest.json');
+const SERVICE_WORKER_PATH = join(DIST_DIR, 'sw.js');
 
-// Budgets in kilobytes (gzipped). Tuned with ~20% headroom over current sizes;
-// bump deliberately (with a note) when a real feature justifies the growth.
-// Bumped 250→260: minimal-pair drills feature added ~6 KB gzipped (May 2026).
-// Bumped 260->275: PWA update flow, lessons, and drill feedback added ~10 KB gzipped.
-// Bumped 275->280: expanded textbook coverage added a small amount of app code;
-// Supabase-enabled builds remained under that cap.
-// Bumped 280->285: global SRS queue shell work added a small amount of app code;
-// measured Supabase-enabled deploy build is ~282 KB gzipped.
-// Bumped 285->295: top-level Guide practice added a lazy ~4.5 KB gzipped view;
-// measured Supabase-enabled deploy build is ~292 KB gzipped.
-// Bumped 295->300: godan row-shift visuals plus Drills Transform put the
-// measured Supabase-enabled build at ~298 KB gzipped.
-// Bumped 300->310: focused Guide/Learn/Practice follow-up routing and
-// family-introduction surfaces put the measured build at ~305 KB gzipped.
-// Bumped 310->315: componentized StudyView practice surfaces put the
-// measured build at ~307 KB gzipped.
-// Bumped 315->325: godan row map, sound changes, and Learn handoffs put the
-// measured build at ~310 KB gzipped locally, close to the previous cap.
-// Bumped 325->330: compact Practice controls, responsive tab cues, richer
-// Transform/Lookup guidance, and learner-confidence labels measure ~328 KB.
+// These caps retain material room above the August 2026 baseline while making
+// regressions in the first load and PWA install visible independently.
+const EAGER_CRITICAL_GZIP_KB = 160;
+// Includes every Workbox install asset, notably the 2,162-word offline lexicon.
+// The August 2026 baseline is ~361 KB, leaving about 15% headroom without
+// weakening the separate eager or whole-JS/CSS budgets.
+const PRECACHE_GZIP_KB = 415;
 const TOTAL_GZIP_KB = 330;
 const MAX_CHUNK_GZIP_KB = 70;
 
 const KB = 1024;
 const fmt = (bytes) => `${(bytes / KB).toFixed(1)} KB`;
 
+function failMissing(path) {
+  console.error(`x ${path} not found - run \`npm run build\` first.`);
+  process.exit(1);
+}
+
 function collectAssets() {
-  let entries;
-  try {
-    entries = readdirSync(ASSET_DIR);
-  } catch {
-    console.error(`✗ ${ASSET_DIR} not found — run \`npm run build\` first.`);
-    process.exit(1);
-  }
-  return entries
+  if (!existsSync(ASSET_DIR)) failMissing(ASSET_DIR);
+  return readdirSync(ASSET_DIR)
     .filter((name) => name.endsWith('.js') || name.endsWith('.css'))
     .map((name) => {
       const path = join(ASSET_DIR, name);
@@ -57,35 +41,117 @@ function collectAssets() {
     .sort((a, b) => b.gzip - a.gzip);
 }
 
+function eagerAssetNames() {
+  if (!existsSync(MANIFEST_PATH)) failMissing(MANIFEST_PATH);
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
+  const names = new Set();
+  const visited = new Set();
+
+  function visit(key) {
+    if (!key || visited.has(key)) return;
+    visited.add(key);
+    const item = manifest[key];
+    if (!item) return;
+    if (item.file?.startsWith('assets/')) names.add(item.file.slice('assets/'.length));
+    for (const css of item.css || []) {
+      if (css.startsWith('assets/')) names.add(css.slice('assets/'.length));
+    }
+    for (const imported of item.imports || []) visit(imported);
+  }
+
+  for (const [key, item] of Object.entries(manifest)) {
+    if (item.isEntry) visit(key);
+  }
+  return names;
+}
+
+function precachePaths() {
+  if (!existsSync(SERVICE_WORKER_PATH)) failMissing(SERVICE_WORKER_PATH);
+  const serviceWorker = readFileSync(SERVICE_WORKER_PATH, 'utf8');
+  const paths = new Set();
+  const urlPattern = /url:["']([^"']+)["']/g;
+  let match;
+  while ((match = urlPattern.exec(serviceWorker))) {
+    const path = match[1].replace(/^\.\//, '').replace(/^\//, '');
+    if (path && !path.includes('..')) paths.add(path);
+  }
+  return paths;
+}
+
+function sumByNames(assets, names) {
+  return assets.reduce((sum, asset) => sum + (names.has(asset.name) ? asset.gzip : 0), 0);
+}
+
+function gzipFile(path) {
+  if (!existsSync(path)) failMissing(path);
+  return gzipSync(readFileSync(path)).length;
+}
+
+function sumPrecache(paths) {
+  let total = 0;
+  for (const path of paths) {
+    const file = join(DIST_DIR, ...path.split('/'));
+    total += gzipFile(file);
+  }
+  return total;
+}
+
 const assets = collectAssets();
-const totalGzip = assets.reduce((sum, a) => sum + a.gzip, 0);
-const totalRaw = assets.reduce((sum, a) => sum + a.raw, 0);
+const eagerNames = eagerAssetNames();
+const cachedPaths = precachePaths();
+const totalGzip = assets.reduce((sum, asset) => sum + asset.gzip, 0);
+const totalRaw = assets.reduce((sum, asset) => sum + asset.raw, 0);
+const eagerGzip = gzipFile(join(DIST_DIR, 'index.html')) + sumByNames(assets, eagerNames);
+const precacheGzip = sumPrecache(cachedPaths);
 
 const failures = [];
-const totalBudget = TOTAL_GZIP_KB * KB;
-const chunkBudget = MAX_CHUNK_GZIP_KB * KB;
+const budgets = {
+  eager: EAGER_CRITICAL_GZIP_KB * KB,
+  precache: PRECACHE_GZIP_KB * KB,
+  total: TOTAL_GZIP_KB * KB,
+  chunk: MAX_CHUNK_GZIP_KB * KB,
+};
 
-if (totalGzip > totalBudget) {
-  failures.push(`Total gzipped bundle ${fmt(totalGzip)} exceeds budget ${fmt(totalBudget)}.`);
+if (eagerGzip > budgets.eager) {
+  failures.push(`Eager/critical payload ${fmt(eagerGzip)} exceeds budget ${fmt(budgets.eager)}.`);
 }
-for (const a of assets) {
-  if (a.gzip > chunkBudget) {
-    failures.push(`Chunk ${a.name} (${fmt(a.gzip)}) exceeds per-chunk budget ${fmt(chunkBudget)}.`);
+if (precacheGzip > budgets.precache) {
+  failures.push(`Precache payload ${fmt(precacheGzip)} exceeds budget ${fmt(budgets.precache)}.`);
+}
+if (totalGzip > budgets.total) {
+  failures.push(`Total gzipped bundle ${fmt(totalGzip)} exceeds budget ${fmt(budgets.total)}.`);
+}
+for (const asset of assets) {
+  if (asset.gzip > budgets.chunk) {
+    failures.push(
+      `Chunk ${asset.name} (${fmt(asset.gzip)}) exceeds per-chunk budget ${fmt(budgets.chunk)}.`,
+    );
   }
+}
+if ([...cachedPaths].some((path) => path.includes('/vendor-supabase-'))) {
+  failures.push('The deferred Supabase SDK must not be in the service-worker precache.');
 }
 
 console.log('Bundle size report (gzipped):');
-for (const a of assets) {
-  const flag = a.gzip > chunkBudget ? ' ⚠️' : '';
-  console.log(`  ${a.name.padEnd(40)} ${fmt(a.gzip).padStart(10)}  (raw ${fmt(a.raw)})${flag}`);
+for (const asset of assets) {
+  const flag = asset.gzip > budgets.chunk ? ' !' : '';
+  console.log(
+    `  ${asset.name.padEnd(40)} ${fmt(asset.gzip).padStart(10)}  (raw ${fmt(asset.raw)})${flag}`,
+  );
 }
+console.log(
+  `  ${'EAGER/CRITICAL'.padEnd(40)} ${fmt(eagerGzip).padStart(10)} / budget ${EAGER_CRITICAL_GZIP_KB} KB`,
+);
+console.log(
+  `  ${'PRECACHE'.padEnd(40)} ${fmt(precacheGzip).padStart(10)} / budget ${PRECACHE_GZIP_KB} KB`,
+);
 console.log(
   `  ${'TOTAL'.padEnd(40)} ${fmt(totalGzip).padStart(10)}  (raw ${fmt(totalRaw)}) / budget ${TOTAL_GZIP_KB} KB`,
 );
 
 if (failures.length) {
-  console.error('\n✗ Bundle size budget exceeded:');
-  for (const f of failures) console.error(`  - ${f}`);
+  console.error('\nx Bundle size budget exceeded:');
+  for (const failure of failures) console.error(`  - ${failure}`);
   process.exit(1);
 }
-console.log('\n✓ Within performance budget.');
+console.log('\nOK Within performance budgets.');

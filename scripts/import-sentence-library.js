@@ -14,10 +14,12 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { inflateVerbRows, mergeBuiltInWords } from '../src/data/verbLexicon.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../src/data/starterWords.js';
 import { surfaceFormFor, wordKey } from '../src/utils/conjugator.js';
 import { buildSegments, capTemplates, validateGenerated } from './sentencePipeline.js';
+import { verifiedReview, reviewProvenance } from './sentenceReview.js';
 
 const LEXICON_PATH = join('public', 'data', 'verb-lexicon.json');
 const DRY_RUN = process.env.SENTENCE_DRY_RUN === '1';
@@ -56,7 +58,7 @@ function katakanaToHiragana(value) {
 // Derive accurate per-token furigana segments from the sentence via kuromoji,
 // collapsing the conjugated form into the {w:true} placeholder. Returns null on
 // any failure so the caller can fall back to the model-provided segments.
-async function deriveSegments(ja, expectedSurface) {
+export async function deriveSentenceSegments(ja, expectedSurface) {
   if (!USE_KUROMOJI || !expectedSurface) return null;
   try {
     const tokenizer = await getTokenizer();
@@ -112,7 +114,7 @@ async function upsertRows(rows) {
   for (let i = 0; i < rows.length; i += UPSERT_CHUNK) {
     const chunk = rows
       .slice(i, i + UPSERT_CHUNK)
-      .map((row) => ({ ...row, model: MODEL, updated_at: now }));
+      .map((row) => ({ ...row, model: row.model || MODEL, updated_at: now }));
     const { error } = await supabase
       .from('sentences')
       .upsert(chunk, { onConflict: 'word_key,type' });
@@ -145,14 +147,26 @@ async function main() {
         continue;
       }
       // Prefer kuromoji-derived readings; fall back to the model's segments.
-      const derived = await deriveSegments(out.ja, expectedSurfaceFor(word, out.type));
+      const derived = await deriveSentenceSegments(out.ja, expectedSurfaceFor(word, out.type));
       const segments = derived || out.segments;
       const result = validateGenerated(word, out.type, { ...out, segments });
       if (!result.ok) {
         rejects.push({ ...out, reason: result.reason });
         continue;
       }
-      accepted.push(result.row);
+      const review = out.review
+        ? verifiedReview(word, out.type, { ...result.row, review: out.review })
+        : null;
+      if (out.review?.status === 'accepted' && !review) {
+        rejects.push({ ...out, reason: 'invalid-or-stale-review' });
+        continue;
+      }
+      const metadata = review || {
+        status: 'pending',
+        version: 1,
+        basis: 'structural-validation-only',
+      };
+      accepted.push({ ...result.row, model: reviewProvenance(metadata), review: metadata });
     }
 
     if (rejects.length) {
@@ -190,14 +204,21 @@ async function main() {
     toUpsert = kept;
   }
 
-  console.log(`${toUpsert.length} valid row(s)${DRY_RUN ? ' (dry run, not upserted)' : ''}`);
+  const approved = toUpsert.filter(
+    (row) => JSON.parse(row.model).review?.status === 'accepted',
+  ).length;
+  console.log(
+    `${toUpsert.length} structurally valid row(s): ${approved} approved, ${toUpsert.length - approved} pending${DRY_RUN ? ' (dry run, not upserted)' : ''}`,
+  );
   if (!DRY_RUN && toUpsert.length) {
     await upsertRows(toUpsert);
     console.log(`Upserted ${toUpsert.length} row(s).`);
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

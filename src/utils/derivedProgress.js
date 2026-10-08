@@ -74,12 +74,14 @@ function dedupeRecent(recent = [], limit = MAX_RECENT_ATTEMPTS) {
   return [...recent]
     .sort((a, b) => (b?.at || 0) - (a?.at || 0))
     .filter((attempt) => {
-      const signature = [
-        attempt?.at || 0,
-        attempt?.correct ? 1 : 0,
-        attempt?.responseMs || 0,
-        attempt?.wordKey || '',
-      ].join('|');
+      const signature =
+        attempt?.id ||
+        [
+          attempt?.at || 0,
+          attempt?.correct ? 1 : 0,
+          attempt?.responseMs || 0,
+          attempt?.wordKey || '',
+        ].join('|');
       if (seen.has(signature)) return false;
       seen.add(signature);
       return true;
@@ -204,6 +206,10 @@ function reconcileReadiness(readiness, canonicalByRule) {
   return { byRule };
 }
 
+/**
+ * @param {Record<string, any>} [state]
+ * @returns {{ state: Record<string, any>, repaired: boolean }}
+ */
 export function reconcileDerivedProgressState(state = {}) {
   const canonical = buildCanonicalProgress(state.cards);
   const weakness = reconcileWeakness(state.weakness, canonical.byLane);

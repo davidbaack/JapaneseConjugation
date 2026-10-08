@@ -7,6 +7,7 @@ import {
 import { ONBIN_PATTERN_META, onbinPatternForVerb, wordKey } from './conjugator.js';
 import { groupDisplayLabel } from './groupDisplay.js';
 import { READINESS_DIMENSIONS, buildReadinessFamilyRows } from './readiness.js';
+import { createSyncEventId } from './syncMetadata.js';
 
 export const QUICK_WORKOUT_LIMIT = 12;
 export const QUICK_PRACTICE_DEFAULT_TYPE_IDS = EVERYDAY_TYPE_IDS;
@@ -36,6 +37,10 @@ function cleanNumber(value) {
 
 function uniqueStrings(values = []) {
   return [...new Set((values || []).map((value) => String(value || '').trim()).filter(Boolean))];
+}
+
+function compareText(left, right) {
+  return left === right ? 0 : left > right ? 1 : -1;
 }
 
 function typeLabel(typeId) {
@@ -366,6 +371,7 @@ function normalizeRecentAttempt(attempt = {}) {
   const at = cleanNumber(attempt.at);
   if (!at) return null;
   return {
+    ...(attempt.id ? { id: String(attempt.id) } : {}),
     correct: !!attempt.correct,
     at,
     responseMs: cleanNumber(attempt.responseMs),
@@ -382,7 +388,7 @@ function normalizeLane(row = {}, fallbackKey = '') {
   const recent = (Array.isArray(row.recent) ? row.recent : [])
     .map(normalizeRecentAttempt)
     .filter(Boolean)
-    .sort((a, b) => b.at - a.at)
+    .sort((a, b) => b.at - a.at || compareText(String(b.id || ''), String(a.id || '')))
     .slice(0, MAX_RECENT_ATTEMPTS);
   return {
     key: fallbackKey || weaknessLaneKey(typeId, subcategoryId),
@@ -390,11 +396,13 @@ function normalizeLane(row = {}, fallbackKey = '') {
     typeLabel: String(row.typeLabel || typeLabel(typeId)),
     subcategoryId,
     subcategoryLabel: String(row.subcategoryLabel || subcategoryId),
+    ...(row.label ? { label: String(row.label) } : {}),
     attempted,
     correct,
     incorrect,
     totalResponseMs: cleanNumber(row.totalResponseMs),
     lastAt: cleanNumber(row.lastAt),
+    ...(row.lastAttemptId ? { lastAttemptId: String(row.lastAttemptId) } : {}),
     recent,
   };
 }
@@ -407,7 +415,8 @@ export function normalizeWeaknessState(weakness = null) {
   const byLane = {};
   for (const [key, row] of Object.entries(weakness?.byLane || {})) {
     const normalized = normalizeLane(row, key);
-    if (normalized.key && normalized.attempted > 0) byLane[normalized.key] = normalized;
+    if (normalized.key && normalized.attempted > 0)
+      byLane[normalized.key] = { ...row, ...normalized };
   }
   return { byLane };
 }
@@ -420,7 +429,10 @@ export function recordWeaknessAttempt(weakness, details = {}) {
   const now = details.now || Date.now();
   const responseMs = cleanNumber(details.responseMs);
   const correct = !!details.correct;
+  const eventId = String(details.eventId || details.id || createSyncEventId());
+  if (current.recent.some((attempt) => attempt.id === eventId)) return normalized;
   const attempt = {
+    id: eventId,
     correct,
     at: now,
     responseMs,
@@ -437,6 +449,7 @@ export function recordWeaknessAttempt(weakness, details = {}) {
         incorrect: current.incorrect + (correct ? 0 : 1),
         totalResponseMs: current.totalResponseMs + responseMs,
         lastAt: now,
+        lastAttemptId: eventId,
         recent: [attempt, ...current.recent].slice(0, MAX_RECENT_ATTEMPTS),
       },
     },
@@ -450,21 +463,36 @@ export function mergeWeaknessState(local, cloud) {
   for (const [key, row] of Object.entries(right.byLane)) {
     const a = normalizeLane(byLane[key], key);
     const b = normalizeLane(row, key);
+    const tied = a.attempted === b.attempted && (a.lastAt || 0) === (b.lastAt || 0);
     const preferred =
       b.attempted > a.attempted ||
       (b.attempted === a.attempted && (b.lastAt || 0) > (a.lastAt || 0))
         ? b
+        : tied && JSON.stringify(b) > JSON.stringify(a)
+          ? b
+          : a;
+    const latest =
+      b.lastAt > a.lastAt ||
+      (b.lastAt === a.lastAt && String(b.lastAttemptId || '') > String(a.lastAttemptId || ''))
+        ? b
         : a;
     const recentKeys = new Set();
     const recent = [...a.recent, ...b.recent]
-      .sort((x, y) => y.at - x.at)
+      .sort(
+        (x, y) =>
+          y.at - x.at ||
+          compareText(String(y.id || ''), String(x.id || '')) ||
+          compareText(JSON.stringify(x), JSON.stringify(y)),
+      )
       .filter((attempt) => {
-        const signature = [
-          attempt.at,
-          attempt.correct ? 1 : 0,
-          attempt.responseMs || 0,
-          attempt.wordKey || '',
-        ].join('|');
+        const signature =
+          attempt.id ||
+          [
+            attempt.at,
+            attempt.correct ? 1 : 0,
+            attempt.responseMs || 0,
+            attempt.wordKey || '',
+          ].join('|');
         if (recentKeys.has(signature)) return false;
         recentKeys.add(signature);
         return true;
@@ -472,11 +500,12 @@ export function mergeWeaknessState(local, cloud) {
       .slice(0, MAX_RECENT_ATTEMPTS);
     byLane[key] = {
       ...preferred,
-      typeId: a.typeId || b.typeId,
-      typeLabel: a.typeLabel || b.typeLabel,
-      subcategoryId: a.subcategoryId || b.subcategoryId,
-      subcategoryLabel: a.subcategoryLabel || b.subcategoryLabel,
+      typeId: preferred.typeId || a.typeId || b.typeId,
+      typeLabel: preferred.typeLabel || a.typeLabel || b.typeLabel,
+      subcategoryId: preferred.subcategoryId || a.subcategoryId || b.subcategoryId,
+      subcategoryLabel: preferred.subcategoryLabel || a.subcategoryLabel || b.subcategoryLabel,
       lastAt: Math.max(a.lastAt || 0, b.lastAt || 0),
+      ...(latest.lastAttemptId ? { lastAttemptId: latest.lastAttemptId } : {}),
       recent,
     };
   }

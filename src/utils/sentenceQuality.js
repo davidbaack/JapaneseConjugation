@@ -170,7 +170,12 @@ export function sentenceSemanticQualityIssue({ en = '', type = '', jaTemplate = 
   }
   if (!ADJECTIVE_TYPE_RE.test(String(type || ''))) return '';
   if (ADJECTIVE_NEGATED_GLOSS_RE.test(text)) return 'en-adjective-negated-gloss-mismatch';
-  if (BAD_ADJECTIVE_GLOSS_RE.test(text)) return 'en-adjective-bad-gloss-fragment';
+  const completeLookingForward =
+    /^(?:I (?:am|was)|(?:he|she) (?:is|was)|(?:we|they|you) (?:are|were))\s+(?:not\s+)?looking forward to\s+[a-z][^.]+\.?$/i.test(
+      text,
+    );
+  if (BAD_ADJECTIVE_GLOSS_RE.test(text) && !completeLookingForward)
+    return 'en-adjective-bad-gloss-fragment';
   const jaEnMismatch = jaEnglishSubjectMismatch({ en: text, jaTemplate });
   if (jaEnMismatch) return jaEnMismatch;
   const humanTraitMismatch = humanTraitSubjectMismatch(text);

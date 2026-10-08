@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { DEFAULT_PREFS } from '../data/defaults.js';
@@ -8,11 +9,13 @@ import { conjugateItem, surfaceFormFor, wordKey } from '../utils/conjugator.js';
 import { englishForForm } from '../utils/display.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
 import { clearSentenceCorpusCache } from '../utils/sentenceCorpus.js';
-import { buildTodayDrillPlan, TODAY_DRILL_LIST_ID } from '../utils/todayDrill.js';
 import { buildReadinessFamilyRows } from '../utils/readiness.js';
+import { recordPracticeAnswer } from '../utils/practiceStats.js';
+import { applyGuideAttemptToState } from '../utils/guidePractice.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
 const mockedSpeech = vi.hoisted(() => ({ playPronunciation: vi.fn() }));
+const mockedSentences = vi.hoisted(() => ({ bundled: vi.fn(), tailored: vi.fn() }));
 let originalScrollIntoView;
 
 vi.mock('../state/AppStateContext.jsx', () => ({
@@ -27,10 +30,22 @@ vi.mock('../utils/speech.js', async () => {
   };
 });
 
+vi.mock('../utils/sentenceCorpus.js', async () => ({
+  ...(await vi.importActual('../utils/sentenceCorpus.js')),
+  fetchBundledSentence: mockedSentences.bundled,
+}));
+
+vi.mock('../utils/sentenceLibrary.js', async () => ({
+  ...(await vi.importActual('../utils/sentenceLibrary.js')),
+  fetchTailoredSentence: mockedSentences.tailored,
+}));
+
 import StudyView, { reviewFeedbackActionForRecord } from '../views/StudyView.jsx';
 import { RunAnswerReveal } from '../views/study/StudyReviewPanels.jsx';
 
 beforeEach(() => {
+  mockedSentences.bundled.mockReset().mockResolvedValue(null);
+  mockedSentences.tailored.mockReset().mockResolvedValue(null);
   originalScrollIntoView = window.Element.prototype.scrollIntoView;
   window.Element.prototype.scrollIntoView = vi.fn();
 });
@@ -54,74 +69,17 @@ function makeApp(overrides = {}) {
     hydrated: true,
     ...overrides,
   };
-  const todayDrillActive =
-    !base.practicePrefs.minimalPairSetId &&
-    !base.practicePrefs.reviewLimitSource &&
-    (base.practicePrefs.wordListIds || []).includes(TODAY_DRILL_LIST_ID);
-  const todayPlan =
-    overrides.todayPlan ||
-    buildTodayDrillPlan(base.state, base.allWords, base.practicePrefs, base.wordLists);
   return {
     ...base,
-    todayPlan,
-    todayDrillActive: overrides.todayDrillActive ?? todayDrillActive,
-    srsQueue: overrides.srsQueue || {
-      date: base.state.daily.date,
-      dueRuleIds: todayDrillActive ? [...(todayPlan.dueRuleIds || [])] : [],
-      completedDueRuleIds: [],
-      startedAt: todayDrillActive ? Date.now() : null,
-    },
-    startTodayDrill: overrides.startTodayDrill || vi.fn(() => true),
-    markSrsQueueCompleted: overrides.markSrsQueueCompleted || vi.fn(),
   };
+}
+
+function resolveStateUpdate(update, previous = mockedApp.value.state) {
+  return typeof update === 'function' ? update(previous) : update;
 }
 
 function goalHitState() {
-  const state = defaultState();
-  return {
-    ...state,
-    daily: {
-      ...state.daily,
-      count: DEFAULT_PREFS.dailyGoal,
-      goalHit: true,
-    },
-  };
-}
-
-function guideGroupInsightState() {
-  return {
-    ...defaultState(),
-    guide: {
-      attempted: 2,
-      correct: 0,
-      assisted: 0,
-      byStep: {
-        base: { attempted: 2, correct: 2, assisted: 0 },
-        group: { attempted: 2, correct: 0, assisted: 0 },
-        answer: { attempted: 2, correct: 2, assisted: 0 },
-      },
-      recent: [
-        {
-          group: 'godan',
-          expectedGroup: 'godan',
-          steps: {
-            base: { correct: true, assisted: false },
-            group: { correct: false, assisted: false },
-            answer: { correct: true, assisted: false },
-          },
-        },
-        {
-          group: 'godan',
-          expectedGroup: 'godan',
-          steps: {
-            base: { correct: true, assisted: false },
-            group: { correct: false, assisted: false },
-            answer: { correct: true, assisted: false },
-          },
-        },
-      ],
-    },
-  };
+  return defaultState();
 }
 
 function stateWithDueRule(ruleId) {
@@ -138,14 +96,6 @@ function stateWithDueRule(ruleId) {
         lastSeen: 0,
       },
     },
-  };
-}
-
-function todayListFor(word) {
-  return {
-    id: TODAY_DRILL_LIST_ID,
-    name: "Today's Drill",
-    wordKeys: [wordKey(word)],
   };
 }
 
@@ -168,28 +118,17 @@ async function waitForPracticeCard() {
   return screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
 }
 
-function sentenceResponse(payload, ok = true) {
+// Loader tests validate approval metadata and content hashes. These view tests
+// supply the already accepted, hydrated entries returned by those loaders.
+function approvedSentenceEntry(word, type, jaTemplate = '昼に{w}。', en = 'I ate at noon.') {
+  const [before, after] = jaTemplate.split('{w}');
   return {
-    ok,
-    json: () => Promise.resolve(payload),
-  };
-}
-
-function sentenceManifestPayload(types) {
-  return {
-    schema: 1,
-    totalRows: types.length,
-    rawBytes: 100,
-    gzipBytes: 50,
-    types: types.map((type) => ({ type, rows: 1 })),
-  };
-}
-
-function sentenceChunkPayload(type, rows) {
-  return {
-    schema: 1,
-    type,
-    rows,
+    jaTemplate,
+    en,
+    segments: [{ t: before, r: '' }, { w: true }, { t: after, r: '' }],
+    surface: surfaceFormFor(word, type),
+    kanaSurface: conjugateItem(word, type),
+    source: 'bundled',
   };
 }
 
@@ -200,8 +139,9 @@ function expectElementBefore(first, second) {
 }
 
 function openPracticeRunSettings() {
-  fireEvent.click(screen.getByRole('button', { name: 'Practice run settings' }));
-  return within(screen.getByRole('group', { name: 'Practice run settings' }));
+  const summary = screen.getByText('Answer settings');
+  fireEvent.click(summary);
+  return within(summary.closest('details'));
 }
 
 async function clickTopReviewNext() {
@@ -360,21 +300,17 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getAllByText('0 cards').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 streak').length).toBeGreaterThan(0);
-    expect(screen.getByText('New enabled form.')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Practice selection' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Core forms' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Practice categories' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Practice quick filters' })).toBeTruthy();
+    expect(screen.queryByText('Change', { exact: true })).toBeNull();
+    expect(screen.queryByText(/Mixed practice/)).toBeNull();
+    expect(screen.queryByText('Practice run')).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Check (Enter)' }).closest('[data-action-dock="true"]'),
     ).toBeTruthy();
-    expect(
-      within(screen.getByText('Practice run').closest('section')).getByRole('button', {
-        name: 'Adjust focus',
-      }),
-    ).toBeTruthy();
-    expect(screen.queryByRole('progressbar', { name: 'Session cards' })).toBeNull();
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
+    expect(screen.getByText('Answer settings')).toBeTruthy();
   });
 
   it('opens continuous Practice while signed out', async () => {
@@ -386,37 +322,8 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     expect(await waitForPracticeCard()).toBeTruthy();
-    expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getAllByText('0 cards').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 streak').length).toBeGreaterThan(0);
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
-  });
-
-  it('surfaces Guide step diagnostics inside the active Practice run', async () => {
-    const setTab = vi.fn();
-    const app = makeApp({
-      state: guideGroupInsightState(),
-      setTab,
-    });
-    mockedApp.value = app;
-
-    render(<StudyView />);
-
-    expect(await waitForPracticeCard()).toBeTruthy();
-    const nudge = screen.getByRole('button', {
-      name: /Guide: word group.*You know the ending.*final-answer step land/i,
-    });
-    expect(nudge.textContent).toMatch(/Guide: word group/);
-    expect(nudge.textContent).not.toMatch(/misclassifying godan verbs/);
-
-    fireEvent.click(screen.getByText('Run details'));
-    expect(screen.getByText('Guide insight')).toBeTruthy();
-    expect(screen.getByText(/misclassifying godan verbs/)).toBeTruthy();
-    expect(screen.getByText(/Guide is seeing the final-answer step land/)).toBeTruthy();
-
-    fireEvent.click(nudge);
-    expect(setTab).toHaveBeenCalledWith('guide');
+    expect(screen.getByRole('region', { name: 'Practice selection' })).toBeTruthy();
+    expect(screen.queryByText('Practice run')).toBeNull();
   });
 
   it('does not surface a local Stats shortcut on an active card', async () => {
@@ -433,20 +340,17 @@ describe('StudyView continuous Practice startup', () => {
     expect(app.setTab).not.toHaveBeenCalled();
   });
 
-  it('keeps the active card before the Practice map in DOM order', async () => {
+  it('keeps the compact selection controls before the active card in DOM order', async () => {
     mockedApp.value = makeApp();
 
     render(<StudyView />);
 
     const answerInput = await waitForPracticeCard();
-    const checkButton = screen.getByRole('button', { name: 'Check (Enter)' });
-    const practiceMap = screen.getByRole('complementary', { name: 'Practice map' });
-
-    expectElementBefore(answerInput, practiceMap);
-    expectElementBefore(checkButton, practiceMap);
+    const selector = screen.getByRole('region', { name: 'Practice selection' });
+    expectElementBefore(selector, answerInput);
   });
 
-  it('surfaces answer style and kana help controls in the Practice run gear menu', async () => {
+  it('surfaces answer style and kana help controls beside the topic selector', async () => {
     const setPracticePrefs = vi.fn();
     mockedApp.value = makeApp({
       setPracticePrefs,
@@ -459,9 +363,6 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     await waitForPracticeCard();
-    expect(screen.getByRole('button', { name: 'Practice run settings' })).toBeTruthy();
-    expect(screen.queryByRole('group', { name: 'Answer style' })).toBeNull();
-
     const settings = openPracticeRunSettings();
     const answerStyle = within(settings.getByRole('group', { name: 'Answer style' }));
     expect(answerStyle.getByRole('button', { name: 'Type' }).getAttribute('aria-pressed')).toBe(
@@ -489,11 +390,9 @@ describe('StudyView continuous Practice startup', () => {
     });
 
     expect(settings.getByRole('button', { name: 'Sentence off' })).toBeTruthy();
-    expect(settings.getByText('Adjust scope')).toBeTruthy();
-    expect(settings.getByRole('button', { name: 'Remove this word from Practice' })).toBeTruthy();
   });
 
-  it('offers an Overview return path from a focused (special) session', async () => {
+  it('returns from a focused word to the persistent Practice mix', async () => {
     const app = makeApp({ studyFocus: { word: STARTER_VERBS[0], type: 'plain-past' } });
     // Consuming the focus clears it in the real provider; mirror that so the
     // dashboard can re-render once the focus lock is released.
@@ -504,79 +403,11 @@ describe('StudyView continuous Practice startup', () => {
 
     render(<StudyView />);
 
-    // A focus launch is a "special" session: it leads with a title banner and
-    // exits the locked focus through that banner rather than the generic
-    // "Back to Stats" header button.
+    // Word-level focus remains explicit, while exiting returns to ordinary Practice.
     await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
 
-    expect(app.setTab).toHaveBeenCalledWith('stats');
-  });
-
-  it('restores normal enabled forms when exiting a Drills recommendation focus', async () => {
-    const returnEnabledTypes = ['plain-past', 'plain-negative'];
-    const focusedTypes = ['te-form'];
-    const list = {
-      id: 'list-review-rec-lab-onbin-review',
-      name: 'Practice te/ta sound changes',
-      wordKeys: STARTER_VERBS.slice(0, 3).map(wordKey),
-    };
-    const app = makeApp({
-      state: { ...defaultState(), enabledTypes: focusedTypes },
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        reviewLimit: 6,
-        reviewLimitSource: 'recommendation',
-        wordListIds: [list.id],
-      },
-      wordLists: [list],
-      studyFocus: {
-        source: 'lab',
-        launchMode: 'recommendation',
-        recommendation: {
-          id: 'lab-onbin-review',
-          source: 'lab',
-          label: 'Practice te/ta sound changes',
-          detail: 'Full recall for te and ta forms.',
-          suggestedCount: 6,
-          wordCount: list.wordKeys.length,
-          typeCount: focusedTypes.length,
-          returnEnabledTypes,
-        },
-      },
-    });
-    app.clearStudyFocus = vi.fn(() => {
-      app.studyFocus = null;
-      mockedApp.value = app;
-    });
-    mockedApp.value = app;
-
-    render(<StudyView />);
-
-    expect(await screen.findByText('Drills focus')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Exit focus' }));
-
-    const stateUpdater = app.setState.mock.calls.at(-1)?.[0];
-    expect(typeof stateUpdater).toBe('function');
-    expect(stateUpdater({ ...app.state, enabledTypes: focusedTypes }).enabledTypes).toEqual(
-      returnEnabledTypes,
-    );
-
-    const prefsUpdater = app.setPracticePrefs.mock.calls.at(-1)?.[0];
-    expect(typeof prefsUpdater).toBe('function');
-    expect(
-      prefsUpdater({
-        ...DEFAULT_PREFS,
-        reviewLimit: 6,
-        reviewLimitSource: 'recommendation',
-        wordListIds: ['favorites', list.id, 'repair-drill'],
-      }),
-    ).toMatchObject({
-      reviewLimit: 0,
-      reviewLimitSource: '',
-      wordListIds: ['favorites'],
-    });
-    expect(app.setTab).toHaveBeenCalledWith('stats');
+    expect(app.setTab).toHaveBeenCalledWith('practice');
   });
 
   it('keeps a focused word launch until the learner exits it', async () => {
@@ -594,7 +425,6 @@ describe('StudyView continuous Practice startup', () => {
 
     const exitFocus = await screen.findByRole('button', { name: 'Exit focus' });
     expect(clearStudyFocus).not.toHaveBeenCalled();
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
     fireEvent.click(exitFocus);
     expect(clearStudyFocus).toHaveBeenCalledTimes(1);
   });
@@ -614,45 +444,6 @@ describe('StudyView continuous Practice startup', () => {
     expect(clearStudyFocus).not.toHaveBeenCalled();
     fireEvent.click(clearFocus);
     expect(clearStudyFocus).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not auto-start today for stale repair launch prefs', async () => {
-    const app = makeApp({
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        reviewLimit: 10,
-        reviewLimitSource: 'repair',
-      },
-    });
-    mockedApp.value = app;
-
-    render(<StudyView />);
-
-    await waitForPracticeCard();
-    expect(screen.queryByText('No cards available')).toBeNull();
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
-  });
-
-  it('does not auto-start today over a persisted study card', async () => {
-    const target = STARTER_VERBS[0];
-    sessionStorage.setItem(
-      'jp-study-current',
-      JSON.stringify({
-        dict: target.dict,
-        reading: target.reading,
-        meaning: target.meaning,
-        group: target.group,
-        type: 'plain-past',
-        word: target,
-      }),
-    );
-    const app = makeApp();
-    mockedApp.value = app;
-
-    render(<StudyView />);
-
-    await waitForPracticeCard();
-    expect(app.startTodayDrill).not.toHaveBeenCalled();
   });
 
   it('restores a persisted study card when vocabulary metadata changes', async () => {
@@ -811,7 +602,6 @@ describe('StudyView continuous Practice startup', () => {
 
   it('does not treat a retired repair list as a persisted special launch', async () => {
     // Retired repair-drill prefs can remain in older storage. They should not
-    // launch a fresh Today drill now that generic repair drills are retired.
     const target = STARTER_VERBS[0];
     mockedApp.value = makeApp({
       state: defaultState(),
@@ -830,7 +620,6 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitForPracticeCard();
     expect(screen.queryByText('No cards available')).toBeNull();
-    expect(mockedApp.value.startTodayDrill).not.toHaveBeenCalled();
   });
 
   it('automatically checks a final spoken answer in speak answer mode', async () => {
@@ -856,7 +645,7 @@ describe('StudyView continuous Practice startup', () => {
     });
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
     expect(nextState.session.currentStreak).toBe(1);
@@ -865,7 +654,132 @@ describe('StudyView continuous Practice startup', () => {
       kind: 'correct',
       label: 'Plain Past',
     });
+    const eventId = nextState.practiceStats.recent[0].id;
+    expect(eventId).toEqual(expect.any(String));
+    expect(nextState.session.recentOutcomes[0].id).toBe(eventId);
+    expect(nextState.cards[cardIdFor(target, type)].lastAttemptId).toBe(eventId);
+    expect(nextState.readiness.byRule[cardIdFor(target, type)].speed.lastAttemptId).toBe(eventId);
+    expect(Object.values(nextState.weakness.byLane)[0].recent[0].id).toBe(eventId);
     expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
+  });
+
+  it('preserves synced progress received while the current spoken answer is being recognized', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const app = makeApp({
+      setState,
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+    mockedApp.value = app;
+    const view = render(<StudyView />);
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
+    const remote = {
+      ...app.state,
+      session: { ...app.state.session, reviewed: 1, correct: 0 },
+      practiceStats: recordPracticeAnswer(app.state.practiceStats, {
+        id: 'remote-answer',
+        typeId: type,
+        correct: false,
+        at: 1000,
+        mode: 'input',
+      }),
+    };
+    mockedApp.value = { ...app, state: remote };
+    view.rerender(<StudyView />);
+    act(() => {
+      FakeSpeechRecognition.instance.emitFinal(conjugateItem(target, type));
+    });
+    await waitFor(() => expect(setState).toHaveBeenCalled());
+    const next = resolveStateUpdate(setState.mock.calls.at(-1)[0]);
+    expect(next.practiceStats.lifetime).toMatchObject({ attempted: 2, correct: 1 });
+    expect(next.session).toMatchObject({ reviewed: 2, correct: 1 });
+    expect(next.practiceStats.recent.some((row) => row.id === 'remote-answer')).toBe(true);
+  });
+
+  it('ignores a final result from a microphone belonging to the previous exercise', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      setState,
+      studyFocus: { word: target, type: 'plain-past' },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+    render(<StudyView />);
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
+    const previousRecognition = FakeSpeechRecognition.instance;
+    fireEvent.click(screen.getByRole('button', { name: 'Skip', exact: true }));
+    await waitFor(() => expect(FakeSpeechRecognition.instance).not.toBe(previousRecognition));
+    setState.mockClear();
+    act(() => {
+      previousRecognition.emitFinal(conjugateItem(target, 'plain-past'));
+    });
+    expect(setState).not.toHaveBeenCalled();
+  });
+
+  it('credits speech against a remote answer queued in the same React batch', async () => {
+    window.SpeechRecognition = FakeSpeechRecognition;
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const rid = cardIdFor(target, type);
+    const app = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, answerMode: 'speak' },
+    });
+    let receiveRemote;
+    let submittedUpdate;
+    function ConcurrentStudy() {
+      const [learnerState, updateLearnerState] = useState(app.state);
+      receiveRemote = updateLearnerState;
+      mockedApp.value = {
+        ...app,
+        state: learnerState,
+        setState: (update) => {
+          submittedUpdate = update;
+          updateLearnerState(update);
+        },
+      };
+      return <StudyView />;
+    }
+    render(<ConcurrentStudy />);
+    await screen.findByRole('button', { name: 'Stop listening' }, { timeout: 5000 });
+    const remote = applyGuideAttemptToState(
+      app.state,
+      {
+        word: target,
+        typeId: type,
+        sourceTypeId: 'dictionary',
+        expectedGroup: target.group,
+        expectedAnswer: conjugateItem(target, type),
+      },
+      {
+        correct: false,
+        assisted: false,
+        steps: {
+          base: { correct: true, assisted: false },
+          group: { correct: true, assisted: false },
+          answer: { correct: false, assisted: false, submitted: 'wrong' },
+        },
+      },
+      { eventId: 'queued-remote-answer', now: 1000, responseMs: 1000 },
+    );
+    act(() => {
+      receiveRemote(remote);
+      FakeSpeechRecognition.instance.emitFinal(conjugateItem(target, type));
+    });
+    const next = mockedApp.value.state;
+    expect(next.practiceStats.lifetime).toMatchObject({ attempted: 2, correct: 1 });
+    expect(next.session).toMatchObject({ reviewed: 2, correct: 1 });
+    expect(next.cards[rid]).toMatchObject({ correct: 1, incorrect: 1 });
+    expect(next.readiness.byRule[rid].production).toMatchObject({ attempted: 2, correct: 1 });
+    expect(Object.values(next.weakness.byLane)[0]).toMatchObject({ attempted: 2, correct: 1 });
+    expect(next.guide.attempted).toBe(1);
+    expect(next.practiceStats.recent.some((row) => row.id === 'queued-remote-answer')).toBe(true);
+    expect(submittedUpdate(remote)).toEqual(submittedUpdate(remote));
+    expect(submittedUpdate(next)).toBe(next);
   });
 
   it('reveals kana directly into the Study answer box', async () => {
@@ -933,22 +847,15 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.queryByRole('button', { name: 'Reveal next kana' })).toBeNull();
   });
 
-  it('shows sentence context for reverse reading practice when Sentence mode is on', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.resolve({ ok: false })),
-    );
+  it('shows the reviewed source sentence for reverse reading practice', async () => {
     const target = STARTER_VERBS[0];
     const sourceType = 'plain-past';
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, sourceType));
     persistStudyCard(target, 'dictionary', { sourceType });
     mockedApp.value = makeApp({
       state: { ...defaultState(), enabledTypes: [sourceType] },
       allWords: [target],
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        reviewStyle: 'reading',
-        sentenceMode: true,
-      },
+      practicePrefs: { ...DEFAULT_PREFS, reviewStyle: 'reading', sentenceMode: true },
     });
 
     render(<StudyView />);
@@ -963,267 +870,292 @@ describe('StudyView continuous Practice startup', () => {
     expect(screen.getByText('Answer with the dictionary form.')).toBeTruthy();
   });
 
-  it('waits briefly and shows the bundled sentence without flashing the offline fallback', async () => {
+  it('waits briefly for reviewed context without generating an unchecked fallback', async () => {
     vi.useFakeTimers();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
-    const row = [
-      wordKey(target),
-      '\u663c\u306b{w}\u3002',
-      'I ate at noon.',
-      [
-        { t: '\u663c', r: '\u3072\u308b' },
-        { t: '\u306b', r: '' },
-        { w: true },
-        { t: '\u3002', r: '' },
-      ],
-    ];
-    const fetchMock = vi.fn((url) => {
-      const text = String(url);
-      if (text.endsWith('/manifest.json')) {
-        return Promise.resolve(sentenceResponse(sentenceManifestPayload([type])));
-      }
-      if (text.includes(`/by-type/${type}.json`)) {
-        return new Promise((resolve) => {
-          setTimeout(() => resolve(sentenceResponse(sentenceChunkPayload(type, [row]))), 100);
-        });
-      }
-      return Promise.resolve(sentenceResponse({}, false));
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    mockedSentences.bundled.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve(approvedSentenceEntry(target, type)), 100),
+        ),
+    );
     mockedApp.value = makeApp({
-      studyFocus: {
-        word: target,
-        type,
-      },
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        sentenceMode: true,
-      },
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
     });
 
     render(<StudyView />);
-
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
     expect(document.querySelector('[data-sentence-mode="forward-cloze"]')).toBeNull();
+    expect(screen.queryByText(/No reviewed sentence/)).toBeNull();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(100);
     });
-
     const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
     expect(sentenceCard).toBeTruthy();
-    expect(sentenceCard.textContent).toContain('\u663c');
+    expect(sentenceCard.textContent).toContain('昼');
+    expect(sentenceCard.textContent).toContain('[______]');
+    expect(sentenceCard.closest('details')).toBeNull();
+    expect(sentenceCard.className).not.toContain('hidden');
   });
 
-  it('freezes the offline sentence when the bundled sentence arrives after the grace window', async () => {
+  it('freezes ordinary Practice if reviewed context arrives after the grace window', async () => {
     vi.useFakeTimers();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
-    let resolveChunk;
-    const row = [
-      wordKey(target),
-      '\u663c\u306b{w}\u3002',
-      'I ate at noon.',
-      [
-        { t: '\u663c', r: '\u3072\u308b' },
-        { t: '\u306b', r: '' },
-        { w: true },
-        { t: '\u3002', r: '' },
-      ],
-    ];
-    const fetchMock = vi.fn((url) => {
-      const text = String(url);
-      if (text.endsWith('/manifest.json')) {
-        return Promise.resolve(sentenceResponse(sentenceManifestPayload([type])));
-      }
-      if (text.includes(`/by-type/${type}.json`)) {
-        return new Promise((resolve) => {
-          resolveChunk = resolve;
-        });
-      }
-      return Promise.resolve(sentenceResponse({}, false));
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    let resolveEntry;
+    mockedSentences.bundled.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveEntry = resolve;
+        }),
+    );
     mockedApp.value = makeApp({
-      studyFocus: {
-        word: target,
-        type,
-      },
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        sentenceMode: true,
-      },
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
     });
 
     render(<StudyView />);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(document.querySelector('[data-sentence-mode="forward-cloze"]')).toBeNull();
-
     await act(async () => {
       await vi.advanceTimersByTimeAsync(250);
     });
-
-    const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
-    expect(sentenceCard).toBeTruthy();
-    const frozenText = sentenceCard.textContent;
-    expect(frozenText).not.toContain('\u663c');
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    expect(screen.getByText(/No reviewed sentence for this word and form yet/)).toBeTruthy();
+    const input = screen.getByPlaceholderText(/Type romaji or kana/i);
+    fireEvent.change(input, { target: { value: 'a' } });
 
     await act(async () => {
-      resolveChunk(sentenceResponse(sentenceChunkPayload(type, [row])));
-      await Promise.resolve();
+      resolveEntry(approvedSentenceEntry(target, type));
     });
-
-    expect(sentenceCard.textContent).toBe(frozenText);
-    expect(sentenceCard.textContent).not.toContain('\u663c');
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    expect(input.value).toBe('あ');
+    expect(mockedApp.value.setPracticePrefs).not.toHaveBeenCalled();
   });
 
-  it('preloads the likely next word-sweep sentence during review', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    const nextType = 'plain-negative';
-    const fetchMock = vi.fn((url) => {
-      const text = String(url);
-      if (text.endsWith('/manifest.json')) {
-        return Promise.resolve(sentenceResponse(sentenceManifestPayload([type, nextType])));
-      }
-      if (text.includes(`/by-type/${type}.json`)) {
-        return Promise.resolve(
-          sentenceResponse(
-            sentenceChunkPayload(type, [
-              [
-                wordKey(target),
-                '\u304d\u3087\u3046{w}\u3002',
-                'I did it today.',
-                [{ t: '\u304d\u3087\u3046', r: '' }, { w: true }, { t: '\u3002', r: '' }],
-              ],
-            ]),
-          ),
-        );
-      }
-      if (text.includes(`/by-type/${nextType}.json`)) {
-        return Promise.resolve(
-          sentenceResponse(
-            sentenceChunkPayload(nextType, [
-              [
-                wordKey(target),
-                '\u3042\u3057\u305f{w}\u3002',
-                'I will not do it tomorrow.',
-                [{ t: '\u3042\u3057\u305f', r: '' }, { w: true }, { t: '\u3002', r: '' }],
-              ],
-            ]),
-          ),
-        );
-      }
-      return Promise.resolve(sentenceResponse({}, false));
-    });
-    vi.stubGlobal('fetch', fetchMock);
+  it('continues a custom word exercise without reviewed context or recording a result', async () => {
+    const target = { dict: '試す', reading: 'ためす', meaning: 'to try', group: 'godan' };
     mockedApp.value = makeApp({
-      state: { ...defaultState(), enabledTypes: [type, nextType] },
       allWords: [target],
-      studyFocus: {
-        word: target,
-        type,
-        launchMode: 'word-sweep',
-      },
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        sentenceMode: true,
-      },
+      studyFocus: { word: target, type: 'plain-past' },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
     });
 
     render(<StudyView />);
-
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    await screen.findByText(/No reviewed sentence for this word and form yet/);
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    expect(mockedApp.value.setPracticePrefs).not.toHaveBeenCalled();
+    expect(mockedApp.value.state.session.reviewed).toBe(0);
+    expect(screen.queryByText('Not quite.')).toBeNull();
+    fireEvent.change(input, { target: { value: 'zzzz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    expect(await screen.findByRole('heading', { name: 'Not quite.' })).toBeTruthy();
+  });
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining(`/data/sentences/by-type/${nextType}.json`),
-        { cache: 'force-cache' },
+  it('shows the correct completed sentence and translation after a wrong answer', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+
+    render(<StudyView />);
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitFor(() => expect(document.querySelector('[data-sentence-mode]')).toBeTruthy());
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+    expect(screen.queryByText('I ate at noon.')).toBeNull();
+    fireEvent.change(input, { target: { value: 'zzzz' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+
+    await screen.findByRole('heading', { name: 'Not quite.' });
+    const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
+    expect(sentenceCard.textContent).toContain(surfaceFormFor(target, type));
+    expect(sentenceCard.textContent).not.toContain('[______]');
+    expect(sentenceCard.textContent).not.toContain('zzzz');
+    expect(within(sentenceCard).getByText('I ate at noon.')).toBeTruthy();
+  });
+
+  it('preloads the next word-sweep reviewed sentence during review', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const nextType = 'plain-negative';
+    mockedSentences.bundled.mockImplementation((word, requestedType) =>
+      Promise.resolve(
+        approvedSentenceEntry(
+          word,
+          requestedType,
+          requestedType === type ? 'きょう{w}。' : 'あした{w}。',
+        ),
       ),
     );
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [type, nextType] },
+      allWords: [target],
+      studyFocus: { word: target, type, launchMode: 'word-sweep' },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
 
+    render(<StudyView />);
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    await waitFor(() => expect(document.querySelector('[data-sentence-mode]')).toBeTruthy());
+    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+    await waitFor(() => expect(mockedSentences.bundled).toHaveBeenCalledWith(target, nextType));
     await clickTopReviewNext();
-
     await waitFor(() => {
       const sentenceCard = document.querySelector('[data-sentence-mode="forward-cloze"]');
       expect(sentenceCard).toBeTruthy();
-      expect(sentenceCard.textContent).toContain('\u3042\u3057\u305f');
+      expect(sentenceCard.textContent).toContain('あした');
     });
   });
 
-  it('uses a bundled filled sentence for listening Sentence mode after Show text', async () => {
+  it('refreshes expired entries for exact retries while keeping the active sentence frozen', async () => {
+    vi.useFakeTimers();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
-    const surface = surfaceFormFor(target, type);
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [type] },
+      allWords: [target],
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+
+    render(<StudyView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(59_999);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+
+    mockedSentences.bundled.mockResolvedValue(
+      approvedSentenceEntry(target, type, '夜に{w}。', 'I ate at night.'),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2);
+    });
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(2);
+    // Prefetch refreshed the cache, while review keeps the original sentence.
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+    expect(document.querySelector('[data-sentence-mode]').textContent).not.toContain('夜');
+    fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('夜');
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(2);
+  });
+
+  it('hides and replays reviewed listening context on an exact-word/form retry', async () => {
     vi.stubGlobal('speechSynthesis', {
       cancel: vi.fn(),
       getVoices: vi.fn(() => []),
       speak: vi.fn(),
     });
-    const fetchMock = vi.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            schema: 1,
-            type,
-            rows: [
-              [
-                wordKey(target),
-                `昼に{w}。`,
-                'I ate at noon.',
-                [{ t: '昼', r: 'ひる' }, { t: 'に', r: '' }, { w: true }, { t: '。', r: '' }],
-              ],
-            ],
-          }),
-      }),
-    );
-    vi.stubGlobal('fetch', fetchMock);
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
     mockedApp.value = makeApp({
-      studyFocus: {
-        word: target,
-        type,
-      },
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        sentenceMode: true,
-        listeningPrompt: true,
-      },
+      state: { ...defaultState(), enabledTypes: [type] },
+      allWords: [target],
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true, listeningPrompt: true },
     });
 
     render(<StudyView />);
+    await screen.findByText('Sentence listening prompt');
+    await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
+    expect(document.querySelector('[data-sentence-mode]')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+    await clickTopReviewNext();
+    await screen.findByText('Sentence listening prompt');
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(2));
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
+  });
 
-    await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    expect(
-      await screen.findByText('Sentence listening prompt', {}, { timeout: 5000 }),
-    ).toBeTruthy();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/data/sentences/manifest.json', {
-      cache: 'no-cache',
+  it('keeps a reviewed listening sentence hidden until Show text and plays it once', async () => {
+    vi.stubGlobal('speechSynthesis', {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+      speak: vi.fn(),
     });
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/data/sentences/by-type/plain-past.json', {
-      cache: 'force-cache',
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const surface = surfaceFormFor(target, type);
+    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true, listeningPrompt: true },
     });
+
+    render(<StudyView />);
+    await screen.findByText('Sentence listening prompt', {}, { timeout: 5000 });
     await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1));
     expect(document.body.textContent).not.toContain(`昼に${surface}。`);
-
     fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
-
-    await waitFor(() => {
-      const sentenceCard = document.querySelector('[data-sentence-mode="listening-recognition"]');
-      expect(sentenceCard).toBeTruthy();
-      expect(sentenceCard.textContent).toContain('昼');
-      expect(sentenceCard.textContent).toContain(surface);
-    });
+    const sentenceCard = document.querySelector('[data-sentence-mode="listening-recognition"]');
+    expect(sentenceCard.textContent).toContain('昼');
+    expect(sentenceCard.textContent).toContain(surface);
     expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1);
+  });
+
+  it('plays ordinary word audio only after missing listening context resolves', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('speechSynthesis', {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+      speak: vi.fn(),
+    });
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled.mockImplementation(() => new Promise(() => {}));
+    mockedApp.value = makeApp({
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true, listeningPrompt: true },
+    });
+
+    render(<StudyView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockedSpeech.playPronunciation).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(screen.getByText('Listening prompt')).toBeTruthy();
+    expect(screen.getByText(/No reviewed sentence/)).toBeTruthy();
+    expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(1);
+    expect(mockedSpeech.playPronunciation.mock.calls[0][0]).not.toContain('昼');
+    fireEvent.click(screen.getByRole('button', { name: 'Show text' }));
+    expect(screen.queryByText('Listening prompt')).toBeNull();
+    expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
   });
 
   it('credits reading practice to the source form without changing the dictionary SRS card', async () => {
@@ -1256,11 +1188,11 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
-      .map(([arg]) => arg)
+      .map(([arg]) => resolveStateUpdate(arg))
       .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
 
     expect(nextState).toBeTruthy();
-    expect(nextState.daily.count).toBe(1);
+    expect(nextState.practiceStats.byType[sourceType]).toMatchObject({ attempted: 1, correct: 1 });
     expect(nextState.cards[dictionaryCardId]).toMatchObject({
       correct: 1,
       incorrect: 0,
@@ -1283,53 +1215,18 @@ describe('StudyView continuous Practice startup', () => {
     expect(sourceFamily.cells.recognition.attempted).toBe(1);
   });
 
-  it('keeps continuous Practice status even when old Today drill prefs are present', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    const dueCardId = cardIdFor(target, type);
-    persistStudyCard(target, type);
-
-    mockedApp.value = makeApp({
-      state: stateWithDueRule(dueCardId),
-      allWords: [target],
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        wordListIds: [TODAY_DRILL_LIST_ID],
-      },
-      wordLists: [todayListFor(target)],
-    });
-
-    render(<StudyView />);
-
-    await waitForPracticeCard();
-    expect(screen.getByText('Practice run')).toBeTruthy();
-    expect(screen.getAllByText('0 cards').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('0 streak').length).toBeGreaterThan(0);
-    expect(screen.queryByText('0/1 ready')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Practice run settings' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Transform' })).toBeNull();
-  });
-
-  it('counts a correct Practice answer without completing the old ready queue', async () => {
+  it('records a correct Practice answer without exposing a ready queue', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
     const dueCardId = cardIdFor(target, type);
     const state = stateWithDueRule(dueCardId);
-    const markSrsQueueCompleted = vi.fn();
     persistStudyCard(target, type);
 
     mockedApp.value = makeApp({
       state,
       setState,
-      markSrsQueueCompleted,
       allWords: [target],
-      practicePrefs: {
-        ...DEFAULT_PREFS,
-        wordListIds: [TODAY_DRILL_LIST_ID],
-      },
-      wordLists: [todayListFor(target)],
     });
 
     render(<StudyView />);
@@ -1340,7 +1237,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
-      .map(([arg]) => arg)
+      .map(([arg]) => resolveStateUpdate(arg))
       .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
 
     expect(nextState).toBeTruthy();
@@ -1350,29 +1247,29 @@ describe('StudyView continuous Practice startup', () => {
       label: 'Plain Past',
     });
     expect(nextState.cards[dueCardId].correct).toBe(1);
-    expect(
-      screen.queryByRole('img', {
-        name: 'Te/Ta Sound Changes this session: 1 right / 0 wrong',
-      }),
-    ).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Te/Ta Sound Changes category details' }));
-    expect(
-      screen.getByRole('img', {
-        name: 'Te/Ta Sound Changes this session: 1 right / 0 wrong',
-      }),
-    ).toBeTruthy();
-    expect(nextState.daily.count).toBe(1);
+    expect(nextState.practiceStats.byType[type]).toMatchObject({ attempted: 1, correct: 1 });
+    expect(screen.queryByText(/ready queue/i)).toBeNull();
     expect(nextState.transformation.attempted).toBe(0);
-    expect(markSrsQueueCompleted).not.toHaveBeenCalled();
   });
 
   it('records Transform drill answers in transformation progress', async () => {
     const setState = vi.fn();
     const target = STARTER_VERBS[0];
     const type = 'plain-past';
+    const initialState = {
+      ...defaultState(),
+      enabledTypes: [type],
+      cards: { preserved: { due: 123, correct: 4, incorrect: 2 } },
+      mistakes: [{ key: 'preserved-mistake', resolved: false }],
+      retryQueue: ['preserved'],
+      readiness: { preserved: { attempted: 2 } },
+      weakness: { preserved: { attempted: 3 } },
+      daily: { ...defaultState().daily, count: 4 },
+      session: { ...defaultState().session, reviewed: 7, correct: 5, skipped: 1 },
+    };
     mockedApp.value = makeApp({
       setState,
-      state: { ...defaultState(), enabledTypes: [type] },
+      state: initialState,
       allWords: [target],
       practicePrefs: {
         ...DEFAULT_PREFS,
@@ -1394,14 +1291,187 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
     const nextState = setState.mock.calls
-      .map(([arg]) => arg)
-      .find((arg) => arg && typeof arg === 'object' && arg.session?.reviewed === 1);
+      .map(([arg]) => resolveStateUpdate(arg))
+      .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
 
     expect(nextState.transformation.attempted).toBe(1);
     expect(nextState.transformation.correct).toBe(1);
     expect(Object.keys(nextState.transformation.byPair)).toHaveLength(1);
-    expect(nextState.cards).toEqual({});
-    expect(nextState.daily.count).toBe(0);
+    for (const field of [
+      'cards',
+      'mistakes',
+      'retryQueue',
+      'readiness',
+      'weakness',
+      'daily',
+      'session',
+    ]) {
+      expect(nextState[field]).toEqual(initialState[field]);
+    }
+  });
+
+  it('leaves pending Practice and Learn focus untouched while Transform is open', async () => {
+    const clearStudyFocus = vi.fn();
+    const clearLearnFocus = vi.fn();
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      clearStudyFocus,
+      clearLearnFocus,
+      learnFocus: {
+        source: 'practice-result',
+        reviewRecord: { word: target, cardType: 'te-form', correct: false },
+      },
+      state: { ...defaultState(), enabledTypes: ['te-form'] },
+      studyFocus: {
+        source: 'lab',
+        launchMode: 'recommendation',
+        recommendation: {
+          id: 'pending-practice-focus',
+          source: 'lab',
+          label: 'Pending Practice focus',
+          returnEnabledTypes: ['plain-past'],
+        },
+      },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        reviewLimit: 6,
+        reviewLimitSource: 'recommendation',
+        wordListIds: ['list-review-rec-pending-practice-focus'],
+      },
+    });
+
+    render(<StudyView mode="transform" />);
+
+    expect(await screen.findByText('Change to the target form')).toBeTruthy();
+    expect(screen.queryByText('Pending Practice focus')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Exit focus' })).toBeNull();
+    expect(clearStudyFocus).not.toHaveBeenCalled();
+    expect(clearLearnFocus).not.toHaveBeenCalled();
+  });
+
+  it('uses the pre-focus scope while a direct form-family Practice launch is pending', async () => {
+    const setState = vi.fn();
+    const target = STARTER_VERBS[0];
+    mockedApp.value = makeApp({
+      setState,
+      state: { ...defaultState(), enabledTypes: ['te-form'] },
+      studyFocus: {
+        formGroupId: 'te-ta-sound-changes',
+        source: 'stats',
+        launchMode: 'form-group',
+        returnEnabledTypes: ['plain-past'],
+        returnPracticePrefs: { ...DEFAULT_PREFS },
+      },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        wordListIds: ['focused-list'],
+      },
+      wordLists: [],
+    });
+
+    render(<StudyView mode="transform" />);
+
+    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
+    fireEvent.change(input, { target: { value: conjugateItem(target, 'plain-past') } });
+
+    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
+    const nextState = setState.mock.calls
+      .map(([arg]) => resolveStateUpdate(arg))
+      .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
+    expect(nextState.transformation.correct).toBe(1);
+    expect(screen.queryByRole('button', { name: 'Exit focus' })).toBeNull();
+  });
+
+  it('isolates Transform self-check and reveal misses from Practice progress', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const initialState = {
+      ...defaultState(),
+      enabledTypes: [type],
+      cards: { preserved: { due: 123, correct: 4, incorrect: 2 } },
+      mistakes: [{ key: 'preserved-mistake', resolved: false }],
+      retryQueue: ['preserved'],
+      readiness: { preserved: { attempted: 2 } },
+      weakness: { preserved: { attempted: 3 } },
+      daily: { ...defaultState().daily, count: 4 },
+      session: { ...defaultState().session, reviewed: 7, correct: 5, skipped: 1 },
+    };
+
+    for (const answerMode of ['self-check', 'input']) {
+      cleanup();
+      const setState = vi.fn();
+      mockedApp.value = makeApp({
+        setState,
+        state: initialState,
+        allWords: [target],
+        practicePrefs: { ...DEFAULT_PREFS, answerMode },
+      });
+      render(<StudyView mode="transform" />);
+
+      await screen.findByText('Change to the target form');
+      if (answerMode === 'self-check') {
+        fireEvent.click(screen.getByRole('button', { name: 'Reveal answer' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Missed' }));
+      } else {
+        fireEvent.click(screen.getByRole('button', { name: 'Reveal' }));
+      }
+      await waitFor(() => expect(setState).toHaveBeenCalled());
+      const nextState = setState.mock.calls
+        .map(([arg]) => resolveStateUpdate(arg))
+        .find((arg) => arg && typeof arg === 'object' && arg.transformation?.attempted === 1);
+
+      expect(nextState.transformation.correct).toBe(0);
+      for (const field of [
+        'cards',
+        'mistakes',
+        'retryQueue',
+        'readiness',
+        'weakness',
+        'daily',
+        'session',
+      ]) {
+        expect(nextState[field]).toEqual(initialState[field]);
+      }
+    }
+  });
+
+  it('keeps Transform skip entirely local', async () => {
+    const setState = vi.fn();
+    mockedApp.value = makeApp({
+      setState,
+      state: { ...defaultState(), enabledTypes: ['plain-past'] },
+      allWords: [STARTER_VERBS[0]],
+    });
+
+    render(<StudyView mode="transform" />);
+
+    await screen.findByText('Change to the target form');
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(setState).not.toHaveBeenCalled();
+  });
+
+  it('does not clear the suspended Practice card when Transform scope changes', async () => {
+    const practiceWord = STARTER_VERBS[0];
+    const transformWord = STARTER_VERBS[1];
+    persistStudyCard(practiceWord, 'plain-past');
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: ['plain-past'] },
+      allWords: [practiceWord],
+    });
+
+    const view = render(<StudyView mode="transform" />);
+    await screen.findByText('Change to the target form');
+
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: ['plain-past'] },
+      allWords: [transformWord],
+    });
+    view.rerender(<StudyView mode="transform" />);
+
+    await waitFor(() => expect(screen.getByText('Change to the target form')).toBeTruthy());
+    expect(JSON.parse(sessionStorage.getItem('jp-study-current')).dict).toBe(practiceWord.dict);
   });
 
   it('keeps an exact romaji answer unsubmitted until Check or Enter when kana help is off', async () => {
@@ -1437,7 +1507,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
     expect(nextState.session.currentStreak).toBe(1);
@@ -1471,7 +1541,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
     expect(nextState.cards[cardId].correct).toBe(1);
@@ -1501,7 +1571,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
     expect(nextState.session.currentStreak).toBe(1);
@@ -1545,7 +1615,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
@@ -1585,7 +1655,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
     expect(nextState.session.recentOutcomes[0]).toMatchObject({
@@ -1621,7 +1691,7 @@ describe('StudyView continuous Practice startup', () => {
 
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
@@ -1658,7 +1728,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.recentOutcomes[0]).toMatchObject({
@@ -1667,40 +1737,6 @@ describe('StudyView continuous Practice startup', () => {
     });
     expect(nextState.cards[cardId].incorrect).toBe(1);
     expect(screen.queryByText('Almost - possible typo.')).toBeNull();
-  });
-
-  it('updates the coach strip after a correct answer in the current run', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    let app;
-    const setState = vi.fn((nextState) => {
-      app = { ...app, state: nextState };
-      mockedApp.value = app;
-    });
-    app = makeApp({
-      setState,
-      allWords: [target],
-      studyFocus: {
-        word: target,
-        type,
-      },
-    });
-    mockedApp.value = app;
-    const { rerender } = render(<StudyView />);
-
-    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.change(input, { target: { value: 'tabeta' } });
-    await waitFor(() => expect(setState).toHaveBeenCalled());
-    rerender(<StudyView />);
-
-    expect(screen.getByText('1 card')).toBeTruthy();
-    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
-    expect(screen.getByText('1 streak')).toBeTruthy();
-    expect(screen.getByText('100% right')).toBeTruthy();
-    expect(screen.getByText('Focused practice: 食べる. Clean run so far.')).toBeTruthy();
-    const compactSummary = screen.getByText('Show run summary').closest('details');
-    expect(compactSummary).toBeTruthy();
-    expect(compactSummary.open).toBe(false);
   });
 
   it('counts a typed wrong answer as missed and resets the current streak', async () => {
@@ -1727,7 +1763,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
@@ -1787,7 +1823,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reveal' }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
@@ -1818,7 +1854,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(await screen.findByRole('button', { name: "I don't know" }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.currentStreak).toBe(0);
@@ -1851,7 +1887,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
 
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(0);
     expect(nextState.session.correct).toBe(0);
     expect(nextState.session.skipped).toBe(1);
@@ -1861,142 +1897,6 @@ describe('StudyView continuous Practice startup', () => {
       kind: 'skipped',
       label: 'Plain Past',
     });
-  });
-
-  it('shows the top session mistake pattern and recent trail in run details', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-negative';
-    let app;
-    const setState = vi.fn((nextState) => {
-      app = { ...app, state: nextState };
-      mockedApp.value = app;
-    });
-    app = makeApp({
-      setState,
-      allWords: [target],
-      studyFocus: {
-        word: target,
-        type,
-      },
-    });
-    mockedApp.value = app;
-    const { rerender } = render(<StudyView />);
-
-    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    fireEvent.change(input, { target: { value: 'tabeta' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
-    await waitFor(() => expect(setState).toHaveBeenCalled());
-    rerender(<StudyView />);
-
-    fireEvent.click(screen.getByText('Run details'));
-    expect(screen.getByText('Why this card')).toBeTruthy();
-    expect(screen.getByText('Top miss')).toBeTruthy();
-    expect(
-      screen.getAllByText(/Negative\/affirmative mismatch: Plain Negative/).length,
-    ).toBeGreaterThan(0);
-    expect(screen.getByText('missed: Plain Negative')).toBeTruthy();
-  });
-
-  it('opens a run review page with expandable answer reveals', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    mockedApp.value = makeApp({
-      allWords: [target],
-      studyFocus: {
-        word: target,
-        type,
-      },
-    });
-
-    render(<StudyView />);
-
-    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    const cardSource = screen.getByLabelText('Current card source');
-    expect(within(cardSource).getByText('New')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Review answers' }).disabled).toBe(true);
-
-    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
-    await waitFor(() => expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0));
-
-    const reviewButton = screen.getByRole('button', { name: 'Review answers' });
-    expect(reviewButton.disabled).toBe(false);
-    fireEvent.click(reviewButton);
-
-    const reviewRegion = screen.getByRole('region', { name: 'Practice run review' });
-    expect(reviewRegion).toBeTruthy();
-    expect(screen.getByText('Answers from this run')).toBeTruthy();
-    expect(screen.getByText('Answer #1')).toBeTruthy();
-    expect(screen.getByText('Your answer:')).toBeTruthy();
-    expect(within(reviewRegion).queryByText('New')).toBeNull();
-
-    fireEvent.click(screen.getByText('Answer #1'));
-    expect(screen.getAllByText('Correct.').length).toBeGreaterThan(0);
-    expect(screen.getByText('Explain the rule')).toBeTruthy();
-    expect(within(reviewRegion).getByText('Walk through this form in Guide')).toBeTruthy();
-    expect(within(reviewRegion).getByText(/Drills this same word and target form/)).toBeTruthy();
-    expect(
-      within(reviewRegion).getByRole('button', { name: 'Open Guide for this rule' }),
-    ).toBeTruthy();
-    expect(within(reviewRegion).getByRole('button', { name: 'Next card' })).toBeTruthy();
-    expect(within(reviewRegion).queryByText('New')).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Practice' }));
-    expect(screen.getByText('Practice run')).toBeTruthy();
-  });
-
-  it('separates a previously missed card from a clean current run', async () => {
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    const retryCardId = cardIdFor(target, type);
-    const state = {
-      ...defaultState(),
-      enabledTypes: [type],
-      retryQueue: [retryCardId],
-      cards: {
-        [retryCardId]: {
-          ease: 2.3,
-          interval: 0,
-          reps: 0,
-          nextReview: Date.now() + 24 * 60 * 60 * 1000,
-          correct: 0,
-          incorrect: 1,
-          lastSeen: 1,
-        },
-      },
-    };
-    let app;
-    const setState = vi.fn((nextState) => {
-      app = { ...app, state: nextState };
-      mockedApp.value = app;
-    });
-    app = makeApp({
-      state,
-      setState,
-      allWords: [target],
-    });
-    mockedApp.value = app;
-
-    const { rerender } = render(<StudyView />);
-
-    const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    const cardSource = screen.getByLabelText('Current card source');
-    expect(within(cardSource).getByText('Previously missed')).toBeTruthy();
-    expect(screen.queryByText('Recent miss')).toBeNull();
-    expect(within(cardSource).queryByText('Returning after a miss')).toBeNull();
-    expect(screen.queryByText('Returning after a miss')).toBeNull();
-    fireEvent.click(screen.getByText('Run details'));
-    const whyThisCard = screen.getByText('Why this card').parentElement;
-    expect(within(whyThisCard).getByText('Previously missed')).toBeTruthy();
-
-    fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
-    await waitFor(() => expect(setState).toHaveBeenCalled());
-    rerender(<StudyView />);
-
-    expect(screen.getByText('100% right')).toBeTruthy();
-    expect(screen.getAllByText('0 missed').length).toBeGreaterThan(0);
-    expect(
-      screen.getByText('Clean run so far. This card was missed in an earlier practice run.'),
-    ).toBeTruthy();
   });
 
   it('keeps the concise miss diagnosis visible and discloses the detailed rule on demand', async () => {
@@ -2018,9 +1918,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     await waitFor(() => expect(screen.getAllByText('Not quite.').length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Review answers' }));
-    const reviewRegion = screen.getByRole('region', { name: 'Practice run review' });
-    fireEvent.click(screen.getByText('Answer #1'));
+    const reviewRegion = document.body;
 
     expect(within(reviewRegion).getAllByText('Not quite.').length).toBeGreaterThan(0);
     const ruleCard = within(reviewRegion).getByText('Rule to apply').closest('section');
@@ -2296,7 +2194,7 @@ describe('StudyView continuous Practice startup', () => {
     fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
     fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
-    const nextState = setState.mock.calls[0][0];
+    const nextState = resolveStateUpdate(setState.mock.calls[0][0]);
     expect(nextState.session.reviewed).toBe(1);
     expect(nextState.session.correct).toBe(1);
   });

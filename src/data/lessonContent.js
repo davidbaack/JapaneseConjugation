@@ -145,20 +145,32 @@ export const LESSON_SECTIONS = [
       ['来る', 'きて / きた', 'kuru uses き for both te and ta'],
     ],
   }),
-  lessonFromGroup('volitional-desire', {
-    title: 'Volitional and Wanting',
-    kana: '意向形・たい形',
-    summary:
-      'Volitional forms propose or intend an action. Tai-forms express wanting to do something and then behave like い-adjectives.',
+  lessonFromGroup('volitional', {
+    title: 'Volitional',
+    kana: '意向形',
+    summary: 'Volitional forms propose an action, invite someone along, or express an intention.',
     build:
-      'Volitional: ichidan stem + よう; godan o-row + う; する -> しよう; 来る -> こよう. Polite volitional uses the stem before ます + ましょう. Tai-form uses that same stem + たい.',
+      'Ichidan uses the stem + よう; godan moves the final kana to the o-row + う; する -> しよう; 来る -> こよう. Polite volitional uses the stem before ます + ましょう.',
+    variants: 'Use the plain volitional for casual invitations and ましょう for polite proposals.',
+    watch: 'Volitional is an invitation or intention, not the same as saying that you want to act.',
+    examples: [
+      ['食べる', '食べよう / 食べましょう', 'ichidan stem + よう / ましょう'],
+      ['書く', '書こう', 'godan o-row + う'],
+      ['する', 'しよう', 'irregular する core'],
+    ],
+  }),
+  lessonFromGroup('wanting', {
+    title: 'Wanting with 〜たい',
+    kana: 'たい形',
+    summary: 'Tai-forms express wanting to do something and then behave like い-adjectives.',
+    build: 'Use the stem before ます + たい: 食べます -> 食べたい, 書きます -> 書きたい.',
     variants:
-      'たい conjugates like an い-adjective: たくない, たかった, たくなかった. Polite tai usually adds です after the tai-form.',
+      'たい conjugates like an い-adjective: たくない, たかった, and たくなかった. Polite tai usually adds です.',
     watch: 'The thing wanted is often marked with が in learner Japanese: 水が飲みたい.',
     examples: [
-      ['食べる', '食べよう / 食べたい', 'ichidan stem plus よう or たい'],
-      ['書く', '書こう / 書きたい', 'godan o-row for volitional, i-row for tai'],
-      ['する', 'しよう / したい', 'irregular する core'],
+      ['食べる', '食べたい / 食べたくない', 'ichidan stem + たい'],
+      ['書く', '書きたい / 書きたかった', 'godan i-row + たい'],
+      ['する', 'したい', 'irregular する stem'],
     ],
   }),
   lessonFromGroup('potential', {
@@ -211,22 +223,54 @@ export const LESSON_SECTIONS = [
       ['食べていません', 'is not eating / has not eaten', 'polite negative'],
     ],
   }),
-  lessonFromGroup('commands-requests', {
-    title: 'Commands, Requests, Permission, Obligation',
-    kana: '命令・依頼',
+  lessonFromGroup('commands', {
+    title: 'Commands and Prohibition',
+    kana: '命令・禁止',
     summary:
-      'These forms control action: direct commands, polite instructions, requests, permission, prohibition, and must-do obligations.',
+      'Commands directly tell someone to act or not act. Their social force matters as much as their formation.',
     build:
-      'Imperative: godan e-row, ichidan stem + ろ, する -> しろ, 来る -> こい. なさい uses the stem before ます + なさい. Requests use te-form + ください.',
-    variants:
-      'Permission is te-form + もいい. Prohibition is dictionary form + な. Obligation is negative base + なければならない.',
-    watch:
-      'Plain imperatives and dictionary + な can sound sharp. てください, ないでください, and なさい are safer for learners.',
+      'Imperative: godan e-row, ichidan stem + ろ, する -> しろ, 来る -> こい. なさい uses the stem before ます + なさい. Prohibition is dictionary form + な.',
+    variants: 'なさい is a firm instruction; the plain imperative and dictionary + な are sharper.',
+    watch: 'Direct commands can sound forceful. Use requests when that force is not intended.',
     examples: [
-      ['書く', '書け / 書きなさい / 書いてください', 'e-row, stem before ます, te-form'],
-      ['食べる', '食べろ / 食べないでください', 'ichidan command and negative request'],
-      ['行く', '行ってもいい / 行かなければならない', 'permission and obligation'],
+      ['書く', '書け / 書きなさい', 'e-row or stem + なさい'],
+      ['食べる', '食べろ', 'ichidan stem + ろ'],
+      ['行く', '行くな', 'dictionary form + な prohibits'],
     ],
+  }),
+  lessonFromGroup('requests', {
+    title: 'Requests',
+    kana: '依頼',
+    summary:
+      'Requests ask someone to do something or not do something without using a direct command.',
+    build:
+      'Use te-form + ください for a positive request and plain negative + でください for a negative request.',
+    variants: 'The positive and negative request patterns start from different connecting forms.',
+    watch: 'ないでください is a request; dictionary form + な is a direct prohibition.',
+    examples: [
+      ['待つ', '待ってください', 'te-form + ください'],
+      ['食べる', '食べないでください', 'plain negative + でください'],
+    ],
+  }),
+  lessonFromGroup('permission', {
+    title: 'Permission',
+    kana: 'てもいい',
+    summary: 'The てもいい pattern asks or states that an action is allowed.',
+    build: 'Make the te-form, then add もいい.',
+    variants: 'Question intonation turns the same pattern into a request for permission.',
+    watch: 'This pattern means may do, not must do.',
+    examples: [['入る', '入ってもいい', 'te-form + もいい']],
+  }),
+  lessonFromGroup('obligation', {
+    title: 'Obligation',
+    kana: 'なければならない',
+    summary: 'The なければならない pattern expresses that an action must be done.',
+    build: 'Start from the plain negative, replace ない with なければ, then add ならない.',
+    variants:
+      'Conversation often shortens the full expression, but the full form makes the structure clear.',
+    watch:
+      'Build from the negative even though the complete expression has a positive must meaning.',
+    examples: [['行く', '行かなければならない', '行かない -> 行かなければならない']],
   }),
   lessonFromGroup('passive', {
     title: 'Passive',
@@ -299,21 +343,20 @@ export const LESSON_SECTIONS = [
       },
     ],
   }),
-  lessonFromGroup('keigo', {
-    title: 'Keigo: Honorific and Humble',
-    kana: '尊敬語・謙譲語',
-    summary:
-      'Keigo changes social perspective. Honorific forms raise someone else’s action; humble forms lower your own or your in-group’s action.',
+  lessonFromGroup('honorific', {
+    title: 'Honorific Keigo',
+    kana: '尊敬語',
+    summary: 'Honorific forms raise the action of the person being spoken about.',
     build:
-      'Regular honorific often uses お/ご + the stem before ます + になる. Regular humble often uses お/ご + the stem before ます + する. Suru compounds commonly use ご + noun + なさる/いたす.',
+      'Regular honorific often uses お/ご + the stem before ます + になる. Suru compounds commonly use ご + noun + なさる.',
     variants:
-      'Polite keigo uses the polite version of the keigo verb. Common verbs have special replacements: 行く/来る/いる -> いらっしゃる, する -> なさる/いたす, 言う -> おっしゃる/申す.',
+      'Common verbs have special replacements: 行く/来る/いる -> いらっしゃる, する -> なさる, 言う -> おっしゃる.',
     watch:
       'Keigo is lexical as much as grammatical. Learn the common special verbs, then use the regular pattern for less common verbs.',
     examples: [
-      ['見る', 'ご覧になる / 拝見する', 'honorific / humble special pair'],
-      ['行く', 'いらっしゃる / 参る', 'movement special pair'],
-      ['待つ', 'お待ちになる / お待ちする', 'regular stem pattern'],
+      ['見る', 'ご覧になる', 'honorific special form'],
+      ['行く', 'いらっしゃる', 'movement special form'],
+      ['待つ', 'お待ちになる', 'regular honorific pattern'],
     ],
     contextExamples: [
       {
@@ -321,6 +364,23 @@ export const LESSON_SECTIONS = [
         japanese: '社長はもうお帰りになりました。',
         english: 'The company president has already gone home.',
       },
+    ],
+  }),
+  lessonFromGroup('humble', {
+    title: 'Humble Keigo',
+    kana: '謙譲語',
+    summary:
+      'Humble forms lower your own or your in-group’s action to show respect to someone else.',
+    build:
+      'Regular humble often uses お/ご + the stem before ます + する. Suru compounds commonly use ご + noun + いたす.',
+    variants: 'Common replacements include 行く/来る -> 参る, 見る -> 拝見する, and 言う -> 申す.',
+    watch: 'Use humble language for your own side’s action, not the respected person’s action.',
+    examples: [
+      ['見る', '拝見する', 'humble special form'],
+      ['行く', '参る', 'movement special form'],
+      ['説明する', 'ご説明いたす', 'humble suru pattern'],
+    ],
+    contextExamples: [
       {
         situation: 'Offering your action',
         japanese: '私が資料をご説明いたします。',
@@ -328,15 +388,15 @@ export const LESSON_SECTIONS = [
       },
     ],
   }),
-  lessonFromGroup('special-forms', {
-    title: 'Negative Connectors and Special Forms',
+  lessonFromGroup('negative-connectors', {
+    title: 'Negative Connectors',
     kana: 'ないで・なくて・ずに',
     summary:
-      'These forms connect negative actions, express “without doing,” make formal negative links, and add conjecture or prohibition.',
+      'These forms connect negative actions, express “without doing,” and make formal negative links.',
     build:
       'ないで attaches to the plain negative and means without doing or please do not when followed by ください. なくて changes ない to なくて for “not and/because.” ずに is the formal without-doing form.',
     variants:
-      'ずに uses the old negative stem: ichidan stem + ずに, godan a-row + ずに, する -> せずに, 来る -> こずに. Conjectural is plain form + だろう.',
+      'ずに uses the old negative stem: ichidan stem + ずに, godan a-row + ずに, する -> せずに, 来る -> こずに.',
     watch:
       'ないで keeps the action undone; なくて often gives a reason or connects adjective-like negatives.',
     examples: [
@@ -352,22 +412,58 @@ export const LESSON_SECTIONS = [
       },
     ],
   }),
-  lessonFromGroup('adjectives', {
-    title: 'Adjectives',
+  lessonFromGroup('conjecture', {
+    title: 'Conjecture with だろう',
+    kana: '推量',
+    summary: 'だろう presents something as probable or expected rather than certain.',
+    build: 'Attach だろう to the appropriate plain form.',
+    variants: 'The polite counterpart is commonly でしょう.',
+    watch: 'Conjecture changes certainty, not tense or polarity by itself.',
+    examples: [['行く', '行くだろう', 'plain form + だろう']],
+  }),
+  lessonFromGroup('adjective-core', {
+    title: 'Adjective Core Forms',
     kana: '形容詞',
-    summary:
-      'Adjectives conjugate for tense, negativity, connection, adverb use, noun modification, conditionals, appearance, excess, and becoming.',
+    summary: 'Adjectives conjugate directly for tense, negativity, and politeness.',
     build:
-      'い-adjectives drop い for changed forms: かった, くない, くて, く, ければ, そう, すぎる, くなる. な-adjectives use the base plus だ/です, だった, ではない, で, に, な, なら, そう, すぎる, になる.',
+      'い-adjectives drop い for changed forms such as かった and くない. な-adjectives use the base plus copula pieces such as だ, です, だった, and ではない.',
     variants:
       'Negative and past-negative adjective forms change before politeness: 高くないです, 高くなかったです; 静かではありません, 静かではありませんでした.',
-    watch:
-      'For そう with い-adjectives, remove い: 高そう. For いい, use よさそう, よかった, よくない.',
+    watch: 'いい and compounds ending in いい use よ for changed forms: よかった and よくない.',
     examples: [
-      ['高い', '高かった / 高くない / 高くて / 高そう', 'い-adjective stem 高'],
-      ['静か', '静かだった / 静かではない / 静かで / 静かに', 'な-adjective base'],
-      ['いい', 'よかった / よくない / よさそう', 'irregular よ stem'],
+      ['高い', '高かった / 高くない', 'い-adjective stem 高'],
+      ['静か', '静かだった / 静かではない', 'な-adjective base'],
+      ['いい', 'よかった / よくない', 'irregular よ stem'],
     ],
+  }),
+  lessonFromGroup('adjective-connectors', {
+    title: 'Adjective Connectors and Modifiers',
+    kana: 'て形・副詞形・連体形',
+    summary: 'These forms connect descriptions, modify actions, and attach adjectives to nouns.',
+    build:
+      'い-adjectives use くて, く, and the original adjective before a noun. な-adjectives use で, に, and な.',
+    variants: 'Negative connectors build from the negative adjective form.',
+    watch: 'The adverbial and noun-modifying endings differ for な-adjectives: 静かに and 静かな.',
+    examples: [['静か', '静かで / 静かに / 静かな部屋', 'connector, adverb, noun modifier']],
+  }),
+  lessonFromGroup('adjective-conditionals', {
+    title: 'Adjective Conditionals',
+    kana: '条件形',
+    summary: 'Adjectives can build ば, なら, and たら conditions directly.',
+    build:
+      'い-adjectives use ければ; な-adjectives use なら. Tara forms build from the adjective past.',
+    variants: 'Negative conditions build from くなければ or ではなければ.',
+    watch: 'Choose the conditional based on meaning as well as adjective type.',
+    examples: [['高い', '高ければ / 高かったら', 'ば and たら conditions']],
+  }),
+  lessonFromGroup('adjective-patterns', {
+    title: 'Adjective Patterns',
+    kana: 'そう・すぎる・なる',
+    summary: 'These patterns express appearance, excess, and becoming.',
+    build: 'Attach そう, すぎる, or なる to the appropriate adjective stem.',
+    variants: 'い-adjectives usually use the stem without い; な-adjectives use the base.',
+    watch: 'For いい, use the irregular よ stem: よさそう.',
+    examples: [['高い', '高そう / 高すぎる / 高くなる', 'looks high, too high, becomes high']],
   }),
 ];
 
@@ -378,7 +474,13 @@ export const LESSON_TRACKS = [
     title: 'Build the everyday core',
     summary:
       'Start with the forms learners need constantly: tense, politeness, te-form links, adjectives, and wanting or inviting.',
-    lessonGroupIds: ['basic-tenses', 'te-ta-sound-changes', 'adjectives', 'volitional-desire'],
+    lessonGroupIds: [
+      'basic-tenses',
+      'te-ta-sound-changes',
+      'adjective-core',
+      'volitional',
+      'wanting',
+    ],
     suggestedCount: 12,
     wordLimit: 18,
   },
@@ -388,7 +490,17 @@ export const LESSON_TRACKS = [
     title: 'Connect ideas and ability',
     summary:
       'Add can-do language, if/when choices, ongoing states, and the practical request patterns that turn forms into sentences.',
-    lessonGroupIds: ['potential', 'conditional', 'progressive', 'commands-requests'],
+    lessonGroupIds: [
+      'potential',
+      'conditional',
+      'progressive',
+      'commands',
+      'requests',
+      'permission',
+      'obligation',
+      'adjective-connectors',
+      'adjective-conditionals',
+    ],
     suggestedCount: 16,
     wordLimit: 12,
   },
@@ -398,7 +510,16 @@ export const LESSON_TRACKS = [
     title: 'Handle perspective and edge forms',
     summary:
       'Practice viewpoint shifts, make/let combinations, keigo, and special negative connectors after the core forms feel stable.',
-    lessonGroupIds: ['passive', 'causative', 'causative-passive', 'keigo', 'special-forms'],
+    lessonGroupIds: [
+      'passive',
+      'causative',
+      'causative-passive',
+      'honorific',
+      'humble',
+      'negative-connectors',
+      'conjecture',
+      'adjective-patterns',
+    ],
     suggestedCount: 20,
     wordLimit: 14,
   },

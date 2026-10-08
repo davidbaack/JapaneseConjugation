@@ -17,9 +17,11 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateVerbRows, mergeBuiltInWords } from '../src/data/verbLexicon.js';
 import { STARTER_ADJECTIVES, STARTER_VERBS } from '../src/data/starterWords.js';
-import { practiceTypesForItem } from '../src/utils/conjugator.js';
+import { practiceTypesForItem, wordKey } from '../src/utils/conjugator.js';
 import { ALL_CARD_TYPES, LEARNER_DEFAULT_TYPE_IDS } from '../src/data/conjugationTypes.js';
 import { buildPair } from './sentencePipeline.js';
+import { verifiedReview } from './sentenceReview.js';
+import { sentenceWordReview } from '../src/data/reviewedSentenceProfiles.js';
 
 const LEXICON_PATH = join('public', 'data', 'verb-lexicon.json');
 const OUT_DIR = process.env.SENTENCE_OUT_DIR || join('tmp', 'sentence-batches');
@@ -51,22 +53,29 @@ function loadWords() {
   return words;
 }
 
-async function fetchExistingPairs() {
+async function fetchExistingPairs(words) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(url, key, { auth: { persistSession: false } });
   const seen = new Set();
+  const wordMap = new Map(words.map((word) => [wordKey(word), word]));
   const pageSize = 1000;
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from('sentences')
-      .select('word_key, type')
+      .select('word_key,type,ja_template,en,segments,model,review')
+      .eq('review->>status', 'accepted')
+      .order('word_key')
+      .order('type')
       .range(from, from + pageSize - 1);
     if (error) throw error;
     if (!data?.length) break;
-    for (const row of data) seen.add(`${row.word_key}|${row.type}`);
+    for (const row of data) {
+      const word = wordMap.get(row.word_key);
+      if (word && verifiedReview(word, row.type, row)) seen.add(`${row.word_key}|${row.type}`);
+    }
     if (data.length < pageSize) break;
   }
   return seen;
@@ -79,7 +88,7 @@ whole point: each one is read by a human studying that exact word and form.
 
 ## What you get
 Each line of a batch .jsonl file is ONE request:
-  { word_key, dict, reading, group, jlpt, type, type_label, transitive,
+  { word_key, dict, reading, meaning, group, jlpt, type, type_label, transitive,
     expected_surface, expected_kana }
 
 ## What you return
@@ -111,6 +120,11 @@ GOOD: {"word_key":"godan:買う","type":"plain-negative","ja":"お金がない�
 BAD:  {"word_key":"godan:買う","type":"plain-negative","ja":"今日、私も買わない。","en":"A short practice sentence using 買う in the Plain Negative form."}
 
 ## Enforcement
+Structural validation does not approve a sentence for learners. Every output
+needs a separate bilingual review of the actual Japanese/English pair and its
+intended lexical sense. Do not invent accepted review metadata. Missing review
+means pending content and ordinary word Practice, not an approved context.
+
 The importer rejects to *.rejects.jsonl any line whose "en" contains Japanese,
 is boilerplate, or names the form; whose sentence doesn't contain the exact
 conjugated form; or whose sentence template is reused more than ~100 times in a
@@ -126,10 +140,11 @@ async function main() {
   const words = loadWords();
   const types = targetTypeIds();
   const typeSet = new Set(types);
-  const existing = await fetchExistingPairs();
+  const existing = await fetchExistingPairs(words);
 
   const pending = [];
   outer: for (const word of words) {
+    if (sentenceWordReview(word).status === 'unsuitable') continue;
     const prefs = /** @type {any} */ ({ skipDuplicateForms: false });
     const applicable = practiceTypesForItem(word, types, prefs)
       .map((t) => t.id)
