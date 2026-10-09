@@ -673,6 +673,55 @@ describe('AppStateProvider cloud session races', () => {
     expect(settledRenders).toBeLessThanOrEqual(8);
   });
 
+  it('does not echo unchanged cross-tab pending saves into new renders and writes', async () => {
+    const renderProbe = vi.fn();
+    function RenderProbe() {
+      const { hydrated } = useApp();
+      renderProbe();
+      return <output>{hydrated ? 'ready' : 'loading'}</output>;
+    }
+    render(
+      <AppStateProvider>
+        <RenderProbe />
+      </AppStateProvider>,
+    );
+    await screen.findByText('ready');
+    await waitFor(() => expect(saveAll).toHaveBeenCalled());
+    await act(async () => Promise.resolve());
+    const [state, customVerbs, customAdjectives, wordLists, syncConfig, , practicePrefs, syncMeta] =
+      saveAll.mock.lastCall;
+    const external = {
+      ...buildSyncPayload({
+        state,
+        customVerbs,
+        customAdjectives,
+        wordLists,
+        practicePrefs,
+        syncMeta,
+      }),
+      syncConfig,
+    };
+    loadAll
+      .mockReturnValueOnce(external)
+      .mockReturnValueOnce(external)
+      .mockReturnValueOnce(external);
+    const settledRenders = renderProbe.mock.calls.length;
+    saveAll.mockClear();
+    for (let index = 0; index < 3; index += 1) {
+      await act(async () => {
+        window.dispatchEvent(
+          new window.StorageEvent('storage', {
+            key: `${STORAGE_KEY}:pending:other-tab:${index}`,
+            newValue: JSON.stringify(external),
+            storageArea: localStorage,
+          }),
+        );
+      });
+    }
+    expect(renderProbe).toHaveBeenCalledTimes(settledRenders);
+    expect(saveAll).not.toHaveBeenCalled();
+  });
+
   it('commits a failed local-only change on the next login even when timestamps match', async () => {
     const updatedAt = '2030-01-01T00:00:00.000Z';
     const localState = defaultState();
