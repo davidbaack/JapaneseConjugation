@@ -214,7 +214,7 @@ function useAppController() {
     );
   }
 
-  function learnerPayloadSignature(payload) {
+  function learnerPayloadSignature(payload, includeMetadata = false) {
     return JSON.stringify(
       [
         payload.state,
@@ -222,6 +222,7 @@ function useAppController() {
         payload.customAdjectives,
         payload.wordLists,
         payload.practicePrefs,
+        ...(includeMetadata ? [payload.syncMeta] : []),
       ],
       (_key, value) =>
         value && typeof value === 'object' && !Array.isArray(value)
@@ -386,6 +387,17 @@ function useAppController() {
     const normalizedPayload = repair.repaired
       ? { ...localPayload, state: repair.state }
       : localPayload;
+    // Pending-save notifications also arrive for snapshots we already know.
+    // Applying them would render and stage another identical save, causing
+    // independent tabs to echo writes and keep lazy views suspended.
+    if (
+      ownerMatches &&
+      !repair.repaired &&
+      !localPayload.diagnosticRepairNeeded &&
+      !incomingNeedsRepair &&
+      learnerPayloadSignature(normalizedPayload, true) === learnerPayloadSignature(current, true)
+    )
+      return { payload: current, repaired: false };
     if (normalizedPayload.syncMeta) incomingSyncMetaRef.current = normalizedPayload.syncMeta;
     if (repair.repaired || localPayload.diagnosticRepairNeeded || incomingNeedsRepair)
       diagnosticRepairPendingRef.current = true;
