@@ -1,7 +1,49 @@
 import js from '@eslint/js';
-import reactPlugin from 'eslint-plugin-react';
+import reactX from 'eslint-plugin-react-x';
+import reactDom from 'eslint-plugin-react-dom';
+import reactJsx from 'eslint-plugin-react-jsx';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettier from 'eslint-config-prettier';
+
+// The replacement plugins do not cover these two existing JSX safety checks.
+const jsxSafety = {
+  rules: {
+    'valid-props': {
+      meta: {
+        type: 'problem',
+        schema: [],
+        messages: {
+          duplicate: 'Duplicate JSX prop {{name}}.',
+          stringRef: 'String refs are unsupported; use a callback or object ref.',
+        },
+      },
+      create(context) {
+        return {
+          JSXOpeningElement(node) {
+            const seen = new Set();
+            for (const attribute of node.attributes) {
+              if (attribute.type !== 'JSXAttribute') continue;
+              const name = context.sourceCode.getText(attribute.name);
+              if (seen.has(name))
+                context.report({ node: attribute, messageId: 'duplicate', data: { name } });
+              seen.add(name);
+              const value =
+                attribute.value?.type === 'JSXExpressionContainer'
+                  ? attribute.value.expression
+                  : attribute.value;
+              if (
+                name === 'ref' &&
+                ((value?.type === 'Literal' && typeof value.value === 'string') ||
+                  value?.type === 'TemplateLiteral')
+              )
+                context.report({ node: attribute, messageId: 'stringRef' });
+            }
+          },
+        };
+      },
+    },
+  },
+};
 
 const commonGlobals = {
   AbortController: 'readonly',
@@ -85,7 +127,10 @@ export default [
   {
     files: ['src/**/*.{js,jsx}'],
     plugins: {
-      react: reactPlugin,
+      'react-x': reactX,
+      'react-dom': reactDom,
+      'react-jsx': reactJsx,
+      'jsx-safety': jsxSafety,
       'react-hooks': reactHooks,
     },
     languageOptions: {
@@ -94,16 +139,31 @@ export default [
         ...browserGlobals,
       },
     },
-    settings: {
-      react: { version: 'detect' },
-    },
+    settings: reactX.configs.recommended.settings,
     rules: {
-      ...reactPlugin.configs.recommended.rules,
+      // Keep the existing correctness checks without adopting unrelated style
+      // or React Compiler policies from the new plugin's recommended preset.
+      // ESLint 10 handles JSX identifier references with its core rules.
+      'react-x/no-missing-key': 'error',
+      'react-x/no-missing-component-display-name': 'error',
+      'react-x/no-direct-mutation-state': 'error',
+      'react-x/no-component-will-mount': 'error',
+      'react-x/no-component-will-receive-props': 'error',
+      'react-x/no-component-will-update': 'error',
+      'react-jsx/no-children-prop': 'error',
+      'react-jsx/no-comment-textnodes': 'error',
+      'react-dom/no-dangerously-set-innerhtml-with-children': 'error',
+      'react-dom/no-find-dom-node': 'error',
+      'react-dom/no-hydrate': 'error',
+      'react-dom/no-render': 'error',
+      'react-dom/no-render-return-value': 'error',
+      'react-dom/no-unknown-property': 'error',
+      'react-dom/no-unsafe-target-blank': 'error',
+      'jsx-safety/valid-props': 'error',
       ...reactHooks.configs.recommended.rules,
       ...sharedRules,
-      'react/react-in-jsx-scope': 'off',
-      'react/prop-types': 'off',
-      'react/no-unescaped-entities': 'off',
+      // Existing default imports are harmless with the automatic JSX runtime.
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^(?:_|React$)', argsIgnorePattern: '^_' }],
       // Hydration patterns loading state from localStorage in useEffect are established here.
       'react-hooks/set-state-in-effect': 'off',
       // Components defined inside render are an established pattern in this codebase.
