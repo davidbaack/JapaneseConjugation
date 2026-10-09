@@ -14,6 +14,46 @@ const RATE_LIMIT_REFILL_MS = readPositiveNumber('GEMINI_RATE_LIMIT_REFILL_MS', 6
 // Pin the provider contract used below. The auto-updating Flash-Lite alias can
 // move to a new model generation whose generationConfig schema is incompatible.
 const GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const GEMINI_TIMEOUT_MS = 30000;
+
+class GeminiTimeoutError extends Error {}
+
+async function withGeminiDeadline<T>(
+  req: Request,
+  run: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel: () => void = () => {};
+  const deadline = new Promise<never>((_, reject) => {
+    cancel = () => {
+      const error = new Error('AI request was cancelled.');
+      reject(error);
+      controller.abort(error);
+    };
+    req.signal.addEventListener('abort', cancel, { once: true });
+    if (req.signal.aborted) cancel();
+    timer = setTimeout(() => {
+      const error = new GeminiTimeoutError('AI request timed out. Please try again.');
+      reject(error);
+      controller.abort(error);
+    }, GEMINI_TIMEOUT_MS);
+  });
+  try {
+    // Body streams and transports may ignore abort. The race still returns a
+    // bounded response, and signal checks prevent late work from reaching Gemini.
+    return await Promise.race([
+      Promise.resolve().then(() => {
+        controller.signal.throwIfAborted();
+        return run(controller.signal);
+      }),
+      deadline,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    req.signal.removeEventListener('abort', cancel);
+  }
+}
 
 type Bucket = {
   tokens: number;
@@ -223,44 +263,49 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!apiKey) {
-      return jsonResponse(
-        req,
-        { error: 'Configuration Error: GEMINI_API_KEY is not set on the Supabase project' },
-        500,
-      );
-    }
+    return await withGeminiDeadline(req, async (signal) => {
+      const apiKey = Deno.env.get('GEMINI_API_KEY');
+      if (!apiKey) {
+        return jsonResponse(
+          req,
+          { error: 'Configuration Error: GEMINI_API_KEY is not set on the Supabase project' },
+          500,
+        );
+      }
 
-    const result = await readGeminiPayload(req);
-    if ('error' in result) {
-      return jsonResponse(req, { error: result.error }, result.status);
-    }
+      const result = await readGeminiPayload(req);
+      signal.throwIfAborted();
+      if ('error' in result) {
+        return jsonResponse(req, { error: result.error }, result.status);
+      }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const response = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(result.payload),
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const response = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(result.payload),
+        signal,
+      });
+
+      const data = await response.json();
+      signal.throwIfAborted();
+      if (!response.ok) {
+        return jsonResponse(
+          req,
+          { error: data.error?.message || `Gemini API returned HTTP ${response.status}` },
+          response.status,
+        );
+      }
+
+      return jsonResponse(req, data, 200);
     });
-
-    const data = await response.json();
-    if (!response.ok) {
-      return jsonResponse(
-        req,
-        { error: data.error?.message || `Gemini API returned HTTP ${response.status}` },
-        response.status,
-      );
-    }
-
-    return jsonResponse(req, data, 200);
   } catch (err) {
     return jsonResponse(
       req,
       { error: err instanceof Error ? err.message : 'An unexpected server error occurred' },
-      500,
+      err instanceof GeminiTimeoutError ? 504 : 500,
     );
   }
 });
