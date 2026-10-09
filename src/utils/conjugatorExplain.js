@@ -9,6 +9,8 @@ import {
   conjugateAdjective,
   conjugateItem,
   getConjugationParts,
+  getSpecialKeigoBase,
+  politeKeigoForm,
   adjectiveStem,
   A_ROW,
   I_ROW,
@@ -25,6 +27,41 @@ import { groupConfusionFeedback } from './answerFeedbackCopy.js';
 
 export function getOfflineTemplateSentence(word, type) {
   return buildOfflineCuedCloze(word, type);
+}
+
+function specialKeigoTeaching(item, type) {
+  const base = getSpecialKeigoBase(item, type);
+  if (!base) return null;
+  const kind = type.startsWith('humble') ? 'humble' : 'honorific';
+  const isPolite = type.endsWith('-polite');
+  const result = isPolite ? politeKeigoForm(base) : base;
+  if (!result) return null;
+  const source = item.reading || item.dict || '';
+  const politeStem = isPolite && result.endsWith('ます') ? result.slice(0, -2) : '';
+  const pathway = `${source} -> ${base}${isPolite ? ` -> ${result}` : ''}`;
+  const expression = politeStem
+    ? `${source} -> ${base} -> ${politeStem} + ます = ${result}`
+    : pathway;
+  const action = kind === 'humble' ? "my/our side's action" : "someone else's action";
+  const detail = `Use the special ${kind} verb ${base} for ${action}.${
+    isPolite
+      ? politeStem
+        ? ` Then use its polite form: ${base} -> ${politeStem} + ます = ${result}.`
+        : ` Then use its polite form: ${base} -> ${result}.`
+      : ''
+  }`;
+  return {
+    kind,
+    base,
+    source,
+    result,
+    isPolite,
+    politeStem,
+    expression,
+    rule: { family: `special ${kind} replacement`, short: pathway, detail },
+    groupConnection: `${item.dict || source} is ${groupDisplayLabel(item.group)} for ordinary conjugation, but this ${typeLabel(type).toLowerCase()} target uses a special replacement: ${pathway}.`,
+    nudge: `This target uses a special replacement. Try to recall the ${kind} verb.`,
+  };
 }
 
 // Maps compound form prefixes to their base conjugation type.
@@ -141,7 +178,9 @@ function continuationHint(expected, correct, compound) {
     : 'Apply the next step above.';
 }
 
-function emptyAnswerNudge(item) {
+function emptyAnswerNudge(item, type) {
+  const special = specialKeigoTeaching(item, type);
+  if (special) return special.nudge;
   if (item?.group === 'godan') {
     return 'You have not typed anything yet. First identify the verb group, then look at the final kana of the dictionary form. Use those two facts to decide the first change before typing.';
   }
@@ -545,6 +584,8 @@ function expectedOnbinRule(item, type, replacement) {
 }
 
 function ruleSummaryFor(item, type, parts, expected) {
+  const special = specialKeigoTeaching(item, type);
+  if (special) return special.rule;
   const ending = originalEndingFor(item);
   const stem = parts.stem || fallbackStem(item, ending);
   const replacement = replacementFromParts(parts, expected, stem);
@@ -630,6 +671,8 @@ function targetName(type) {
 
 function groupRuleConnection(item, type, parts, expected) {
   if (!item || isAdjective(item)) return '';
+  const special = specialKeigoTeaching(item, type);
+  if (special) return special.groupConnection;
   const label = groupDisplayLabel(item.group);
   const surface = surfaceFormFor(item, type) || expected;
   const ending = originalEndingFor(item);
@@ -889,6 +932,83 @@ export function inferMistakenConjugationPattern(item, type, userAnswer) {
 
 export function getConjugationDebugInfo(word, type, userAnswer = '') {
   const ans = conjugateItem(word, type);
+  const special = specialKeigoTeaching(word, type);
+  if (special) {
+    const label = typeLabel(type);
+    const formula = {
+      stem: '',
+      originalEnding: '',
+      replacement: special.base,
+      result: ans,
+      expression: special.expression,
+    };
+    const cells = [
+      { label: 'Dictionary form', value: special.source },
+      { label: 'Special verb', value: special.base },
+      ...(special.politeStem ? [{ label: 'Polite stem', value: special.politeStem }] : []),
+      { label: 'Result', value: ans },
+    ];
+    return {
+      source: special.source,
+      targetType: type,
+      targetLabel: label,
+      category: learnerCategoryInfo(word),
+      groupLabel: groupLabel(word),
+      stem: '',
+      originalEnding: '',
+      replacement: special.base,
+      result: ans,
+      formula,
+      rule: special.rule,
+      soundChangeVisual: null,
+      rowShiftVisual: null,
+      routes: {
+        plain: {
+          title: 'From dictionary/plain form',
+          cells,
+          formula: special.expression,
+          detail: special.rule.detail,
+        },
+        polite: null,
+      },
+      groupConnection: special.groupConnection,
+      steps: [
+        {
+          title: 'Identify Word Type & Group',
+          desc: `"${word.dict}" (${word.reading}) means "${word.meaning}" and is ${groupSentenceLabel(word.group)}.`,
+          key: 'group',
+          label: 'group',
+          value: groupLabel(word),
+        },
+        {
+          title: 'Choose the Special Verb',
+          desc: `Replace the whole dictionary verb ${special.source} with the special ${special.kind} verb ${special.base}.`,
+          key: 'split',
+          label: 'special verb',
+          value: special.base,
+        },
+        {
+          title: 'Apply Rule',
+          desc: special.rule.detail,
+          key: 'rule',
+          label: 'rule',
+          value: special.rule.short,
+        },
+        {
+          title: 'Verify Conjugation Result',
+          desc: special.isPolite
+            ? `Use the polite form of the special ${special.kind} verb for this ${label} target.`
+            : `Use the special ${special.kind} verb for this ${label} target.`,
+          key: 'result',
+          label: 'result',
+          value: ans,
+          isResult: true,
+          expected: ans,
+        },
+      ],
+      mistake: inferMistakenConjugationPattern(word, type, userAnswer),
+    };
+  }
   const parts = getConjugationParts(word, type, ans);
   const originalEnding = originalEndingFor(word);
   const stem = parts.stem || fallbackStem(word, originalEnding);
@@ -1205,6 +1325,16 @@ export function explainAdjective(adj, type) {
 
 export function explainItem(item, type) {
   if (isAdjective(item)) return explainAdjective(item, type);
+  const special = specialKeigoTeaching(item, type);
+  if (special) {
+    return {
+      intro: `${item.dict} (${item.reading}) is ${GROUP_NAMES[item.group]}.`,
+      rule: special.rule.detail,
+      derivation: special.expression,
+      note: '',
+      reason: special.groupConnection,
+    };
+  }
   const e = explainConjugation(item, type);
   const common = {
     'masu-stem': 'Use the stem that appears before ます.',
@@ -1379,23 +1509,28 @@ export function explainItem(item, type) {
 export function stepCoachHint(item, type, typed, reveal = false) {
   const expected = conjugateItem(item, type);
   const exp = explainItem(item, type);
+  const special = specialKeigoTeaching(item, type);
   const compound = compoundBuildInfo(item, type);
   let recipe = [exp.rule, exp.note, safeCompoundRecipe(compound)].filter(Boolean).join(' ').trim();
   // Only a genuine transformation can spoil — the unchanged dictionary form can't.
   const wouldReveal = !!expected && expected !== item.reading && recipe.includes(expected);
   let masked = false;
   if (wouldReveal && !reveal) {
-    recipe = `This is an irregular form, so it doesn't follow the usual pattern — try to recall its special conjugation. Tap Hint again or use "Discuss further" to reveal the steps.`;
+    recipe = special
+      ? `${special.nudge} Tap Hint again or use "Discuss further" to reveal the steps.`
+      : `This is an irregular form, so it doesn't follow the usual pattern — try to recall its special conjugation. Tap Hint again or use "Discuss further" to reveal the steps.`;
     masked = true;
   }
   const got = toHiragana(typed || '') || typed || '';
-  if (!got && !(wouldReveal && reveal)) return { text: emptyAnswerNudge(item), masked };
+  if (!got && !(wouldReveal && reveal)) return { text: emptyAnswerNudge(item, type), masked };
   let correct = 0;
   while (correct < got.length && correct < expected.length && got[correct] === expected[correct])
     correct++;
   let status;
   if (!got) {
-    status = emptyAnswerNudge(item);
+    status = special
+      ? 'Use the special verb above, then type the requested target.'
+      : emptyAnswerNudge(item, type);
   } else if (correct === 0) {
     status = `The very beginning doesn't match yet. ${positionHint(type, got, expected, correct, compound)}`;
   } else if (correct < got.length) {

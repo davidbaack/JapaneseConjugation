@@ -7,12 +7,16 @@ import {
   normalizePromptFormSetting,
   pickPromptType,
   surfaceFormFor,
+  getConjugationParts,
+  KEIGO_SPECIALS,
 } from '../utils/conjugator.js';
 import {
   contextSentenceFor,
   getConjugationDebugInfo,
   inferMistakenConjugationPattern,
   stepCoachHint,
+  explainItem,
+  getConjugationSteps,
 } from '../utils/conjugatorExplain.js';
 
 // ─── Test verbs ───────────────────────────────────────────────────────────────
@@ -573,6 +577,133 @@ describe('visual conjugation debugger metadata', () => {
     expect(mistake.detail).toBe(
       'You used the ichidan drop る pattern, which produced かえない. 帰る is godan row-shift, so use る -> ら + ない: かえらない.',
     );
+  });
+});
+
+describe('special keigo teaching', () => {
+  const targets = ['humble', 'humble-polite', 'honorific', 'honorific-polite'];
+
+  it.each(targets)('teaches iku %s as a whole-word replacement', (type) => {
+    const debug = getConjugationDebugInfo(IKU, type, 'ikimasu');
+    expect(debug.rule.family).toMatch(/special.*replacement/i);
+    expect(debug.rule.short).toContain('いく');
+    expect(debug.rule.short).toContain(type.startsWith('humble') ? 'まいる' : 'いらっしゃる');
+    expect(debug.formula.expression).not.toMatch(/(?:^| -> )い \+/);
+    expect(debug.groupConnection).not.toMatch(/uses the .* row|removes final/);
+    expect(debug.groupConnection).toMatch(/special|replacement/i);
+    expect(debug.category.label).toMatch(/godan/);
+    expect(debug.soundChangeVisual).toBeNull();
+    expect(debug.rowShiftVisual).toBeNull();
+    expect(debug.routes.polite).toBeNull();
+    expect(debug.routes.plain.cells.some((cell) => cell.label === 'Stem')).toBe(false);
+    expect(
+      getConjugationSteps(IKU, type)
+        .map((step) => step.desc)
+        .join(' '),
+    ).not.toMatch(/Keep the stem|Combine the stem|needed row/);
+    expect(debug.mistake.expectedRule).toBe(debug.rule.short);
+  });
+
+  it('shows the replacement verb before forming its polite style', () => {
+    const plain = getConjugationDebugInfo(IKU, 'humble');
+    const polite = getConjugationDebugInfo(IKU, 'humble-polite');
+    expect(plain.formula.expression).toBe('いく -> まいる');
+    expect(polite.formula.expression).toContain('いく -> まいる');
+    expect(polite.formula.expression).toContain('まいり + ます = まいります');
+    expect(explainItem(IKU, 'humble-polite').derivation).toBe(polite.formula.expression);
+    const explanation = explainItem(IKU, 'humble');
+    expect([explanation.rule, explanation.note, explanation.reason].join(' ')).toMatch(
+      /special.*replacement/i,
+    );
+    expect([explanation.rule, explanation.note, explanation.reason].join(' ')).toMatch(
+      /own|in-group|my\/our/i,
+    );
+  });
+
+  it('handles mapped replacements across groups and supported polite overrides', () => {
+    for (const [reading, mappings] of Object.entries(KEIGO_SPECIALS)) {
+      const word = {
+        reading,
+        dict: reading,
+        meaning: 'example',
+        group:
+          reading === 'する'
+            ? 'suru'
+            : reading === 'くる'
+              ? 'kuru'
+              : [
+                    'たべる',
+                    'みる',
+                    'きる',
+                    'ねる',
+                    'いる',
+                    'たずねる',
+                    'かりる',
+                    'あげる',
+                    'くれる',
+                  ].includes(reading)
+                ? 'ichidan'
+                : 'godan',
+      };
+      for (const type of targets) {
+        const base = mappings[type.startsWith('humble') ? 'humble' : 'honorific'];
+        if (!base) continue;
+        const result = conjugateItem(word, type);
+        const debug = getConjugationDebugInfo(word, type);
+        expect(debug.rule.short, `${reading}/${type}`).toContain(base);
+        expect(debug.result).toBe(result);
+        expect(debug.formula.expression).toContain(result);
+        expect(debug.formula.expression).not.toContain(' + ' + result);
+        expect(debug.rowShiftVisual).toBeNull();
+        expect(debug.soundChangeVisual).toBeNull();
+        expect(getConjugationParts(word, type, result)).toEqual({
+          stem: '',
+          change: '',
+          suffix: result,
+        });
+      }
+    }
+    expect(getConjugationDebugInfo(TABERU, 'humble').rule.short).toContain('いただく');
+    expect(getConjugationDebugInfo(SURU, 'honorific-polite').result).toBe('なさいます');
+    expect(getConjugationDebugInfo(KURU, 'honorific-polite').result).toBe('いらっしゃいます');
+  });
+
+  it('does not reuse original kanji from an incidental shared kana prefix', () => {
+    expect(surfaceFormFor(IKU, 'honorific')).toBe('いらっしゃる');
+    expect(surfaceFormFor(IKU, 'honorific-polite')).toBe('いらっしゃいます');
+    const au = { dict: '会う', reading: 'あう', group: 'godan' };
+    expect(surfaceFormFor(au, 'humble')).toBe('おめにかかる');
+    expect(getConjugationParts(IKU, 'honorific', 'いらっしゃる').stem).toBe('');
+  });
+
+  it.each(['humble', 'humble-polite'])(
+    'keeps first %s hints masked and reveals the replacement on request',
+    (type) => {
+      const expected = conjugateItem(IKU, type);
+      for (const typed of ['', 'いき', expected.slice(0, 2)]) {
+        const first = stepCoachHint(IKU, type, typed);
+        expect(first.masked).toBe(true);
+        expect(first.text).toMatch(/special replacement/i);
+        expect(first.text).not.toContain(expected);
+        expect(first.text).not.toContain('This is an irregular form');
+      }
+      const revealed = stepCoachHint(IKU, type, '', true);
+      expect(revealed.masked).toBe(false);
+      expect(revealed.text).toContain(expected);
+      expect(revealed.text).not.toMatch(/needed row|く -> ま/);
+      expect(stepCoachHint(IKU, type, expected).text).toMatch(/press Enter/);
+    },
+  );
+
+  it('preserves ordinary iku explanations and regular keigo behavior', () => {
+    const negative = getConjugationDebugInfo(IKU, 'plain-negative');
+    expect(negative.rule.short).toBe('く -> か + ない');
+    expect(surfaceFormFor(IKU, 'plain-negative')).toBe('行かない');
+    expect(surfaceFormFor(IKU, 'plain-past')).toBe('行った');
+    expect(surfaceFormFor(IKU, 'te-form')).toBe('行って');
+    expect(getConjugationDebugInfo(MATSU, 'humble').result).toBe('おまちする');
+    expect(getConjugationDebugInfo(MATSU, 'humble').rule.family).not.toMatch(/special/);
+    expect(stepCoachHint(MATSU, 'humble', '').masked).toBe(false);
   });
 });
 

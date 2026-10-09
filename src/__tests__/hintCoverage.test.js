@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { conjugateItem, compatibleTypes } from '../utils/conjugator.js';
+import { conjugateItem, compatibleTypes, getSpecialKeigoBase } from '../utils/conjugator.js';
 import { explainItem, stepCoachHint } from '../utils/conjugatorExplain.js';
 
 // Representative words spanning every class: ichidan, all godan endings
@@ -83,8 +83,23 @@ describe('stepCoachHint coverage sweep (all classes × all conjugations)', () =>
   it('regular, derivable forms are never masked', () => {
     const REGULAR = ['食べる', '書く', '待つ', '飲む', '高い', '静か'];
     const wrongly = COMBOS.filter(
-      ({ w, type }) => REGULAR.includes(w.dict) && stepCoachHint(w, type, '').masked,
+      ({ w, type }) =>
+        REGULAR.includes(w.dict) &&
+        !getSpecialKeigoBase(w, type) &&
+        stepCoachHint(w, type, '').masked,
     ).map(({ w, type }) => `${w.dict}/${type}`);
     expect(wrongly).toEqual([]);
+  });
+
+  it('masks mapped replacement targets even when their original word has a regular group', () => {
+    const replacements = COMBOS.filter(({ w, type }) => getSpecialKeigoBase(w, type));
+    expect(replacements.length).toBeGreaterThan(10);
+    for (const { w, type, answer } of replacements) {
+      const first = stepCoachHint(w, type, '');
+      expect(first.masked, `${w.dict}/${type}`).toBe(true);
+      expect(first.text).toMatch(/special replacement/i);
+      expect(first.text).not.toContain(answer);
+      expect(stepCoachHint(w, type, '', true).text).toContain(answer);
+    }
   });
 });

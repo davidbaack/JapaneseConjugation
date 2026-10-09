@@ -603,6 +603,16 @@ export const KEIGO_POLITE_OVERRIDES = {
   ごぞんじである: 'ごぞんじです',
 };
 
+export function getSpecialKeigoBase(word, type) {
+  const kind =
+    type === 'humble' || type === 'humble-polite'
+      ? 'humble'
+      : type === 'honorific' || type === 'honorific-polite'
+        ? 'honorific'
+        : null;
+  return kind ? KEIGO_SPECIALS[word?.reading]?.[kind] : undefined;
+}
+
 export function regularHonorificForm(verb) {
   if (!verb) return '';
   if (verb.group === 'suru') {
@@ -1097,6 +1107,9 @@ export function conjugateItem(item, type) {
 export function getConjugationParts(word, type, answer) {
   const ans = answer || conjugateItem(word, type);
   if (!ans) return { stem: '', change: '', suffix: '' };
+  // A lexical replacement does not retain the original word's stem, even
+  // when the two words happen to start with the same kana.
+  if (getSpecialKeigoBase(word, type)) return { stem: '', change: '', suffix: ans };
 
   const reading = word.reading;
   const dict = word.dict;
@@ -1277,6 +1290,7 @@ export function surfaceStemPair(item) {
 export function surfaceFormFor(item, typeId) {
   const answer = conjugateItem(item, typeId);
   if (!answer || !item || !item.dict || item.dict === item.reading) return answer || '';
+  if (getSpecialKeigoBase(item, typeId)) return answer;
   if (item.group === 'i-adjective' && usesYoiAdjectiveStem(item)) {
     if (answer.startsWith(item.reading)) return item.dict + answer.slice(item.reading.length);
     const readingStem = adjectiveStem(item);
