@@ -131,7 +131,16 @@ describe('durable backup restore', () => {
       return realGet(key);
     });
     expect(() => persistBackupRestore(original, serializeBackup(original))).toThrow(
-      /Reload Settings/,
+      expect.objectContaining({
+        message: expect.stringMatching(/Reload Settings/),
+        restoreMayHaveCommitted: true,
+        cause: expect.objectContaining({
+          message: 'Another tab changed saved data during verification.',
+          cause: expect.objectContaining({
+            message: 'Could not verify the restored learner data.',
+          }),
+        }),
+      }),
     );
     expect(JSON.parse(entries.get(STORAGE_KEY)).state.session.reviewed).toBe(99);
   });

@@ -52,15 +52,16 @@ export function persistBackupRestore(parts, beforeBackupJson) {
     if (committed) {
       try {
         if (localStorage.getItem(STORAGE_KEY) !== committedRaw) {
-          throw new Error('Another tab changed saved data during verification.');
+          throw new Error('Another tab changed saved data during verification.', { cause: error });
         }
         if (beforeRaw === null) localStorage.removeItem(STORAGE_KEY);
         else localStorage.setItem(STORAGE_KEY, beforeRaw);
         acceptCurrentStorageSnapshot();
-      } catch {
+      } catch (rollbackError) {
         throw Object.assign(
           new Error(
             'Storage stopped responding after the restore was written. Reload Settings before trying again; the recovery copy is retained.',
+            { cause: rollbackError },
           ),
           { restoreMayHaveCommitted: true },
         );
