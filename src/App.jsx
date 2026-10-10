@@ -1,5 +1,4 @@
-import React, { Suspense } from 'react';
-import AuthModal from './components/AuthModal.jsx';
+import React, { Suspense, useEffect, useState } from 'react';
 import HorizontalTabList from './components/HorizontalTabList.jsx';
 import ViewSkeleton from './components/Skeleton.jsx';
 import UpdatePrompt from './components/UpdatePrompt.jsx';
@@ -17,6 +16,7 @@ const LessonsView = React.lazy(() => import('./views/LessonsView.jsx'));
 const PracticeLabView = React.lazy(() => import('./views/PracticeLabView.jsx'));
 const ToolsView = React.lazy(() => import('./views/ToolsView.jsx'));
 const SettingsView = React.lazy(() => import('./views/SettingsView.jsx'));
+const AuthModal = React.lazy(() => import('./components/AuthModal.jsx'));
 const DevHistoryPanel = import.meta.env.DEV
   ? React.lazy(() => import('./components/DevHistoryPanel.jsx'))
   : null;
@@ -28,6 +28,7 @@ function AppShell() {
     tab,
     setTab,
     showAuthModal,
+    authReturnFocusRef,
     setShowAuthModal,
     supabase,
     supabaseConfigured,
@@ -37,6 +38,13 @@ function AppShell() {
     dataRecoveryError,
     localPersistenceBlocked,
   } = useApp();
+
+  // Fetch sign-in UI on its first opening, then retain its existing form state
+  // across closes just as the eagerly mounted dialog did.
+  const [authRequested, setAuthRequested] = useState(false);
+  useEffect(() => {
+    if (showAuthModal) setAuthRequested(true);
+  }, [showAuthModal]);
 
   const { tabProps, panelProps } = useTablist(TABS, tab, setTab);
   const shellWidthClass = tab === 'practice' ? 'max-w-[80rem]' : 'max-w-4xl';
@@ -115,15 +123,20 @@ function AppShell() {
           </div>
         </Suspense>
       </div>
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        supabase={supabase}
-        configured={supabaseConfigured}
-        clientStatus={supabaseStatus}
-        clientError={supabaseError}
-        onRetryClient={retrySupabase}
-      />
+      {(authRequested || showAuthModal) && (
+        <Suspense fallback={<div role="status">Opening sign-in…</div>}>
+          <AuthModal
+            isOpen={showAuthModal}
+            onClose={() => setShowAuthModal(false)}
+            supabase={supabase}
+            configured={supabaseConfigured}
+            clientStatus={supabaseStatus}
+            clientError={supabaseError}
+            onRetryClient={retrySupabase}
+            returnFocusRef={authReturnFocusRef}
+          />
+        </Suspense>
+      )}
       <UpdatePrompt />
       {DevHistoryPanel && (
         <Suspense fallback={null}>
