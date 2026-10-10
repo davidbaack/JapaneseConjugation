@@ -191,6 +191,8 @@ export function capTemplates(rows, cap, existingCounts = {}) {
   return { kept, rejected };
 }
 
+/** @typedef {{ word_key: string, dict: string, reading: string, group: string, type: string, ja_template: string, surface: string, segments: Array<{w: boolean} | {t: string, r: string}>, en: string }} GeneratedSentenceRow */
+
 /**
  * Validate a Codex-generated entry and build the DB row.
  *
@@ -199,7 +201,7 @@ export function capTemplates(rows, cap, existingCounts = {}) {
  * single { w: true } sentinel. Validation re-derives the expected surface from
  * the engine and requires the reconstructed sentence to match `ja` exactly.
  *
- * @returns {{ ok: true, row: object } | { ok: false, reason: string }}
+ * @returns {{ ok: true, row: GeneratedSentenceRow } | { ok: false, reason: string }}
  */
 export function validateGenerated(word, type, out) {
   if (!out || typeof out !== 'object') return fail('not-an-object');

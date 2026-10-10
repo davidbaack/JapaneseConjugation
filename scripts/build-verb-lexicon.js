@@ -569,6 +569,7 @@ async function main() {
     if (polite && !politeLookup.has(polite)) politeLookup.set(polite, word);
   }
 
+  /** @type {number | null} */
   let currentLesson = null;
   for (const [dict, reading, meaning] of parseCsv(minnaCsv)) {
     const lessonMatch = String(dict || '').match(/Lesson\s+(\d+)\s*[:：]?/);

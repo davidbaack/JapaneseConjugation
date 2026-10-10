@@ -158,6 +158,11 @@ page origin and path, excluding URL credentials, query parameters and fragments.
 | Unit tests | Vitest |
 | E2E tests | Playwright across Chromium, Firefox, and WebKit |
 
+Type checks use TypeScript 7's native `tsc`. ESLint plugins and proxy test
+transpilation use the TypeScript 6 compatibility API through the `typescript`
+npm alias; `@typescript/native` supplies the TypeScript 7 executable. This follows
+[Microsoft's side-by-side migration guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0).
+
 ## Getting Started
 
 Use Node.js 24 LTS, matching pull-request validation and deployment.

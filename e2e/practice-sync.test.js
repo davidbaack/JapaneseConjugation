@@ -38,6 +38,7 @@ function controlledCloud() {
     revision: 1,
   };
   const offline = new Set();
+  /** @type {Array<{ route: import('@playwright/test').Route, snapshot: typeof row }> | null} */
   let heldReads = null;
   let conflicts = 0;
   const fulfill = (route, body, status = 200) =>
