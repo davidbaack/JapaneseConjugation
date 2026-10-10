@@ -84,9 +84,18 @@ test.describe('Serious and critical accessibility checks', () => {
 
     const openAuth = page.getByRole('button', { name: 'Sign In / Sign Up' });
     test.skip((await openAuth.count()) === 0, 'Cloud sync is not configured for this build');
+    await openAuth.focus();
     await openAuth.click();
     await expect(page.getByRole('dialog', { name: 'Sign In to Katachiya' })).toBeVisible();
 
     await expectNoSeriousViolations(page, 'authentication dialog');
+
+    const email = page.getByLabel('Email address');
+    await email.fill('retained-form@example.invalid');
+    await email.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Sign In to Katachiya' })).toBeHidden();
+    await expect(openAuth).toBeFocused();
+    await openAuth.click();
+    await expect(page.getByLabel('Email address')).toHaveValue('retained-form@example.invalid');
   });
 });

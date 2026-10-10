@@ -22,13 +22,14 @@ const FOCUSABLE_SELECTOR = [
  * @typedef {object} FocusTrapOptions
  * @property {boolean} isOpen
  * @property {() => void} [onClose]
+ * @property {{ current: HTMLElement | null }} [returnFocusRef]
  */
 
 /**
  * @param {FocusTrapOptions} options
  * @returns {import('react').RefObject<HTMLElement | null>}
  */
-export function useFocusTrap({ isOpen, onClose }) {
+export function useFocusTrap({ isOpen, onClose, returnFocusRef }) {
   const ref = useRef(/** @type {HTMLElement | null} */ (null));
 
   // Keep the latest onClose without re-running the trap effect on every render.
@@ -41,7 +42,7 @@ export function useFocusTrap({ isOpen, onClose }) {
     if (!isOpen) return;
     const dialog = ref.current;
     if (!dialog) return;
-    const previouslyFocused = document.activeElement;
+    const previouslyFocused = returnFocusRef?.current || document.activeElement;
 
     const getFocusable = () => {
       /** @type {HTMLElement[]} */
@@ -93,7 +94,7 @@ export function useFocusTrap({ isOpen, onClose }) {
         previouslyFocused.focus();
       }
     };
-  }, [isOpen]);
+  }, [isOpen, returnFocusRef]);
 
   return ref;
 }

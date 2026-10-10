@@ -9,6 +9,7 @@ export default function AuthModal({
   clientStatus,
   clientError,
   onRetryClient,
+  returnFocusRef,
 }) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -19,7 +20,7 @@ export default function AuthModal({
   const [successMsg, setSuccessMsg] = useState('');
 
   // Esc-to-close, focus trap, and focus restoration (shared modal a11y).
-  const dialogRef = useFocusTrap({ isOpen, onClose });
+  const dialogRef = useFocusTrap({ isOpen, onClose, returnFocusRef });
 
   if (!isOpen) return null;
 
