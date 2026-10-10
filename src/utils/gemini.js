@@ -87,16 +87,27 @@ export function extractJSON(text) {
 
 const GEMINI_TIMEOUT_MS = 30000;
 
-function fetchWithTimeout(url, options) {
+async function withGeminiDeadline(run) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-  return fetch(url, { ...options, signal: controller.signal })
-    .catch((e) => {
-      if (e.name === 'AbortError')
-        throw new Error('Request timed out — check your connection and try again');
-      throw e;
-    })
-    .finally(() => clearTimeout(timer));
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error('Request timed out — check your connection and try again');
+      reject(error);
+      controller.abort(error);
+    }, GEMINI_TIMEOUT_MS);
+  });
+  try {
+    // Race the entire attempt, including auth and body reads. Abort cancels the
+    // real transport; the race also bounds adapters that ignore cancellation.
+    return await Promise.race([run(controller.signal), deadline]);
+  } catch (error) {
+    if (error.name === 'AbortError')
+      throw new Error('Request timed out — check your connection and try again', { cause: error });
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Build an Error that carries the HTTP status so retry logic can tell a
@@ -132,18 +143,23 @@ async function executeGeminiProxyRequest(payload) {
     throw new Error('Gemini proxy is not configured for this build.');
   }
 
-  const token = await getSupabaseAccessToken();
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  return withGeminiDeadline(async (signal) => {
+    const token = await getSupabaseAccessToken();
+    signal.throwIfAborted();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
 
-  const r = await fetchWithTimeout(`${supabaseUrl}/functions/v1/gemini-proxy`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
+    const r = await fetch(`${supabaseUrl}/functions/v1/gemini-proxy`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal,
+    });
+    const d = await readJsonResponse(r);
+    signal.throwIfAborted();
+    if (!r.ok) throw httpError(d.error, r.status);
+    return d;
   });
-  const d = await readJsonResponse(r);
-  if (!r.ok) throw httpError(d.error, r.status);
-  return d;
 }
 
 async function executeGeminiRequestOnce(payload, apiKey) {

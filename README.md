@@ -9,7 +9,7 @@ The current app shape is:
 
 - **Practice** - the landing page and main learner loop.
 - **Guide** - scaffolded step-by-step conjugation practice.
-- **Stats** - progress, recommendations, upcoming reviews, and readiness.
+- **Stats** - lifetime progress, dated trends, topic strength, and recommendations.
 - **Learn** - formation lessons and guided tracks for every app form.
 - **Drills** - focused exercises for endings, transformations, groups, and speed.
 - **Tools** - lookup, word management, saved lists, and custom words.
@@ -20,46 +20,52 @@ The current app shape is:
 ### Practice
 
 Practice opens directly into the next continuous card when cards are available.
-The active card shows the current prompt, answer controls, a compact Practice
-run strip with cards practiced, missed count, streak, and why the card appeared,
-plus access to the persistent Practice map. Focused "Practice this" launches
-from Learn, Drills, Guide, or Tools route straight into targeted cards and stay
-focused until the learner exits the banner.
+Category chips and Time, Polarity, and Style filters stay visible above the
+active exercise. See all forms discloses exact-form choices. Fresh learners start
+with Core forms, and category/form selection persists between visits.
+
+Launches from Learn, Drills, Guide, and Stats update that persistent selection.
+A word-level "Practice this" launch from Check or Lookup can lock Practice to
+that word until the learner exits its banner.
 
 Default Practice is continuous: it has no 12-card target, daily-goal stop, or
 completion summary. Selection favors the lowest-skill enabled families, delayed
 retry of recent misses, and varied words in the same weak patterns. SRS review
 data still exists for planning, but due cards do not drive the default queue.
 
-Practice has a persistent map for form scope. It shows every form family,
-including disabled and untried families, expanded exact-form toggles, lifetime
-right/wrong counts, skill visualization, and subgroup weakness rows once there
-is data. Word removal on the active card updates the same durable word-exclusion
-state managed from Tools, and removed words can be restored there.
+Global filters narrow the selected categories and refuse changes that would
+leave no matching forms. An eligible active card stays in place; an ineligible
+card is replaced without recording a skip, miss, or progress event. Word removal
+on the active card updates the same durable word-exclusion state managed from
+Tools, and removed words can be restored there.
 
 Active cards support typed answers, multiple choice, self-check, and spoken
 answers; forward production, reading/reverse practice, and automatic mixing;
 inline romaji-to-kana conversion in the text field; live kana help with
 hide/show behavior and Reveal next kana controls; deterministic hints; optional
-sentence-mode context prompts backed by a bundled all-form corpus with local
-offline fallbacks; speech playback; and optional Gemini clue/chat support.
+sentence-mode context prompts backed by reviewed bundled chunks and reviewed
+shared Supabase rows; speech playback; and optional Gemini clue/chat support.
+When reviewed context is unavailable, Sentence stays enabled and the card
+continues ordinary word Practice with an explanation and no progress event.
 
 ### Guide
 
 Guide is a scaffolded practice mode for building one conjugation step by step.
 Each card asks the learner to recover the base form, identify the word group,
-and produce the target conjugation before one final submit. Hints and skips mark
-assisted steps, the guided set tracks accuracy, and completed guided cards can
-count toward Practice progress while recording step-level diagnostics.
+and produce the target conjugation through three gated steps. Each first response
+is checked immediately; a missed step must be corrected before continuing, and
+the original miss remains recorded. Hints and reveals mark assistance. Resolving
+the final step can count once toward Practice progress while preserving
+step-level diagnostics.
 
 ### Stats
 
-Stats keeps progress and planning information out of active Practice. It
-shows the Practice pulse, ready cards, continuous cards practiced, recent
-misses, recommended practice from Learn and Drills, upcoming review timing, and
-form-family readiness once the learner has enough history. Readiness gaps can
-launch focused Practice or route the learner to the matching Drill, such as
-Ending Lab, Groups, or Rush.
+Stats shows lifetime answers, dated improvement trends, recent misses,
+answer-mode comparisons, topic strength, and one primary recommendation.
+Accuracy appears with its attempt count; sparse evidence is labeled as an early
+estimate. It does not frame progress around daily goals, scheduled reviews, or
+completed sessions. Recommendations update persistent Practice selection or
+route to a matching Drill, such as Ending Lab, Groups, or Rush.
 
 ### Learn
 
@@ -127,14 +133,19 @@ than in global Settings.
 - Word filters: JLPT N5-N1, 23 Genki lessons, 50 Minna no Nihongo lessons, word
   types, word groups, and custom study lists.
 - Card coverage: 126 selectable card types across 13 form families.
-- Type packs: Textbook Core, Basics, Everyday Expansion, Advanced Patterns,
-  Compound Challenge, All forms, Weak mix, and Custom.
+- Practice scope: learner-facing category chips, exact-form choices, and global
+  Time, Polarity, and Style filters; categories are balanced rather than weighted
+  by their number of exact forms.
 - Minimal-pair support covers contrasts such as ichidan vs godan ru-verbs,
   i-adjective vs na-adjective, passive vs potential, godan sound-change
   clusters, and causative vs passive.
 
 The default automatic Practice scope is verb-first plus common textbook
-adjectives with Textbook Core forms enabled.
+adjectives with Core forms selected.
+
+AI coaching remains anonymous with shared network and global spending limits;
+see [the AI budget policy](docs/ai-budget.md). Optional telemetry sends only the
+page origin and path, excluding URL credentials, query parameters and fragments.
 
 ## Stack
 
