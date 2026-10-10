@@ -95,6 +95,7 @@ async function serviceRequest(query, options = {}) {
 
 export async function snapshotSentenceTable() {
   const result = [];
+  /** @type {{ word_key: string, type: string } | null} */
   let cursor = null;
   for (;;) {
     const query = new globalThis.URLSearchParams({
@@ -162,6 +163,7 @@ export async function prepareSentenceReview(sourceRows, outDir, words = loadSent
     const proposed = buildReviewedSentence(word, pair.type);
     const issue = original ? concreteMismatch(original) : '';
     if (issue) counts.concreteSourceIssues++;
+    /** @type {(Extract<ReturnType<typeof validateGenerated>, {ok: true}>['row'] & { model: string, review: { status: string, version: number, basis: string, sense: string, hash: string } }) | null} */
     let replacement = null;
     if (proposed) {
       const ja = proposed.jaTemplate.replace('{w}', surfaceFormFor(word, pair.type));

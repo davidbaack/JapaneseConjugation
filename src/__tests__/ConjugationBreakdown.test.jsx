@@ -8,6 +8,7 @@ import { getConjugationDebugInfo } from '../utils/conjugatorExplain.js';
 afterEach(cleanup);
 
 const KAKU = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan' };
+const IKU = { dict: '行く', reading: 'いく', meaning: 'to go', group: 'godan' };
 const KAERU = { dict: '帰る', reading: 'かえる', meaning: 'to return home', group: 'godan' };
 const YOMU = { dict: '読む', reading: 'よむ', meaning: 'to read', group: 'godan' };
 const TABERU = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
@@ -30,6 +31,33 @@ const SHIZUKA = { dict: '静か', reading: 'しずか', meaning: 'quiet', group:
 const GAKUSEI = { dict: '学生', reading: 'がくせい', meaning: 'student', group: 'noun' };
 
 describe('ConjugationBreakdown', () => {
+  it.each(['humble', 'humble-polite', 'honorific', 'honorific-polite'])(
+    'renders %s as a special replacement without inventing a source row',
+    (type) => {
+      const { container } = render(
+        <ConjugationBreakdown word={IKU} type={type} userAnswer="いきます" />,
+      );
+      const text = container.textContent;
+      expect(text).toContain('godan');
+      expect(text).toMatch(/special.*replacement/i);
+      expect(text).toContain(type.startsWith('humble') ? 'まいる' : 'いらっしゃる');
+      expect(text).not.toMatch(/uses the .* row for (humble|honorific)/);
+      expect(text).not.toMatch(/い \+ まい|く -> ま \+|く -> ら \+ っしゃ/);
+      expect(text).not.toContain('行らっしゃ');
+      expect(screen.queryByText('Row visual')).toBeNull();
+      expect(screen.queryByText('Sound-change visual')).toBeNull();
+      expect(screen.queryByRole('tab', { name: 'ます form' })).toBeNull();
+    },
+  );
+
+  it('keeps the special-target explanation visible when the short rule is promoted elsewhere', () => {
+    const { container } = render(
+      <ConjugationBreakdown word={IKU} type="humble-polite" suppressRuleSummary />,
+    );
+    expect(container.textContent).toMatch(/special.*replacement/i);
+    expect(container.textContent).not.toContain('ま row');
+  });
+
   it('renders a mobile-readable visual rule path and inferred wrong pattern', () => {
     const openLearn = vi.fn();
     render(

@@ -27,6 +27,15 @@ function serialize(value) {
   }
 }
 
+function telemetryUrl() {
+  try {
+    const url = new URL(window.location?.href);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return '';
+  }
+}
+
 function maybePost(entry) {
   if (!endpoint || typeof window === 'undefined') return;
   // Only ship warnings/errors, and throttle so a burst can't flood the network.
@@ -35,7 +44,7 @@ function maybePost(entry) {
   if (now - lastPostAt < MIN_POST_INTERVAL_MS) return;
   lastPostAt = now;
 
-  const body = JSON.stringify({ ...entry, version: appVersion, url: window.location?.href });
+  const body = JSON.stringify({ ...entry, version: appVersion, url: telemetryUrl() });
   try {
     if (navigator.sendBeacon) {
       navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));

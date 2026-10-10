@@ -9,18 +9,49 @@ const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGIN') ?? '')
 const MAX_BODY_BYTES = readPositiveNumber('GEMINI_MAX_BODY_BYTES', 32000);
 const MAX_TEXT_CHARS = readPositiveNumber('GEMINI_MAX_TEXT_CHARS', 12000);
 const MAX_OUTPUT_TOKENS = readPositiveNumber('GEMINI_MAX_OUTPUT_TOKENS', 1200);
-const RATE_LIMIT_BURST = readPositiveNumber('GEMINI_RATE_LIMIT_BURST', 10);
-const RATE_LIMIT_REFILL_MS = readPositiveNumber('GEMINI_RATE_LIMIT_REFILL_MS', 6000);
 // Pin the provider contract used below. The auto-updating Flash-Lite alias can
 // move to a new model generation whose generationConfig schema is incompatible.
 const GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const GEMINI_TIMEOUT_MS = 30000;
 
-type Bucket = {
-  tokens: number;
-  updatedAt: number;
-};
+class GeminiTimeoutError extends Error {}
 
-const buckets = new Map<string, Bucket>();
+async function withGeminiDeadline<T>(
+  req: Request,
+  run: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel: () => void = () => {};
+  const deadline = new Promise<never>((_, reject) => {
+    cancel = () => {
+      const error = new Error('AI request was cancelled.');
+      reject(error);
+      controller.abort(error);
+    };
+    req.signal.addEventListener('abort', cancel, { once: true });
+    if (req.signal.aborted) cancel();
+    timer = setTimeout(() => {
+      const error = new GeminiTimeoutError('AI request timed out. Please try again.');
+      reject(error);
+      controller.abort(error);
+    }, GEMINI_TIMEOUT_MS);
+  });
+  try {
+    // Body streams and transports may ignore abort. The race still returns a
+    // bounded response, and signal checks prevent late work from reaching Gemini.
+    return await Promise.race([
+      Promise.resolve().then(() => {
+        controller.signal.throwIfAborted();
+        return run(controller.signal);
+      }),
+      deadline,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    req.signal.removeEventListener('abort', cancel);
+  }
+}
 
 const MISSING_ALLOWED_ORIGIN_ERROR =
   'Configuration Error: ALLOWED_ORIGIN is not set on the Supabase project';
@@ -88,32 +119,75 @@ function clientKey(req: Request) {
   );
 }
 
-function cleanupBuckets(now: number) {
-  if (buckets.size < 1000) return;
-  const maxAge = RATE_LIMIT_REFILL_MS * RATE_LIMIT_BURST * 2;
-  for (const [key, bucket] of buckets) {
-    if (now - bucket.updatedAt > maxAge) buckets.delete(key);
+async function reservePaidRequest(
+  req: Request,
+  payload: unknown,
+  outputTokens: number,
+  signal: AbortSignal,
+) {
+  const url = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !serviceKey)
+    throw new Error('AI quota enforcement is unavailable. Please try again later.');
+  // Daily HMACs permit shared limits without storing raw IPs or stable IP hashes.
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(serviceKey),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const day = new Date().toISOString().slice(0, 10);
+  const hash = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(`ai-proxy-ip:v1:${day}:${clientKey(req)}`),
+  );
+  const clientHash = Array.from(new Uint8Array(hash), (value) =>
+    value.toString(16).padStart(2, '0'),
+  ).join('');
+  // Text-only input cannot reference external media. UTF-8 bytes plus a generous
+  // framing allowance conservatively bound input tokens; output includes thoughts.
+  const inputTokenBound = encoder.encode(JSON.stringify(payload)).byteLength + 4096;
+  signal.throwIfAborted();
+  const response = await fetch(`${url}/rest/v1/rpc/reserve_ai_proxy_request`, {
+    method: 'POST',
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      client_hash: clientHash,
+      client_day: day,
+      input_token_bound: inputTokenBound,
+      output_token_bound: outputTokens,
+      model: GEMINI_MODEL,
+    }),
+    signal,
+  });
+  if (!response.ok) throw new Error('AI quota enforcement is unavailable. Please try again later.');
+  const decision = await response.json();
+  signal.throwIfAborted();
+  if (decision?.allowed === true) return null;
+  if (
+    decision?.allowed !== false ||
+    !['burst', 'ip_daily', 'global_daily'].includes(decision.reason) ||
+    !Number.isInteger(decision.retry_after_seconds) ||
+    decision.retry_after_seconds < 1
+  ) {
+    throw new Error('AI quota enforcement is unavailable. Please try again later.');
   }
-}
-
-function rateLimitRetryAfterMs(req: Request) {
-  const now = Date.now();
-  const key = clientKey(req);
-  const bucket = buckets.get(key) ?? { tokens: RATE_LIMIT_BURST, updatedAt: now };
-  const elapsed = Math.max(0, now - bucket.updatedAt);
-
-  bucket.tokens = Math.min(RATE_LIMIT_BURST, bucket.tokens + elapsed / RATE_LIMIT_REFILL_MS);
-  bucket.updatedAt = now;
-
-  if (bucket.tokens < 1) {
-    buckets.set(key, bucket);
-    return Math.ceil((1 - bucket.tokens) * RATE_LIMIT_REFILL_MS);
-  }
-
-  bucket.tokens -= 1;
-  buckets.set(key, bucket);
-  cleanupBuckets(now);
-  return 0;
+  const message =
+    decision.reason === 'global_daily'
+      ? 'The shared daily AI budget has been reached. Please try again tomorrow.'
+      : decision.reason === 'ip_daily'
+        ? 'This network has reached its daily AI allowance. Please try again tomorrow.'
+        : 'Too many AI requests in a short time. Please wait a moment and try again.';
+  return jsonResponse(req, { error: message }, 429, {
+    'Retry-After': String(decision.retry_after_seconds),
+  });
 }
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number) {
@@ -136,10 +210,34 @@ function countStringLeaves(value: unknown): number {
 function sanitizeGenerationConfig(value: unknown) {
   const config = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   return {
-    maxOutputTokens: Math.floor(clampNumber(config.maxOutputTokens, 600, 1, MAX_OUTPUT_TOKENS)),
+    maxOutputTokens: Math.floor(
+      clampNumber(config.maxOutputTokens, 600, 1, Math.min(1200, MAX_OUTPUT_TOKENS)),
+    ),
     // Gemini 3.x rejects the legacy numeric thinking budget used by 2.5.
     // Flash-Lite's minimal level preserves the low-latency coaching behavior.
     thinkingConfig: { thinkingLevel: 'MINIMAL' },
+  };
+}
+
+function textContent(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const content = value as Record<string, unknown>;
+  if (content.role !== undefined && !['user', 'model'].includes(String(content.role))) return null;
+  if (!Array.isArray(content.parts) || content.parts.length === 0) return null;
+  if (
+    content.parts.some(
+      (part) =>
+        !part ||
+        typeof part !== 'object' ||
+        Array.isArray(part) ||
+        Object.keys(part).some((key) => key !== 'text') ||
+        typeof part.text !== 'string',
+    )
+  )
+    return null;
+  return {
+    ...(content.role ? { role: String(content.role) } : {}),
+    parts: content.parts.map((part) => ({ text: part.text as string })),
   };
 }
 
@@ -160,7 +258,7 @@ async function readGeminiPayload(req: Request): Promise<GeminiPayloadResult> {
   }
 
   const raw = await req.text();
-  if (raw.length > MAX_BODY_BYTES) {
+  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) {
     return { error: 'Request is too large', status: 413 };
   }
 
@@ -172,12 +270,18 @@ async function readGeminiPayload(req: Request): Promise<GeminiPayloadResult> {
   }
 
   const body = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
-  const contents = body.contents;
-  if (!Array.isArray(contents) || contents.length === 0) {
+  if (!Array.isArray(body.contents) || body.contents.length === 0) {
     return { error: 'Missing Gemini contents', status: 400 };
   }
 
-  const textChars = countStringLeaves(contents) + countStringLeaves(body.systemInstruction);
+  const contents = body.contents.map(textContent);
+  const systemInstruction =
+    body.systemInstruction === undefined ? undefined : textContent(body.systemInstruction);
+  if (contents.some((content) => !content) || systemInstruction === null) {
+    return { error: 'Only text AI requests are supported.', status: 400 };
+  }
+
+  const textChars = countStringLeaves(contents) + countStringLeaves(systemInstruction);
   if (textChars > MAX_TEXT_CHARS) {
     return { error: 'Prompt is too large', status: 413 };
   }
@@ -185,7 +289,7 @@ async function readGeminiPayload(req: Request): Promise<GeminiPayloadResult> {
   return {
     payload: {
       contents,
-      systemInstruction: body.systemInstruction,
+      systemInstruction,
       generationConfig: sanitizeGenerationConfig(body.generationConfig),
     },
   };
@@ -212,55 +316,69 @@ Deno.serve(async (req) => {
     return jsonResponse(req, { error: 'Method not allowed' }, 405, { Allow: 'POST, OPTIONS' });
   }
 
-  const retryAfterMs = rateLimitRetryAfterMs(req);
-  if (retryAfterMs > 0) {
-    return jsonResponse(
-      req,
-      { error: 'Too many AI requests in a short time. Please wait a moment and try again.' },
-      429,
-      { 'Retry-After': String(Math.ceil(retryAfterMs / 1000)) },
-    );
-  }
-
   try {
-    const apiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!apiKey) {
-      return jsonResponse(
-        req,
-        { error: 'Configuration Error: GEMINI_API_KEY is not set on the Supabase project' },
-        500,
-      );
-    }
+    return await withGeminiDeadline(req, async (signal) => {
+      const apiKey = Deno.env.get('GEMINI_API_KEY');
+      if (!apiKey) {
+        return jsonResponse(
+          req,
+          { error: 'Configuration Error: GEMINI_API_KEY is not set on the Supabase project' },
+          500,
+        );
+      }
 
-    const result = await readGeminiPayload(req);
-    if ('error' in result) {
-      return jsonResponse(req, { error: result.error }, result.status);
-    }
+      const result = await readGeminiPayload(req);
+      signal.throwIfAborted();
+      if ('error' in result) {
+        return jsonResponse(req, { error: result.error }, result.status);
+      }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const response = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(result.payload),
+      let denial: Response | null;
+      try {
+        denial = await reservePaidRequest(
+          req,
+          result.payload,
+          result.payload.generationConfig.maxOutputTokens,
+          signal,
+        );
+      } catch {
+        signal.throwIfAborted();
+        return jsonResponse(
+          req,
+          { error: 'AI quota enforcement is unavailable. Please try again later.' },
+          503,
+        );
+      }
+      if (denial) return denial;
+      signal.throwIfAborted();
+
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const response = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(result.payload),
+        signal,
+      });
+
+      const data = await response.json();
+      signal.throwIfAborted();
+      if (!response.ok) {
+        return jsonResponse(
+          req,
+          { error: data.error?.message || `Gemini API returned HTTP ${response.status}` },
+          response.status,
+        );
+      }
+
+      return jsonResponse(req, data, 200);
     });
-
-    const data = await response.json();
-    if (!response.ok) {
-      return jsonResponse(
-        req,
-        { error: data.error?.message || `Gemini API returned HTTP ${response.status}` },
-        response.status,
-      );
-    }
-
-    return jsonResponse(req, data, 200);
   } catch (err) {
     return jsonResponse(
       req,
       { error: err instanceof Error ? err.message : 'An unexpected server error occurred' },
-      500,
+      err instanceof GeminiTimeoutError ? 504 : 500,
     );
   }
 });

@@ -1,0 +1,27 @@
+{
+  "reviewedAt": "2026-10-09",
+  "basis": "Explicit bilingual re-review of corrected whole-word keigo rendering after eliminating source-stem kanji reuse",
+  "humanEditorialReview": false,
+  "reasoning": "The teacher is the respected actor; 学校へ identifies the destination; 行く establishes the going sense. Both corrected honorific completions retain the original reviewed English and sentence segments.",
+  "scope": "Two bundled content approvals only; all other row payloads and the historical 2026-10-07 ledger are unchanged.",
+  "records": [
+    {
+      "wordKey": "godan:行く",
+      "type": "honorific-polite",
+      "completedJapanese": "先生は学校へいらっしゃいます。",
+      "english": "The teacher goes to school.",
+      "sense": "go to school",
+      "previousApprovalHash": "a2298a9a4d36aec7f6ed9f513627fb258624d473b1c201400bb4c8aaf2fbc8fb",
+      "approvalHash": "d2098133ca81ba78659a18be69d0a6ec552438d2f204b47e047488fb661e3263"
+    },
+    {
+      "wordKey": "godan:行く",
+      "type": "honorific",
+      "completedJapanese": "先生は学校へいらっしゃる。",
+      "english": "The teacher goes to school.",
+      "sense": "go to school",
+      "previousApprovalHash": "7c3d424ac2d8fa8cf8d4f6508add193183fca32709c595c5750dca0d68933c96",
+      "approvalHash": "c85167895e618999878ee5baeee012bd71531697b542b5671b2008e5a2c0140c"
+    }
+  ]
+}

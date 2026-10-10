@@ -134,6 +134,7 @@ function useAppController() {
   const [guideFocus, setGuideFocus] = useState(null);
   const [labFocus, setLabFocus] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const authReturnFocusRef = useRef(/** @type {HTMLElement | null} */ (null));
   const [syncStatus, setSyncStatus] = useState({ kind: 'idle', message: '', at: null });
   const [cloudReadyUserId, setCloudReadyUserId] = useState('');
   const [syncOwnerUserId, setSyncOwnerUserId] = useState('');
@@ -1240,6 +1241,8 @@ function useAppController() {
   }
   const clearLabFocus = () => setLabFocus(null);
   const showAuth = () => {
+    authReturnFocusRef.current =
+      document.activeElement instanceof window.HTMLElement ? document.activeElement : null;
     setShowAuthModal(true);
     if (supabaseState.configured && !supabase) {
       void supabaseClientModule.loadSupabaseClient?.().catch(() => {});
@@ -1311,6 +1314,7 @@ function useAppController() {
     addReviewRecommendation,
     startReviewRecommendation,
     showAuthModal,
+    authReturnFocusRef,
     setShowAuthModal,
     showAuth,
     syncStatus,

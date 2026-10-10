@@ -32,6 +32,8 @@ const TEMPLATE_CAP = Number(process.env.SENTENCE_TEMPLATE_CAP || 100);
 const USE_KUROMOJI = process.env.SENTENCE_NO_KUROMOJI !== '1';
 
 // Lazily build the kuromoji tokenizer once (the dictionary load is async).
+/** @typedef {{ tokenize: (text: string) => Array<{ surface_form: string, reading?: string }> }} SentenceTokenizer */
+/** @type {Promise<SentenceTokenizer> | null} */
 let tokenizerPromise = null;
 function getTokenizer() {
   if (!tokenizerPromise) {
@@ -39,11 +41,13 @@ function getTokenizer() {
       const require = createRequire(import.meta.url);
       const dicPath = join(dirname(require.resolve('kuromoji')), '..', 'dict');
       const kuromoji = /** @type {any} */ ((await import('kuromoji')).default);
-      return new Promise((resolve, reject) => {
-        kuromoji
-          .builder({ dicPath })
-          .build((err, tokenizer) => (err ? reject(err) : resolve(tokenizer)));
-      });
+      return /** @type {Promise<SentenceTokenizer>} */ (
+        new Promise((resolve, reject) => {
+          kuromoji
+            .builder({ dicPath })
+            .build((err, tokenizer) => (err ? reject(err) : resolve(tokenizer)));
+        })
+      );
     })();
   }
   return tokenizerPromise;
