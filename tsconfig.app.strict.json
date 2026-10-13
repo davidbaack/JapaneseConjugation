@@ -9,7 +9,10 @@
     "src/hooks/useVirtualRows.js",
     "src/i18n/**/*.js",
     "src/utils/rateLimiter.js",
-    "src/utils/retry.js"
+    "src/utils/retry.js",
+    "src/utils/persistenceContracts.js",
+    "src/utils/studySnapshot.js",
+    "src/typechecks/persistenceContracts.js"
   ],
   "exclude": ["node_modules", "dist"]
 }

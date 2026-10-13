@@ -49,6 +49,9 @@ describe('static coverage configuration', () => {
         'src/i18n/**/*.js',
         'src/utils/rateLimiter.js',
         'src/utils/retry.js',
+        'src/utils/persistenceContracts.js',
+        'src/utils/studySnapshot.js',
+        'src/typechecks/persistenceContracts.js',
       ]),
     );
     expect(app.compilerOptions.checkJs).not.toBe(false);
@@ -60,6 +63,8 @@ describe('static coverage configuration', () => {
         'src/utils/rateLimiter.js',
         'src/utils/retry.js',
         'src/utils/storage.js',
+        'src/utils/localJournal.js',
+        'src/utils/restorePersistence.js',
         'src/views/StudyView.jsx',
       ]),
     );

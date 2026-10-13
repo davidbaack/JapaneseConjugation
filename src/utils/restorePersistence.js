@@ -1,5 +1,6 @@
 import { STORAGE_KEY } from '../data/defaults.js';
 import { acceptCurrentStorageSnapshot, assertCurrentStorageEpoch, saveAll } from './storage.js';
+import { assertRestoreRollbackOwner } from './persistenceContracts.js';
 
 const RECOVERY_PREFIX = 'jp-backup-recovery:';
 export { getRecoveryBackup } from './storage.js';
@@ -51,9 +52,7 @@ export function persistBackupRestore(parts, beforeBackupJson) {
   } catch (error) {
     if (committed) {
       try {
-        if (localStorage.getItem(STORAGE_KEY) !== committedRaw) {
-          throw new Error('Another tab changed saved data during verification.', { cause: error });
-        }
+        assertRestoreRollbackOwner(committedRaw, localStorage.getItem(STORAGE_KEY), error);
         if (beforeRaw === null) localStorage.removeItem(STORAGE_KEY);
         else localStorage.setItem(STORAGE_KEY, beforeRaw);
         acceptCurrentStorageSnapshot();

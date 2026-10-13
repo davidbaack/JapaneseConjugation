@@ -41,6 +41,12 @@ import {
   withLearnerStorageLock,
 } from '../utils/localPersistence.js';
 import { validateLearnerBundle } from '../utils/learnerStateValidation.js';
+import {
+  admitLearnerSnapshot,
+  assertRestoreCanStart,
+  assertRestorePreparationCurrent,
+  ownsPersistenceOperation,
+} from '../utils/persistenceContracts.js';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
 import { getJapaneseVoices } from '../utils/speech.js';
 import { mergePracticePrefs } from '../utils/display.js';
@@ -339,7 +345,7 @@ function useAppController() {
 
   function applySyncPayload(payload) {
     if (!payload) return { payload, repaired: false };
-    validateLearnerBundle(payload);
+    admitLearnerSnapshot(payload, validateLearnerBundle);
     const incomingSignature = learnerPayloadSignature(payload);
     const incomingNeedsRepair =
       !!payload.diagnosticRepairNeeded ||
@@ -380,7 +386,7 @@ function useAppController() {
       replacementEpochRef.current = { from, to, owner: syncOwnerUserId };
       if (!ownerMatches) setSyncOwnerUserId(targetOwner);
     }
-    validateLearnerBundle(payload);
+    admitLearnerSnapshot(payload, validateLearnerBundle);
     const localPayload = adoptSyncMetadata(payload, getLocalSyncDeviceId());
     const repair = localPayload.state
       ? reconcileDerivedProgressState(localPayload.state)
@@ -1024,12 +1030,13 @@ function useAppController() {
   }
 
   async function restoreBackup(text) {
-    if (staleTabRef.current || !currentTabCanWrite()) {
-      throw new Error('Learner data changed in another tab. Reload before restoring.');
-    }
-    if (!hydrated || restoreInFlightRef.current) {
-      throw new Error('Wait for the current restore to finish.');
-    }
+    const restoreAdmission = () => ({
+      hydrated,
+      inFlight: restoreInFlightRef.current,
+      staleTab: staleTabRef.current,
+      canWrite: currentTabCanWrite,
+    });
+    assertRestoreCanStart(restoreAdmission());
     const importGeneration = syncGenerationRef.current;
     const [{ parseBackup, serializeBackup }, { persistBackupRestore }] = await Promise.all([
       import('../utils/backup.js'),
@@ -1037,14 +1044,11 @@ function useAppController() {
     ]);
     // Lazy loading can yield to another confirmation, a storage event, or an
     // account switch. Recheck ownership before beginning the atomic replace.
-    if (!hydrated || restoreInFlightRef.current || importGeneration !== syncGenerationRef.current) {
-      throw new Error(
-        'Learner data changed while preparing this restore. Review the backup again.',
-      );
-    }
-    if (staleTabRef.current || !currentTabCanWrite()) {
-      throw new Error('Learner data changed in another tab. Reload before restoring.');
-    }
+    assertRestorePreparationCurrent(
+      restoreAdmission(),
+      importGeneration,
+      syncGenerationRef.current,
+    );
     const parsed = parseBackup(text);
     if (!parsed.ok) throw new Error(parsed.error || 'Invalid backup');
     const userId = session?.user?.id || '';
@@ -1064,10 +1068,13 @@ function useAppController() {
     );
     const beforeBackupJson = persistenceBlocked ? null : serializeBackup(before);
     const generation = ++syncGenerationRef.current;
+    const restoreOperation = { generation, ownerUserId: userId };
     const restoreOwnsOperation = () =>
-      generation === syncGenerationRef.current &&
-      activeAuthUserIdRef.current === userId &&
-      !staleTabRef.current;
+      ownsPersistenceOperation(restoreOperation, {
+        generation: syncGenerationRef.current,
+        ownerUserId: activeAuthUserIdRef.current,
+        staleTab: staleTabRef.current,
+      });
     const restoreStillCurrent = () => restoreOwnsOperation() && currentTabCanWrite();
     restoreInFlightRef.current = true;
     setRestoreBusy(true);

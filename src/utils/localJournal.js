@@ -3,6 +3,7 @@ import { getProgressWriterId } from './progressContributions.js';
 import { progressEpoch } from './syncMetadata.js';
 import { mergeSyncPayload, writeWithQuotaRecovery } from './storage.js';
 import { learnerDataError, validateLearnerBundle } from './learnerStateValidation.js';
+import { admitLearnerSnapshot, parseSnapshotJson } from './persistenceContracts.js';
 
 const PREFIX = `${STORAGE_KEY}:pending:`;
 let stagingSequence = 0;
@@ -55,14 +56,14 @@ export function mergeStagedLocalSnapshots(base, consumed = []) {
     if (!raw) continue;
     let staged;
     try {
-      staged = JSON.parse(raw);
+      staged = parseSnapshotJson(raw);
     } catch {
       throw learnerDataError(
         'A pending learner save needs recovery; the saved copy has been preserved.',
       );
     }
     if (merged && !sameLocalLineage(merged, staged)) continue;
-    validateLearnerBundle(staged);
+    staged = admitLearnerSnapshot(staged, validateLearnerBundle);
     merged = merged
       ? {
           ...merged,

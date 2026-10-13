@@ -7,6 +7,15 @@ import { retryWithBackoff } from './retry.js';
 import { mergeStagedLocalSnapshots } from './localJournal.js';
 import { abortableQuery, withCloudDeadline } from './cloudDeadline.js';
 import {
+  admitLearnerSnapshot,
+  assertExpectedCloudOwner,
+  cloudCasArguments,
+  createStorageEpochTracker,
+  parseSnapshotJson,
+  readCloudCommitResult,
+  requireCloudRevision,
+} from './persistenceContracts.js';
+import {
   defaultReadinessState,
   mergeReadinessState,
   normalizeReadinessState,
@@ -80,7 +89,7 @@ const BEGINNER_LADDER_STAGES = [
 const SIMPLE_GODAN_ENDINGS = /[うくぐすつぬぶむ]$/;
 
 const RETIRED_REPAIR_DRILL_LIST_ID = 'repair-drill';
-const storageBaselines = new WeakMap();
+const storageEpoch = createStorageEpochTracker();
 
 export function getRecoveryBackup() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -92,22 +101,12 @@ export function getRecoveryBackup() {
 }
 
 export function acceptCurrentStorageSnapshot() {
-  storageBaselines.set(localStorage, localStorage.getItem(STORAGE_KEY));
+  storageEpoch.accept(localStorage, localStorage.getItem(STORAGE_KEY));
 }
 
 export function assertCurrentStorageEpoch() {
   if (typeof localStorage === 'undefined') return;
-  if (
-    storageBaselines.has(localStorage) &&
-    storageBaselines.get(localStorage) !== localStorage.getItem(STORAGE_KEY)
-  ) {
-    throw Object.assign(
-      new Error(
-        'Learner data changed in another tab. Reload before saving or restoring; the newer saved data is preserved.',
-      ),
-      { code: 'STALE_LEARNER_SNAPSHOT' },
-    );
-  }
+  storageEpoch.assertCurrent(localStorage, STORAGE_KEY);
 }
 
 export function wordSrsKey(word) {
@@ -167,13 +166,14 @@ export function normalizeWordLists(wordLists = []) {
 export function loadAll() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    storageBaselines.set(localStorage, raw);
+    storageEpoch.accept(localStorage, raw);
     if (!raw) return mergeStagedLocalSnapshots(null);
-    const parsed = JSON.parse(raw);
-    if (!isRecord(parsed)) throw learnerDataError('Saved learner data is not an object.');
-    if (!isRecord(parsed.state?.cards))
-      throw learnerDataError('Saved learner card data is missing.');
-    validateLearnerBundle(parsed);
+    const parsed = admitLearnerSnapshot(parseSnapshotJson(raw), (source) => {
+      if (!isRecord(source)) throw learnerDataError('Saved learner data is not an object.');
+      if (!isRecord(source.state) || !isRecord(source.state.cards))
+        throw learnerDataError('Saved learner card data is missing.');
+      validateLearnerBundle(source);
+    });
     for (const key of ['customVerbs', 'customAdjectives', 'wordLists']) {
       if (Object.hasOwn(parsed, key) && !Array.isArray(parsed[key]))
         throw learnerDataError(`Saved ${key} is not an array.`);
@@ -261,7 +261,7 @@ export function saveAll(
     ...(recoveryBackupKey ? { recoveryBackupKey } : {}),
   });
   writeWithQuotaRecovery(() => localStorage.setItem(STORAGE_KEY, payload));
-  storageBaselines.set(localStorage, payload);
+  storageEpoch.accept(localStorage, payload);
   return payload;
 }
 
@@ -383,11 +383,7 @@ export function syncReady() {
  * @param {string} expectedUserId
  */
 function assertExpectedCloudUser(session, expectedUserId) {
-  if (!expectedUserId) return;
-  const actualUserId = session?.user?.id || '';
-  if (actualUserId !== expectedUserId) {
-    throw new Error('Authenticated user changed before cloud sync completed');
-  }
+  assertExpectedCloudOwner(session?.user?.id || '', expectedUserId);
 }
 
 /** @param {string} [expectedUserId] */
@@ -420,15 +416,14 @@ export async function cloudFetch(expectedUserId = '') {
 }
 
 /**
- * @param {any} payload
+ * @param {unknown} payload
  * @param {string} [expectedUserId]
+ * @param {import('./persistenceContracts.js').CloudRevision | undefined} [expectedRevision]
  */
 export async function cloudUpsert(payload, expectedUserId = '', expectedRevision = undefined) {
   return withCloudDeadline(async (signal) => {
     const supabase = await requireSupabaseClient();
-    if (expectedRevision === undefined) {
-      throw new Error('Cloud compare-and-set revision is required');
-    }
+    const revision = requireCloudRevision(expectedRevision);
 
     const {
       data: { session },
@@ -438,11 +433,10 @@ export async function cloudUpsert(payload, expectedUserId = '', expectedRevision
     if (!expectedUserId) throw new Error('Expected cloud user is required');
 
     return retryWithBackoff(async () => {
-      const query = supabase.rpc('cas_srs_sync', {
-        expected_revision: expectedRevision,
-        next_data: payload,
-        expected_user_id: expectedUserId,
-      });
+      const query = supabase.rpc(
+        'cas_srs_sync',
+        cloudCasArguments(payload, expectedUserId, revision),
+      );
       const { data, error } = await abortableQuery(query, signal);
       if (error) {
         if (
@@ -457,15 +451,7 @@ export async function cloudUpsert(payload, expectedUserId = '', expectedRevision
         }
         throw error;
       }
-      const row = Array.isArray(data) ? data[0] : data;
-      if (!row || typeof row.sync_revision !== 'number') {
-        throw new Error('Cloud compare-and-set did not return a revision');
-      }
-      return {
-        data: row.sync_data,
-        updated_at: row.sync_updated_at,
-        revision: row.sync_revision,
-      };
+      return readCloudCommitResult(data);
     });
   });
 }

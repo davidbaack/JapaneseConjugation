@@ -12,6 +12,8 @@
     "src/utils/rateLimiter.js",
     "src/utils/retry.js",
     "src/utils/storage.js",
+    "src/utils/localJournal.js",
+    "src/utils/restorePersistence.js",
     "src/views/StudyView.jsx"
   ],
   "exclude": ["node_modules", "dist"]

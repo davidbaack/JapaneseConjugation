@@ -12,6 +12,7 @@ import {
   speechRecognitionErrorMessage,
 } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
+import { snapshotStudyWord } from '../utils/studySnapshot.js';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import { lessonForType } from '../data/lessonContent.js';
 import { ChatPanel } from '../components/ChatPanel.jsx';
@@ -411,21 +412,6 @@ function loadPersistedCurrent(state, words, enabledTypes, prefs) {
     clearPersistedCurrent();
     return null;
   }
-}
-
-function snapshotStudyWord(word) {
-  return {
-    dict: word.dict,
-    reading: word.reading,
-    meaning: word.meaning,
-    group: word.group,
-    ...(word.jlpt ? { jlpt: word.jlpt } : {}),
-    ...(word.lesson ? { lesson: word.lesson } : {}),
-    ...(word.lessons ? { lessons: word.lessons } : {}),
-    ...(word.minnaLesson ? { minnaLesson: word.minnaLesson } : {}),
-    ...(word.minnaLessons ? { minnaLessons: word.minnaLessons } : {}),
-    ...(word.pitchAccent ? { pitchAccent: word.pitchAccent } : {}),
-  };
 }
 
 function persistCurrent(card) {

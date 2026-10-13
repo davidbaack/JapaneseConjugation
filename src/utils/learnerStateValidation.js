@@ -2,6 +2,8 @@ import { ALL_CARD_TYPES } from '../data/conjugationTypes.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { validateProgressContributionsState } from './progressContributions.js';
 import { progressEpoch } from './syncMetadata.js';
+import { isRecord } from './persistenceContracts.js';
+export { isRecord } from './persistenceContracts.js';
 
 const TYPE_IDS = new Set(['dictionary', ...ALL_CARD_TYPES.map((type) => type.id)]);
 const STRING_KEYS = new Set([
@@ -136,15 +138,6 @@ const NUMBER_KEYS = new Set([
 
 export function learnerDataError(message) {
   return Object.assign(new Error(message), { code: 'LEARNER_DATA_INVALID' });
-}
-
-export function isRecord(value) {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)
-  );
 }
 
 function requireValue(test, path, expected) {
