@@ -179,4 +179,6 @@ export async function expectPracticeTotals(page, attempted, correct) {
   await expect(
     dashboard.getByText(`${Math.round((correct / attempted) * 100)}%`, { exact: true }).first(),
   ).toBeVisible();
+  if (attempted > 0 && attempted < 3)
+    await expect(dashboard.getByText(/early estimate/).first()).toBeVisible();
 }

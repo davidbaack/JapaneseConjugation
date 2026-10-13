@@ -57,7 +57,9 @@ test('authenticated independent browser sessions preserve offline Practice answe
   const password = randomBytes(36).toString('base64url');
   const runTag = randomUUID();
   const email = `practice-sync-${runTag}@example.invalid`;
-  const evidenceDirectory = resolve('tmp/practice-sync-2026-10-08');
+  const evidenceDirectory = resolve(
+    process.env.LIVE_SYNC_EVIDENCE_DIR || 'tmp/practice-sync-2026-10-08',
+  );
   mkdirSync(evidenceDirectory, { recursive: true });
   const lifecyclePath = resolve(evidenceDirectory, `live-fixture-${runTag}.json`);
   const contexts = [];
