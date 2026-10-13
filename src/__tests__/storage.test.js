@@ -549,7 +549,27 @@ describe('mergeState', () => {
   it('uses sessionOverride for session', () => {
     const override = { reviewed: 5, correct: 3, skipped: 1 };
     const state = mergeState(null, override);
-    expect(state.session).toEqual(override);
+    expect(state.session).toEqual({ ...defaultState().session, ...override });
+    expect(override).toEqual({ reviewed: 5, correct: 3, skipped: 1 });
+  });
+
+  it('completes partial current-schema session fields without changing saved progress', () => {
+    const saved = {
+      ...defaultState(),
+      session: { reviewed: 12, correct: 9, retainedNote: 'keep this field' },
+    };
+    const before = JSON.stringify(saved);
+    const state = mergeState(saved);
+    expect(state.session).toEqual({
+      ...defaultState().session,
+      reviewed: 12,
+      correct: 9,
+      retainedNote: 'keep this field',
+    });
+    expect(state.session.recentOutcomes).toEqual([]);
+    expect(state.session.mistakePatterns).toEqual({});
+    expect(JSON.stringify(saved)).toBe(before);
+    expect(state.practiceStats).toEqual(saved.practiceStats);
   });
 
   it('backfills optional current-schema areas without losing saved session totals', () => {

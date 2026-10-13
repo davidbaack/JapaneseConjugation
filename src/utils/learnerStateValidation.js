@@ -413,6 +413,37 @@ export function validateSnapshotShape(source, template, path = 'state') {
   }
 }
 
+/** @param {unknown} value @returns {unknown} */
+function copySnapshotDefault(value) {
+  if (Array.isArray(value)) return value.map(copySnapshotDefault);
+  if (isRecord(value))
+    return Object.fromEntries(
+      Object.entries(value).map(([key, child]) => [key, copySnapshotDefault(child)]),
+    );
+  return value;
+}
+
+/**
+ * Complete only absent fields in the supported static template. Supplied
+ * values, including invalid or undefined values, must remain untouched so
+ * validation can reject them. Empty template maps do not create dynamic rows,
+ * and arrays/history are never completed with invented entries.
+ * Callers must validate the source before completion and the full result after.
+ * @param {Record<string, unknown>} source
+ * @param {Record<string, unknown>} template
+ * @returns {Record<string, unknown>}
+ */
+export function fillMissingSnapshotDefaults(source, template) {
+  const completed = { ...source };
+  for (const [key, example] of Object.entries(template)) {
+    const value = source[key];
+    if (!Object.hasOwn(source, key)) completed[key] = copySnapshotDefault(example);
+    else if (isRecord(value) && isRecord(example))
+      completed[key] = fillMissingSnapshotDefaults(value, example);
+  }
+  return completed;
+}
+
 export function validateBackupContent(data, options = {}) {
   validateSafeJson(data, options);
   for (const key of ['customVerbs', 'customAdjectives', 'wordLists'])

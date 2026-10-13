@@ -135,6 +135,16 @@ export default defineConfig({
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor-react';
           }
+          // These modules already load with the shell. Keep their shared
+          // helpers in one gzip stream instead of a second eager recovery chunk.
+          if (
+            [
+              '/src/utils/storage.js',
+              '/src/utils/persistenceContracts.js',
+              '/src/utils/savedRecovery.js',
+            ].some((path) => id.endsWith(path))
+          )
+            return 'storage';
         },
       },
     },

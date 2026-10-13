@@ -9,6 +9,12 @@ import {
 } from '../utils/storage.js';
 import { mergeMinimalPairProgress, recordMinimalPairResult } from '../utils/minimalPairs.js';
 import { makeLearnerSnapshot, makeLegacyV42Backup } from './fixtures/learnerSnapshot.js';
+import {
+  validateLearnerBundle,
+  validatePreservedSnapshot,
+  fillMissingSnapshotDefaults,
+} from '../utils/learnerStateValidation.js';
+import { mergePracticePrefs } from '../utils/display.js';
 
 const roundTrip = () => parseBackup(serializeBackup(makeLearnerSnapshot()));
 
@@ -38,6 +44,150 @@ describe('complete versioned backup', () => {
       lists: 1,
     });
     expect(restored.warnings).toEqual([]);
+  });
+  it('re-exports an accepted partial session as a complete restorable current snapshot', () => {
+    const source = makeLearnerSnapshot();
+    // The normal-profile export had this accepted shape despite independent
+    // Practice lifetime counts. Those counts cannot supply missing session
+    // history, skips, streaks, or mistake patterns.
+    source.state.session = { reviewed: 0, correct: 0 };
+    const before = JSON.stringify(source);
+    expect(() => validateLearnerBundle(source)).not.toThrow();
+    const incompleteExport = { ...buildBackup(source), state: source.state };
+    expect(parseBackup(JSON.stringify(incompleteExport))).toMatchObject({
+      ok: false,
+      error: 'state.session.skipped: expected a saved field.',
+    });
+    for (const state of [source.state, mergeState(source.state)]) {
+      const parsed = parseBackup(serializeBackup({ ...source, state }));
+      expect(parsed.ok, parsed.error).toBe(true);
+      expect(parsed.data.state.session).toEqual(defaultState().session);
+      expect(parsed.data.state.practiceStats).toEqual(source.state.practiceStats);
+      expect(parsed.data.state.cards).toEqual(source.state.cards);
+      expect(() => validatePreservedSnapshot(source.state, parsed.data.state)).not.toThrow();
+    }
+    expect(JSON.stringify(source)).toBe(before);
+  });
+  it('refuses to export normalization that would drop saved learner fields', () => {
+    const source = makeLearnerSnapshot();
+    source.state.reference.retainedNote = 'irreplaceable source evidence';
+    const before = JSON.stringify(source);
+    expect(() => buildBackup(source)).toThrow(/state.reference.retainedNote.*without loss/);
+    expect(JSON.stringify(source)).toBe(before);
+  });
+  it.each([{}, { theme: 'dark', displayScripts: { kana: true }, autoSpeak: false }])(
+    'completes accepted partial preferences while preserving every supplied value',
+    (practicePrefs) => {
+      const source = { ...makeLearnerSnapshot(), practicePrefs };
+      const before = JSON.stringify(practicePrefs);
+      const backup = buildBackup(source);
+      const restored = parseBackup(JSON.stringify(backup));
+      expect(restored.ok, restored.error).toBe(true);
+      expect(() =>
+        validatePreservedSnapshot(practicePrefs, restored.data.practicePrefs),
+      ).not.toThrow();
+      expect(restored.data.practicePrefs).toEqual(mergePracticePrefs(backup.practicePrefs));
+      expect(JSON.stringify(practicePrefs)).toBe(before);
+    },
+  );
+  it('refuses supplied invalid, discarded, or rewritten preference values without mutating them', () => {
+    for (const practicePrefs of [
+      { autoSpeak: null },
+      { displayScripts: { kana: 'false' } },
+      { retainedNote: 'unknown preference evidence' },
+      { reviewStyle: 'unsupported-style' },
+      { skipDuplicateForms: false },
+    ]) {
+      const before = JSON.stringify(practicePrefs);
+      expect(() => buildBackup({ ...makeLearnerSnapshot(), practicePrefs })).toThrow();
+      expect(JSON.stringify(practicePrefs)).toBe(before);
+    }
+  });
+  it.each([{ attempted: 4 }, {}])(
+    'completes an accepted partial shadow bucket without weakening its original import',
+    (shadow) => {
+      const source = makeLearnerSnapshot();
+      source.state.shadow = shadow;
+      const before = JSON.stringify(source);
+      expect(() => validateLearnerBundle(source)).not.toThrow();
+      const backup = buildBackup({ ...source, state: mergeState(source.state) });
+      const originalIncomplete = { ...backup, state: source.state };
+      expect(parseBackup(JSON.stringify(originalIncomplete)).ok).toBe(false);
+      const restored = parseBackup(JSON.stringify(backup));
+      expect(restored.ok, restored.error).toBe(true);
+      expect(restored.data.state.shadow).toEqual({ ...defaultState().shadow, ...shadow });
+      expect(restored.data.state.cards).toEqual(source.state.cards);
+      expect(restored.data.state.practiceStats).toEqual(source.state.practiceStats);
+      expect(() => validatePreservedSnapshot(source.state, restored.data.state)).not.toThrow();
+      expect(JSON.stringify(source)).toBe(before);
+    },
+  );
+  it('completes absent static nested fields while preserving supplied counters and dynamic rows', () => {
+    const source = makeLearnerSnapshot();
+    delete source.state.guide.byStep.base.assisted;
+    delete source.state.guide.byStep.group.correct;
+    source.state.shadow = { attempted: 4, byScenario: { saved: { attempted: 4 } } };
+    source.state.ambient = {};
+    const before = JSON.stringify(source);
+    const backup = buildBackup(source);
+    const restored = parseBackup(JSON.stringify(backup));
+    expect(restored.ok, restored.error).toBe(true);
+    expect(restored.data.state.guide.byStep.base).toEqual({
+      ...source.state.guide.byStep.base,
+      assisted: 0,
+    });
+    expect(restored.data.state.guide.byStep.group).toEqual({
+      ...source.state.guide.byStep.group,
+      correct: 0,
+    });
+    expect(restored.data.state.shadow).toEqual({ ...source.state.shadow, totalRating: 0 });
+    expect(restored.data.state.shadow.byScenario).toEqual({ saved: { attempted: 4 } });
+    expect(restored.data.state.ambient).toEqual(defaultState().ambient);
+    expect(() => validatePreservedSnapshot(source.state, restored.data.state)).not.toThrow();
+    expect(JSON.stringify(source)).toBe(before);
+  });
+  it('does not overwrite provided invalid values with supported defaults during export', () => {
+    for (const shadow of [
+      { attempted: 4, totalRating: '7' },
+      { attempted: 4, totalRating: null },
+      { attempted: 4, byScenario: [] },
+      { attempted: undefined },
+    ]) {
+      const source = makeLearnerSnapshot();
+      source.state.shadow = shadow;
+      expect(() => buildBackup(source)).toThrow();
+      expect(source.state.shadow).toBe(shadow);
+      expect(fillMissingSnapshotDefaults(shadow, defaultState().shadow)).toMatchObject(shadow);
+    }
+  });
+  it('fills only absent default keys and does not mutate the source or template', () => {
+    const source = {
+      existing: undefined,
+      nullable: null,
+      dynamic: { saved: { count: 4 } },
+      history: [{ id: 'known' }],
+      nested: { count: 4 },
+    };
+    const template = {
+      existing: 7,
+      nullable: 8,
+      dynamic: {},
+      history: [],
+      nested: { count: 0, correct: 0 },
+      missingHistory: [],
+    };
+    const completed = fillMissingSnapshotDefaults(source, template);
+    expect(completed).toEqual({
+      ...source,
+      nested: { count: 4, correct: 0 },
+      missingHistory: [],
+    });
+    expect(Object.hasOwn(completed, 'existing')).toBe(true);
+    expect(completed.existing).toBeUndefined();
+    expect(source.nested).toEqual({ count: 4 });
+    expect(template.nested).toEqual({ count: 0, correct: 0 });
+    completed.missingHistory.push({ id: 'new' });
+    expect(template.missingHistory).toEqual([]);
   });
   it('round trips committed Transform and Minimal Pair identities without dropping replay evidence', () => {
     const parts = makeLearnerSnapshot();

@@ -163,6 +163,7 @@ function useAppController() {
   );
   const lastSyncedAtRef = useRef(0);
   const latestSyncPayloadRef = useRef(null);
+  const latestLearnerPartsRef = useRef(null);
   const previousLocalPayloadRef = useRef(null);
   const incomingSyncMetaRef = useRef(null);
   const incomingSyncBaseRef = useRef(null);
@@ -178,15 +179,10 @@ function useAppController() {
   const forceCloudPushRef = useRef(false);
 
   useLayoutEffect(() => {
+    const parts = { state, customVerbs, customAdjectives, wordLists, practicePrefs, syncMeta };
+    latestLearnerPartsRef.current = parts;
     const payload = {
-      ...buildSyncPayload({
-        state,
-        customVerbs,
-        customAdjectives,
-        wordLists,
-        practicePrefs,
-        syncMeta,
-      }),
+      ...buildSyncPayload(parts),
       localOwnerUserId: syncOwnerUserId,
     };
     if (incomingSyncMetaRef.current) {
@@ -1066,7 +1062,19 @@ function useAppController() {
       buildSyncPayload(parsed.data),
       userId || syncOwnerUserId,
     );
-    const beforeBackupJson = persistenceBlocked ? null : serializeBackup(before);
+    let beforeBackupJson = null;
+    let needsRawRecovery = persistenceBlocked;
+    const recoverySnapshot = () => ({ ...currentSyncPayload(), ...latestLearnerPartsRef.current });
+    if (!needsRawRecovery) {
+      try {
+        beforeBackupJson = serializeBackup(recoverySnapshot());
+      } catch {
+        // Explicit replacement remains available when the current snapshot
+        // cannot be represented as an importable backup. Secure the original
+        // durable/pending bytes and current learner snapshot instead.
+        needsRawRecovery = true;
+      }
+    }
     const generation = ++syncGenerationRef.current;
     const restoreOperation = { generation, ownerUserId: userId };
     const restoreOwnsOperation = () =>
@@ -1085,11 +1093,18 @@ function useAppController() {
     });
 
     try {
+      // Keep recovery serialization lazy and outside the synchronous storage
+      // lock. The lock callback rechecks operation/storage ownership after this
+      // import yields, then captures the raw bytes immediately before commit.
+      const rawRecovery = needsRawRecovery
+        ? (await import('../utils/restoreRecovery.js')).serializeRestoreRecoveryData
+        : null;
       const persisted = await withLearnerStorageLock(() => {
         if (!restoreStillCurrent())
           throw Object.assign(new Error('A newer account or operation superseded this restore.'), {
             code: 'SYNC_SUPERSEDED',
           });
+        if (rawRecovery) beforeBackupJson = rawRecovery(recoverySnapshot());
         return persistBackupRestore(
           {
             ...replacement,
@@ -1149,6 +1164,7 @@ function useAppController() {
         return { cloud: false, pending: true, recoveryBackup: recovery };
       }
     } catch (error) {
+      if (!restoreOwnsOperation()) return { cloud: false, pending: true, stale: true };
       if (error.restoreMayHaveCommitted) {
         setPersistenceBlocked(true);
         setDataRecoveryError(error.message);

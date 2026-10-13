@@ -7,6 +7,7 @@ import {
   validateSafeJson,
   validateSnapshotShape,
   validatePreservedSnapshot,
+  fillMissingSnapshotDefaults,
 } from './learnerStateValidation.js';
 
 export const BACKUP_FORMAT = 'jp-verb-srs';
@@ -50,16 +51,40 @@ export function buildBackup({
   wordLists = [],
   practicePrefs = {},
 }) {
+  // Current-schema storage admits missing optional fields. Export fills only
+  // absent supported defaults, then applies the stricter import checks. Known
+  // values must survive the restore normalizer exactly; invalid supplied values
+  // are never replaced with defaults to make an export pass.
+  validateLearnerState(state);
+  const template = defaultState();
+  const backupState = fillMissingSnapshotDefaults(state, template);
+  validateLearnerState(backupState, { allowMissingFields: false });
+  validateSnapshotShape(backupState, template);
+  validatePreservedSnapshot(backupState, mergeState(backupState));
+  // Preferences get the same absent-default and preservation guarantees as
+  // learner state. Validate supplied values before any normalizer can rewrite
+  // them, including unknown fields that must not silently disappear.
+  validateBackupContent({
+    state: backupState,
+    customVerbs,
+    customAdjectives,
+    wordLists,
+    practicePrefs,
+  });
+  const prefsTemplate = mergePracticePrefs({});
+  const backupPrefs = fillMissingSnapshotDefaults(practicePrefs, prefsTemplate);
+  validateSnapshotShape(backupPrefs, prefsTemplate, 'practicePrefs');
+  validatePreservedSnapshot(backupPrefs, mergePracticePrefs(backupPrefs), 'practicePrefs');
   return JSON.parse(
     JSON.stringify({
       format: BACKUP_FORMAT,
       version: BACKUP_VERSION,
       exportedAt: new Date().toISOString(),
-      state,
+      state: backupState,
       customVerbs,
       customAdjectives,
       wordLists,
-      practicePrefs: mergePracticePrefs(practicePrefs),
+      practicePrefs: backupPrefs,
     }),
   );
 }

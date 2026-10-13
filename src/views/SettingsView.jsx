@@ -100,13 +100,21 @@ export default function SettingsView() {
     }
   }, [importOpen, restoreStatus]);
 
-  const exportData = useMemo(
-    () =>
-      exportBlocked
-        ? ''
-        : serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
-    [state, customVerbs, customAdjectives, wordLists, practicePrefs, exportBlocked],
-  );
+  const preparedExport = useMemo(() => {
+    if (exportBlocked) return { data: '', failed: false };
+    try {
+      return {
+        data: serializeBackup({ state, customVerbs, customAdjectives, wordLists, practicePrefs }),
+        failed: false,
+      };
+    } catch {
+      // A refusal must leave Settings and raw recovery accessible. Normalizing
+      // an export is never permission to discard saved fields or history.
+      return { data: '', failed: true };
+    }
+  }, [state, customVerbs, customAdjectives, wordLists, practicePrefs, exportBlocked]);
+  const exportData = preparedExport.data;
+  const exportUnavailable = exportBlocked || preparedExport.failed;
   const recoveryIsBackup = useMemo(
     () => !!recoveryBackup && parseBackup(recoveryBackup).ok,
     [recoveryBackup],
@@ -178,7 +186,8 @@ export default function SettingsView() {
     if (!stagedBackup || restoreBusy || stagedBackup.text !== importText) return;
     setImportErr('');
     try {
-      await restoreBackup(stagedBackup.text);
+      const result = await restoreBackup(stagedBackup.text);
+      if (result?.stale) return;
       finishedRestoreRef.current = true;
       setStagedBackup(null);
       setImportText('');
@@ -552,16 +561,20 @@ export default function SettingsView() {
               Save or replace your progress, preferences, custom words, and saved lists. Backups do
               not contain your login credentials or recent Check inputs.
             </p>
-            {dataRecoveryError && (
+            {(dataRecoveryError || preparedExport.failed) && (
               <div
                 role="alert"
                 className="mb-3 rounded-lg border border-rose-200 p-3 text-sm text-rose-700 dark:border-rose-900 dark:text-rose-300"
               >
-                <p>{dataRecoveryError}</p>
+                <p>
+                  {dataRecoveryError || 'A standard backup cannot preserve all of this snapshot.'}
+                </p>
                 <p className="mt-1">
-                  {exportBlocked
-                    ? 'Export is unavailable while saved data cannot be read. Download the saved recovery data before choosing a replacement; this file may need repair before import.'
-                    : 'Your local progress can be exported. Download a backup before choosing which learner snapshot to restore.'}
+                  {preparedExport.failed
+                    ? 'Backup export is paused to preserve your data. Download the saved recovery data for safekeeping before choosing a replacement. It may need repair before import.'
+                    : exportBlocked
+                      ? 'Export is unavailable while saved data cannot be read. Download the saved recovery data before choosing a replacement; this file may need repair before import.'
+                      : 'Your local progress can be exported. Download a backup before choosing which learner snapshot to restore.'}
                 </p>
                 <button
                   type="button"
@@ -622,7 +635,7 @@ export default function SettingsView() {
                   setImportOpen(false);
                   setStagedBackup(null);
                 }}
-                disabled={restoreBusy || exportBlocked}
+                disabled={restoreBusy || exportUnavailable}
                 aria-expanded={exportOpen}
                 className={`flex-1 px-3 py-1.5 border rounded-lg text-sm transition ${
                   exportOpen
@@ -650,7 +663,7 @@ export default function SettingsView() {
                 Import
               </button>
             </div>
-            {exportOpen && !exportBlocked && (
+            {exportOpen && !exportUnavailable && (
               <div className="mt-3 space-y-2">
                 <textarea
                   aria-label="Backup export JSON"

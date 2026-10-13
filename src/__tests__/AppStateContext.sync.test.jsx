@@ -57,7 +57,7 @@ import {
 import { weaknessLaneForCard } from '../utils/subcategoryWeakness.js';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
 import { buildRestoreSyncPayload } from '../utils/syncMetadata.js';
-import { serializeBackup } from '../utils/backup.js';
+import { parseBackup, serializeBackup } from '../utils/backup.js';
 import { makeLearnerSnapshot, makeLegacyV42Backup } from './fixtures/learnerSnapshot.js';
 import { persistBackupRestore } from '../utils/restorePersistence.js';
 
@@ -209,6 +209,28 @@ function Probe() {
       >
         Enable auto speak
       </button>
+      <button
+        type="button"
+        onClick={() =>
+          setState((current) => ({
+            ...current,
+            reference: { ...current.reference, retainedNote: 'current unsaved reference evidence' },
+          }))
+        }
+      >
+        Retain unsupported reference field
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          setPracticePrefs((current) => ({
+            ...current,
+            retainedNote: 'current unsaved preference evidence',
+          }))
+        }
+      >
+        Retain unsupported preference field
+      </button>
       <button type="button" onClick={() => void syncNow()}>
         Sync now
       </button>
@@ -303,6 +325,48 @@ describe('AppStateProvider cloud session races', () => {
     }
   });
 
+  it('keeps a newer account restore status when an older queued restore rejects as superseded', async () => {
+    renderProvider();
+    await act(async () => {
+      authCallbacks[0]('SIGNED_IN', SESSION_A);
+    });
+    await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Synced to cloud'));
+    await act(async () => Promise.resolve());
+    const lock = holdLocalWrites();
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+      await waitFor(() => expect(lock.queued.length).toBeGreaterThan(0));
+      const oldRestoreIndex = 0;
+      await act(async () => {
+        authCallbacks[0]('SIGNED_IN', SESSION_B);
+      });
+      await waitFor(() => expect(screen.getByTestId('sync').textContent).toBe('Synced to cloud'));
+      const newRestoreIndex = lock.queued.length;
+      fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+      await waitFor(() => expect(lock.queued.length).toBeGreaterThan(newRestoreIndex));
+      // Release B's coordinated writes first to model A receiving a late lock
+      // callback after ownership has already moved to B's successful restore.
+      let next = newRestoreIndex;
+      for (let pass = 0; pass < 10; pass += 1) {
+        while (next < lock.queued.length) await lock.release(next++);
+        if (screen.getByTestId('restore-status').textContent === 'ok') break;
+        await act(async () => Promise.resolve());
+      }
+      await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('ok'));
+      const newerSnapshot = screen.getByTestId('snapshot').textContent;
+      const newerRecovery = screen.getByTestId('recovery').textContent;
+      await lock.release(oldRestoreIndex);
+      expect(screen.getByTestId('restore-status').textContent).toBe('ok');
+      expect(screen.getByTestId('snapshot').textContent).toBe(newerSnapshot);
+      expect(screen.getByTestId('recovery').textContent).toBe(newerRecovery);
+      expect(screen.getByTestId('recovery-error').textContent).toBe('');
+      expect(persistBackupRestore).toHaveBeenCalledTimes(1);
+      expect(persistBackupRestore.mock.calls[0][0].syncConfig.userId).toBe('user-b');
+    } finally {
+      lock.restore();
+    }
+  });
+
   it('revokes a queued reset save when the signed-in account changes after cloud acknowledgement', async () => {
     renderProvider();
     await act(async () => {
@@ -363,6 +427,70 @@ describe('AppStateProvider cloud session races', () => {
     expect(screen.getByTestId('recovery').textContent).toBe(previous);
     expect(JSON.parse(previous).state.guide.attempted).toBe(0);
   });
+
+  it.each(['reference', 'preference'])(
+    'secures raw saved, pending, and current evidence before replacing an unexportable %s snapshot',
+    async (domain) => {
+      const original = makeLearnerSnapshot();
+      original.state.reference.retainedNote = 'durable reference evidence';
+      const originalRaw = JSON.stringify(original);
+      localStorage.setItem(STORAGE_KEY, originalRaw);
+      localStorage.setItem('sb-fixture-auth-token', 'private-auth-fixture');
+      acceptCurrentStorageSnapshot();
+      loadAll.mockReturnValueOnce(original);
+      renderProvider();
+      await waitFor(() => expect(screen.getByTestId('cards').textContent).toContain('食べる'));
+      await act(async () => Promise.resolve());
+      const lock = holdLocalWrites();
+      const actualStorage = await vi.importActual('../utils/storage.js');
+      const actualRestore = await vi.importActual('../utils/restorePersistence.js');
+      try {
+        fireEvent.click(screen.getByRole('button', { name: `Retain unsupported ${domain} field` }));
+        await waitFor(() => expect(lock.queued.length).toBeGreaterThan(0));
+        const current = JSON.parse(screen.getByTestId('snapshot').textContent);
+        if (domain === 'reference') {
+          expect(current.reference.retainedNote).toBe('current unsaved reference evidence');
+          expect(() => serializeBackup({ ...original, state: current })).toThrow(/without loss/);
+        }
+        const pendingKey = `${STORAGE_KEY}:pending:raw-recovery-fixture`;
+        const pendingRaw = 'unreadable pending answer bytes';
+        localStorage.setItem(pendingKey, pendingRaw);
+        const queuedBeforeRestore = lock.queued.length;
+        saveAll.mockImplementation(actualStorage.saveAll);
+        persistBackupRestore.mockImplementation(actualRestore.persistBackupRestore);
+        fireEvent.click(screen.getByRole('button', { name: 'Restore backup' }));
+        await waitFor(() => expect(lock.queued.length).toBeGreaterThan(queuedBeforeRestore));
+        await lock.release(queuedBeforeRestore);
+        await waitFor(() => expect(screen.getByTestId('restore-status').textContent).toBe('ok'));
+        const recoveryText = screen.getByTestId('recovery').textContent;
+        const recovery = JSON.parse(recoveryText);
+        expect(recovery.format).toBe('katachiya-saved-recovery');
+        expect(recovery.saved).toBe(originalRaw);
+        expect(recovery.pending).toContainEqual({ key: pendingKey, raw: pendingRaw });
+        if (domain === 'reference')
+          expect(recovery.current.state.reference.retainedNote).toBe(
+            'current unsaved reference evidence',
+          );
+        else
+          expect(recovery.current.practicePrefs.retainedNote).toBe(
+            'current unsaved preference evidence',
+          );
+        expect(recoveryText).not.toContain('private-auth-fixture');
+        expect(parseBackup(recoveryText).ok).toBe(false);
+        expect(JSON.parse(screen.getByTestId('snapshot').textContent)).toEqual(
+          makeLearnerSnapshot().state,
+        );
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY)).state).toEqual(
+          makeLearnerSnapshot().state,
+        );
+        expect(actualStorage.getRecoveryBackup()).toBe(recoveryText);
+        expect(localStorage.getItem(pendingKey)).toBe(pendingRaw);
+      } finally {
+        saveAll.mockReset();
+        lock.restore();
+      }
+    },
+  );
 
   it('commits only one replacement when two confirmations race while restore helpers load', async () => {
     renderProvider();

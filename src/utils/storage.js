@@ -1385,7 +1385,7 @@ export function defaultState() {
 export function mergeState(saved, sessionOverride) {
   const base = defaultState();
   if (!saved) {
-    return { ...base, session: sessionOverride || base.session };
+    return { ...base, session: { ...base.session, ...(sessionOverride || {}) } };
   }
   validateLearnerState(saved);
   const merged = {
@@ -1434,7 +1434,9 @@ export function mergeState(saved, sessionOverride) {
     practiceSelection: normalizePracticeSelection(saved && saved.practiceSelection),
     practiceStats: normalizePracticeStats(saved && saved.practiceStats),
     classify: (saved && saved.classify) || base.classify,
-    session: sessionOverride || saved.session || base.session,
+    // An accepted current-schema snapshot may predate optional session fields.
+    // Add empty defaults without replacing saved totals or inventing outcomes.
+    session: { ...base.session, ...(sessionOverride || saved.session || {}) },
   };
   merged.enabledTypes = effectiveTypeIdsForPracticeSelection(merged.practiceSelection);
 

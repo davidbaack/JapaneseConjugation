@@ -24,6 +24,18 @@ device-local recent Check inputs, and the currently displayed exercise are
 excluded. A restored file uses the currently signed-in account; it cannot log
 in as the account that created the file.
 
+Exports complete missing supported fields in accepted current-schema local data
+with their empty defaults, while preserving every supplied value. This includes
+partial session and other supported progress buckets; missing histories are not
+reconstructed. Export verifies that the complete snapshot can survive strict
+restore normalization. A refused export leaves Settings usable and offers saved
+recovery data for safekeeping. Invalid imports remain rejected before replacement.
+If a checked replacement is explicitly confirmed while the current snapshot
+cannot be exported normally, restore first verifies a raw recovery envelope with
+the durable bytes, pending saves, and current learner fields. That envelope needs
+repair before ordinary import and does not contain separate authentication storage.
+Superseded restore completions cannot change a newer account's status or preview.
+
 ## Restore flow
 
 1. Paste the JSON and select **Check backup**. Checking does not change data.

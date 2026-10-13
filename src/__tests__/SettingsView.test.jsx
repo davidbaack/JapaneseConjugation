@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 vi.mock('../utils/supabase.js', () => ({
   getSupabaseClientState: () => ({
@@ -29,6 +29,7 @@ afterEach(() => {
   sessionStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   restoreClipboard?.();
   restoreClipboard = undefined;
 });
@@ -208,6 +209,30 @@ function mockSettingsContext(overrides = {}) {
 }
 
 describe('Settings restore error and sync feedback', () => {
+  it('does not close a newer checked import when a superseded restore completes', async () => {
+    let finishOld;
+    const pending = new Promise((resolve) => {
+      finishOld = resolve;
+    });
+    const context = mockSettingsContext({ restoreBackup: vi.fn().mockReturnValueOnce(pending) });
+    vi.spyOn(appContext, 'useApp').mockReturnValue(context);
+    render(<SettingsView />);
+    fireEvent.click(screen.getByText('Data & account'));
+    pasteBackup(serializeBackup(makeLearnerSnapshot()));
+    fireEvent.click(screen.getByRole('button', { name: 'Replace learner data' }));
+    const newer = makeLearnerSnapshot();
+    newer.practicePrefs.theme = 'light';
+    const text = serializeBackup(newer);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Paste backup JSON to restore' }), {
+      target: { value: text },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check backup' }));
+    await act(async () => finishOld({ stale: true }));
+    expect(screen.getByRole('region', { name: 'Backup preview' })).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'Paste backup JSON to restore' }).value).toBe(text);
+    expect(context.restoreBackup).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the checked backup available when durable restore fails', async () => {
     const context = mockSettingsContext({
       restoreBackup: vi
@@ -259,6 +284,43 @@ describe('Settings restore error and sync feedback', () => {
     expect(screen.getByRole('button', { name: 'Import', exact: true }).disabled).toBe(false);
     expect(screen.getByRole('heading', { name: 'Saved data recovery copy' })).toBeTruthy();
     expect(screen.getByText(/may need repair before it can be imported/)).toBeTruthy();
+  });
+
+  it('keeps Settings usable and raw saved recovery available when export would lose a field', async () => {
+    const parts = makeLearnerSnapshot();
+    parts.state.reference.retainedNote = 'keep this recorded value';
+    const raw = JSON.stringify(parts);
+    localStorage.setItem(STORAGE_KEY, raw);
+    const context = mockSettingsContext(parts);
+    vi.spyOn(appContext, 'useApp').mockReturnValue(context);
+    const createUrl = vi.fn(() => 'blob:recovery-fixture');
+    const revokeUrl = vi.fn();
+    const NativeURL = URL;
+    vi.stubGlobal(
+      'URL',
+      class extends NativeURL {
+        static createObjectURL = createUrl;
+        static revokeObjectURL = revokeUrl;
+      },
+    );
+    vi.spyOn(window.HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    render(<SettingsView />);
+    fireEvent.click(screen.getByText('Data & account'));
+    expect(screen.getByRole('alert').textContent).toMatch(
+      /export is paused to preserve your data/i,
+    );
+    expect(screen.getByRole('button', { name: 'Export', exact: true }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Import', exact: true }).disabled).toBe(false);
+    expect(screen.getByRole('heading', { name: 'Display & audio' })).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Download saved recovery data', exact: true }),
+    );
+    await waitFor(() => expect(createUrl).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(revokeUrl).toHaveBeenCalledTimes(1), { timeout: 1800 });
+    expect(createUrl.mock.calls[0][0]).toBeInstanceOf(Blob);
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(raw);
+    expect(context.resetLearnerData).not.toHaveBeenCalled();
+    expect(context.restoreBackup).not.toHaveBeenCalled();
   });
 });
 
