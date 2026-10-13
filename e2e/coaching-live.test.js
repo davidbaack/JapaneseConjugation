@@ -22,7 +22,7 @@ test('deployed coaching returns a readable reply within its bounded admission bu
   let attempts = 0,
     reservationMicrousd = 0;
   try {
-    await seedPracticeContext(context);
+    await seedPracticeContext(context, { answerMode: 'input' });
     const page = await context.newPage();
     await page.route('**/functions/v1/gemini-proxy', async (route) => {
       const raw = route.request().postData() || '';
@@ -60,6 +60,7 @@ test('deployed coaching returns a readable reply within its bounded admission bu
       visibleReply: reply,
     };
     writeFileSync(resolve(dir, 'live-coaching.json'), JSON.stringify(evidence, null, 2));
+    await log.scrollIntoViewIfNeeded();
     await page.screenshot({ path: resolve(dir, 'live-coaching.png') });
     console.log(
       JSON.stringify({
@@ -71,6 +72,19 @@ test('deployed coaching returns a readable reply within its bounded admission bu
       }),
     );
   } finally {
-    await context.close();
+    writeFileSync(
+      resolve(dir, `live-coaching-attempt-${Date.now()}.json`),
+      JSON.stringify(
+        {
+          attempts,
+          reservationMicrousd,
+          budgetMicrousd: 20000,
+          checkedAtUtc: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+    );
+    await context.close().catch(() => {});
   }
 });

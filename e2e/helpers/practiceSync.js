@@ -59,9 +59,13 @@ export function emptyPracticeSnapshot(userId = '') {
   };
 }
 
-/** @param {any} context @param {{ session?: any, url?: string }} [options] */
-export async function seedPracticeContext(context, { session = null, url = '' } = {}) {
+/** @param {any} context @param {{ session?: any, url?: string, answerMode?: 'input' | 'self-check' }} [options] */
+export async function seedPracticeContext(
+  context,
+  { session = null, url = '', answerMode = 'self-check' } = {},
+) {
   const snapshot = emptyPracticeSnapshot(session?.user?.id || '');
+  snapshot.practicePrefs.answerMode = answerMode;
   const authKey = url ? `sb-${new URL(url).hostname.split('.')[0]}-auth-token` : '';
   await context.addInitScript(
     ({ key, snapshot: initial, authKey: sessionKey, session: initialSession }) => {
