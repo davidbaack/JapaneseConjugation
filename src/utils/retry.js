@@ -6,8 +6,23 @@
 // error). Only *transient* failures are retried — auth/validation errors fail
 // fast so the user gets immediate, actionable feedback.
 
-/** @param {number} ms */
-const DEFAULT_SLEEP = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/** @param {number} ms @param {AbortSignal} [signal] */
+const DEFAULT_SLEEP = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve(undefined);
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 
 // Pull an HTTP-ish status code out of an error if one is present.
 /** @param {any} error */
@@ -25,6 +40,7 @@ function statusOf(error) {
 /** @param {any} error */
 export function isTransientError(error) {
   if (!error) return false;
+  if (error.name === 'AbortError' || error.retryable === false) return false;
   const msg = String(error.message || error).toLowerCase();
   if (
     msg.includes('timed out') ||
@@ -53,7 +69,8 @@ export function isTransientError(error) {
  * @property {boolean} [jitter]      Apply [50%,100%] jitter to each delay.
  * @property {(error: any) => boolean} [shouldRetry]
  * @property {(error: any, attempt: number, delay: number) => void} [onRetry]
- * @property {(ms: number) => Promise<void>} [sleep]
+ * @property {(ms: number, signal?: AbortSignal) => Promise<void>} [sleep]
+ * @property {AbortSignal} [signal]
  */
 /**
  * @template T
@@ -71,13 +88,18 @@ export async function retryWithBackoff(fn, options = {}) {
     shouldRetry = isTransientError,
     onRetry,
     sleep = DEFAULT_SLEEP,
+    signal,
   } = options;
 
   let attempt = 0;
   for (;;) {
+    signal?.throwIfAborted();
     try {
-      return await fn(attempt);
+      const result = await fn(attempt);
+      signal?.throwIfAborted();
+      return result;
     } catch (error) {
+      signal?.throwIfAborted();
       attempt += 1;
       if (attempt > retries || !shouldRetry(error)) throw error;
       let delay = Math.min(maxDelay, baseDelay * factor ** (attempt - 1));
@@ -85,7 +107,7 @@ export async function retryWithBackoff(fn, options = {}) {
       // synchronize their retries into a thundering herd.
       if (jitter) delay = Math.round(delay * (0.5 + Math.random() * 0.5));
       if (onRetry) onRetry(error, attempt, delay);
-      await sleep(delay);
+      await sleep(delay, signal);
     }
   }
 }

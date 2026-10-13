@@ -155,12 +155,6 @@ export function ChatPanel({
   wasCorrect = false,
   reviewTone = 'rose',
 }) {
-  const [apiHistory, setApiHistory] = useState([]);
-  const [display, setDisplay] = useState([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(true);
-  const logRef = useRef(null);
-  const sendCancelledRef = useRef(false);
   /* eslint-disable react-hooks/exhaustive-deps */
   const context = useMemo(
     () =>
@@ -206,27 +200,60 @@ export function ChatPanel({
   );
   /* eslint-enable react-hooks/exhaustive-deps */
 
+  return (
+    <ChatConversation
+      key={JSON.stringify([context, systemText, geminiKey])}
+      context={context}
+      systemText={systemText}
+      geminiKey={geminiKey}
+      mode={mode}
+      reviewBorderClass={reviewBorderClass}
+    />
+  );
+}
+
+function ChatConversation({ context, systemText, geminiKey, mode, reviewBorderClass }) {
+  // Context belongs to the conversation even when its first response fails or
+  // is cancelled. A different exercise remounts this conversation completely.
+  const [apiHistory, setApiHistory] = useState(() => [{ role: 'user', content: context }]);
+  const [display, setDisplay] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [stopped, setStopped] = useState(false);
+  const logRef = useRef(null);
+  const inputRef = useRef(null);
+  const requestRef = useRef(null);
+
   useEffect(() => {
-    let cancelled = false;
+    const request = { controller: new AbortController() };
+    requestRef.current = request;
+    const ownsRequest = () => requestRef.current === request && !request.controller.signal.aborted;
     const init = [{ role: 'user', content: context }];
     const geminiMsgs = init.map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
     }));
-    callGemini(geminiMsgs, geminiKey, 600, 0.7, systemText)
+    callGemini(geminiMsgs, geminiKey, 600, 0.7, systemText, {
+      signal: request.controller.signal,
+    })
       .then((reply) => {
-        if (cancelled) return;
+        if (!ownsRequest()) return;
         setApiHistory([...init, { role: 'assistant', content: reply }]);
         setDisplay([{ role: 'assistant', content: reply }]);
       })
       .catch((e) => {
-        if (!cancelled) setDisplay([{ role: 'assistant', content: `Error: ${e.message}` }]);
+        if (ownsRequest()) setDisplay([{ role: 'assistant', content: `Error: ${e.message}` }]);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (ownsRequest()) {
+          requestRef.current = null;
+          setLoading(false);
+        }
       });
     return () => {
-      cancelled = true;
+      // Also cancels any follow-up started after the initial request finished.
+      requestRef.current?.controller.abort();
+      requestRef.current = null;
     };
   }, [context, geminiKey, systemText]);
 
@@ -236,13 +263,20 @@ export function ChatPanel({
     log.scrollTop = log.scrollHeight;
   }, [display, loading]);
 
+  useEffect(() => {
+    if (stopped && !loading) inputRef.current?.focus();
+  }, [stopped, loading]);
+
   const REVIEW_CHIPS = ['Explain more simply', 'Give me 3 examples', 'Compare with similar forms'];
 
   async function sendText(txt) {
-    if (!txt.trim() || loading) return;
+    if (!txt.trim() || loading || requestRef.current) return;
+    const request = { controller: new AbortController() };
+    requestRef.current = request;
+    const ownsRequest = () => requestRef.current === request && !request.controller.signal.aborted;
     const newDisplay = [...display, { role: 'user', content: txt }];
     setDisplay(newDisplay);
-    sendCancelledRef.current = false;
+    setStopped(false);
     setLoading(true);
     const newApi = [...apiHistory, { role: 'user', content: txt }];
     try {
@@ -250,16 +284,22 @@ export function ChatPanel({
         role: m.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: m.content }],
       }));
-      const reply = await callGemini(geminiMsgs, geminiKey, 600, 0.7, systemText);
-      if (!sendCancelledRef.current) {
+      const reply = await callGemini(geminiMsgs, geminiKey, 600, 0.7, systemText, {
+        signal: request.controller.signal,
+      });
+      if (ownsRequest()) {
         setApiHistory([...newApi, { role: 'assistant', content: reply }]);
         setDisplay([...newDisplay, { role: 'assistant', content: reply }]);
       }
     } catch (e) {
-      if (!sendCancelledRef.current)
+      if (ownsRequest())
         setDisplay([...newDisplay, { role: 'assistant', content: `Error: ${e.message}` }]);
+    } finally {
+      if (ownsRequest()) {
+        requestRef.current = null;
+        setLoading(false);
+      }
     }
-    if (!sendCancelledRef.current) setLoading(false);
   }
 
   async function send() {
@@ -270,8 +310,10 @@ export function ChatPanel({
   }
 
   function cancelSend() {
-    sendCancelledRef.current = true;
+    requestRef.current?.controller.abort();
+    requestRef.current = null;
     setLoading(false);
+    setStopped(true);
   }
 
   return (
@@ -282,6 +324,11 @@ export function ChatPanel({
         <IconChat className="w-3.5 h-3.5" />
         {mode === 'coach' ? 'Discuss with Gemini' : 'Chat with Gemini'}
       </div>
+      {stopped && (
+        <p role="status" className="mt-2 text-xs text-stone-500">
+          Request stopped. Ask another question when you’re ready.
+        </p>
+      )}
       <div
         role="log"
         aria-live="polite"
@@ -323,6 +370,7 @@ export function ChatPanel({
       )}
       <div className="flex gap-2 mt-2">
         <input
+          ref={inputRef}
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}

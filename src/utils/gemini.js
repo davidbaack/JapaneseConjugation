@@ -87,9 +87,18 @@ export function extractJSON(text) {
 
 const GEMINI_TIMEOUT_MS = 30000;
 
-async function withGeminiDeadline(run) {
+async function withGeminiDeadline(run, callerSignal) {
+  callerSignal?.throwIfAborted();
   const controller = new AbortController();
   let timer;
+  let onAbort;
+  const cancellation = new Promise((_, reject) => {
+    onAbort = () => {
+      controller.abort(callerSignal.reason);
+      reject(callerSignal.reason);
+    };
+    callerSignal?.addEventListener('abort', onAbort, { once: true });
+  });
   const deadline = new Promise((_, reject) => {
     timer = setTimeout(() => {
       const error = new Error('Request timed out — check your connection and try again');
@@ -100,13 +109,15 @@ async function withGeminiDeadline(run) {
   try {
     // Race the entire attempt, including auth and body reads. Abort cancels the
     // real transport; the race also bounds adapters that ignore cancellation.
-    return await Promise.race([run(controller.signal), deadline]);
+    return await Promise.race([run(controller.signal), deadline, cancellation]);
   } catch (error) {
+    callerSignal?.throwIfAborted();
     if (error.name === 'AbortError')
       throw new Error('Request timed out — check your connection and try again', { cause: error });
     throw error;
   } finally {
     clearTimeout(timer);
+    callerSignal?.removeEventListener('abort', onAbort);
   }
 }
 
@@ -137,7 +148,7 @@ async function getSupabaseAccessToken() {
   }
 }
 
-async function executeGeminiProxyRequest(payload) {
+async function executeGeminiProxyRequest(payload, signal) {
   const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL || '';
   if (!supabaseUrl) {
     throw new Error('Gemini proxy is not configured for this build.');
@@ -159,15 +170,15 @@ async function executeGeminiProxyRequest(payload) {
     signal.throwIfAborted();
     if (!r.ok) throw httpError(d.error, r.status);
     return d;
-  });
+  }, signal);
 }
 
-async function executeGeminiRequestOnce(payload, apiKey) {
+async function executeGeminiRequestOnce(payload, apiKey, signal) {
   // Prefer the server-side proxy so the Gemini API key never ships to browsers.
   // The proxy accepts anonymous learner requests and may include a bearer token
   // when the user is signed in, but sign-in is not required for AI coaching.
   if ((import.meta.env?.VITE_SUPABASE_URL || '') && apiKey === 'proxy') {
-    return executeGeminiProxyRequest(payload);
+    return executeGeminiProxyRequest(payload, signal);
   }
 
   throw new Error('Gemini is not configured for this build. Configure the cloud proxy.');
@@ -175,17 +186,24 @@ async function executeGeminiRequestOnce(payload, apiKey) {
 
 // Retry transient failures (timeouts, 429, 5xx) with backoff so a momentary
 // hiccup doesn't surface as a hard error to the learner (improvement #14).
-function executeGeminiRequest(payload, apiKey) {
-  return retryWithBackoff(() => executeGeminiRequestOnce(payload, apiKey), { retries: 2 });
+function executeGeminiRequest(payload, apiKey, signal) {
+  return retryWithBackoff(() => executeGeminiRequestOnce(payload, apiKey, signal), {
+    retries: 2,
+    signal,
+  });
 }
 
+/** @param {{ signal?: AbortSignal }} [options] */
 export async function callGemini(
   contents,
   apiKey,
   maxTokens = 600,
   temp = 0.7,
   systemText = AI_SYSTEM,
+  options = {},
 ) {
+  const { signal } = options;
+  signal?.throwIfAborted();
   guardAIRequest();
   const payload = {
     contents,
@@ -199,7 +217,7 @@ export async function callGemini(
       thinkingConfig: { thinkingBudget: 0 },
     },
   };
-  const d = await executeGeminiRequest(payload, apiKey);
+  const d = await executeGeminiRequest(payload, apiKey, signal);
   return geminiText(d);
 }
 

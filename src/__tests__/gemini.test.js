@@ -6,7 +6,9 @@ vi.mock('../utils/supabase.js', () => ({
   getLoadedSupabaseClient: () => ({ auth: { getSession } }),
 }));
 
-beforeEach(() => getSession.mockReset().mockResolvedValue({ data: { session: null } }));
+beforeEach(() => {
+  getSession.mockReset().mockResolvedValue({ data: { session: null } });
+});
 
 const contents = [{ role: 'user', parts: [{ text: 'Help me practice te-form.' }] }];
 const geminiResponse = {
@@ -35,6 +37,52 @@ describe('Gemini request deadlines', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.stubEnv('VITE_SUPABASE_URL', 'https://katachiya.example.supabase.co');
+  });
+
+  it.each(['authentication', 'transport', 'body'])(
+    'cancels stalled %s without retries',
+    async (stage) => {
+      const pending = new Promise(() => {});
+      if (stage === 'authentication') getSession.mockReturnValue(pending);
+      const fetchMock = vi.fn(() =>
+        stage === 'transport' ? pending : Promise.resolve({ ok: true, json: () => pending }),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const { callGemini } = await import('../utils/gemini.js');
+      const controller = new AbortController();
+      const request = callGemini(contents, 'proxy', 600, 0.7, undefined, {
+        signal: controller.signal,
+      });
+      const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+      await vi.advanceTimersByTimeAsync(0);
+      controller.abort();
+      await rejected;
+      await vi.advanceTimersByTimeAsync(92000);
+      expect(fetchMock).toHaveBeenCalledTimes(stage === 'authentication' ? 0 : 1);
+      if (stage !== 'authentication') expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it('cancels during retry backoff before another provider request', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({ error: 'Temporarily unavailable' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { callGemini } = await import('../utils/gemini.js');
+    const controller = new AbortController();
+    const request = callGemini(contents, 'proxy', 600, 0.7, undefined, {
+      signal: controller.signal,
+    });
+    const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort();
+    await rejected;
+    await vi.advanceTimersByTimeAsync(92000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it.each(['transport', 'body'])('bounds stalled %s even when it ignores abort', async (stage) => {
