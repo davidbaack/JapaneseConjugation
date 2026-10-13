@@ -1,7 +1,10 @@
 import { createHash, webcrypto } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { TextEncoder } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as conjugator from '../utils/conjugator.js';
+import { loadSentenceWordMap } from '../../scripts/sentenceEnglish.js';
+import { buildReviewedSentence } from '../utils/reviewedSentenceFrames.js';
 import {
   hashSentenceContent,
   parseSentenceReview,
@@ -38,6 +41,48 @@ afterEach(() => {
 });
 
 describe('content-bound sentence review', () => {
+  it.each([
+    ['ichidan:褒める', 'passive-polite-past', 'be praised by the teacher'],
+    ['godan:飲む', 'humble', 'drink tea received from the teacher'],
+  ])('rebinds only the reviewed sense repair for %s %s', async (key, type, sense) => {
+    const baseline = JSON.parse(
+      readFileSync('data/sentence-reviews/2026-10-13-editorial-sample-baseline.json', 'utf8'),
+    ).samples.find((sample) => sample.key === key && sample.type === type);
+    const item = loadSentenceWordMap().get(key);
+    const original = {
+      jaTemplate: baseline.jaTemplate,
+      en: baseline.english,
+      segments: baseline.segments,
+      review: baseline.corpusReview,
+    };
+    expect(await verifySentenceValue(item, type, original)).toBe(true);
+    const target = { ...original, review: { ...original.review, sense } };
+    expect(await verifySentenceValue(item, type, target)).toBe(false);
+    target.review.hash = await hashSentenceContent(item, type, target);
+    expect(target.review.hash).not.toBe(original.review.hash);
+    expect(await verifySentenceValue(item, type, target)).toBe(true);
+    const composition = buildReviewedSentence(item, type);
+    expect({
+      jaTemplate: composition.jaTemplate,
+      en: composition.en,
+      sense: composition.sense,
+    }).toEqual({
+      jaTemplate: original.jaTemplate,
+      en: original.en,
+      sense,
+    });
+    const currentRow = JSON.parse(
+      readFileSync(`public/data/sentences/by-type/${type}.json`, 'utf8'),
+    ).rows.find((row) => row[0] === key);
+    expect(currentRow).toEqual([
+      key,
+      original.jaTemplate,
+      original.en,
+      original.segments,
+      target.review,
+    ]);
+  });
+
   it('uses the same canonical content hash in browser and Node tooling', async () => {
     const value = reviewedValue();
     expect(await hashSentenceContent(WORD, TYPE, value)).toBe(value.review.hash);

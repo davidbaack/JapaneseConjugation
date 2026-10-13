@@ -253,6 +253,14 @@ const VOLITIONAL_ACTIONS = {
   'ichidan:締める': 'fasten our belts',
 };
 
+// Independent completed-pair review found these two full-context sense labels
+// still described the generic profile's object. Limit the correction to the
+// exact reviewed pairs; other forms require their own editorial decision.
+const REVIEWED_PAIR_SENSES = {
+  'ichidan:褒める|passive-polite-past': 'be praised by the teacher',
+  'godan:飲む|humble': 'drink tea received from the teacher',
+};
+
 function adjectiveSentence(profile, type, key) {
   if (!type.startsWith('adj-') || profile.exclude?.includes(type)) return null;
   if (profile.kind === 'special-adjective') {
@@ -415,7 +423,7 @@ export function buildReviewedSentence(word, type) {
     en,
     surface,
     kana,
-    sense: frameSense || profile.sense,
+    sense: REVIEWED_PAIR_SENSES[`${key}|${type}`] || frameSense || profile.sense,
     basis: 'explicit-bilingual-profile-and-compatible-frame',
     profileVersion: REVIEWED_SENTENCE_PROFILE_VERSION,
     frameVersion: REVIEWED_SENTENCE_FRAME_VERSION,

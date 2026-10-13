@@ -25,6 +25,61 @@ The source ledger and its limitations remain visible:
   `tmp/sentence-trust-reviewed-2026-10-07-04/` directory. Original bundled data
   also remains recoverable from Git commit `ce83612`.
 
+An independent AI editorial sample on October 13, 2026 reviewed 32 actual completed
+Japanese/English pairs from the tracked 23,075-row bundled corpus. It used fixed,
+purposeful selectors covering all six word groups, exceptional conjugations,
+positive/negative and past/nonpast forms, ongoing/resulting-state aspect,
+causative/passive roles, conditionals, and plain/polite/honorific/humble speech.
+The artifact records a separate translation of the actual Japanese, actor/object
+and particle analysis, reading and sense checks, and an explicit decision for
+every pair. This is a bounded independent AI review, not native-speaker signoff or
+whole-corpus clearance.
+
+- `data/sentence-reviews/2026-10-13-editorial-sample.json` contains exact source
+  paths/zero-based row indices, word identities, completed forms/readings,
+  row/chunk/manifest digests, content-bound approval hashes, and editorial reasoning.
+  It is the current final sample after the two definite metadata repairs: 30 accept,
+  2 edit, and 0 block decisions. The original 28 accept / 4 edit audit is preserved
+  unchanged in `2026-10-13-editorial-sample-baseline.json` as historical evidence.
+- The two definite repairs are exact word/form overrides: `ichidan:褒める` /
+  `passive-polite-past` now binds `be praised by the teacher`, and `godan:飲む` /
+  `humble` now binds `drink tea received from the teacher`. Their Japanese, English,
+  readings, and conjugated forms are unchanged. Other forms retain their previous
+  sense metadata pending their own review; this is not family-wide reapproval.
+- The two remaining edits are optional standalone Japanese clarity recommendations
+  for the `negative-zuni` regret/anaphora frame and adjective negative-te reporting
+  frame, distinguished from proven mistranslations. Their wording remains unchanged
+  pending the user's decision. Recording an editorial recommendation does not
+  automatically quarantine a row.
+- `node scripts/sample-sentence-editorial.js --check` reproduces the fixed
+  selection from tracked files and verifies that the recorded review still binds
+  the same source content and explicit decisions. `--snapshot` prints source facts
+  for a new review; it never translates, grants approval, changes files, contacts a
+  provider, or publishes. Run from the repository root. A changed row, lexical or
+  engine identity, or profile/frame source fails the recorded-source check rather
+  than silently reusing the old verdict. Passing this command establishes source
+  correspondence and mechanical integrity, not correctness of AI judgment.
+
+`node scripts/repair-sentence-editorial-senses.js --prepare` prepares/resumes only
+the two approved metadata repairs. The immutable
+`data/sentence-reviews/2026-10-13-exact-sense-repair.json` package preserves original
+rows, approval hashes, and affected chunk/manifest bodies; it stores exact targets
+and later-publication signatures. The existing corpus generator rebuilds only the
+two affected type files and the manifest. The remaining 23,073 rows are checked as
+unchanged. `--check` verifies the applied bundled result. These commands make no
+live reads, provider calls, or publication requests. The pure
+`bindExactSenseRepairPublication` helper takes exactly two separately fetched live
+rows and builds CAS expectations from their actual DB fields, refusing changed
+content or identity. Live RPC publication and verification are a separate step;
+the offline package alone does not establish that shared content was published.
+
+On October 13, 2026, the two exact live rows were bound to this package and
+published in one atomic RPC batch. Both resulting signatures and approval hashes
+were reread and verified. Bundled publication revision is
+`2941ca5b6bd47a101c741bf6c7d78b3d8d9c086d459fd314ee79ab34d0932d37`.
+The historical review and offline preparation package remain immutable evidence
+of the earlier stages; their flags describe those stages, not this later live check.
+
 ## Acceptance contract
 
 An approved row has structured `review` metadata: accepted status, policy

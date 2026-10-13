@@ -70,6 +70,24 @@ describe('explicit reviewed sentence content', () => {
     expect(buildReviewedSentence(word('i-adjective:高い'), 'adj-plain-present').sense).toBe('tall');
   });
 
+  it('uses exact-pair sense repairs without changing unreviewed neighboring forms', () => {
+    const praise = buildReviewedSentence(word('ichidan:褒める'), 'passive-polite-past');
+    expect(praise.sense).toBe('be praised by the teacher');
+    expect(filled('ichidan:褒める', 'passive-polite-past')).toEqual({
+      ja: '私は先生に褒められました。',
+      en: 'I was praised by the teacher.',
+    });
+    expect(buildReviewedSentence(word('ichidan:褒める'), 'passive').sense).toBe('praise a child');
+    const tea = buildReviewedSentence(word('godan:飲む'), 'humble');
+    expect(tea.sense).toBe('drink tea received from the teacher');
+    expect(filled('godan:飲む', 'humble')).toEqual({
+      ja: '私は先生にいただいたお茶をいただく。',
+      en: 'I drink the tea I received from the teacher.',
+    });
+    expect(buildReviewedSentence(word('godan:飲む'), 'humble-polite').sense).toBe('drink water');
+    expect(buildReviewedSentence(word('godan:飲む'), 'plain-present').sense).toBe('drink water');
+  });
+
   it('does not invent ongoing motion for resulting states', () => {
     expect(filled('godan:死ぬ', 'progressive')).toEqual({
       ja: '金魚が死んでいる。',

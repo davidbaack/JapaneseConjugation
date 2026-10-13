@@ -1,0 +1,3044 @@
+{
+  "schema": 1,
+  "reviewedAtUtc": "2026-10-13T07:04:12Z",
+  "evidenceBaseCommit": "20d411d5d98c6706b285a46abebe3f2618609166",
+  "reviewer": {
+    "kind": "independent-ai-editorial-review",
+    "author": "Codex",
+    "scope": "Bounded completed-pair review of 32 exact currently tracked bundled corpus examples. The generation profiles were inspected for provenance, but each independent translation and decision was made from the completed Japanese, then compared with English, roles, aspect, sense, register, and reading.",
+    "nativeSpeakerSignoff": false,
+    "wholeCorpusClearance": false,
+    "providerCalls": false,
+    "livePublication": false
+  },
+  "decisionPolicy": {
+    "accept": "The completed pair is defensible in its explicit context, with accurate reading and compatible intended lexical sense; optional English polish alone does not require an edit.",
+    "edit": "A concrete source-metadata mismatch or editorial clarity problem has a narrow proposed remedy. A phrasing recommendation is distinguished from a proven mistranslation.",
+    "block": "A pair cannot be made defensible within its stated lexical identity/form/context without further evidence or a replacement context."
+  },
+  "limitations": [
+    "Purposeful coverage sample of 32 out of 23075 published rows, not statistical sampling or native-speaker approval.",
+    "Natural Japanese often omits subjects, number, possession and arguments. Context-compatible English resolution is allowed; alternatives are recorded where material.",
+    "Aspectual state readings such as 着ている and 知っている are checked as resulting states of the same lexical event, not rejected merely because profile labels name the event.",
+    "No live shared corpus, publication, provider, listening audio, normal-profile browser, or full-corpus editorial review was performed.",
+    "Recorded edit decisions do not automatically quarantine or change the runtime corpus. Runtime/publication repair remains separate work."
+  ],
+  "summary": {
+    "sampleCount": 32,
+    "decisions": {
+      "accept": 28,
+      "edit": 4,
+      "block": 0
+    },
+    "findings": [
+      "editorial-11: full-context review sense names a child although the speaker is praised.",
+      "editorial-21: full-context review sense names water although the explicit drink is tea.",
+      "editorial-17: without-doing plus anaphoric regret is too indirect for a standalone teaching example; editorial clarity recommendation.",
+      "editorial-28: adjective negative connective changes from a book topic to an omitted reporter with vague content; editorial naturalness recommendation."
+    ],
+    "mechanicalCheck": "All selected corpus rows passed structural checks, exact approval-hash checks, chunk/manifest revisions, complete kana reading, and authored profile/frame parity. This is evidence identity and composition, not proof of editorial decisions."
+  },
+  "selection": {
+    "method": "fixed-purposeful-stratified-v1",
+    "sampleCount": 32,
+    "explanation": "32 fixed exact word/form selectors cover selected semantic and conjugation risks. This is not random sampling or whole-corpus clearance. Missing or changed selectors fail instead of being silently replaced."
+  },
+  "corpus": {
+    "path": "public/data/sentences/manifest.json",
+    "manifestSha256": "b03b52914cae030f450a3f095d5233bb62d3b80863899db05c2ed2865548d7b0",
+    "revision": "6f773656f11c0c1ffd89fddc16551a3139ec4d1303f2f6bf47ad34e8d24fcf8c",
+    "totalRows": 23075,
+    "typeCount": 126
+  },
+  "contextSources": [
+    {
+      "path": "public/data/verb-lexicon.json",
+      "sha256": "0182760269271a7d7e8cd065a63a57b917f0a607e707dc249885d01dc63a08a2"
+    },
+    {
+      "path": "src/data/starterWords.js",
+      "sha256": "08417e38c2e2b992f7abf03f2d62f28faa6758d6060da4be7fef8a952ffaff25"
+    },
+    {
+      "path": "src/data/verbLexicon.js",
+      "sha256": "201bc8df49a2fc64baf8b3777c64100e7e379b9b0a863b6d758878a6324e3d5a"
+    },
+    {
+      "path": "src/utils/conjugator.js",
+      "sha256": "a8b9d413750e3726ddfc1d2230c2e690126c54e311430824b32598d6a20b18b8"
+    },
+    {
+      "path": "src/utils/sentenceTrust.js",
+      "sha256": "e657e9f8401353d7009b7285a4b066871b8cc6ff13be74ba7442847282cc8674"
+    },
+    {
+      "path": "src/data/reviewedSentenceProfiles.js",
+      "sha256": "a54d5de4dd3506782c5041508e4dbe188fcc8fbfc30a2581fd3703e9ddedc7a1"
+    },
+    {
+      "path": "src/utils/reviewedSentenceFrames.js",
+      "sha256": "cfc8fbaf96eea253512196f2ea6658deda2928ed5c6e330e7ee53714bfb5ea78"
+    }
+  ],
+  "samples": [
+    {
+      "sampleId": "editorial-01",
+      "type": "plain-past",
+      "key": "godan:行く",
+      "coverage": [
+        "iku-exception",
+        "past",
+        "positive",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/plain-past.json",
+        "rowIndex": 137,
+        "rowSha256": "278f640562e04918ae28ba9c5ce9d77cb5c4dad49222ba06b35d9ab2c8367e86",
+        "chunkRevision": "565c80116de29c200ac076c8308ed303992872bc45582b132b13851f88780868",
+        "contentReviewHash": "336e0c1ab7f95f5c04c82e1a53a3cd7fcee5bab425291eabe2e42822fdf27d7f"
+      },
+      "word": {
+        "dict": "行く",
+        "reading": "いく",
+        "group": "godan",
+        "meaning": "to go",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は学校へ{w}。",
+      "completedJapanese": "私は学校へ行った。",
+      "completedReading": "わたしはがっこうへいった。",
+      "conjugatedForm": {
+        "surface": "行った",
+        "kana": "いった"
+      },
+      "english": "I went to school.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "がっこう",
+          "t": "学校"
+        },
+        {
+          "r": "",
+          "t": "へ"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "336e0c1ab7f95f5c04c82e1a53a3cd7fcee5bab425291eabe2e42822fdf27d7f",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "go to school",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "学校へ",
+        "action": "go to school",
+        "flags": "a",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "be at school",
+        "sense": "go to school"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I went to school.",
+        "rolesAndGrammar": "私は names the speaker; 学校へ gives the destination. 行った is completed past, affirmative.",
+        "readingCheck": "行った is いった, with the exceptional って/った stem of 行く; 学校 is がっこう.",
+        "senseCheck": "The go-to-school sense fits 行く and the explicit destination.",
+        "registerCheck": "Plain past Japanese; neutral English does not introduce a different social role.",
+        "reason": "The destination, speaker, completed action and exceptional past form agree."
+      }
+    },
+    {
+      "sampleId": "editorial-02",
+      "type": "te-form",
+      "key": "godan:泳ぐ",
+      "coverage": [
+        "godan-onbin",
+        "sequence",
+        "past",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/te-form.json",
+        "rowIndex": 59,
+        "rowSha256": "e35f1d8ba9e4e1d6918fd1730a2ce46d838dedd0327862a109648e60c9218622",
+        "chunkRevision": "099f49c0fe52b138b7f6ac945c181b3dc02c9041066ad24f2398c23517613c20",
+        "contentReviewHash": "7dd7982c6e905a1a2cdcdda719dacb8860027e41842264f4fa03b103d7b26be6"
+      },
+      "word": {
+        "dict": "泳ぐ",
+        "reading": "およぐ",
+        "group": "godan",
+        "meaning": "to swim",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私はプールで{w}、日記を書いた。",
+      "completedJapanese": "私はプールで泳いで、日記を書いた。",
+      "completedReading": "わたしはプールでおよいで、にっきをかいた。",
+      "conjugatedForm": {
+        "surface": "泳いで",
+        "kana": "およいで"
+      },
+      "english": "I swam in the pool, then wrote in my diary.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "",
+          "t": "プール"
+        },
+        {
+          "r": "",
+          "t": "で"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "、"
+        },
+        {
+          "r": "にっき",
+          "t": "日記"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "r": "かい",
+          "t": "書い"
+        },
+        {
+          "r": "",
+          "t": "た"
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "7dd7982c6e905a1a2cdcdda719dacb8860027e41842264f4fa03b103d7b26be6",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "swim in the pool",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "プールで",
+        "action": "swim in the pool",
+        "flags": "ap",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "swim in the pool"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I swam at the pool and then wrote a diary entry.",
+        "rolesAndGrammar": "Speaker subject carries through both clauses. プールで is the swimming location; 日記を is the second verb object. The final 書いた supplies past time to the sequence.",
+        "readingCheck": "泳いで is およいで (ぐ to いで); 日記を書いた reads にっきをかいた.",
+        "senseCheck": "Swim in a pool is the intended 泳ぐ action; no transit or object is invented.",
+        "registerCheck": "Plain narrative with a neutral English narrative.",
+        "reason": "The te-clause gives a natural sequence; the English past and then are compatible with the whole Japanese sentence."
+      }
+    },
+    {
+      "sampleId": "editorial-03",
+      "type": "polite-negative",
+      "key": "ichidan:食べる",
+      "coverage": [
+        "ichidan",
+        "nonpast",
+        "negative",
+        "polite"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/polite-negative.json",
+        "rowIndex": 274,
+        "rowSha256": "5b1415a9a4f2d007c0de1c8c9ab72843353a54216c648ad4889be0026b3fb112",
+        "chunkRevision": "26cc52bef7b40e5006a3bce1dada1fcc994e96f06c78acedf28c79f8926df35f",
+        "contentReviewHash": "cf7e08164decd265220694ddcdc281fb2d919fe19394552fa21bf96efc02c7b6"
+      },
+      "word": {
+        "dict": "食べる",
+        "reading": "たべる",
+        "group": "ichidan",
+        "meaning": "to eat",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は昼食を{w}。",
+      "completedJapanese": "私は昼食を食べません。",
+      "completedReading": "わたしはちゅうしょくをたべません。",
+      "conjugatedForm": {
+        "surface": "食べません",
+        "kana": "たべません"
+      },
+      "english": "I do not eat lunch.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "ちゅうしょく",
+          "t": "昼食"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "cf7e08164decd265220694ddcdc281fb2d919fe19394552fa21bf96efc02c7b6",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "eat lunch",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "昼食を",
+        "action": "eat lunch",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "eat lunch"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I do not eat lunch.",
+        "rolesAndGrammar": "私は is the eater; 昼食を is the object. 食べません negates a nonpast eating action.",
+        "readingCheck": "昼食 is ちゅうしょく; 食べません is たべません.",
+        "senseCheck": "食べる means eat here, and lunch is explicit.",
+        "registerCheck": "ます negative is polite Japanese. Neutral English preserves content without inventing deference to a third party.",
+        "reason": "Nonpast negative, actor and lunch object agree; a habitual reading is defensible."
+      }
+    },
+    {
+      "sampleId": "editorial-04",
+      "type": "plain-past-negative",
+      "key": "suru:する",
+      "coverage": [
+        "suru-exception",
+        "past",
+        "negative",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/plain-past-negative.json",
+        "rowIndex": 279,
+        "rowSha256": "e12fbb9d991d5a3ca4030a8e455f7d2ad721c074a0fc9fc305c93113278036b8",
+        "chunkRevision": "ba395f0ec56bf7caed82e93847885dbfcbcd7b4d24f85d24ae4e39c299871edf",
+        "contentReviewHash": "d8e0707c9b0ca6bc5cb1460723e1f8f9a1277ee6a8b61a67536e6e5f4ac683fb"
+      },
+      "word": {
+        "dict": "する",
+        "reading": "する",
+        "group": "suru",
+        "meaning": "to do, to try; to wear small items (e.g., necktie, watch, etc.)",
+        "exerciseMeaning": "to do",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は宿題を{w}。",
+      "completedJapanese": "私は宿題をしなかった。",
+      "completedReading": "わたしはしゅくだいをしなかった。",
+      "conjugatedForm": {
+        "surface": "しなかった",
+        "kana": "しなかった"
+      },
+      "english": "I did not do my homework.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "しゅくだい",
+          "t": "宿題"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "d8e0707c9b0ca6bc5cb1460723e1f8f9a1277ee6a8b61a67536e6e5f4ac683fb",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "do my homework",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "宿題を",
+        "action": "do my homework",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "do my homework"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I did not do my homework.",
+        "rolesAndGrammar": "私は is the agent; 宿題を is the object. しなかった is negative past of する.",
+        "readingCheck": "宿題 is しゅくだい; する has the irregular negative stem し and the reading しなかった.",
+        "senseCheck": "This is する in the do sense, not wearing an accessory or another dictionary sense.",
+        "registerCheck": "Plain negative-past Japanese; ordinary English narrative.",
+        "reason": "The explicit homework context selects the intended sense and preserves past negation."
+      }
+    },
+    {
+      "sampleId": "editorial-05",
+      "type": "polite-past",
+      "key": "kuru:来る",
+      "coverage": [
+        "kuru-exception",
+        "past",
+        "positive",
+        "polite"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/polite-past.json",
+        "rowIndex": 275,
+        "rowSha256": "f5ab82d76a422fd10ad210e3ef1cf9c6cd58fddfacdc329aa3ce11a8d80b46a6",
+        "chunkRevision": "79d247d99a66896660aac8db54459435ac47edeafdab1fe76f08f13f14496222",
+        "contentReviewHash": "8ae6c3e1356a6704a020a78255ee95a5ab778410d4d77509e56d32a17fba7049"
+      },
+      "word": {
+        "dict": "来る",
+        "reading": "くる",
+        "group": "kuru",
+        "meaning": "to come",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は学校に{w}。",
+      "completedJapanese": "私は学校に来ました。",
+      "completedReading": "わたしはがっこうにきました。",
+      "conjugatedForm": {
+        "surface": "来ました",
+        "kana": "きました"
+      },
+      "english": "I came to school.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "がっこう",
+          "t": "学校"
+        },
+        {
+          "r": "",
+          "t": "に"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "8ae6c3e1356a6704a020a78255ee95a5ab778410d4d77509e56d32a17fba7049",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "come to school",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "学校に",
+        "action": "come to school",
+        "flags": "a",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "",
+        "sense": "come to school"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I came to school.",
+        "rolesAndGrammar": "The speaker is the mover; 学校に is the arrival destination. 来ました is affirmative past.",
+        "readingCheck": "来ました is きました, not くました; 学校 is がっこう.",
+        "senseCheck": "来る retains the come viewpoint; English does not change it to go.",
+        "registerCheck": "Polite past Japanese; neutral English with the same speaker and destination.",
+        "reason": "The irregular 来る reading, past time and deictic direction agree."
+      }
+    },
+    {
+      "sampleId": "editorial-06",
+      "type": "plain-negative",
+      "key": "godan:有る",
+      "coverage": [
+        "aru-exception",
+        "existence",
+        "negative",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/plain-negative.json",
+        "rowIndex": 91,
+        "rowSha256": "ec1f974ce442ac030f0dda8f388d4edc059825b9c58c5d3c865b35affc2886b3",
+        "chunkRevision": "662b6aac9f223eccf7214a63695c2866b1ac9b07480337a572451ae1ce0c698b",
+        "contentReviewHash": "019402dc3715d443a6dbd44f0d3894bfc7452daf7377a1980ea7ff6104135924"
+      },
+      "word": {
+        "dict": "有る",
+        "reading": "ある",
+        "group": "godan",
+        "meaning": "to be, to have",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "机の上に本が{w}。",
+      "completedJapanese": "机の上に本がない。",
+      "completedReading": "つくえのうえにほんがない。",
+      "conjugatedForm": {
+        "surface": "ない",
+        "kana": "ない"
+      },
+      "english": "There is not a book on the desk.",
+      "segments": [
+        {
+          "r": "つくえ",
+          "t": "机"
+        },
+        {
+          "r": "",
+          "t": "の"
+        },
+        {
+          "r": "うえ",
+          "t": "上"
+        },
+        {
+          "r": "",
+          "t": "に"
+        },
+        {
+          "r": "ほん",
+          "t": "本"
+        },
+        {
+          "r": "",
+          "t": "が"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "019402dc3715d443a6dbd44f0d3894bfc7452daf7377a1980ea7ff6104135924",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "be a book on the desk",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "",
+        "action": "be a book on the desk",
+        "flags": "",
+        "subjectJa": "机の上に本が",
+        "subjectEn": "There",
+        "aspect": "",
+        "sense": "be a book on the desk"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "There is no book on the desk.",
+        "rolesAndGrammar": "机の上に names the location; 本が is the thing whose existence is denied. There is no agent.",
+        "readingCheck": "机の上 is つくえのうえ; ない is the suppletive negative of ある.",
+        "senseCheck": "Existence of a book fits 有る; this is not a human residence or need sense.",
+        "registerCheck": "Plain negative state; neutral English existential clause.",
+        "reason": "The negative existence construction and location are faithful. The corpus English is grammatical, although no book is smoother than not a book."
+      }
+    },
+    {
+      "sampleId": "editorial-07",
+      "type": "progressive",
+      "key": "ichidan:着る",
+      "coverage": [
+        "resulting-state",
+        "clothing",
+        "positive",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/progressive.json",
+        "rowIndex": 137,
+        "rowSha256": "5c4428df6097728b7281d40b3738f9e95518cfb1a7b0d730fd2c02fd6f953ccc",
+        "chunkRevision": "159d808cf886b5a44f6f0e53d9ea34b3d35449bf5dc8ea72c6d1230d345246ef",
+        "contentReviewHash": "72b535e512117fd8c7678491db61fe0bd82e3ce2376690c5c2a01ee09201b708"
+      },
+      "word": {
+        "dict": "着る",
+        "reading": "きる",
+        "group": "ichidan",
+        "meaning": "to put on (clothes above your waist); to wear",
+        "exerciseMeaning": "to wear",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は上着を{w}。",
+      "completedJapanese": "私は上着を着ている。",
+      "completedReading": "わたしはうわぎをきている。",
+      "conjugatedForm": {
+        "surface": "着ている",
+        "kana": "きている"
+      },
+      "english": "I am wearing my jacket.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "うわぎ",
+          "t": "上着"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "72b535e512117fd8c7678491db61fe0bd82e3ce2376690c5c2a01ee09201b708",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "put on my jacket",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "上着を",
+        "action": "put on my jacket",
+        "flags": "at",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "be wearing my jacket",
+        "sense": "put on my jacket"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I am wearing a jacket.",
+        "rolesAndGrammar": "Speaker topic and 上着を object are explicit. 着ている denotes the state after putting the jacket on, not an ongoing attempt to put it on.",
+        "readingCheck": "上着 is うわぎ; 着ている is きている.",
+        "senseCheck": "The profile put-on sense and resulting state wearing are the same lexical event/state relation; the exercise meaning wear is compatible.",
+        "registerCheck": "Plain state description; neutral English. My jacket is a normal contextual possessive, not a different participant.",
+        "reason": "The English correctly interprets 着ている as wearing and preserves the jacket object."
+      }
+    },
+    {
+      "sampleId": "editorial-08",
+      "type": "progressive-past-negative",
+      "key": "godan:書く",
+      "coverage": [
+        "ongoing-aspect",
+        "past",
+        "negative",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/progressive-past-negative.json",
+        "rowIndex": 51,
+        "rowSha256": "25bc5898e11042e339b10a8a33970dc7d04c094ae9f29269df89c97753b3183d",
+        "chunkRevision": "cad5861a4344eba1967b3a74dfa324db31519b7f1c2d367d47d8d43a5b482232",
+        "contentReviewHash": "f8e6fdedad2b65f9220ba7356a335ff7490b9eed5ca027b0689a077468222b62"
+      },
+      "word": {
+        "dict": "書く",
+        "reading": "かく",
+        "group": "godan",
+        "meaning": "to write",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は手紙を{w}。",
+      "completedJapanese": "私は手紙を書いていなかった。",
+      "completedReading": "わたしはてがみをかいていなかった。",
+      "conjugatedForm": {
+        "surface": "書いていなかった",
+        "kana": "かいていなかった"
+      },
+      "english": "I was not writing a letter.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "てがみ",
+          "t": "手紙"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "f8e6fdedad2b65f9220ba7356a335ff7490b9eed5ca027b0689a077468222b62",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "write a letter",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "手紙を",
+        "action": "write a letter",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "write a letter"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I was not writing a letter.",
+        "rolesAndGrammar": "私は is the writer; 手紙を is the object. 書いていなかった denies an ongoing action in the past.",
+        "readingCheck": "手紙 is てがみ; 書いていなかった is かいていなかった.",
+        "senseCheck": "Write a letter fits 書く. The sentence can have a context-dependent not-yet-written reading too, but the ongoing reading is available.",
+        "registerCheck": "Plain past-negative Japanese; neutral English.",
+        "reason": "The chosen ongoing interpretation is natural and matches the corpus English; it does not substitute a future or positive event."
+      }
+    },
+    {
+      "sampleId": "editorial-09",
+      "type": "progressive-polite",
+      "key": "godan:知る",
+      "coverage": [
+        "resulting-state",
+        "knowledge",
+        "positive",
+        "polite"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/progressive-polite.json",
+        "rowIndex": 76,
+        "rowSha256": "620dde0bdd7fad9864800817d66d375fb2afd08b91dece3071f84a4b39ca9944",
+        "chunkRevision": "6cd190c26ff92e377e09ed88dd57e09d557e5571c0122dfe2e58ebeeac2caf21",
+        "contentReviewHash": "85d8788dc1feb7abe80258247371bef58527daf13e39a2ecb0b1d4d1c9de5d59"
+      },
+      "word": {
+        "dict": "知る",
+        "reading": "しる",
+        "group": "godan",
+        "meaning": "to know, to understand",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私はその事実を{w}。",
+      "completedJapanese": "私はその事実を知っています。",
+      "completedReading": "わたしはそのじじつをしっています。",
+      "conjugatedForm": {
+        "surface": "知っています",
+        "kana": "しっています"
+      },
+      "english": "I know that fact.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "",
+          "t": "その"
+        },
+        {
+          "r": "じじつ",
+          "t": "事実"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "85d8788dc1feb7abe80258247371bef58527daf13e39a2ecb0b1d4d1c9de5d59",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "learn that fact",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "その事実を",
+        "action": "learn that fact",
+        "flags": "",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "know that fact",
+        "sense": "learn that fact",
+        "coreEnglish": {
+          "positive": "I learn that fact.",
+          "negative": "I do not know that fact.",
+          "past": "I found out that fact.",
+          "pastNegative": "I did not know that fact."
+        }
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I know that fact.",
+        "rolesAndGrammar": "Speaker topic and その事実を object are explicit. 知っています expresses a current acquired-knowledge state.",
+        "readingCheck": "その事実 is そのじじつ; 知っています is しっています.",
+        "senseCheck": "The learn/come-to-know lexical event yields know in ている; this is aspectual interpretation, not a different object or word sense.",
+        "registerCheck": "Polite Japanese predicate; English has the same knowledge state.",
+        "reason": "The corpus avoids the false ongoing English am learning interpretation and preserves the known fact."
+      }
+    },
+    {
+      "sampleId": "editorial-10",
+      "type": "potential-polite-past-negative",
+      "key": "godan:読む",
+      "coverage": [
+        "ability",
+        "past",
+        "negative",
+        "polite"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/potential-polite-past-negative.json",
+        "rowIndex": 86,
+        "rowSha256": "b6c61617db0cb672bcf1642d7d5182d77aca49b73ac03f3c04ba74f03abc1da7",
+        "chunkRevision": "81b53f2fc597683aee5339c767b1cbdcfc842d34584f8bf0ac959e03b6016826",
+        "contentReviewHash": "e1dd9a35bd088c2f3a2f544f1f51351da4e7d0af5eda77d7ee52c11fcbfa39e0"
+      },
+      "word": {
+        "dict": "読む",
+        "reading": "よむ",
+        "group": "godan",
+        "meaning": "to read",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は本を{w}。",
+      "completedJapanese": "私は本を読めませんでした。",
+      "completedReading": "わたしはほんをよめませんでした。",
+      "conjugatedForm": {
+        "surface": "読めませんでした",
+        "kana": "よめませんでした"
+      },
+      "english": "I was not able to read a book.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "ほん",
+          "t": "本"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "e1dd9a35bd088c2f3a2f544f1f51351da4e7d0af5eda77d7ee52c11fcbfa39e0",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "read a book",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "本を",
+        "action": "read a book",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "read a book"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I could not read a book.",
+        "rolesAndGrammar": "Speaker and 本を object are explicit. 読めませんでした is past negative ability, not simply failure to perform a normal reading action.",
+        "readingCheck": "読めませんでした is よめませんでした; the potential stem is よめ.",
+        "senseCheck": "Read a book matches 読む; potential retains that action.",
+        "registerCheck": "Polite past-negative ability in Japanese; neutral English unable-to statement.",
+        "reason": "Actor, book object, past time and negative ability agree."
+      }
+    },
+    {
+      "sampleId": "editorial-11",
+      "type": "passive-polite-past",
+      "key": "ichidan:褒める",
+      "coverage": [
+        "passive",
+        "agent-receiver",
+        "past",
+        "polite"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/passive-polite-past.json",
+        "rowIndex": 11,
+        "rowSha256": "df19f4bf503a624ce5f46c0f54a221ae66e8a36a83b467b2cab4db553fff8745",
+        "chunkRevision": "c2a61e4f4441089b3f6d034f25892ae67d8da52f29b3808e732da9f67f7aac8b",
+        "contentReviewHash": "54608d3119900b375b10c5b5e90690d385e16dc232d3e6ea8037bbe78a79c746"
+      },
+      "word": {
+        "dict": "褒める",
+        "reading": "ほめる",
+        "group": "ichidan",
+        "meaning": "to praise; to say nice things",
+        "exerciseMeaning": "",
+        "jlpt": "N4"
+      },
+      "jaTemplate": "私は先生に{w}。",
+      "completedJapanese": "私は先生に褒められました。",
+      "completedReading": "わたしはせんせいにほめられました。",
+      "conjugatedForm": {
+        "surface": "褒められました",
+        "kana": "ほめられました"
+      },
+      "english": "I was praised by the teacher.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "せんせい",
+          "t": "先生"
+        },
+        {
+          "r": "",
+          "t": "に"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "54608d3119900b375b10c5b5e90690d385e16dc232d3e6ea8037bbe78a79c746",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "praise a child",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "子どもを",
+        "action": "praise a child",
+        "flags": "at",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "",
+        "sense": "praise a child"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "edit",
+        "independentTranslation": "I was praised by the teacher.",
+        "rolesAndGrammar": "私は is the praise receiver; 先生に is the agent. 褒められました is affirmative passive past.",
+        "readingCheck": "褒められました is ほめられました; 先生 is せんせい.",
+        "senseCheck": "Japanese and English correctly select praise, but corpusReview.sense is praise a child. No child occurs; the praised person is the speaker.",
+        "registerCheck": "Polite passive with a teacher agent. Neither language reverses who praises whom.",
+        "reason": "The bilingual pair is faithful, but its approval-bound full-context sense names a different patient. The hash faithfully binds this mismatch rather than correcting it.",
+        "recommendedChange": "Retain the pair, explicitly review a frame sense such as be praised by the teacher, and regenerate that exact approval hash through the normal review workflow. Do not reuse praise a child as the frame-specific intended context."
+      }
+    },
+    {
+      "sampleId": "editorial-12",
+      "type": "causative",
+      "key": "godan:飲む",
+      "coverage": [
+        "causative",
+        "actor-causee-object",
+        "nonpast",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/causative.json",
+        "rowIndex": 109,
+        "rowSha256": "ec1b6f20ac27fa8883f423966c0d65239ae12342b340760a767c3fbf1008a4c3",
+        "chunkRevision": "0c89f43d31d74e02a554442c914d95a7ab6cbeb825dbd424704036dc664374c4",
+        "contentReviewHash": "8cacf299a75ffb3168d5d7e532da0d3ad775b2a8f034304a5c302e1854c8181d"
+      },
+      "word": {
+        "dict": "飲む",
+        "reading": "のむ",
+        "group": "godan",
+        "meaning": "to drink",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "先生は私に水を{w}。",
+      "completedJapanese": "先生は私に水を飲ませる。",
+      "completedReading": "せんせいはわたしにみずをのませる。",
+      "conjugatedForm": {
+        "surface": "飲ませる",
+        "kana": "のませる"
+      },
+      "english": "The teacher makes me drink water.",
+      "segments": [
+        {
+          "r": "せんせい",
+          "t": "先生"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "に"
+        },
+        {
+          "r": "みず",
+          "t": "水"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "8cacf299a75ffb3168d5d7e532da0d3ad775b2a8f034304a5c302e1854c8181d",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "drink water",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "水を",
+        "action": "drink water",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "drink water"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "The teacher makes me drink water.",
+        "rolesAndGrammar": "先生は is the causer; 私に is the causee; 水を is what the speaker drinks. 飲ませる is affirmative causative nonpast.",
+        "readingCheck": "飲ませる is のませる; 水 is みず.",
+        "senseCheck": "Drink water fits 飲む; causative changes the event participants but not the consumed liquid.",
+        "registerCheck": "Plain predicate with a teacher causer; the sentence does not claim honorific or humble wording.",
+        "reason": "The explicit に/を distinction and English roles agree. Makes is an available causative interpretation; the Japanese can also mean allows in a suitable context."
+      }
+    },
+    {
+      "sampleId": "editorial-13",
+      "type": "causative-passive-past-negative",
+      "key": "godan:待つ",
+      "coverage": [
+        "causative-passive",
+        "actor-causee-object",
+        "past",
+        "negative",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/causative-passive-past-negative.json",
+        "rowIndex": 41,
+        "rowSha256": "e098b51f4e0fd09356f14922397cc1867ef0a03b68fcbe321671a7c804f65236",
+        "chunkRevision": "c1f030df009ab7847eb251861c688c61bcccab2f70f4e9ab522880330aa5e03c",
+        "contentReviewHash": "9fb960abfe8e3f5d01d966c82afb6bb5039d5419436429777ce6dd68898f4b57"
+      },
+      "word": {
+        "dict": "待つ",
+        "reading": "まつ",
+        "group": "godan",
+        "meaning": "to wait",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は先生に友だちを{w}。",
+      "completedJapanese": "私は先生に友だちを待たせられなかった。",
+      "completedReading": "わたしはせんせいにともだちをまたせられなかった。",
+      "conjugatedForm": {
+        "surface": "待たせられなかった",
+        "kana": "またせられなかった"
+      },
+      "english": "I was not made to wait for a friend by the teacher.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "せんせい",
+          "t": "先生"
+        },
+        {
+          "r": "",
+          "t": "に"
+        },
+        {
+          "r": "ともだち",
+          "t": "友だち"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "9fb960abfe8e3f5d01d966c82afb6bb5039d5419436429777ce6dd68898f4b57",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "wait for a friend",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "友だちを",
+        "action": "wait for a friend",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "wait for a friend"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "The teacher did not make me wait for a friend.",
+        "rolesAndGrammar": "私は is the person subject to causation; 先生に is the causer; 友だちを is the waited-for person. 待たせられなかった is negative past causative-passive.",
+        "readingCheck": "待たせられなかった is またせられなかった; the full causative-passive form is valid, though 待たされなかった is often shorter.",
+        "senseCheck": "Wait for a friend is the intended 待つ construction; 友だちを is not the causer.",
+        "registerCheck": "Plain negative past. English names the same teacher and speaker roles.",
+        "reason": "The corpus English preserves the negative causative-passive. Japanese negative-passive morphology can be contextually ambiguous, but the recorded reading is available."
+      }
+    },
+    {
+      "sampleId": "editorial-14",
+      "type": "conditional-nara",
+      "key": "godan:行く",
+      "coverage": [
+        "conditional",
+        "nara",
+        "speaker-subject",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/conditional-nara.json",
+        "rowIndex": 80,
+        "rowSha256": "0f7ac7da7d06e139dbcace69b186004d36a252ae25b2a600adb21bcd0ee5fa0e",
+        "chunkRevision": "9badff7e8b9fdc1f7f92063f60a892874803f85a4fc499be0e66aec53b53258d",
+        "contentReviewHash": "e1ee136253f6d3f8cf44bd0d1892b0d0ecbf5be6ec087626a7128ad6e00cc918"
+      },
+      "word": {
+        "dict": "行く",
+        "reading": "いく",
+        "group": "godan",
+        "meaning": "to go",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "もし私が学校へ{w}、どうなりますか。",
+      "completedJapanese": "もし私が学校へ行くなら、どうなりますか。",
+      "completedReading": "もしわたしががっこうへいくなら、どうなりますか。",
+      "conjugatedForm": {
+        "surface": "行くなら",
+        "kana": "いくなら"
+      },
+      "english": "What happens if I go to school?",
+      "segments": [
+        {
+          "r": "",
+          "t": "もし"
+        },
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "が"
+        },
+        {
+          "r": "がっこう",
+          "t": "学校"
+        },
+        {
+          "r": "",
+          "t": "へ"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "、"
+        },
+        {
+          "r": "",
+          "t": "どう"
+        },
+        {
+          "r": "",
+          "t": "なり"
+        },
+        {
+          "r": "",
+          "t": "ます"
+        },
+        {
+          "r": "",
+          "t": "か"
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "e1ee136253f6d3f8cf44bd0d1892b0d0ecbf5be6ec087626a7128ad6e00cc918",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "go to school",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "学校へ",
+        "action": "go to school",
+        "flags": "a",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "be at school",
+        "sense": "go to school"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "If I am going to school, what will happen?",
+        "rolesAndGrammar": "私が is the hypothetical mover; 学校へ is the destination. 行くなら takes going to school as the premise, then asks what results.",
+        "readingCheck": "行くなら is いくなら; どうなりますか is the polite question ending.",
+        "senseCheck": "Go-to-school is retained; the condition is not a completed visit.",
+        "registerCheck": "Plain conditional subordinate clause with polite question ending; English remains a question.",
+        "reason": "What happens if I go to school is a defensible compact translation of the premise/result question. The Japanese nara nuance does not imply an incompatible event."
+      }
+    },
+    {
+      "sampleId": "editorial-15",
+      "type": "desiderative-past-negative",
+      "key": "ichidan:食べる",
+      "coverage": [
+        "wanting",
+        "past",
+        "negative",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/desiderative-past-negative.json",
+        "rowIndex": 171,
+        "rowSha256": "0c7ccd864ff27b62af034d2e3a98b2d509d0c19020e56163e0937b24b1a5a385",
+        "chunkRevision": "bc4e752d6e93f6fcbe6b879d1a3d9f32423287f598f185548390a64ba1c05974",
+        "contentReviewHash": "77b5f436f06b2b65c9d1de7996eadb4a60df8fbccc5208206aadbeb48d113696"
+      },
+      "word": {
+        "dict": "食べる",
+        "reading": "たべる",
+        "group": "ichidan",
+        "meaning": "to eat",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は昼食を{w}。",
+      "completedJapanese": "私は昼食を食べたくなかった。",
+      "completedReading": "わたしはちゅうしょくをたべたくなかった。",
+      "conjugatedForm": {
+        "surface": "食べたくなかった",
+        "kana": "たべたくなかった"
+      },
+      "english": "I did not want to eat lunch.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "ちゅうしょく",
+          "t": "昼食"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "77b5f436f06b2b65c9d1de7996eadb4a60df8fbccc5208206aadbeb48d113696",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "eat lunch",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "昼食を",
+        "action": "eat lunch",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "eat lunch"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I did not want to eat lunch.",
+        "rolesAndGrammar": "私は is the experiencer; 昼食を is the contemplated eating object. 食べたくなかった negates past desire, not the eating event itself.",
+        "readingCheck": "食べたくなかった is たべたくなかった; 昼食 is ちゅうしょく.",
+        "senseCheck": "Eat lunch remains the intended action under wanting.",
+        "registerCheck": "Plain desiderative negative past; neutral English.",
+        "reason": "The translation correctly distinguishes not wanting to eat from not eating and preserves past time."
+      }
+    },
+    {
+      "sampleId": "editorial-16",
+      "type": "volitional",
+      "key": "godan:脱ぐ",
+      "coverage": [
+        "volitional",
+        "implicit-inclusive-subject",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/volitional.json",
+        "rowIndex": 78,
+        "rowSha256": "ea5bdb25ec4031176d5d0c2f47017ad0239ee8ab1eac7d09365349fb8db423c5",
+        "chunkRevision": "0042bbf4a80572a6770fcf3ff94ced58f982aa5a340d1c7673988ac693ec7946",
+        "contentReviewHash": "c031c0bc8d79ef78e95dfa9ded28f553380dc5db9f89784ef7345055af9864bb"
+      },
+      "word": {
+        "dict": "脱ぐ",
+        "reading": "ぬぐ",
+        "group": "godan",
+        "meaning": "to take off (clothes)",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "上着を{w}。",
+      "completedJapanese": "上着を脱ごう。",
+      "completedReading": "うわぎをぬごう。",
+      "conjugatedForm": {
+        "surface": "脱ごう",
+        "kana": "ぬごう"
+      },
+      "english": "Let's take off our jackets.",
+      "segments": [
+        {
+          "r": "うわぎ",
+          "t": "上着"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "c031c0bc8d79ef78e95dfa9ded28f553380dc5db9f89784ef7345055af9864bb",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "take off my jacket",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "上着を",
+        "action": "take off my jacket",
+        "flags": "at",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "",
+        "sense": "take off my jacket"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "Let us take off our jackets.",
+        "rolesAndGrammar": "No subject is explicit. 脱ごう is an intentional volitional invitation; 上着を supplies the clothing object. Inclusive we is a natural standalone invitation reading.",
+        "readingCheck": "上着 is うわぎ; 脱ごう is ぬごう with the godan g-row volitional.",
+        "senseCheck": "Removing an upper-body garment fits 脱ぐ. The profile my jacket is a lexical context anchor; the volitional explicitly changes it to an inclusive invitation.",
+        "registerCheck": "Plain invitation rather than a command or humble act.",
+        "reason": "English let us and our jackets match the inclusive interpretation. Japanese number and possession are implicit; a self-directed I will reading is also possible without extra context."
+      }
+    },
+    {
+      "sampleId": "editorial-17",
+      "type": "negative-zuni",
+      "key": "godan:買う",
+      "coverage": [
+        "without-doing",
+        "anaphora",
+        "negative",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/negative-zuni.json",
+        "rowIndex": 88,
+        "rowSha256": "7614d7bd077cfc3590b0d758b6c456e38f11360c83f27f43d798adb5d1ef320d",
+        "chunkRevision": "9881dc0ee46ff8a60d444272eeb56b8f8324c366c2ebeb2f0e215653a5612833",
+        "contentReviewHash": "65af9dd40d35163fade0f56a39d32480ecbed9a00077da9ac78f02971d668574"
+      },
+      "word": {
+        "dict": "買う",
+        "reading": "かう",
+        "group": "godan",
+        "meaning": "to buy",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私はパンを{w}、そのことを後悔した。",
+      "completedJapanese": "私はパンを買わずに、そのことを後悔した。",
+      "completedReading": "わたしはパンをかわずに、そのことをこうかいした。",
+      "conjugatedForm": {
+        "surface": "買わずに",
+        "kana": "かわずに"
+      },
+      "english": "I regretted not buying bread.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "",
+          "t": "パン"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "、"
+        },
+        {
+          "r": "",
+          "t": "その"
+        },
+        {
+          "r": "",
+          "t": "こと"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "r": "こうかい",
+          "t": "後悔"
+        },
+        {
+          "r": "",
+          "t": "し"
+        },
+        {
+          "r": "",
+          "t": "た"
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "65af9dd40d35163fade0f56a39d32480ecbed9a00077da9ac78f02971d668574",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "buy bread",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "パンを",
+        "action": "buy bread",
+        "flags": "at",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "",
+        "sense": "buy bread"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "edit",
+        "independentTranslation": "Without buying bread, I regretted that.",
+        "rolesAndGrammar": "私は is the subject; パンを is the unbought object. 買わずに modifies the subsequent 後悔した action. そのこと is an anaphoric regret object, whose referent is left to inference.",
+        "readingCheck": "買わずに is かわずに, the ず negative of 買う; 後悔した is こうかいした.",
+        "senseCheck": "Buy bread is the intended action; the issue is the relation between its absence and the regret object.",
+        "registerCheck": "Plain past narrative without special social viewpoint.",
+        "reason": "The English intended regret about not buying bread is inferable, but the Japanese does not directly encode that as a nominal regret object. This is an editorial clarity recommendation, not proof that the English is impossible.",
+        "recommendedChange": "Keep a real without-doing complement, for example 私はパンを{w}帰った。 / I went home without buying bread. Review the parallel negative-te row as well. Alternatively author a natural regret construction with the appropriate nominalized negative form, rather than granting approval from the type id."
+      }
+    },
+    {
+      "sampleId": "editorial-18",
+      "type": "obligation",
+      "key": "suru:勉強する",
+      "coverage": [
+        "obligation",
+        "suru",
+        "nonpast",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/obligation.json",
+        "rowIndex": 184,
+        "rowSha256": "53b7c8ccf12939d43536c838b556a95cbfb9b1d71a7fd2a3d6cba578fb951a99",
+        "chunkRevision": "4a279de69d3c5ce326e9aee90b4b40aa5ad31f9062fc252eb64ef7c8f29bf954",
+        "contentReviewHash": "7c89386c93c91bcaf98abd99448898c8a0ce062caa395b687434a1915b5be2ff"
+      },
+      "word": {
+        "dict": "勉強する",
+        "reading": "べんきょうする",
+        "group": "suru",
+        "meaning": "Study",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は日本語を{w}。",
+      "completedJapanese": "私は日本語を勉強しなければならない。",
+      "completedReading": "わたしはにほんごをべんきょうしなければならない。",
+      "conjugatedForm": {
+        "surface": "勉強しなければならない",
+        "kana": "べんきょうしなければならない"
+      },
+      "english": "I must study Japanese.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "にほんご",
+          "t": "日本語"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "7c89386c93c91bcaf98abd99448898c8a0ce062caa395b687434a1915b5be2ff",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "study Japanese",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "日本語を",
+        "action": "study Japanese",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "study Japanese"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I must study Japanese.",
+        "rolesAndGrammar": "私は is the obligated actor; 日本語を is the study object. 勉強しなければならない is the negative-condition plus necessity idiom.",
+        "readingCheck": "日本語 is にほんご; 勉強しなければならない is べんきょうしなければならない.",
+        "senseCheck": "Study Japanese fits 勉強する; the surface negative condition expresses obligation overall.",
+        "registerCheck": "Plain obligation predicate; English must expresses the same modal force.",
+        "reason": "The translation preserves obligation instead of treating the Japanese morphological negative as do not study."
+      }
+    },
+    {
+      "sampleId": "editorial-19",
+      "type": "honorific-polite",
+      "key": "godan:行く",
+      "coverage": [
+        "honorific",
+        "irregular-keigo",
+        "respected-actor",
+        "polite"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/honorific-polite.json",
+        "rowIndex": 4,
+        "rowSha256": "b4d05a337f3872b863d4fa441136819117999eb6a65a38ad1e027e362805273e",
+        "chunkRevision": "80c96c844ac245619df13c9d641e5945e17b54f73d2c234d9efbb1ed98c9e895",
+        "contentReviewHash": "d2098133ca81ba78659a18be69d0a6ec552438d2f204b47e047488fb661e3263"
+      },
+      "word": {
+        "dict": "行く",
+        "reading": "いく",
+        "group": "godan",
+        "meaning": "to go",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "先生は学校へ{w}。",
+      "completedJapanese": "先生は学校へいらっしゃいます。",
+      "completedReading": "せんせいはがっこうへいらっしゃいます。",
+      "conjugatedForm": {
+        "surface": "いらっしゃいます",
+        "kana": "いらっしゃいます"
+      },
+      "english": "The teacher goes to school.",
+      "segments": [
+        {
+          "r": "せんせい",
+          "t": "先生"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "がっこう",
+          "t": "学校"
+        },
+        {
+          "r": "",
+          "t": "へ"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "d2098133ca81ba78659a18be69d0a6ec552438d2f204b47e047488fb661e3263",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "go to school",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "学校へ",
+        "action": "go to school",
+        "flags": "a",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "be at school",
+        "sense": "go to school"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "The teacher goes to school.",
+        "rolesAndGrammar": "先生は is the respected mover; 学校へ is the destination. いらっしゃいます replaces 行きます in the honorific pattern.",
+        "readingCheck": "いらっしゃいます is entirely kana with the contracted polite ending; 先生 is せんせい.",
+        "senseCheck": "The destination frame supports the 行く interpretation of いらっしゃる, which can also correspond to come or be elsewhere.",
+        "registerCheck": "Honorific raises the teacher and ます is polite. English lacks a grammatical honorific, but does not lower or replace the actor.",
+        "reason": "The Japanese social viewpoint is appropriate for the teacher, and the English go reading matches the selected lexical source and destination."
+      }
+    },
+    {
+      "sampleId": "editorial-20",
+      "type": "humble-polite",
+      "key": "godan:書く",
+      "coverage": [
+        "humble",
+        "recipient-viewpoint",
+        "polite"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/humble-polite.json",
+        "rowIndex": 3,
+        "rowSha256": "be36296e119d06dfa0a8178e7fb89d0055e75158c915fffd3f2ffd49f0f813e9",
+        "chunkRevision": "0809f457062e6225b0c37d49a57a6c5987addb9d681d620dfb41612d691fc033",
+        "contentReviewHash": "ec133d80fde5cfca20615b0ccf78f04fcd3aaf74e4b80b6165e39713e45b80f7"
+      },
+      "word": {
+        "dict": "書く",
+        "reading": "かく",
+        "group": "godan",
+        "meaning": "to write",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は先生に手紙を{w}。",
+      "completedJapanese": "私は先生に手紙をおかきします。",
+      "completedReading": "わたしはせんせいにてがみをおかきします。",
+      "conjugatedForm": {
+        "surface": "おかきします",
+        "kana": "おかきします"
+      },
+      "english": "I write a letter to the teacher.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "せんせい",
+          "t": "先生"
+        },
+        {
+          "r": "",
+          "t": "に"
+        },
+        {
+          "r": "てがみ",
+          "t": "手紙"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "ec133d80fde5cfca20615b0ccf78f04fcd3aaf74e4b80b6165e39713e45b80f7",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "write a letter",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "手紙を",
+        "action": "write a letter",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "write a letter"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I write a letter to the teacher.",
+        "rolesAndGrammar": "私は is the writer; 先生に is the respected recipient; 手紙を is the object. おかきします is the humble お plus stem plus する construction.",
+        "readingCheck": "おかきします is お + かき + します. The kana-only surface is readable; normal orthography may use お書きします.",
+        "senseCheck": "Write a letter is the intended 書く action, directed to a recipient rather than an arbitrary self-action.",
+        "registerCheck": "The speaker lowers their writing act relative to the teacher recipient; polite ます is present.",
+        "reason": "The recipient makes this humble frame defensible and both languages keep the same writer, letter and recipient."
+      }
+    },
+    {
+      "sampleId": "editorial-21",
+      "type": "humble",
+      "key": "godan:飲む",
+      "coverage": [
+        "humble",
+        "irregular-keigo",
+        "gift-source",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/humble.json",
+        "rowIndex": 7,
+        "rowSha256": "eeada1c296aa452f91256794ee604897b5473065eb736f6dd24314cbd686f4d5",
+        "chunkRevision": "46eb378f2347e8cd85b8fcef33b6a63d05e4615c5051fef1f831767b0855da62",
+        "contentReviewHash": "86e7d8f6bcd3e6b8e1cc4012185da103e84730ae8975d343a908d17b376e9b61"
+      },
+      "word": {
+        "dict": "飲む",
+        "reading": "のむ",
+        "group": "godan",
+        "meaning": "to drink",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "私は先生にいただいたお茶を{w}。",
+      "completedJapanese": "私は先生にいただいたお茶をいただく。",
+      "completedReading": "わたしはせんせいにいただいたおちゃをいただく。",
+      "conjugatedForm": {
+        "surface": "いただく",
+        "kana": "いただく"
+      },
+      "english": "I drink the tea I received from the teacher.",
+      "segments": [
+        {
+          "r": "わたし",
+          "t": "私"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "せんせい",
+          "t": "先生"
+        },
+        {
+          "r": "",
+          "t": "に"
+        },
+        {
+          "r": "",
+          "t": "いただい"
+        },
+        {
+          "r": "",
+          "t": "た"
+        },
+        {
+          "r": "おちゃ",
+          "t": "お茶"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "86e7d8f6bcd3e6b8e1cc4012185da103e84730ae8975d343a908d17b376e9b61",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "drink water",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "水を",
+        "action": "drink water",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "drink water"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "edit",
+        "independentTranslation": "I drink the tea that I received from the teacher.",
+        "rolesAndGrammar": "私は is the drinker; 先生にいただいた modifies お茶 and names its respected giver. The final いただく means humbly consume, not receive a second unspecified gift.",
+        "readingCheck": "いただいた and いただく are kana; お茶 is おちゃ. The completed reading resolves both clauses correctly.",
+        "senseCheck": "The actual pair is about tea, but corpusReview.sense is drink water, inherited from the generic 飲む profile. Tea and water are different explicit objects.",
+        "registerCheck": "Both いただく uses lower the speaker relative to the teacher; repetition is grammatical though stylistically heavy.",
+        "reason": "The Japanese/English pair is faithful. The definite object in the review-bound sense is wrong for this frame and should not be used as evidence that the actual tea context was reviewed.",
+        "recommendedChange": "Give this humble frame an explicit sense such as drink tea received from the teacher, independently review it, and rebuild the content-bound hash. The Japanese/English pair can remain; broader keigo context changes need frame-specific sense metadata too."
+      }
+    },
+    {
+      "sampleId": "editorial-22",
+      "type": "honorific",
+      "key": "ichidan:食べる",
+      "coverage": [
+        "honorific",
+        "irregular-keigo",
+        "respected-actor",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/honorific.json",
+        "rowIndex": 11,
+        "rowSha256": "e91a682799d387a188b7a8a786be63c06e6d450b6b785dcdbb0eb691b9849a9d",
+        "chunkRevision": "d5e0491f7f6c129c6ee9f55b0d23d5b7683379c0d1ab22b1edb0e4d288be4c0b",
+        "contentReviewHash": "4e039407b833c4ba7929c873887fcd91a3fda94efc3fc09939e270a0d45472b0"
+      },
+      "word": {
+        "dict": "食べる",
+        "reading": "たべる",
+        "group": "ichidan",
+        "meaning": "to eat",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "先生は昼食を{w}。",
+      "completedJapanese": "先生は昼食をめしあがる。",
+      "completedReading": "せんせいはちゅうしょくをめしあがる。",
+      "conjugatedForm": {
+        "surface": "めしあがる",
+        "kana": "めしあがる"
+      },
+      "english": "The teacher eats lunch.",
+      "segments": [
+        {
+          "r": "せんせい",
+          "t": "先生"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "r": "ちゅうしょく",
+          "t": "昼食"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "4e039407b833c4ba7929c873887fcd91a3fda94efc3fc09939e270a0d45472b0",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "eat lunch",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "verb",
+        "ja": "昼食を",
+        "action": "eat lunch",
+        "flags": "atp",
+        "subjectJa": "私は",
+        "subjectEn": "I",
+        "aspect": "ongoing",
+        "sense": "eat lunch"
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "The teacher eats lunch.",
+        "rolesAndGrammar": "先生は is the eater; 昼食を is the object. めしあがる is the honorific equivalent of 食べる.",
+        "readingCheck": "めしあがる is めしあがる; 昼食 is ちゅうしょく. Kana-only めしあがる does not change the reading of 召し上がる.",
+        "senseCheck": "Eating, not drinking, is selected by the explicit lunch object.",
+        "registerCheck": "Honorific raises the teacher; plain predicate is still possible honorific speech. English does not encode Japanese deference morphologically.",
+        "reason": "The social actor, lunch object and selected honorific lexical form agree."
+      }
+    },
+    {
+      "sampleId": "editorial-23",
+      "type": "adj-plain-past",
+      "key": "i-adjective:いい",
+      "coverage": [
+        "i-adjective",
+        "ii-exception",
+        "past",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/adj-plain-past.json",
+        "rowIndex": 0,
+        "rowSha256": "22ebac0115eeb0b65c0452f3b125ff5aedc2aee03ecd5a09e9364e768fecdefa",
+        "chunkRevision": "c8674fc4acebf64a3c252354dae940d0118c1fa927001bac6b125de46077551d",
+        "contentReviewHash": "b375ec3467cd7f32cdf628b0854656469ca0050b515017273834fe4f7da1c36d"
+      },
+      "word": {
+        "dict": "いい",
+        "reading": "いい",
+        "group": "i-adjective",
+        "meaning": "good",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "この本は{w}。",
+      "completedJapanese": "この本はよかった。",
+      "completedReading": "このほんはよかった。",
+      "conjugatedForm": {
+        "surface": "よかった",
+        "kana": "よかった"
+      },
+      "english": "This book was good.",
+      "segments": [
+        {
+          "r": "",
+          "t": "この"
+        },
+        {
+          "r": "ほん",
+          "t": "本"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "b375ec3467cd7f32cdf628b0854656469ca0050b515017273834fe4f7da1c36d",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "good",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "adjective",
+        "subjectJa": "この本",
+        "subjectEn": "this book",
+        "adjective": "good",
+        "sense": "good",
+        "exclude": []
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "This book was good.",
+        "rolesAndGrammar": "この本は is the evaluated object/topic; よかった is affirmative past of いい.",
+        "readingCheck": "よかった uses the irregular よい stem, not いかった; 本 is ほん.",
+        "senseCheck": "Good evaluates the book, compatible with いい.",
+        "registerCheck": "Plain past evaluation; neutral English.",
+        "reason": "The exception, past state and demonstrative object match exactly."
+      }
+    },
+    {
+      "sampleId": "editorial-24",
+      "type": "adj-polite-negative",
+      "key": "na-adjective:静か",
+      "coverage": [
+        "na-adjective",
+        "nonpast",
+        "negative",
+        "polite"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/adj-polite-negative.json",
+        "rowIndex": 173,
+        "rowSha256": "1bba19c1a9c88b42dbf181ba58068058b4097130def0fe2f9d3f808344da07f8",
+        "chunkRevision": "c3e2a32b364149a2a6f443f79751057b53f942a1dcc0bb8647d6a6bad242f975",
+        "contentReviewHash": "4218a9ac0c914253f7493e25bab782a5edc8084b0e4dc0b9c9f24015c09aa453"
+      },
+      "word": {
+        "dict": "静か",
+        "reading": "しずか",
+        "group": "na-adjective",
+        "meaning": "quiet, calm",
+        "exerciseMeaning": "quiet",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "この部屋は{w}。",
+      "completedJapanese": "この部屋は静かではありません。",
+      "completedReading": "このへやはしずかではありません。",
+      "conjugatedForm": {
+        "surface": "静かではありません",
+        "kana": "しずかではありません"
+      },
+      "english": "This room is not quiet.",
+      "segments": [
+        {
+          "r": "",
+          "t": "この"
+        },
+        {
+          "r": "へや",
+          "t": "部屋"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "4218a9ac0c914253f7493e25bab782a5edc8084b0e4dc0b9c9f24015c09aa453",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "quiet",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "adjective",
+        "subjectJa": "この部屋",
+        "subjectEn": "this room",
+        "adjective": "quiet",
+        "sense": "quiet",
+        "exclude": []
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "This room is not quiet.",
+        "rolesAndGrammar": "この部屋は is the topic. 静かではありません is a na-adjective nonpast negative predicate.",
+        "readingCheck": "静か is しずか; 部屋 is へや; ではありません is the polite negative copula.",
+        "senseCheck": "The acoustic quiet sense fits a room and the curated exercise meaning.",
+        "registerCheck": "Polite negative predicate; neutral English without a changed viewpoint.",
+        "reason": "The correct na-adjective negative, room topic and quiet sense agree."
+      }
+    },
+    {
+      "sampleId": "editorial-25",
+      "type": "adj-plain-past-negative",
+      "key": "i-adjective:暑い",
+      "coverage": [
+        "i-adjective",
+        "weather-sense",
+        "past",
+        "negative"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/adj-plain-past-negative.json",
+        "rowIndex": 50,
+        "rowSha256": "ef714a36e0a480add6fa03698f44a5227d48c4903edaf730c6abb77c00ba29ef",
+        "chunkRevision": "38c85d78bccef89adb8edb5a571bdf254a41b6e91b31dd48d8ba68bdb346c3d3",
+        "contentReviewHash": "0baa1573bbc99c2584e90549b4e15ce7bf74cc5a2abe41e29538d7702f13d003"
+      },
+      "word": {
+        "dict": "暑い",
+        "reading": "あつい",
+        "group": "i-adjective",
+        "meaning": "hot (in reference to weather), warm",
+        "exerciseMeaning": "hot weather",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "今日は{w}。",
+      "completedJapanese": "今日は暑くなかった。",
+      "completedReading": "きょうはあつくなかった。",
+      "conjugatedForm": {
+        "surface": "暑くなかった",
+        "kana": "あつくなかった"
+      },
+      "english": "Today was not hot.",
+      "segments": [
+        {
+          "r": "きょう",
+          "t": "今日"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "0baa1573bbc99c2584e90549b4e15ce7bf74cc5a2abe41e29538d7702f13d003",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "hot",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "adjective",
+        "subjectJa": "今日",
+        "subjectEn": "today",
+        "adjective": "hot",
+        "sense": "hot",
+        "exclude": [
+          "adj-naru"
+        ]
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "It was not hot today.",
+        "rolesAndGrammar": "今日は is the time/topic; 暑くなかった negates a past weather condition.",
+        "readingCheck": "今日 is きょう; 暑くなかった is あつくなかった with the i-adjective negative-past ending.",
+        "senseCheck": "暑い is weather/air heat, not a hot drink or object surface.",
+        "registerCheck": "Plain negative-past weather description; neutral English.",
+        "reason": "The English today was not hot preserves the weather sense and past negation; today need not be over for a past evaluation."
+      }
+    },
+    {
+      "sampleId": "editorial-26",
+      "type": "adj-sou",
+      "key": "na-adjective:元気",
+      "coverage": [
+        "na-adjective",
+        "appearance",
+        "energetic-sense",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/adj-sou.json",
+        "rowIndex": 106,
+        "rowSha256": "4fff5c22632b101eef8db29e77bad9fb317f2610ba3fd4944793fdd0aa7f595c",
+        "chunkRevision": "23ab4261d568f9866fbd33efb401840d53715920dfb95f39ceb5bb2e85ff4ba7",
+        "contentReviewHash": "fc4348d6bda446745899e3d33d3b60d718fc62953bd27413e07cfafbe917eccd"
+      },
+      "word": {
+        "dict": "元気",
+        "reading": "げんき",
+        "group": "na-adjective",
+        "meaning": "health(y), energetic",
+        "exerciseMeaning": "healthy / energetic",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "この子は{w}だ。",
+      "completedJapanese": "この子は元気そうだ。",
+      "completedReading": "このこはげんきそうだ。",
+      "conjugatedForm": {
+        "surface": "元気そう",
+        "kana": "げんきそう"
+      },
+      "english": "This child looks energetic.",
+      "segments": [
+        {
+          "r": "",
+          "t": "この"
+        },
+        {
+          "r": "こ",
+          "t": "子"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "だ"
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "fc4348d6bda446745899e3d33d3b60d718fc62953bd27413e07cfafbe917eccd",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "energetic",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "adjective",
+        "subjectJa": "この子",
+        "subjectEn": "this child",
+        "adjective": "energetic",
+        "sense": "energetic",
+        "exclude": []
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "This child seems energetic.",
+        "rolesAndGrammar": "この子は is the observed child; 元気そうだ describes an appearance, not a certainty about health.",
+        "readingCheck": "この子 is このこ; 元気そうだ is げんきそうだ.",
+        "senseCheck": "Energetic is an available 元気 sense for a child; the frame does not require an inanimate object or subjective hearsay.",
+        "registerCheck": "Plain appearance predicate; neutral English looks expresses the same evidential status.",
+        "reason": "The subject, energetic sense and visual impression align; the English does not overclaim the child definitely is healthy."
+      }
+    },
+    {
+      "sampleId": "editorial-27",
+      "type": "adj-conditional",
+      "key": "i-adjective:高い",
+      "coverage": [
+        "i-adjective",
+        "conditional",
+        "height-sense",
+        "plain"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/adj-conditional.json",
+        "rowIndex": 93,
+        "rowSha256": "06d9655e10370108b97882b7211f18e69653fe4e1cb82d8d5154a5ac585eab4f",
+        "chunkRevision": "671c35b14aee54181111d4a0939a1edca32274d853c5fdc68c2dc83057f9cda3",
+        "contentReviewHash": "a16fb2e211c452c07a6f2ffec9373930a396363e99b5af5fe599d30bdb206dc9"
+      },
+      "word": {
+        "dict": "高い",
+        "reading": "たかい",
+        "group": "i-adjective",
+        "meaning": "tall, high; expensive",
+        "exerciseMeaning": "tall / expensive",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "もしこの建物が{w}、先生に伝える。",
+      "completedJapanese": "もしこの建物が高ければ、先生に伝える。",
+      "completedReading": "もしこのたてものがたかければ、せんせいにつたえる。",
+      "conjugatedForm": {
+        "surface": "高ければ",
+        "kana": "たかければ"
+      },
+      "english": "If this building is tall, I will tell the teacher.",
+      "segments": [
+        {
+          "r": "",
+          "t": "もし"
+        },
+        {
+          "r": "",
+          "t": "この"
+        },
+        {
+          "r": "たてもの",
+          "t": "建物"
+        },
+        {
+          "r": "",
+          "t": "が"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "、"
+        },
+        {
+          "r": "せんせい",
+          "t": "先生"
+        },
+        {
+          "r": "",
+          "t": "に"
+        },
+        {
+          "r": "つたえる",
+          "t": "伝える"
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "a16fb2e211c452c07a6f2ffec9373930a396363e99b5af5fe599d30bdb206dc9",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "tall",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "adjective",
+        "subjectJa": "この建物",
+        "subjectEn": "this building",
+        "adjective": "tall",
+        "sense": "tall",
+        "exclude": []
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "If this building is tall, I will tell the teacher.",
+        "rolesAndGrammar": "この建物が is the conditional subject; 高ければ is the height condition. The speaker is the conventional omitted agent of 先生に伝える, with the teacher as recipient.",
+        "readingCheck": "建物 is たてもの; 高ければ is たかければ; 伝える is つたえる.",
+        "senseCheck": "High/tall is selected by 建物 rather than expensive, one of 高い alternate senses.",
+        "registerCheck": "Plain conditional and report predicate; English future report is compatible with the hypothetical condition.",
+        "reason": "The intended height sense, condition and teacher recipient agree. The missing report object naturally refers to the preceding condition in this conditional construction."
+      }
+    },
+    {
+      "sampleId": "editorial-28",
+      "type": "adj-negative-te-form",
+      "key": "i-adjective:新しい",
+      "coverage": [
+        "i-adjective",
+        "negative",
+        "cause",
+        "subject-shift"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/adj-negative-te-form.json",
+        "rowIndex": 45,
+        "rowSha256": "043e56100950479a843b88422a22e35c4b22dcda17ed93d1588f4c90ed6d25b5",
+        "chunkRevision": "bd9e891b2e7a6ad3ece113cb710bf91325533506f1026018b4db5a1c1743996d",
+        "contentReviewHash": "26ba21fea44dfb1b515c0007090e78ac49b7e65b10af685f6361de4defd13f3b"
+      },
+      "word": {
+        "dict": "新しい",
+        "reading": "あたらしい",
+        "group": "i-adjective",
+        "meaning": "new",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "この本は{w}、先生に伝える。",
+      "completedJapanese": "この本は新しくなくて、先生に伝える。",
+      "completedReading": "このほんはあたらしくなくて、せんせいにつたえる。",
+      "conjugatedForm": {
+        "surface": "新しくなくて",
+        "kana": "あたらしくなくて"
+      },
+      "english": "This book is not new, so I will tell the teacher.",
+      "segments": [
+        {
+          "r": "",
+          "t": "この"
+        },
+        {
+          "r": "ほん",
+          "t": "本"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "、"
+        },
+        {
+          "r": "せんせい",
+          "t": "先生"
+        },
+        {
+          "r": "",
+          "t": "に"
+        },
+        {
+          "r": "つたえる",
+          "t": "伝える"
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "26ba21fea44dfb1b515c0007090e78ac49b7e65b10af685f6361de4defd13f3b",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "new",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "adjective",
+        "subjectJa": "この本",
+        "subjectEn": "this book",
+        "adjective": "new",
+        "sense": "new",
+        "exclude": []
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "edit",
+        "independentTranslation": "This book is not new, and I tell the teacher about it.",
+        "rolesAndGrammar": "この本は is the first-clause topic; 新しくなくて links a negative state to 先生に伝える. The second clause needs a human reporting agent and an omitted object; neither is named.",
+        "readingCheck": "新しくなくて is あたらしくなくて; 本 is ほん; 伝える is つたえる.",
+        "senseCheck": "New is the appropriate book-age sense; the issue is the standalone report clause, not the adjective sense.",
+        "registerCheck": "Plain adjective connective and plain report predicate; English introduces the intended I and a causal so relation.",
+        "reason": "The intended meaning can be recovered, but the abrupt book-topic to unnamed speaker transition and vague report content make this a weak standalone learning example. This is a naturalness/clarity edit, not a definite actor mistranslation.",
+        "recommendedChange": "Use an explicit, meaningful linked clause such as この本は{w}、私は困っている。 / This book is not new, so I am having trouble. Review the positive adjective te-linking frame too; do not merely infer actor/cause correctness from a valid hash."
+      }
+    },
+    {
+      "sampleId": "editorial-29",
+      "type": "adj-adverb",
+      "key": "i-adjective:長い",
+      "coverage": [
+        "i-adjective",
+        "resultative-adverb",
+        "length-sense"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/adj-adverb.json",
+        "rowIndex": 16,
+        "rowSha256": "d9133e1ebbe09dc4f0ce52fd2fd5f95d2ac438e3223dc4a035ce14c482ac9df6",
+        "chunkRevision": "e54dfa9701b003dd509a766420c3d558af482c99ae4c737c3dbdfc59f0443938",
+        "contentReviewHash": "84608f031c17fd8ee0cc8e3b477587e25acb69bb779ecd10670f3fa0708a339f"
+      },
+      "word": {
+        "dict": "長い",
+        "reading": "ながい",
+        "group": "i-adjective",
+        "meaning": "long, lengthy",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "ロープを{w}切る。",
+      "completedJapanese": "ロープを長く切る。",
+      "completedReading": "ロープをながくきる。",
+      "conjugatedForm": {
+        "surface": "長く",
+        "kana": "ながく"
+      },
+      "english": "I cut the rope into a long piece.",
+      "segments": [
+        {
+          "r": "",
+          "t": "ロープ"
+        },
+        {
+          "r": "",
+          "t": "を"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "きる",
+          "t": "切る"
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "84608f031c17fd8ee0cc8e3b477587e25acb69bb779ecd10670f3fa0708a339f",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "long",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "adjective",
+        "subjectJa": "このロープ",
+        "subjectEn": "this rope",
+        "adjective": "long",
+        "sense": "long",
+        "exclude": []
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I cut the rope into a long piece.",
+        "rolesAndGrammar": "The speaker is implicit; ロープを is the cutting object. 長く modifies the resulting length of the cut piece rather than the duration of cutting.",
+        "readingCheck": "長く is ながく; 切る is きる; ロープ retains its katakana long vowel.",
+        "senseCheck": "Long is length here. The resultative adverbial use is compatible with 長い and the cutting context.",
+        "registerCheck": "Plain nonpast action; neutral English with a conventional omitted speaker.",
+        "reason": "The English into a long piece resolves the plausible resulting-length reading and keeps the same rope object."
+      }
+    },
+    {
+      "sampleId": "editorial-30",
+      "type": "adj-attributive",
+      "key": "na-adjective:きれい",
+      "coverage": [
+        "na-adjective",
+        "attributive",
+        "clean-sense"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/adj-attributive.json",
+        "rowIndex": 83,
+        "rowSha256": "36cd3282519667e09a2030b6b4302ee74def135f85b14ab4a10f02f09d031e75",
+        "chunkRevision": "3118775b3bfc7281c00087a715587435dfd872b0c59a659d693ba1afece36378",
+        "contentReviewHash": "d81c92404104f6487437206ffaf54370f09b7c35a26f3e69a93ea2a4feb6928f"
+      },
+      "word": {
+        "dict": "きれい",
+        "reading": "きれい",
+        "group": "na-adjective",
+        "meaning": "Beautiful, Clean",
+        "exerciseMeaning": "pretty / clean",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "この{w}部屋について話した。",
+      "completedJapanese": "このきれいな部屋について話した。",
+      "completedReading": "このきれいなへやについてはなした。",
+      "conjugatedForm": {
+        "surface": "きれいな",
+        "kana": "きれいな"
+      },
+      "english": "I talked about this clean room.",
+      "segments": [
+        {
+          "r": "",
+          "t": "この"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "へや",
+          "t": "部屋"
+        },
+        {
+          "r": "",
+          "t": "について"
+        },
+        {
+          "r": "はなし",
+          "t": "話し"
+        },
+        {
+          "r": "",
+          "t": "た"
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "d81c92404104f6487437206ffaf54370f09b7c35a26f3e69a93ea2a4feb6928f",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "clean",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "adjective",
+        "subjectJa": "この部屋",
+        "subjectEn": "this room",
+        "adjective": "clean",
+        "sense": "clean",
+        "exclude": []
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "I spoke about this clean room.",
+        "rolesAndGrammar": "このきれいな部屋 is the topic/object of について話した. きれいな is the na-adjective attributive form, and the whole sentence is past.",
+        "readingCheck": "部屋 is へや; 話した is はなした; きれいな remains kana.",
+        "senseCheck": "Clean is selected by the room context and profile; beautiful would also be lexically possible, but is not forced.",
+        "registerCheck": "Plain past narration; neutral English.",
+        "reason": "The adjective modifies the room with な, and the English retains the this room referent and past discussion."
+      }
+    },
+    {
+      "sampleId": "editorial-31",
+      "type": "adj-naru",
+      "key": "i-adjective:早い",
+      "coverage": [
+        "i-adjective",
+        "change-of-state",
+        "early-sense"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/adj-naru.json",
+        "rowIndex": 43,
+        "rowSha256": "a30e9be254256817bfbae3ad9f59b9520abd648cb7c98083b3bf0cebe9468698",
+        "chunkRevision": "c9511cb531d6064b06367cda7c1a8ddf2d7a2f7a246063169a7f62bb33a76e5d",
+        "contentReviewHash": "886e5d5425ce3ae05cfea4c374ea184988661233ab393c968b6e5e2fc04cac7c"
+      },
+      "word": {
+        "dict": "早い",
+        "reading": "はやい",
+        "group": "i-adjective",
+        "meaning": "early",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "出発が{w}。",
+      "completedJapanese": "出発が早くなる。",
+      "completedReading": "しゅっぱつがはやくなる。",
+      "conjugatedForm": {
+        "surface": "早くなる",
+        "kana": "はやくなる"
+      },
+      "english": "The departure becomes earlier.",
+      "segments": [
+        {
+          "r": "しゅっぱつ",
+          "t": "出発"
+        },
+        {
+          "r": "",
+          "t": "が"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "886e5d5425ce3ae05cfea4c374ea184988661233ab393c968b6e5e2fc04cac7c",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "early",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "adjective",
+        "subjectJa": "出発",
+        "subjectEn": "the departure",
+        "adjective": "early",
+        "sense": "early",
+        "exclude": []
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "The departure time becomes earlier.",
+        "rolesAndGrammar": "出発が is what changes; 早くなる expresses becoming earlier, not moving faster.",
+        "readingCheck": "出発 is しゅっぱつ; 早くなる is はやくなる.",
+        "senseCheck": "Early is temporal, consistent with 早い; it is not the speed sense 速い.",
+        "registerCheck": "Plain nonpast change; neutral English.",
+        "reason": "The temporal comparison follows from なる with early and matches the English earlier; adding time in the independent translation explains the natural interpretation."
+      }
+    },
+    {
+      "sampleId": "editorial-32",
+      "type": "adj-sugiru",
+      "key": "i-adjective:多い",
+      "coverage": [
+        "i-adjective",
+        "excess",
+        "plural-subject"
+      ],
+      "source": {
+        "path": "public/data/sentences/by-type/adj-sugiru.json",
+        "rowIndex": 27,
+        "rowSha256": "fb1f2a3f78eec574792fb0a2764727356f5e40561a1de950540372419e74c6b3",
+        "chunkRevision": "642c8e61a9704e1ad6498c4187b8b14baa59dc90054f541e3cf8e3113eee848a",
+        "contentReviewHash": "ce96e435081c015919744dfeeb1734257a6cd952e43f1d23eb4bd03980a3e509"
+      },
+      "word": {
+        "dict": "多い",
+        "reading": "おおい",
+        "group": "i-adjective",
+        "meaning": "many; there are a lot",
+        "exerciseMeaning": "",
+        "jlpt": "N5"
+      },
+      "jaTemplate": "ここの人は{w}。",
+      "completedJapanese": "ここの人は多すぎる。",
+      "completedReading": "ここのひとはおおすぎる。",
+      "conjugatedForm": {
+        "surface": "多すぎる",
+        "kana": "おおすぎる"
+      },
+      "english": "The people here are too numerous.",
+      "segments": [
+        {
+          "r": "",
+          "t": "ここ"
+        },
+        {
+          "r": "",
+          "t": "の"
+        },
+        {
+          "r": "ひと",
+          "t": "人"
+        },
+        {
+          "r": "",
+          "t": "は"
+        },
+        {
+          "w": true
+        },
+        {
+          "r": "",
+          "t": "。"
+        }
+      ],
+      "corpusReview": {
+        "hash": "ce96e435081c015919744dfeeb1734257a6cd952e43f1d23eb4bd03980a3e509",
+        "basis": "explicit-bilingual-profile-and-compatible-frame",
+        "sense": "numerous",
+        "status": "accepted",
+        "version": 1
+      },
+      "authoredProfile": {
+        "kind": "adjective",
+        "subjectJa": "ここの人",
+        "subjectEn": "the people here",
+        "adjective": "numerous",
+        "sense": "numerous",
+        "exclude": [
+          "adj-attributive",
+          "adj-sou",
+          "adj-naru"
+        ]
+      },
+      "compositionVersions": {
+        "profile": "2026-10-07.1",
+        "frame": "2026-10-07.1"
+      },
+      "editorial": {
+        "decision": "accept",
+        "independentTranslation": "There are too many people here.",
+        "rolesAndGrammar": "ここの人は supplies the group/topic; 多すぎる describes excessive number. No actor or action is introduced.",
+        "readingCheck": "人 is ひと in this phrase; 多すぎる is おおすぎる.",
+        "senseCheck": "Many/numerous is the correct quantity sense, applied to people.",
+        "registerCheck": "Plain excessive-state description; neutral English.",
+        "reason": "The corpus English too numerous matches Japanese excessive count and correctly treats people as plural. The independent translation is more idiomatic English, but the recorded pair is faithful."
+      }
+    }
+  ]
+}
