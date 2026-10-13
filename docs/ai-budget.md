@@ -34,6 +34,11 @@ errors and timeouts can still be billed. The cap can therefore stop requests
 before actual billed usage reaches $5. Each retry reserves separately.
 
 Denied admission returns 429 with a burst/daily explanation and Retry-After.
+The proxy exposes that header to browser CORS requests and repeats the delay and
+stable quota reason in its JSON error. Clients wait at least the short burst
+delay; daily exhaustion returns immediately without automatic retries. Cancelling
+coaching aborts transport and retry backoff. Invalid or incomplete successful
+provider replies fail with recovery guidance instead of becoming empty coaching.
 Database failures return a safe 503. Client ledger rows expire after seven days;
 global totals expire after 30 days. Expiry never resets an active daily quota.
 

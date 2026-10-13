@@ -42,8 +42,39 @@ export const AI_GUIDE_TONES = [
 ];
 
 export function geminiText(d) {
-  const parts = d.candidates?.[0]?.content?.parts || [];
-  return (parts.find((p) => !p.thought) || parts[0])?.text || '';
+  if (d?.promptFeedback?.blockReason)
+    throw responseError('Gemini could not answer this question. Try rephrasing it.');
+  const candidate = Array.isArray(d?.candidates) ? d.candidates[0] : null;
+  if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
+    throw responseError(
+      candidate.finishReason === 'MAX_TOKENS'
+        ? 'Gemini’s reply was incomplete. Ask a shorter or more focused question.'
+        : 'Gemini could not complete this reply. Try rephrasing your question.',
+    );
+  }
+  const parts = candidate?.content?.parts;
+  if (
+    !Array.isArray(parts) ||
+    parts.some(
+      (part) =>
+        !part ||
+        typeof part !== 'object' ||
+        (part.thought !== undefined && typeof part.thought !== 'boolean') ||
+        (!part.thought && typeof part.text !== 'string'),
+    )
+  )
+    throw responseError('Gemini returned an unsupported reply. Try asking again.');
+  const text = parts
+    .filter((part) => !part.thought)
+    .map((part) => part.text)
+    .join('');
+  if (!text.trim())
+    throw responseError('Gemini returned no readable reply. Try rephrasing your question.');
+  return text;
+}
+
+function responseError(message) {
+  return Object.assign(new Error(message), { retryable: false });
 }
 
 export function normalizeGroup(g) {
@@ -123,14 +154,36 @@ async function withGeminiDeadline(run, callerSignal) {
 
 // Build an Error that carries the HTTP status so retry logic can tell a
 // transient 429/5xx from a permanent 4xx.
-function httpError(message, status) {
-  return Object.assign(new Error(message || `HTTP ${status}`), { status });
+function httpError(message, status, retryAfter, quotaReason) {
+  let retryAfterMs = 0;
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    retryAfterMs = Number.isFinite(seconds)
+      ? Math.max(0, seconds * 1000)
+      : Math.max(0, Date.parse(retryAfter) - Date.now()) || 0;
+  }
+  return Object.assign(new Error(message || `HTTP ${status}`), {
+    status,
+    retryAfterMs,
+    // Daily quota denials cannot recover during this interaction. The server
+    // supplies their reset delay and learner-facing explanation.
+    ...(status === 429 &&
+    (['ip_daily', 'global_daily'].includes(quotaReason) || retryAfterMs > 8000)
+      ? { retryable: false }
+      : {}),
+  });
 }
 
 async function readJsonResponse(response) {
   try {
     return await response.json();
-  } catch {
+  } catch (error) {
+    if (response.ok) {
+      if (error instanceof SyntaxError)
+        throw responseError('Gemini returned an unreadable reply. Try asking again.');
+      // Body streams can fail after HTTP 200. Preserve transport/abort errors.
+      throw error;
+    }
     return {};
   }
 }
@@ -168,7 +221,14 @@ async function executeGeminiProxyRequest(payload, signal) {
     });
     const d = await readJsonResponse(r);
     signal.throwIfAborted();
-    if (!r.ok) throw httpError(d.error, r.status);
+    if (!r.ok)
+      throw httpError(
+        d?.error,
+        r.status,
+        r.headers?.get?.('Retry-After') ||
+          (Number.isInteger(d?.retryAfterSeconds) ? String(d.retryAfterSeconds) : ''),
+        d?.quotaReason,
+      );
     return d;
   }, signal);
 }

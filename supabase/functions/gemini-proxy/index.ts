@@ -74,6 +74,7 @@ function corsHeaders(req: Request) {
   const headers: Record<string, string> = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Expose-Headers': 'Retry-After',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
@@ -185,9 +186,18 @@ async function reservePaidRequest(
       : decision.reason === 'ip_daily'
         ? 'This network has reached its daily AI allowance. Please try again tomorrow.'
         : 'Too many AI requests in a short time. Please wait a moment and try again.';
-  return jsonResponse(req, { error: message }, 429, {
-    'Retry-After': String(decision.retry_after_seconds),
-  });
+  return jsonResponse(
+    req,
+    {
+      error: message,
+      quotaReason: decision.reason,
+      retryAfterSeconds: decision.retry_after_seconds,
+    },
+    429,
+    {
+      'Retry-After': String(decision.retry_after_seconds),
+    },
+  );
 }
 
 function clampNumber(value: unknown, fallback: number, min: number, max: number) {

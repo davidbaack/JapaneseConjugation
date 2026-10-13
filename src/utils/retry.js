@@ -34,6 +34,13 @@ function statusOf(error) {
   return m ? Number(m[1]) : 0;
 }
 
+/** @param {any} error */
+function retryAfterOf(error) {
+  return typeof error?.retryAfterMs === 'number' && Number.isFinite(error.retryAfterMs)
+    ? Math.max(0, error.retryAfterMs)
+    : 0;
+}
+
 // Heuristic: is this error worth retrying? Network blips, timeouts, rate limits
 // (429), and server errors (5xx) are transient; everything else (bad request,
 // auth, validation) is not and should fail immediately.
@@ -102,10 +109,14 @@ export async function retryWithBackoff(fn, options = {}) {
       signal?.throwIfAborted();
       attempt += 1;
       if (attempt > retries || !shouldRetry(error)) throw error;
+      const retryAfter = retryAfterOf(error);
+      if (retryAfter > maxDelay) throw error;
       let delay = Math.min(maxDelay, baseDelay * factor ** (attempt - 1));
       // Full jitter in the [50%, 100%] band so concurrent clients don't
       // synchronize their retries into a thundering herd.
       if (jitter) delay = Math.round(delay * (0.5 + Math.random() * 0.5));
+      // Retry-After is a lower bound; jitter must never retry admission early.
+      delay = Math.max(delay, retryAfter);
       if (onRetry) onRetry(error, attempt, delay);
       await sleep(delay, signal);
     }

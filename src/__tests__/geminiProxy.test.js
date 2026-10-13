@@ -168,6 +168,8 @@ describe('shared AI quota admission', () => {
       const response = await proxy(paid, quota)(request());
       expect(response.status).toBe(429);
       expect(response.headers.get('Retry-After')).toBe('60');
+      expect(response.headers.get('Access-Control-Expose-Headers')).toBe('Retry-After');
+      expect(await response.json()).toMatchObject({ quotaReason: reason, retryAfterSeconds: 60 });
       expect(paid).not.toHaveBeenCalled();
     },
   );
