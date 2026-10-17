@@ -441,10 +441,9 @@ function learnerCategoryInfo(item) {
     const attributive = categoryExampleForm(item, 'adj-attributive');
     return {
       label: 'な-adjective',
-      why: `${dict} is a な-adjective: the base stays the same, and the word after it (a copula like です / だ, or な before a noun) carries the grammar. It behaves more like a noun than like an い-adjective.`,
+      why: `${dict} uses the な-adjective pattern: its base stays the same, its noun-modifying form is ${attributive}, and a copula like です / だ carries the predicate grammar.`,
       checks: [
-        attributive &&
-          `Tell-tale sign: it does not end in a changing い. It takes な before a noun (${attributive} + noun) and です / だ to act as a predicate.`,
+        attributive && `It uses ${attributive} before a noun and です / だ to act as a predicate.`,
       ].filter(Boolean),
     };
   }
@@ -620,6 +619,12 @@ function ruleSummaryFor(item, type, parts, expected) {
   }
 
   if (item.group === 'godan') {
+    if (parts.change === 'い' && /(?:なさ|いらっしゃ|おっしゃ|くださ|ござ)る$/.test(item.reading))
+      return {
+        family: 'honorific stem exception',
+        short: `る -> い${parts.suffix ? ` + ${parts.suffix}` : ''}`,
+        detail: 'This honorific verb uses its special い-stem here.',
+      };
     const onbin = expectedOnbinRule(item, type, replacement);
     if (onbin && (type === 'te-form' || type === 'plain-past')) {
       return {
@@ -825,7 +830,7 @@ function buildGodanSoundChangeVisual(item, type, parts, expected) {
     const representative = cluster.endings[0];
     return {
       label: cluster.label,
-      kana: active && isIkuException ? replacement : targetMap[representative] || '',
+      kana: active ? replacement : targetMap[representative] || '',
       active,
     };
   }).filter((row) => row.kana);
@@ -1105,6 +1110,13 @@ export function explainConjugation(verb, type) {
   const stem = reading.slice(0, -1),
     last = reading.slice(-1);
   const intro = `${dict} (${reading}) is ${GROUP_NAMES[group]}.`;
+  if (!result)
+    return {
+      intro,
+      rule: 'This form is unavailable in the standard practice lane.',
+      derivation: '',
+      note: '',
+    };
   let rule = '',
     derivation = result,
     note = '';
@@ -1186,6 +1198,18 @@ export function explainConjugation(verb, type) {
       derivation = `Use regular causative-passive: ${conjugate(verb, 'causative-passive')}`;
       note = 'For forms like 話す, keep させられる instead of shortening.';
     }
+    if (
+      ['とう', 'こう'].includes(reading) &&
+      ['te-form', 'plain-past', 'conditional-tara'].includes(type)
+    ) {
+      rule = '問う and 請う/乞う retain う in their て / た forms.';
+      derivation = `${reading} + ${type === 'te-form' ? 'て' : type === 'plain-past' ? 'た' : 'たら'} = ${result}`;
+    }
+    if (/(?:なさ|いらっしゃ|おっしゃ|くださ|ござ)る$/.test(reading) && type.startsWith('polite-')) {
+      const politeStem = conjugate(verb, 'masu-stem');
+      rule = 'Use the special honorific い-stem before the polite ending.';
+      derivation = `${politeStem} + ${result.slice(politeStem.length)} = ${result}`;
+    }
   } else if (group === 'suru') {
     const compound = reading.endsWith('する') && reading !== 'する' ? reading.slice(0, -2) : '';
     const M = {
@@ -1228,7 +1252,6 @@ export function explainConjugation(verb, type) {
       imperative: '来る → 来い (こい). く→こ.',
       passive: '来る → 来られる. く→こ.',
       causative: '来る → 来させる. く→こ.',
-      'short-causative-passive': 'Short spoken form: 来さされる (こさされる).',
     };
     rule = `${dict} is irregular: く shifts to き (polite/past/te) or こ (negative/potential/volitional).`;
     note = M[type] || '';
@@ -1240,6 +1263,13 @@ export function explainAdjective(adj, type) {
   const result = conjugateAdjective(adj, type);
   const stem = adjectiveStem(adj);
   const intro = `${adj.dict} (${adj.reading}) is ${GROUP_NAMES[adj.group]}.`;
+  if (!result)
+    return {
+      intro,
+      rule: 'This form is unavailable in the standard practice lane.',
+      derivation: '',
+      note: adj.reading === 'かわいい' ? 'かわいそう means pitiable, not looks cute.' : '',
+    };
   let rule = '',
     derivation = result,
     note = '';
@@ -1280,8 +1310,14 @@ export function explainAdjective(adj, type) {
       ],
       'adj-tara': ['Plain past + ら.', `${stem} + かった + ら = ${result}`],
       'adj-negative-tara': ['Plain past negative + ら.', `${stem} + くなかった + ら = ${result}`],
-      'adj-sou': ['Drop い, add そう.', `${stem} + そう = ${result}`],
-      'adj-sugiru': ['Drop い, add すぎる.', `${stem} + すぎる = ${result}`],
+      'adj-sou': [
+        `Drop い, add ${result.endsWith('さそう') ? 'さそう' : 'そう'}.`,
+        `${stem} + ${result.endsWith('さそう') ? 'さそう' : 'そう'} = ${result}`,
+      ],
+      'adj-sugiru': [
+        `Drop い, add ${adj.reading === 'ない' ? 'さすぎる' : 'すぎる'}.`,
+        `${stem} + ${adj.reading === 'ない' ? 'さすぎる' : 'すぎる'} = ${result}`,
+      ],
       'adj-naru': ['Drop い, add くなる.', `${stem} + くなる = ${result}`],
     };
     [rule, derivation] = M[type] || ['', result];
@@ -1306,7 +1342,13 @@ export function explainAdjective(adj, type) {
         `${s} + ではなくて = ${result}`,
       ],
       'adj-adverb': ['Add に for the adverbial form.', `${s} + に = ${result}`],
-      'adj-attributive': ['Add な before a noun.', `${s} + な = ${result}`],
+      'adj-attributive':
+        result === s
+          ? ['Use the base directly before a noun.', result]
+          : [
+              `Add ${result.slice(s.length)} before a noun.`,
+              `${s} + ${result.slice(s.length)} = ${result}`,
+            ],
       'adj-conditional': ['Use なら for the common conditional.', `${s} + なら = ${result}`],
       'adj-negative-conditional': [
         'Make the plain negative, then replace ない with なければ.',

@@ -1,23 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_CARD_TYPES } from '../data/conjugationTypes.js';
 import { loadSentenceWordMap } from '../../scripts/sentenceEnglish.js';
-import { sentenceWordReview } from '../data/reviewedSentenceProfiles.js';
+import {
+  reviewedSentenceRestriction,
+  sentenceWordReview,
+} from '../data/reviewedSentenceProfiles.js';
 import { buildReviewedSentence } from '../utils/reviewedSentenceFrames.js';
 
 const words = loadSentenceWordMap();
 const word = (key) => words.get(key);
+const pendingRepairedIdentities = new Map([
+  ['godan:いただく', 'いただく'],
+  ['i-adjective:うれしい', 'うれしい'],
+  ['na-adjective:いっぱい', 'いっぱい'],
+  ['suru:あいさつする', 'あいさつする'],
+  ['godan:終わる', 'おわる'],
+  ['godan:曲がる', 'まがる'],
+  ['ichidan:落ちる', 'おちる'],
+  ['godan:落とす', 'おとす'],
+  ['godan:楽しむ', 'たのしむ'],
+]);
 const filled = (key, type) => {
   const sentence = buildReviewedSentence(word(key), type);
   return sentence && { ja: sentence.jaTemplate.replace('{w}', sentence.surface), en: sentence.en };
 };
 
 describe('explicit reviewed sentence content', () => {
-  it('classifies every beginner entry and keeps real coverage in every form', () => {
+  it('classifies beginner entries or explicitly awaits review of repaired identities', () => {
     const counts = new Map();
     let supported = 0;
     for (const item of words.values()) {
       const review = sentenceWordReview(item);
-      if (['N5', 'N4'].includes(item.jlpt)) expect(review.status).not.toBe('needs-review');
+      if (pendingRepairedIdentities.get(review.key) === item.reading)
+        expect(review.status).toBe('needs-review');
+      else if (['N5', 'N4'].includes(item.jlpt)) expect(review.status).not.toBe('needs-review');
       if (review.status === 'supported') supported += 1;
       for (const { id } of ALL_CARD_TYPES) {
         const sentence = buildReviewedSentence(item, id);
@@ -70,22 +86,34 @@ describe('explicit reviewed sentence content', () => {
     expect(buildReviewedSentence(word('i-adjective:高い'), 'adj-plain-present').sense).toBe('tall');
   });
 
-  it('uses exact-pair sense repairs without changing unreviewed neighboring forms', () => {
+  it('binds each passive and keigo frame to its actual object and recipient', () => {
     const praise = buildReviewedSentence(word('ichidan:褒める'), 'passive-polite-past');
     expect(praise.sense).toBe('be praised by the teacher');
     expect(filled('ichidan:褒める', 'passive-polite-past')).toEqual({
       ja: '私は先生に褒められました。',
       en: 'I was praised by the teacher.',
     });
-    expect(buildReviewedSentence(word('ichidan:褒める'), 'passive').sense).toBe('praise a child');
+    expect(buildReviewedSentence(word('ichidan:褒める'), 'passive').sense).toBe(
+      'be praised by the teacher',
+    );
     const tea = buildReviewedSentence(word('godan:飲む'), 'humble');
     expect(tea.sense).toBe('drink tea received from the teacher');
     expect(filled('godan:飲む', 'humble')).toEqual({
       ja: '私は先生にいただいたお茶をいただく。',
       en: 'I drink the tea I received from the teacher.',
     });
-    expect(buildReviewedSentence(word('godan:飲む'), 'humble-polite').sense).toBe('drink water');
+    expect(buildReviewedSentence(word('godan:飲む'), 'humble-polite').sense).toBe(
+      'drink tea received from the teacher',
+    );
     expect(buildReviewedSentence(word('godan:飲む'), 'plain-present').sense).toBe('drink water');
+    expect(buildReviewedSentence(word('godan:買う'), 'passive').sense).toBe('buy a book');
+    expect(buildReviewedSentence(word('godan:洗う'), 'passive-negative').sense).toBe(
+      'wash a plate',
+    );
+    expect(buildReviewedSentence(word('ichidan:見る'), 'honorific').sense).toBe('look at a photo');
+    expect(buildReviewedSentence(word('ichidan:教える'), 'humble').sense).toBe(
+      'explain how to use it to the teacher',
+    );
   });
 
   it('does not invent ongoing motion for resulting states', () => {
@@ -96,6 +124,18 @@ describe('explicit reviewed sentence content', () => {
     expect(filled('ichidan:着る', 'progressive').en).toBe('I am wearing my jacket.');
     expect(filled('godan:走る', 'progressive').en).toBe('I am running in the park.');
     expect(filled('godan:止まる', 'progressive').en).toBe('The train is stopped.');
+    expect(filled('godan:始まる', 'progressive-negative').en).toBe('The class has not started.');
+    expect(filled('godan:始まる', 'progressive-polite-past-negative').en).toBe(
+      'The class had not started.',
+    );
+    expect(filled('ichidan:覚える', 'progressive-negative').en).toBe(
+      'I do not remember the kanji.',
+    );
+    expect(filled('godan:すく', 'progressive-negative').en).toBe(
+      'The road is not lightly trafficked.',
+    );
+    expect(filled('godan:残る', 'plain-negative').en).toBe('No bread remains.');
+    expect(filled('godan:残る', 'progressive-past-negative').en).toBe('There was no bread left.');
   });
 
   it('keeps Japanese and English tense, polarity, and receiver aligned', () => {
@@ -120,12 +160,91 @@ describe('explicit reviewed sentence content', () => {
       en: 'I regretted not returning home.',
     });
     expect(filled('godan:休む', 'te-form')).toEqual({
-      ja: '私は少し休んで、日記を書いた。',
-      en: 'I rested a little, then wrote in my diary.',
+      ja: '私は休んで、日記を書いた。',
+      en: 'I rested, then wrote in my diary.',
     });
     expect(filled('godan:歩く', 'causative').ja).toBe('先生は私に公園を歩かせる。');
     expect(filled('godan:有る', 'plain-present').ja).toBe('机の上に本が有る。');
     expect(filled('na-adjective:色々', 'adj-plain-present').en).toBe('The types are varied.');
+  });
+
+  it('uses factual reactions for adjective linking forms and identifies the experiencer', () => {
+    expect(filled('na-adjective:静か', 'adj-te-form')).toEqual({
+      ja: 'この部屋は静かで、私は驚いた。',
+      en: 'This room was quiet, and I was surprised.',
+    });
+    expect(filled('i-adjective:おいしい', 'adj-negative-te-form')).toEqual({
+      ja: 'この料理はおいしくなくて、私は驚いた。',
+      en: 'This dish was not delicious, and I was surprised.',
+    });
+    expect(filled('na-adjective:心配', 'adj-conditional')).toEqual({
+      ja: 'もし子どものことが心配なら、私は先生に伝える。',
+      en: 'If I am worried about the child, I will tell the teacher.',
+    });
+    expect(filled('na-adjective:残念', 'adj-sou')).toEqual({
+      ja: 'この結果を見て、先生は残念そうだ。',
+      en: 'After seeing this result, the teacher looks disappointed.',
+    });
+  });
+
+  it('keeps English grammar and inference aligned with the named subject', () => {
+    expect(filled('na-adjective:邪魔', 'adj-attributive').en).toBe(
+      'I talked about this box that was in the way.',
+    );
+    expect(filled('na-adjective:邪魔', 'adj-naru').en).toBe('This box gets in the way.');
+    expect(filled('na-adjective:変', 'adj-plain-present').en).toBe('This sound is strange.');
+    expect(filled('godan:書く', 'causative-passive-conditional-ba')).toEqual({
+      ja: 'もし私が先生に手紙を書かせられれば、どうなりますか。',
+      en: 'What happens if I am made to write a letter by the teacher?',
+    });
+    expect(filled('godan:読む', 'passive-conditional-ba').ja).toBe(
+      'もしこの本が学生に読まれれば、どうなりますか。',
+    );
+    expect(filled('godan:書く', 'passive')).toEqual({
+      ja: 'この説明は専門家によって書かれる。',
+      en: 'This explanation is written by an expert.',
+    });
+  });
+
+  it('gives accompaniment, ability, rest and relatives unambiguous contexts', () => {
+    expect(filled('ichidan:連れる', 'plain-present')).toEqual({
+      ja: '私は子どもを連れる。',
+      en: 'I take a child along.',
+    });
+    expect(filled('suru:する', 'potential-conditional-ba')).toEqual({
+      ja: 'もし宿題ができれば、どうなりますか。',
+      en: 'What happens if I can do my homework?',
+    });
+    expect(filled('godan:休む', 'plain-negative')).toEqual({
+      ja: '私は休まない。',
+      en: 'I do not rest.',
+    });
+    expect(filled('godan:手伝う', 'request-kudasai')).toEqual({
+      ja: '私の母を手伝ってください。',
+      en: 'Please help my mother.',
+    });
+    expect(filled('godan:起こす', 'prohibition')).toEqual({
+      ja: '私の弟を起こすな。',
+      en: 'Do not wake my younger brother!',
+    });
+  });
+
+  it('withholds named unsettled contexts without declaring every variant invalid', () => {
+    for (const [key, type] of [
+      ['i-adjective:かわいい', 'adj-sou'],
+      ['i-adjective:白い', 'adj-sou'],
+      ['na-adjective:結構', 'adj-plain-negative'],
+      ['na-adjective:適当', 'adj-sugiru'],
+      ['na-adjective:変', 'adj-sou'],
+      ['i-adjective:ない', 'adj-polite-past-negative'],
+      ['godan:知る', 'progressive-negative'],
+      ['godan:おる', 'plain-present'],
+    ]) {
+      expect(reviewedSentenceRestriction(word(key), type)).not.toBe('');
+      expect(buildReviewedSentence(word(key), type)).toBeNull();
+    }
+    expect(filled('i-adjective:白い', 'adj-plain-present')).not.toBeNull();
+    expect(filled('suru:修理する', 'plain-present')).not.toBeNull();
   });
 
   it('rejects changed readings, changed senses, custom homographs, and malformed kana', () => {
@@ -145,16 +264,16 @@ describe('explicit reviewed sentence content', () => {
         'plain-present',
       ),
     ).toBeNull();
-    for (const key of [
-      'godan:いただく',
-      'i-adjective:うれしい',
-      'na-adjective:いっぱい',
-      'suru:あいさつする',
-      'godan:しまう',
-      'i-adjective:辛い',
-    ]) {
-      expect(sentenceWordReview(word(key)).status).toBe('unsuitable');
-      expect(buildReviewedSentence(word(key), 'plain-present')).toBeNull();
+    for (const key of ['godan:しまう', 'i-adjective:辛い']) {
+      const item = word(key);
+      if (item) expect(sentenceWordReview(item).status).toBe('unsuitable');
+      expect(buildReviewedSentence(item, 'plain-present')).toBeNull();
+    }
+    for (const [key, reading] of pendingRepairedIdentities) {
+      const item = word(key);
+      expect(item.reading).toBe(reading);
+      expect(sentenceWordReview(item).status).toBe('needs-review');
+      expect(buildReviewedSentence(item, 'plain-present')).toBeNull();
     }
   });
 

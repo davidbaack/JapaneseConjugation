@@ -59,6 +59,38 @@ function katakanaToHiragana(value) {
   );
 }
 
+// Tokenizer defaults can choose an on-reading or split a compound incorrectly.
+// These whole-phrase contexts have separately reviewed ordinary noun readings;
+// they do not change a target word or readings inside unrelated compounds.
+function reviewedContextReadings(tokens, ja) {
+  const compounds = [];
+  if (/^(?:もし)?洗濯物が/u.test(ja)) compounds.push(['洗濯物', 'せんたくもの']);
+  if (/^(?:もし)?この料理[はが]有名な料理人によって/u.test(ja))
+    compounds.push(['料理人', 'りょうりにん']);
+  let result = tokens;
+  for (const [surface, reading] of compounds) {
+    const revised = [];
+    for (let start = 0; start < result.length; start += 1) {
+      let joined = '';
+      let end = start;
+      while (end < result.length && joined.length < surface.length) {
+        joined += result[end].surface;
+        end += 1;
+      }
+      if (joined === surface) {
+        revised.push({ surface, reading });
+        start = end - 1;
+      } else revised.push(result[start]);
+    }
+    result = revised;
+  }
+  if (/^この(?:白い|薄い)紙について話した。$/u.test(ja))
+    result = result.map((token) =>
+      token.surface === '紙' ? { ...token, reading: 'かみ' } : token,
+    );
+  return result;
+}
+
 // Derive accurate per-token furigana segments from the sentence via kuromoji,
 // collapsing the conjugated form into the {w:true} placeholder. Returns null on
 // any failure so the caller can fall back to the model-provided segments.
@@ -70,7 +102,7 @@ export async function deriveSentenceSegments(ja, expectedSurface) {
       surface: t.surface_form,
       reading: t.reading && t.reading !== '*' ? katakanaToHiragana(t.reading) : '',
     }));
-    const result = buildSegments(tokens, expectedSurface);
+    const result = buildSegments(reviewedContextReadings(tokens, ja), expectedSurface);
     return result.ok ? result.segments : null;
   } catch {
     return null;

@@ -15,6 +15,25 @@ async function openGenkiPractice(page) {
 }
 
 test.describe('Reviewed Sentence practice', () => {
+  test('piano causative lookup launches Practice with the corrected kana answer', async ({
+    page,
+  }) => {
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes('/data/verb-lexicon.json')),
+      page.goto('./'),
+    ]);
+    await page.getByRole('tab', { name: 'Tools', exact: true }).click();
+    await page
+      .getByRole('textbox', { name: 'Search for a word or conjugation form', exact: true })
+      .fill('弾かせる');
+    await page.getByRole('button', { name: 'Practice this form', exact: true }).click();
+    await expect(page.getByRole('tabpanel', { name: 'Practice', exact: true })).toContainText(
+      '弾く',
+    );
+    await page.getByRole('textbox', { name: 'Answer', exact: true }).fill('ひかせる');
+    await expect(page.getByText('Correct.', { exact: true }).last()).toBeVisible();
+  });
+
   test('320px context stays visible and review fills the correct paired sentence', async ({
     page,
   }) => {

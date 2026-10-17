@@ -1,13 +1,14 @@
 import {
   REVIEWED_SENTENCE_PROFILE_VERSION,
   reviewedSentenceProfile,
+  reviewedSentenceRestriction,
 } from '../data/reviewedSentenceProfiles.js';
 import { conjugateItem, surfaceFormFor } from './conjugator.js';
 import { gerund, pastParticiple, simplePast, thirdPerson } from './display.js';
 
 // Reviewed grammar frames share one lexical context on both language sides.
 // They do not certify the old corpus or invent a context for an unknown word.
-export const REVIEWED_SENTENCE_FRAME_VERSION = '2026-10-07.1';
+export const REVIEWED_SENTENCE_FRAME_VERSION = '2026-10-17.1';
 
 const PLURAL_SUBJECTS = new Set([
   'we',
@@ -98,24 +99,44 @@ const flagsFor = (type) => ({ past: type.includes('past'), negative: type.includ
 // Explicitly reviewed direct passives. The receiver and agent are present on
 // both sides; intransitive suffering passives need individual examples instead.
 const PASSIVES = {
-  'godan:読む': ['この本は学生に', 'this book', 'read by a student'],
-  'godan:書く': ['この手紙は先生に', 'this letter', 'written by the teacher'],
-  'godan:買う': ['この本は学生に', 'this book', 'bought by a student'],
-  'godan:売る': ['この本は店員に', 'this book', 'sold by a shop assistant'],
-  'godan:作る': ['この料理は母に', 'this dish', 'made by my mother'],
-  'godan:洗う': ['この皿は父に', 'this plate', 'washed by my father'],
-  'godan:使う': ['この道具は先生に', 'this tool', 'used by the teacher'],
-  'godan:運ぶ': ['この箱は学生に', 'this box', 'carried by a student'],
-  'godan:呼ぶ': ['私は先生に', 'I', 'called by the teacher'],
-  'godan:叱る': ['私は先生に', 'I', 'scolded by the teacher'],
-  'ichidan:食べる': ['このパンは子どもに', 'this bread', 'eaten by a child'],
-  'ichidan:見る': ['この映画は学生に', 'this film', 'watched by a student'],
-  'ichidan:教える': ['日本語は先生に', 'Japanese', 'taught by the teacher'],
-  'ichidan:開ける': ['この窓は先生に', 'this window', 'opened by the teacher'],
-  'ichidan:閉める': ['この窓は先生に', 'this window', 'closed by the teacher'],
-  'ichidan:褒める': ['私は先生に', 'I', 'praised by the teacher'],
-  'suru:説明する': ['この問題は先生に', 'this problem', 'explained by the teacher'],
-  'suru:翻訳する': ['この手紙は先生に', 'this letter', 'translated by the teacher'],
+  'godan:読む': ['この本は学生に', 'this book', 'read by a student', 'read a book'],
+  'godan:書く': [
+    'この説明は専門家によって',
+    'this explanation',
+    'written by an expert',
+    'write an explanation',
+  ],
+  'godan:買う': ['この本は学生に', 'this book', 'bought by a student', 'buy a book'],
+  'godan:売る': ['この本は店員に', 'this book', 'sold by a shop assistant', 'sell a book'],
+  'godan:作る': [
+    'この料理は有名な料理人によって',
+    'this dish',
+    'made by a famous chef',
+    'make a dish',
+  ],
+  'godan:洗う': ['この皿は父に', 'this plate', 'washed by my father', 'wash a plate'],
+  'godan:使う': ['この道具は先生に', 'this tool', 'used by the teacher', 'use a tool'],
+  'godan:運ぶ': ['この箱は学生に', 'this box', 'carried by a student', 'carry a box'],
+  'godan:呼ぶ': ['私は先生に', 'I', 'called by the teacher', 'be called by the teacher'],
+  'godan:叱る': ['私は先生に', 'I', 'scolded by the teacher', 'be scolded by the teacher'],
+  'ichidan:食べる': ['このパンは子どもに', 'this bread', 'eaten by a child', 'eat bread'],
+  'ichidan:見る': ['この映画は学生に', 'this film', 'watched by a student', 'watch a film'],
+  'ichidan:教える': ['日本語は先生に', 'Japanese', 'taught by the teacher', 'teach Japanese'],
+  'ichidan:開ける': ['この窓は先生に', 'this window', 'opened by the teacher', 'open a window'],
+  'ichidan:閉める': ['この窓は先生に', 'this window', 'closed by the teacher', 'close a window'],
+  'ichidan:褒める': ['私は先生に', 'I', 'praised by the teacher', 'be praised by the teacher'],
+  'suru:説明する': [
+    'この問題は先生に',
+    'this problem',
+    'explained by the teacher',
+    'explain a problem',
+  ],
+  'suru:翻訳する': [
+    'この手紙は先生に',
+    'this letter',
+    'translated by the teacher',
+    'translate a letter',
+  ],
 };
 
 // Keigo needs a social relationship. Humble clauses name the respected recipient
@@ -246,6 +267,7 @@ const ADVERBS = {
 };
 
 const VOLITIONAL_ACTIONS = {
+  'godan:なる': 'become teachers',
   'godan:言う': 'say our names',
   'ichidan:上げる': 'raise our hands',
   'ichidan:着る': 'put on our jackets',
@@ -253,12 +275,22 @@ const VOLITIONAL_ACTIONS = {
   'ichidan:締める': 'fasten our belts',
 };
 
-// Independent completed-pair review found these two full-context sense labels
-// still described the generic profile's object. Limit the correction to the
-// exact reviewed pairs; other forms require their own editorial decision.
-const REVIEWED_PAIR_SENSES = {
-  'ichidan:褒める|passive-polite-past': 'be praised by the teacher',
-  'godan:飲む|humble': 'drink tea received from the teacher',
+// A keigo frame can select a different object or recipient from the ordinary
+// lexical profile. Its sense must describe the actual paired context.
+const KEIGO_SENSES = {
+  'godan:読む': ['read a book', 'read a letter to the teacher'],
+  'godan:書く': ['write a letter', 'write a letter to the teacher'],
+  'godan:話す': ['speak Japanese', 'tell the teacher my plans'],
+  'godan:待つ': ['wait for a friend', 'wait for the teacher'],
+  'godan:持つ': ['hold a bag', "carry the teacher's bag"],
+  'godan:会う': ['meet a friend', 'meet the teacher'],
+  'godan:行く': ['go to school', "go to the teacher's house"],
+  'godan:飲む': ['drink tea', 'drink tea received from the teacher'],
+  'ichidan:食べる': ['eat lunch', 'eat bread received from the teacher'],
+  'ichidan:見る': ['look at a photo', "look at the teacher's photo"],
+  'ichidan:見せる': ['show a photo', 'show a photo to the teacher'],
+  'ichidan:教える': ['teach Japanese', 'explain how to use it to the teacher'],
+  'kuru:来る': ['come to school', "come to the teacher's house"],
 };
 
 function adjectiveSentence(profile, type, key) {
@@ -272,6 +304,28 @@ function adjectiveSentence(profile, type, key) {
   }
   const { subjectJa, subjectEn, adjective } = profile;
   const core = type.replace(/^adj-/, '');
+  if (key === 'na-adjective:心配') {
+    if (type === 'adj-naru')
+      return [
+        '子どものことが{w}。',
+        'I become worried about the child.',
+        'worried about the child',
+      ];
+    if (
+      ['adj-conditional', 'adj-tara', 'adj-negative-conditional', 'adj-negative-tara'].includes(
+        type,
+      )
+    ) {
+      const state = finite('I', 'be worried about the child', {
+        negative: type.includes('negative'),
+      });
+      return [
+        'もし子どものことが{w}、私は先生に伝える。',
+        `If ${state}, I will tell the teacher.`,
+        'worried about the child',
+      ];
+    }
+  }
   if (CORE_TYPES.has(core)) {
     return [`${subjectJa}は{w}。`, `${cap(finite(subjectEn, `be ${adjective}`, flagsFor(type)))}.`];
   }
@@ -280,12 +334,17 @@ function adjectiveSentence(profile, type, key) {
     if (!subjectJa.startsWith('この') || !subjectEn.startsWith('this ')) return null;
     return [
       `この{w}${subjectJa.slice(2)}について話した。`,
-      `I talked about this ${adjective} ${subjectEn.slice(5)}.`,
+      key === 'na-adjective:邪魔'
+        ? 'I talked about this box that was in the way.'
+        : `I talked about this ${adjective} ${subjectEn.slice(5)}.`,
     ];
   }
   if (['adj-te-form', 'adj-negative-te-form'].includes(type)) {
-    const state = finite(subjectEn, `be ${adjective}`, { negative: type.includes('negative') });
-    return [`${subjectJa}は{w}、先生に伝える。`, `${cap(state)}, so I will tell the teacher.`];
+    const state = finite(subjectEn, `be ${adjective}`, {
+      past: true,
+      negative: type.includes('negative'),
+    });
+    return [`${subjectJa}は{w}、私は驚いた。`, `${cap(state)}, and I was surprised.`];
   }
   if (
     ['adj-conditional', 'adj-tara', 'adj-negative-conditional', 'adj-negative-tara'].includes(type)
@@ -296,8 +355,27 @@ function adjectiveSentence(profile, type, key) {
     return [`もし${subjectJa}が{w}、先生に伝える。`, `If ${state}, I will tell the teacher.`];
   }
   if (type === 'adj-sou') {
+    if (key === 'na-adjective:嫌') {
+      return [
+        'この仕事の話を聞いて、先生は{w}だ。',
+        'After hearing about this task, the teacher looks displeased.',
+        'displeased about this task',
+      ];
+    }
+    if (key === 'na-adjective:残念') {
+      return [
+        'この結果を見て、先生は{w}だ。',
+        'After seeing this result, the teacher looks disappointed.',
+        'disappointed about this result',
+      ];
+    }
     const look = subjectEn === 'I' || plural(subjectEn) ? 'look' : 'looks';
-    return [`${subjectJa}は{w}だ。`, `${cap(subjectEn)} ${look} ${adjective}.`];
+    return [
+      `${subjectJa}は{w}だ。`,
+      key === 'na-adjective:変'
+        ? 'This sound seems strange.'
+        : `${cap(subjectEn)} ${look} ${adjective}.`,
+    ];
   }
   if (type === 'adj-sugiru') {
     return [`${subjectJa}は{w}。`, `${cap(finite(subjectEn, `be too ${adjective}`))}.`];
@@ -305,7 +383,12 @@ function adjectiveSentence(profile, type, key) {
   if (type === 'adj-naru') {
     const become = subjectEn === 'I' || plural(subjectEn) ? 'become' : 'becomes';
     const result = key === 'i-adjective:早い' ? 'earlier' : adjective;
-    return [`${subjectJa}が{w}。`, `${cap(subjectEn)} ${become} ${result}.`];
+    return [
+      `${subjectJa}が{w}。`,
+      key === 'na-adjective:邪魔'
+        ? 'This box gets in the way.'
+        : `${cap(subjectEn)} ${become} ${result}.`,
+    ];
   }
   return null;
 }
@@ -319,11 +402,29 @@ function verbSentence(profile, type, key) {
     const form = past ? (negative ? 'pastNegative' : 'past') : negative ? 'negative' : 'positive';
     return [
       `${prefix}{w}。`,
-      profile.coreEnglish?.[form] || `${cap(finite(subjectEn, action, { past, negative }))}.`,
+      key === 'godan:残る' && negative
+        ? `No bread ${past ? 'remained' : 'remains'}.`
+        : profile.coreEnglish?.[form] || `${cap(finite(subjectEn, action, { past, negative }))}.`,
     ];
   }
   if (type.startsWith('progressive')) {
     if (!aspect) return null;
+    if (key === 'godan:始まる' && negative) {
+      return [`${prefix}{w}。`, `The class ${past ? 'had' : 'has'} not started.`];
+    }
+    if (key === 'ichidan:覚える' && negative) {
+      return [
+        `${prefix}{w}。`,
+        `I ${past ? 'did' : 'do'} not remember the kanji.`,
+        'remember the kanji',
+      ];
+    }
+    if (key === 'godan:すく' && negative) {
+      return [`${prefix}{w}。`, `The road ${past ? 'was' : 'is'} not lightly trafficked.`];
+    }
+    if (key === 'godan:残る' && negative) {
+      return [`${prefix}{w}。`, `There ${past ? 'was' : 'is'} no bread left.`];
+    }
     const state = aspect === 'ongoing' ? `be ${inflect(action, 'gerund')}` : aspect;
     return [`${prefix}{w}。`, `${cap(finite(subjectEn, state, { past, negative }))}.`];
   }
@@ -331,24 +432,33 @@ function verbSentence(profile, type, key) {
     const entry = KEIGO[key];
     if (!entry) return null;
     return type.startsWith('honorific')
-      ? [`${entry[0]}{w}。`, entry[1]]
-      : [`${entry[2]}{w}。`, entry[3]];
+      ? [`${entry[0]}{w}。`, entry[1], KEIGO_SENSES[key][0]]
+      : [`${entry[2]}{w}。`, entry[3], KEIGO_SENSES[key][1]];
   }
   if (type.startsWith('passive')) {
     const entry = PASSIVES[key];
-    if (!entry) return null;
+    if (!entry?.[3]) return null;
     if (type.includes('conditional')) {
       const condition = finite(entry[1], `be ${entry[2]}`, { negative });
-      return [`もし${entry[0]}{w}、どうなりますか。`, `What happens if ${condition}?`];
+      const conditionPrefix = entry[0].replace('は', 'が');
+      return [
+        `もし${conditionPrefix}{w}、どうなりますか。`,
+        `What happens if ${condition}?`,
+        entry[3],
+      ];
     }
-    return [`${entry[0]}{w}。`, `${cap(finite(entry[1], `be ${entry[2]}`, { past, negative }))}.`];
+    return [
+      `${entry[0]}{w}。`,
+      `${cap(finite(entry[1], `be ${entry[2]}`, { past, negative }))}.`,
+      entry[3],
+    ];
   }
   if (!flags.includes('a') || subjectEn !== 'I') return null;
   const conditionSubject = subjectJa.replace(/は$/, 'が');
   if (type.includes('causative-passive')) {
     const condition = `I ${be('I', past)}${negative ? ' not' : ''} made to ${action} by the teacher`;
     return type.includes('conditional')
-      ? [`もし私は先生に${ja}{w}、どうなりますか。`, `What happens if ${lowerSubject(condition)}?`]
+      ? [`もし私が先生に${ja}{w}、どうなりますか。`, `What happens if ${condition}?`]
       : [`私は先生に${ja}{w}。`, `${condition}.`];
   }
   if (type.includes('causative')) {
@@ -362,9 +472,11 @@ function verbSentence(profile, type, key) {
     const state = past
       ? `I was${negative ? ' not' : ''} able to ${action}`
       : `I ${negative ? 'cannot' : 'can'} ${action}`;
+    const abilityPrefix = key === 'suru:する' ? '私は宿題が' : prefix;
+    const abilityCondition = key === 'suru:する' ? '宿題が' : `${conditionSubject}${ja}`;
     return type.includes('conditional')
-      ? [`もし${conditionSubject}${ja}{w}、どうなりますか。`, `What happens if ${state}?`]
-      : [`${prefix}{w}。`, `${state}.`];
+      ? [`もし${abilityCondition}{w}、どうなりますか。`, `What happens if ${state}?`]
+      : [`${abilityPrefix}{w}。`, `${state}.`];
   }
   if (type.includes('desiderative')) {
     return [`${prefix}{w}。`, `${cap(finite('I', `want to ${action}`, { past, negative }))}.`];
@@ -389,12 +501,15 @@ function verbSentence(profile, type, key) {
   if (type === 'negative-te-connective') {
     return [`${prefix}{w}、困った。`, `I did not ${action}, which was a problem.`];
   }
-  const addresseeAction = action.replace(/\bmy\b/g, 'your');
-  if (type === 'request-kudasai') return [`${ja}{w}。`, `Please ${addresseeAction}.`];
-  if (type === 'negative-request') return [`${ja}{w}。`, `Please do not ${addresseeAction}.`];
-  if (type === 'prohibition') return [`${ja}{w}。`, `Do not ${addresseeAction}!`];
+  const speakerRelative = ['godan:手伝う', 'godan:起こす'].includes(key);
+  const addresseeJa = speakerRelative ? `私の${ja}` : ja;
+  const addresseeAction = speakerRelative ? action : action.replace(/\bmy\b/g, 'your');
+  if (type === 'request-kudasai') return [`${addresseeJa}{w}。`, `Please ${addresseeAction}.`];
+  if (type === 'negative-request')
+    return [`${addresseeJa}{w}。`, `Please do not ${addresseeAction}.`];
+  if (type === 'prohibition') return [`${addresseeJa}{w}。`, `Do not ${addresseeAction}!`];
   if (['imperative', 'command-nasai'].includes(type))
-    return [`${ja}{w}。`, `${cap(addresseeAction)}!`];
+    return [`${addresseeJa}{w}。`, `${cap(addresseeAction)}!`];
   if (type === 'permission') return [`${prefix}{w}。`, `I may ${action}.`];
   if (type === 'obligation') return [`${prefix}{w}。`, `I must ${action}.`];
   return null;
@@ -406,7 +521,7 @@ function verbSentence(profile, type, key) {
  */
 export function buildReviewedSentence(word, type) {
   const profile = reviewedSentenceProfile(word);
-  if (!profile) return null;
+  if (!profile || reviewedSentenceRestriction(word, type)) return null;
   const surface = surfaceFormFor(word, type);
   const kana = conjugateItem(word, type);
   if (!surface || !kana || !/^[\u3040-\u30ff\s]+$/u.test(kana)) return null;
@@ -423,7 +538,7 @@ export function buildReviewedSentence(word, type) {
     en,
     surface,
     kana,
-    sense: REVIEWED_PAIR_SENSES[`${key}|${type}`] || frameSense || profile.sense,
+    sense: frameSense || profile.sense,
     basis: 'explicit-bilingual-profile-and-compatible-frame',
     profileVersion: REVIEWED_SENTENCE_PROFILE_VERSION,
     frameVersion: REVIEWED_SENTENCE_FRAME_VERSION,

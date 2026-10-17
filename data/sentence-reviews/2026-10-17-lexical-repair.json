@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "reviewedAtUtc": "2026-10-17T19:17:21.367Z",
+  "originalLexicalIdentities": 2162,
+  "currentLexicalIdentities": 2091,
+  "counts": {
+    "retained": 1978,
+    "repaired-or-restricted": 121,
+    "excluded-import": 63
+  },
+  "unresolvedMandatoryFlags": 0,
+  "uncoveredCurrentIdentities": 0,
+  "sourceReviewMethod": "All original loaded lexical identities individually reviewed by the UX agent; every applied repair/restriction is source-bound, with full shared-engine before/after form comparison.",
+  "nativeSpeakerSignoff": false,
+  "dictionary": {
+    "source": "https://github.com/scriptin/jmdict-simplified/releases/tag/3.6.2%2B20261012204142",
+    "archiveSha256": "4e742f7d5b0c59e6818c545b73ed3ca71618878de11f54876d3aa43a5f0cafa9",
+    "dictDate": "2026-10-12",
+    "scope": "Reading and POS evidence supports lexical review; dictionary POS alone does not certify intended sense or every sentence context."
+  },
+  "ledgerPath": "data/sentence-reviews/2026-10-17-lexical-repair.jsonl.gz",
+  "ledgerSha256": "72fa890f48ea2a2b86c992d8a625f964ebde7deec3c2736d9f57e3f2c4d76efa",
+  "sources": [
+    {
+      "path": "public/data/verb-lexicon.json",
+      "sha256": "f52c116e8ababd44fcbbbd802ba6389c22f1b9cac2fae660f6d587d696c7fe5f"
+    },
+    {
+      "path": "src/data/starterWords.js",
+      "sha256": "08417e38c2e2b992f7abf03f2d62f28faa6758d6060da4be7fef8a952ffaff25"
+    },
+    {
+      "path": "src/data/verbLexicon.js",
+      "sha256": "201bc8df49a2fc64baf8b3777c64100e7e379b9b0a863b6d758878a6324e3d5a"
+    },
+    {
+      "path": "src/utils/conjugator.js",
+      "sha256": "d76b4d014b254859d445aa9012f07a4d600f710074068f88d0e1260617e90de8"
+    },
+    {
+      "path": "scripts/lexicalTeachingRepairs.js",
+      "sha256": "68ed4ac6bf9123db800c2d95c0bebc4062df62d5fd7ea6f0d89a00608df201b3"
+    },
+    {
+      "path": "scripts/build-verb-lexicon.js",
+      "sha256": "c4a6ea185d0a13c330ae82d1c6cb455e22a2a58fb50a6ae81f597c954f74466d"
+    }
+  ]
+}

@@ -208,9 +208,13 @@ describe('ConjugationBreakdown', () => {
     render(<ConjugationBreakdown word={SHIZUKA} type="adj-polite-present" />);
 
     expect(screen.getByText('な-adjective')).toBeTruthy();
-    expect(screen.getByText(/静か is a な-adjective: the base stays the same/)).toBeTruthy();
-    expect(screen.getByText(/Tell-tale sign: it does not end in a changing い/)).toBeTruthy();
-    expect(screen.getByText(/It takes な before a noun \(静かな \+ noun\)/)).toBeTruthy();
+    expect(
+      screen.getByText(/静か uses the な-adjective pattern: its base stays the same/),
+    ).toBeTruthy();
+    expect(screen.getByText(/its noun-modifying form is 静かな/)).toBeTruthy();
+    expect(
+      screen.getByText(/It uses 静かな before a noun and です \/ だ to act as a predicate/),
+    ).toBeTruthy();
   });
 
   it('explains irregular adjectives and noun category boundaries', () => {

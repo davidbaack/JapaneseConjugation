@@ -5,7 +5,49 @@ syntactically valid JSON do not establish a natural sentence or a faithful
 translation. Missing approved context continues ordinary Practice while keeping
 Sentence enabled.
 
-## Current review
+## Current editorial repair
+
+The October 17 repair closes the source-bound October 13 exhaustive AI review.
+The current counts and corpus revision are recorded in
+`data/sentence-reviews/2026-10-17-teaching-repair.json`; its compressed ledger
+accounts for every original pair as retained, repaired, or withheld. Every
+changed or previously flagged pair requires an exact-target editorial decision.
+Unchanged prior accepts retain their original AI-review provenance. This is not
+native-speaker signoff or a promise that arbitrary custom words or future AI
+coaching are error-free.
+
+Corrections belong in the lexical identities, conjugator eligibility, bilingual
+profiles/frames, and context readings before corpus regeneration. Imported nouns,
+adverbs, malformed forms, and bound-only senses must not become ordinary Practice
+targets just because sentence mode already withholds them. Valid colloquial or
+alternative forms remain distinct from confirmed errors and optional polish.
+
+Contexts with unresolved suitability remain unavailable. Sentence mode continues
+ordinary word Practice using its existing explanation and records no progress
+event for that fallback. Withholding does not label every possible use of the
+expression ungrammatical.
+
+The content hash namespace is now `sentence-review-v2`. Metadata `version: 1`
+remains compatible with the existing database RLS schema; the namespace change
+retires every previous content hash in bundled, database, and cached admission.
+An old accepted database row cannot restore a corrected or withheld example.
+Reviewed current rows receive new content-bound hashes and publication uses
+exact current-row compare-and-set expectations.
+
+Run `node scripts/repair-teaching-corpus.js --check` to verify the complete
+resolution ledger against current lexical/engine/profile sources and published
+rows. Candidate generation does not grant semantic approval. The separate
+`publish-teaching-repair.js --prepare` command reads only the original reviewed
+identities and freezes their CAS expectations; `--publish` revalidates the
+package against the current reviewed targets, updates only those identities,
+and rereads every resulting row. It never deletes source evidence or writes
+learner data.
+
+The October 7 and October 13 packages below remain immutable historical evidence.
+Their source-check commands deliberately reject later changed content and hash
+policies; use the current complete-ledger check for the repaired corpus.
+
+## Historical review
 
 The October 7, 2026 pass accounted for all 153,764 original word/form pairs.
 23,075 compatible pairs were rebuilt from explicitly authored bilingual lexical
@@ -38,7 +80,7 @@ whole-corpus clearance.
 - `data/sentence-reviews/2026-10-13-editorial-sample.json` contains exact source
   paths/zero-based row indices, word identities, completed forms/readings,
   row/chunk/manifest digests, content-bound approval hashes, and editorial reasoning.
-  It is the current final sample after the two definite metadata repairs: 30 accept,
+  It is the recorded sample after the two definite metadata repairs: 30 accept,
   2 edit, and 0 block decisions. The original 28 accept / 4 edit audit is preserved
   unchanged in `2026-10-13-editorial-sample-baseline.json` as historical evidence.
 - The two definite repairs are exact word/form overrides: `ichidan:褒める` /

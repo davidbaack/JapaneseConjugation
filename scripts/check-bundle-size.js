@@ -14,7 +14,7 @@ const SERVICE_WORKER_PATH = join(DIST_DIR, 'sw.js');
 // These caps retain material room above the August 2026 baseline while making
 // regressions in the first load and PWA install visible independently.
 const EAGER_CRITICAL_GZIP_KB = 160;
-// Includes every Workbox install asset, notably the 2,162-word offline lexicon.
+// Includes every Workbox install asset, notably the 2,091-word offline lexicon.
 // The August 2026 baseline is ~361 KB, leaving about 15% headroom without
 // weakening the separate eager or whole-JS/CSS budgets.
 const PRECACHE_GZIP_KB = 415;

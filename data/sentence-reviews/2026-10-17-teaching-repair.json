@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "createdAtUtc": "2026-10-17T19:16:30.565Z",
+  "hashPolicy": "sentence-review-v2",
+  "metadataVersion": 1,
+  "baselineCorpusRevision": "2941ca5b6bd47a101c741bf6c7d78b3d8d9c086d459fd314ee79ab34d0932d37",
+  "corpusRevision": "83a0c24ae6acd306ab0f968ec68f06474f42e4e0b95f3f1d22de08134de83e15",
+  "originalPairs": 23075,
+  "publishedPairs": 23024,
+  "grammarTypes": 126,
+  "counts": {
+    "retained": 21055,
+    "repaired": 1969,
+    "withheld": 51
+  },
+  "reviewMethod": "Source-bound prior exhaustive AI accepts plus independent review of every changed or previously flagged pair.",
+  "nativeSpeakerSignoff": false,
+  "ledgerSha256": "94e9a97a8bc101e108585e6b8334104de8aed7f4f9c053b6a60f1bf2bfc98c55",
+  "contextSources": [
+    {
+      "path": "public/data/verb-lexicon.json",
+      "sha256": "f52c116e8ababd44fcbbbd802ba6389c22f1b9cac2fae660f6d587d696c7fe5f"
+    },
+    {
+      "path": "src/utils/conjugator.js",
+      "sha256": "d76b4d014b254859d445aa9012f07a4d600f710074068f88d0e1260617e90de8"
+    },
+    {
+      "path": "src/utils/sentenceTrust.js",
+      "sha256": "281aa5e59490917fa0c6e29fe334a5cea652fda996166f50f58805c4540cf09a"
+    },
+    {
+      "path": "src/data/reviewedSentenceProfiles.js",
+      "sha256": "783cbe2ec71a9938ffc84dcbe5e9dfada847b096626255c65314dacd586af812"
+    },
+    {
+      "path": "src/utils/reviewedSentenceFrames.js",
+      "sha256": "6c81c9145be70238fc29e0a3d3430a68f6ae4d853f18baaaee31beb45bc2b5d8"
+    },
+    {
+      "path": "scripts/import-sentence-library.js",
+      "sha256": "7cd2b35999abc993e63efa1d79e24319c94e1961fac0c9d8441b06cbb1f92ab8"
+    }
+  ]
+}

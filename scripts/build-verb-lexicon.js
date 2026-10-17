@@ -2,8 +2,13 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
+import { pathToFileURL } from 'node:url';
 import { isLexiconArtifactWord, normalizeLexiconWord } from '../src/utils/lexiconArtifacts.js';
 import { compactPitchAccentForWord, parseKanjiumAccentRows } from '../src/utils/pitchAccent.js';
+import {
+  repairLexicalTeachingSource,
+  repairLexicalTeachingWord,
+} from './lexicalTeachingRepairs.js';
 
 const JLPT_GENKI_URL = 'https://raw.githubusercontent.com/elzup/jlpt-word-list/master/out/all.csv';
 const MINNA_URL = 'https://www.astr.tohoku.ac.jp/~akhlaghi/blog/JapaneseVocab/MNNvocab.csv';
@@ -24,77 +29,6 @@ const PRACTICE_GROUPS = new Set([
   'na-adjective',
 ]);
 const cleanedArtifacts = { removed: 0, repaired: 0 };
-const VERB_ENDINGS = new Set(['う', 'く', 'ぐ', 'す', 'つ', 'ぬ', 'ぶ', 'む', 'る']);
-const ICHIDAN_HINTS = new Set([
-  'え',
-  'け',
-  'げ',
-  'せ',
-  'ぜ',
-  'て',
-  'で',
-  'ね',
-  'へ',
-  'べ',
-  'め',
-  'れ',
-  'い',
-  'き',
-  'ぎ',
-  'し',
-  'じ',
-  'ち',
-  'に',
-  'ひ',
-  'び',
-  'み',
-  'り',
-]);
-const GODAN_RU_READINGS = new Set([
-  'あせる',
-  'あざける',
-  'あなどる',
-  'あまる',
-  'あやまる',
-  'いる',
-  'いびる',
-  'いる',
-  'かえる',
-  'かぎる',
-  'かじる',
-  'かぶる',
-  'きる',
-  'くつがえる',
-  'ける',
-  'こもる',
-  'さえぎる',
-  'さかのぼる',
-  'しげる',
-  'しめる',
-  'しゃべる',
-  'しる',
-  'すべる',
-  'せまる',
-  'せる',
-  'たぎる',
-  'たどる',
-  'ちぎる',
-  'てる',
-  'とどこおる',
-  'にぎる',
-  'ねる',
-  'ののしる',
-  'はいる',
-  'はしる',
-  'ひねる',
-  'ふける',
-  'へる',
-  'まいる',
-  'まじる',
-  'みなぎる',
-  'よみがえる',
-  'よる',
-]);
 const E_TO_U = {
   い: 'う',
   き: 'く',
@@ -162,22 +96,6 @@ function normalizeMeaning(value) {
     .trim();
 }
 
-function endsLikeVerb(value) {
-  const clean = cleanTerm(value);
-  return VERB_ENDINGS.has(clean.slice(-1));
-}
-
-function classifyVerb(reading) {
-  const r = cleanTerm(reading);
-  if (!r || !endsLikeVerb(r)) return null;
-  if (r === 'くる') return 'kuru';
-  if (r.endsWith('する')) return 'suru';
-  if (!r.endsWith('る')) return 'godan';
-  if (GODAN_RU_READINGS.has(r)) return 'godan';
-  const prev = r.slice(-2, -1);
-  return ICHIDAN_HINTS.has(prev) ? 'ichidan' : 'godan';
-}
-
 function jlptFromTags(tags = '') {
   const modern = String(tags).match(/JLPT_N([1-5])/);
   if (modern) return `N${modern[1]}`;
@@ -223,16 +141,59 @@ function entryIsCommon(entry) {
   return [...(entry?.kanji || []), ...(entry?.kana || [])].some((form) => form.common);
 }
 
-function posSet(entry) {
-  return new Set((entry?.sense || []).flatMap((sense) => sense.partOfSpeech || []));
+function glossTokens(value) {
+  return new Set(
+    String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z]+/g, ' ')
+      .split(' ')
+      .filter((word) => word && !['to', 'a', 'an', 'the', 'of', 'and', 'be'].includes(word)),
+  );
+}
+
+export function matchingJmdictSenses(entry, row = {}) {
+  const dict = jmdictSurface(row.dict || row.expression);
+  const reading = jmdictSurface(row.reading);
+  let inheritedPos = [];
+  const applicable = (entry?.sense || []).flatMap((sense) => {
+    if (sense.partOfSpeech?.length) inheritedPos = sense.partOfSpeech;
+    const applies = (restriction, value) =>
+      !restriction?.length ||
+      restriction.includes('*') ||
+      restriction.includes(value) ||
+      restriction.includes(stripSuruSuffix(value));
+    return applies(sense.appliesToKanji, dict) && applies(sense.appliesToKana, reading)
+      ? [{ ...sense, partOfSpeech: inheritedPos }]
+      : [];
+  });
+  if (!row.meaning) return applicable;
+  const sourceTokens = glossTokens(row.meaning);
+  const scored = applicable.map((sense) => {
+    const score = Math.max(
+      0,
+      ...(sense.gloss || []).map((gloss) => {
+        const tokens = glossTokens(gloss.text);
+        return [...sourceTokens].filter((token) => tokens.has(token)).length;
+      }),
+    );
+    return { sense, score };
+  });
+  const best = Math.max(0, ...scored.map(({ score }) => score));
+  // An unmatched source gloss needs review. It must not borrow an unrelated
+  // adjective/verb classification from another sense of the same spelling.
+  return best ? scored.filter(({ score }) => score === best).map(({ sense }) => sense) : [];
+}
+
+function posSet(entry, row = {}) {
+  return new Set(matchingJmdictSenses(entry, row).flatMap((sense) => sense.partOfSpeech || []));
 }
 
 // JMdict tags verbs as transitive (vt) and/or intransitive (vi). Surface this as
 // 't' / 'i' / 'b' (both) / '' (unknown) so the offline cloze generator can pick
 // argument-structure-appropriate frames (e.g. suppress passive-by-agent frames
 // for intransitive verbs).
-function transitivityFromPos(entry) {
-  const pos = posSet(entry);
+function transitivityFromPos(entry, row = {}) {
+  const pos = posSet(entry, row);
   const vt = pos.has('vt');
   const vi = pos.has('vi');
   if (vt && vi) return 'b';
@@ -252,8 +213,8 @@ function allowsSuru(row = {}) {
   );
 }
 
-function groupFromPos(entry, row = {}) {
-  const pos = posSet(entry);
+export function groupFromPos(entry, row = {}) {
+  const pos = posSet(entry, row);
   if (pos.has('vk')) return 'kuru';
   if ((pos.has('vs') || pos.has('vs-i') || pos.has('vs-s')) && allowsSuru(row)) return 'suru';
   if ([...pos].some((tag) => tag.startsWith('v1'))) return 'ichidan';
@@ -300,7 +261,7 @@ function rankJmdictEntry(entry, cleanDict, cleanReading) {
   );
 }
 
-function findJmdictEntry(index, dict, reading) {
+export function findJmdictEntry(index, dict, reading, meaning = '') {
   const cleanDict = cleanTerm(dict);
   const cleanReading = cleanTerm(reading);
   const keys = [
@@ -311,22 +272,45 @@ function findJmdictEntry(index, dict, reading) {
     stripSuruSuffix(cleanDict),
     stripSuruSuffix(cleanReading),
   ].filter(Boolean);
-  const candidates = [...new Set(keys.flatMap((key) => index.get(key) || []))];
+  const candidates = [...new Set(keys.flatMap((key) => index.get(key) || []))].filter((entry) => {
+    const spellings = new Set([cleanDict, jmdictSurface(dict), stripSuruSuffix(cleanDict)]);
+    const readings = new Set([cleanReading, jmdictSurface(reading), stripSuruSuffix(cleanReading)]);
+    const kana = (entry.kana || []).filter((form) => readings.has(form.text));
+    return kana.some((form) => {
+      const restrictions = form.appliesToKanji || ['*'];
+      return (
+        spellings.has(form.text) ||
+        (entry.kanji || []).some(
+          (kanji) =>
+            spellings.has(kanji.text) &&
+            (restrictions.includes('*') || restrictions.includes(kanji.text)),
+        )
+      );
+    });
+  });
   if (!candidates.length) return null;
   return candidates
     .map((entry, order) => ({
       entry,
       order,
-      score: rankJmdictEntry(entry, cleanDict, cleanReading),
+      score:
+        rankJmdictEntry(entry, cleanDict, cleanReading) +
+        (meaning && matchingJmdictSenses(entry, { dict, reading, meaning }).length ? 32 : 0),
     }))
     .sort((a, b) => b.score - a.score || a.order - b.order)[0].entry;
 }
 
-function normalizeSupportedWord(row, jmdictIndex) {
-  let dict = cleanTerm(row.dict || row.expression);
-  let reading = cleanTerm(row.reading) || dict;
-  const entry = findJmdictEntry(jmdictIndex, dict, reading);
-  const group = groupFromPos(entry, row);
+export function normalizeSupportedWord(row, jmdictIndex) {
+  const source = {
+    dict: cleanTerm(row.dict || row.expression),
+    reading: cleanTerm(row.reading) || cleanTerm(row.dict || row.expression),
+    meaning: row.meaning,
+  };
+  const curated = repairLexicalTeachingSource(source);
+  if (!curated) return null;
+  let { dict, reading } = curated;
+  const entry = findJmdictEntry(jmdictIndex, dict, reading, curated.meaning);
+  const group = curated !== source ? curated.group : groupFromPos(entry, curated);
   if (!group) return null;
 
   if (group === 'suru') {
@@ -343,15 +327,15 @@ function normalizeSupportedWord(row, jmdictIndex) {
   return {
     dict,
     reading,
-    meaning: row.meaning,
+    meaning: curated.meaning,
     group,
     common: entryIsCommon(entry),
-    transitive: transitivityFromPos(entry),
+    transitive: transitivityFromPos(entry, curated),
   };
 }
 
 function mergeWord(map, rawWord) {
-  const word = normalizeLexiconWord(rawWord);
+  const word = repairLexicalTeachingWord(normalizeLexiconWord(rawWord));
   if (!word) {
     cleanedArtifacts.removed += 1;
     return;
@@ -550,11 +534,9 @@ async function main() {
   for (const row of jlptRows) {
     const dict = cleanTerm(row.expression);
     const reading = cleanTerm(row.reading);
-    const word =
-      normalizeSupportedWord({ dict, reading, meaning: row.meaning }, jmdictIndex) ||
-      (/\bto\s+[a-z]/i.test(row.meaning) && endsLikeVerb(dict)
-        ? { dict, reading, meaning: row.meaning, group: classifyVerb(reading) }
-        : null);
+    // Unmatched reading/sense/POS combinations await curation. Guessing a group
+    // from the final kana would undo the dictionary's rejection.
+    const word = normalizeSupportedWord({ dict, reading, meaning: row.meaning }, jmdictIndex);
     if (!word?.group) continue;
     mergeWord(words, {
       ...word,
@@ -726,7 +708,9 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

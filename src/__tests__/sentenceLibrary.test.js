@@ -93,6 +93,21 @@ describe('fetchTailoredSentence', () => {
     }
   });
 
+  it('rejects the retired editorial hash from both the current cache and shared database', async () => {
+    const row = validRow();
+    const review = JSON.parse(row.model).review;
+    const oldInput = JSON.parse(sentenceContentSerialization(WORD, TYPE, row, review));
+    oldInput[0] = 'sentence-review';
+    review.hash = createHash('sha256').update(JSON.stringify(oldInput)).digest('hex');
+    row.model = JSON.stringify({ review });
+    seedCache(cacheKey(), row);
+    const fetchMock = vi.fn().mockResolvedValue(response([row]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
+    expect(await fetchTailoredSentence(WORD, TYPE)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('reads public review metadata over REST with anonymous headers and no HTTP cache', async () => {
     const fetchMock = vi.fn().mockResolvedValue(response([validRow()]));
     vi.stubGlobal('fetch', fetchMock);

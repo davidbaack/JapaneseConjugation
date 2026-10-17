@@ -1,7 +1,7 @@
 // Explicit bilingual lexical decisions. These are authored examples, not
 // translations inferred from a dictionary's first gloss. Unlisted words remain
 // needs-review. A profile approves only the frame families it explicitly enables.
-export const REVIEWED_SENTENCE_PROFILE_VERSION = '2026-10-07.1';
+export const REVIEWED_SENTENCE_PROFILE_VERSION = '2026-10-17.1';
 
 const profiles = new Map();
 
@@ -102,7 +102,7 @@ verbs(
 回す|ハンドルを|turn the handle|atp
 磨く|歯を|brush my teeth|atp
 持つ|かばんを|hold a bag|at|||be holding a bag
-休む|少し|rest a little|ap
+休む||rest|ap
 やる|宿題を|do my homework|atp
 呼ぶ|友だちを|call a friend|at
 読む|本を|read a book|atp
@@ -297,7 +297,7 @@ verbs(
 漬ける|野菜を|pickle vegetables|atp
 伝える|友だちに予定を|tell a friend my plans|at
 続ける|練習を|continue practicing|atp
-連れる|子どもを公園に|take a child to the park|at
+連れる|子どもを|take a child along|at
 届ける|友だちに荷物を|deliver a parcel to a friend|at
 止める|車を|stop the car|at
 取り替える|電池を|replace the battery|at
@@ -712,9 +712,10 @@ profiles.get('godan:知る').coreEnglish = {
   pastNegative: 'I did not know that fact.',
 };
 
-// Current imported readings contain kanji for four entries; approving their
-// rendered furigana would be incorrect. しまう is listed as a bound auxiliary,
-// so a standalone "put away" context would change the exercise's intended sense.
+// These four kana identities were repaired after the original corpus review;
+// their former examples remain unavailable pending individual bilingual review.
+// しまう is listed as a bound auxiliary, so a standalone "put away" context
+// would change the exercise's intended sense.
 for (const key of [
   'godan:いただく',
   'i-adjective:うれしい',
@@ -760,10 +761,6 @@ export const UNSUITABLE_SENTENCE_WORDS = Object.freeze(
       'godan:しまう',
       'The listed end-up-doing sense is a bound auxiliary and needs a preceding verb.',
     ],
-    ['godan:いただく', 'The current supposed kana reading contains kanji: 頂く.'],
-    ['i-adjective:うれしい', 'The current supposed kana reading contains kanji: 嬉しい.'],
-    ['na-adjective:いっぱい', 'The current supposed kana reading contains kanji: 一杯.'],
-    ['suru:あいさつする', 'The current supposed kana reading contains kanji: 挨拶する.'],
     [
       'i-adjective:辛い',
       'The stored reading づらい is a bound ending and does not match a standalone 辛い predicate.',
@@ -802,6 +799,67 @@ export const UNSUITABLE_SENTENCE_WORDS = Object.freeze(
 );
 
 export const REVIEWED_SENTENCE_PROFILES = Object.freeze(Object.fromEntries(profiles));
+
+// A valid word and conjugation do not establish that every supplied teaching
+// context is suitable. These restrictions preserve the exact unresolved
+// editorial questions rather than silently approving the former examples.
+const UNREVIEWED_VISIBLE_SOU = new Set([
+  'i-adjective:かっこいい',
+  'i-adjective:白い',
+  'i-adjective:美しい',
+  'i-adjective:赤い',
+  'i-adjective:青い',
+  'i-adjective:黄色い',
+  'i-adjective:黒い',
+  'na-adjective:きれい',
+  'na-adjective:綺麗',
+]);
+
+export function reviewedSentenceRestriction(word, type) {
+  const key = `${word?.group || ''}:${word?.dict || ''}`;
+  if (type === 'adj-sou' && ['i-adjective:かわいい', 'i-adjective:可愛い'].includes(key))
+    return 'cute-appearance-sou-is-lexicalized-as-pity';
+  if (type === 'adj-sou' && UNREVIEWED_VISIBLE_SOU.has(key))
+    return 'visible-property-appearance-context-needs-editorial-review';
+  if (key === 'na-adjective:変' && type === 'adj-sou')
+    return 'auditory-sou-inference-needs-indirect-evidence-context';
+  if (
+    key === 'na-adjective:結構' &&
+    [
+      'adj-plain-present',
+      'adj-plain-past',
+      'adj-plain-negative',
+      'adj-plain-past-negative',
+      'adj-polite-present',
+      'adj-polite-past',
+      'adj-polite-negative',
+      'adj-polite-past-negative',
+      'adj-conditional',
+      'adj-negative-conditional',
+      'adj-tara',
+      'adj-negative-tara',
+      'adj-te-form',
+      'adj-negative-te-form',
+    ].includes(type)
+  )
+    return 'splendid-scenery-predicate-register-needs-editorial-review';
+  if (key === 'na-adjective:適当' && type === 'adj-sugiru')
+    return 'appropriate-versus-careless-sugiru-sense-needs-editorial-review';
+  if (key === 'i-adjective:ない' && type === 'adj-polite-past-negative')
+    return 'standalone-double-negative-context-needs-editorial-review';
+  if (key === 'godan:間に合う' && type.includes('potential'))
+    return 'already-achieved-ability-needs-individual-potential-example';
+  if (word?.group === 'kuru' && type.startsWith('short-causative-passive'))
+    return 'irregular-contracted-causative-passive-register-needs-review';
+  if (
+    key === 'godan:知る' &&
+    ['progressive-negative', 'progressive-polite-negative'].includes(type)
+  )
+    return 'negative-knowledge-state-needs-individual-context';
+  if (key === 'godan:おる' && type === 'plain-present')
+    return 'bare-oru-dialect-or-humble-context-needs-editorial-review';
+  return '';
+}
 
 export function reviewedSentenceProfile(word) {
   if (!word || !word.group || !word.dict) return null;
@@ -850,7 +908,7 @@ export const REVIEWED_SENTENCE_LEXEMES = Object.freeze({
   'godan:なる': ['なる', 'to become', ''],
   'godan:はく': ['はく', 'to put on (items below your waist)', ''],
   'godan:もらう': ['もらう', 'to receive', ''],
-  'godan:やる': ['やる', 'to do; to give (to pets, parents, siblings, etc.)', ''],
+  'godan:やる': ['やる', 'to do; to give (casually, to someone of equal or lower status)', ''],
   'godan:上がる': ['あがる', 'to rise, to go up', ''],
   'godan:下る': ['くだる', 'to get down, to descend', ''],
   'godan:並ぶ': ['ならぶ', 'to line up, to stand in a line (v.i.)', ''],
@@ -876,7 +934,7 @@ export const REVIEWED_SENTENCE_LEXEMES = Object.freeze({
   'godan:包む': ['つつむ', 'to wrap, to cover', ''],
   'godan:参る': ['まいる', 'humble expression for 行く and 来る', ''],
   'godan:取る': ['とる', 'to take (a class); to get (a grade)', 'to take'],
-  'godan:叩く': ['はたく', 'to strike, to clap, to dust, to beat', ''],
+  'godan:叩く': ['たたく', 'to strike, to clap, to dust, to beat', ''],
   'godan:召し上がる': ['めしあがる', '-- honorific form of 食べる (たべる) and 飲む (のむ) --', ''],
   'godan:叱る': ['しかる', 'to scold', ''],
   'godan:合う': ['あう', 'to fit, to match', ''],
@@ -905,7 +963,7 @@ export const REVIEWED_SENTENCE_LEXEMES = Object.freeze({
   'godan:座る': ['すわる', 'to sit', ''],
   'godan:引く': ['ひく', 'to pull, to draw; subtract', ''],
   'godan:引っ越す': ['ひっこす', 'to move to a new place of residence', ''],
-  'godan:弾く': ['はじく', 'to play (piano, guitar)', ''],
+  'godan:弾く': ['ひく', 'to play (piano, guitar)', ''],
   'godan:役に立つ': ['やくにたつ', 'to be helpful, to be useful', ''],
   'godan:待つ': ['まつ', 'to wait', ''],
   'godan:怒る': ['おこる', 'to get angry; to scold angrily', ''],
@@ -914,7 +972,7 @@ export const REVIEWED_SENTENCE_LEXEMES = Object.freeze({
   'godan:急ぐ': ['いそぐ', 'to hurry, to be in a hurry, to rush', ''],
   'godan:戻る': ['もどる', 'to return (v.i.); to come back', ''],
   'godan:手伝う': ['てつだう', 'to help', ''],
-  'godan:打つ': ['ぶつ', 'to hit, to strike', ''],
+  'godan:打つ': ['うつ', 'to hit, to strike', ''],
   'godan:払う': ['はらう', 'to pay', ''],
   'godan:折る': ['おる', 'to snap, to break; to bend', ''],
   'godan:押す': ['おす', 'to push, to press, to stamp (e.g., a passport)', ''],
@@ -1035,7 +1093,7 @@ export const REVIEWED_SENTENCE_LEXEMES = Object.freeze({
     '',
   ],
   'i-adjective:よろしい': ['よろしい', '(hon.) good, OK, all right', ''],
-  'i-adjective:不味い': ['まずい', 'Unpleasent, Unappetising', ''],
+  'i-adjective:不味い': ['まずい', 'Unpleasant, Unappetising', ''],
   'i-adjective:丸い': ['まるい', 'round, circular', ''],
   'i-adjective:低い': ['ひくい', 'short, low', ''],
   'i-adjective:優しい': ['やさしい', 'kind (person), gentle (person), easy (problem)', ''],
@@ -1132,7 +1190,7 @@ export const REVIEWED_SENTENCE_LEXEMES = Object.freeze({
   'ichidan:下りる': ['おりる', 'to get down, to go; come down', ''],
   'ichidan:並べる': ['ならべる', 'to put (things) side by side; to line up', ''],
   'ichidan:乗り換える': ['のりかえる', 'to transfer (trains), to change (bus, train, etc.)', ''],
-  'ichidan:付ける': ['つける', 'to attach, to join, to add', ''],
+  'ichidan:付ける': ['つける', 'to attach, to join, to add; to turn on', ''],
   'ichidan:伝える': ['つたえる', 'to convey (a message); to tell, to report', ''],
   'ichidan:似る': ['にる', 'to resemble, to be similar', ''],
   'ichidan:倒れる': ['たおれる', 'to collapse, to break down', ''],
@@ -1152,7 +1210,7 @@ export const REVIEWED_SENTENCE_LEXEMES = Object.freeze({
   'ichidan:始める': ['はじめる', 'to start, to begin', ''],
   'ichidan:寝る': ['ねる', 'to sleep; to go to sleep; to go to bed', 'to sleep'],
   'ichidan:尋ねる': ['たずねる', 'to inquire (same as 質問する)', ''],
-  'ichidan:居る': ['いる', '(humble) to be (animate), to exist', ''],
+  'ichidan:居る': ['いる', 'to be (animate), to exist', ''],
   'ichidan:届ける': ['とどける', 'to deliver (v.t.)', ''],
   'ichidan:差し上げる': ['さしあげる', '-- humble expression for あげる --', ''],
   'ichidan:建てる': ['たてる', 'to build', ''],
@@ -1168,7 +1226,7 @@ export const REVIEWED_SENTENCE_LEXEMES = Object.freeze({
   'ichidan:晴れる': ['はれる', 'to be sunny', ''],
   'ichidan:暮れる': ['くれる', 'to get dark, to come to an end', ''],
   'ichidan:植える': ['うえる', 'to plant', ''],
-  'ichidan:止める': ['とどめる', 'to end, to stop, to cease, to resign', ''],
+  'ichidan:止める': ['とめる', 'to end, to stop, to cease, to resign', ''],
   'ichidan:比べる': ['くらべる', 'to compare', ''],
   'ichidan:汚れる': ['よごれる', 'to become dirty', ''],
   'ichidan:決める': ['きめる', 'to decide (v.t.)', ''],
@@ -1212,7 +1270,7 @@ export const REVIEWED_SENTENCE_LEXEMES = Object.freeze({
   'ichidan:逃げる': ['にげる', 'to escape, to run away', ''],
   'ichidan:連れる': ['つれる', 'to lead, to take (a person)', ''],
   'ichidan:遅れる': ['おくれる', 'to (be) become late', ''],
-  'ichidan:過ぎる': ['すぎる', 'too much ~', ''],
+  'ichidan:過ぎる': ['すぎる', 'to pass, to elapse', ''],
   'ichidan:閉める': ['しめる', 'to close, to shut', 'to close'],
   'ichidan:開ける': ['あける', 'to open (v.t.)', 'to open'],
   'ichidan:間違える': ['まちがえる', 'to make a mistake', ''],
@@ -1322,7 +1380,7 @@ export const REVIEWED_SENTENCE_LEXEMES = Object.freeze({
   'suru:勉強する': ['べんきょうする', 'Study', ''],
   'suru:卒業する': ['そつぎょうする', 'Graduate from (a university)', ''],
   'suru:参加する': ['さんかする', 'Attend', ''],
-  'suru:失敗する': ['しっぱいする', 'Fail (an examination）', ''],
+  'suru:失敗する': ['しっぱいする', 'to fail', ''],
   'suru:安心する': ['あんしんする', 'Be relieved', ''],
   'suru:復習する': ['ふくしゅうする', "Review one's lesson", ''],
   'suru:心配する': ['しんぱいする', 'worry, concern', ''],

@@ -20,7 +20,13 @@ describe('published sentence trust', () => {
     const words = loadSentenceWordMap();
     for (const chunk of loadBundledCorpusChunks())
       for (const [key, jaTemplate, en, , review] of chunk.rows) {
-        if (review?.basis !== 'explicit-bilingual-profile-and-compatible-frame') continue;
+        if (
+          ![
+            'explicit-bilingual-profile-and-compatible-frame',
+            'independent-ai-editorial-repair-2026-10-17',
+          ].includes(review?.basis)
+        )
+          continue;
         const expected = buildReviewedSentence(words.get(key), chunk.type);
         expect(expected, `${key}|${chunk.type}`).not.toBeNull();
         expect({ jaTemplate, en, sense: review.sense }).toEqual({

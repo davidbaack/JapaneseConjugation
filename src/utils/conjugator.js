@@ -80,6 +80,16 @@ function isSpontaneousIntransitiveVerb(verb) {
 // True when (verb, type) is a form the verb does not actually have, so the
 // engine should report it as non-existent ('').
 function isSuppressedVerbForm(verb, type) {
+  // 間に合う already expresses being able to make a deadline in this lane.
+  if (verb?.reading === 'まにあう' && type.startsWith('potential')) return true;
+  // These lexical suru verbs do not use noun + できる. Their individual
+  // potential paradigms need their own reviewed lane rather than 愛できる etc.
+  if (
+    verb?.group === 'suru' &&
+    type.startsWith('potential') &&
+    /^(愛|関|接|属|対|達|適|熱|罰|値|害|恋|察|称|制|即|題|脱|徹|反|面|有|要)する$/.test(verb.dict)
+  )
+    return true;
   if (isStativeDefectiveVerb(verb)) return STATIVE_DEFECTIVE_SUPPRESSED.has(type);
   if (isSpontaneousIntransitiveVerb(verb)) return SPONTANEOUS_INTRANSITIVE_SUPPRESSED.has(type);
   return false;
@@ -314,10 +324,13 @@ function defectiveStativeForms(item) {
 }
 
 export function compatibleTypes(item) {
-  if (isAdjective(item)) return ADJ_TYPES;
   const allowed = defectiveStativeForms(item);
-  if (allowed) return CONJ_TYPES.filter((t) => allowed.has(t.id));
-  return CONJ_TYPES;
+  const types = isAdjective(item)
+    ? ADJ_TYPES
+    : allowed
+      ? CONJ_TYPES.filter((t) => allowed.has(t.id))
+      : CONJ_TYPES;
+  return types.filter((type) => conjugateItem(item, type.id));
 }
 
 export function isTypeCompatible(item, typeId) {
@@ -545,8 +558,6 @@ export function shortCausativePassive(verb) {
     if (last === 'す') return '';
     return stem + A_ROW[last] + 'される';
   }
-  if (group === 'kuru')
-    return (reading.endsWith('くる') ? reading.slice(0, -2) : '') + 'こさされる';
   return '';
 }
 
@@ -711,6 +722,8 @@ export function progressiveAspectForm(verb, ending) {
 }
 
 export function commandNasaiForm(verb) {
+  // These honorific ます-stems would produce duplicates such as なさいなさい.
+  if (/(?:なさ|いらっしゃ|おっしゃ|くださ|ござ)る$/.test(verb.reading)) return '';
   const stem = conjugate(verb, 'masu-stem');
   return stem ? stem + 'なさい' : '';
 }
@@ -735,60 +748,24 @@ export function conjugate(verb, type) {
     'short-causative-negative-conditional-ba': 'negative-conditional-ba',
   }[type];
   if (shortCausativeBase) return conjugateShortCausative(verb, shortCausativeBase);
-  const politeBase = {
-    'potential-polite': 'potential',
-    'passive-polite': 'passive',
-    'causative-polite': 'causative',
-    'causative-passive-polite': 'causative-passive',
-    'short-causative-passive-polite': 'short-causative-passive',
-  }[type];
-  if (politeBase) return politeRuForm(conjugate(verb, politeBase));
-  const politePastBase = {
-    'potential-polite-past': 'potential',
-    'passive-polite-past': 'passive',
-    'causative-polite-past': 'causative',
-    'causative-passive-polite-past': 'causative-passive',
-    'short-causative-passive-polite-past': 'short-causative-passive',
-  }[type];
-  if (politePastBase) return politePastRuForm(conjugate(verb, politePastBase));
-  const pastBase = {
-    'potential-past': 'potential',
-    'passive-past': 'passive',
-    'causative-past': 'causative',
-    'causative-passive-past': 'causative-passive',
-    'short-causative-passive-past': 'short-causative-passive',
-  }[type];
-  if (pastBase) return pastRuForm(conjugate(verb, pastBase));
-  const pastNegBase = {
-    'potential-past-negative': 'potential',
-    'passive-past-negative': 'passive',
-    'causative-past-negative': 'causative',
-    'causative-passive-past-negative': 'causative-passive',
-    'short-causative-passive-past-negative': 'short-causative-passive',
-  }[type];
-  if (pastNegBase) return pastNegativeRuForm(conjugate(verb, pastNegBase));
-  const conditionalBase = {
-    'potential-conditional-ba': 'potential',
-    'passive-conditional-ba': 'passive',
-    'causative-conditional-ba': 'causative',
-    'causative-passive-conditional-ba': 'causative-passive',
-    'short-causative-passive-conditional-ba': 'short-causative-passive',
-  }[type];
-  if (conditionalBase) return conditionalRuForm(conjugate(verb, conditionalBase));
-  const negativeBase = {
-    'causative-passive-negative': 'causative-passive',
-    'short-causative-passive-negative': 'short-causative-passive',
-  }[type];
-  if (negativeBase) return negativeRuForm(conjugate(verb, negativeBase));
-  const negativeBaBase = {
-    'negative-conditional-ba': 'plain-negative',
-    'potential-negative-conditional-ba': 'potential-negative',
-    'passive-negative-conditional-ba': 'passive-negative',
-    'causative-negative-conditional-ba': 'causative-negative',
-    'causative-passive-negative-conditional-ba': 'causative-passive-negative',
-    'short-causative-passive-negative-conditional-ba': 'short-causative-passive-negative',
-  }[type];
-  if (negativeBaBase) return negativeBaForm(conjugate(verb, negativeBaBase));
+  const derived = type.match(
+    /^(potential|passive|causative(?:-passive)?|short-causative-passive)-(.+)$/,
+  );
+  const transform =
+    derived &&
+    {
+      polite: politeRuForm,
+      'polite-past': politePastRuForm,
+      past: pastRuForm,
+      'past-negative': pastNegativeRuForm,
+      'conditional-ba': conditionalRuForm,
+      negative: negativeRuForm,
+      'negative-conditional-ba': (form) => negativeBaForm(negativeRuForm(form)),
+      'polite-negative': politeNegativeRuForm,
+      'polite-past-negative': politePastNegativeRuForm,
+    }[derived[2]];
+  if (transform) return transform(conjugate(verb, derived[1]));
+  if (type === 'negative-conditional-ba') return negativeBaForm(conjugate(verb, 'plain-negative'));
   if (type === 'negative-te-connective')
     return negativeTeConnectiveForm(conjugate(verb, 'plain-negative'));
   if (type === 'negative-zu') return negativeZuForm(verb);
@@ -805,22 +782,6 @@ export function conjugate(verb, type) {
   }[type];
   if (progressiveEnding) return progressiveAspectForm(verb, progressiveEnding);
   if (type === 'command-nasai') return commandNasaiForm(verb);
-  const politeNegBase = {
-    'potential-polite-negative': 'potential',
-    'passive-polite-negative': 'passive',
-    'causative-polite-negative': 'causative',
-    'causative-passive-polite-negative': 'causative-passive',
-    'short-causative-passive-polite-negative': 'short-causative-passive',
-  }[type];
-  if (politeNegBase) return politeNegativeRuForm(conjugate(verb, politeNegBase));
-  const politePastNegBase = {
-    'potential-polite-past-negative': 'potential',
-    'passive-polite-past-negative': 'passive',
-    'causative-polite-past-negative': 'causative',
-    'causative-passive-polite-past-negative': 'causative-passive',
-    'short-causative-passive-polite-past-negative': 'short-causative-passive',
-  }[type];
-  if (politePastNegBase) return politePastNegativeRuForm(conjugate(verb, politePastNegBase));
   if (type === 'short-causative-passive') return shortCausativePassive(verb);
   if (type === 'desiderative') return desiderativeStem(verb) + 'たい';
   if (type === 'desiderative-polite') return desiderativeStem(verb) + 'たいです';
@@ -884,11 +845,17 @@ export function conjugate(verb, type) {
       pastEnd = 'った';
       teEnd = 'って';
     }
+    if (['とう', 'こう'].includes(reading)) {
+      pastEnd = 'うた';
+      teEnd = 'うて';
+    }
     const neg = reading === 'ある' ? 'ない' : stem + A_ROW[last] + 'ない';
     const pastNeg = reading === 'ある' ? 'なかった' : stem + A_ROW[last] + 'なかった';
     const te = stem + teEnd,
       past = stem + pastEnd,
-      iStem = stem + I_ROW[last],
+      iStem = /(?:なさ|いらっしゃ|おっしゃ|くださ|ござ)る$/.test(reading)
+        ? stem + 'い'
+        : stem + I_ROW[last],
       aStem = stem + A_ROW[last],
       eStem = stem + E_ROW[last],
       oStem = stem + O_ROW[last];
@@ -914,7 +881,7 @@ export function conjugate(verb, type) {
       'conditional-ba': eStem + 'ば',
       'conditional-nara': reading + 'なら',
       conjectural: reading + 'だろう',
-      imperative: eStem,
+      imperative: /(?:なさ|いらっしゃ|おっしゃ|くださ)る$/.test(reading) ? iStem : eStem,
       passive: aStem + 'れる',
       'passive-negative': aStem + 'れない',
       causative: aStem + 'せる',
@@ -1027,6 +994,7 @@ function usesYoiAdjectiveStem(adj) {
   return !!(
     adj?.irregular ||
     reading === 'いい' ||
+    reading === 'よい' ||
     reading === 'かっこいい' ||
     reading === 'ちょうどいい' ||
     reading.endsWith('がいい')
@@ -1043,7 +1011,11 @@ export function conjugateAdjective(adj, type) {
   const { reading, group } = adj;
   if (group === 'i-adjective') {
     const stem = adjectiveStem(adj);
-    const sou = usesYoiAdjectiveStem(adj) ? stem + 'さそう' : stem + 'そう';
+    // かわいそう is the lexical word "pitiable", not "looks cute".
+    const sou =
+      reading === 'かわいい'
+        ? ''
+        : stem + (usesYoiAdjectiveStem(adj) || reading === 'ない' ? 'さそう' : 'そう');
     const past = stem + 'かった',
       neg = stem + 'くない',
       pastNeg = stem + 'くなかった';
@@ -1065,7 +1037,7 @@ export function conjugateAdjective(adj, type) {
       'adj-tara': past + 'ら',
       'adj-negative-tara': pastNeg + 'ら',
       'adj-sou': sou,
-      'adj-sugiru': stem + 'すぎる',
+      'adj-sugiru': stem + (reading === 'ない' ? 'さすぎる' : 'すぎる'),
       'adj-naru': stem + 'くなる',
     };
     return M[type] || '';
@@ -1084,7 +1056,13 @@ export function conjugateAdjective(adj, type) {
       'adj-te-form': stem + 'で',
       'adj-negative-te-form': negativeTeConnectiveForm(stem + 'ではない'),
       'adj-adverb': stem + 'に',
-      'adj-attributive': stem + 'な',
+      'adj-attributive':
+        stem +
+        (['ふつう', 'ほんと', 'ほんとう', 'きいろ', 'たくさん'].includes(stem)
+          ? 'の'
+          : stem === 'おなじ'
+            ? ''
+            : 'な'),
       'adj-conditional': stem + 'なら',
       'adj-negative-conditional': negativeBaForm(stem + 'ではない'),
       'adj-tara': stem + 'だったら',

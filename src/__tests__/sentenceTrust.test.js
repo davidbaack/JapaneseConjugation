@@ -44,43 +44,64 @@ describe('content-bound sentence review', () => {
   it.each([
     ['ichidan:褒める', 'passive-polite-past', 'be praised by the teacher'],
     ['godan:飲む', 'humble', 'drink tea received from the teacher'],
-  ])('rebinds only the reviewed sense repair for %s %s', async (key, type, sense) => {
-    const baseline = JSON.parse(
-      readFileSync('data/sentence-reviews/2026-10-13-editorial-sample-baseline.json', 'utf8'),
-    ).samples.find((sample) => sample.key === key && sample.type === type);
-    const item = loadSentenceWordMap().get(key);
-    const original = {
-      jaTemplate: baseline.jaTemplate,
-      en: baseline.english,
-      segments: baseline.segments,
-      review: baseline.corpusReview,
-    };
-    expect(await verifySentenceValue(item, type, original)).toBe(true);
-    const target = { ...original, review: { ...original.review, sense } };
-    expect(await verifySentenceValue(item, type, target)).toBe(false);
-    target.review.hash = await hashSentenceContent(item, type, target);
-    expect(target.review.hash).not.toBe(original.review.hash);
-    expect(await verifySentenceValue(item, type, target)).toBe(true);
-    const composition = buildReviewedSentence(item, type);
-    expect({
-      jaTemplate: composition.jaTemplate,
-      en: composition.en,
-      sense: composition.sense,
-    }).toEqual({
-      jaTemplate: original.jaTemplate,
-      en: original.en,
-      sense,
-    });
-    const currentRow = JSON.parse(
-      readFileSync(`public/data/sentences/by-type/${type}.json`, 'utf8'),
-    ).rows.find((row) => row[0] === key);
-    expect(currentRow).toEqual([
-      key,
-      original.jaTemplate,
-      original.en,
-      original.segments,
-      target.review,
-    ]);
+  ])(
+    'retires historical approvals and binds the reviewed sense for %s %s',
+    async (key, type, sense) => {
+      const baseline = JSON.parse(
+        readFileSync('data/sentence-reviews/2026-10-13-editorial-sample-baseline.json', 'utf8'),
+      ).samples.find((sample) => sample.key === key && sample.type === type);
+      const item = loadSentenceWordMap().get(key);
+      const original = {
+        jaTemplate: baseline.jaTemplate,
+        en: baseline.english,
+        segments: baseline.segments,
+        review: baseline.corpusReview,
+      };
+      expect(await verifySentenceValue(item, type, original)).toBe(false);
+      const target = { ...original, review: { ...original.review, sense } };
+      expect(await verifySentenceValue(item, type, target)).toBe(false);
+      target.review.hash = await hashSentenceContent(item, type, target);
+      expect(target.review.hash).not.toBe(original.review.hash);
+      expect(await verifySentenceValue(item, type, target)).toBe(true);
+      const composition = buildReviewedSentence(item, type);
+      expect({
+        jaTemplate: composition.jaTemplate,
+        en: composition.en,
+        sense: composition.sense,
+      }).toEqual({
+        jaTemplate: original.jaTemplate,
+        en: original.en,
+        sense,
+      });
+      const currentRow = JSON.parse(
+        readFileSync(`public/data/sentences/by-type/${type}.json`, 'utf8'),
+      ).rows.find((row) => row[0] === key);
+      expect(currentRow.slice(0, 4)).toEqual([
+        key,
+        original.jaTemplate,
+        original.en,
+        original.segments,
+      ]);
+      expect(currentRow[4]).toMatchObject({ ...target.review, basis: expect.any(String) });
+      expect(
+        await verifySentenceValue(item, type, {
+          jaTemplate: currentRow[1],
+          en: currentRow[2],
+          segments: currentRow[3],
+          review: currentRow[4],
+        }),
+      ).toBe(true);
+    },
+  );
+
+  it('rejects the retired hash policy even when the word and content are unchanged', async () => {
+    const value = reviewedValue();
+    const oldInput = JSON.parse(sentenceContentSerialization(WORD, TYPE, value));
+    oldInput[0] = 'sentence-review';
+    value.review.hash = createHash('sha256').update(JSON.stringify(oldInput)).digest('hex');
+    expect(await verifySentenceValue(WORD, TYPE, value)).toBe(false);
+    value.review.hash = await hashSentenceContent(WORD, TYPE, value);
+    expect(await verifySentenceValue(WORD, TYPE, value)).toBe(true);
   });
 
   it('uses the same canonical content hash in browser and Node tooling', async () => {

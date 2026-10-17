@@ -128,8 +128,9 @@ than in global Settings.
 ## Practice Scope And Data
 
 - Starter data: 30 verbs and 25 adjectives.
-- Generated lexicon: 2,162 practiceable words in `public/data/verb-lexicon.json`
-  as of the current tracked build, including 1,374 verbs and 788 adjectives.
+- Generated lexicon: 2,091 practiceable words after starter merging, including
+  1,354 verbs and 737 adjectives. The source and repair evidence are in
+  `public/data/verb-lexicon.json` and `data/sentence-reviews/2026-10-17-lexical-repair.json`.
 - Word filters: JLPT N5-N1, 23 Genki lessons, 50 Minna no Nihongo lessons, word
   types, word groups, and custom study lists.
 - Card coverage: 126 selectable card types across 13 form families.

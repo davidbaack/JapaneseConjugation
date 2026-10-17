@@ -5,7 +5,6 @@ import {
   isTypeCompatible,
   practiceTypesForItem,
 } from '../utils/conjugator.js';
-import { CONJ_TYPES } from '../data/conjugationTypes.js';
 
 // Defective stative verbs: rules can build advanced forms, but they aren't real
 // Japanese, so the app must never present them.
@@ -84,9 +83,10 @@ describe('defective stative verbs', () => {
   it('does not restrict true verbs that share a reading or spelling', () => {
     for (const word of NORMAL) {
       const list = compatibleTypes(word).map((t) => t.id);
-      expect(list).toHaveLength(CONJ_TYPES.length);
-      expect(list).toContain('passive');
-      expect(list).toContain('causative');
+      expect(list).toEqual(
+        expect.arrayContaining([...BASE_FORMS, ...AGENCY_AND_VOLITION, 'causative', 'progressive']),
+      );
+      expect(list.includes('short-causative-passive')).toBe(word.group === 'godan');
     }
   });
 });

@@ -2,6 +2,8 @@ import { conjugateItem, surfaceFormFor, wordKey } from './conjugator.js';
 import { sentenceRowQualityIssue } from './sentenceQuality.js';
 
 export const SENTENCE_REVIEW_VERSION = 1;
+// Retire pre-editorial-review approvals without changing the deployed database
+// metadata/RLS schema. Every transport and cache verifies this same hash epoch.
 const SHA256_RE = /^[a-f0-9]{64}$/;
 const KANA_RE = /^[぀-ヿ\s]*$/;
 
@@ -53,7 +55,7 @@ function normalizedSegments(segments) {
  */
 export function sentenceContentSerialization(word, type, value, review = reviewFor(value)) {
   return JSON.stringify([
-    'sentence-review',
+    'sentence-review-v2',
     review?.version,
     wordKey(word),
     String(type || ''),
