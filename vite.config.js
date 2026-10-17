@@ -11,6 +11,17 @@ export default defineConfig({
   plugins: [
     devHistoryPlugin(),
     react(),
+    {
+      name: 'production-css-sources',
+      apply: 'build',
+      enforce: 'pre',
+      transform(source, id) {
+        if (!id.replaceAll('\\', '/').endsWith('/src/index.css')) return;
+        // The History panel is DEV-only. Its utilities belong to the dev page,
+        // while production still scans every learner-facing component.
+        return { code: `${source}\n@source not "./components/DevHistoryPanel.jsx";\n`, map: null };
+      },
+    },
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',

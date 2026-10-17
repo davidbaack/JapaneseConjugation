@@ -624,8 +624,32 @@ describe('special keigo teaching', () => {
     for (const [reading, mappings] of Object.entries(KEIGO_SPECIALS)) {
       const word = {
         reading,
-        dict: reading,
-        meaning: 'example',
+        dict:
+          {
+            たべる: '食べる',
+            のむ: '飲む',
+            みる: '見る',
+            きる: '着る',
+            ねる: '寝る',
+            しぬ: '死ぬ',
+            いく: '行く',
+            くる: '来る',
+            いる: '居る',
+            いう: '言う',
+            きく: '聞く',
+            たずねる: '尋ねる',
+            あう: '会う',
+            かりる: '借りる',
+            しる: '知る',
+          }[reading] || reading,
+        meaning:
+          {
+            みる: 'to see, to look',
+            あう: 'to meet, to see',
+            きく: 'to hear, to listen, to ask',
+            あげる: 'to give',
+            くれる: 'to give, to do for',
+          }[reading] || 'example',
         group:
           reading === 'する'
             ? 'suru'

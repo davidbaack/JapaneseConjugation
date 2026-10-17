@@ -77,8 +77,8 @@ function isSpontaneousIntransitiveVerb(verb) {
   return !!verb && (verb.dict === '生まれる' || verb.reading === 'うまれる');
 }
 
-// True when (verb, type) is a form the verb does not actually have, so the
-// engine should report it as non-existent ('').
+// Forms unavailable in this practice lane, including constructions that need
+// individual lexical/context review. An empty answer does not certify nonexistence.
 function isSuppressedVerbForm(verb, type) {
   // 間に合う already expresses being able to make a deadline in this lane.
   if (verb?.reading === 'まにあう' && type.startsWith('potential')) return true;
@@ -586,7 +586,7 @@ export const KEIGO_SPECIALS = {
   のむ: { honorific: 'めしあがる', humble: 'いただく' },
   みる: { honorific: 'ごらんになる', humble: 'はいけんする' },
   きる: { honorific: 'おめしになる', humble: '' },
-  ねる: { honorific: 'おやすみになる', humble: 'やすませていただく' },
+  ねる: { honorific: 'おやすみになる', humble: '' },
   しぬ: { honorific: 'おなくなりになる', humble: '' },
   いく: { honorific: 'いらっしゃる', humble: 'まいる' },
   くる: { honorific: 'いらっしゃる', humble: 'まいる' },
@@ -614,6 +614,50 @@ export const KEIGO_POLITE_OVERRIDES = {
   ごぞんじである: 'ごぞんじです',
 };
 
+// These are ordinary lexical sources for special replacements, not reading-only
+// rules: 切る, 煎る, 練る, 刷る, 合う and other homographs have different senses.
+const KEIGO_SOURCE_SPELLINGS = {
+  'ichidan:たべる': '食べる',
+  'godan:のむ': '飲む',
+  'ichidan:みる': '見る',
+  'ichidan:きる': '着る',
+  'ichidan:ねる': '寝る',
+  'godan:しぬ': '死ぬ',
+  'godan:いく': '行く',
+  'kuru:くる': '来る',
+  'ichidan:いる': '居る',
+  'suru:する': 'する',
+  'godan:いう': '言う',
+  'godan:きく': '聞く',
+  'ichidan:たずねる': '尋ねる|訪ねる',
+  'godan:あう': '会う',
+  'ichidan:かりる': '借りる',
+  'ichidan:あげる': 'あげる',
+  'godan:もらう': 'もらう',
+  'ichidan:くれる': 'くれる',
+  'godan:しる': '知る',
+};
+
+// Kana-only homographs need the reviewed ordinary sense as well as the group.
+const KEIGO_KANA_SENSES = {
+  あげる: 'to give',
+  くれる: 'to give, to do for',
+};
+
+// Remaining ordinary sources with individually reviewed honorific/humble
+// contexts in reviewedSentenceFrames. Other words need their own context review.
+// This includes already-polite words: conventional layered expressions exist,
+// but they cannot be inferred by applying お〜になる / お〜する indiscriminately.
+const REVIEWED_REGULAR_KEIGO = {
+  'godan:読む': 'よむ',
+  'godan:書く': 'かく',
+  'godan:話す': 'はなす',
+  'godan:待つ': 'まつ',
+  'godan:持つ': 'もつ',
+  'ichidan:見せる': 'みせる',
+  'ichidan:教える': 'おしえる',
+};
+
 export function getSpecialKeigoBase(word, type) {
   const kind =
     type === 'humble' || type === 'humble-polite'
@@ -621,42 +665,32 @@ export function getSpecialKeigoBase(word, type) {
       : type === 'honorific' || type === 'honorific-polite'
         ? 'honorific'
         : null;
-  return kind ? KEIGO_SPECIALS[word?.reading]?.[kind] : undefined;
-}
-
-export function regularHonorificForm(verb) {
-  if (!verb) return '';
-  if (verb.group === 'suru') {
-    const stem = verb.reading.endsWith('する') ? verb.reading.slice(0, -2) : '';
-    return stem ? stem + 'なさる' : 'なさる';
-  }
-  if (verb.group === 'kuru')
-    return (verb.reading.endsWith('くる') ? verb.reading.slice(0, -2) : '') + 'いらっしゃる';
-  const stem = conjugate(verb, 'masu-stem');
-  return stem ? 'お' + stem + 'になる' : '';
-}
-
-export function regularHumbleForm(verb) {
-  if (!verb) return '';
-  if (verb.group === 'suru') {
-    const stem = verb.reading.endsWith('する') ? verb.reading.slice(0, -2) : '';
-    return stem ? stem + 'いたす' : 'いたす';
-  }
-  if (verb.group === 'kuru')
-    return (verb.reading.endsWith('くる') ? verb.reading.slice(0, -2) : '') + 'まいる';
-  const stem = conjugate(verb, 'masu-stem');
-  return stem ? 'お' + stem + 'する' : '';
+  if (!kind) return undefined;
+  const source = KEIGO_SOURCE_SPELLINGS[`${word?.group}:${word?.reading}`];
+  if (!source || !source.split('|').includes(word.dict)) return undefined;
+  if (KEIGO_KANA_SENSES[word.reading] && word.meaning !== KEIGO_KANA_SENSES[word.reading])
+    return undefined;
+  return KEIGO_SPECIALS[word.reading]?.[kind];
 }
 
 export function keigoForm(verb, kind) {
-  const special = KEIGO_SPECIALS[verb?.reading]?.[kind];
+  const special = getSpecialKeigoBase(verb, kind);
   if (special !== undefined) return special;
-  return kind === 'honorific' ? regularHonorificForm(verb) : regularHumbleForm(verb);
+  if (!verb?.reading || REVIEWED_REGULAR_KEIGO[wordKey(verb)] !== verb.reading) return '';
+  const stem = conjugate(verb, 'masu-stem');
+  return stem ? 'お' + stem + (kind === 'honorific' ? 'になる' : 'する') : '';
+}
+
+export function regularHonorificForm(verb) {
+  return keigoForm(verb, 'honorific');
+}
+
+export function regularHumbleForm(verb) {
+  return keigoForm(verb, 'humble');
 }
 
 export function politeKeigoForm(form) {
   if (!form) return '';
-  if (KEIGO_POLITE_OVERRIDES[form]) return KEIGO_POLITE_OVERRIDES[form];
   for (const [plain, polite] of Object.entries(KEIGO_POLITE_OVERRIDES)) {
     if (form.endsWith(plain)) return form.slice(0, -plain.length) + polite;
   }
@@ -664,34 +698,19 @@ export function politeKeigoForm(form) {
   const last = form.slice(-1),
     stem = form.slice(0, -1);
   if (I_ROW[last]) return stem + I_ROW[last] + 'ます';
-  if (form.endsWith('る')) return stem + 'ます';
   return '';
 }
 
-export function politeRuForm(form) {
-  return form && form.endsWith('る') ? form.slice(0, -1) + 'ます' : '';
-}
-export function politePastRuForm(form) {
-  return form && form.endsWith('る') ? form.slice(0, -1) + 'ました' : '';
-}
-export function pastRuForm(form) {
-  return form && form.endsWith('る') ? form.slice(0, -1) + 'た' : '';
-}
-export function pastNegativeRuForm(form) {
-  return form && form.endsWith('る') ? form.slice(0, -1) + 'なかった' : '';
-}
-export function conditionalRuForm(form) {
-  return form && form.endsWith('る') ? form.slice(0, -1) + 'れば' : '';
-}
-export function negativeRuForm(form) {
-  return form && form.endsWith('る') ? form.slice(0, -1) + 'ない' : '';
-}
-export function politeNegativeRuForm(form) {
-  return form && form.endsWith('る') ? form.slice(0, -1) + 'ません' : '';
-}
-export function politePastNegativeRuForm(form) {
-  return form && form.endsWith('る') ? form.slice(0, -1) + 'ませんでした' : '';
-}
+const ruEnding = (ending) => (form) =>
+  form && form.endsWith('る') ? form.slice(0, -1) + ending : '';
+export const politeRuForm = ruEnding('ます');
+export const politePastRuForm = ruEnding('ました');
+export const pastRuForm = ruEnding('た');
+export const pastNegativeRuForm = ruEnding('なかった');
+export const conditionalRuForm = ruEnding('れば');
+export const negativeRuForm = ruEnding('ない');
+export const politeNegativeRuForm = ruEnding('ません');
+export const politePastNegativeRuForm = ruEnding('ませんでした');
 export function negativeBaForm(form) {
   return form && form.endsWith('ない') ? form.slice(0, -2) + 'なければ' : '';
 }
@@ -735,18 +754,16 @@ export function conjugate(verb, type) {
   if (type === 'humble') return keigoForm(verb, 'humble');
   if (type === 'honorific-polite') return politeKeigoForm(keigoForm(verb, 'honorific'));
   if (type === 'humble-polite') return politeKeigoForm(keigoForm(verb, 'humble'));
-  const shortCausativeBase = {
-    'short-causative': 'plain-present',
-    'short-causative-polite': 'polite-present',
-    'short-causative-negative': 'plain-negative',
-    'short-causative-polite-negative': 'polite-negative',
-    'short-causative-past': 'plain-past',
-    'short-causative-polite-past': 'polite-past',
-    'short-causative-past-negative': 'plain-past-negative',
-    'short-causative-polite-past-negative': 'polite-past-negative',
-    'short-causative-conditional-ba': 'conditional-ba',
-    'short-causative-negative-conditional-ba': 'negative-conditional-ba',
-  }[type];
+  const shortCausativeBase =
+    type.startsWith('short-') && FORM_GROUP_TYPE_IDS.causative.includes(type)
+      ? {
+          '': 'plain-present',
+          polite: 'polite-present',
+          negative: 'plain-negative',
+          past: 'plain-past',
+          'past-negative': 'plain-past-negative',
+        }[type.slice(16)] || type.slice(16)
+      : null;
   if (shortCausativeBase) return conjugateShortCausative(verb, shortCausativeBase);
   const derived = type.match(
     /^(potential|passive|causative(?:-passive)?|short-causative-passive)-(.+)$/,
@@ -783,15 +800,17 @@ export function conjugate(verb, type) {
   if (progressiveEnding) return progressiveAspectForm(verb, progressiveEnding);
   if (type === 'command-nasai') return commandNasaiForm(verb);
   if (type === 'short-causative-passive') return shortCausativePassive(verb);
-  if (type === 'desiderative') return desiderativeStem(verb) + 'たい';
-  if (type === 'desiderative-polite') return desiderativeStem(verb) + 'たいです';
-  if (type === 'desiderative-negative') return desiderativeStem(verb) + 'たくない';
-  if (type === 'desiderative-polite-negative') return desiderativeStem(verb) + 'たくないです';
-  if (type === 'desiderative-past') return desiderativeStem(verb) + 'たかった';
-  if (type === 'desiderative-polite-past') return desiderativeStem(verb) + 'たかったです';
-  if (type === 'desiderative-past-negative') return desiderativeStem(verb) + 'たくなかった';
-  if (type === 'desiderative-polite-past-negative')
-    return desiderativeStem(verb) + 'たくなかったです';
+  const desiderativeEnding = {
+    desiderative: 'たい',
+    'desiderative-polite': 'たいです',
+    'desiderative-negative': 'たくない',
+    'desiderative-polite-negative': 'たくないです',
+    'desiderative-past': 'たかった',
+    'desiderative-polite-past': 'たかったです',
+    'desiderative-past-negative': 'たくなかった',
+    'desiderative-polite-past-negative': 'たくなかったです',
+  }[type];
+  if (desiderativeEnding) return desiderativeStem(verb) + desiderativeEnding;
   if (group === 'ichidan') {
     const stem = reading.slice(0, -1);
     const te = stem + 'て',
@@ -812,7 +831,6 @@ export function conjugate(verb, type) {
       'polite-conditional-tara': stem + 'ましたら',
       'te-form': te,
       potential: stem + 'られる',
-      'potential-negative': stem + 'られない',
       volitional: stem + 'よう',
       'conditional-tara': past + 'ら',
       'negative-conditional-tara': stem + 'なかったら',
@@ -821,12 +839,8 @@ export function conjugate(verb, type) {
       conjectural: reading + 'だろう',
       imperative: stem + 'ろ',
       passive: stem + 'られる',
-      'passive-negative': stem + 'られない',
       causative: stem + 'させる',
-      'causative-negative': stem + 'させない',
       'causative-passive': stem + 'させられる',
-      desiderative: stem + 'たい',
-      progressive: te + 'いる',
       'negative-te': neg + 'で',
       prohibition: reading + 'な',
       'request-kudasai': te + 'ください',
@@ -874,7 +888,6 @@ export function conjugate(verb, type) {
       'polite-conditional-tara': iStem + 'ましたら',
       'te-form': te,
       potential: eStem + 'る',
-      'potential-negative': eStem + 'ない',
       volitional: oStem + 'う',
       'conditional-tara': past + 'ら',
       'negative-conditional-tara': pastNeg + 'ら',
@@ -883,12 +896,8 @@ export function conjugate(verb, type) {
       conjectural: reading + 'だろう',
       imperative: /(?:なさ|いらっしゃ|おっしゃ|くださ)る$/.test(reading) ? iStem : eStem,
       passive: aStem + 'れる',
-      'passive-negative': aStem + 'れない',
       causative: aStem + 'せる',
-      'causative-negative': aStem + 'せない',
       'causative-passive': aStem + 'せられる',
-      desiderative: iStem + 'たい',
-      progressive: te + 'いる',
       'negative-te': neg + 'で',
       prohibition: reading + 'な',
       'request-kudasai': te + 'ください',
@@ -915,7 +924,6 @@ export function conjugate(verb, type) {
       'polite-conditional-tara': 'しましたら',
       'te-form': 'して',
       potential: 'できる',
-      'potential-negative': 'できない',
       volitional: 'しよう',
       'conditional-tara': 'したら',
       'negative-conditional-tara': 'しなかったら',
@@ -924,12 +932,8 @@ export function conjugate(verb, type) {
       conjectural: 'するだろう',
       imperative: 'しろ',
       passive: 'される',
-      'passive-negative': 'されない',
       causative: 'させる',
-      'causative-negative': 'させない',
       'causative-passive': 'させられる',
-      desiderative: 'したい',
-      progressive: 'している',
       'negative-te': 'しないで',
       prohibition: 'するな',
       'request-kudasai': 'してください',
@@ -956,7 +960,6 @@ export function conjugate(verb, type) {
       'polite-conditional-tara': 'きましたら',
       'te-form': 'きて',
       potential: 'こられる',
-      'potential-negative': 'こられない',
       volitional: 'こよう',
       'conditional-tara': 'きたら',
       'negative-conditional-tara': 'こなかったら',
@@ -965,12 +968,8 @@ export function conjugate(verb, type) {
       conjectural: 'くるだろう',
       imperative: 'こい',
       passive: 'こられる',
-      'passive-negative': 'こられない',
       causative: 'こさせる',
-      'causative-negative': 'こさせない',
       'causative-passive': 'こさせられる',
-      desiderative: 'きたい',
-      progressive: 'きている',
       'negative-te': 'こないで',
       prohibition: 'くるな',
       'request-kudasai': 'きてください',

@@ -38,6 +38,25 @@ export function checkLexicalTeachingReview() {
     if (!word || Object.entries(record.target).some(([key, value]) => (word[key] || '') !== value))
       throw new Error(`Reviewed lexical identity changed: ${record.key}`);
     covered.add(wordKey(word));
+    if (!word.group.includes('adjective')) {
+      const review = record.registerReview;
+      if (
+        !review ||
+        sha256(JSON.stringify(review.source)) !== review.sourceSha256 ||
+        Object.entries(review.source).some(([key, value]) => (word[key] || '') !== value)
+      )
+        throw new Error(`Honorific/humble review source changed: ${record.key}`);
+      for (const type of ['honorific', 'honorific-polite', 'humble', 'humble-polite']) {
+        const decision = review.finalPerTypeDecisions[type];
+        if (!decision?.reason?.trim() || conjugateItem(word, type) !== decision.target)
+          throw new Error(`Reviewed honorific/humble target changed: ${record.key}|${type}`);
+      }
+      for (const [type, answer] of Object.entries(review.ordinaryFormsToPreserve))
+        if (conjugateItem(word, type) !== answer)
+          throw new Error(
+            `Ordinary form changed during honorific/humble repair: ${record.key}|${type}`,
+          );
+    }
     for (const form of record.changedForms)
       if (
         conjugateItem(word, form.type) !== form.after ||

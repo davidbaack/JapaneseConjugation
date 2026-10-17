@@ -44,6 +44,15 @@ function identity(word) {
   );
 }
 
+function eligibleTypes(word, cache) {
+  const key = wordKey(word);
+  if (!cache.has(key)) {
+    const prefs = /** @type {any} */ ({ skipDuplicateForms: false });
+    cache.set(key, new Set(practiceTypesForItem(word, [], prefs).map((type) => type.id)));
+  }
+  return cache.get(key);
+}
+
 export function teachingTargetFingerprint(target) {
   return target
     ? sha256(
@@ -77,14 +86,14 @@ export async function prepareTeachingCandidates(directory = TEACHING_REPAIR_DIR)
   if (source.length !== 23075 || audit.size !== source.length)
     throw new Error('Incomplete frozen baseline');
   const words = new Map(loadSentenceWords().map((word) => [wordKey(word), word]));
+  const eligibilityCache = new Map();
   const candidates = [];
   for (const original of source) {
     const prior = audit.get(original.id);
     if (!prior || sha256(JSON.stringify(original.row)) !== prior.rowSha256)
       throw new Error(`Original row binding changed: ${original.id}`);
     const word = words.get(original.row[0]);
-    const eligible =
-      word && practiceTypesForItem(word, [original.type]).some((type) => type.id === original.type);
+    const eligible = word && eligibleTypes(word, eligibilityCache).has(original.type);
     const composition = eligible && buildReviewedSentence(word, original.type);
     /** @type {any} */
     let target = null;
@@ -334,6 +343,7 @@ export function checkTeachingRepair() {
     }
   }
   const words = new Map(loadSentenceWords().map((word) => [wordKey(word), word]));
+  const eligibilityCache = new Map();
   for (const record of records) {
     const baselineKey = record.id.slice(0, record.id.lastIndexOf('|'));
     if (
@@ -386,7 +396,7 @@ export function checkTeachingRepair() {
       throw new Error(`Current composition differs from reviewed target: ${record.id}`);
     if (
       !composition ||
-      !practiceTypesForItem(word, [type]).some((t) => t.id === type) ||
+      !eligibleTypes(word, eligibilityCache).has(type) ||
       !verifiedReview(word, type, {
         jaTemplate: row[1],
         en: row[2],

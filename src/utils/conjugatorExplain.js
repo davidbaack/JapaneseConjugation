@@ -937,6 +937,33 @@ export function inferMistakenConjugationPattern(item, type, userAnswer) {
 
 export function getConjugationDebugInfo(word, type, userAnswer = '') {
   const ans = conjugateItem(word, type);
+  if (!ans) {
+    const detail = explainItem(word, type).rule;
+    return {
+      source: word.reading || word.dict || '',
+      targetType: type,
+      targetLabel: typeLabel(type),
+      category: learnerCategoryInfo(word),
+      groupLabel: groupLabel(word),
+      stem: '',
+      originalEnding: '',
+      replacement: '',
+      result: '',
+      formula: { stem: '', originalEnding: '', replacement: '', result: '', expression: '' },
+      rule: { family: 'unavailable', short: 'Form not provided', detail },
+      soundChangeVisual: null,
+      rowShiftVisual: null,
+      routes: {
+        plain: { title: 'Not provided', cells: [], formula: '', detail },
+        polite: null,
+      },
+      groupConnection: '',
+      steps: [
+        { title: 'Form not provided', desc: detail, key: 'rule', label: 'availability', value: '' },
+      ],
+      mistake: null,
+    };
+  }
   const special = specialKeigoTeaching(word, type);
   if (special) {
     const label = typeLabel(type);
@@ -1113,7 +1140,9 @@ export function explainConjugation(verb, type) {
   if (!result)
     return {
       intro,
-      rule: 'This form is unavailable in the standard practice lane.',
+      rule: /^(honorific|humble)(-|$)/.test(type)
+        ? 'This word needs an individually reviewed honorific or humble context.'
+        : 'This form is unavailable in the standard practice lane.',
       derivation: '',
       note: '',
     };
@@ -1551,6 +1580,7 @@ export function explainItem(item, type) {
 export function stepCoachHint(item, type, typed, reveal = false) {
   const expected = conjugateItem(item, type);
   const exp = explainItem(item, type);
+  if (!expected) return { text: exp.rule, masked: false };
   const special = specialKeigoTeaching(item, type);
   const compound = compoundBuildInfo(item, type);
   let recipe = [exp.rule, exp.note, safeCompoundRecipe(compound)].filter(Boolean).join(' ').trim();

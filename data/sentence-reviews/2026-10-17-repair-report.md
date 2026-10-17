@@ -42,11 +42,20 @@ source artifact applies 81 exact source repairs, excludes 63 unsupported importe
 senses, and merges eight duplicate identities while retaining canonical metadata.
 The current loaded inventory contains 2,091 words: 1,354 verbs and 737 adjectives.
 
-The lexical resolution ledger accounts for 1,978 unchanged original identities,
-121 repaired or restricted identities, and 63 excluded imports. Every current word
+The lexical resolution ledger accounts for 734 retained original identities,
+1,365 repaired or restricted identities, and 63 excluded imports. Every current word
 has a source-bound resolution, and no mandatory flag from this review remains
 unresolved. These counts differ from raw source edits because merges and shared
 engine corrections are accounted for per original loaded word.
+
+The final register review covers all 1,354 current verbs and all 5,416 automatic
+honorific/humble slots. Only 27 explicitly reviewed lexical identities offer those
+transforms, yielding 100 available targets. Other automatic transforms are withheld
+until their lexical sense and social context are reviewed. This includes existing
+honorific/humble words and homophones that previously received an unrelated special
+form. It does not declare every withheld expression ungrammatical: conventional
+doubled honorifics exist. Ordinary conjugations remain available. All 165,188
+non-register outputs matched the preceding repair commit exactly.
 
 Repairs include piano ひく, ordinary existence and elapsed-time meanings, wrong
 verb groups, malformed kana and okurigana, transitive glosses, honorific stems,
@@ -81,14 +90,17 @@ profile; repaired identities without individual context review remain pending.
 
 ## Validation
 
-- `npm run ci:fast`: formatting, lint, all type checks, 105 files / 1,339 tests passed.
-- `npm run ci` outside the Windows sandbox: 1,339 unit tests and 100 browser tests
+- `npm run ci:fast`: formatting, lint, all type checks, 105 files / 1,343 tests passed.
+- `npm run ci` outside the Windows sandbox: 1,343 unit tests and 100 browser tests
   passed across Chromium, Firefox, and WebKit; 20 configured skips remain skips.
   The new served regression launches piano causative Practice and accepts ひかせる.
-- Production build and unchanged bundle caps passed: eager 159.9/160 KB,
-  precache 374.0/415 KB, total JS/CSS 321.4/330 KB.
+- Production build and unchanged bundle caps passed: eager 159.7/160 KB,
+  precache 374.0/415 KB, total JS/CSS 321.5/330 KB.
 - The narrow derived-form dispatch simplification preserves 1,071,504 compared
   answer/surface outputs across 4,252 original/current words and all 126 types.
+- Production Tailwind sources cover application code and exclude tests, mocks,
+  type-check fixtures, and the DEV-only History panel. Development still includes
+  History styles. Existing bundle caps were not increased.
 - Both full editorial-ledger checks and the 23,024-row mechanical corpus check
   passed. Independent final review found no blocking issue in the reviewed scope.
 - The production lexicon loader, bundled admission, and prompt builder accepted
@@ -102,3 +114,5 @@ Primary grammar calibration: [Japan Foundation appearance-sou](https://www.kyoza
 [spoken short causatives](https://www.kyozai.jpf.go.jp/kyozai/material/BMA00075/ja/render.do),
 [standard causative-passives](https://www.kyozai.jpf.go.jp/kyozai/material/BMA00076/ja/render.do),
 and [NINJAL piano reading](https://mmsrv.ninjal.ac.jp/kamus/data/item1266.html).
+Register calibration also uses the [Cultural Agency's 敬語の指針](https://www.bunka.go.jp/seisaku/bunkashingikai/kokugo/hokoku/pdf/93927001_09.pdf),
+including its discussion of conventional doubled forms on printed page 30.

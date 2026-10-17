@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "reviewedAtUtc": "2026-10-17T19:17:21.367Z",
+  "reviewedAtUtc": "2026-10-17T19:54:50.513Z",
   "originalLexicalIdentities": 2162,
   "currentLexicalIdentities": 2091,
   "counts": {
-    "retained": 1978,
-    "repaired-or-restricted": 121,
+    "retained": 734,
+    "repaired-or-restricted": 1365,
     "excluded-import": 63
   },
   "unresolvedMandatoryFlags": 0,
@@ -19,7 +19,7 @@
     "scope": "Reading and POS evidence supports lexical review; dictionary POS alone does not certify intended sense or every sentence context."
   },
   "ledgerPath": "data/sentence-reviews/2026-10-17-lexical-repair.jsonl.gz",
-  "ledgerSha256": "72fa890f48ea2a2b86c992d8a625f964ebde7deec3c2736d9f57e3f2c4d76efa",
+  "ledgerSha256": "7e84c008d8f109a0df0e3b3e1e5b03bf16767ede792e26c48dc155324259c142",
   "sources": [
     {
       "path": "public/data/verb-lexicon.json",
@@ -35,7 +35,7 @@
     },
     {
       "path": "src/utils/conjugator.js",
-      "sha256": "d76b4d014b254859d445aa9012f07a4d600f710074068f88d0e1260617e90de8"
+      "sha256": "ffc2b199bfd0294d745606ea660db3b9a93c287640ac551abe1e71e09c3fff97"
     },
     {
       "path": "scripts/lexicalTeachingRepairs.js",
@@ -45,5 +45,15 @@
       "path": "scripts/build-verb-lexicon.js",
       "sha256": "c4a6ea185d0a13c330ae82d1c6cb455e22a2a58fb50a6ae81f597c954f74466d"
     }
-  ]
+  ],
+  "registerPolicy": {
+    "verbs": 1354,
+    "slots": 5416,
+    "reviewedOrdinaryIdentities": 27,
+    "offeredTargets": 100,
+    "rule": "Honorific/humble transformations require reviewed canonical spelling, group and reading; the two canonical kana giving identities also require the reviewed sense. Unknown aliases and generic contexts are withheld, not declared nonexistent.",
+    "primaryEvidence": "https://www.bunka.go.jp/seisaku/bunkashingikai/kokugo/hokoku/pdf/93927001_09.pdf",
+    "ordinaryOutputsCompared": 165188,
+    "ordinaryOutputDifferences": 0
+  }
 }

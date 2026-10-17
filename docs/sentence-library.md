@@ -27,6 +27,13 @@ ordinary word Practice using its existing explanation and records no progress
 event for that fallback. Withholding does not label every possible use of the
 expression ungrammatical.
 
+Automatic honorific/humble word Practice also requires a reviewed lexical identity,
+reading, and sense. The current register overlay reviews all 1,354 verbs and offers
+100 transforms across 27 identities. Existing register-marked words, ambiguous
+aliases, and unreviewed combinations receive no automatic register target; their
+ordinary conjugations remain available. This restriction does not claim that every
+possible contextual use is ungrammatical.
+
 The content hash namespace is now `sentence-review-v2`. Metadata `version: 1`
 remains compatible with the existing database RLS schema; the namespace change
 retires every previous content hash in bundled, database, and cached admission.

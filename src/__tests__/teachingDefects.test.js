@@ -5,11 +5,15 @@ import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
 import {
   compatibleTypes,
   conjugateItem,
+  getSpecialKeigoBase,
   isTypeCompatible,
+  keigoForm,
   practiceTypesForItem,
+  regularHonorificForm,
+  regularHumbleForm,
   surfaceFormFor,
 } from '../utils/conjugator.js';
-import { explainItem, getConjugationDebugInfo } from '../utils/conjugatorExplain.js';
+import { explainItem, getConjugationDebugInfo, stepCoachHint } from '../utils/conjugatorExplain.js';
 import { repairLexicalTeachingRow } from '../../scripts/lexicalTeachingRepairs.js';
 import {
   findJmdictEntry,
@@ -26,6 +30,163 @@ const words = mergeBuiltInWords(inflateVerbRows([...lexicon.verbs, ...lexicon.ad
 const word = (dict, group) => words.find((item) => item.dict === dict && item.group === group);
 
 describe('learner-facing teaching repairs', () => {
+  it('withholds automatic keigo for already polite words and unreviewed phrase contexts', () => {
+    for (const dict of [
+      '致す',
+      'いらっしゃる',
+      '伺う',
+      'おっしゃる',
+      'おる',
+      'くださる',
+      'ごらんになる',
+      '差し上げる',
+      'なさる',
+      '拝見する',
+      '参る',
+      '召し上がる',
+      '申し上げる',
+      '申す',
+      'いただく',
+      '承る',
+      'お目に掛かる',
+      '存じる',
+      '召す',
+      'ござる',
+      'ご覧になる',
+      '失礼いたす',
+      'でござる',
+      'お先に失礼する',
+      '学校に入る',
+    ]) {
+      const item = words.find((entry) => entry.dict === dict);
+      expect(item, dict).toBeDefined();
+      for (const type of ['honorific', 'honorific-polite', 'humble', 'humble-polite']) {
+        expect(conjugateItem(item, type), `${dict}/${type}`).toBe('');
+        expect(surfaceFormFor(item, type)).toBe('');
+        expect(isTypeCompatible(item, type)).toBe(false);
+        expect(getSpecialKeigoBase(item, type)).toBeUndefined();
+        expect(getConjugationDebugInfo(item, type).formula.expression).toBe('');
+        expect(getConjugationDebugInfo(item, type).rule.family).toBe('unavailable');
+        expect(explainItem(item, type).rule).toContain('reviewed');
+        expect(stepCoachHint(item, type, '').text).toContain('reviewed');
+      }
+      expect(regularHonorificForm(item)).toBe('');
+      expect(regularHumbleForm(item)).toBe('');
+      expect(keigoForm(item, 'honorific')).toBe('');
+      expect(keigoForm(item, 'humble')).toBe('');
+      expect(conjugateItem(item, 'polite-present')).not.toBe('');
+    }
+  });
+
+  it('does not replace homographs with unrelated eating, sleeping, giving or meeting senses', () => {
+    for (const dict of [
+      '切る',
+      '斬る',
+      '煎る',
+      '炒る',
+      '練る',
+      '刷る',
+      '合う',
+      '効く',
+      '上げる',
+      '揚げる',
+      '暮れる',
+      '診る',
+      '遭う',
+    ]) {
+      const item = words.find((entry) => entry.dict === dict);
+      expect(item, dict).toBeDefined();
+      for (const type of ['honorific', 'humble']) {
+        expect(getSpecialKeigoBase(item, type)).toBeUndefined();
+        expect(conjugateItem(item, type), `${dict}/${type}`).toBe('');
+      }
+      expect(conjugateItem(item, 'plain-past')).not.toBe('');
+    }
+  });
+
+  it('requires the known sense for ambiguous kana-only special verbs', () => {
+    expect(keigoForm({ dict: '造語', group: 'godan' }, 'honorific')).toBe('');
+    for (const [dict, reading, group] of [
+      ['読む', 'はなす', 'godan'],
+      ['話す', 'かく', 'godan'],
+      ['教える', 'たべる', 'ichidan'],
+    ]) {
+      const changed = { dict, reading, group, meaning: 'different custom identity' };
+      expect(conjugateItem(changed, 'honorific')).toBe('');
+      expect(conjugateItem(changed, 'humble')).toBe('');
+    }
+    for (const [dict, meaning, group] of [
+      ['あう', 'to fit', 'godan'],
+      ['あげる', 'to raise', 'ichidan'],
+      ['みる', 'to examine a patient', 'ichidan'],
+      ['くれる', 'to get dark', 'ichidan'],
+      ['きく', 'to be effective', 'godan'],
+    ]) {
+      const item = { dict, reading: dict, meaning, group };
+      expect(getSpecialKeigoBase(item, 'honorific')).toBeUndefined();
+      expect(conjugateItem(item, 'honorific')).toBe('');
+    }
+    expect(
+      conjugateItem(
+        { dict: 'きる', reading: 'きる', meaning: 'to cut', group: 'godan' },
+        'honorific',
+      ),
+    ).toBe('');
+    expect(
+      conjugateItem(
+        { dict: '着る', reading: 'きる', meaning: 'to wear', group: 'ichidan' },
+        'honorific',
+      ),
+    ).toBe('おめしになる');
+  });
+
+  it('preserves the 27 reviewed ordinary keigo sources and their correct meanings', () => {
+    const approved = words.filter((item) =>
+      ['honorific', 'humble'].some((type) => !!conjugateItem(item, type)),
+    );
+    expect(approved.map((item) => item.dict).sort()).toEqual(
+      [
+        '会う',
+        '言う',
+        '行く',
+        '居る',
+        '教える',
+        '書く',
+        '借りる',
+        '聞く',
+        '着る',
+        '来る',
+        '死ぬ',
+        '知る',
+        'する',
+        '食べる',
+        '寝る',
+        '飲む',
+        '話す',
+        '待つ',
+        '見せる',
+        '見る',
+        '持つ',
+        '読む',
+        'あげる',
+        'くれる',
+        '尋ねる',
+        '訪ねる',
+        'もらう',
+      ].sort(),
+    );
+    expect(conjugateItem(word('読む', 'godan'), 'honorific')).toBe('およみになる');
+    expect(conjugateItem(word('読む', 'godan'), 'humble-polite')).toBe('およみします');
+    expect(conjugateItem(word('着る', 'ichidan'), 'honorific')).toBe('おめしになる');
+    expect(conjugateItem(word('死ぬ', 'godan'), 'honorific')).toBe('おなくなりになる');
+    expect(regularHonorificForm(word('死ぬ', 'godan'))).toBe('おなくなりになる');
+    expect(conjugateItem(word('寝る', 'ichidan'), 'honorific')).toBe('おやすみになる');
+    expect(conjugateItem(word('寝る', 'ichidan'), 'humble')).toBe('');
+    expect(conjugateItem(word('寝る', 'ichidan'), 'humble-polite')).toBe('');
+    expect(conjugateItem(word('あげる', 'ichidan'), 'honorific')).toBe('くださる');
+    expect(conjugateItem(word('くれる', 'ichidan'), 'honorific-polite')).toBe('くださいます');
+  });
+
   it('never offers pitiable as the appearance form of cute', () => {
     for (const dict of ['かわいい', '可愛い']) {
       const item = word(dict, 'i-adjective');

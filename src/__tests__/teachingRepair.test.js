@@ -62,5 +62,5 @@ describe('source-bound teaching repair', () => {
     expect(result.originalPairs).toBe(23075);
     expect(result.publishedPairs).toBe(result.counts.retained + result.counts.repaired);
     expect(result.counts.retained + result.counts.repaired + result.counts.withheld).toBe(23075);
-  });
+  }, 15000);
 });

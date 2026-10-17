@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "createdAtUtc": "2026-10-17T19:16:30.565Z",
+  "createdAtUtc": "2026-10-17T19:54:53.044Z",
   "hashPolicy": "sentence-review-v2",
   "metadataVersion": 1,
   "baselineCorpusRevision": "2941ca5b6bd47a101c741bf6c7d78b3d8d9c086d459fd314ee79ab34d0932d37",
@@ -23,7 +23,7 @@
     },
     {
       "path": "src/utils/conjugator.js",
-      "sha256": "d76b4d014b254859d445aa9012f07a4d600f710074068f88d0e1260617e90de8"
+      "sha256": "ffc2b199bfd0294d745606ea660db3b9a93c287640ac551abe1e71e09c3fff97"
     },
     {
       "path": "src/utils/sentenceTrust.js",
