@@ -20,7 +20,9 @@ const VIEW_ANCHORS = {
 
 async function gotoFreshApp(page) {
   await page.goto('/');
-  await page.waitForLoadState('networkidle');
+  // Background service-worker traffic can outlast the usable app in Firefox.
+  await expect(page.getByRole('button', { name: 'Core forms', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Answer', exact: true })).toBeVisible();
   await page.evaluate(async () => {
     const registrations = navigator.serviceWorker
       ? await navigator.serviceWorker.getRegistrations()
@@ -30,7 +32,8 @@ async function gotoFreshApp(page) {
     await Promise.all(keys.map((key) => window.caches.delete(key)));
   });
   await page.goto('/');
-  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('button', { name: 'Core forms', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Answer', exact: true })).toBeVisible();
 }
 
 test.describe('Tab navigation', () => {

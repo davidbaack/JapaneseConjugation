@@ -2858,7 +2858,9 @@ export default function StudyView({ mode = 'practice' }) {
           </details>
         )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-          <div className="relative px-4 pb-3 pt-14 text-center sm:px-6 sm:pb-8 sm:pt-16">
+          <div
+            className={`relative px-4 pb-3 ${transformationMode ? 'pt-20' : 'pt-14'} text-center sm:px-6 sm:pb-8 sm:pt-16`}
+          >
             <div className="absolute left-4 right-4 top-4 grid grid-cols-2 items-start gap-x-2 gap-y-1 sm:left-6 sm:right-6 sm:top-8 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-y-0">
               <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
                 Word level: {currentWordMeta.jlpt}

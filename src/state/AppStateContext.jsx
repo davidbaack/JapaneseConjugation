@@ -1199,12 +1199,37 @@ function useAppController() {
   const allWords = useMemo(() => [...allVerbs, ...allAdjectives], [allVerbs, allAdjectives]);
   // Cross-view actions, so views don't need ad-hoc callback props.
   function practiceWord(word, type, options = {}) {
+    // Reference comparisons and weak rules prepare their own multi-form selection;
+    // inventory only supplies an initial card. All other typed launches request
+    // that exact form, including Check's "Practice this form" action.
+    const selectsExactForm =
+      !!type && !['compare', 'weak', 'inventory'].includes(options.launchMode);
     if (word || type) {
-      setState((prev) =>
-        includeTypeFamilyInReviewState(includeWordInReviewState(prev, word), type),
-      );
+      setState((prev) => {
+        const next = includeTypeFamilyInReviewState(includeWordInReviewState(prev, word), type);
+        return selectsExactForm
+          ? updateStatePracticeSelection(
+              next,
+              practiceSelectionForTypeIds([type], next.practiceSelection),
+            )
+          : next;
+      });
     }
-    if (options.launchMode === 'word-sweep') {
+    if (selectsExactForm) {
+      setPracticePrefs((prev) => ({
+        ...prev,
+        reviewStyle: 'forms',
+        sourceFormStrategy: 'dictionary',
+        promptForm: 'dictionary',
+        minimalPairSetId: '',
+        minimalPairReturn: null,
+        reviewLimit: 0,
+        reviewLimitSource: '',
+        practicePath: '',
+        wordListIds: [],
+      }));
+    }
+    if (selectsExactForm || options.launchMode === 'word-sweep') {
       try {
         sessionStorage.removeItem('jp-study-current');
       } catch {}

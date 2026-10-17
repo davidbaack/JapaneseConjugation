@@ -264,7 +264,7 @@ export function AnswerInputPanel({
               <p className="text-sm text-stone-600 dark:text-stone-400 mb-3">
                 Say or write the answer on your own, then reveal it and grade honestly.
               </p>
-              <StickyAction className="mt-3" dock>
+              <StickyAction className="mt-3" dock flowOnMobile={transformationMode}>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setSelfCheckOpen(true)}
@@ -297,7 +297,7 @@ export function AnswerInputPanel({
                 />
                 <div className="text-xs text-stone-600 mt-2">{targetEnglish}</div>
               </div>
-              <StickyAction className="mt-3" dock>
+              <StickyAction className="mt-3" dock flowOnMobile={transformationMode}>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => gradeSelfCheck(true, 'Remembered')}
@@ -405,7 +405,7 @@ export function AnswerInputPanel({
               {speechError}
             </div>
           )}
-          <StickyAction className="mt-3" dock>
+          <StickyAction className="mt-3" dock flowOnMobile={transformationMode}>
             <button
               onClick={() => submit(answer, { spoken: true })}
               disabled={!answer.trim()}
@@ -565,7 +565,7 @@ export function AnswerInputPanel({
               {liveStatus}
             </div>
           )}
-          <StickyAction className="mt-3" dock>
+          <StickyAction className="mt-3" dock flowOnMobile={transformationMode}>
             <button
               onClick={() => submit()}
               disabled={!answer.trim()}
@@ -598,7 +598,7 @@ export function AnswerInputPanel({
         </>
       ) : (
         <>
-          <StickyAction className="mt-1" dock>
+          <StickyAction className="mt-1" dock flowOnMobile={transformationMode}>
             <label
               htmlFor={answerInputId}
               className="mb-1.5 block text-left text-xs font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400"

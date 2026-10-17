@@ -348,11 +348,13 @@ export default function RushView() {
               style={{ width: pct + '%' }}
             />
           </div>
-          <div className="relative h-80 overflow-hidden rounded-2xl bg-stone-900 border border-stone-800 text-white">
-            <div className="absolute inset-x-5 bottom-10 h-px bg-rose-400/70" />
+          <div className="relative min-h-48 rounded-2xl bg-stone-900 border border-stone-800 text-white sm:h-80 sm:overflow-hidden">
+            <div className="absolute inset-x-5 bottom-10 hidden h-px bg-rose-400/70 sm:block" />
             {round && (
               <div
-                className="absolute left-5 right-5 transition-transform duration-100"
+                role="group"
+                aria-label="Rush prompt"
+                className="relative p-3 max-sm:transform-none! sm:absolute sm:left-5 sm:right-5 sm:p-0 sm:transition-transform sm:duration-100"
                 style={{ transform: `translateY(${fall}px)` }}
               >
                 <div className="rounded-2xl bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 shadow-xl p-5 border border-stone-200 dark:border-stone-800">
@@ -411,7 +413,7 @@ export default function RushView() {
               </div>
             )}
           </div>
-          <StickyAction pad="-mx-5 px-5" className="mt-4">
+          <StickyAction pad="-mx-5 px-5" className="mt-4" flowOnMobile>
             <div className="grid sm:grid-cols-[1fr_auto] gap-2">
               <input
                 value={answer}
