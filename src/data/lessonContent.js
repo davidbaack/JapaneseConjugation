@@ -8,6 +8,29 @@ const lessonFromGroup = (groupId, lesson) => ({
   typeIds: groupTypeIds(groupId),
 });
 
+export const BEGINNER_TERMS = [
+  {
+    term: 'Dictionary form',
+    definition:
+      'The form used to look up a word, such as 食べる (たべる, to eat). For verbs, it is also the plain non-past form.',
+  },
+  {
+    term: 'Plain form',
+    definition:
+      'A form without a polite ending such as ます. Plain forms are used in casual speech and inside many sentence patterns. Plain Past asks for the past form, not the dictionary form.',
+  },
+  {
+    term: 'Ichidan',
+    definition:
+      'A verb group that drops its final る before adding endings: 食べる (たべる) → 食べない (たべない, do not eat).',
+  },
+  {
+    term: 'Godan',
+    definition:
+      'A verb group whose final kana changes with the ending: 書く (かく) → 書かない (かかない, do not write). Some verbs ending in る are godan; check the word’s group.',
+  },
+];
+
 export const FOUNDATION_CARDS = [
   {
     title: 'Ichidan verbs',
@@ -128,6 +151,35 @@ export const LESSON_SECTIONS = [
       ['書く', '書く / 書かない / 書きます', 'godan uses a-row for negative and i-row before ます'],
       ['高い', '高くない / 高いです / 高くないです', 'い-adjective stem is 高'],
     ],
+    exampleSupport: {
+      食べる: {
+        reading: 'たべる',
+        meaning: 'to eat',
+        forms: [
+          ['たべる', 'eat / will eat'],
+          ['たべない', 'do not eat / will not eat'],
+          ['たべます', 'eat / will eat (polite)'],
+        ],
+      },
+      書く: {
+        reading: 'かく',
+        meaning: 'to write',
+        forms: [
+          ['かく', 'write / will write'],
+          ['かかない', 'do not write / will not write'],
+          ['かきます', 'write / will write (polite)'],
+        ],
+      },
+      高い: {
+        reading: 'たかい',
+        meaning: 'high / expensive',
+        forms: [
+          ['たかくない', 'not high / not expensive'],
+          ['たかいです', 'high / expensive (polite)'],
+          ['たかくないです', 'not high / not expensive (polite)'],
+        ],
+      },
+    },
   }),
   lessonFromGroup('te-ta-sound-changes', {
     title: 'Te/Ta Sound Changes',
@@ -144,6 +196,32 @@ export const LESSON_SECTIONS = [
       ['話す', '話して / 話した', 'す becomes して / した'],
       ['来る', 'きて / きた', 'kuru uses き for both te and ta'],
     ],
+    exampleSupport: {
+      読む: {
+        reading: 'よむ',
+        meaning: 'to read',
+        forms: [
+          ['よんで', 'read and… (connects to what follows)'],
+          ['よんだ', 'read (past)'],
+        ],
+      },
+      話す: {
+        reading: 'はなす',
+        meaning: 'to speak',
+        forms: [
+          ['はなして', 'speak and… (connects to what follows)'],
+          ['はなした', 'spoke'],
+        ],
+      },
+      来る: {
+        reading: 'くる',
+        meaning: 'to come',
+        forms: [
+          ['きて', 'come and… (connects to what follows)'],
+          ['きた', 'came'],
+        ],
+      },
+    },
   }),
   lessonFromGroup('volitional', {
     title: 'Volitional',
@@ -158,6 +236,26 @@ export const LESSON_SECTIONS = [
       ['書く', '書こう', 'godan o-row + う'],
       ['する', 'しよう', 'irregular する core'],
     ],
+    exampleSupport: {
+      食べる: {
+        reading: 'たべる',
+        meaning: 'to eat',
+        forms: [
+          ['たべよう', 'let’s eat'],
+          ['たべましょう', 'let’s eat (polite)'],
+        ],
+      },
+      書く: {
+        reading: 'かく',
+        meaning: 'to write',
+        forms: [['かこう', 'let’s write']],
+      },
+      する: {
+        reading: 'する',
+        meaning: 'to do',
+        forms: [['しよう', 'let’s do it']],
+      },
+    },
   }),
   lessonFromGroup('wanting', {
     title: 'Wanting with 〜たい',
@@ -172,6 +270,29 @@ export const LESSON_SECTIONS = [
       ['書く', '書きたい / 書きたかった', 'godan i-row + たい'],
       ['する', 'したい', 'irregular する stem'],
     ],
+    exampleSupport: {
+      食べる: {
+        reading: 'たべる',
+        meaning: 'to eat',
+        forms: [
+          ['たべたい', 'want to eat'],
+          ['たべたくない', 'do not want to eat'],
+        ],
+      },
+      書く: {
+        reading: 'かく',
+        meaning: 'to write',
+        forms: [
+          ['かきたい', 'want to write'],
+          ['かきたかった', 'wanted to write'],
+        ],
+      },
+      する: {
+        reading: 'する',
+        meaning: 'to do',
+        forms: [['したい', 'want to do']],
+      },
+    },
   }),
   lessonFromGroup('potential', {
     title: 'Potential',
@@ -435,6 +556,32 @@ export const LESSON_SECTIONS = [
       ['静か', '静かだった / 静かではない', 'な-adjective base'],
       ['いい', 'よかった / よくない', 'irregular よ stem'],
     ],
+    exampleSupport: {
+      高い: {
+        reading: 'たかい',
+        meaning: 'high / expensive',
+        forms: [
+          ['たかかった', 'was high / expensive'],
+          ['たかくない', 'not high / not expensive'],
+        ],
+      },
+      静か: {
+        reading: 'しずか',
+        meaning: 'quiet',
+        forms: [
+          ['しずかだった', 'was quiet'],
+          ['しずかではない', 'not quiet'],
+        ],
+      },
+      いい: {
+        reading: 'いい',
+        meaning: 'good',
+        forms: [
+          ['よかった', 'was good'],
+          ['よくない', 'not good'],
+        ],
+      },
+    },
   }),
   lessonFromGroup('adjective-connectors', {
     title: 'Adjective Connectors and Modifiers',

@@ -297,6 +297,7 @@ export default function GuideView() {
 
   useEffect(() => {
     if (!card) return;
+    if (document.activeElement?.getAttribute('role') === 'tab') return;
     if (result) {
       recapRef.current?.focus();
       return;

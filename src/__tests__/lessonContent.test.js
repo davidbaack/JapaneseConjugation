@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RU_MASU_DIAGNOSTIC_ROWS } from '../data/lessonContent.js';
+import { LESSON_SECTIONS, LESSON_TRACKS, RU_MASU_DIAGNOSTIC_ROWS } from '../data/lessonContent.js';
 
 describe('lesson content', () => {
   it('teaches the ru-verb masu diagnostic with trap and homophone examples', () => {
@@ -19,5 +19,23 @@ describe('lesson content', () => {
       polite: '着ます',
       group: 'ichidan',
     });
+  });
+
+  it('provides kana and meanings for every base and form in the beginner track', () => {
+    const beginner = LESSON_TRACKS.find((track) => track.id === 'beginner');
+    for (const groupId of beginner.lessonGroupIds) {
+      const lesson = LESSON_SECTIONS.find((section) => section.groupId === groupId);
+      for (const [base, forms] of lesson.examples) {
+        const support = lesson.exampleSupport[base];
+        expect(support, `${groupId}: ${base}`).toBeTruthy();
+        expect(support.reading).toMatch(/^[\u3040-\u30ff]+$/u);
+        expect(support.meaning).toMatch(/[a-z]/i);
+        expect(support.forms).toHaveLength(forms.split(' / ').length);
+        for (const [reading, meaning] of support.forms) {
+          expect(reading).toMatch(/^[\u3040-\u30ff]+$/u);
+          expect(meaning).toMatch(/[a-z]/i);
+        }
+      }
+    }
   });
 });

@@ -270,7 +270,7 @@ export default function CheckView() {
   // Land with the cursor in the box — this is a "type immediately" tool — but
   // not on touch devices, where it would force the keyboard up over the intro.
   useEffect(() => {
-    if (!isCoarsePointer) focusInput();
+    if (!isCoarsePointer && document.activeElement?.getAttribute('role') !== 'tab') focusInput();
   }, [focusInput]);
 
   // Persist recent checks so they survive tab switches and reloads.

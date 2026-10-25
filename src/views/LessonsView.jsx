@@ -15,6 +15,23 @@ import {
   buildRuleReviewRecommendation,
 } from '../utils/reviewRecommendations.js';
 import { parseFormationKeysHash } from '../utils/formationKeys.js';
+import { BeginnerTerms } from './study/PracticeBeginnerHelp.jsx';
+
+function LessonExampleWord({ text, reading = '', meaning = '' }) {
+  return (
+    <div>
+      <div lang={/[\u3040-\u30ff\u3400-\u9fff]/u.test(text) ? 'ja' : undefined}>{text}</div>
+      {reading && reading !== text ? (
+        <div lang="ja" className="mt-0.5 text-xs font-normal text-stone-600 dark:text-stone-400">
+          {reading}
+        </div>
+      ) : null}
+      {meaning ? (
+        <div className="mt-1 text-xs font-normal text-stone-600 dark:text-stone-400">{meaning}</div>
+      ) : null}
+    </div>
+  );
+}
 
 function TypeChip({ id }) {
   const type = getTypeInfo(id);
@@ -215,6 +232,11 @@ function lessonMatches(lesson, query) {
     lesson.variants,
     lesson.watch,
     ...lesson.examples.flat(),
+    ...Object.values(lesson.exampleSupport || {}).flatMap((example) => [
+      example.reading,
+      example.meaning,
+      ...example.forms.flat(),
+    ]),
     ...lesson.typeIds.map((id) => {
       const type = getTypeInfo(id);
       return `${type.label} ${type.hint}`;
@@ -292,6 +314,7 @@ export default function LessonsView() {
     if (!lesson) return;
 
     const timer = window.setTimeout(() => {
+      if (document.activeElement?.getAttribute('role') === 'tab') return;
       lesson.scrollIntoView({ behavior: 'smooth', block: 'start' });
       try {
         lesson.focus({ preventScroll: true });
@@ -384,6 +407,15 @@ export default function LessonsView() {
           </p>
         </div>
       </section>
+
+      <details className="rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-700 dark:text-stone-200">
+          What do dictionary, plain, ichidan and godan mean?
+        </summary>
+        <div className="border-t border-stone-100 p-4 dark:border-stone-800">
+          <BeginnerTerms />
+        </div>
+      </details>
 
       {learnFocus?.source === 'practice-result' && learnFocus?.lessonGroupId && (
         <PracticeCardReturnPanel
@@ -742,25 +774,39 @@ export default function LessonsView() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
-                          {lesson.examples.map(([base, forms, why]) => (
-                            <tr key={`${lesson.groupId}-${base}`}>
-                              <td
-                                lang="ja"
-                                className="px-4 py-2 font-semibold text-stone-900 dark:text-stone-100"
-                              >
-                                {base}
-                              </td>
-                              <td
-                                lang="ja"
-                                className="px-4 py-2 text-stone-700 dark:text-stone-300"
-                              >
-                                {forms}
-                              </td>
-                              <td className="px-4 py-2 text-stone-600 hidden sm:table-cell">
-                                {why}
-                              </td>
-                            </tr>
-                          ))}
+                          {lesson.examples.map(([base, forms, why]) => {
+                            const support = lesson.exampleSupport?.[base];
+                            return (
+                              <tr key={`${lesson.groupId}-${base}`}>
+                                <td className="px-4 py-3 align-top font-semibold text-stone-900 dark:text-stone-100">
+                                  <LessonExampleWord
+                                    text={base}
+                                    reading={support?.reading}
+                                    meaning={support?.meaning}
+                                  />
+                                </td>
+                                <td className="px-4 py-3 text-stone-700 dark:text-stone-300">
+                                  {support ? (
+                                    <div className="space-y-3">
+                                      {forms.split(' / ').map((form, index) => (
+                                        <LessonExampleWord
+                                          key={form}
+                                          text={form}
+                                          reading={support.forms[index]?.[0]}
+                                          meaning={support.forms[index]?.[1]}
+                                        />
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <LessonExampleWord text={forms} />
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 align-top text-stone-600 hidden sm:table-cell">
+                                  {why}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

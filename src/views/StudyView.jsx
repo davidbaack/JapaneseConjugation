@@ -94,6 +94,7 @@ import {
 import { StudyFocusBar } from './study/StudyFocusBar.jsx';
 import { AnswerInputPanel } from './study/AnswerInputPanel.jsx';
 import PracticeSelector from './study/PracticeSelector.jsx';
+import PracticeBeginnerHelp from './study/PracticeBeginnerHelp.jsx';
 import {
   addPracticeTypeSelection,
   matchingPracticeTypeIdsForCategory,
@@ -132,6 +133,8 @@ const ANSWER_STYLE_OPTIONS = [
 
 function focusWithoutScroll(element) {
   if (!element || typeof window === 'undefined') return;
+  // Mounting/restoring an exercise must not interrupt tablist navigation.
+  if (document.activeElement?.getAttribute('role') === 'tab') return;
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
   element.focus({ preventScroll: true });
@@ -1282,7 +1285,25 @@ export default function StudyView({ mode = 'practice' }) {
   }
 
   if (!current) {
-    const hasSessionFilter = !!(sessionFilterWord || sessionFilterFormGroupId);
+    const focusedWord = sessionFilterWord || focusWordLock;
+    const hasSessionFilter = !!(focusedWord || sessionFilterFormGroupId);
+    const incompatibleWord =
+      focusedWord &&
+      !wordSweep &&
+      !transformationMode &&
+      !practiceTypesForItem(focusedWord, enabledTypes, practicePrefs).length;
+    const recoveryGroup = FORM_GROUPS.find(
+      (group) =>
+        group.id === (focusedWord && isAdjective(focusedWord) ? 'adjective-core' : 'basic-tenses'),
+    );
+    const recoveryTypes = incompatibleWord
+      ? wordSweepTypeIdsFor(
+          state,
+          focusedWord,
+          reviewTypeIdsForState(state, recoveryGroup?.typeIds || []),
+          practicePrefs,
+        )
+      : [];
     return (
       <div className="space-y-4">
         {!transformationMode && (
@@ -1304,18 +1325,60 @@ export default function StudyView({ mode = 'practice' }) {
           />
         )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
-          {hasSessionFilter ? (
+          {incompatibleWord && recoveryTypes.length ? (
+            <div className="space-y-4 text-left">
+              <h2 className="font-semibold text-stone-800 dark:text-stone-100">
+                Choose compatible forms for <span lang="ja">{focusedWord.dict}</span>
+              </h2>
+              <p className="text-sm text-stone-600 dark:text-stone-300">
+                This word uses the {groupDisplayLabel(focusedWord.group)} pattern. Your selected
+                forms ({enabledTypes.map((type) => getTypeInfo(type).label).join(', ')}) do not
+                apply to it.
+              </p>
+              <p className="text-sm text-stone-600 dark:text-stone-300">
+                Practicing {recoveryGroup.label} will replace your selection with these{' '}
+                {recoveryTypes.length} forms and keep this word selected:
+              </p>
+              <ul className="list-disc pl-5 text-sm text-stone-600 dark:text-stone-300">
+                {recoveryTypes.map((type) => (
+                  <li key={type}>{getTypeInfo(type).label}</li>
+                ))}
+              </ul>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetActiveAttempt();
+                    setSessionFilterFormGroupId(null);
+                    onFocusConsumed?.();
+                    setState((prev) =>
+                      updateStatePracticeSelection(
+                        prev,
+                        practiceSelectionForTypeIds(recoveryTypes),
+                      ),
+                    );
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+                >
+                  Practice {recoveryGroup.label}
+                </button>
+                <button
+                  type="button"
+                  onClick={returnToOverview}
+                  className="px-4 py-2 border border-stone-200 dark:border-stone-800 rounded-lg text-sm"
+                >
+                  Keep selected forms; choose another word
+                </button>
+              </div>
+            </div>
+          ) : hasSessionFilter ? (
             <>
               <p className="text-stone-600 dark:text-stone-300 mb-2">No cards for this focus</p>
               <p className="text-xs text-stone-600 dark:text-stone-500 mb-4">
                 Try a different word or form type.
               </p>
               <button
-                onClick={() => {
-                  setSessionFilterWord(null);
-                  setSessionFilterFormGroupId(null);
-                  onFocusConsumed?.();
-                }}
+                onClick={returnToOverview}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
               >
                 Clear focus
@@ -1652,6 +1715,10 @@ export default function StudyView({ mode = 'practice' }) {
       cardOrigin: cardOriginForStudyCard(current),
       selectionReason: current.selectionReason || null,
       submittedAnswer: answerSnapshot,
+      sentencePrompt:
+        sentencePrompt?.mode === 'forward-cloze'
+          ? { ...sentencePrompt, cloze: { ...sentencePrompt.cloze } }
+          : null,
       reviewChoiceLabel: choiceLabel,
       revealedMiss: wasRevealed,
       correct,
@@ -2544,6 +2611,18 @@ export default function StudyView({ mode = 'practice' }) {
   // text, an optional "Discuss further" AI chat trigger, and the chat itself.
   // Each mode supplies its own step-coach button (styled to fit its layout) that
   // calls showStepHint().
+  const currentHint = stepHint
+    ? stepCoachHint(current.verb, current.type, answer, hintRevealed)
+    : null;
+  const currentHintText = currentHint
+    ? transformationMode
+      ? transformationHintFromBase(currentHint, {
+          reverseDrill,
+          sourceInfo: sourceTypeInfo,
+          targetInfo: targetTypeInfo,
+        }).text
+      : currentHint.text
+    : '';
   const stepHintButtonLabel = hintMasked || hintRevealed ? 'Reveal steps' : 'Hint';
   const hintDisclosure =
     !reverseDrill && (stepHint || (geminiKey && (stepHint || coachChatOpen))) ? (
@@ -2554,7 +2633,7 @@ export default function StudyView({ mode = 'practice' }) {
             style={{ whiteSpace: 'pre-wrap' }}
             className="w-full rounded-lg border border-indigo-100 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-2 text-xs text-stone-700 dark:text-stone-300 text-left max-h-40 overflow-y-auto"
           >
-            {stepHint}
+            {currentHintText}
           </div>
         )}
         {geminiKey && stepHint && !coachChatOpen && (
@@ -2974,6 +3053,7 @@ export default function StudyView({ mode = 'practice' }) {
             )}
             <div className="mt-3 flex flex-col gap-1 sm:mt-4">
               <AnswerInputPanel
+                sentencePrompt={sentencePrompt}
                 phase={phase}
                 transformationMode={transformationMode}
                 transformationActionLabel={transformationActionLabel}
@@ -3058,6 +3138,15 @@ export default function StudyView({ mode = 'practice' }) {
           </span>
           , or press Esc to skip without penalty.
         </div>
+        {!transformationMode && (
+          <PracticeBeginnerHelp
+            activeWord={current.verb}
+            onLearnBasics={() => {
+              window.location.hash = 'lesson-basic-tenses';
+              openLearnFocus({ source: 'beginner-help', lessonGroupId: 'basic-tenses' });
+            }}
+          />
+        )}
       </div>
     </div>
   );

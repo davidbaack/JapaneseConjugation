@@ -25,6 +25,7 @@ import {
   buildMistakeExplanation,
 } from '../../utils/answerFeedbackCopy.js';
 import { accuracyForTotals, evidenceLabelForTotals } from '../../utils/practiceStats.js';
+import { sentenceBlankFeedback } from '../../utils/sentencePrompt.js';
 
 function ReviewDisclosure({ tone = 'stone', summary, children, hintLabel = 'More' }) {
   const toneClass =
@@ -312,6 +313,63 @@ function guideFocusOptionsForReview(record) {
   };
 }
 
+function SentenceBlankReview({ record, submittedAnswer }) {
+  const prompt = record.sentencePrompt;
+  if (
+    prompt?.mode !== 'forward-cloze' ||
+    !prompt.cloze ||
+    record.reverseDrill ||
+    record.minimalPairFeedback
+  ) {
+    return null;
+  }
+  const hasSubmittedAnswer = !record.revealedMiss && !record.reviewChoiceLabel && !!submittedAnswer;
+  const feedback =
+    !record.correct && hasSubmittedAnswer
+      ? sentenceBlankFeedback(prompt, record.submittedAnswer)
+      : null;
+  const { prefix, suffix } = prompt.cloze;
+  return (
+    <section
+      aria-label="Sentence blank review"
+      className="mt-3 rounded-xl border border-indigo-200 bg-white/80 p-3 text-left dark:border-indigo-900/60 dark:bg-stone-950/40"
+    >
+      <div className="text-xs font-semibold text-indigo-800 dark:text-indigo-200">
+        Fill only the blank
+      </div>
+      <p className="mt-1 text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+        {feedback?.message || 'The surrounding sentence text is already supplied.'}
+      </p>
+      {!record.correct && hasSubmittedAnswer && (
+        <div className="mt-2">
+          <div className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+            Your answer in the sentence
+          </div>
+          <p className="mt-1 break-words text-base text-stone-800 dark:text-stone-200" lang="ja">
+            {prefix}
+            <mark className="rounded bg-rose-100 px-0.5 text-rose-900 dark:bg-rose-950 dark:text-rose-100">
+              {submittedAnswer}
+            </mark>
+            {suffix}
+          </p>
+        </div>
+      )}
+      <div className="mt-2">
+        <div className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+          Completed sentence · highlighted text fills the blank
+        </div>
+        <p className="mt-1 break-words text-base text-stone-800 dark:text-stone-200" lang="ja">
+          {prefix}
+          <mark className="rounded bg-emerald-100 px-0.5 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-100">
+            {prompt.surface}
+          </mark>
+          {suffix}
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function RunAnswerReveal({
   record,
   contextStats = null,
@@ -472,6 +530,7 @@ function RunAnswerReveal({
               marked as a miss so it can come back for practice.
             </div>
           )}
+          <SentenceBlankReview record={record} submittedAnswer={reviewSubmittedAnswer} />
           {!record.correct && <PromotedRuleCard debug={promotedRuleDebug} />}
 
           {record.correct ? (

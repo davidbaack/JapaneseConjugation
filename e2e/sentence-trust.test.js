@@ -107,7 +107,7 @@ test.describe('Reviewed Sentence practice', () => {
     }
     await expect(panel).toContainText('この子は');
     await expect(page.getByText('Sentence context', { exact: true })).toHaveCount(0);
-    await page.getByRole('textbox', { name: 'Answer', exact: true }).fill('zzzz');
+    await page.getByRole('textbox', { name: 'Fill only the blank', exact: true }).fill('zzzz');
     await page.getByRole('button', { name: 'Check (Enter)', exact: true }).click();
     await expect(panel).toContainText('この子は元気そうだ。');
     await expect(page.getByText('This child looks energetic.', { exact: true })).toBeVisible();

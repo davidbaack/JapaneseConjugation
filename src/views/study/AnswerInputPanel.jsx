@@ -155,8 +155,16 @@ export function AnswerInputPanel({
   setTab,
   openLearnForRuleRecord,
   autoAdvanceCorrect,
+  sentencePrompt = null,
 }) {
   const answerInputId = transformationMode ? 'transformation-answer' : 'practice-answer';
+  const fillOnlyBlank =
+    sentencePrompt?.mode === 'forward-cloze' &&
+    !!sentencePrompt.cloze &&
+    !transformationMode &&
+    !reverseDrill &&
+    !minimalPairSetForCurrent;
+  const answerLabel = fillOnlyBlank ? 'Fill only the blank' : 'Answer';
 
   return phase === 'answering' ? (
     <>
@@ -254,6 +262,11 @@ export function AnswerInputPanel({
           )}
         </div>
       )}
+      {fillOnlyBlank && (answerMode === 'choice' || answerMode === 'self-check') && (
+        <p className="mb-2 text-left text-xs font-semibold text-stone-600 dark:text-stone-400">
+          Fill only the blank
+        </p>
+      )}
       {answerMode === 'self-check' ? (
         <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-4">
           <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-2">
@@ -322,7 +335,7 @@ export function AnswerInputPanel({
             htmlFor="spoken-answer"
             className="mb-2 block text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400"
           >
-            Answer
+            {answerLabel}
           </label>
           <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
             <div className="min-w-0">
@@ -504,7 +517,7 @@ export function AnswerInputPanel({
             htmlFor={answerInputId}
             className="mb-1.5 block text-left text-xs font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400"
           >
-            Answer
+            {answerLabel}
           </label>
           <div className="flex items-center gap-2">
             <input
@@ -603,7 +616,7 @@ export function AnswerInputPanel({
               htmlFor={answerInputId}
               className="mb-1.5 block text-left text-xs font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400"
             >
-              Answer
+              {answerLabel}
             </label>
             <div className="flex items-center gap-2">
               <input
