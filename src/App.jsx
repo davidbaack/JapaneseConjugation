@@ -67,6 +67,7 @@ function AppShell() {
             </h1>
           </div>
         </header>
+        <UpdatePrompt />
         <HorizontalTabList
           activeId={tab}
           ariaLabel="App sections"
@@ -137,7 +138,6 @@ function AppShell() {
           />
         </Suspense>
       )}
-      <UpdatePrompt />
       {DevHistoryPanel && (
         <Suspense fallback={null}>
           <DevHistoryPanel />

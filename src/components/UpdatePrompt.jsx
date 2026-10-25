@@ -11,7 +11,7 @@ export default function UpdatePrompt() {
   return (
     <div
       role="status"
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-indigo-700 text-white rounded-xl px-4 py-3 shadow-xl text-sm whitespace-nowrap"
+      className="mb-3 flex flex-wrap items-center justify-between gap-3 bg-indigo-700 text-white rounded-xl px-4 py-3 text-sm"
     >
       <span>Update available</span>
       <button

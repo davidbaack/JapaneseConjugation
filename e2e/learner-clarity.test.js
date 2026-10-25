@@ -78,6 +78,33 @@ test('beginner help stays optional and leads to readable lesson examples', async
   await expect.poll(async () => (await savedState(page)).practiceStats.lifetime.attempted).toBe(0);
 });
 
+test('a waiting app update keeps beginner help reachable at 320px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await seedPractice(page);
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => null));
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  // A different script URL installs another worker for the same scope, leaving
+  // a real update waiting while the current page remains open.
+  await page.evaluate(async () => {
+    const script = new URL('sw.js', window.location.href);
+    script.searchParams.set('update-prompt-test', '1');
+    await navigator.serviceWorker.register(script.href);
+  });
+  const notice = page.getByRole('status').filter({ hasText: 'Update available' });
+  await expect(notice).toBeVisible();
+  await expect(notice.getByRole('button', { name: 'Reload', exact: true })).toBeVisible();
+  const noticeBox = await notice.boundingBox();
+  const navigationBox = await page.locator('nav').boundingBox();
+  if (!noticeBox || !navigationBox) throw new Error('Update notice and navigation must be visible');
+  expect(noticeBox.y + noticeBox.height).toBeLessThanOrEqual(navigationBox.y);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  const help = page.locator('details').filter({ hasText: 'New to conjugation?' });
+  await help.getByText('New to conjugation?', { exact: true }).click();
+  await expect(help.getByRole('region', { name: 'Worked example: Plain Negative' })).toBeVisible();
+  await expect(notice).toBeVisible();
+});
+
 test('open Hint follows empty, partial, wrong and revised input without a new click', async ({
   page,
 }) => {

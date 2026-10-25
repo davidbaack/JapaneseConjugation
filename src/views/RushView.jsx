@@ -414,7 +414,7 @@ export default function RushView() {
             )}
           </div>
           <StickyAction pad="-mx-5 px-5" className="mt-4" flowOnMobile>
-            <div className="grid sm:grid-cols-[1fr_auto] gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-2">
               <input
                 value={answer}
                 onChange={(e) => {
@@ -448,7 +448,7 @@ export default function RushView() {
                 autoCorrect="off"
                 enterKeyHint="done"
                 spellCheck="false"
-                className="px-4 py-3 text-xl border-2 border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-xl focus:border-indigo-500 focus:outline-none disabled:bg-stone-50 dark:disabled:bg-stone-900 transition"
+                className="w-full min-w-0 px-4 py-3 text-xl border-2 border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 rounded-xl focus:border-indigo-500 focus:outline-none disabled:bg-stone-50 dark:disabled:bg-stone-900 transition"
               />
               <button
                 onClick={submit}
