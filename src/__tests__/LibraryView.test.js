@@ -204,6 +204,25 @@ describe('searchWords', () => {
     expect(result).toContain(TABERU);
   });
 
+  it.each(['　ＴＡＢＥＲＵ　', 'タベル', 'ﾀﾍﾞﾙ'])(
+    'shares normalized dictionary search for %s',
+    (query) => {
+      expect(searchWords(query, words)).toContain(TABERU);
+    },
+  );
+
+  it('retains group matching for Lookup and the Lists word picker', () => {
+    expect(searchWords('ichidan', words)).toEqual([TABERU]);
+    expect(searchWords('godan', words)).toEqual([KAKU]);
+  });
+
+  it.each(['tabeta', 'たべた', 'タベタ', '　ＴＡＢＥＴＡ　'])(
+    'retains conjugated-form matching for %s',
+    (query) => {
+      expect(searchWords(query, words)).toContain(TABERU);
+    },
+  );
+
   it('returns empty for no match', () => {
     expect(searchWords('zzznomatch', words)).toHaveLength(0);
   });

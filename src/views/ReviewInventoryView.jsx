@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppStateContext.jsx';
 import { compatibleTypes, getWordMeta, wordKey } from '../utils/conjugator.js';
+import { createDictionaryWordMatcher, normalizeWordSearchQuery } from '../utils/wordSearch.js';
 import {
   excludeWordFromReviewState,
   includeWordInReviewState,
@@ -29,22 +30,23 @@ export default function ReviewInventoryView() {
   const { state, setState, allWords, practiceWord } = useApp();
   const [query, setQuery] = useState('');
   const [visibleLimit, setVisibleLimit] = useState(30);
-  const q = query.trim().toLowerCase();
+  const searchId = useId();
+  const searchInputRef = useRef(null);
+  const q = normalizeWordSearchQuery(query);
   const sortedWords = useMemo(
     () =>
       [...(allWords || [])]
         .sort((a, b) => wordRank(a) - wordRank(b) || wordKey(a).localeCompare(wordKey(b)))
-        .filter((word) => {
-          if (!q) return true;
-          return (
-            word.dict?.includes(query) ||
-            word.reading?.includes(query) ||
-            word.meaning?.toLowerCase().includes(q)
-          );
-        })
+        .filter(createDictionaryWordMatcher(q))
         .slice(0, 120),
-    [allWords, q, query],
+    [allWords, q],
   );
+
+  function clearSearch() {
+    setQuery('');
+    setVisibleLimit(30);
+    searchInputRef.current?.focus();
+  }
 
   function toggleWord(word) {
     setState((prev) =>
@@ -91,18 +93,46 @@ export default function ReviewInventoryView() {
               Textbook order uses the earliest Genki or Minna lesson.
             </p>
           </div>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setVisibleLimit(30);
-            }}
-            placeholder="Search words..."
-            className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-indigo-400 dark:border-stone-800 dark:bg-stone-950"
-          />
+          <div className="min-w-0 sm:max-w-sm">
+            <label htmlFor={searchId} className="sr-only">
+              Search words
+            </label>
+            <input
+              id={searchId}
+              ref={searchInputRef}
+              type="search"
+              value={query}
+              aria-describedby={`${searchId}-help`}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setVisibleLimit(30);
+              }}
+              placeholder="Search words..."
+              className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-indigo-400 dark:border-stone-800 dark:bg-stone-950"
+            />
+            <p id={`${searchId}-help`} className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+              Use romaji, kana, kanji, or English. Try iku, いく, or 行く.
+            </p>
+          </div>
         </div>
-        <div className="divide-y divide-stone-100 rounded-xl border border-stone-200 dark:divide-stone-800 dark:border-stone-800">
+        {q && sortedWords.length === 0 && (
+          <div className="rounded-xl border border-stone-200 p-4 dark:border-stone-800">
+            <p role="status" className="break-words text-sm text-stone-600 dark:text-stone-300">
+              No words match “{query.trim()}”. Try romaji, kana, kanji, or English.
+            </p>
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="mt-3 rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
+            >
+              Clear search
+            </button>
+          </div>
+        )}
+        <div
+          hidden={sortedWords.length === 0}
+          className="divide-y divide-stone-100 rounded-xl border border-stone-200 dark:divide-stone-800 dark:border-stone-800"
+        >
           {sortedWords.slice(0, visibleLimit).map((word) => {
             const excluded = isWordExcludedFromReview(state, word);
             return (

@@ -3,6 +3,7 @@
 // list transforms — all dependency-light functions kept out of the (large) view
 // component so they can be tested and reused directly.
 import { toHiragana, kanaToRomaji } from './romaji.js';
+import { createDictionaryWordMatcher, normalizeWordSearchQuery } from './wordSearch.js';
 import {
   conjugateItem,
   isAdjective,
@@ -55,35 +56,11 @@ export function wordKeyLocal(word) {
   return `${word.group}:${word.dict}`;
 }
 
-const wordSearchCache = new WeakMap();
 const answerRowsCache = new WeakMap();
 const formRowsCache = new WeakMap();
 
 function canCacheObject(value) {
   return !!value && (typeof value === 'object' || typeof value === 'function');
-}
-
-function wordSearchData(word) {
-  if (!canCacheObject(word)) {
-    return {
-      dict: word?.dict || '',
-      reading: word?.reading || '',
-      romaji: kanaToRomaji(word?.reading || ''),
-      meaning: String(word?.meaning || '').toLowerCase(),
-      group: String(GROUP_NAMES[word?.group] || '').toLowerCase(),
-    };
-  }
-  const cached = wordSearchCache.get(word);
-  if (cached) return cached;
-  const data = {
-    dict: word.dict || '',
-    reading: word.reading || '',
-    romaji: kanaToRomaji(word.reading || ''),
-    meaning: String(word.meaning || '').toLowerCase(),
-    group: String(GROUP_NAMES[word.group] || '').toLowerCase(),
-  };
-  wordSearchCache.set(word, data);
-  return data;
 }
 
 function lookupRows(item) {
@@ -122,17 +99,16 @@ function answerRows(item) {
 }
 
 export function searchWords(query, words) {
-  const q = query.trim().toLowerCase();
+  const q = normalizeWordSearchQuery(query);
   if (!q) return words;
   const h = toHiragana(q);
+  const matchesDictionaryWord = createDictionaryWordMatcher(q);
   return words.filter((w) => {
-    const search = wordSearchData(w);
     if (
-      search.dict.includes(query) ||
-      search.reading.includes(h) ||
-      search.romaji.includes(q) ||
-      search.meaning.includes(q) ||
-      search.group.includes(q)
+      matchesDictionaryWord(w) ||
+      String(GROUP_NAMES[w?.group] || '')
+        .toLowerCase()
+        .includes(q)
     )
       return true;
     return answerRows(w).some(
