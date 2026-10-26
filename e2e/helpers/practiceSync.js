@@ -180,9 +180,12 @@ export async function expectPracticeTotals(page, attempted, correct) {
   expect(Object.values(stats.byDate).reduce((sum, row) => sum + row.correct, 0)).toBe(correct);
   await page.locator('nav').getByRole('tab', { name: 'Stats', exact: true }).click();
   const dashboard = page.getByRole('region', { name: 'Stats dashboard' });
+  const accuracy = dashboard.getByText('Accuracy', { exact: true }).locator('..');
   await expect(
-    dashboard.getByText(`${Math.round((correct / attempted) * 100)}%`, { exact: true }).first(),
+    accuracy.getByText(`${Math.round((correct / attempted) * 100)}%`, { exact: true }),
   ).toBeVisible();
-  if (attempted > 0 && attempted < 3)
-    await expect(dashboard.getByText(/early estimate/).first()).toBeVisible();
+  if (attempted === 1)
+    await expect(accuracy.getByText('First attempt', { exact: true })).toBeVisible();
+  else if (attempted === 2)
+    await expect(accuracy.getByText('Early estimate', { exact: true })).toBeVisible();
 }

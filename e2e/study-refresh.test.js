@@ -35,9 +35,12 @@ test.describe('Study refresh persistence', () => {
     const before = await waitForStableStoredCurrent(page);
     expect(before).toBeTruthy();
 
-    // The prompt block (word + meaning + task) is derived entirely from the
-    // current card, so it doubles as a visible fingerprint of the verb shown.
-    const promptBefore = await page.locator('.text-center.relative').first().innerText();
+    // The source word and reading provide a visible fingerprint of the word.
+    // The complete stored descriptor also preserves the card's form type.
+    const prompt = page.getByTestId('practice-prompt');
+    await expect(prompt).toBeVisible();
+    await expect(prompt).toHaveText(/\S/);
+    const promptBefore = await prompt.innerText();
 
     await page.reload();
     await page.waitForLoadState('networkidle');
@@ -46,7 +49,9 @@ test.describe('Study refresh persistence', () => {
     // Same descriptor and same visible prompt after the reload.
     await expect.poll(() => readStoredCurrent(page)).toBe(before);
 
-    const promptAfter = await page.locator('.text-center.relative').first().innerText();
+    await expect(prompt).toBeVisible();
+    await expect(prompt).toHaveText(/\S/);
+    const promptAfter = await prompt.innerText();
     expect(promptAfter).toBe(promptBefore);
   });
 });

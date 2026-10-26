@@ -2761,7 +2761,7 @@ export default function StudyView({ mode = 'practice' }) {
 
   return (
     <div className={transformationMode ? 'mx-auto max-w-3xl' : 'mx-auto max-w-3xl'}>
-      <div className="order-1 min-w-0 space-y-4 xl:w-full">
+      <div className="order-1 min-w-0 space-y-4 max-[359px]:space-y-3 xl:w-full">
         {focusBanner && (
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 px-5 py-4 dark:border-indigo-800 dark:bg-indigo-950/20">
             <div className="flex items-start justify-between gap-3">
@@ -2936,8 +2936,8 @@ export default function StudyView({ mode = 'practice' }) {
           </details>
         )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-          <div className="px-4 pb-3 pt-4 text-center sm:px-6 sm:pb-8 sm:pt-8">
-            <div className="mb-3 grid grid-cols-2 items-start gap-x-2 gap-y-1 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-y-0">
+          <div className="px-4 pb-3 pt-4 text-center max-[359px]:pt-2 sm:px-6 sm:pb-8 sm:pt-8">
+            <div className="mb-3 grid grid-cols-2 items-start gap-x-2 gap-y-1 max-[359px]:mb-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-y-0">
               <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
                 Word level: {currentWordMeta.jlpt}
               </span>
@@ -3012,7 +3012,7 @@ export default function StudyView({ mode = 'practice' }) {
                 </div>
               </div>
             ) : (
-              <>
+              <div data-testid="practice-prompt">
                 {transformationMode && (
                   <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
                     Starting form
@@ -3023,7 +3023,7 @@ export default function StudyView({ mode = 'practice' }) {
                   className="mb-1 text-3xl font-medium text-stone-900 dark:text-stone-100 sm:mb-2 sm:text-5xl"
                   subClassName="text-base text-stone-600"
                 />
-              </>
+              </div>
             )}
             {noChangePrompt && !hidePromptText && (
               <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium">
@@ -3048,7 +3048,7 @@ export default function StudyView({ mode = 'practice' }) {
                   : ''}
               </div>
             )}
-            <div className="mt-3 flex flex-col gap-1 sm:mt-4">
+            <div className="mt-3 flex flex-col gap-1 max-[359px]:mt-2 sm:mt-4">
               <AnswerInputPanel
                 beginnerHelp={
                   !transformationMode ? (
