@@ -17,6 +17,7 @@ import { promptDisplay, formDisplay, shuffled } from '../utils/display.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { playPronunciation } from '../utils/speech.js';
 import { useApp } from '../state/AppStateContext.jsx';
+import { accuracyForTotals, evidenceLabelForTotals } from '../utils/practiceStats.js';
 import {
   ANSWER_OUTCOME,
   answerComparisonLabels,
@@ -210,9 +211,12 @@ export default function EndingsView() {
 
   // Stats header values — adapt to active mode family
   const displayStats = isRegisterMode ? registerStats : stats;
-  const displayAcc = displayStats.attempted
-    ? Math.round((displayStats.correct / displayStats.attempted) * 100)
-    : 0;
+  const displayAccuracy =
+    displayStats.attempted >= 3
+      ? `${accuracyForTotals(displayStats)}%`
+      : displayStats.attempted
+        ? evidenceLabelForTotals(displayStats)
+        : 'New';
   const displayPatternStats = isRegisterMode ? registerPatternStats : patternStats;
   const displayPatternLabel = isRegisterMode ? (activePair?.label ?? '—') : (pattern?.label ?? '—');
 
@@ -362,6 +366,11 @@ export default function EndingsView() {
                   ? 'Register-switch drill — flip between plain and polite forms.'
                   : 'Rapid sound-change drill for て-form and plain past endings.'}
               </p>
+              {!isRegisterMode && (
+                <p className="mt-1 text-xs font-medium text-indigo-600 dark:text-indigo-300">
+                  Rule-supported practice
+                </p>
+              )}
             </div>
             <div className="flex gap-1.5 flex-wrap justify-end">
               {MODE_BUTTONS.map((o) => (
@@ -629,8 +638,12 @@ export default function EndingsView() {
                           {p.label}
                         </span>
                         <span className="text-xs text-stone-500">
-                          {s.correct || 0}/{s.attempted || 0}
+                          {s.correct || 0} right / {s.attempted || 0}{' '}
+                          {s.attempted === 1 ? 'attempt' : 'attempts'}
                         </span>
+                      </div>
+                      <div className="mt-1 text-xs text-stone-500">
+                        {s.attempted < 3 ? (s.attempted ? evidenceLabelForTotals(s) : 'New') : ''}
                       </div>
                       <div className="mt-1 h-1.5 bg-stone-100 dark:bg-stone-950 rounded-full overflow-hidden">
                         <div className="h-full bg-indigo-500" style={{ width: pctVal + '%' }} />
@@ -657,13 +670,17 @@ export default function EndingsView() {
                           {p.label}
                         </span>
                         <span className="text-xs text-stone-500">
-                          {s.correct || 0}/{s.attempted || 0}
+                          {s.correct || 0} right / {s.attempted || 0}{' '}
+                          {s.attempted === 1 ? 'attempt' : 'attempts'}
                         </span>
                       </div>
                       <div className="mt-1 h-1.5 bg-stone-100 dark:bg-stone-950 rounded-full overflow-hidden">
                         <div className="h-full bg-indigo-500" style={{ width: pctVal + '%' }} />
                       </div>
                       <div className="mt-1 text-xs text-stone-500">{p.cue}</div>
+                      <div className="mt-1 text-xs text-stone-500">
+                        {s.attempted < 3 ? (s.attempted ? evidenceLabelForTotals(s) : 'New') : ''}
+                      </div>
                     </div>
                   );
                 })}
@@ -673,36 +690,45 @@ export default function EndingsView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Ending Lab results">
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
-            {displayStats.correct || 0}/{displayStats.attempted || 0}
+      <section aria-label="Ending Lab results" className="space-y-2">
+        {!isRegisterMode && (
+          <p className="text-xs font-medium text-indigo-600 dark:text-indigo-300">
+            Rule-supported practice · the current exercise shows its rule.
+          </p>
+        )}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+            <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+              {displayStats.correct || 0}/{displayStats.attempted || 0}
+            </div>
+            <div className="text-xs text-stone-500">
+              {displayStats.attempted || 0} {displayStats.attempted === 1 ? 'attempt' : 'attempts'}
+            </div>
           </div>
-          <div className="text-xs text-stone-500">Accuracy</div>
+          <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+            <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+              {displayAccuracy}
+            </div>
+            <div className="text-xs text-stone-500">Overall</div>
+          </div>
+          <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+            <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
+              {displayStats.streak || 0}
+            </div>
+            <div className="text-xs text-stone-500">Streak</div>
+          </div>
+          <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
+            <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50 text-ellipsis overflow-hidden whitespace-nowrap">
+              {displayPatternStats
+                ? `${displayPatternStats.correct || 0}/${displayPatternStats.attempted || 0}`
+                : '—'}
+            </div>
+            <div className="text-xs text-stone-500 text-ellipsis overflow-hidden whitespace-nowrap">
+              {displayPatternLabel}
+            </div>
+          </div>
         </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
-            {displayAcc}%
-          </div>
-          <div className="text-xs text-stone-500">Overall</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50">
-            {displayStats.streak || 0}
-          </div>
-          <div className="text-xs text-stone-500">Streak</div>
-        </div>
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4">
-          <div className="text-2xl font-semibold tabular-nums text-stone-900 dark:text-stone-50 text-ellipsis overflow-hidden whitespace-nowrap">
-            {displayPatternStats
-              ? `${displayPatternStats.correct || 0}/${displayPatternStats.attempted || 0}`
-              : '—'}
-          </div>
-          <div className="text-xs text-stone-500 text-ellipsis overflow-hidden whitespace-nowrap">
-            {displayPatternLabel}
-          </div>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }

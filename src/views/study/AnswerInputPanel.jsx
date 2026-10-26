@@ -2,7 +2,8 @@ import React from 'react';
 import { IconMic, IconSpark } from '../../components/Icons.jsx';
 import ScriptDisplay from '../../components/ScriptDisplay.jsx';
 import StickyAction from '../../components/StickyAction.jsx';
-import { exerciseMeaningForWord, formDisplay, promptDisplay } from '../../utils/display.js';
+import { formDisplay, promptDisplay } from '../../utils/display.js';
+import { exerciseMeaningForWord } from '../../utils/exerciseMeaning.js';
 import { buildFormationKeysHash } from '../../utils/formationKeys.js';
 import { clearMinimalPairPrefs, minimalPairReturnEnabledTypes } from '../../utils/minimalPairs.js';
 import { RunAnswerReveal } from './StudyReviewPanels.jsx';
@@ -11,6 +12,46 @@ import {
   practiceSelectionForTypeIds,
   updateStatePracticeSelection,
 } from '../../utils/practiceSelection.js';
+
+export function PracticeAnswerTip({
+  phase,
+  answerMode,
+  selfCheckOpen,
+  listeningPrompt,
+  showPromptText,
+  speechRecognitionAvailable,
+}) {
+  let tip;
+  if (phase === 'reviewing') {
+    tip = 'Review the answer, then choose Next card to continue.';
+  } else if (answerMode === 'choice') {
+    tip = 'Choose the matching answer, or use Skip without penalty.';
+  } else if (answerMode === 'self-check') {
+    tip = selfCheckOpen
+      ? 'Compare your answer, then mark Remembered or Missed.'
+      : 'Recall the answer, reveal it, then mark Remembered or Missed.';
+  } else if (answerMode === 'speak') {
+    tip = speechRecognitionAvailable
+      ? 'Use Speak answer, check what was heard, then check the spoken answer.'
+      : 'Speech input is unavailable here. Type the Japanese answer in the field, then check it.';
+  } else {
+    tip = (
+      <>
+        Type romaji like <span className="font-mono">tabeta</span>, use kana{' '}
+        <span lang="ja">たべた</span>, or press Esc to skip without penalty.
+      </>
+    );
+  }
+  return (
+    <div data-testid="practice-answer-tip" className="text-center text-xs text-stone-600">
+      Tip:{' '}
+      {phase === 'answering' && listeningPrompt && !showPromptText
+        ? 'Listen to the prompt; use Replay to hear it again. '
+        : ''}
+      {tip}
+    </div>
+  );
+}
 
 export function KanaCoachStrip({
   visibleCoachCells,
@@ -156,6 +197,7 @@ export function AnswerInputPanel({
   openLearnForRuleRecord,
   autoAdvanceCorrect,
   sentencePrompt = null,
+  beginnerHelp = null,
 }) {
   const answerInputId = transformationMode ? 'transformation-answer' : 'practice-answer';
   const fillOnlyBlank =
@@ -225,6 +267,7 @@ export function AnswerInputPanel({
         )}
         <div className="sr-only">{transformationMode ? transformationRoute : taskLabel}</div>
       </div>
+      {!transformationMode && beginnerHelp}
       {minimalPairSetForCurrent && (
         <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-200">
           <div className="flex flex-wrap items-center gap-2">
@@ -611,7 +654,12 @@ export function AnswerInputPanel({
         </>
       ) : (
         <>
-          <StickyAction className="mt-1" dock flowOnMobile={transformationMode}>
+          <StickyAction
+            className="mt-1"
+            dock
+            flowOnMobile={transformationMode}
+            flowUntilKeyboardOnMobile={!transformationMode && !!beginnerHelp}
+          >
             <label
               htmlFor={answerInputId}
               className="mb-1.5 block text-left text-xs font-semibold uppercase tracking-wide text-stone-600 dark:text-stone-400"

@@ -6,6 +6,7 @@ import {
   sentenceWordReview,
 } from '../data/reviewedSentenceProfiles.js';
 import { buildReviewedSentence } from '../utils/reviewedSentenceFrames.js';
+import { exerciseEnglishForForm, exerciseMeaningForWord } from '../utils/exerciseMeaning.js';
 
 const words = loadSentenceWordMap();
 const word = (key) => words.get(key);
@@ -26,6 +27,19 @@ const filled = (key, type) => {
 };
 
 describe('explicit reviewed sentence content', () => {
+  it('keeps approved preference contexts unchanged after display-only gloss repair', () => {
+    for (const key of ['na-adjective:好き', 'na-adjective:嫌い']) {
+      const item = word(key);
+      const original = JSON.stringify(item);
+      const before = buildReviewedSentence(item, 'adj-plain-present');
+      expect(before).not.toBeNull();
+      expect(exerciseMeaningForWord(item)).toMatch(/^(?:dis)?like \(something\)$/);
+      expect(exerciseEnglishForForm(item, 'adj-sou')).toMatch(/^seems to /);
+      expect(JSON.stringify(item)).toBe(original);
+      expect(buildReviewedSentence(item, 'adj-plain-present')).toEqual(before);
+    }
+  });
+
   it('classifies beginner entries or explicitly awaits review of repaired identities', () => {
     const counts = new Map();
     let supported = 0;

@@ -14,7 +14,8 @@ import { ConjugationBreakdown } from '../../components/ConjugationBreakdown.jsx'
 import { ChatPanel } from '../../components/ChatPanel.jsx';
 import { lessonForType } from '../../data/lessonContent.js';
 import { DEFAULT_PREFS } from '../../data/defaults.js';
-import { exerciseEnglishForForm, formDisplay, promptDisplay } from '../../utils/display.js';
+import { formDisplay, promptDisplay } from '../../utils/display.js';
+import { exerciseEnglishForForm } from '../../utils/exerciseMeaning.js';
 import { toHiragana } from '../../utils/romaji.js';
 import { getConjugationDebugInfo } from '../../utils/conjugatorExplain.js';
 import { labRouteForMistakePattern } from '../../utils/mistakeDiagnosis.js';
@@ -694,7 +695,8 @@ function RunAnswerReveal({
                 {contextStats.type.label}
               </div>
               <div className="mt-1 text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-100">
-                {contextStats.exact.correct} right / {contextStats.exact.attempted} attempts
+                {contextStats.exact.correct} right / {contextStats.exact.attempted}{' '}
+                {contextStats.exact.attempted === 1 ? 'attempt' : 'attempts'}
               </div>
               <div className="mt-0.5 text-[11px] text-stone-600 dark:text-stone-400">
                 {evidenceLabelForTotals(contextStats.exact)}
@@ -710,7 +712,7 @@ function RunAnswerReveal({
                 </div>
                 <div className="mt-1 text-sm font-semibold tabular-nums text-stone-900 dark:text-stone-100">
                   {contextStats.topicTotals.correct} right / {contextStats.topicTotals.attempted}{' '}
-                  attempts
+                  {contextStats.topicTotals.attempted === 1 ? 'attempt' : 'attempts'}
                 </div>
                 <div className="mt-0.5 text-[11px] text-stone-600 dark:text-stone-400">
                   {contextStats.topicTotals.attempted >= 3

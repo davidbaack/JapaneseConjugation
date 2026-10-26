@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   englishForForm,
-  exerciseEnglishForForm,
-  exerciseMeaningForWord,
   editDistance,
   normalizeJapaneseText,
   typoGuardForAnswer,
@@ -22,6 +20,7 @@ import {
   resolveAutoAdvanceCorrect,
   spokenAnswerResult,
 } from '../utils/display.js';
+import { exerciseEnglishForForm, exerciseMeaningForWord } from '../utils/exerciseMeaning.js';
 import {
   compatibleTypes,
   conjugateItem,
@@ -309,6 +308,46 @@ describe('englishForForm', () => {
 });
 
 describe('exercise English glosses', () => {
+  it.each([
+    ['好き', 'すき', 'liking, fondness, love', 'liked', 'like', 'liked'],
+    ['嫌い', 'きらい', 'dislike', 'disliked', 'dislike', 'disliked'],
+  ])(
+    'keeps %s preference wording coherent across exercise forms',
+    (dict, reading, meaning, exerciseMeaning, action, past) => {
+      const word = Object.freeze({
+        dict,
+        reading,
+        meaning,
+        exerciseMeaning,
+        group: 'na-adjective',
+      });
+      expect(exerciseMeaningForWord(word)).toBe(`${action} (something)`);
+      expect(exerciseEnglishForForm(word, 'adj-plain-past')).toBe(`${past} (something)`);
+      expect(exerciseEnglishForForm(word, 'adj-plain-negative')).toBe(
+        `do not ${action} (something)`,
+      );
+      expect(exerciseEnglishForForm(word, 'adj-polite-past-negative')).toBe(
+        `did not ${action} (something) (polite)`,
+      );
+      expect(exerciseEnglishForForm(word, 'adj-sou')).toBe(`seems to ${action} (something)`);
+      expect(exerciseEnglishForForm(word, 'adj-naru')).toBe(`comes to ${action} (something)`);
+      expect(exerciseEnglishForForm(word, 'adj-attributive')).toBe(`a ${past} …`);
+      expect(exerciseEnglishForForm(word, 'adj-adverb')).toContain('meaning depends on context');
+      expect(englishForForm(word, null)).toBe(meaning);
+      expect(word.exerciseMeaning).toBe(exerciseMeaning);
+    },
+  );
+
+  it('does not rewrite custom senses, readings, or grammatical identities', () => {
+    const word = { dict: '好き', reading: 'すき', meaning: 'popular', group: 'na-adjective' };
+    expect(exerciseEnglishForForm(word, 'adj-sou')).toBe('looks popular');
+    expect(
+      exerciseEnglishForForm({ ...word, meaning: 'liked', exerciseMeaning: 'popular' }, 'adj-sou'),
+    ).toBe('looks popular');
+    expect(exerciseMeaningForWord({ ...word, meaning: 'liked', reading: 'べつ' })).toBe('liked');
+    expect(exerciseMeaningForWord({ ...word, meaning: 'liked', group: 'godan' })).toBe('liked');
+  });
+
   it('prefers a curated exercise meaning without changing the reference meaning', () => {
     const suru = {
       dict: 'する',

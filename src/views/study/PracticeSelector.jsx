@@ -329,7 +329,7 @@ export default function PracticeSelector({
         </span>
         <div className="flex items-center gap-1.5">
           <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-700 dark:bg-stone-800 dark:text-stone-200">
-            {activeTypeCount} forms
+            {activeTypeCount} {activeTypeCount === 1 ? 'form' : 'forms'}
           </span>
           <button
             type="button"
@@ -346,6 +346,7 @@ export default function PracticeSelector({
       <HorizontalChoiceRail
         ariaLabel="Practice categories"
         testId="practice-category-rail"
+        revealSelectionKey={normalized.selectedCategoryIds.join('|')}
         wrapperClassName="mt-2"
         className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:auto-cols-max lg:grid-flow-col lg:grid-rows-2"
       >

@@ -137,6 +137,6 @@ test.describe('Reviewed Sentence practice', () => {
     await expect(page.getByText(/Type · Kana on · Sentence on/)).toBeVisible();
     await page.getByRole('textbox', { name: 'Answer', exact: true }).fill('genkisou');
     await expect(page.getByText('Correct.', { exact: true }).last()).toBeVisible();
-    await expect(page.getByText('1 right / 1 attempts').first()).toBeVisible();
+    await expect(page.getByText('1 right / 1 attempt', { exact: true }).first()).toBeVisible();
   });
 });

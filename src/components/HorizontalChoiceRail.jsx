@@ -13,8 +13,12 @@ export default function HorizontalChoiceRail({
   fadeClassName = 'from-white dark:from-stone-900',
   testId = 'horizontal-choice-rail',
   wrapperClassName = '',
+  revealSelectionKey = undefined,
 }) {
   const railRef = useRef(null);
+  const previousSelectedRef = useRef(new Set());
+  const revealedChoiceRef = useRef(null);
+  const revealSelectedChoices = revealSelectionKey !== undefined;
   const [edges, setEdges] = useState({ canScrollLeft: false, canScrollRight: false });
 
   const updateEdges = useCallback(() => {
@@ -25,6 +29,42 @@ export default function HorizontalChoiceRail({
         : next,
     );
   }, []);
+
+  const keepSelectedChoiceVisible = useCallback(() => {
+    const rail = railRef.current;
+    if (!rail || !revealSelectedChoices) return;
+    const selected = [...rail.querySelectorAll('[aria-pressed="true"]')];
+    const choice = selected.includes(revealedChoiceRef.current)
+      ? revealedChoiceRef.current
+      : selected[0];
+    if (!choice) return;
+
+    // Match HorizontalTabList's horizontal-only visibility adjustment. Avoid
+    // scrollIntoView: a scope change must not move the page or steal focus.
+    const gutter = 4;
+    const visibleLeft = rail.scrollLeft + gutter;
+    const visibleRight = rail.scrollLeft + rail.clientWidth - gutter;
+    const choiceLeft = choice.offsetLeft;
+    const choiceRight = choiceLeft + choice.offsetWidth;
+    if (choiceLeft < visibleLeft) {
+      rail.scrollLeft = Math.max(0, choiceLeft - gutter);
+    } else if (choiceRight > visibleRight) {
+      rail.scrollLeft = Math.min(
+        Math.max(0, rail.scrollWidth - rail.clientWidth),
+        choiceRight - rail.clientWidth + gutter,
+      );
+    }
+    updateEdges();
+  }, [revealSelectedChoices, updateEdges]);
+
+  useLayoutEffect(() => {
+    if (revealSelectionKey === undefined) return;
+    const selected = [...(railRef.current?.querySelectorAll('[aria-pressed="true"]') || [])];
+    revealedChoiceRef.current =
+      selected.find((choice) => !previousSelectedRef.current.has(choice)) || selected[0];
+    previousSelectedRef.current = new Set(selected);
+    keepSelectedChoiceVisible();
+  }, [revealSelectionKey, keepSelectedChoiceVisible]);
 
   useLayoutEffect(() => {
     updateEdges();
@@ -37,17 +77,21 @@ export default function HorizontalChoiceRail({
     const onScroll = () => updateEdges();
     rail.addEventListener('scroll', onScroll, { passive: true });
 
+    const onResize = () => {
+      keepSelectedChoiceVisible();
+      updateEdges();
+    };
     const resizeObserver =
-      typeof window.ResizeObserver === 'function' ? new window.ResizeObserver(updateEdges) : null;
+      typeof window.ResizeObserver === 'function' ? new window.ResizeObserver(onResize) : null;
     resizeObserver?.observe(rail);
-    window.addEventListener('resize', updateEdges);
+    window.addEventListener('resize', onResize);
 
     return () => {
       rail.removeEventListener('scroll', onScroll);
       resizeObserver?.disconnect();
-      window.removeEventListener('resize', updateEdges);
+      window.removeEventListener('resize', onResize);
     };
-  }, [updateEdges]);
+  }, [keepSelectedChoiceVisible, updateEdges]);
 
   return (
     <div className={`relative min-w-0 ${wrapperClassName}`}>

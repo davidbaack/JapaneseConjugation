@@ -9,6 +9,10 @@ import {
   totalsForPracticeTopic,
 } from '../utils/practiceStats.js';
 
+function attemptCount(count) {
+  return `${count} ${count === 1 ? 'attempt' : 'attempts'}`;
+}
+
 function StatTile({ label, value, detail }) {
   return (
     <div className="rounded-xl border border-stone-200 bg-white px-3 py-3 dark:border-stone-800 dark:bg-stone-900">
@@ -73,7 +77,7 @@ function ModeCard({ label, totals, detail }) {
         </div>
       </div>
       <div className="mt-1 text-xs text-stone-500">
-        {totals.correct} right / {totals.attempted} attempts
+        {totals.correct} right / {attemptCount(totals.attempted)}
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
         <span
@@ -114,8 +118,8 @@ function TrendChart({ rows }) {
                 {row.attempted || ''}
               </div>
               <div
-                title={`${row.key}: ${row.attempted} attempts, ${row.accuracy}% right`}
-                aria-label={`${row.key}: ${row.attempted} attempts, ${row.accuracy}% right`}
+                title={`${row.key}: ${attemptCount(row.attempted)}, ${row.accuracy}% right`}
+                aria-label={`${row.key}: ${attemptCount(row.attempted)}, ${row.accuracy}% right`}
                 className={`min-h-1 rounded-t-md transition-all ${
                   row.accuracy >= 80
                     ? 'bg-emerald-500 dark:bg-emerald-400'
@@ -146,7 +150,7 @@ function TrendChart({ rows }) {
   );
 }
 
-export function StatsDashboard({ state, onPracticeTopic }) {
+export function StatsDashboard({ state, onPracticeTopic, onContinuePractice }) {
   const stats = normalizePracticeStats(state.practiceStats);
   const comparison = recentComparison(stats.recent);
   const trendRows = practiceTrendDays(stats, 14);
@@ -170,6 +174,19 @@ export function StatsDashboard({ state, onPracticeTopic }) {
   const recognition = modeTotals(stats, ['choice', 'listening']);
   const selfCheck = modeTotals(stats, ['self-check']);
   const recentMisses = stats.recent.filter((row) => !row.correct).slice(0, 5);
+  const recentMissTopic = recentMisses
+    .map((row) =>
+      FORM_GROUPS.find((topic) => topic.id === row.topicId || topic.typeIds.includes(row.typeId)),
+    )
+    .find(Boolean);
+  const recommendedTopic = weakest || recentMissTopic;
+  const recommendationReason = weakest
+    ? ratedTopics.length === 1
+      ? 'Your only topic with at least 3 attempts so far. Keep practicing to build a clearer picture.'
+      : 'Your lowest-accuracy topic among those with at least 3 attempts.'
+    : recentMissTopic
+      ? 'Try a topic from your recent misses. More answers are needed to compare topic accuracy.'
+      : 'Keep your current Practice selection. More answers will help identify a useful next topic.';
 
   return (
     <section className="space-y-4" aria-label="Stats dashboard">
@@ -206,32 +223,45 @@ export function StatsDashboard({ state, onPracticeTopic }) {
             <StatTile
               label="Strongest"
               value={strongest?.label || 'Gathering data'}
-              detail={strongest ? `${accuracyForTotals(strongest.totals)}% right` : ''}
+              detail={
+                strongest
+                  ? `${accuracyForTotals(strongest.totals)}% right · ${attemptCount(strongest.totals.attempted)}`
+                  : ''
+              }
             />
           </div>
         </div>
       </div>
 
-      {weakest && (
-        <button
-          type="button"
-          onClick={() => onPracticeTopic?.(weakest.id)}
-          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left transition hover:border-amber-300 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/20 dark:hover:bg-amber-950/35"
-        >
-          <span>
-            <span className="block text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
-              Worth another look
-            </span>
-            <span className="mt-0.5 block text-sm font-semibold text-amber-950 dark:text-amber-100">
-              {weakest.label} · {accuracyForTotals(weakest.totals)}% right across{' '}
-              {weakest.totals.attempted} attempts
-            </span>
+      <button
+        type="button"
+        onClick={() =>
+          recommendedTopic ? onPracticeTopic?.(recommendedTopic.id) : onContinuePractice?.()
+        }
+        aria-label={recommendedTopic ? `Practice ${recommendedTopic.label}` : 'Continue practice'}
+        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left transition hover:border-amber-300 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/20 dark:hover:bg-amber-950/35"
+      >
+        <span>
+          <span className="block text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+            {weakest
+              ? 'Worth another look'
+              : recentMissTopic
+                ? 'Revisit a recent miss'
+                : 'Next step'}
           </span>
-          <span className="shrink-0 text-xs font-semibold text-amber-800 dark:text-amber-200">
-            Practice →
+          <span className="mt-0.5 block text-sm font-semibold text-amber-950 dark:text-amber-100">
+            {weakest
+              ? `${weakest.label} · ${accuracyForTotals(weakest.totals)}% right across ${attemptCount(weakest.totals.attempted)}`
+              : recentMissTopic?.label || 'Continue practice'}
           </span>
-        </button>
-      )}
+          <span className="mt-1 block text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+            {recommendationReason}
+          </span>
+        </span>
+        <span className="shrink-0 text-xs font-semibold text-amber-800 dark:text-amber-200">
+          Practice →
+        </span>
+      </button>
 
       <TrendChart rows={trendRows} />
 
@@ -319,9 +349,9 @@ export function StatsDashboard({ state, onPracticeTopic }) {
                   </span>
                 </div>
                 <div className="mt-1 text-xs text-stone-500">
-                  {topic.totals.correct} right / {topic.totals.attempted} attempts
+                  {topic.totals.correct} right / {attemptCount(topic.totals.attempted)}
                   {topic.totals.attempted > 0 && topic.totals.attempted < 3
-                    ? ' · early estimate'
+                    ? ` · ${evidenceLabelForTotals(topic.totals)}`
                     : ''}
                   {topic.trend == null
                     ? ''
@@ -343,7 +373,7 @@ export function StatsDashboard({ state, onPracticeTopic }) {
 }
 
 export default function StatsView() {
-  const { state, practiceFormGroup, hydrated } = useApp();
+  const { state, practiceFormGroup, setTab, hydrated } = useApp();
 
   if (!hydrated) {
     return (
@@ -354,6 +384,10 @@ export default function StatsView() {
   }
 
   return (
-    <StatsDashboard state={state} onPracticeTopic={(familyId) => practiceFormGroup({ familyId })} />
+    <StatsDashboard
+      state={state}
+      onPracticeTopic={(familyId) => practiceFormGroup({ familyId })}
+      onContinuePractice={() => setTab('practice')}
+    />
   );
 }

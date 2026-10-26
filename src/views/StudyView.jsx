@@ -45,8 +45,6 @@ import { recordReadinessAttempt } from '../utils/readiness.js';
 import {
   formDisplay,
   promptDisplay,
-  exerciseEnglishForForm,
-  exerciseMeaningForWord,
   answerPhaseTaskDetails,
   makeChoices,
   makeReverseChoices,
@@ -58,6 +56,7 @@ import {
   kanaMatchDisplayForPrefs,
   spokenAnswerResult,
 } from '../utils/display.js';
+import { exerciseEnglishForForm, exerciseMeaningForWord } from '../utils/exerciseMeaning.js';
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
 import { fetchBundledSentence } from '../utils/sentenceCorpus.js';
 import { fetchTailoredSentence } from '../utils/sentenceLibrary.js';
@@ -92,7 +91,7 @@ import {
   withCardOrigin,
 } from './study/StudyReviewPanels.jsx';
 import { StudyFocusBar } from './study/StudyFocusBar.jsx';
-import { AnswerInputPanel } from './study/AnswerInputPanel.jsx';
+import { AnswerInputPanel, PracticeAnswerTip } from './study/AnswerInputPanel.jsx';
 import PracticeSelector from './study/PracticeSelector.jsx';
 import PracticeBeginnerHelp from './study/PracticeBeginnerHelp.jsx';
 import {
@@ -2937,10 +2936,8 @@ export default function StudyView({ mode = 'practice' }) {
           </details>
         )}
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-          <div
-            className={`relative px-4 pb-3 ${transformationMode ? 'pt-20' : 'pt-14'} text-center sm:px-6 sm:pb-8 sm:pt-16`}
-          >
-            <div className="absolute left-4 right-4 top-4 grid grid-cols-2 items-start gap-x-2 gap-y-1 sm:left-6 sm:right-6 sm:top-8 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-y-0">
+          <div className="px-4 pb-3 pt-4 text-center sm:px-6 sm:pb-8 sm:pt-8">
+            <div className="mb-3 grid grid-cols-2 items-start gap-x-2 gap-y-1 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-y-0">
               <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
                 Word level: {currentWordMeta.jlpt}
               </span>
@@ -2950,7 +2947,7 @@ export default function StudyView({ mode = 'practice' }) {
               >
                 <span
                   title={currentSourceChipLabel}
-                  className={`block max-w-64 truncate rounded-full border px-2.5 py-1 text-[11px] font-semibold ${currentOriginMeta.chipClass} sm:max-w-[18rem]`}
+                  className={`block max-w-full rounded-full border px-2.5 py-1 text-[11px] font-semibold ${currentOriginMeta.chipClass} sm:max-w-[18rem]`}
                 >
                   {currentSourceChipLabel}
                 </span>
@@ -3053,6 +3050,22 @@ export default function StudyView({ mode = 'practice' }) {
             )}
             <div className="mt-3 flex flex-col gap-1 sm:mt-4">
               <AnswerInputPanel
+                beginnerHelp={
+                  !transformationMode ? (
+                    <div className="mb-3 text-left">
+                      <PracticeBeginnerHelp
+                        activeWord={current.verb}
+                        onLearnBasics={() => {
+                          window.location.hash = 'lesson-basic-tenses';
+                          openLearnFocus({
+                            source: 'beginner-help',
+                            lessonGroupId: 'basic-tenses',
+                          });
+                        }}
+                      />
+                    </div>
+                  ) : null
+                }
                 sentencePrompt={sentencePrompt}
                 phase={phase}
                 transformationMode={transformationMode}
@@ -3131,22 +3144,14 @@ export default function StudyView({ mode = 'practice' }) {
             </div>
           </div>
         </div>
-        <div className="text-center text-xs text-stone-600">
-          Tip: type romaji like <span className="font-mono text-stone-600">tabeta</span>, use kana{' '}
-          <span lang="ja" className="text-stone-600 dark:text-stone-400">
-            たべた
-          </span>
-          , or press Esc to skip without penalty.
-        </div>
-        {!transformationMode && (
-          <PracticeBeginnerHelp
-            activeWord={current.verb}
-            onLearnBasics={() => {
-              window.location.hash = 'lesson-basic-tenses';
-              openLearnFocus({ source: 'beginner-help', lessonGroupId: 'basic-tenses' });
-            }}
-          />
-        )}
+        <PracticeAnswerTip
+          phase={phase}
+          answerMode={answerMode}
+          selfCheckOpen={selfCheckOpen}
+          listeningPrompt={listeningPrompt}
+          showPromptText={showPromptText}
+          speechRecognitionAvailable={speechRecognitionAvailable}
+        />
       </div>
     </div>
   );

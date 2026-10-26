@@ -5,6 +5,9 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import LessonsView from '../views/LessonsView.jsx';
 import PracticeBeginnerHelp from '../views/study/PracticeBeginnerHelp.jsx';
+import { AnswerInputPanel, PracticeAnswerTip } from '../views/study/AnswerInputPanel.jsx';
+import PracticeSelector from '../views/study/PracticeSelector.jsx';
+import { practiceSelectionForTypeIds } from '../utils/practiceSelection.js';
 
 vi.mock('../state/AppStateContext.jsx', () => ({
   useApp: () => ({ allWords: [] }),
@@ -65,6 +68,92 @@ describe('beginner learning support', () => {
     expect(within(example).getByText('食べない (たべない)')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Learn Basics and Politeness' }));
     expect(onLearnBasics).toHaveBeenCalledTimes(1);
+  });
+
+  it('places a single collapsed help disclosure after the active target and before answers', () => {
+    const panelProps = {
+      phase: 'answering',
+      answerMode: 'choice',
+      current: { verb: { dict: '見る', reading: 'みる', group: 'ichidan' } },
+      taskLabel: 'Plain Past',
+      answerTaskDetails: {},
+      practicePrefs: {},
+      choices: ['みた'],
+      beginnerHelp: <PracticeBeginnerHelp onLearnBasics={vi.fn()} />,
+    };
+    const { rerender } = render(<AnswerInputPanel {...panelProps} />);
+    const help = screen.getByText('New to conjugation?').closest('details');
+    const target = screen.getAllByText('Plain Past')[0];
+    const answer = screen.getByRole('button', { name: 'みた' });
+    expect(help.open).toBe(false);
+    expect(
+      target.compareDocumentPosition(help) & window.Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      help.compareDocumentPosition(answer) & window.Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getAllByText('New to conjugation?')).toHaveLength(1);
+
+    rerender(
+      <AnswerInputPanel
+        {...panelProps}
+        transformationMode
+        targetTypeInfo={{ label: 'Plain Past' }}
+        sourceTypeInfo={{ label: 'Plain Negative' }}
+      />,
+    );
+    expect(screen.queryByText('New to conjugation?')).toBeNull();
+  });
+
+  it.each([
+    ['input', false, true, 'Type romaji like'],
+    ['choice', false, true, 'Choose the matching answer'],
+    ['self-check', false, true, 'Recall the answer, reveal it'],
+    ['self-check', true, true, 'Compare your answer'],
+    ['speak', false, true, 'Use Speak answer'],
+    ['speak', false, false, 'Speech input is unavailable here'],
+  ])(
+    'matches instructions to %s mode and its current state',
+    (answerMode, selfCheckOpen, available, copy) => {
+      render(
+        <PracticeAnswerTip
+          phase="answering"
+          answerMode={answerMode}
+          selfCheckOpen={selfCheckOpen}
+          speechRecognitionAvailable={available}
+        />,
+      );
+      const tip = screen.getByTestId('practice-answer-tip');
+      expect(tip.textContent).toContain(copy);
+      if (answerMode !== 'input') expect(tip.textContent).not.toContain('romaji');
+    },
+  );
+
+  it('combines listening guidance with the answer mode and switches to review instructions', () => {
+    const { rerender } = render(
+      <PracticeAnswerTip phase="answering" answerMode="choice" listeningPrompt />,
+    );
+    const tip = screen.getByTestId('practice-answer-tip');
+    expect(tip.textContent).toContain('Listen to the prompt; use Replay');
+    expect(tip.textContent).toContain('Choose the matching answer');
+    rerender(
+      <PracticeAnswerTip phase="answering" answerMode="choice" listeningPrompt showPromptText />,
+    );
+    expect(tip.textContent).not.toContain('Listen to the prompt');
+    rerender(<PracticeAnswerTip phase="reviewing" answerMode="choice" listeningPrompt />);
+    expect(tip.textContent).toContain('choose Next card');
+    expect(tip.textContent).not.toContain('Listen to the prompt');
+  });
+
+  it('uses singular and plural counts for the exact selected scope', () => {
+    const { rerender } = render(
+      <PracticeSelector selection={practiceSelectionForTypeIds(['plain-past'])} />,
+    );
+    expect(screen.getByText('1 form')).toBeTruthy();
+    rerender(
+      <PracticeSelector selection={practiceSelectionForTypeIds(['humble', 'humble-polite'])} />,
+    );
+    expect(screen.getByText('2 forms')).toBeTruthy();
   });
 
   it.each([

@@ -30,6 +30,32 @@ afterEach(() => {
 });
 
 describe('StickyAction', () => {
+  it('can keep mobile help in flow until a focused keyboard requires docking', async () => {
+    const viewport = installVisualViewport({ height: 780 });
+    render(
+      <StickyAction dock flowUntilKeyboardOnMobile>
+        <input aria-label="Answer" />
+        <button type="button">Check</button>
+      </StickyAction>,
+    );
+    const input = screen.getByLabelText('Answer');
+    const dock = input.parentElement;
+    expect(dock.classList.contains('sm:sticky')).toBe(true);
+    input.focus();
+    viewport.height = 480;
+    viewport.dispatchEvent(new Event('resize'));
+    await waitFor(() => {
+      expect(dock.style.bottom).toBe('320px');
+      expect(dock.classList.contains('sticky')).toBe(true);
+    });
+    viewport.height = 780;
+    viewport.dispatchEvent(new Event('resize'));
+    await waitFor(() => {
+      expect(dock.style.bottom).toBe('0px');
+      expect(dock.classList.contains('sm:sticky')).toBe(true);
+    });
+  });
+
   it('offsets above the visual viewport occlusion while a text input is focused', async () => {
     const viewport = installVisualViewport({ height: 480, offsetTop: 0 });
 

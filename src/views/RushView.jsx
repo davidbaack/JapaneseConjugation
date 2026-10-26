@@ -281,7 +281,7 @@ export default function RushView() {
   const kanaMatchDisplay = kanaMatchDisplayForPrefs(practicePrefs);
   const answerPreview = normalizeRushAnswer(answer);
   const rushKanaCells =
-    round?.expected && kanaMatchDisplay !== 'none'
+    round?.expected && answerPreview && kanaMatchDisplay !== 'none'
       ? kanaCoachCells(round.expected, answer, 0, active && !paused)
       : [];
   const rushWrongIndex = rushKanaCells.findIndex(

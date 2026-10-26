@@ -95,8 +95,10 @@ export default function StickyAction({
   className = '',
   dock = false,
   flowOnMobile = false,
+  flowUntilKeyboardOnMobile = false,
 }) {
   const keyboardInset = useKeyboardInset();
+  const mobileFlow = flowOnMobile || (flowUntilKeyboardOnMobile && keyboardInset === 0);
   const bottom = `${keyboardInset}px`;
   const paddingBottom =
     keyboardInset > 0 ? '0.5rem' : 'calc(0.25rem + env(safe-area-inset-bottom, 0px))';
@@ -104,7 +106,7 @@ export default function StickyAction({
   return (
     <div
       data-action-dock={dock ? 'true' : undefined}
-      className={`${flowOnMobile ? 'sm:sticky' : 'sticky'} z-10 pt-3 pb-1 bg-gradient-to-t from-white via-white dark:from-stone-900 dark:via-stone-900 to-transparent ${pad} ${className}`}
+      className={`${mobileFlow ? 'sm:sticky' : 'sticky'} z-10 pt-3 pb-1 bg-gradient-to-t from-white via-white dark:from-stone-900 dark:via-stone-900 to-transparent ${pad} ${className}`}
       style={{ bottom, paddingBottom }}
     >
       {children}

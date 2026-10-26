@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { accuracyForTotals, evidenceLabelForTotals } from '../utils/practiceStats.js';
 import { IconSpark } from '../components/Icons.jsx';
 import ScriptDisplay from '../components/ScriptDisplay.jsx';
 import StickyAction from '../components/StickyAction.jsx';
@@ -323,7 +324,12 @@ export default function ClassificationView() {
     aiAbortRef.current = null;
   }
 
-  const realAcc = stats.attempted ? Math.round((stats.correct / stats.attempted) * 100) : 0;
+  const accuracyLabel =
+    stats.attempted >= 3
+      ? `${accuracyForTotals(stats)}% accuracy`
+      : stats.attempted
+        ? evidenceLabelForTotals(stats)
+        : 'New';
   const currentView = promptDisplay(current, null, practicePrefs);
   const teaching = result ? classificationTeachingMoment(current) : null;
   const resultCopy = result
@@ -338,7 +344,7 @@ export default function ClassificationView() {
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-5 text-left">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="font-medium text-stone-950 dark:text-stone-50">Classification drill</h3>
             <p className="text-xs text-stone-500">
@@ -348,9 +354,10 @@ export default function ClassificationView() {
           </div>
           <div className="text-xs text-stone-500 text-right">
             <div>
-              {stats.correct || 0}/{stats.attempted || 0}
+              {stats.correct || 0} right / {stats.attempted || 0}{' '}
+              {stats.attempted === 1 ? 'attempt' : 'attempts'}
             </div>
-            <div>{realAcc}% accuracy</div>
+            <div>{accuracyLabel}</div>
             <div className="text-[9px] text-stone-400 mt-1">
               {[
                 getWordMeta(current).lesson && `Genki L${getWordMeta(current).lesson}`,
@@ -547,7 +554,11 @@ export default function ClassificationView() {
                   <div className="text-xs text-stone-500">{row.hint}</div>
                 </div>
                 <div className="text-sm font-semibold tabular-nums text-stone-700 dark:text-stone-300">
-                  {row.attempted ? `${row.accuracy}%` : 'new'}
+                  {row.attempted >= 3
+                    ? `${row.accuracy}%`
+                    : row.attempted
+                      ? evidenceLabelForTotals(row)
+                      : 'New'}
                 </div>
               </div>
               <div className="mt-2 h-2 bg-white dark:bg-stone-900 rounded-full overflow-hidden border border-stone-100 dark:border-stone-800">
@@ -557,7 +568,8 @@ export default function ClassificationView() {
                 />
               </div>
               <div className="mt-1 text-[11px] text-stone-400 tabular-nums">
-                {row.correct || 0}/{row.attempted || 0} correct
+                {row.correct || 0} right / {row.attempted || 0}{' '}
+                {row.attempted === 1 ? 'attempt' : 'attempts'}
               </div>
             </div>
           ))}

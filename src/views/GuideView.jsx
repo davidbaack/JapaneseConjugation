@@ -14,7 +14,8 @@ import {
   guideResultFromSteps,
   guideGroupOptions,
 } from '../utils/guidePractice.js';
-import { exerciseMeaningForWord, formDisplay } from '../utils/display.js';
+import { formDisplay } from '../utils/display.js';
+import { exerciseMeaningForWord } from '../utils/exerciseMeaning.js';
 import { conjugateItem, isTypeCompatible, wordKey } from '../utils/conjugator.js';
 import { ANSWER_OUTCOME, answerOutcomeCopy } from '../utils/answerFeedbackCopy.js';
 import { groupDisplayLabel } from '../utils/groupDisplay.js';
