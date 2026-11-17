@@ -82,7 +82,7 @@ test.describe('Serious and critical accessibility checks', () => {
     const picker = page.getByRole('combobox', { name: 'Browse category' });
     const categories = await picker
       .locator('option')
-      .evaluateAll((options) => options.map((option) => option.value));
+      .evaluateAll((options) => options.map((option) => option.getAttribute('value') || ''));
     for (const dark of [false, true]) {
       await page.evaluate((enabled) => document.body.classList.toggle('dark', enabled), dark);
       for (const time of ['All', 'Past']) {
