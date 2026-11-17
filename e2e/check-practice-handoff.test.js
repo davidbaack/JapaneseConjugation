@@ -52,9 +52,10 @@ for (const answerMode of ['input', 'choice']) {
       },
     );
     await page.reload();
-    await expect(
-      page.getByRole('button', { name: 'Passive & causative', exact: true }),
-    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /^Passive & causative \d+\// })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     await page.getByRole('tab', { name: 'Tools', exact: true }).click();
     await page.getByRole('tab', { name: /^Check/ }).click();
     await page.getByLabel('Conjugated form', { exact: true }).fill('yomunai');

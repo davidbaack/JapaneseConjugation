@@ -53,8 +53,7 @@ function CategoryButton({ category, active, matchingCount, onClick }) {
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      aria-label={category.label}
-      aria-description={`${category.description} ${matchingCount} of ${totalCount} forms match the current filters. ${previewText}.`}
+      aria-description={`${category.description} ${matchingCount} of ${totalCount} forms match the current filters.`}
       title={`${category.description} ${previewText}.`}
       className={`min-h-14 shrink-0 whitespace-nowrap rounded-xl border px-3 py-2 text-left transition active:scale-[0.98] ${
         active
@@ -63,9 +62,8 @@ function CategoryButton({ category, active, matchingCount, onClick }) {
       }`}
     >
       <span className="flex items-center justify-between gap-3 text-[11px] font-semibold">
-        <span>{category.label}</span>
+        <span>{category.label}</span>{' '}
         <span
-          aria-hidden="true"
           className={`rounded-full px-1.5 py-0.5 text-[9px] tabular-nums ${
             active
               ? 'bg-white/18 text-white dark:bg-stone-950/15 dark:text-stone-950'
@@ -74,8 +72,8 @@ function CategoryButton({ category, active, matchingCount, onClick }) {
         >
           {matchingCount}/{totalCount}
         </span>
-      </span>
-      <span aria-hidden="true" className="mt-1 block text-[9px] leading-none">
+      </span>{' '}
+      <span className="mt-1 block text-[9px] leading-none">
         <CategoryPreview parts={category.previewParts} />
       </span>
     </button>

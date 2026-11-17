@@ -301,7 +301,7 @@ describe('StudyView continuous Practice startup', () => {
 
     expect(await waitForPracticeCard()).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Practice selection' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Core forms' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Core forms \d+\// })).toBeTruthy();
     expect(screen.getByRole('group', { name: 'Practice categories' })).toBeTruthy();
     expect(screen.getByRole('group', { name: 'Practice quick filters' })).toBeTruthy();
     expect(screen.queryByText('Change', { exact: true })).toBeNull();

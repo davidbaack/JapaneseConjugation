@@ -42,7 +42,7 @@ describe('App shell', () => {
     expect(screen.getByRole('tab', { name: 'Practice' }).getAttribute('aria-selected')).toBe(
       'true',
     );
-    expect(screen.getByRole('button', { name: 'Core forms' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Core forms \d+\// })).toBeTruthy();
     expect(screen.getByText('8 forms')).toBeTruthy();
     expect(screen.getByRole('radio', { name: 'Non-past' })).toBeTruthy();
     expect(screen.getByRole('radio', { name: 'Negative' })).toBeTruthy();
@@ -56,7 +56,7 @@ describe('App shell', () => {
   it('combines category toggles with cross-category quick filters', async () => {
     await renderApp();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Wants & intentions' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Wants & intentions \d+\// }));
     expect(await screen.findByText('Wants & intentions added to Practice.')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('radio', { name: 'Past' }));
@@ -67,9 +67,9 @@ describe('App shell', () => {
   it('previews category endings and inspects inactive exact forms without changing scope', async () => {
     await renderApp();
 
-    const coreForms = screen.getByRole('button', { name: 'Core forms' });
+    const coreForms = screen.getByRole('button', { name: /^Core forms \d+\// });
     expect(coreForms.getAttribute('aria-description')).toContain('8 of 8 forms');
-    expect(coreForms.getAttribute('aria-description')).toContain('〜ない not');
+    expect(screen.getByRole('button', { name: /^Core forms 8\/8 .*〜ない not/ })).toBe(coreForms);
 
     fireEvent.click(screen.getByRole('button', { name: 'See all forms' }));
     fireEvent.click(screen.getByRole('button', { name: 'Expand Ability & ongoing forms' }));
@@ -77,7 +77,7 @@ describe('App shell', () => {
     expect(screen.getByText('食べる → 食べられる')).toBeTruthy();
     expect(screen.getByText('書く → 書ける')).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Ability & ongoing' }).getAttribute('aria-pressed'),
+      screen.getByRole('button', { name: /^Ability & ongoing \d+\// }).getAttribute('aria-pressed'),
     ).toBe('false');
   });
 
@@ -92,7 +92,7 @@ describe('App shell', () => {
     expect(await screen.findByText('Potential added to Practice.')).toBeTruthy();
     expect(screen.getByText('9 forms')).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Ability & ongoing' }).getAttribute('aria-pressed'),
+      screen.getByRole('button', { name: /^Ability & ongoing \d+\// }).getAttribute('aria-pressed'),
     ).toBe('true');
   });
 
@@ -111,7 +111,7 @@ describe('App shell', () => {
     expect(screen.getByText('4 forms')).toBeTruthy();
     expect(
       within(screen.getByRole('group', { name: 'Practice categories' }))
-        .getByRole('button', { name: 'Te-form' })
+        .getByRole('button', { name: /^Te-form\b/ })
         .getAttribute('aria-pressed'),
     ).toBe('false');
   });

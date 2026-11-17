@@ -122,7 +122,7 @@ test('Humble lesson scope stays visible through resize without snapping manual c
     .getByRole('button', { name: 'Practice this', exact: true })
     .click();
   const rail = page.getByTestId('practice-category-rail');
-  const keigo = rail.getByRole('button', { name: 'Keigo', exact: true });
+  const keigo = rail.getByRole('button', { name: /^Keigo \d+\// });
   await expect(keigo).toHaveAttribute('aria-pressed', 'true');
   await expect(keigo).toContainText('2/4');
   await expectChoiceFullyVisible(rail, keigo);
@@ -138,7 +138,7 @@ test('Humble lesson scope stays visible through resize without snapping manual c
     element.scrollLeft = 0;
     element.dispatchEvent(new Event('scroll'));
   });
-  await expect(rail.getByRole('button', { name: 'Core forms', exact: true })).toBeInViewport();
+  await expect(rail.getByRole('button', { name: /^Core forms \d+\// })).toBeInViewport();
   const settings = page.getByText('Answer settings', { exact: true });
   await settings.click();
   await page.getByRole('button', { name: 'Auto next off', exact: true }).click();

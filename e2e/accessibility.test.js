@@ -65,6 +65,16 @@ test.describe('Serious and critical accessibility checks', () => {
     await expectNoSeriousViolations(page, 'answer feedback');
   });
 
+  test('category names include their visible counts and examples', async ({ page }) => {
+    await page.goto('/');
+    const categories = page.getByTestId('practice-category-rail').getByRole('button');
+    await expect(categories).toHaveCount(11);
+    for (const category of await categories.all()) {
+      const visibleText = (await category.innerText()).replace(/\s+/g, ' ').trim();
+      await expect(category).toHaveAccessibleName(visibleText);
+    }
+  });
+
   test('Check tool input', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
