@@ -72,12 +72,16 @@ confirms the new direction, update this document in the same change.
   Specific filters match only exact forms carrying that distinction; neutral
   forms are excluded. The UI shows the live matching count and refuses a change
   that would leave no matching forms rather than silently substituting forms.
-- Exact forms remain available in one optional See all forms disclosure. It can
-  inspect categories that are off and shows each form's Japanese marker,
-  meaning, and example conjugations. Choosing a form from an off category turns
-  on only that form; additions blocked by global filters explain which filters
-  must be relaxed. Multiple selected categories are balanced by category rather
-  than by raw exact-form count, so a large category cannot drown out a small one.
+- Exact forms remain available in one optional Choose specific forms disclosure.
+  A single Browse category picker shows one category's forms immediately,
+  initially opening the first active category. Browsing includes categories that
+  are off and does not change the Practice selection. Each form shows its
+  Japanese marker, meaning, and example conjugations. Category On/Off controls
+  appear only in the chips above, not again inside this disclosure. Choosing a
+  form from an off category turns on only that form; additions blocked by global
+  filters explain which filters must be relaxed. Multiple selected categories
+  are balanced by category rather than by raw exact-form count, so a large
+  category cannot drown out a small one.
 - A manual category, filter, or exact-form change keeps the active card if it is still
   eligible. If the card becomes ineligible it is replaced immediately, the
   unfinished answer is cleared, and no skip, miss, retry, or progress event is

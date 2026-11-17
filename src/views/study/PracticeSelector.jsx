@@ -183,102 +183,54 @@ function ExactFormButton({ typeId, categoryId, categoryActive, selection, onTogg
   );
 }
 
-function ExactFormRefinement({ selection, categoryMatchCounts, onToggleCategory, onToggleType }) {
-  const [expandedCategoryIds, setExpandedCategoryIds] = useState(() => new Set());
-
-  function toggleExpanded(categoryId) {
-    setExpandedCategoryIds((current) => {
-      const next = new Set(current);
-      if (next.has(categoryId)) next.delete(categoryId);
-      else next.add(categoryId);
-      return next;
-    });
-  }
+function ExactFormRefinement({ selection, onToggleType }) {
+  const [browsedCategoryId, setBrowsedCategoryId] = useState(
+    () => selection.selectedCategoryIds[0] || PRACTICE_CATEGORIES[0].id,
+  );
+  const category =
+    PRACTICE_CATEGORIES.find((entry) => entry.id === browsedCategoryId) || PRACTICE_CATEGORIES[0];
+  const active = selection.selectedCategoryIds.includes(category.id);
 
   return (
     <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50/80 p-2 dark:border-stone-800 dark:bg-stone-950/45">
-      <div className="px-1 pb-2">
-        <h2 className="text-xs font-semibold text-stone-800 dark:text-stone-100">Exact forms</h2>
-        <p className="mt-0.5 text-[10px] leading-relaxed text-stone-500 dark:text-stone-400">
-          Open any category to see its endings, meaning, and example conjugations.
+      <div className="px-1">
+        <label
+          htmlFor="practice-form-category"
+          className="block text-[10px] font-semibold text-stone-700 dark:text-stone-200"
+        >
+          Browse category
+        </label>
+        <select
+          id="practice-form-category"
+          value={category.id}
+          onChange={(event) => setBrowsedCategoryId(event.target.value)}
+          aria-describedby="practice-form-category-description"
+          className="mt-1 block min-h-9 w-full rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-xs text-stone-800 sm:max-w-xs dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+        >
+          {PRACTICE_CATEGORIES.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.label}
+            </option>
+          ))}
+        </select>
+        <p
+          id="practice-form-category-description"
+          className="mt-1.5 text-[10px] leading-relaxed text-stone-500 dark:text-stone-400"
+        >
+          {category.description} Choose individual forms to include in Practice.
         </p>
       </div>
-      <div className="space-y-1.5">
-        {PRACTICE_CATEGORIES.map((category) => {
-          const active = selection.selectedCategoryIds.includes(category.id);
-          const expanded = expandedCategoryIds.has(category.id);
-          const matchingCount = categoryMatchCounts.get(category.id) || 0;
-          const contentId = `practice-category-forms-${category.id}`;
-          return (
-            <section
-              key={category.id}
-              aria-labelledby={`practice-category-heading-${category.id}`}
-              className="overflow-hidden rounded-lg border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900"
-            >
-              <div className="flex items-stretch">
-                <button
-                  type="button"
-                  onClick={() => toggleExpanded(category.id)}
-                  aria-expanded={expanded}
-                  aria-controls={contentId}
-                  aria-label={`${expanded ? 'Collapse' : 'Expand'} ${category.label} forms`}
-                  className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left transition hover:bg-stone-50 dark:hover:bg-stone-800/60"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`text-sm text-stone-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                  >
-                    ›
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span
-                      id={`practice-category-heading-${category.id}`}
-                      className="flex items-center gap-2 text-xs font-semibold text-stone-800 dark:text-stone-100"
-                    >
-                      {category.label}
-                      <span className="text-[9px] font-medium tabular-nums text-stone-500 dark:text-stone-400">
-                        {matchingCount}/{category.typeIds.length}
-                      </span>
-                    </span>
-                    <span className="mt-0.5 block truncate text-[10px] text-stone-500 dark:text-stone-400">
-                      {category.description}
-                    </span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onToggleCategory(category.id)}
-                  aria-pressed={active}
-                  aria-label={`${category.label} category`}
-                  className={`m-1.5 min-w-12 rounded-md border px-2 text-[10px] font-semibold transition ${
-                    active
-                      ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-200'
-                      : 'border-stone-200 bg-stone-50 text-stone-500 hover:border-indigo-300 hover:text-indigo-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-400 dark:hover:border-indigo-700 dark:hover:text-indigo-200'
-                  }`}
-                >
-                  {active ? 'On' : 'Off'}
-                </button>
-              </div>
-              {expanded ? (
-                <div
-                  id={contentId}
-                  className="grid gap-2 border-t border-stone-100 bg-stone-50/60 p-2 md:grid-cols-2 dark:border-stone-800 dark:bg-stone-950/25"
-                >
-                  {category.typeIds.map((typeId) => (
-                    <ExactFormButton
-                      key={typeId}
-                      typeId={typeId}
-                      categoryId={category.id}
-                      categoryActive={active}
-                      selection={selection}
-                      onToggleType={onToggleType}
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          );
-        })}
+      <div id={`practice-category-forms-${category.id}`} className="mt-2 grid gap-2 md:grid-cols-2">
+        {category.typeIds.map((typeId) => (
+          <ExactFormButton
+            key={typeId}
+            typeId={typeId}
+            categoryId={category.id}
+            categoryActive={active}
+            selection={selection}
+            onToggleType={onToggleType}
+          />
+        ))}
       </div>
     </div>
   );
@@ -323,7 +275,7 @@ export default function PracticeSelector({
       aria-label="Practice selection"
       className="rounded-2xl border border-stone-200 bg-white px-3 py-2.5 shadow-sm shadow-stone-950/5 dark:border-stone-800 dark:bg-stone-900 sm:px-4"
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
           Practice categories
         </span>
@@ -338,7 +290,7 @@ export default function PracticeSelector({
             aria-controls="practice-exact-form-refinement"
             className="min-h-7 rounded-lg border border-stone-200 px-2 py-1 text-[10px] font-semibold text-stone-600 transition hover:bg-stone-50 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800"
           >
-            See all forms
+            Choose specific forms
           </button>
         </div>
       </div>
@@ -365,12 +317,7 @@ export default function PracticeSelector({
 
       {showExactForms ? (
         <div id="practice-exact-form-refinement">
-          <ExactFormRefinement
-            selection={normalized}
-            categoryMatchCounts={categoryMatchCounts}
-            onToggleCategory={onToggleCategory}
-            onToggleType={onToggleType}
-          />
+          <ExactFormRefinement selection={normalized} onToggleType={onToggleType} />
         </div>
       ) : null}
 
