@@ -1,6 +1,6 @@
 import { DEFAULT_PREFS } from '../../data/defaults.js';
 import { wordKey } from '../../utils/conjugator.js';
-import { mergePracticePrefs } from '../../utils/display.js';
+import { mergePracticePrefs } from '../../utils/practicePrefs.js';
 import { recordGuideAttempt } from '../../utils/guidePractice.js';
 import { bumpSessionMistakePattern, diagnoseMistake } from '../../utils/mistakeDiagnosis.js';
 import { practiceSelectionForTypeIds } from '../../utils/practiceSelection.js';

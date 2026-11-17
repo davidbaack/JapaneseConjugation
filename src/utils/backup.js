@@ -1,5 +1,5 @@
 import { defaultState, mergeState } from './storage.js';
-import { mergePracticePrefs } from './display.js';
+import { mergePracticePrefs } from './practicePrefs.js';
 import {
   isRecord,
   validateBackupContent,

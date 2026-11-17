@@ -10,16 +10,18 @@ import {
   pastParticiple,
   simplePast,
   thirdPerson,
-  resolveDisplayScripts,
   answerPhaseTaskDetails,
-  autoAdvanceAnswerFormKey,
-  mergePracticePrefs,
   makeChoices,
   makeReverseChoices,
   normalizeSentenceBlankForTarget,
-  resolveAutoAdvanceCorrect,
   spokenAnswerResult,
 } from '../utils/display.js';
+import {
+  resolveDisplayScripts,
+  autoAdvanceAnswerFormKey,
+  mergePracticePrefs,
+  resolveAutoAdvanceCorrect,
+} from '../utils/practicePrefs.js';
 import { exerciseEnglishForForm, exerciseMeaningForWord } from '../utils/exerciseMeaning.js';
 import {
   compatibleTypes,

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { IconVolume, IconCloud, IconRefresh } from '../components/Icons.jsx';
-import { resolveDisplayScripts, scriptModeFromDisplay } from '../utils/display.js';
+import { resolveDisplayScripts, scriptModeFromDisplay } from '../utils/practicePrefs.js';
 import { speakJapanese } from '../utils/speech.js';
 import { serializeBackup, parseBackup } from '../utils/backup.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';

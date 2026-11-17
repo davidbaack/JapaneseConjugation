@@ -49,7 +49,7 @@ import {
 } from '../utils/persistenceContracts.js';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
 import { getJapaneseVoices } from '../utils/speech.js';
-import { mergePracticePrefs } from '../utils/display.js';
+import { mergePracticePrefs } from '../utils/practicePrefs.js';
 import { STARTER_VERBS, STARTER_ADJECTIVES } from '../data/starterWords.js';
 import { loadVerbLexicon } from '../data/verbLexicon.js';
 import * as supabaseClientModule from '../utils/supabase.js';

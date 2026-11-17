@@ -14,7 +14,7 @@ import {
   validatePreservedSnapshot,
   fillMissingSnapshotDefaults,
 } from '../utils/learnerStateValidation.js';
-import { mergePracticePrefs } from '../utils/display.js';
+import { mergePracticePrefs } from '../utils/practicePrefs.js';
 
 const roundTrip = () => parseBackup(serializeBackup(makeLearnerSnapshot()));
 

@@ -1,5 +1,5 @@
 import { DEFAULT_PREFS } from '../data/defaults.js';
-import { resolveDisplayScripts } from './display.js';
+import { resolveDisplayScripts } from './practicePrefs.js';
 import { kanaToRomaji } from './romaji.js';
 
 const KANJI_RE = /[\u3400-\u9fff]/u;

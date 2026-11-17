@@ -49,13 +49,15 @@ import {
   makeChoices,
   makeReverseChoices,
   dictionaryAnswerMatches,
+  spokenAnswerResult,
+} from '../utils/display.js';
+import {
   normalizeAnswerMode,
   resolveKanaAssist,
   autoAdvanceAnswerFormKey,
   resolveAutoAdvanceCorrect,
   kanaMatchDisplayForPrefs,
-  spokenAnswerResult,
-} from '../utils/display.js';
+} from '../utils/practicePrefs.js';
 import { exerciseEnglishForForm, exerciseMeaningForWord } from '../utils/exerciseMeaning.js';
 import { sentenceDisplay } from '../utils/sentenceDisplay.js';
 import { fetchBundledSentence } from '../utils/sentenceCorpus.js';
