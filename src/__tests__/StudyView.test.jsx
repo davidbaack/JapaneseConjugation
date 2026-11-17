@@ -12,6 +12,7 @@ import { clearSentenceCorpusCache } from '../utils/sentenceCorpus.js';
 import { buildReadinessFamilyRows } from '../utils/readiness.js';
 import { recordPracticeAnswer } from '../utils/practiceStats.js';
 import { applyGuideAttemptToState } from '../utils/guidePractice.js';
+import { SENTENCE_REQUEST_TIMEOUT_MS } from '../utils/sentenceDeadline.js';
 
 const mockedApp = vi.hoisted(() => ({ value: null }));
 const mockedSpeech = vi.hoisted(() => ({ playPronunciation: vi.fn() }));
@@ -935,6 +936,46 @@ describe('StudyView continuous Practice startup', () => {
     expect(document.querySelector('[data-sentence-mode]')).toBeNull();
     expect(input.value).toBe('あ');
     expect(mockedApp.value.setPracticePrefs).not.toHaveBeenCalled();
+  });
+
+  it('releases a stalled sentence entry so a later exact retry can load context', async () => {
+    vi.useFakeTimers();
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    mockedSentences.bundled
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValue(approvedSentenceEntry(target, type));
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: [type] },
+      allWords: [target],
+      studyFocus: { word: target, type },
+      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+    });
+    render(<StudyView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    const input = screen.getByPlaceholderText(/Type romaji or kana/i);
+    fireEvent.change(input, { target: { value: 'a' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SENTENCE_REQUEST_TIMEOUT_MS);
+    });
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    expect(input.value).toBe('あ');
+    expect(mockedApp.value.state.session.reviewed).toBe(0);
+    expect(mockedSentences.tailored).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('[data-sentence-mode]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
   });
 
   it('continues a custom word exercise without reviewed context or recording a result', async () => {

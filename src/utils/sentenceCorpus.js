@@ -1,6 +1,7 @@
 import { wordKey } from './conjugator.js';
 import { hydrateSentenceValue } from './sentencePrompt.js';
 import { parseSentenceReview, sha256Hex, verifySentenceValue } from './sentenceTrust.js';
+import { withSentenceDeadline } from './sentenceDeadline.js';
 
 const BASE_URL = /** @type {any} */ (import.meta).env?.BASE_URL || '/';
 const SENTENCE_CORPUS_BASE_URL = `${BASE_URL}data/sentences/`;
@@ -60,25 +61,30 @@ async function loadManifest() {
     return manifestPromise;
   }
   manifestLoadedAt = Date.now();
-  manifestPromise = fetch(`${SENTENCE_CORPUS_BASE_URL}manifest.json`, { cache: 'no-cache' })
-    .then(async (response) => {
-      if (!response.ok) return null;
-      const manifest = await response.json();
-      if (!validManifest(manifest)) return null;
-      const revisions = [...manifest.types]
-        .sort((a, b) => a.type.localeCompare(b.type))
-        .map((entry) => [entry.type, entry.revision]);
-      if ((await sha256Hex(JSON.stringify(revisions))) !== manifest.revision) return null;
-      if (manifestRevision !== manifest.revision) {
-        typeCache.clear();
-        manifestRevision = manifest.revision;
-      }
-      return manifest;
-    })
-    .catch(() => null);
+  const request = withSentenceDeadline(async (signal) => {
+    const response = await fetch(`${SENTENCE_CORPUS_BASE_URL}manifest.json`, {
+      cache: 'no-cache',
+      signal,
+    });
+    if (!response.ok) return null;
+    const manifest = await response.json();
+    if (!validManifest(manifest)) return null;
+    const revisions = [...manifest.types]
+      .sort((a, b) => a.type.localeCompare(b.type))
+      .map((entry) => [entry.type, entry.revision]);
+    if ((await sha256Hex(JSON.stringify(revisions))) !== manifest.revision) return null;
+    return manifest;
+  }).catch(() => null);
 
-  const manifest = await manifestPromise;
-  if (!manifest) manifestPromise = null;
+  manifestPromise = request;
+  const manifest = await request;
+  if (manifestPromise !== request) return manifest;
+  if (!manifest) {
+    manifestPromise = null;
+  } else if (manifestRevision !== manifest.revision) {
+    typeCache.clear();
+    manifestRevision = manifest.revision;
+  }
   return manifest;
 }
 
@@ -94,35 +100,34 @@ async function loadTypeCorpus(type) {
   const cacheKey = `${type}|${manifest.revision}|${typeEntry.revision}`;
   if (typeCache.has(cacheKey)) return typeCache.get(cacheKey);
 
-  const promise = fetch(
-    `${SENTENCE_CORPUS_BY_TYPE_URL}${type}.json?v=${encodeURIComponent(typeEntry.revision)}`,
-    { cache: 'force-cache' },
-  )
-    .then(async (response) => {
-      if (!response.ok) return null;
-      const data = await response.json();
-      if (
-        data?.schema !== SCHEMA_VERSION ||
-        data?.type !== type ||
-        data?.revision !== typeEntry.revision ||
-        !Array.isArray(data.rows) ||
-        data.rows.length !== typeEntry.count ||
-        (await sha256Hex(JSON.stringify(data.rows))) !== typeEntry.revision
-      ) {
-        return null;
-      }
-      const rows = new Map();
-      for (const rawRow of data.rows) {
-        const parsed = rowValue(rawRow);
-        if (parsed) rows.set(parsed.key, parsed.value);
-      }
-      return rows;
-    })
-    .catch(() => null);
+  const promise = withSentenceDeadline(async (signal) => {
+    const response = await fetch(
+      `${SENTENCE_CORPUS_BY_TYPE_URL}${type}.json?v=${encodeURIComponent(typeEntry.revision)}`,
+      { cache: 'force-cache', signal },
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (
+      data?.schema !== SCHEMA_VERSION ||
+      data?.type !== type ||
+      data?.revision !== typeEntry.revision ||
+      !Array.isArray(data.rows) ||
+      data.rows.length !== typeEntry.count ||
+      (await sha256Hex(JSON.stringify(data.rows))) !== typeEntry.revision
+    ) {
+      return null;
+    }
+    const rows = new Map();
+    for (const rawRow of data.rows) {
+      const parsed = rowValue(rawRow);
+      if (parsed) rows.set(parsed.key, parsed.value);
+    }
+    return rows;
+  }).catch(() => null);
 
   typeCache.set(cacheKey, promise);
   const rows = await promise;
-  if (!rows) typeCache.delete(cacheKey);
+  if (!rows && typeCache.get(cacheKey) === promise) typeCache.delete(cacheKey);
   return rows;
 }
 

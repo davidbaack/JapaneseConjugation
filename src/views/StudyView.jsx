@@ -61,6 +61,7 @@ import { sentenceDisplay } from '../utils/sentenceDisplay.js';
 import { fetchBundledSentence } from '../utils/sentenceCorpus.js';
 import { fetchTailoredSentence } from '../utils/sentenceLibrary.js';
 import { buildSentencePromptModel } from '../utils/sentencePrompt.js';
+import { withSentenceDeadline } from '../utils/sentenceDeadline.js';
 import {
   bumpSessionMistakePattern,
   labRouteForMistakePattern,
@@ -733,8 +734,11 @@ export default function StudyView({ mode = 'practice' }) {
     if (existing) return existing;
 
     let request;
-    request = fetchBundledSentence(word, type)
-      .then((res) => res || fetchTailoredSentence(word, type))
+    request = withSentenceDeadline(async (signal) => {
+      const bundled = await fetchBundledSentence(word, type);
+      signal.throwIfAborted();
+      return bundled || fetchTailoredSentence(word, type);
+    })
       .then((entry) => {
         if (entry?.jaTemplate) {
           sentenceEntryCacheRef.current.set(key, { entry, loadedAt: Date.now() });
