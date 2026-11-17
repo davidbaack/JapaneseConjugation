@@ -164,6 +164,11 @@ transpilation use the TypeScript 6 compatibility API through the `typescript`
 npm alias; `@typescript/native` supplies the TypeScript 7 executable. This follows
 [Microsoft's side-by-side migration guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0).
 
+The Workbox build dependency uses a scoped `glob ^14.0.6` override while upstream
+still requests vulnerable glob 11. Keep it scoped to `workbox-build`; when upstream
+adopts a patched release, remove the override and verify that the precache
+manifest still includes the same intended assets.
+
 ## Getting Started
 
 Use Node.js 24 LTS, matching pull-request validation and deployment.
