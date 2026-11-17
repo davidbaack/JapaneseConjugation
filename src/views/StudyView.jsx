@@ -93,6 +93,8 @@ import {
 import { StudyFocusBar } from './study/StudyFocusBar.jsx';
 import { AnswerInputPanel, PracticeAnswerTip } from './study/AnswerInputPanel.jsx';
 import PracticeSelector from './study/PracticeSelector.jsx';
+import FormStrengthPanel from './study/FormStrengthPanel.jsx';
+import { buildFormStrengthRows } from '../utils/formStrength.js';
 import {
   addPracticeTypeSelection,
   matchingPracticeTypeIdsForCategory,
@@ -260,7 +262,10 @@ function cardMatchesPractice(card, words, enabledTypes, prefs = DEFAULT_PREFS) {
   const minimalPairSet = getMinimalPairSet(prefs.minimalPairSetId);
   const activeTypes = minimalPairSet ? minimalPairSet.typeIds : enabledTypeIdsFor(enabledTypes);
   if (card.type === DICTIONARY_TYPE_ID) {
-    return (prefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'reading' || !!card.sourceType;
+    return (
+      activeTypes.includes(card.sourceType) &&
+      ((prefs.reviewStyle || DEFAULT_PREFS.reviewStyle) === 'reading' || !!card.sourceType)
+    );
   }
   if (!activeTypes.includes(card.type)) return false;
   if (minimalPairSet && !minimalPairSetMatchesCard(minimalPairSet, card.verb, card.type)) {
@@ -300,13 +305,25 @@ function sessionOutcomeLabel(card) {
   return getTypeInfo(card.type).label || 'Practice card';
 }
 
-function withReadingSourceTypeStat(card = {}, typeId, correct, now = Date.now(), eventId) {
+function withReadingSourceTypeStat(
+  card = {},
+  typeId,
+  correct,
+  now = Date.now(),
+  eventId,
+  previousCard = {},
+) {
   if (!typeId || typeId === DICTIONARY_TYPE_ID) return card;
-  const current = card.sourceTypeStats?.[typeId] || {};
+  const sourceTypeStats = card.sourceTypeStats || {};
+  const current = sourceTypeStats[typeId] || {};
   return {
     ...card,
+    // Keep the known source of older answers. The meter derives their remainder
+    // from card totals; copying it into additive counters would duplicate it
+    // when two tabs answer independently.
+    ...(previousCard.sourceType ? { sourceType: previousCard.sourceType } : {}),
     sourceTypeStats: {
-      ...(card.sourceTypeStats || {}),
+      ...sourceTypeStats,
       [typeId]: {
         correct: (Number(current.correct) || 0) + (correct ? 1 : 0),
         incorrect: (Number(current.incorrect) || 0) + (correct ? 0 : 1),
@@ -398,13 +415,15 @@ function loadPersistedCurrent(state, words, enabledTypes, prefs) {
     }
     const word = snapshotWord || resolvedWord;
     const card = buildFocusCard(state, word, saved.type);
-    if (!card || !cardMatchesPractice(card, words, enabledTypes, prefs)) {
+    const restoredCard = card
+      ? { ...card, ...(saved.sourceType ? { sourceType: saved.sourceType } : {}) }
+      : null;
+    if (!restoredCard || !cardMatchesPractice(restoredCard, words, enabledTypes, prefs)) {
       clearPersistedCurrent();
       return null;
     }
     return {
-      ...card,
-      ...(saved.sourceType ? { sourceType: saved.sourceType } : {}),
+      ...restoredCard,
       ...(saved.selectionBucket ? { selectionBucket: saved.selectionBucket } : {}),
       ...(saved.selectionOrigin ? { selectionOrigin: saved.selectionOrigin } : {}),
       ...(saved.selectionReason ? { selectionReason: saved.selectionReason } : {}),
@@ -674,6 +693,13 @@ export default function StudyView({ mode = 'practice' }) {
   );
   const reverseDrill = current?.type === DICTIONARY_TYPE_ID;
   const sourceTypeForReading = current?.sourceType || 'plain-past';
+  const formStrengthRows = useMemo(
+    () =>
+      transformationMode
+        ? []
+        : buildFormStrengthRows(state, activeMinimalPairSet?.typeIds || enabledTypes),
+    [state, enabledTypes, activeMinimalPairSet, transformationMode],
+  );
   const sourceForm = current
     ? reverseDrill
       ? conjugateItem(current.verb, sourceTypeForReading)
@@ -1606,7 +1632,14 @@ export default function StudyView({ mode = 'practice' }) {
       lastAttemptId: eventId,
     };
     const storedCard = reverseDrill
-      ? withReadingSourceTypeStat(gradedCard, progressTypeId, correct, gradedAt, eventId)
+      ? withReadingSourceTypeStat(
+          gradedCard,
+          progressTypeId,
+          correct,
+          gradedAt,
+          eventId,
+          baseState.cards[rid],
+        )
       : gradedCard;
     const submittedMistake = nextMistakes?.[0];
     const mistakes = correct
@@ -1681,6 +1714,7 @@ export default function StudyView({ mode = 'practice' }) {
   }
 
   function buildRunAnswerRecord({
+    gradedState,
     correct,
     submittedAnswer: answerSnapshot = '',
     reviewChoiceLabel: choiceLabel = '',
@@ -1689,6 +1723,9 @@ export default function StudyView({ mode = 'practice' }) {
     mistakeDiagnosis = null,
   }) {
     if (!current) return null;
+    const strengthBefore = formStrengthRows.find((row) => row.typeId === practicedType);
+    const strengthAfter =
+      strengthBefore && gradedState ? buildFormStrengthRows(gradedState, [practicedType])[0] : null;
     const explanationSnapshot = transformationReviewExplanation({
       item: current.verb,
       type: practicedType,
@@ -1704,6 +1741,13 @@ export default function StudyView({ mode = 'practice' }) {
       word: { ...current.verb },
       cardType: current.type,
       practicedType,
+      formStrengthChange: strengthAfter
+        ? {
+            typeId: practicedType,
+            beforeScore: strengthBefore.score,
+            afterScore: strengthAfter.score,
+          }
+        : null,
       promptType: sourceTypeId,
       promptForm: promptSourceForm,
       typeLabel: typeInfo.label || sessionOutcomeLabel(current),
@@ -2093,6 +2137,7 @@ export default function StudyView({ mode = 'practice' }) {
     const runRecord = buildRunAnswerRecord({
       correct: ok,
       submittedAnswer: submittedForReview,
+      gradedState: nextState,
       mistakeDiagnosis,
       wasCorrected: finalOk && !ok,
     });
@@ -2234,6 +2279,7 @@ export default function StudyView({ mode = 'practice' }) {
     const runRecord = buildRunAnswerRecord({
       correct: ok,
       submittedAnswer: '',
+      gradedState: nextState,
       reviewChoiceLabel: label,
       revealedMiss: !ok,
       mistakeDiagnosis,
@@ -2319,6 +2365,7 @@ export default function StudyView({ mode = 'practice' }) {
     const runRecord = buildRunAnswerRecord({
       correct: false,
       submittedAnswer: '',
+      gradedState: nextState,
       reviewChoiceLabel: "I don't know",
       revealedMiss: true,
       mistakeDiagnosis,
@@ -2759,7 +2806,7 @@ export default function StudyView({ mode = 'practice' }) {
       : currentOriginMeta.label;
 
   return (
-    <div className={transformationMode ? 'mx-auto max-w-3xl' : 'mx-auto max-w-3xl'}>
+    <div className={transformationMode ? 'mx-auto max-w-3xl' : 'mx-auto max-w-6xl'}>
       <div className="order-1 min-w-0 space-y-4 max-[359px]:space-y-3 xl:w-full">
         {focusBanner && (
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 px-5 py-4 dark:border-indigo-800 dark:bg-indigo-950/20">
@@ -2934,207 +2981,224 @@ export default function StudyView({ mode = 'practice' }) {
             </div>
           </details>
         )}
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
-          <div className="px-4 pb-3 pt-4 text-center max-[359px]:pt-2 sm:px-6 sm:pb-8 sm:pt-8">
-            <div className="mb-3 grid grid-cols-2 items-start gap-x-2 gap-y-1 max-[359px]:mb-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-y-0">
-              <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
-                Word level: {currentWordMeta.jlpt}
-              </span>
-              <span
-                aria-label="Current card source"
-                className="col-span-2 row-start-2 min-w-0 justify-self-center sm:col-span-1 sm:col-start-2 sm:row-start-1"
-              >
-                <span
-                  title={currentSourceChipLabel}
-                  className={`block max-w-full rounded-full border px-2.5 py-1 text-[11px] font-semibold ${currentOriginMeta.chipClass} sm:max-w-[18rem]`}
-                >
-                  {currentSourceChipLabel}
-                </span>
-              </span>
-              <span className="col-start-2 row-start-1 min-w-0 justify-self-end text-right sm:col-start-3">
-                {lessonMetaText && (
-                  <span className="inline-block max-w-full truncate rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
-                    {lessonMetaText}
+        <div
+          className={
+            transformationMode
+              ? ''
+              : 'grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_16rem]'
+          }
+        >
+          {!transformationMode && (
+            <FormStrengthPanel
+              rows={formStrengthRows}
+              currentTypeId={practicedType}
+              feedback={phase === 'reviewing' ? reviewRecord?.formStrengthChange : null}
+            />
+          )}
+          <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+            <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800">
+              <div className="px-4 pb-3 pt-4 text-center max-[359px]:pt-2 sm:px-6 sm:pb-8 sm:pt-8">
+                <div className="mb-3 grid grid-cols-2 items-start gap-x-2 gap-y-1 max-[359px]:mb-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-y-0">
+                  <span className="justify-self-start rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
+                    Word level: {currentWordMeta.jlpt}
                   </span>
-                )}
-              </span>
-            </div>
-            {sentenceUnavailable && (
-              <p className="mx-auto mb-3 max-w-md text-xs leading-relaxed text-stone-500 dark:text-stone-400">
-                No reviewed sentence for this word and form yet. Practice the word below.
-              </p>
-            )}
-            {sentencePrompt && !hidePromptText && (
-              <div
-                className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-3 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 sm:px-4"
-                data-sentence-mode={sentencePrompt.mode}
-              >
-                <ScriptDisplay
-                  view={sentencePromptView}
-                  className="break-words text-base leading-relaxed text-stone-900 dark:text-stone-100 sm:text-lg"
-                  subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
-                  colorHighlight={false}
-                />
-                {sentencePrompt.cue && (
-                  <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
-                    {sentencePrompt.cue}
-                  </div>
-                )}
-                {!hideEnglishMeaning && sentencePrompt.note && (
-                  <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
-                    {sentencePrompt.note}
-                  </div>
-                )}
-              </div>
-            )}
-            {hidePromptText ? (
-              <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
-                <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-3">
-                  {sentencePrompt?.mode === 'listening-recognition'
-                    ? 'Sentence listening prompt'
-                    : 'Listening prompt'}
-                </div>
-                <div className="flex flex-wrap justify-center gap-2">
-                  <button
-                    onClick={() => speakJapaneseLocal(promptAudioText, 0.85)}
-                    className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm flex items-center gap-1.5"
+                  <span
+                    aria-label="Current card source"
+                    className="col-span-2 row-start-2 min-w-0 justify-self-center sm:col-span-1 sm:col-start-2 sm:row-start-1"
                   >
-                    <IconVolume className="w-4 h-4" />
-                    Replay
-                  </button>
-                  <button
-                    onClick={() => setShowPromptText(true)}
-                    className="px-3 py-2 border border-indigo-200 bg-white/70 hover:bg-white text-indigo-700 rounded-lg text-sm dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300"
-                  >
-                    Show text
-                  </button>
+                    <span
+                      title={currentSourceChipLabel}
+                      className={`block max-w-full rounded-full border px-2.5 py-1 text-[11px] font-semibold ${currentOriginMeta.chipClass} sm:max-w-[18rem]`}
+                    >
+                      {currentSourceChipLabel}
+                    </span>
+                  </span>
+                  <span className="col-start-2 row-start-1 min-w-0 justify-self-end text-right sm:col-start-3">
+                    {lessonMetaText && (
+                      <span className="inline-block max-w-full truncate rounded-full bg-white/85 px-1.5 py-0.5 text-[9px] text-stone-600 ring-1 ring-stone-200/70 dark:bg-stone-900/85 dark:text-stone-400 dark:ring-stone-700/70">
+                        {lessonMetaText}
+                      </span>
+                    )}
+                  </span>
                 </div>
-              </div>
-            ) : (
-              <div data-testid="practice-prompt">
-                {transformationMode && (
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                    Starting form
+                {sentenceUnavailable && (
+                  <p className="mx-auto mb-3 max-w-md text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                    No reviewed sentence for this word and form yet. Practice the word below.
+                  </p>
+                )}
+                {sentencePrompt && !hidePromptText && (
+                  <div
+                    className="mx-auto mb-4 max-w-md rounded-2xl border border-indigo-200 bg-indigo-50/70 px-3 py-3 text-left dark:border-indigo-900/50 dark:bg-indigo-950/20 sm:px-4"
+                    data-sentence-mode={sentencePrompt.mode}
+                  >
+                    <ScriptDisplay
+                      view={sentencePromptView}
+                      className="break-words text-base leading-relaxed text-stone-900 dark:text-stone-100 sm:text-lg"
+                      subClassName="mt-1 text-[11px] leading-snug text-stone-600 dark:text-stone-400"
+                      colorHighlight={false}
+                    />
+                    {sentencePrompt.cue && (
+                      <div className="mt-1.5 text-[11px] leading-snug text-indigo-700 dark:text-indigo-300">
+                        {sentencePrompt.cue}
+                      </div>
+                    )}
+                    {!hideEnglishMeaning && sentencePrompt.note && (
+                      <div className="mt-1.5 text-[11px] italic leading-snug text-stone-600 dark:text-stone-400">
+                        {sentencePrompt.note}
+                      </div>
+                    )}
                   </div>
                 )}
-                <ScriptDisplay
-                  view={promptView}
-                  className="mb-1 text-3xl font-medium text-stone-900 dark:text-stone-100 sm:mb-2 sm:text-5xl"
-                  subClassName="text-base text-stone-600"
-                />
-              </div>
-            )}
-            {noChangePrompt && !hidePromptText && (
-              <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium">
-                Trick: no change needed
-              </div>
-            )}
-            {reverseDrill && !hidePromptText && (
-              <div className="text-xs text-stone-600">Answer with the dictionary form.</div>
-            )}
+                {hidePromptText ? (
+                  <div className="max-w-md mx-auto rounded-2xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-5">
+                    <div className="text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold mb-3">
+                      {sentencePrompt?.mode === 'listening-recognition'
+                        ? 'Sentence listening prompt'
+                        : 'Listening prompt'}
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <button
+                        onClick={() => speakJapaneseLocal(promptAudioText, 0.85)}
+                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm flex items-center gap-1.5"
+                      >
+                        <IconVolume className="w-4 h-4" />
+                        Replay
+                      </button>
+                      <button
+                        onClick={() => setShowPromptText(true)}
+                        className="px-3 py-2 border border-indigo-200 bg-white/70 hover:bg-white text-indigo-700 rounded-lg text-sm dark:bg-stone-800 dark:border-stone-700 dark:text-stone-300"
+                      >
+                        Show text
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div data-testid="practice-prompt">
+                    {transformationMode && (
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                        Starting form
+                      </div>
+                    )}
+                    <ScriptDisplay
+                      view={promptView}
+                      className="mb-1 text-3xl font-medium text-stone-900 dark:text-stone-100 sm:mb-2 sm:text-5xl"
+                      subClassName="text-base text-stone-600"
+                    />
+                  </div>
+                )}
+                {noChangePrompt && !hidePromptText && (
+                  <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium">
+                    Trick: no change needed
+                  </div>
+                )}
+                {reverseDrill && !hidePromptText && (
+                  <div className="text-xs text-stone-600">Answer with the dictionary form.</div>
+                )}
 
-            {!hideEnglishMeaning && (
-              <div className="mt-2 text-sm italic text-stone-600 max-[359px]:hidden">
-                {promptEnglish}
-              </div>
-            )}
+                {!hideEnglishMeaning && (
+                  <div className="mt-2 text-sm italic text-stone-600 max-[359px]:hidden">
+                    {promptEnglish}
+                  </div>
+                )}
 
-            {phase === 'reviewing' && practicePrefs.showWordCategory && (
-              <div className="text-xs text-stone-600 mt-1">
-                {groupDisplayLabel(current.verb.group)} · {wordType}
-                {groupAliasText(current.verb.group)
-                  ? ` · ${groupAliasText(current.verb.group)}`
-                  : ''}
+                {phase === 'reviewing' && practicePrefs.showWordCategory && (
+                  <div className="text-xs text-stone-600 mt-1">
+                    {groupDisplayLabel(current.verb.group)} · {wordType}
+                    {groupAliasText(current.verb.group)
+                      ? ` · ${groupAliasText(current.verb.group)}`
+                      : ''}
+                  </div>
+                )}
+                <div className="mt-3 flex flex-col gap-1 max-[359px]:mt-2 sm:mt-4">
+                  <AnswerInputPanel
+                    sentencePrompt={sentencePrompt}
+                    phase={phase}
+                    transformationMode={transformationMode}
+                    transformationActionLabel={transformationActionLabel}
+                    targetTypeInfo={targetTypeInfo}
+                    answerTaskDetails={answerTaskDetails}
+                    sourceTypeInfo={sourceTypeInfo}
+                    transformationSupportText={transformationSupportText}
+                    transformationContractText={transformationContractText}
+                    taskLabel={taskLabel}
+                    current={current}
+                    practicePrefs={practicePrefs}
+                    transformationRoute={transformationRoute}
+                    minimalPairSetForCurrent={minimalPairSetForCurrent}
+                    activeMinimalPairSet={activeMinimalPairSet}
+                    reviewsDone={reviewsDone}
+                    setPracticePrefs={setPracticePrefs}
+                    setState={setState}
+                    answerMode={answerMode}
+                    selfCheckOpen={selfCheckOpen}
+                    setSelfCheckOpen={setSelfCheckOpen}
+                    skipCurrent={skipCurrent}
+                    expectedView={expectedView}
+                    practicedType={practicedType}
+                    targetEnglish={targetEnglish}
+                    gradeSelfCheck={gradeSelfCheck}
+                    inputRef={inputRef}
+                    answer={answer}
+                    setAnswer={setAnswer}
+                    setSpeechError={setSpeechError}
+                    submit={submit}
+                    speechListening={speechListening}
+                    speechMatch={speechMatch}
+                    speechRecognitionAvailable={speechRecognitionAvailable}
+                    startSpeechAnswer={startSpeechAnswer}
+                    speechError={speechError}
+                    revealAnswer={revealAnswer}
+                    reverseDrill={reverseDrill}
+                    choices={choices}
+                    hideEnglishMeaning={hideEnglishMeaning}
+                    guidedKana={guidedKana}
+                    visibleCoachCells={visibleCoachCells}
+                    kanaMatchDisplay={kanaMatchDisplay}
+                    coachStatus={coachStatus}
+                    coachWrongIndex={coachWrongIndex}
+                    coachPreview={coachPreview}
+                    expected={expected}
+                    showStepHint={showStepHint}
+                    stepHintButtonLabel={stepHintButtonLabel}
+                    hintDisclosure={hintDisclosure}
+                    answerComposingRef={answerComposingRef}
+                    updateAnswerFromInput={updateAnswerFromInput}
+                    commitAnswerComposition={commitAnswerComposition}
+                    answerInputClassName={answerInputClassName}
+                    revealNextKana={revealNextKana}
+                    coachRevealed={coachRevealed}
+                    expectedKanaCount={expectedKanaCount}
+                    liveKana={liveKana}
+                    liveStatus={liveStatus}
+                    answerFeedbackClassName={answerFeedbackClassName}
+                    revealKanaHint={revealKanaHint}
+                    liveKanaHelpEnabled={liveKanaHelpEnabled}
+                    wasCorrect={wasCorrect}
+                    wasCorrected={wasCorrected}
+                    reviewRecord={reviewRecord}
+                    contextStats={contextualPracticeStats}
+                    geminiKey={geminiKey}
+                    nextButtonRef={nextButtonRef}
+                    wordSweep={wordSweep}
+                    openGuideForReviewRule={openGuideForReviewRule}
+                    openLabForReviewRoute={openLabForReviewRoute}
+                    setTab={setTab}
+                    openLearnForRuleRecord={openLearnForRuleRecord}
+                    autoAdvanceCorrect={autoAdvanceCorrect}
+                  />
+                </div>
               </div>
-            )}
-            <div className="mt-3 flex flex-col gap-1 max-[359px]:mt-2 sm:mt-4">
-              <AnswerInputPanel
-                sentencePrompt={sentencePrompt}
-                phase={phase}
-                transformationMode={transformationMode}
-                transformationActionLabel={transformationActionLabel}
-                targetTypeInfo={targetTypeInfo}
-                answerTaskDetails={answerTaskDetails}
-                sourceTypeInfo={sourceTypeInfo}
-                transformationSupportText={transformationSupportText}
-                transformationContractText={transformationContractText}
-                taskLabel={taskLabel}
-                current={current}
-                practicePrefs={practicePrefs}
-                transformationRoute={transformationRoute}
-                minimalPairSetForCurrent={minimalPairSetForCurrent}
-                activeMinimalPairSet={activeMinimalPairSet}
-                reviewsDone={reviewsDone}
-                setPracticePrefs={setPracticePrefs}
-                setState={setState}
-                answerMode={answerMode}
-                selfCheckOpen={selfCheckOpen}
-                setSelfCheckOpen={setSelfCheckOpen}
-                skipCurrent={skipCurrent}
-                expectedView={expectedView}
-                practicedType={practicedType}
-                targetEnglish={targetEnglish}
-                gradeSelfCheck={gradeSelfCheck}
-                inputRef={inputRef}
-                answer={answer}
-                setAnswer={setAnswer}
-                setSpeechError={setSpeechError}
-                submit={submit}
-                speechListening={speechListening}
-                speechMatch={speechMatch}
-                speechRecognitionAvailable={speechRecognitionAvailable}
-                startSpeechAnswer={startSpeechAnswer}
-                speechError={speechError}
-                revealAnswer={revealAnswer}
-                reverseDrill={reverseDrill}
-                choices={choices}
-                hideEnglishMeaning={hideEnglishMeaning}
-                guidedKana={guidedKana}
-                visibleCoachCells={visibleCoachCells}
-                kanaMatchDisplay={kanaMatchDisplay}
-                coachStatus={coachStatus}
-                coachWrongIndex={coachWrongIndex}
-                coachPreview={coachPreview}
-                expected={expected}
-                showStepHint={showStepHint}
-                stepHintButtonLabel={stepHintButtonLabel}
-                hintDisclosure={hintDisclosure}
-                answerComposingRef={answerComposingRef}
-                updateAnswerFromInput={updateAnswerFromInput}
-                commitAnswerComposition={commitAnswerComposition}
-                answerInputClassName={answerInputClassName}
-                revealNextKana={revealNextKana}
-                coachRevealed={coachRevealed}
-                expectedKanaCount={expectedKanaCount}
-                liveKana={liveKana}
-                liveStatus={liveStatus}
-                answerFeedbackClassName={answerFeedbackClassName}
-                revealKanaHint={revealKanaHint}
-                liveKanaHelpEnabled={liveKanaHelpEnabled}
-                wasCorrect={wasCorrect}
-                wasCorrected={wasCorrected}
-                reviewRecord={reviewRecord}
-                contextStats={contextualPracticeStats}
-                geminiKey={geminiKey}
-                nextButtonRef={nextButtonRef}
-                wordSweep={wordSweep}
-                openGuideForReviewRule={openGuideForReviewRule}
-                openLabForReviewRoute={openLabForReviewRoute}
-                setTab={setTab}
-                openLearnForRuleRecord={openLearnForRuleRecord}
-                autoAdvanceCorrect={autoAdvanceCorrect}
-              />
             </div>
+            <PracticeAnswerTip
+              phase={phase}
+              answerMode={answerMode}
+              selfCheckOpen={selfCheckOpen}
+              listeningPrompt={listeningPrompt}
+              showPromptText={showPromptText}
+              speechRecognitionAvailable={speechRecognitionAvailable}
+            />
           </div>
         </div>
-        <PracticeAnswerTip
-          phase={phase}
-          answerMode={answerMode}
-          selfCheckOpen={selfCheckOpen}
-          listeningPrompt={listeningPrompt}
-          showPromptText={showPromptText}
-          speechRecognitionAvailable={speechRecognitionAvailable}
-        />
       </div>
     </div>
   );

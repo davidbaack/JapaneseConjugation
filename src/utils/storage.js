@@ -24,20 +24,16 @@ import { getMinimalPairSet, mergeMinimalPairProgress } from './minimalPairs.js';
 import { mergePracticePrefs } from './display.js';
 import { normalizeWordListKeys } from './lexiconArtifacts.js';
 import { buildRuleCandidates } from './ruleCandidates.js';
-import {
-  defaultReviewScope,
-  formFamilyForType,
-  normalizeReviewScope,
-  reviewTypeIdsForState,
-} from './reviewScope.js';
+import { defaultReviewScope, normalizeReviewScope, reviewTypeIdsForState } from './reviewScope.js';
 import {
   QUICK_PRACTICE_DEFAULT_TYPE_IDS,
-  buildWeaknessFamilyRows,
   defaultWeaknessState,
   mergeWeaknessState,
   normalizeWeaknessState,
   rankedWeaknessLanes,
   recencyDecayFactor,
+  weaknessLaneForCard,
+  weaknessLaneScore,
   weaknessScoreForCard,
 } from './subcategoryWeakness.js';
 import {
@@ -51,6 +47,7 @@ import {
   mergePracticeStats,
   normalizePracticeStats,
 } from './practiceStats.js';
+import { buildFormStrengthRows } from './formStrength.js';
 import { reconcileDerivedProgressState } from './derivedProgress.js';
 import {
   isRecord,
@@ -74,10 +71,8 @@ export const DAY = 86400000;
 export const SRS_SCHEMA_VERSION = 4;
 export const DICTIONARY_TYPE_ID = 'dictionary';
 const REVIEW_ROTATION_SIZE = 8;
-const WEAK_BOOST_CAP = 12;
-const WEAK_BOOST_SCALE = 1.5;
-const SEVERE_FAMILY_GAP = 15;
-const MAX_FAMILY_RUN = 3;
+const SEVERE_FORM_GAP = 15;
+const MAX_FORM_RUN = 3;
 const BEGINNER_LADDER_CARD_COUNT = 5;
 const BEGINNER_LADDER_STAGES = [
   { group: 'ichidan', type: 'plain-past' },
@@ -1581,8 +1576,12 @@ export function cardWeakScore(state, cardId, word = null, typeId = null, options
   const now = options.now || Date.now();
   const resolvedType = typeId || typeIdFromCardId(cardId);
   const card = (state.cards || {})[cardId] || {};
-  const laneScore =
-    word && resolvedType ? weaknessScoreForCard(state.weakness, word, resolvedType, { now }) : 0;
+  const lane = word && resolvedType ? weaknessLaneForCard(word, resolvedType) : null;
+  const laneScore = lane
+    ? options.laneScores
+      ? options.laneScores.get(lane.key) || 0
+      : weaknessScoreForCard(state.weakness, word, resolvedType, { now })
+    : 0;
   const unresolved = decayedMistakeCount(
     state.mistakes,
     now,
@@ -1632,7 +1631,9 @@ export function weakTypeIdsForState(state, fallbackIds = []) {
 export function pickWeakWeighted(pool, state) {
   const scored = pool.map((p) => ({
     ...p,
-    weakScore: cardWeakScore(state, p.id || p.rule.id, p.verb, p.type || p.rule.type),
+    weakScore: Number.isFinite(p.weakScore)
+      ? p.weakScore
+      : cardWeakScore(state, p.id || p.rule.id, p.verb, p.type || p.rule.type),
   }));
   if (!scored.some((p) => p.weakScore > 0)) return null;
   const weights = scored.map((p) => 1 + p.weakScore * p.weakScore);
@@ -1658,8 +1659,9 @@ function buildWordFormCandidates(
     for (const verb of candidates) {
       const type = readingPractice ? DICTIONARY_TYPE_ID : rule.type;
       const id = cardIdFor(verb, type);
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
+      const candidateKey = readingPractice ? `${id}|${rule.type}` : id;
+      if (!id || seen.has(candidateKey)) continue;
+      seen.add(candidateKey);
       entries.push({
         id,
         verb,
@@ -1818,25 +1820,19 @@ function pickFreshReview(pool, options, openBeginnerStage) {
   )[0];
 }
 
-function familyIdForType(typeId) {
-  return formFamilyForType(typeId)?.id || '';
-}
-
-function candidateFamilyId(candidate) {
-  return familyIdForType(candidate?.type || '');
+function candidateFormType(candidate) {
+  return candidate?.sourceType || candidate?.type || '';
 }
 
 function selectionReasonFor(candidate, bucket) {
   if (bucket === 'due') return 'Due review';
   if (bucket === 'retry') return 'Previously missed';
   if (bucket === 'skill') {
-    const familyLabel = formFamilyForType(candidate?.type || '')?.label;
-    // A never-attempted family enters skill selection at neutral score; frame it as
-    // an introduction rather than strengthening so the coach strip stays truthful.
-    if (candidate?.familySkillStatus === 'untested') {
-      return familyLabel ? `Introducing ${familyLabel}` : 'New enabled form';
+    const formLabel = candidate.formLabel;
+    if (!candidate.formAttempted) {
+      return formLabel ? `Introducing ${formLabel}` : 'New enabled form';
     }
-    return familyLabel ? `Strengthening ${familyLabel}` : 'Strengthening enabled category';
+    return formLabel ? `Strengthening ${formLabel}` : 'Strengthening enabled form';
   }
   if (bucket === 'fresh') return 'New enabled form';
   return 'Varied practice from enabled categories';
@@ -1856,8 +1852,15 @@ function withSelectionReason(candidate, bucket) {
   };
 }
 
-function familyIdFromCardId(cardId) {
-  return familyIdForType(typeIdFromCardId(cardId));
+function formTypeFromCardId(cardId, state) {
+  const typeId = typeIdFromCardId(cardId);
+  if (typeId !== DICTIONARY_TYPE_ID) return typeId;
+  const card = state.cards?.[cardId];
+  const latestSource = Object.entries(card?.sourceTypeStats || {}).sort(
+    ([leftType, left], [rightType, right]) =>
+      (Number(right.lastAt) || 0) - (Number(left.lastAt) || 0) || leftType.localeCompare(rightType),
+  )[0];
+  return latestSource?.[0] || card?.sourceType || '';
 }
 
 export function selectNext(
@@ -1878,27 +1881,29 @@ export function selectNext(
     });
   const pool = buildWordFormCandidates(verbs, enabledTypes, prefs, candidates);
   if (!pool.length) return null;
-  const avail = pool.length > 1 ? pool.filter((p) => p.id !== lastCardId) : pool;
-  const familySkills = new Map(buildWeaknessFamilyRows(state).map((row) => [row.id, row]));
+  const alternatives = pool.filter((p) => p.id !== lastCardId);
+  const avail = alternatives.length ? alternatives : pool;
+  const formStrengths = new Map(buildFormStrengthRows(state).map((row) => [row.typeId, row]));
+  // A reading pool contains one candidate per word and source form. Normalize
+  // each saved lane once, rather than the complete weakness model per candidate.
+  const laneScores = new Map();
+  for (const [key, lane] of Object.entries(state.weakness?.byLane || {})) {
+    const [typeId, subcategoryId] = key.split('|');
+    laneScores.set(
+      key,
+      weaknessLaneScore({ byLane: { [key]: lane } }, typeId, subcategoryId, { now }),
+    );
+  }
   const scoredAvail = avail.map((p) => {
-    const familyId = candidateFamilyId(p);
-    const familySkill = familySkills.get(familyId);
-    const familySkillStatus = familySkill?.skillStatus || 'untested';
-    const familySkillScore = familySkillStatus === 'untested' ? 50 : familySkill?.skillScore || 50;
-    const weakScore = cardWeakScore(state, p.id, p.verb, p.type);
-    // Card/lane weakness lowers the effective skill score by a bounded amount
-    // so a stubborn weak card can win within or near its family's band, while
-    // a strong family (85+) can never outrank a genuinely weak one (<60) on
-    // card weakness alone. Untested families stay exactly neutral.
-    const weakBoost =
-      familySkillStatus === 'untested' ? 0 : Math.min(WEAK_BOOST_CAP, weakScore * WEAK_BOOST_SCALE);
+    const formType = candidateFormType(p);
+    const formStrength = formStrengths.get(formType);
     return {
       ...p,
-      familyId,
-      familySkillScore,
-      familySkillStatus,
-      weakScore,
-      selectionScore: familySkillScore - weakBoost,
+      formType,
+      formLabel: formStrength?.label,
+      formAttempted: formStrength?.attempted || 0,
+      weakScore: cardWeakScore(state, p.id, p.verb, formType, { now, laneScores }),
+      selectionScore: formStrength?.score ?? 50,
     };
   });
   const retryIds = new Set(state.retryQueue || []);
@@ -1922,35 +1927,27 @@ export function selectNext(
     : [];
   const retryCandidateIds = new Set(retry.map((p) => p.id));
   const recentIds = new Set((options.recentCardIds || []).filter(Boolean));
-  // Untested enabled families are neutral (familySkillScore 50), so they belong in
-  // the lowest-skill-first selection alongside started families. During the beginner
-  // ladder they stay out of skill so pickFreshReview's stage ordering still drives
-  // onboarding; once the ladder is done they interleave by neutral skill.
+  // New forms enter at neutral strength. Preserve the short beginner ladder;
+  // afterwards every eligible exact form uses the same score as its meter.
   const beginnerLadderActive =
     options.beginnerLadder && reviewedCardCount(state) < BEGINNER_LADDER_CARD_COUNT;
-  const skill = [...reviewed, ...fresh]
-    .filter(
-      (p) =>
-        !retryCandidateIds.has(p.id) &&
-        (!beginnerLadderActive || p.familySkillStatus !== 'untested'),
-    )
-    .filter((p, index, arr) => arr.findIndex((item) => item.id === p.id) === index);
+  const skill = [...reviewed, ...fresh].filter(
+    (p) => !retryCandidateIds.has(p.id) && (!beginnerLadderActive || p.formAttempted >= 3),
+  );
   const hasReviewFallback = fresh.length || nearDue.length || future.length;
   // Keep recently shown skill cards out of rotation by card count (they reappear
   // roughly five cards later), not by wall-clock time.
   const readySkill = hasReviewFallback ? skill.filter((p) => !recentIds.has(p.id)) : skill;
   const openBeginnerStage = beginnerLadderActive ? openBeginnerLadderStage(pool, state) : -1;
-  const lastFamilyId =
-    options.lastFamilyId ||
-    familyIdFromCardId((options.recentCardIds || []).find(Boolean) || lastCardId);
-  // Consecutive cards already shown from lastFamilyId (recentCardIds is
-  // newest-first), used to cap severe-weakness family repeats.
-  const recentFamilySequence = (options.recentCardIds || []).filter(Boolean);
-  if (!recentFamilySequence.length && lastCardId) recentFamilySequence.push(lastCardId);
-  let lastFamilyRun = 0;
-  for (const id of recentFamilySequence) {
-    if (!lastFamilyId || familyIdFromCardId(id) !== lastFamilyId) break;
-    lastFamilyRun += 1;
+  const lastTypeId =
+    options.lastTypeId ||
+    formTypeFromCardId((options.recentCardIds || []).find(Boolean) || lastCardId, state);
+  const recentSequence = (options.recentCardIds || []).filter(Boolean);
+  if (!recentSequence.length && lastCardId) recentSequence.push(lastCardId);
+  let lastFormRun = 0;
+  for (const id of recentSequence) {
+    if (!lastTypeId || formTypeFromCardId(id, state) !== lastTypeId) break;
+    lastFormRun += 1;
   }
   const recentWordKeys = new Set(
     [...recentIds, ...(options.recentWordKeys || [])]
@@ -1959,42 +1956,56 @@ export function selectNext(
   );
   const dropRecent = (items) => items.filter((item) => !recentIds.has(item.id));
   const dropRecentWords = (items) => {
-    const cardFiltered = dropRecent(items);
+    const withoutRecent = dropRecent(items);
+    const cardFiltered = withoutRecent.length ? withoutRecent : items;
     const wordFiltered = cardFiltered.filter((item) => !recentWordKeys.has(wordSrsKey(item.verb)));
     return wordFiltered.length ? wordFiltered : cardFiltered;
   };
-  const avoidLastFamily = (items) => {
-    if (!lastFamilyId) return items;
-    const others = items.filter((item) => item.familyId !== lastFamilyId);
+  const avoidLastForm = (items) => {
+    if (!lastTypeId) return items;
+    const others = items.filter((item) => item.formType !== lastTypeId);
     if (!others.length) return items;
-    // Variety still wins by default, but a family whose best candidate is a
-    // full band weaker than every alternative may repeat (words keep rotating
-    // via dropRecentWords) for at most MAX_FAMILY_RUN consecutive cards.
-    if (lastFamilyRun < MAX_FAMILY_RUN) {
+    // A form a full band below every alternative may repeat up to three cards.
+    if (lastFormRun < MAX_FORM_RUN) {
       const bestScore = (pool) =>
         pool.reduce((min, item) => Math.min(min, item.selectionScore ?? 50), Infinity);
-      const sameFamily = items.filter((item) => item.familyId === lastFamilyId);
-      if (sameFamily.length && bestScore(sameFamily) + SEVERE_FAMILY_GAP <= bestScore(others)) {
+      const sameForm = items.filter((item) => item.formType === lastTypeId);
+      if (sameForm.length && bestScore(sameForm) + SEVERE_FORM_GAP <= bestScore(others)) {
         return items;
       }
     }
     return others;
   };
-  const vary = (items) => avoidLastFamily(dropRecentWords(items));
+  const vary = (items) => avoidLastForm(dropRecent(items));
+  const weakestWords = (items) => {
+    // Establish exact-form eligibility before word variety and the top-eight
+    // word rotation; a small weak form must not lose to an older strong form.
+    let weakestScore = Infinity;
+    for (const item of items) weakestScore = Math.min(weakestScore, item.selectionScore);
+    const weakest = items.filter((item) => item.selectionScore === weakestScore);
+    const varied = dropRecentWords(weakest);
+    return varied.length ? varied : weakest;
+  };
   const choose = (groups) =>
     withSelectionReason(pickDueReview(groups.due, state), 'due') ||
     withSelectionReason(pickRetryReview(groups.retry, state), 'retry') ||
-    withSelectionReason(pickSkillReview(groups.readySkill, state, options), 'skill') ||
+    withSelectionReason(
+      pickSkillReview(weakestWords(groups.readySkill), state, options),
+      'skill',
+    ) ||
     withSelectionReason(pickFreshReview(groups.fresh, options, openBeginnerStage), 'fresh') ||
     withSelectionReason(pickFutureReview(groups.nearDue, state, options), 'varied') ||
-    withSelectionReason(pickReviewedReview(groups.reviewed, state, options), 'varied');
+    withSelectionReason(
+      pickReviewedReview(weakestWords(groups.reviewed), state, options),
+      'varied',
+    );
   let chosen = choose({
-    due: vary(due),
-    retry: vary(retry),
+    due: dropRecentWords(vary(due)),
+    retry: dropRecentWords(vary(retry)),
     readySkill: vary(readySkill),
-    fresh: vary(fresh),
-    nearDue: vary(nearDue),
-    reviewed: vary([...nearDue, ...future, ...reviewed]),
+    fresh: dropRecentWords(vary(fresh)),
+    nearDue: dropRecentWords(vary(nearDue)),
+    reviewed: dropRecentWords(vary([...nearDue, ...future, ...reviewed])),
   });
   if (!chosen) chosen = choose({ due, retry, readySkill, fresh, nearDue, reviewed });
   if (!chosen) return null;
