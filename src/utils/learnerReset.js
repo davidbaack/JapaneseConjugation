@@ -1,6 +1,6 @@
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import { buildSyncPayload, defaultState } from './storage.js';
-import { mergePracticePrefs } from './display.js';
+import { mergePracticePrefs } from './practicePrefs.js';
 import {
   adoptSyncMetadata,
   getLocalSyncDeviceId,

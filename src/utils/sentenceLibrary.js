@@ -6,6 +6,7 @@ import { getAICache, setAICache } from './storage.js';
 import { retryWithBackoff } from './retry.js';
 import { hydrateSentenceValue } from './sentencePrompt.js';
 import { getSentenceCorpusRevision } from './sentenceCorpus.js';
+import { withSentenceDeadline } from './sentenceDeadline.js';
 import {
   SENTENCE_REVIEW_VERSION,
   parseSentenceReview,
@@ -33,29 +34,35 @@ export async function fetchTailoredSentence(word, type) {
 
   let row;
   try {
-    row = await retryWithBackoff(async () => {
-      const query = new globalThis.URLSearchParams({
-        select: 'ja_template,segments,en,model,review',
-        word_key: `eq.${wordKey(word)}`,
-        type: `eq.${type}`,
-        limit: '1',
-      });
-      const response = await fetch(`${url}/rest/v1/sentences?${query}`, {
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`,
-          Accept: 'application/json',
+    row = await withSentenceDeadline((signal) =>
+      retryWithBackoff(
+        async () => {
+          const query = new globalThis.URLSearchParams({
+            select: 'ja_template,segments,en,model,review',
+            word_key: `eq.${wordKey(word)}`,
+            type: `eq.${type}`,
+            limit: '1',
+          });
+          const response = await fetch(`${url}/rest/v1/sentences?${query}`, {
+            headers: {
+              apikey: anonKey,
+              Authorization: `Bearer ${anonKey}`,
+              Accept: 'application/json',
+            },
+            cache: 'no-store',
+            signal,
+          });
+          if (!response.ok) {
+            throw Object.assign(new Error(`Sentence library HTTP ${response.status}`), {
+              status: response.status,
+            });
+          }
+          const rows = await response.json();
+          return Array.isArray(rows) ? rows[0] || null : null;
         },
-        cache: 'no-store',
-      });
-      if (!response.ok) {
-        throw Object.assign(new Error(`Sentence library HTTP ${response.status}`), {
-          status: response.status,
-        });
-      }
-      const rows = await response.json();
-      return Array.isArray(rows) ? rows[0] || null : null;
-    });
+        { signal },
+      ),
+    );
   } catch {
     // Network, RLS, and missing-table errors do not create negative cache hits.
     return null;

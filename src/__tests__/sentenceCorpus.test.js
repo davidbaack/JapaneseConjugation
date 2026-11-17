@@ -3,6 +3,7 @@ import { TextEncoder } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { wordKey } from '../utils/conjugator.js';
 import { sentenceContentSerialization } from '../utils/sentenceTrust.js';
+import { SENTENCE_REQUEST_TIMEOUT_MS } from '../utils/sentenceDeadline.js';
 
 const WORD = { dict: '買う', reading: 'かう', meaning: 'to buy', group: 'godan' };
 const TYPE = 'plain-past';
@@ -79,11 +80,12 @@ describe('fetchBundledSentence', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/data/sentences/manifest.json', {
       cache: 'no-cache',
+      signal: expect.any(globalThis.AbortSignal),
     });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       `/data/sentences/by-type/${TYPE}.json?v=${payload.chunk.revision}`,
-      { cache: 'force-cache' },
+      { cache: 'force-cache', signal: expect.any(globalThis.AbortSignal) },
     );
     expect(first).toMatchObject({
       jaTemplate: TEMPLATE,
@@ -118,6 +120,75 @@ describe('fetchBundledSentence', () => {
     expect(await fetchBundledSentence(WORD, TYPE)).toBeNull();
     expect(await fetchBundledSentence(WORD, TYPE)).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    ['manifest', 'fetch'],
+    ['manifest', 'body'],
+    ['chunk', 'fetch'],
+    ['chunk', 'body'],
+  ])('recovers a stalled %s %s with a fresh request', async (resource, stage) => {
+    vi.useFakeTimers();
+    const payload = corpusPayload();
+    const fetchMock = installCorpus(payload);
+    const { fetchBundledSentence, getSentenceCorpusRevision } = await loadCorpus();
+    if (resource === 'chunk') await getSentenceCorpusRevision();
+    fetchMock.mockImplementation((url) => {
+      const isManifest = String(url).endsWith('/manifest.json');
+      if ((resource === 'manifest') === isManifest) {
+        return stage === 'fetch'
+          ? new Promise(() => {})
+          : Promise.resolve({ ok: true, json: () => new Promise(() => {}) });
+      }
+      return Promise.resolve(response(isManifest ? payload.manifest : payload.chunk));
+    });
+
+    const stalled = fetchBundledSentence(WORD, TYPE);
+    await vi.advanceTimersByTimeAsync(0);
+    const stalledSignal = fetchMock.mock.calls.at(-1)[1].signal;
+    await vi.advanceTimersByTimeAsync(SENTENCE_REQUEST_TIMEOUT_MS);
+    expect(await stalled).toBeNull();
+    expect(stalledSignal.aborted).toBe(true);
+    const callsBeforeRetry = fetchMock.mock.calls.length;
+    fetchMock.mockImplementation((url) =>
+      Promise.resolve(
+        response(String(url).endsWith('/manifest.json') ? payload.manifest : payload.chunk),
+      ),
+    );
+    expect(await fetchBundledSentence(WORD, TYPE)).toMatchObject({ surface: '買った' });
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
+  });
+
+  it('does not evict a newer chunk request when an older request fails after cache clearing', async () => {
+    const payload = corpusPayload();
+    let finishFirst;
+    let finishSecond;
+    let chunkCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url) => {
+        if (String(url).endsWith('/manifest.json'))
+          return Promise.resolve(response(payload.manifest));
+        chunkCalls += 1;
+        return new Promise((resolve) => {
+          if (chunkCalls === 1) finishFirst = resolve;
+          else finishSecond = resolve;
+        });
+      }),
+    );
+    const { fetchBundledSentence, clearSentenceCorpusCache } = await loadCorpus();
+    const first = fetchBundledSentence(WORD, TYPE);
+    await vi.waitFor(() => expect(chunkCalls).toBe(1));
+    clearSentenceCorpusCache();
+    const second = fetchBundledSentence(WORD, TYPE);
+    await vi.waitFor(() => expect(chunkCalls).toBe(2));
+    finishFirst(response(null, false));
+    expect(await first).toBeNull();
+    const sharedRetry = fetchBundledSentence(WORD, TYPE);
+    finishSecond(response(payload.chunk));
+    expect(await second).toMatchObject({ surface: '買った' });
+    expect(await sharedRetry).toMatchObject({ surface: '買った' });
+    expect(chunkCalls).toBe(2);
   });
 
   it('rejects corrupt chunks even if their claimed revision is current', async () => {

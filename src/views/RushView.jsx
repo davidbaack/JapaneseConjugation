@@ -14,7 +14,8 @@ import {
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { defaultState } from '../utils/storage.js';
-import { kanaMatchDisplayForPrefs, promptDisplay, shuffled } from '../utils/display.js';
+import { promptDisplay, shuffled } from '../utils/display.js';
+import { kanaMatchDisplayForPrefs } from '../utils/practicePrefs.js';
 import {
   isRushAnswerCorrect,
   normalizeRushAnswer,

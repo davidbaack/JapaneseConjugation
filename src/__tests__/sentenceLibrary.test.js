@@ -3,6 +3,7 @@ import { createHash, webcrypto } from 'node:crypto';
 import { TextEncoder } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sentenceContentSerialization } from '../utils/sentenceTrust.js';
+import { SENTENCE_REQUEST_TIMEOUT_MS } from '../utils/sentenceDeadline.js';
 
 const WORD = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
 const TYPE = 'plain-past';
@@ -58,6 +59,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.doUnmock('../utils/supabase.js');
   vi.doUnmock('../utils/sentenceCorpus.js');
@@ -65,6 +67,52 @@ afterEach(() => {
 });
 
 describe('fetchTailoredSentence', () => {
+  it('ignores a late body from an aborted request after a newer retry is cached', async () => {
+    vi.useFakeTimers();
+    let finishBody;
+    const body = new Promise((resolve) => {
+      finishBody = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: () => body })
+      .mockResolvedValue(response([validRow({ en: 'Today I ate.' })]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence } = await load();
+    const stalled = fetchTailoredSentence(WORD, TYPE);
+    await vi.advanceTimersByTimeAsync(SENTENCE_REQUEST_TIMEOUT_MS);
+    expect(await stalled).toBeNull();
+    expect((await fetchTailoredSentence(WORD, TYPE)).en).toBe('Today I ate.');
+    finishBody([validRow()]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await fetchTailoredSentence(WORD, TYPE)).en).toBe('Today I ate.');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['fetch', 'body'])(
+    'bounds a stalled %s and permits a fresh reviewed retry',
+    async (stage) => {
+      vi.useFakeTimers();
+      const fetchMock = vi.fn(() =>
+        stage === 'fetch'
+          ? new Promise(() => {})
+          : Promise.resolve({ ok: true, json: () => new Promise(() => {}) }),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const { fetchTailoredSentence } = await load();
+      const stalled = fetchTailoredSentence(WORD, TYPE);
+      await vi.advanceTimersByTimeAsync(0);
+      const signal = fetchMock.mock.calls[0][1].signal;
+      await vi.advanceTimersByTimeAsync(SENTENCE_REQUEST_TIMEOUT_MS);
+      expect(await stalled).toBeNull();
+      expect(signal.aborted).toBe(true);
+      expect(localStorage.getItem(CACHE_STORE)).toBeNull();
+      fetchMock.mockResolvedValue(response([validRow()]));
+      expect(await fetchTailoredSentence(WORD, TYPE)).toMatchObject({ surface: '食べた' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it('returns null without configuration and does not query the database', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

@@ -21,7 +21,7 @@ import {
   normalizeReadinessState,
 } from './readiness.js';
 import { getMinimalPairSet, mergeMinimalPairProgress } from './minimalPairs.js';
-import { mergePracticePrefs } from './display.js';
+import { mergePracticePrefs } from './practicePrefs.js';
 import { normalizeWordListKeys } from './lexiconArtifacts.js';
 import { buildRuleCandidates } from './ruleCandidates.js';
 import {

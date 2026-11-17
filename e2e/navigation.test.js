@@ -21,7 +21,7 @@ const VIEW_ANCHORS = {
 async function gotoFreshApp(page) {
   await page.goto('/');
   // Background service-worker traffic can outlast the usable app in Firefox.
-  await expect(page.getByRole('button', { name: 'Core forms', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Core forms \d+\// })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Answer', exact: true })).toBeVisible();
   await page.evaluate(async () => {
     const registrations = navigator.serviceWorker
@@ -32,7 +32,7 @@ async function gotoFreshApp(page) {
     await Promise.all(keys.map((key) => window.caches.delete(key)));
   });
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Core forms', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Core forms \d+\// })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Answer', exact: true })).toBeVisible();
 }
 
@@ -60,7 +60,7 @@ test.describe('Tab navigation', () => {
     await expect(practiceTab).toHaveClass(/font-semibold/);
     const answer = page.getByPlaceholder('Type romaji or kana...');
     await expect(answer).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Core forms' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Core forms \d+\// })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Practice categories' })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Practice quick filters' })).toBeVisible();
     await expect(page.getByText('Change', { exact: true })).toHaveCount(0);
@@ -99,7 +99,7 @@ test.describe('Tab navigation', () => {
       element.scrollLeft = element.scrollWidth;
       element.dispatchEvent(new Event('scroll'));
     });
-    await expect(categoryRail.getByRole('button', { name: 'Adjectives' })).toBeInViewport();
+    await expect(categoryRail.getByRole('button', { name: /^Adjectives \d+\// })).toBeInViewport();
 
     await expect(page.getByRole('radiogroup', { name: 'Time' })).toBeAttached();
     await expect(page.getByRole('radiogroup', { name: 'Polarity' })).toBeAttached();

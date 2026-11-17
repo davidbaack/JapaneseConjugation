@@ -107,9 +107,14 @@ test('a waiting app update keeps Practice controls reachable at 320px', async ({
   expect(noticeBox.y + noticeBox.height).toBeLessThanOrEqual(navigationBox.y);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   const answer = page.getByRole('textbox', { name: 'Answer', exact: true });
-  await answer.scrollIntoViewIfNeeded();
+  const answerDock = page.locator('[data-action-dock]').filter({ has: answer });
+  await answerDock.scrollIntoViewIfNeeded();
+  await expect(answerDock).toBeInViewport({ ratio: 1 });
   await expect(answer).toBeInViewport({ ratio: 1 });
-  await expect(page.getByRole('button', { name: 'Check (Enter)', exact: true })).toBeInViewport();
+  await expect(page.getByText('Plain Past', { exact: true }).first()).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Check (Enter)', exact: true })).toBeInViewport({
+    ratio: 1,
+  });
   await expect(notice).toBeVisible();
 });
 

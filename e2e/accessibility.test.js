@@ -65,6 +65,50 @@ test.describe('Serious and critical accessibility checks', () => {
     await expectNoSeriousViolations(page, 'answer feedback');
   });
 
+  test('category names include their visible counts and examples', async ({ page }) => {
+    await page.goto('/');
+    const categories = page.getByTestId('practice-category-rail').getByRole('button');
+    await expect(categories).toHaveCount(11);
+    for (const category of await categories.all()) {
+      const visibleText = (await category.innerText()).replace(/\s+/g, ' ').trim();
+      await expect(category).toHaveAccessibleName(visibleText);
+    }
+  });
+
+  test('specific-form controls retain visible names in every category', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Choose specific forms', exact: true }).click();
+    const picker = page.getByRole('combobox', { name: 'Browse category' });
+    const categories = await picker
+      .locator('option')
+      .evaluateAll((options) => options.map((option) => option.getAttribute('value') || ''));
+    for (const dark of [false, true]) {
+      await page.evaluate((enabled) => document.body.classList.toggle('theme-dark', enabled), dark);
+      if (dark) await expect(page.locator('body')).toHaveClass(/theme-dark/);
+      else await expect(page.locator('body')).not.toHaveClass(/theme-dark/);
+      for (const time of ['All', 'Past']) {
+        await page
+          .getByRole('radiogroup', { name: 'Time', exact: true })
+          .getByRole('radio', { name: time, exact: true })
+          .click();
+        for (const category of categories) {
+          await picker.selectOption(category);
+          const forms = page.locator(`#practice-category-forms-${category}`);
+          for (const form of await forms.getByRole('button').all()) {
+            const visibleText = (await form.innerText()).replace(/\s+/g, ' ').trim();
+            await expect(form).toHaveAccessibleName(visibleText);
+          }
+          await expectNoSeriousViolations(
+            page,
+            `specific forms: ${category} / ${time} / ${dark ? 'dark' : 'light'}`,
+            `#practice-category-forms-${category}`,
+          );
+        }
+      }
+    }
+  });
+
   test('Check tool input', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
