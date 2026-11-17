@@ -80,12 +80,12 @@ describe('fetchBundledSentence', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/data/sentences/manifest.json', {
       cache: 'no-cache',
-      signal: expect.any(AbortSignal),
+      signal: expect.any(globalThis.AbortSignal),
     });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       `/data/sentences/by-type/${TYPE}.json?v=${payload.chunk.revision}`,
-      { cache: 'force-cache', signal: expect.any(AbortSignal) },
+      { cache: 'force-cache', signal: expect.any(globalThis.AbortSignal) },
     );
     expect(first).toMatchObject({
       jaTemplate: TEMPLATE,
