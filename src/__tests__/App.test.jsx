@@ -95,7 +95,7 @@ describe('App shell', () => {
       target: { value: 'ability-ongoing' },
     });
     const exactForms = document.getElementById('practice-category-forms-ability-ongoing');
-    fireEvent.click(within(exactForms).getByRole('button', { name: 'Potential' }));
+    fireEvent.click(within(exactForms).getByRole('button', { name: /^Potential 可能形/ }));
 
     expect(await screen.findByText('Potential added to Practice.')).toBeTruthy();
     expect(screen.getByText('9 forms')).toBeTruthy();
@@ -113,7 +113,7 @@ describe('App shell', () => {
       target: { value: 'te-form' },
     });
     const exactForms = document.getElementById('practice-category-forms-te-form');
-    fireEvent.click(within(exactForms).getByRole('button', { name: 'Te-form' }));
+    fireEvent.click(within(exactForms).getByRole('button', { name: /^Te-form\b/ }));
 
     expect(
       await screen.findByText('Te-form does not match Time: Past. Set Time to All first.'),

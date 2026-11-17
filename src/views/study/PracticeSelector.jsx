@@ -122,17 +122,13 @@ function ExactFormButton({ typeId, categoryId, categoryActive, selection, onTogg
   const examples = examplesForType(typeId);
   const details = [...new Set([type?.sub, type?.hint].filter(Boolean))];
   const filterText = conflicts.map((conflict) => conflict.valueLabel).join(' + ');
-  const exampleText = examples.map((example) => `${example.source} → ${example.answer}`).join(', ');
 
   return (
     <button
       type="button"
       onClick={() => onToggleType(typeId)}
       aria-pressed={selected}
-      aria-label={type?.label || typeId}
-      aria-description={`${details.join('. ')}. ${exampleText}.${
-        conflicts.length ? ` Excluded by ${filterText}.` : ''
-      }`}
+      aria-description={conflicts.length ? `Excluded by ${filterText}.` : undefined}
       className={`min-h-20 rounded-xl border px-3 py-2.5 text-left transition active:scale-[0.99] ${
         filteredOut
           ? 'border-amber-300 bg-amber-50/80 text-amber-950 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-100'
@@ -142,7 +138,7 @@ function ExactFormButton({ typeId, categoryId, categoryActive, selection, onTogg
       }`}
     >
       <span className="flex items-start justify-between gap-2">
-        <span className="text-xs font-semibold">{type?.label || typeId}</span>
+        <span className="text-xs font-semibold">{type?.label || typeId}</span>{' '}
         {filteredOut ? (
           <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
             Filtered
@@ -152,13 +148,13 @@ function ExactFormButton({ typeId, categoryId, categoryActive, selection, onTogg
             On
           </span>
         ) : conflicts.length ? (
-          <span className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[9px] font-medium text-stone-500 dark:bg-stone-800 dark:text-stone-400">
+          <span className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[9px] font-medium text-stone-600 dark:bg-stone-800 dark:text-stone-400">
             {filterText}
           </span>
         ) : null}
-      </span>
+      </span>{' '}
       {details.length ? (
-        <span className="mt-1 block text-[10px] text-stone-500 dark:text-stone-400">
+        <span className="mt-1 block text-[10px] text-stone-600 dark:text-stone-400">
           {details.map((detail, index) => (
             <React.Fragment key={detail}>
               {index > 0 ? ' · ' : null}
@@ -166,7 +162,7 @@ function ExactFormButton({ typeId, categoryId, categoryActive, selection, onTogg
             </React.Fragment>
           ))}
         </span>
-      ) : null}
+      ) : null}{' '}
       <span className="mt-1.5 block text-[10px] font-medium text-stone-700 dark:text-stone-300">
         {examples.map((example, index) => (
           <React.Fragment key={`${example.source}-${example.answer}`}>
