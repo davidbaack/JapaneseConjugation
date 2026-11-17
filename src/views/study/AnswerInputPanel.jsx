@@ -197,7 +197,6 @@ export function AnswerInputPanel({
   openLearnForRuleRecord,
   autoAdvanceCorrect,
   sentencePrompt = null,
-  beginnerHelp = null,
 }) {
   const answerInputId = transformationMode ? 'transformation-answer' : 'practice-answer';
   const fillOnlyBlank =
@@ -267,7 +266,6 @@ export function AnswerInputPanel({
         )}
         <div className="sr-only">{transformationMode ? transformationRoute : taskLabel}</div>
       </div>
-      {!transformationMode && beginnerHelp}
       {minimalPairSetForCurrent && (
         <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 text-xs text-emerald-800 dark:text-emerald-200">
           <div className="flex flex-wrap items-center gap-2">
@@ -658,7 +656,7 @@ export function AnswerInputPanel({
             className="mt-1"
             dock
             flowOnMobile={transformationMode}
-            flowUntilKeyboardOnMobile={!transformationMode && !!beginnerHelp}
+            flowUntilKeyboardOnMobile={!transformationMode}
           >
             <label
               htmlFor={answerInputId}

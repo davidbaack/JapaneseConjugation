@@ -15,7 +15,7 @@ import {
   buildRuleReviewRecommendation,
 } from '../utils/reviewRecommendations.js';
 import { parseFormationKeysHash } from '../utils/formationKeys.js';
-import { BeginnerTerms } from './study/PracticeBeginnerHelp.jsx';
+import BeginnerTerms from '../components/BeginnerTerms.jsx';
 
 function LessonExampleWord({ text, reading = '', meaning = '' }) {
   return (

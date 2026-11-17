@@ -152,27 +152,18 @@ test('Humble lesson scope stays visible through resize without snapping manual c
   });
 });
 
-test('beginner help is collapsed between the target and answer and leaves mobile controls reachable', async ({
-  page,
-}) => {
+test('Practice keeps the target above reachable mobile answer controls', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await seedPractice(page);
-  const help = page.locator('details').filter({ hasText: 'New to conjugation?' });
   const answer = page.getByRole('textbox', { name: 'Answer', exact: true });
-  await expect(help).toHaveCount(1);
-  await expect(help).not.toHaveAttribute('open');
-  await expectAbove(page.getByText('Plain Past', { exact: true }).first(), help);
-  await expectAbove(help, answer);
+  await expect(page.getByText('New to conjugation?', { exact: true })).toHaveCount(0);
+  await expectAbove(page.getByText('Plain Past', { exact: true }).first(), answer);
   await answer.scrollIntoViewIfNeeded();
   await expect(answer).toBeInViewport({ ratio: 1 });
-  await help.getByText('New to conjugation?', { exact: true }).click();
-  await expect(help.getByRole('region', { name: 'Worked example: Plain Negative' })).toContainText(
-    '食べない (たべない)',
-  );
-  await expect(help).not.toContainText('見た');
-  await expectAbove(help, answer);
-  await help.getByRole('button', { name: 'Learn Basics and Politeness', exact: true }).click();
-  await expect(page.locator('#lesson-panel-basic-tenses')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Check (Enter)', exact: true })).toBeInViewport();
+  for (const name of ['Hint', 'Reveal', 'Skip']) {
+    await expect(page.getByRole('button', { name, exact: true })).toBeInViewport();
+  }
   await page.getByRole('tab', { name: 'Drills', exact: true }).click();
   await page.getByRole('tab', { name: /^Transform/ }).click();
   await expect(page.getByRole('textbox', { name: 'Answer', exact: true })).toBeVisible();

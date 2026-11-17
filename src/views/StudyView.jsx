@@ -93,7 +93,6 @@ import {
 import { StudyFocusBar } from './study/StudyFocusBar.jsx';
 import { AnswerInputPanel, PracticeAnswerTip } from './study/AnswerInputPanel.jsx';
 import PracticeSelector from './study/PracticeSelector.jsx';
-import PracticeBeginnerHelp from './study/PracticeBeginnerHelp.jsx';
 import {
   addPracticeTypeSelection,
   matchingPracticeTypeIdsForCategory,
@@ -3050,22 +3049,6 @@ export default function StudyView({ mode = 'practice' }) {
             )}
             <div className="mt-3 flex flex-col gap-1 max-[359px]:mt-2 sm:mt-4">
               <AnswerInputPanel
-                beginnerHelp={
-                  !transformationMode ? (
-                    <div className="mb-3 text-left">
-                      <PracticeBeginnerHelp
-                        activeWord={current.verb}
-                        onLearnBasics={() => {
-                          window.location.hash = 'lesson-basic-tenses';
-                          openLearnFocus({
-                            source: 'beginner-help',
-                            lessonGroupId: 'basic-tenses',
-                          });
-                        }}
-                      />
-                    </div>
-                  ) : null
-                }
                 sentencePrompt={sentencePrompt}
                 phase={phase}
                 transformationMode={transformationMode}

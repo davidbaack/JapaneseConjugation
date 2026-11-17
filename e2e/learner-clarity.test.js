@@ -58,27 +58,34 @@ async function openGenkiWord(page) {
   await panel.getByRole('button', { name: 'Practice this', exact: true }).click();
 }
 
-test('beginner help stays optional and leads to readable lesson examples', async ({ page }) => {
+test('Learn keeps beginner terms and readable lesson examples available from Practice', async ({
+  page,
+}) => {
   await seedPractice(page);
-  const help = page.locator('details').filter({ hasText: 'New to conjugation?' });
-  await expect(help).not.toHaveAttribute('open');
-  await help.getByText('New to conjugation?', { exact: true }).click();
-  await expect(help.getByRole('region', { name: 'Worked example: Plain Negative' })).toContainText(
-    '食べない (たべない)',
-  );
-  await help.getByRole('button', { name: 'Learn Basics and Politeness', exact: true }).click();
+  await expect(page.getByText('New to conjugation?', { exact: true })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Learn', exact: true }).click();
+  const terms = page.locator('details').filter({
+    hasText: 'What do dictionary, plain, ichidan and godan mean?',
+  });
+  await expect(terms).not.toHaveAttribute('open');
+  await terms.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await expect(terms.getByText('Dictionary form', { exact: true })).toBeVisible();
+  await expect(terms.getByText('Godan', { exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Find a rule', exact: true }).fill('Basics');
   const lesson = page.locator('#lesson-panel-basic-tenses');
   await expect(lesson).toBeVisible();
   const writeRow = lesson.getByRole('row').filter({ hasText: 'to write' });
   await expect(writeRow).toContainText('かかない');
   await expect(writeRow).toContainText('かきます');
   await expect(lesson).toContainText('たべない');
+  await lesson.scrollIntoViewIfNeeded();
   await expect(lesson).toBeInViewport();
   await expect.poll(async () => (await savedState(page)).enabledTypes).toEqual(['plain-past']);
   await expect.poll(async () => (await savedState(page)).practiceStats.lifetime.attempted).toBe(0);
 });
 
-test('a waiting app update keeps beginner help reachable at 320px', async ({ page }) => {
+test('a waiting app update keeps Practice controls reachable at 320px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await seedPractice(page);
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => null));
@@ -99,9 +106,10 @@ test('a waiting app update keeps beginner help reachable at 320px', async ({ pag
   if (!noticeBox || !navigationBox) throw new Error('Update notice and navigation must be visible');
   expect(noticeBox.y + noticeBox.height).toBeLessThanOrEqual(navigationBox.y);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
-  const help = page.locator('details').filter({ hasText: 'New to conjugation?' });
-  await help.getByText('New to conjugation?', { exact: true }).click();
-  await expect(help.getByRole('region', { name: 'Worked example: Plain Negative' })).toBeVisible();
+  const answer = page.getByRole('textbox', { name: 'Answer', exact: true });
+  await answer.scrollIntoViewIfNeeded();
+  await expect(answer).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('button', { name: 'Check (Enter)', exact: true })).toBeInViewport();
   await expect(notice).toBeVisible();
 });
 

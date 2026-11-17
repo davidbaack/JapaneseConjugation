@@ -54,6 +54,9 @@ confirms the new direction, update this document in the same change.
   continuously.
 - Practice leads with the active exercise while keeping its category and filter
   controls visible in a compact area above the card. There is no Change menu.
+- Practice keeps the word, target form, and answer together without a generic
+  beginner-help disclosure. Foundational definitions and examples live in Learn;
+  Hint and Guide provide help with the current exercise.
 - All learner-facing categories appear as positive multi-select chips. On narrow
   screens they stay in one horizontally scrollable row with boundary cues; on
   desktop they wrap into no more than two compact rows. Category descriptions

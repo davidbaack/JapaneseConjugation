@@ -4,8 +4,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import LessonsView from '../views/LessonsView.jsx';
-import PracticeBeginnerHelp from '../views/study/PracticeBeginnerHelp.jsx';
-import { AnswerInputPanel, PracticeAnswerTip } from '../views/study/AnswerInputPanel.jsx';
+import { PracticeAnswerTip } from '../views/study/AnswerInputPanel.jsx';
 import PracticeSelector from '../views/study/PracticeSelector.jsx';
 import { practiceSelectionForTypeIds } from '../utils/practiceSelection.js';
 
@@ -53,56 +52,6 @@ describe('beginner learning support', () => {
     expect(details.open).toBe(true);
     expect(within(details).getByText('Dictionary form')).toBeTruthy();
     expect(within(details).getByText('Godan')).toBeTruthy();
-  });
-
-  it('keeps Practice help optional and sends the learner to Basics explicitly', () => {
-    const onLearnBasics = vi.fn();
-    render(<PracticeBeginnerHelp onLearnBasics={onLearnBasics} />);
-    const summary = screen.getByText('New to conjugation?');
-    const details = summary.closest('details');
-    expect(details.open).toBe(false);
-    fireEvent.click(summary);
-    expect(details.open).toBe(true);
-    const example = screen.getByRole('region', { name: 'Worked example: Plain Negative' });
-    expect(within(example).getByText('食べる (たべる)')).toBeTruthy();
-    expect(within(example).getByText('食べない (たべない)')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Learn Basics and Politeness' }));
-    expect(onLearnBasics).toHaveBeenCalledTimes(1);
-  });
-
-  it('places a single collapsed help disclosure after the active target and before answers', () => {
-    const panelProps = {
-      phase: 'answering',
-      answerMode: 'choice',
-      current: { verb: { dict: '見る', reading: 'みる', group: 'ichidan' } },
-      taskLabel: 'Plain Past',
-      answerTaskDetails: {},
-      practicePrefs: {},
-      choices: ['みた'],
-      beginnerHelp: <PracticeBeginnerHelp onLearnBasics={vi.fn()} />,
-    };
-    const { rerender } = render(<AnswerInputPanel {...panelProps} />);
-    const help = screen.getByText('New to conjugation?').closest('details');
-    const target = screen.getAllByText('Plain Past')[0];
-    const answer = screen.getByRole('button', { name: 'みた' });
-    expect(help.open).toBe(false);
-    expect(
-      target.compareDocumentPosition(help) & window.Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      help.compareDocumentPosition(answer) & window.Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(screen.getAllByText('New to conjugation?')).toHaveLength(1);
-
-    rerender(
-      <AnswerInputPanel
-        {...panelProps}
-        transformationMode
-        targetTypeInfo={{ label: 'Plain Past' }}
-        sourceTypeInfo={{ label: 'Plain Negative' }}
-      />,
-    );
-    expect(screen.queryByText('New to conjugation?')).toBeNull();
   });
 
   it.each([
@@ -155,33 +104,4 @@ describe('beginner learning support', () => {
     );
     expect(screen.getByText('2 forms')).toBeTruthy();
   });
-
-  it.each([
-    [{ dict: '食べる', reading: 'たべる' }, '寝ない (ねない)', '食べない', 'たべない'],
-    [{ dict: 'たべる' }, '寝ない (ねない)', '食べない', 'たべない'],
-    [{ dict: '寝る', reading: 'ねる' }, '食べない (たべない)', '寝ない', 'ねない'],
-    [{ dict: '書く', reading: 'かく' }, '食べない (たべない)', '書かない', 'かかない'],
-  ])(
-    'keeps Practice teaching separate from the active %j card',
-    (activeWord, sample, answer, reading) => {
-      const { rerender } = render(
-        <PracticeBeginnerHelp activeWord={activeWord} onLearnBasics={vi.fn()} />,
-      );
-      fireEvent.click(screen.getByText('New to conjugation?'));
-      const details = screen.getByText('New to conjugation?').closest('details');
-      expect(within(details).getByText(sample)).toBeTruthy();
-      expect(details.textContent).not.toContain(answer);
-      expect(details.textContent).not.toContain(reading);
-      expect(details.querySelector('dl').textContent).not.toMatch(/[\u3040-\u30ff\u3400-\u9fff]/u);
-
-      rerender(
-        <PracticeBeginnerHelp
-          activeWord={{ dict: '食べる', reading: 'たべる' }}
-          onLearnBasics={vi.fn()}
-        />,
-      );
-      expect(details.textContent).not.toContain('食べない');
-      expect(within(details).getByText('寝ない (ねない)')).toBeTruthy();
-    },
-  );
 });
