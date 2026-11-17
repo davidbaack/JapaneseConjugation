@@ -158,11 +158,17 @@ test('Practice keeps the target above reachable mobile answer controls', async (
   const answer = page.getByRole('textbox', { name: 'Answer', exact: true });
   await expect(page.getByText('New to conjugation?', { exact: true })).toHaveCount(0);
   await expectAbove(page.getByText('Plain Past', { exact: true }).first(), answer);
-  await answer.scrollIntoViewIfNeeded();
+  const answerDock = page.locator('[data-action-dock]').filter({ has: answer });
+  await answerDock.scrollIntoViewIfNeeded();
+  await expect(answerDock).toBeInViewport({ ratio: 1 });
   await expect(answer).toBeInViewport({ ratio: 1 });
-  await expect(page.getByRole('button', { name: 'Check (Enter)', exact: true })).toBeInViewport();
+  await expect(page.getByText('Plain Past', { exact: true }).first()).toBeInViewport({ ratio: 1 });
+  await expectAbove(page.getByText('Plain Past', { exact: true }).first(), answer);
+  await expect(page.getByRole('button', { name: 'Check (Enter)', exact: true })).toBeInViewport({
+    ratio: 1,
+  });
   for (const name of ['Hint', 'Reveal', 'Skip']) {
-    await expect(page.getByRole('button', { name, exact: true })).toBeInViewport();
+    await expect(page.getByRole('button', { name, exact: true })).toBeInViewport({ ratio: 1 });
   }
   await page.getByRole('tab', { name: 'Drills', exact: true }).click();
   await page.getByRole('tab', { name: /^Transform/ }).click();

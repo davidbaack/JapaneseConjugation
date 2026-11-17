@@ -84,7 +84,9 @@ test.describe('Serious and critical accessibility checks', () => {
       .locator('option')
       .evaluateAll((options) => options.map((option) => option.getAttribute('value') || ''));
     for (const dark of [false, true]) {
-      await page.evaluate((enabled) => document.body.classList.toggle('dark', enabled), dark);
+      await page.evaluate((enabled) => document.body.classList.toggle('theme-dark', enabled), dark);
+      if (dark) await expect(page.locator('body')).toHaveClass(/theme-dark/);
+      else await expect(page.locator('body')).not.toHaveClass(/theme-dark/);
       for (const time of ['All', 'Past']) {
         await page
           .getByRole('radiogroup', { name: 'Time', exact: true })
