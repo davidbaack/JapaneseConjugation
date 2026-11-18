@@ -113,6 +113,8 @@ test('Humble lesson exact forms stay visible through resize without changing bro
     JSON.parse(sessionStorage.getItem('jp-study-current') || 'null'),
   );
   await page.setViewportSize({ width: 320, height: 720 });
+  // Return to the chooser if resizing scrolled to the focused answer.
+  await summary.scrollIntoViewIfNeeded();
   await expect(summary).toHaveText('Humble · plain / Humble · polite');
   await page.getByRole('button', { name: 'Choose forms', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'Humble · plain', exact: true })).toBeChecked();
