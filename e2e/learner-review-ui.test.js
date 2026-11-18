@@ -196,7 +196,6 @@ test('answer-mode tips follow the visible controls while preserving the card and
   await styles.getByRole('button', { name: 'Speak', exact: true }).click();
   await expect(tip).toContainText(/Use Speak answer|Speech input is unavailable here/);
   await styles.getByRole('button', { name: 'Type', exact: true }).click();
-  await settings.click();
   await expect(tip).toContainText('Type romaji like');
   expect(
     await page.evaluate(() => JSON.parse(sessionStorage.getItem('jp-study-current') || 'null')),
