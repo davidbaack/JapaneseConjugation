@@ -65,21 +65,21 @@ test.describe('Tab navigation', () => {
     await expect(page.getByRole('group', { name: 'Practice quick filters' })).toBeVisible();
     await expect(page.getByText('Change', { exact: true })).toHaveCount(0);
     await expect(page.getByText(/Mixed practice/)).toHaveCount(0);
-    const answerBox = await answer.boundingBox();
-    expect(answerBox?.y).toBeLessThan(720);
+    await answer.scrollIntoViewIfNeeded();
+    await expect(answer).toBeInViewport();
     await expect(page.getByRole('button', { name: /Start workout|Continue workout/ })).toHaveCount(
       0,
     );
   });
 
-  test('practice controls remain compact and reachable at 320px', async ({ page }) => {
+  test('practice controls remain reachable by scrolling at 320px', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await gotoFreshApp(page);
 
     const answer = page.getByPlaceholder('Type romaji or kana...');
-    const answerBox = await answer.boundingBox();
-    if (!answerBox) throw new Error('Practice answer should be visible at 320px');
-    expect(answerBox.y + answerBox.height).toBeLessThanOrEqual(720);
+    const settings = page.getByRole('region', { name: 'Answer settings', exact: true });
+    await expect(settings.getByRole('group', { name: 'Answer style', exact: true })).toBeVisible();
+    await expect(settings.getByRole('button', { name: 'Type', exact: true })).toBeVisible();
 
     const pageWidth = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
@@ -104,6 +104,17 @@ test.describe('Tab navigation', () => {
     await expect(page.getByRole('radiogroup', { name: 'Time' })).toBeAttached();
     await expect(page.getByRole('radiogroup', { name: 'Polarity' })).toBeAttached();
     await expect(page.getByRole('radiogroup', { name: 'Style' })).toBeAttached();
+
+    for (const height of [720, 400]) {
+      // A short viewport approximates the space available above a phone keyboard.
+      await page.setViewportSize({ width: 320, height });
+      await page.getByRole('button', { name: 'Skip', exact: true }).scrollIntoViewIfNeeded();
+      await expect(answer).toBeInViewport();
+      await expect(page.getByRole('button', { name: 'Check (Enter)' })).toBeInViewport();
+      await expect(page.getByRole('button', { name: 'Hint', exact: true })).toBeInViewport();
+      await expect(page.getByRole('button', { name: 'Reveal', exact: true })).toBeInViewport();
+      await expect(page.getByRole('button', { name: 'Skip', exact: true })).toBeInViewport();
+    }
   });
 
   test('practice categories wrap into no more than two desktop rows', async ({ page }) => {

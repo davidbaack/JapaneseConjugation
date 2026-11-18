@@ -123,7 +123,10 @@ test('320px meters scroll without page overflow and keep answer actions reachabl
   const panel = page.getByRole('complementary', { name: 'Form strength' });
   const rail = page.getByTestId('form-strength-rail');
   for (const category of PRACTICE_CATEGORIES) {
-    const chip = page.getByRole('button', { name: category.label, exact: true });
+    const chip = page
+      .getByRole('group', { name: 'Practice categories', exact: true })
+      .getByRole('button')
+      .filter({ has: page.getByText(category.label, { exact: true }) });
     if ((await chip.getAttribute('aria-pressed')) !== 'true') await chip.click();
   }
   expect(await panel.getByRole('meter').count()).toBeGreaterThan(100);

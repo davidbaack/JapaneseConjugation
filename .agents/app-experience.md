@@ -90,7 +90,10 @@ confirms the new direction, update this document in the same change.
   unfinished answer is cleared, and no skip, miss, retry, or progress event is
   recorded.
 - Practice settings control answer style, kana help, sentence context, and
-  other presentation choices without creating a session. The answer field and
+  other presentation choices without creating a session. Answer settings remains
+  expanded above the exercise. Narrow screens may scroll to the answer rather
+  than compressing these controls or requiring the answer in the first viewport.
+  The answer field and
   primary action remain reachable above the soft keyboard; Hint, Reveal, and
   Skip stay adjacent as secondary actions. Next card is likewise sticky during
   review.
