@@ -24,6 +24,7 @@ import {
   DAY,
 } from '../utils/storage.js';
 import { conjugateItem } from '../utils/conjugator.js';
+import { buildRuleCandidates } from '../utils/ruleCandidates.js';
 import { filterWordsForStudyScope } from '../utils/vocabularyProgression.js';
 import {
   ALL_CARD_TYPES,
@@ -945,7 +946,7 @@ describe('word-form SRS selection', () => {
     const card = selectNext(state, [TABERU, KAKU], ['plain-past'], null, DEFAULT_PREFS);
     expect(card.id).toBe(cardIdFor(KAKU, 'plain-past'));
     expect(card.selectionOrigin).toBe('new');
-    expect(card.selectionReason).toBe('Introducing Te/Ta Sound Changes');
+    expect(card.selectionReason).toBe('Strengthening Plain Past');
   });
 
   it('can still schedule due cards by exact word-form card id when explicitly requested', () => {
@@ -1033,7 +1034,7 @@ describe('word-form SRS selection', () => {
     );
 
     expect(card.verb).toBe(earlyWord);
-    expect(card.selectionReason).toBe('Introducing Te/Ta Sound Changes');
+    expect(card.selectionReason).toBe('Introducing Plain Past');
   });
 
   it('ladders fresh Core Warmup through regular ichidan and godan before irregulars', () => {
@@ -1104,7 +1105,7 @@ describe('word-form SRS selection', () => {
     expect(card).toBeNull();
   });
 
-  it('prefers the lowest-skill enabled family after retry handling', () => {
+  it('prefers the lowest-strength enabled exact form after retry handling', () => {
     const now = Date.now();
     const weakPast = cardIdFor(TABERU, 'plain-negative');
     const strongTe = cardIdFor(KAKU, 'te-form');
@@ -1141,10 +1142,10 @@ describe('word-form SRS selection', () => {
     );
 
     expect(card.type).toBe('plain-negative');
-    expect(card.selectionReason).toBe('Strengthening Core Verb Forms');
+    expect(card.selectionReason).toBe('Strengthening Plain Negative');
   });
 
-  it('surfaces a neutral untested enabled family ahead of a higher-skill started family', () => {
+  it('surfaces a neutral new form ahead of a higher-strength started form', () => {
     const now = Date.now();
     const strongTe = cardIdFor(KAKU, 'te-form');
     const state = {
@@ -1162,15 +1163,147 @@ describe('word-form SRS selection', () => {
       },
     };
 
-    // 'volitional' (Volitional & Desire) is enabled but never attempted, so it is
-    // neutral (skill 50) and should beat the high-skill Te/Ta family.
+    // An unanswered exact form starts neutral and can precede a strong form.
     const card = selectNext(state, [TABERU, KAKU], ['te-form', 'volitional'], null, DEFAULT_PREFS);
 
     expect(card.type).toBe('volitional');
-    expect(card.selectionReason).toBe('Introducing Volitional');
+    expect(card.selectionReason).toBe('Introducing Plain Volitional');
   });
 
-  it('avoids repeating the same family back-to-back when a comparable family is available', () => {
+  it('separates sibling forms and selects the lowest meter before rotating words', () => {
+    const now = Date.now();
+    const weakPastId = cardIdFor(TABERU, 'plain-past');
+    const strongTeId = cardIdFor(KAKU, 'te-form');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [weakPastId]: {
+          correct: 0,
+          incorrect: 5,
+          reps: 0,
+          recentMiss: 0,
+          nextReview: now + DAY,
+          lastSeen: now,
+        },
+        [strongTeId]: {
+          correct: 20,
+          incorrect: 0,
+          reps: 20,
+          recentMiss: 0,
+          nextReview: now + DAY,
+          lastSeen: 1,
+        },
+      },
+    };
+    const types = ['plain-past', 'te-form'];
+    const candidates = buildRuleCandidates([TABERU, KAKU], types, DEFAULT_PREFS).map(
+      ({ rule, candidates: words }) => ({
+        rule,
+        candidates: words.filter((word) => word === (rule.type === 'plain-past' ? TABERU : KAKU)),
+      }),
+    );
+    const card = selectNext(state, [TABERU, KAKU], types, null, DEFAULT_PREFS, candidates, {
+      // Word variety must not discard the sole candidate of a weaker form.
+      recentWordKeys: [weakPastId],
+    });
+
+    expect(card.id).toBe(weakPastId);
+    expect(card.selectionReason).toBe('Strengthening Plain Past');
+
+    const fallback = selectNext(state, [TABERU, KAKU], types, null, DEFAULT_PREFS, candidates, {
+      // When every candidate is recent, fallback still respects the meters.
+      recentCardIds: [weakPastId, strongTeId],
+    });
+    expect(fallback.id).toBe(weakPastId);
+  });
+
+  it('ranks reading cards by their exact source form rather than dictionary target', () => {
+    const state = {
+      ...defaultState(),
+      cards: {
+        [cardIdFor(TABERU, 'dictionary')]: {
+          correct: 20,
+          incorrect: 5,
+          nextReview: Date.now() + DAY,
+          sourceTypeStats: {
+            'te-form': { correct: 20, incorrect: 0 },
+            'plain-past': { correct: 0, incorrect: 5 },
+          },
+        },
+      },
+    };
+    const card = selectNext(state, [TABERU, KAKU], ['te-form', 'plain-past'], null, {
+      ...DEFAULT_PREFS,
+      reviewStyle: 'reading',
+    });
+
+    expect(card.type).toBe('dictionary');
+    expect(card.sourceType).toBe('plain-past');
+    expect(card.selectionReason).toBe('Strengthening Plain Past');
+  });
+
+  it('keeps reading practice available for one word with multiple source forms', () => {
+    const id = cardIdFor(TABERU, 'dictionary');
+    const state = {
+      ...defaultState(),
+      cards: {
+        [id]: {
+          correct: 2,
+          incorrect: 1,
+          nextReview: Date.now() + DAY,
+          sourceTypeStats: {
+            'te-form': { correct: 2, incorrect: 0, lastAt: 1 },
+            'plain-past': { correct: 0, incorrect: 1, lastAt: 2 },
+          },
+        },
+      },
+    };
+    const card = selectNext(
+      state,
+      [TABERU],
+      ['te-form', 'plain-past'],
+      id,
+      { ...DEFAULT_PREFS, reviewStyle: 'reading' },
+      null,
+      { recentCardIds: [id] },
+    );
+
+    expect(card).not.toBeNull();
+    expect(card.id).toBe(id);
+    expect(card.sourceType).toBe('plain-past');
+  });
+
+  it('scores saved lanes once as reading word-form candidates multiply', () => {
+    let historyReads = 0;
+    const recent = [{ id: 'recent-miss', at: Date.now(), correct: false }];
+    const lane = {
+      attempted: 1,
+      correct: 0,
+      incorrect: 1,
+      get recent() {
+        historyReads += 1;
+        return recent;
+      },
+    };
+    const words = Array.from({ length: 24 }, (_, index) => ({
+      ...TABERU,
+      dict: `食べる${index}`,
+    }));
+    const state = {
+      ...defaultState(),
+      weakness: { byLane: { 'te-form|ichidan': lane } },
+    };
+    const card = selectNext(state, words, ['te-form', 'plain-past'], null, {
+      ...DEFAULT_PREFS,
+      reviewStyle: 'reading',
+    });
+
+    expect(card.sourceType).toBe('te-form');
+    // Retained history work is bounded by lanes, not the 48 source candidates.
+    expect(historyReads).toBeLessThan(20);
+  });
+
+  it('avoids repeating the same exact form when a comparable form is available', () => {
     const now = Date.now();
     const weakPast = cardIdFor(TABERU, 'plain-negative');
     const otherFamily = cardIdFor(KAKU, 'te-form');
@@ -1213,7 +1346,7 @@ describe('word-form SRS selection', () => {
     expect(card.id).toBe(otherFamily);
   });
 
-  it('boosts a stubborn weak card ahead of a nearby higher-skill family', () => {
+  it('keeps a stubborn weak card from outranking a lower exact-form meter', () => {
     const now = Date.now();
     const reviewed = (overrides) => ({
       ease: 2.3,
@@ -1227,10 +1360,10 @@ describe('word-form SRS selection', () => {
     const state = {
       ...defaultState(),
       cards: {
-        // Te/Ta family ~83 skill overall, but this one card keeps missing.
+        // This exact form is strong overall despite one repeatedly missed word.
         [cardIdFor(KAKU, 'te-form')]: reviewed({ reps: 5, correct: 19, incorrect: 0 }),
         [weakCardId]: reviewed({ reps: 0, correct: 1, incorrect: 4, recentMiss: 4 }),
-        // Basics & Politeness sits at 75 skill with no weak cards.
+        // Plain Negative has a lower meter and must be selected first.
         [cardIdFor(TABERU, 'plain-negative')]: reviewed({ reps: 3, correct: 3, incorrect: 1 }),
         [cardIdFor(KAKU, 'plain-negative')]: reviewed({ reps: 3, correct: 3, incorrect: 1 }),
       },
@@ -1244,10 +1377,11 @@ describe('word-form SRS selection', () => {
       DEFAULT_PREFS,
     );
 
-    expect(card.id).toBe(weakCardId);
+    expect(card.type).toBe('plain-negative');
+    expect(card.id).not.toBe(weakCardId);
   });
 
-  it('never lets card weakness outrank a genuinely weak family', () => {
+  it('never lets card weakness outrank a genuinely weak exact form', () => {
     const now = Date.now();
     const reviewed = (overrides) => ({
       ease: 2.3,
@@ -1260,8 +1394,7 @@ describe('word-form SRS selection', () => {
     const state = {
       ...defaultState(),
       cards: {
-        // Te/Ta family at 85 skill with a maxed-out weak card: the bounded
-        // boost (85 - 12 = 73) must not undercut a family at 60.
+        // A maxed-out weak word cannot lower the shared exact-form meter.
         [cardIdFor(KAKU, 'te-form')]: reviewed({ reps: 5, correct: 21, incorrect: 1 }),
         [cardIdFor(TABERU, 'te-form')]: reviewed({
           reps: 0,
@@ -1285,7 +1418,7 @@ describe('word-form SRS selection', () => {
     expect(card.type).toBe('plain-negative');
   });
 
-  it('repeats a severely weak family with a different word instead of deferring it', () => {
+  it('repeats a severely weak exact form with a different word instead of deferring it', () => {
     const now = Date.now();
     const lastCardId = cardIdFor(TABERU, 'plain-negative');
     const weakBasics = (overrides = {}) => ({
@@ -1330,7 +1463,7 @@ describe('word-form SRS selection', () => {
     expect(card.id).toBe(cardIdFor(KAKU, 'plain-negative'));
   });
 
-  it('caps severe-weakness family repeats at three consecutive cards', () => {
+  it('caps severe-weakness exact-form repeats at three consecutive cards', () => {
     const now = Date.now();
     const weakBasics = (overrides = {}) => ({
       ease: 1.9,

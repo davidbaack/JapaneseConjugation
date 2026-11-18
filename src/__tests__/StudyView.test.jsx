@@ -312,6 +312,9 @@ describe('StudyView continuous Practice startup', () => {
       screen.getByRole('button', { name: 'Check (Enter)' }).closest('[data-action-dock="true"]'),
     ).toBeTruthy();
     expect(screen.getByText('Answer settings')).toBeTruthy();
+    expect(
+      within(screen.getByRole('complementary', { name: 'Form strength' })).getAllByRole('meter'),
+    ).toHaveLength(app.state.enabledTypes.length);
   });
 
   it('opens continuous Practice while signed out', async () => {
@@ -1254,6 +1257,90 @@ describe('StudyView continuous Practice startup', () => {
     const readinessRows = buildReadinessFamilyRows(nextState);
     const sourceFamily = readinessRows.find((row) => (row.typeIds || []).includes(sourceType));
     expect(sourceFamily.cells.recognition.attempted).toBe(1);
+  });
+
+  it.each([true, false])(
+    'updates the visible meter once after a graded answer (%s)',
+    async (correct) => {
+      const target = STARTER_VERBS[0];
+      const type = 'plain-past';
+      persistStudyCard(target, type);
+      const app = makeApp({
+        state: { ...defaultState(), enabledTypes: [type] },
+        allWords: [target],
+      });
+      function LivePractice() {
+        const [learnerState, updateState] = useState(app.state);
+        mockedApp.value = { ...app, state: learnerState, setState: updateState };
+        return <StudyView />;
+      }
+      render(<LivePractice />);
+      const input = await waitForPracticeCard();
+      const meter = screen.getByRole('meter', { name: 'Plain Past' });
+      const before = Number(meter.getAttribute('aria-valuenow'));
+      fireEvent.change(input, { target: { value: correct ? conjugateItem(target, type) : 'zzz' } });
+      if (!correct) fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+      const panel = within(screen.getByRole('complementary', { name: 'Form strength' }));
+      await waitFor(() =>
+        expect(panel.getByRole('status').textContent).toContain(
+          correct ? 'increased' : 'decreased',
+        ),
+      );
+      const after = Number(meter.getAttribute('aria-valuenow'));
+      if (correct) expect(after).toBeGreaterThan(before);
+      else expect(after).toBeLessThan(before);
+      expect(mockedApp.value.state.practiceStats.byType[type].attempted).toBe(1);
+      expect(panel.getByText('First attempt')).toBeTruthy();
+    },
+  );
+
+  it('restores an eligible saved reading source before checking the active forms', async () => {
+    const target = STARTER_VERBS[5];
+    persistStudyCard(target, 'dictionary', { sourceType: 'te-form' });
+    mockedApp.value = makeApp({
+      state: { ...defaultState(), enabledTypes: ['te-form'] },
+      allWords: [STARTER_VERBS[0], target],
+      practicePrefs: { ...DEFAULT_PREFS, reviewStyle: 'reading' },
+    });
+    render(<StudyView />);
+    await screen.findByPlaceholderText(/Type dictionary form/i);
+    const restored = JSON.parse(sessionStorage.getItem('jp-study-current'));
+    expect(restored.dict).toBe(target.dict);
+    expect(restored.sourceType).toBe('te-form');
+    expect(screen.getByText('Now').closest('[data-form-type]').dataset.formType).toBe('te-form');
+  });
+
+  it('preserves known historical reading evidence when grading the next answer', async () => {
+    const target = STARTER_VERBS[0];
+    const type = 'plain-past';
+    const rid = cardIdFor(target, 'dictionary');
+    const state = stateWithDueRule(rid);
+    state.enabledTypes = [type];
+    state.cards[rid] = { ...state.cards[rid], correct: 100, sourceType: type };
+    persistStudyCard(target, 'dictionary', { sourceType: type });
+    const app = makeApp({
+      state,
+      allWords: [target],
+      practicePrefs: { ...DEFAULT_PREFS, reviewStyle: 'reading' },
+    });
+    function LivePractice() {
+      const [learnerState, updateState] = useState(app.state);
+      mockedApp.value = { ...app, state: learnerState, setState: updateState };
+      return <StudyView />;
+    }
+    render(<LivePractice />);
+    const input = await screen.findByPlaceholderText(/Type dictionary form/i);
+    const meter = screen.getByRole('meter', { name: 'Plain Past' });
+    const before = parseFloat(meter.firstElementChild.style.width);
+    fireEvent.change(input, { target: { value: target.reading } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+    await waitFor(() =>
+      expect(mockedApp.value.state.practiceStats.byType[type]?.attempted).toBe(1),
+    );
+    expect(mockedApp.value.state.cards[rid].sourceTypeStats[type].correct).toBe(1);
+    expect(mockedApp.value.state.cards[rid].sourceType).toBe(type);
+    expect(screen.getByText('101 attempts')).toBeTruthy();
+    expect(parseFloat(meter.firstElementChild.style.width)).toBeGreaterThan(before);
   });
 
   it('records a correct Practice answer without exposing a ready queue', async () => {

@@ -82,9 +82,9 @@ confirms the new direction, update this document in the same change.
   Japanese marker, meaning, and example conjugations. Category On/Off controls
   appear only in the chips above, not again inside this disclosure. Choosing a
   form from an off category turns on only that form; additions blocked by global
-  filters explain which filters must be relaxed. Multiple selected categories
-  are balanced by category rather than by raw exact-form count, so a large
-  category cannot drown out a small one.
+  filters explain which filters must be relaxed. Selection favors the weakest
+  eligible exact forms before rotating words, so the number of words available
+  for a stronger form cannot drown out a weaker one.
 - A manual category, filter, or exact-form change keeps the active card if it is still
   eligible. If the card becomes ineligible it is replaced immediately, the
   unfinished answer is cleared, and no skip, miss, retry, or progress event is
@@ -96,6 +96,12 @@ confirms the new direction, update this document in the same change.
   review.
 - Practice selection persists through `state.practiceSelection`; `enabledTypes`
   is a derived compatibility input for the card-selection engine.
+- Practice shows Form strength for every active exact form after filters, beside
+  the exercise on desktop and in a short horizontal rail above it on narrow
+  screens. The current form is highlighted, meter order stays stable, and graded
+  answers show their strength change. Strength is a saved estimate out of 100,
+  not accuracy or a completion target. New forms start at neutral 50; the first
+  two answers remain labeled First attempt or Early estimate.
 - The active card may remove the current word from automatic Practice with an
   undo affordance. It must not remove a whole form family from the active card.
 - Main Practice prompts from the dictionary form only for forward production
@@ -133,24 +139,27 @@ confirms the new direction, update this document in the same change.
   derived subcategory, and word key.
 - Weakness steering affects Practice selection only. It must not shorten SRS
   intervals in this version.
-- Selection uses the lowest-skill enabled topic after delayed retry handling.
-  Exact missed cards reappear roughly five cards later when alternatives exist,
-  and family skill blends lifetime correctness, recent misses, readiness data,
-  and response speed. Untested and barely tested families display as neutral,
-  not weak.
+- Selection uses the same exact-form strength shown by the meters after delayed
+  retry handling. Saved lifetime correctness supplies a neutral-smoothed baseline;
+  the latest 30 distinct answers for that form are replayed in order, each moving
+  strength 20% toward 100 for correct or 0 for incorrect. Correct answers raise
+  strength and mistakes lower it, with small changes near the bounds sometimes
+  rounding to the same displayed number. Speed and readiness do not change this
+  score. Exact missed cards reappear roughly five cards later when alternatives
+  exist. Filtering forms never resets their saved strength.
 - Per-card weakness is recency-weighted: misses fade over roughly two weeks
   and with consecutive correct answers, so cards missed long ago but reliable
-  now stop counting as weak. Card and lane weakness can boost a card within
-  steady-state selection by a bounded amount, without overriding lowest-skill
-  family steering, boosting untested families, or shortening SRS intervals.
+  now stop counting as weak. Card and lane weakness help choose words within
+  the lowest-strength eligible form, without overriding the visible form score
+  or shortening SRS intervals.
 - Missing godan te-form should boost related godan te-form cards, especially
   fresh or older words in that lane.
 - Practice does not expose or prioritize a due queue. SRS data may remain stored
   as an internal aid, but it does not frame the learner experience.
-- Practice should avoid repeating the same family or verb unless there are no
+- Practice should avoid repeating the same exact form or verb unless there are no
   good alternatives. Repeat the category plus subcategory pattern more than the
-  exact same word. Exception: when a family's best candidate is severely
-  weaker (a full skill band, 15+ points) than every alternative, it may repeat
+  exact same word. Exception: when a form's strength is severely
+  weaker (15+ points) than every alternative, it may repeat
   for up to three consecutive cards while still rotating words.
 
 ## Tools
