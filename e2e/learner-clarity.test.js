@@ -144,9 +144,7 @@ test('sentence review explains copied endings and marks only the blank', async (
     .getByRole('textbox', { name: 'Search for a word or conjugation form' })
     .fill('genkisou');
   await page.getByRole('button', { name: 'Practice this form', exact: true }).click();
-  await page.getByText('Answer settings', { exact: true }).click();
   await page.getByRole('button', { name: 'Sentence off', exact: true }).click();
-  await page.getByText('Answer settings', { exact: true }).click();
   const panel = page.getByRole('tabpanel', { name: 'Practice', exact: true });
   await expect(panel).toContainText(/この子は|No reviewed sentence/);
   if (await page.getByText(/No reviewed sentence for this word/).isVisible()) {

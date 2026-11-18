@@ -139,10 +139,8 @@ function expectElementBefore(first, second) {
   ).toBe(true);
 }
 
-function openPracticeRunSettings() {
-  const summary = screen.getByText('Answer settings');
-  fireEvent.click(summary);
-  return within(summary.closest('details'));
+function getPracticeAnswerSettings() {
+  return within(screen.getByRole('region', { name: 'Answer settings' }));
 }
 
 async function clickTopReviewNext() {
@@ -367,7 +365,7 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     await waitForPracticeCard();
-    const settings = openPracticeRunSettings();
+    const settings = getPracticeAnswerSettings();
     const answerStyle = within(settings.getByRole('group', { name: 'Answer style' }));
     expect(answerStyle.getByRole('button', { name: 'Type' }).getAttribute('aria-pressed')).toBe(
       'true',
@@ -2309,7 +2307,7 @@ describe('StudyView continuous Practice startup', () => {
     render(<StudyView />);
 
     const input = await screen.findByPlaceholderText(/Type romaji or kana/i, {}, { timeout: 5000 });
-    const settings = openPracticeRunSettings();
+    const settings = getPracticeAnswerSettings();
     expect(
       settings.getByRole('button', { name: 'Kana help off' }).getAttribute('aria-pressed'),
     ).toBe('false');

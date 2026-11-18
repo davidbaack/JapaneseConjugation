@@ -11,7 +11,6 @@ async function openGenkiPractice(page) {
     .fill('genkisou');
   await page.getByRole('button', { name: 'Practice this form', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Answer', exact: true })).toBeVisible();
-  await page.getByText('Answer settings', { exact: true }).click();
 }
 
 test.describe('Reviewed Sentence practice', () => {
@@ -91,7 +90,6 @@ test.describe('Reviewed Sentence practice', () => {
     await page.setViewportSize({ width: 320, height: 720 });
     await openGenkiPractice(page);
     await page.getByRole('button', { name: 'Sentence off', exact: true }).click();
-    await page.getByText('Answer settings', { exact: true }).click();
     const panel = page.getByRole('tabpanel', { name: 'Practice', exact: true });
     // A first cold load may finalize ordinary Practice before the chunk arrives.
     // The next exact focused card must use the reviewed cached content.
@@ -127,7 +125,6 @@ test.describe('Reviewed Sentence practice', () => {
     await openGenkiPractice(page);
     await context.setOffline(true);
     await page.getByRole('button', { name: 'Sentence off', exact: true }).click();
-    await page.getByText('Answer settings', { exact: true }).click();
     await expect(
       page.getByText('No reviewed sentence for this word and form yet. Practice the word below.', {
         exact: true,

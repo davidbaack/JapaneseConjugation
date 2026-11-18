@@ -2903,14 +2903,17 @@ export default function StudyView({ mode = 'practice' }) {
           />
         )}
         {!transformationMode && (
-          <details className="rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-stone-700 dark:text-stone-200">
-              <span>Answer settings</span>
+          <section
+            aria-label="Answer settings"
+            className="rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900"
+          >
+            <div className="flex min-h-11 items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-stone-700 dark:text-stone-200">
+              <h2>Answer settings</h2>
               <span className="text-xs font-medium text-stone-500">
                 {ANSWER_STYLE_OPTIONS.find((option) => option.id === answerMode)?.label || 'Type'} ·
                 Kana {liveKanaHelpEnabled ? 'on' : 'off'} · Sentence {sentenceMode ? 'on' : 'off'}
               </span>
-            </summary>
+            </div>
             <div className="flex flex-col gap-3 border-t border-stone-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-stone-800">
               <div
                 role="group"
@@ -2985,7 +2988,7 @@ export default function StudyView({ mode = 'practice' }) {
                 </button>
               </div>
             </div>
-          </details>
+          </section>
         )}
         <div
           className={

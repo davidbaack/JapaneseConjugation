@@ -139,10 +139,7 @@ test('Humble lesson scope stays visible through resize without snapping manual c
     element.dispatchEvent(new Event('scroll'));
   });
   await expect(rail.getByRole('button', { name: /^Core forms \d+\// })).toBeInViewport();
-  const settings = page.getByText('Answer settings', { exact: true });
-  await settings.click();
   await page.getByRole('button', { name: 'Auto next off', exact: true }).click();
-  await settings.click();
   await expect.poll(() => rail.evaluate((element) => element.scrollLeft)).toBe(0);
   expect(
     await page.evaluate(() => JSON.parse(sessionStorage.getItem('jp-study-current') || 'null')),
@@ -188,8 +185,6 @@ test('answer-mode tips follow the visible controls while preserving the card and
   const tip = page.getByTestId('practice-answer-tip');
   await expect(tip).toContainText('Type romaji like');
   await expect(page.getByText('1 form', { exact: true })).toBeVisible();
-  const settings = page.getByText('Answer settings', { exact: true });
-  await settings.click();
   const styles = page.getByRole('group', { name: 'Answer style', exact: true });
   await styles.getByRole('button', { name: 'Choose', exact: true }).click();
   await expect(tip).toContainText('Choose the matching answer');
