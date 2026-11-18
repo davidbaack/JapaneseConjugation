@@ -134,6 +134,9 @@ test('Humble lesson scope stays visible through resize without snapping manual c
   );
   await page.setViewportSize({ width: 320, height: 720 });
   await expectChoiceFullyVisible(rail, keigo);
+  // WebKit may scroll to the focused answer after resizing. Return to the
+  // chooser before testing manual browsing through its horizontal rail.
+  await rail.scrollIntoViewIfNeeded();
   await rail.evaluate((element) => {
     element.scrollLeft = 0;
     element.dispatchEvent(new Event('scroll'));
