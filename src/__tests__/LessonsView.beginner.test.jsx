@@ -98,10 +98,10 @@ describe('beginner learning support', () => {
     const { rerender } = render(
       <PracticeSelector selection={practiceSelectionForTypeIds(['plain-past'])} />,
     );
-    expect(screen.getByText('1 form')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Practicing 1 form' })).toBeTruthy();
     rerender(
       <PracticeSelector selection={practiceSelectionForTypeIds(['humble', 'humble-polite'])} />,
     );
-    expect(screen.getByText('2 forms')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Practicing 2 forms' })).toBeTruthy();
   });
 });

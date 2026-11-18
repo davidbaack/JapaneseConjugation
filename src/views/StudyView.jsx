@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { IconVolume, IconChat, IconFlame } from '../components/Icons.jsx';
 import { ALL_CARD_TYPES, FORM_GROUPS } from '../data/conjugationTypes.js';
-import {
-  PRACTICE_CATEGORIES,
-  PRACTICE_FILTERS,
-  practiceCategoryForType,
-} from '../data/practiceTaxonomy.js';
+import { PRACTICE_FORM_CHOICE_BY_ID } from '../data/practiceFormChoices.js';
 import {
   getSpeechRecognitionConstructor,
   playPronunciation,
@@ -99,13 +95,9 @@ import PracticeSelector from './study/PracticeSelector.jsx';
 import FormStrengthPanel from './study/FormStrengthPanel.jsx';
 import { buildFormStrengthRows } from '../utils/formStrength.js';
 import {
-  addPracticeTypeSelection,
-  matchingPracticeTypeIdsForCategory,
+  effectiveTypeIdsForPracticeSelection,
   normalizePracticeSelection,
-  practiceFilterConflictsForType,
   practiceSelectionForTypeIds,
-  setPracticeFilterSelection,
-  togglePracticeCategorySelection,
   togglePracticeTypeSelection,
   updateStatePracticeSelection,
 } from '../utils/practiceSelection.js';
@@ -121,7 +113,6 @@ const STUDY_CURRENT_KEY = 'jp-study-current';
 const DICTIONARY_TYPE_ID = 'dictionary';
 const DICTIONARY_TYPE_INFO = { label: 'Dictionary Form', sub: '辞書形', hint: 'dictionary form' };
 const REVIEW_LIMIT_SOURCES = new Set(['lab']);
-const CARD_TYPE_BY_ID = new Map(ALL_CARD_TYPES.map((type) => [type.id, type]));
 const REVIEW_SESSION_HISTORY_SIZE = 4;
 const CORRECT_AUTO_ADVANCE_MS = 850;
 const SENTENCE_PROMPT_GRACE_MS = 250;
@@ -138,6 +129,8 @@ function focusWithoutScroll(element) {
   if (!element || typeof window === 'undefined') return;
   // Mounting/restoring an exercise must not interrupt tablist navigation.
   if (document.activeElement?.getAttribute('role') === 'tab') return;
+  // Replacing an ineligible exercise must leave the learner in the chooser.
+  if (document.activeElement?.closest('[aria-label="Practice selection"]')) return;
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
   element.focus({ preventScroll: true });
@@ -1230,74 +1223,21 @@ export default function StudyView({ mode = 'practice' }) {
       setSelectionStatus(blockedMessage || message);
       return;
     }
-    clearPersistedCurrent();
     preparedNextCardRef.current = null;
     setState((prev) => updateStatePracticeSelection(prev, resolvedSelection));
     setSelectionStatus(message);
   }
 
-  function togglePracticeCategory(categoryId) {
-    const category = PRACTICE_CATEGORIES.find((item) => item.id === categoryId);
-    if (!category) return;
-    const normalized = normalizePracticeSelection(state.practiceSelection);
-    const wasSelected = normalized.selectedCategoryIds.includes(categoryId);
-    if (!wasSelected && !matchingPracticeTypeIdsForCategory(normalized, categoryId).length) {
-      const activeFilters = PRACTICE_FILTERS.flatMap((filter) => {
-        const value = normalized.filters[filter.id];
-        if (value === 'all') return [];
-        const option = filter.options.find((item) => item.id === value);
-        return [`${filter.label}: ${option?.label || value}`];
-      });
-      setSelectionStatus(
-        `No ${category.label} forms match ${activeFilters.join(' and ')}. Set one or more of those filters to All first.`,
-      );
-      return;
-    }
-    applyPracticeSelection(
-      (selection) => togglePracticeCategorySelection(selection, categoryId),
-      `${category.label} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
-      'Keep at least one category on, or choose another category first.',
-    );
-  }
-
-  function setPracticeSelectionFilter(filterId, value) {
-    const filter = PRACTICE_FILTERS.find((item) => item.id === filterId);
-    const option = filter?.options.find((item) => item.id === value);
-    if (!filter || !option) return;
-    applyPracticeSelection(
-      (selection) => setPracticeFilterSelection(selection, filterId, value),
-      `${filter.label} filter set to ${option.label}.`,
-      `No forms match ${option.label} with the current categories and filters.`,
-    );
-  }
-
   function togglePracticeSelectionType(typeId) {
-    const type = CARD_TYPE_BY_ID.get(typeId);
+    const type = PRACTICE_FORM_CHOICE_BY_ID.get(typeId);
     if (!type) return;
-    const category = practiceCategoryForType(typeId);
-    if (!category) return;
-    const normalized = normalizePracticeSelection(state.practiceSelection);
-    const categoryActive = normalized.selectedCategoryIds.includes(category.id);
-    const wasSelected =
-      categoryActive && normalized.selectedTypeIdsByCategory[category.id]?.includes(typeId);
-    const conflicts = practiceFilterConflictsForType(typeId, normalized.filters);
-    if (!wasSelected && conflicts.length) {
-      const currentFilters = conflicts
-        .map((conflict) => `${conflict.label}: ${conflict.valueLabel}`)
-        .join(' and ');
-      const resetFilters = conflicts.map((conflict) => conflict.label).join(' and ');
-      setSelectionStatus(
-        `${type.label} does not match ${currentFilters}. Set ${resetFilters} to All first.`,
-      );
-      return;
-    }
+    const wasSelected = effectiveTypeIdsForPracticeSelection(state.practiceSelection).includes(
+      typeId,
+    );
     applyPracticeSelection(
-      (selection) =>
-        categoryActive
-          ? togglePracticeTypeSelection(selection, typeId)
-          : addPracticeTypeSelection(selection, typeId),
-      `${type.label} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
-      'Keep at least one matching exact form, or relax a quick filter first.',
+      (selection) => togglePracticeTypeSelection(selection, typeId),
+      `${type.choiceLabel} ${wasSelected ? 'removed from' : 'added to'} Practice.`,
+      'Keep at least one form selected. Choose another form before removing this one.',
     );
   }
 
@@ -1335,100 +1275,101 @@ export default function StudyView({ mode = 'practice' }) {
         )
       : [];
     return (
-      <div className="space-y-4">
-        {!transformationMode && (
-          <PracticeSelector
-            selection={state.practiceSelection}
-            onToggleCategory={togglePracticeCategory}
-            onSetFilter={setPracticeSelectionFilter}
-            onToggleType={togglePracticeSelectionType}
-            statusMessage={selectionStatus}
-          />
-        )}
-        {hasSessionFilter && (
-          <StudyFocusBar
-            allWords={verbs}
-            sessionFilterWord={sessionFilterWord}
-            onWordChange={chooseFocusWord}
-            sessionFilterFormGroupId={sessionFilterFormGroupId}
-            onFormGroupChange={chooseFocusFormGroup}
-          />
-        )}
-        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
-          {incompatibleWord && recoveryTypes.length ? (
-            <div className="space-y-4 text-left">
-              <h2 className="font-semibold text-stone-800 dark:text-stone-100">
-                Choose compatible forms for <span lang="ja">{focusedWord.dict}</span>
-              </h2>
-              <p className="text-sm text-stone-600 dark:text-stone-300">
-                This word uses the {groupDisplayLabel(focusedWord.group)} pattern. Your selected
-                forms ({enabledTypes.map((type) => getTypeInfo(type).label).join(', ')}) do not
-                apply to it.
-              </p>
-              <p className="text-sm text-stone-600 dark:text-stone-300">
-                Practicing {recoveryGroup.label} will replace your selection with these{' '}
-                {recoveryTypes.length} forms and keep this word selected:
-              </p>
-              <ul className="list-disc pl-5 text-sm text-stone-600 dark:text-stone-300">
-                {recoveryTypes.map((type) => (
-                  <li key={type}>{getTypeInfo(type).label}</li>
-                ))}
-              </ul>
-              <div className="flex flex-wrap gap-2">
+      <div className={transformationMode ? 'mx-auto max-w-3xl' : 'mx-auto max-w-6xl'}>
+        <div className="order-1 min-w-0 space-y-4 max-[359px]:space-y-3 xl:w-full">
+          {!transformationMode && (
+            <PracticeSelector
+              key="practice-selection"
+              selection={state.practiceSelection}
+              onToggleType={togglePracticeSelectionType}
+              statusMessage={selectionStatus}
+            />
+          )}
+          {hasSessionFilter && (
+            <StudyFocusBar
+              allWords={verbs}
+              sessionFilterWord={sessionFilterWord}
+              onWordChange={chooseFocusWord}
+              sessionFilterFormGroupId={sessionFilterFormGroupId}
+              onFormGroupChange={chooseFocusFormGroup}
+            />
+          )}
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center">
+            {incompatibleWord && recoveryTypes.length ? (
+              <div className="space-y-4 text-left">
+                <h2 className="font-semibold text-stone-800 dark:text-stone-100">
+                  Choose compatible forms for <span lang="ja">{focusedWord.dict}</span>
+                </h2>
+                <p className="text-sm text-stone-600 dark:text-stone-300">
+                  This word uses the {groupDisplayLabel(focusedWord.group)} pattern. Your selected
+                  forms ({enabledTypes.map((type) => getTypeInfo(type).label).join(', ')}) do not
+                  apply to it.
+                </p>
+                <p className="text-sm text-stone-600 dark:text-stone-300">
+                  Practicing {recoveryGroup.label} will replace your selection with these{' '}
+                  {recoveryTypes.length} forms and keep this word selected:
+                </p>
+                <ul className="list-disc pl-5 text-sm text-stone-600 dark:text-stone-300">
+                  {recoveryTypes.map((type) => (
+                    <li key={type}>{getTypeInfo(type).label}</li>
+                  ))}
+                </ul>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetActiveAttempt();
+                      setSessionFilterFormGroupId(null);
+                      onFocusConsumed?.();
+                      setState((prev) =>
+                        updateStatePracticeSelection(
+                          prev,
+                          practiceSelectionForTypeIds(recoveryTypes),
+                        ),
+                      );
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
+                  >
+                    Practice {recoveryGroup.label}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={returnToOverview}
+                    className="px-4 py-2 border border-stone-200 dark:border-stone-800 rounded-lg text-sm"
+                  >
+                    Keep selected forms; choose another word
+                  </button>
+                </div>
+              </div>
+            ) : hasSessionFilter ? (
+              <>
+                <p className="text-stone-600 dark:text-stone-300 mb-2">No cards for this focus</p>
+                <p className="text-xs text-stone-600 dark:text-stone-500 mb-4">
+                  Try a different word or form type.
+                </p>
                 <button
-                  type="button"
-                  onClick={() => {
-                    resetActiveAttempt();
-                    setSessionFilterFormGroupId(null);
-                    onFocusConsumed?.();
-                    setState((prev) =>
-                      updateStatePracticeSelection(
-                        prev,
-                        practiceSelectionForTypeIds(recoveryTypes),
-                      ),
-                    );
-                  }}
+                  onClick={returnToOverview}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
                 >
-                  Practice {recoveryGroup.label}
+                  Clear focus
                 </button>
+              </>
+            ) : (
+              <>
+                <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
+                <p className="text-xs text-stone-600 dark:text-stone-500 mb-4">
+                  No words are available for this selection. Choose another form or restore words
+                  from Tools.
+                </p>
                 <button
-                  type="button"
-                  onClick={returnToOverview}
-                  className="px-4 py-2 border border-stone-200 dark:border-stone-800 rounded-lg text-sm"
+                  onClick={() => setTab('tools')}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
                 >
-                  Keep selected forms; choose another word
+                  Open Tools
                 </button>
-              </div>
-            </div>
-          ) : hasSessionFilter ? (
-            <>
-              <p className="text-stone-600 dark:text-stone-300 mb-2">No cards for this focus</p>
-              <p className="text-xs text-stone-600 dark:text-stone-500 mb-4">
-                Try a different word or form type.
-              </p>
-              <button
-                onClick={returnToOverview}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
-              >
-                Clear focus
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="text-stone-600 dark:text-stone-300 mb-2">No cards available</p>
-              <p className="text-xs text-stone-600 dark:text-stone-500 mb-4">
-                No words are available for this selection. Choose another practice topic or restore
-                words from Tools.
-              </p>
-              <button
-                onClick={() => setTab('tools')}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition"
-              >
-                Open Tools
-              </button>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -2895,9 +2836,8 @@ export default function StudyView({ mode = 'practice' }) {
         )}
         {!transformationMode && (
           <PracticeSelector
+            key="practice-selection"
             selection={state.practiceSelection}
-            onToggleCategory={togglePracticeCategory}
-            onSetFilter={setPracticeSelectionFilter}
             onToggleType={togglePracticeSelectionType}
             statusMessage={selectionStatus}
           />

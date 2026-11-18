@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../src/data/defaults.js';
-import { PRACTICE_CATEGORIES } from '../src/data/practiceTaxonomy.js';
+import { ALL_CARD_TYPES } from '../src/data/conjugationTypes.js';
 const selectionModule = '../src/utils/practiceSelection.js';
 const { practiceSelectionForTypeIds } = await import(selectionModule);
 
@@ -41,7 +41,7 @@ async function seedPractice(page, types = TYPES, overrides = {}) {
   await expect(page.getByRole('complementary', { name: 'Form strength' })).toBeVisible();
 }
 
-test('saved exact-form meters rise and fall, survive reload, and follow filters', async ({
+test('saved exact-form meters rise and fall, survive reload, and follow exact selection', async ({
   page,
 }) => {
   await seedPractice(page);
@@ -65,15 +65,18 @@ test('saved exact-form meters rise and fall, survive reload, and follow filters'
   expect(Number(await savedMeter.getAttribute('aria-valuenow'))).toBeLessThan(raised);
   await page.getByRole('button', { name: 'Next card', exact: true }).click();
   await expect(panel.getByRole('status')).toBeEmpty();
-  const time = page.getByRole('radiogroup', { name: 'Time', exact: true });
-  await time.getByRole('radio', { name: 'Past', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose forms', exact: true }).click();
+  const negative = page.getByRole('checkbox', { name: 'Negative · plain', exact: true });
+  await negative.uncheck();
+  await page.getByRole('checkbox', { name: 'Te-form', exact: true }).uncheck();
   await expect(panel.getByRole('meter')).toHaveCount(1);
-  await time.getByRole('radio', { name: 'All', exact: true }).click();
+  await negative.check();
+  await page.getByRole('checkbox', { name: 'Te-form', exact: true }).check();
   await expect(panel.getByRole('meter')).toHaveCount(3);
   expect(Number(await savedMeter.getAttribute('aria-valuenow'))).toBeLessThan(raised);
 });
 
-test('filtering the current reading source replaces it without recording an answer', async ({
+test('removing the current reading source replaces it without recording an answer', async ({
   page,
 }) => {
   await seedPractice(page, ['plain-past', 'plain-negative'], { reviewStyle: 'reading' });
@@ -82,10 +85,9 @@ test('filtering the current reading source replaces it without recording an answ
     'data-form-type',
     'plain-past',
   );
-  await page
-    .getByRole('radiogroup', { name: 'Time', exact: true })
-    .getByRole('radio', { name: 'Non-past', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Choose forms', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Past · plain', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Hide form chooser', exact: true }).click();
   await expect(panel.getByRole('meter')).toHaveCount(1);
   await expect(panel.locator('[aria-current="true"]')).toHaveAttribute(
     'data-form-type',
@@ -119,16 +121,12 @@ test('320px meters scroll without page overflow and keep answer actions reachabl
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 720 });
-  await seedPractice(page);
+  await seedPractice(
+    page,
+    ALL_CARD_TYPES.map((type) => type.id),
+  );
   const panel = page.getByRole('complementary', { name: 'Form strength' });
   const rail = page.getByTestId('form-strength-rail');
-  for (const category of PRACTICE_CATEGORIES) {
-    const chip = page
-      .getByRole('group', { name: 'Practice categories', exact: true })
-      .getByRole('button')
-      .filter({ has: page.getByText(category.label, { exact: true }) });
-    if ((await chip.getAttribute('aria-pressed')) !== 'true') await chip.click();
-  }
   expect(await panel.getByRole('meter').count()).toBeGreaterThan(100);
   expect(await rail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(

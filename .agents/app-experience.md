@@ -52,40 +52,32 @@ confirms the new direction, update this document in the same change.
 - Practice has no run, workout, daily-goal, completion, or temporary-focus
   framing. The learner chooses what they want to practice and answers
   continuously.
-- Practice leads with the active exercise while keeping its category and filter
-  controls visible in a compact area above the card. There is no Change menu.
+- Practice leads with the active exercise and a compact exact-form selection
+  summary above the card: Practicing N forms, up to three selected names, and
+  Choose forms. The chooser starts collapsed.
 - Practice keeps the word, target form, and answer together without a generic
   beginner-help disclosure. Foundational definitions and examples live in Learn;
   Hint and Guide provide help with the current exercise.
-- All learner-facing categories appear as positive multi-select chips. On narrow
-  screens they stay in one horizontally scrollable row with boundary cues; on
-  desktop they wrap into no more than two compact rows. Category descriptions
-  remain available to assistive technology, while each chip uses a compact
-  second line for representative Japanese endings, plain-English meanings, and
-  a live matching-form count.
-- Time, Polarity, and Style filters remain visible below the category chips. On
-  narrow screens their segmented radio groups share a second horizontal rail;
-  on desktop they sit side by side. There is no separate Mixed mode, saved-mix
-  override, Quick picks section, or duplicate Browse-all hierarchy.
-- Fresh learners start with Core forms. Learner-facing categories are broader
-  than the exact-form families used by Learn, Stats, readiness, and weakness
-  analysis; a launch from those surfaces still selects its exact intended forms.
-- Global quick filters narrow selected categories by Time (All, Non-past,
-  Past), Polarity (All, Positive, Negative), and Style (All, Plain, Polite).
-  Specific filters match only exact forms carrying that distinction; neutral
-  forms are excluded. The UI shows the live matching count and refuses a change
-  that would leave no matching forms rather than silently substituting forms.
-- Exact forms remain available in one optional Choose specific forms disclosure.
-  A single Browse category picker shows one category's forms immediately,
-  initially opening the first active category. Browsing includes categories that
-  are off and does not change the Practice selection. Each form shows its
-  Japanese marker, meaning, and example conjugations. Category On/Off controls
-  appear only in the chips above, not again inside this disclosure. Choosing a
-  form from an off category turns on only that form; additions blocked by global
-  filters explain which filters must be relaxed. Selection favors the weakest
-  eligible exact forms before rotating words, so the number of words available
-  for a stronger form cannot drown out a weaker one.
-- A manual category, filter, or exact-form change keeps the active card if it is still
+- The expanded chooser has one checkbox per exact form. Each choice names its
+  variant (including past, negative, and plain/polite where applicable), gives a
+  short English meaning, and shows concrete Japanese conjugation examples.
+  A checkbox changes only that form, immediately. At least one form must remain
+  selected; removing the final form explains how to choose a replacement first.
+- Expandable grammar headings organize the choices without selecting whole
+  families. Basic forms contains the eight basic verb forms; Te-form is separate.
+  Other headings use the distinct exact-form families shared with Learn.
+  Opening the chooser expands sections containing selected forms. Search matches
+  names, meanings, and Japanese examples across every section, reveals matching
+  forms, and never changes selection. Clearing search restores prior expansion.
+- The chooser uses wrapping text and one column on narrow screens, without
+  horizontal scrolling. Category toggles, fraction badges, the category dropdown,
+  and global Time/Polarity/Style controls are absent. Checked forms are exactly
+  the active Practice forms; selection merges combine active exact forms only.
+- Fresh learners start with the existing eight basic verb forms. Launches from
+  Learn, Stats, and Tools still select their exact intended forms. Selection
+  favors the weakest eligible exact forms before rotating words, so the number
+  of words available for a stronger form cannot drown out a weaker one.
+- A manual exact-form change keeps the active card if it is still
   eligible. If the card becomes ineligible it is replaced immediately, the
   unfinished answer is cleared, and no skip, miss, retry, or progress event is
   recorded.
@@ -99,7 +91,7 @@ confirms the new direction, update this document in the same change.
   review.
 - Practice selection persists through `state.practiceSelection`; `enabledTypes`
   is a derived compatibility input for the card-selection engine.
-- Practice shows Form strength for every active exact form after filters, beside
+- Practice shows Form strength for every selected exact form, beside
   the exercise on desktop and in a short horizontal rail above it on narrow
   screens. The current form is highlighted, meter order stays stable, and graded
   answers show their strength change. Strength is a saved estimate out of 100,

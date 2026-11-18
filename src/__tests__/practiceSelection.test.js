@@ -144,7 +144,7 @@ describe('practice selection', () => {
     expect(migrated.filters).toEqual({ time: 'all', polarity: 'all', style: 'all' });
   });
 
-  it('merges categories and relaxes conflicting cloud filters to All', () => {
+  it('merges only active exact forms and clears global filters', () => {
     const left = setPracticeFilterSelection(
       practiceSelectionForCategory('wants-intentions'),
       'time',
@@ -159,6 +159,46 @@ describe('practice selection', () => {
 
     expect(merged.selectedCategoryIds).toEqual(['wants-intentions', 'ability-ongoing']);
     expect(merged.filters).toEqual({ time: 'all', polarity: 'all', style: 'all' });
-    expect(effectiveTypeIdsForPracticeSelection(merged).length).toBeGreaterThan(0);
+    expect(new Set(effectiveTypeIdsForPracticeSelection(merged))).toEqual(
+      new Set([
+        ...effectiveTypeIdsForPracticeSelection(left),
+        ...effectiveTypeIdsForPracticeSelection(right),
+      ]),
+    );
+  });
+
+  it('toggles one exact form without adding its siblings', () => {
+    const selection = togglePracticeTypeSelection(defaultPracticeSelection(), 'potential');
+    expect(new Set(effectiveTypeIdsForPracticeSelection(selection))).toEqual(
+      new Set([...effectiveTypeIdsForPracticeSelection(defaultPracticeSelection()), 'potential']),
+    );
+  });
+
+  it('removes the final form in a category while another form remains', () => {
+    const selection = practiceSelectionForTypeIds(['potential', 'te-form']);
+    const removed = togglePracticeTypeSelection(selection, 'potential');
+    expect(effectiveTypeIdsForPracticeSelection(removed)).toEqual(['te-form']);
+    expect(
+      effectiveTypeIdsForPracticeSelection(togglePracticeTypeSelection(removed, 'te-form')),
+    ).toEqual(['te-form']);
+  });
+
+  it('edits a filtered selection without reintroducing hidden forms', () => {
+    const past = setPracticeFilterSelection(defaultPracticeSelection(), 'time', 'past');
+    const added = togglePracticeTypeSelection(past, 'te-form');
+    expect(new Set(effectiveTypeIdsForPracticeSelection(added))).toEqual(
+      new Set([...effectiveTypeIdsForPracticeSelection(past), 'te-form']),
+    );
+    expect(added.filters).toEqual({ time: 'all', polarity: 'all', style: 'all' });
+  });
+
+  it('does not merge inactive category contents into exact selections', () => {
+    const left = defaultPracticeSelection();
+    const right = practiceSelectionForTypeIds(['potential']);
+    const merged = mergePracticeSelections(left, right);
+    expect(new Set(effectiveTypeIdsForPracticeSelection(merged))).toEqual(
+      new Set([...effectiveTypeIdsForPracticeSelection(left), 'potential']),
+    );
+    expect(mergePracticeSelections(merged, merged)).toEqual(merged);
   });
 });

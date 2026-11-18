@@ -60,21 +60,6 @@ async function expectAbove(upper, lower) {
   expect(upperBox.y + upperBox.height).toBeLessThanOrEqual(lowerBox.y);
 }
 
-async function expectChoiceFullyVisible(rail, choice) {
-  await expect
-    .poll(async () => {
-      const railBox = await rail.boundingBox();
-      const choiceBox = await choice.boundingBox();
-      return (
-        !!railBox &&
-        !!choiceBox &&
-        choiceBox.x >= railBox.x &&
-        choiceBox.x + choiceBox.width <= railBox.x + railBox.width
-      );
-    })
-    .toBe(true);
-}
-
 for (const viewport of [
   { width: 320, height: 720 },
   { width: 390, height: 844 },
@@ -110,7 +95,7 @@ for (const viewport of [
   });
 }
 
-test('Humble lesson scope stays visible through resize without snapping manual category browsing', async ({
+test('Humble lesson exact forms stay visible through resize without changing browsing or the card', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -121,26 +106,21 @@ test('Humble lesson scope stays visible through resize without snapping manual c
     .locator('#lesson-panel-humble')
     .getByRole('button', { name: 'Practice this', exact: true })
     .click();
-  const rail = page.getByTestId('practice-category-rail');
-  const keigo = rail.getByRole('button', { name: /^Keigo \d+\// });
-  await expect(keigo).toHaveAttribute('aria-pressed', 'true');
-  await expect(keigo).toContainText('2/4');
-  await expectChoiceFullyVisible(rail, keigo);
-  await expect(page.getByText('2 forms', { exact: true })).toBeVisible();
-
-  // Resizing re-exposes the selected category without changing the active word or form.
+  const summary = page.getByTestId('practice-form-summary');
+  await expect(summary).toHaveText('Humble · plain / Humble · polite');
+  await expect(page.getByRole('heading', { name: 'Practicing 2 forms' })).toBeVisible();
   const activeBefore = await page.evaluate(() =>
     JSON.parse(sessionStorage.getItem('jp-study-current') || 'null'),
   );
   await page.setViewportSize({ width: 320, height: 720 });
-  await expectChoiceFullyVisible(rail, keigo);
-  await rail.evaluate((element) => {
-    element.scrollLeft = 0;
-    element.dispatchEvent(new Event('scroll'));
-  });
-  await expect(rail.getByRole('button', { name: /^Core forms \d+\// })).toBeInViewport();
+  await expect(summary).toHaveText('Humble · plain / Humble · polite');
+  await page.getByRole('button', { name: 'Choose forms', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Humble · plain', exact: true })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Humble · polite', exact: true })).toBeChecked();
+  const basic = page.getByRole('button', { name: 'Basic forms', exact: true });
+  await basic.click();
   await page.getByRole('button', { name: 'Auto next off', exact: true }).click();
-  await expect.poll(() => rail.evaluate((element) => element.scrollLeft)).toBe(0);
+  await expect(basic).toHaveAttribute('aria-expanded', 'true');
   expect(
     await page.evaluate(() => JSON.parse(sessionStorage.getItem('jp-study-current') || 'null')),
   ).toMatchObject({
@@ -184,7 +164,7 @@ test('answer-mode tips follow the visible controls while preserving the card and
   await seedPractice(page);
   const tip = page.getByTestId('practice-answer-tip');
   await expect(tip).toContainText('Type romaji like');
-  await expect(page.getByText('1 form', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Practicing 1 form', exact: true })).toBeVisible();
   const styles = page.getByRole('group', { name: 'Answer style', exact: true });
   await styles.getByRole('button', { name: 'Choose', exact: true }).click();
   await expect(tip).toContainText('Choose the matching answer');

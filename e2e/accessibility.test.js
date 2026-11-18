@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { AxeBuilder } from '@axe-core/playwright';
 
 const SURFACES = [
-  { tab: 'Practice', anchor: 'Core forms' },
+  { tab: 'Practice', anchor: 'Practicing 8 forms' },
   { tab: 'Guide', anchor: 'Build the conjugation step by step.' },
   { tab: 'Learn', anchor: 'Conjugation formation guide' },
   { tab: 'Tools', anchor: 'Lookup, check, word lists, and word management.' },
@@ -65,47 +65,48 @@ test.describe('Serious and critical accessibility checks', () => {
     await expectNoSeriousViolations(page, 'answer feedback');
   });
 
-  test('category names include their visible counts and examples', async ({ page }) => {
+  test('form chooser supports keyboard opening, search, and checkboxes', async ({ page }) => {
     await page.goto('/');
-    const categories = page.getByTestId('practice-category-rail').getByRole('button');
-    await expect(categories).toHaveCount(11);
-    for (const category of await categories.all()) {
-      const visibleText = (await category.innerText()).replace(/\s+/g, ' ').trim();
-      await expect(category).toHaveAccessibleName(visibleText);
-    }
+    const choose = page.getByRole('button', { name: 'Choose forms', exact: true });
+    await choose.focus();
+    await page.keyboard.press('Enter');
+    const search = page.getByRole('searchbox', { name: 'Find a form' });
+    await page.keyboard.press('Tab');
+    await expect(search).toBeFocused();
+    await search.fill('potential');
+    const form = page.getByRole('checkbox', { name: 'Potential · plain', exact: true });
+    await form.focus();
+    await page.keyboard.press('Space');
+    await expect(form).toBeChecked();
+    await expect(page.getByRole('heading', { name: 'Practicing 9 forms' })).toBeVisible();
+    await page.getByRole('button', { name: 'Close form chooser', exact: true }).click();
+    await expect(choose).toBeFocused();
   });
 
-  test('specific-form controls retain visible names in every category', async ({ page }) => {
+  test('every exact form has a visible name and accessible meaning and examples in both themes', async ({
+    page,
+  }) => {
     test.setTimeout(120_000);
     await page.goto('/');
-    await page.getByRole('button', { name: 'Choose specific forms', exact: true }).click();
-    const picker = page.getByRole('combobox', { name: 'Browse category' });
-    const categories = await picker
-      .locator('option')
-      .evaluateAll((options) => options.map((option) => option.getAttribute('value') || ''));
+    await page.getByRole('button', { name: 'Choose forms', exact: true }).click();
+    for (const heading of await page.locator('#practice-form-chooser h3 button').all()) {
+      if ((await heading.getAttribute('aria-expanded')) === 'false') await heading.click();
+    }
+    const forms = page.locator('#practice-form-chooser').getByRole('checkbox');
+    await expect(forms).toHaveCount(126);
     for (const dark of [false, true]) {
       await page.evaluate((enabled) => document.body.classList.toggle('theme-dark', enabled), dark);
-      if (dark) await expect(page.locator('body')).toHaveClass(/theme-dark/);
-      else await expect(page.locator('body')).not.toHaveClass(/theme-dark/);
-      for (const time of ['All', 'Past']) {
-        await page
-          .getByRole('radiogroup', { name: 'Time', exact: true })
-          .getByRole('radio', { name: time, exact: true })
-          .click();
-        for (const category of categories) {
-          await picker.selectOption(category);
-          const forms = page.locator(`#practice-category-forms-${category}`);
-          for (const form of await forms.getByRole('button').all()) {
-            const visibleText = (await form.innerText()).replace(/\s+/g, ' ').trim();
-            await expect(form).toHaveAccessibleName(visibleText);
-          }
-          await expectNoSeriousViolations(
-            page,
-            `specific forms: ${category} / ${time} / ${dark ? 'dark' : 'light'}`,
-            `#practice-category-forms-${category}`,
-          );
-        }
+      for (const form of await forms.all()) {
+        const labelId = await form.getAttribute('aria-labelledby');
+        const visibleName = await page.locator(`[id="${labelId}"]`).innerText();
+        await expect(form).toHaveAccessibleName(visibleName);
+        await expect(form).toHaveAccessibleDescription(/→/);
       }
+      await expectNoSeriousViolations(
+        page,
+        `exact forms / ${dark ? 'dark' : 'light'}`,
+        '#practice-form-chooser',
+      );
     }
   });
 

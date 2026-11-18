@@ -52,10 +52,7 @@ for (const answerMode of ['input', 'choice']) {
       },
     );
     await page.reload();
-    await expect(page.getByRole('button', { name: /^Passive & causative \d+\// })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await expect(page.getByTestId('practice-form-summary')).toContainText('Causative · plain');
     await page.getByRole('tab', { name: 'Tools', exact: true }).click();
     await page.getByRole('tab', { name: /^Check/ }).click();
     await page.getByLabel('Conjugated form', { exact: true }).fill('yomunai');
@@ -69,7 +66,9 @@ for (const answerMode of ['input', 'choice']) {
       .poll(() => activeCard(page))
       .toMatchObject({ dict: '読む', type: 'plain-negative' });
     await expect.poll(() => savedTypes(page)).toEqual(['plain-negative']);
-    await expect(page.getByText(/^1 forms?$/)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Practicing 1 form', exact: true }),
+    ).toBeVisible();
     if (answerMode === 'input') {
       await page.getByRole('textbox', { name: 'Answer', exact: true }).fill('yomanai');
     } else {

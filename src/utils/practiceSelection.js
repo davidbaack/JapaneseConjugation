@@ -214,30 +214,18 @@ export function setPracticeFilterSelection(selection, filterId, value) {
 }
 
 export function togglePracticeTypeSelection(selection, typeId) {
-  const category = practiceCategoryForType(typeId);
-  if (!category) return normalizePracticeSelection(selection);
   const normalized = normalizePracticeSelection(selection);
-  const current = new Set(normalized.selectedTypeIdsByCategory[category.id] || category.typeIds);
+  if (!TYPE_ID_SET.has(typeId)) return normalized;
+  const current = new Set(filteredTypeIdsForSelection(normalized));
   if (current.has(typeId)) {
     if (current.size === 1) return normalized;
     current.delete(typeId);
   } else {
     current.add(typeId);
   }
-  const selectedCategoryIds = normalized.selectedCategoryIds.includes(category.id)
-    ? normalized.selectedCategoryIds
-    : PRACTICE_CATEGORIES.map((item) => item.id).filter(
-        (id) => normalized.selectedCategoryIds.includes(id) || id === category.id,
-      );
-  const next = {
-    ...normalized,
-    selectedCategoryIds,
-    selectedTypeIdsByCategory: {
-      ...normalized.selectedTypeIdsByCategory,
-      [category.id]: category.typeIds.filter((id) => current.has(id)),
-    },
-  };
-  return filteredTypeIdsForSelection(next).length ? next : normalized;
+  // Rebuild from active exact forms so inactive categories and old filters
+  // cannot add siblings or hide the form the learner just checked.
+  return selectionForRequestedTypeIds([...current], normalized);
 }
 
 export function addPracticeTypeSelection(selection, typeId) {
@@ -284,34 +272,10 @@ export function updateStatePracticeSelection(state, nextSelection) {
 }
 
 export function mergePracticeSelections(local, cloud) {
-  const left = normalizePracticeSelection(local);
-  const right = normalizePracticeSelection(cloud);
-  const selected = new Set([...left.selectedCategoryIds, ...right.selectedCategoryIds]);
-  const merged = normalizePracticeSelection({
-    version: PRACTICE_SELECTION_VERSION,
-    selectedCategoryIds: PRACTICE_CATEGORIES.map((category) => category.id).filter((categoryId) =>
-      selected.has(categoryId),
-    ),
-    selectedTypeIdsByCategory: Object.fromEntries(
-      PRACTICE_CATEGORIES.map((category) => [
-        category.id,
-        category.typeIds.filter(
-          (typeId) =>
-            left.selectedTypeIdsByCategory[category.id]?.includes(typeId) ||
-            right.selectedTypeIdsByCategory[category.id]?.includes(typeId),
-        ),
-      ]),
-    ),
-    filters: Object.fromEntries(
-      PRACTICE_FILTERS.map((filter) => [
-        filter.id,
-        left.filters[filter.id] === right.filters[filter.id] ? left.filters[filter.id] : 'all',
-      ]),
-    ),
-  });
-  return effectiveTypeIdsForPracticeSelection(merged).length
-    ? merged
-    : { ...merged, filters: { ...DEFAULT_PRACTICE_FILTERS } };
+  return selectionForRequestedTypeIds([
+    ...effectiveTypeIdsForPracticeSelection(local),
+    ...effectiveTypeIdsForPracticeSelection(cloud),
+  ]);
 }
 
 export function topicForPracticeType(typeId) {

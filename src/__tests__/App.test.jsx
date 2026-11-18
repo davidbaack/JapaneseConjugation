@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../utils/supabase.js', () => ({
@@ -36,94 +36,52 @@ async function renderApp() {
 }
 
 describe('App shell', () => {
-  it('opens directly into task-first Practice with always-visible compact controls', async () => {
+  it('opens directly into Practice with a compact exact-form summary', async () => {
     await renderApp();
-
     expect(screen.getByRole('tab', { name: 'Practice' }).getAttribute('aria-selected')).toBe(
       'true',
     );
-    expect(screen.getByRole('button', { name: /^Core forms \d+\// })).toBeTruthy();
-    expect(screen.getByText('8 forms')).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Non-past' })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Negative' })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Polite' })).toBeTruthy();
-    expect(screen.queryByText('Change', { exact: true })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Practicing 8 forms' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Choose forms' }).getAttribute('aria-expanded')).toBe(
+      'false',
+    );
+    expect(screen.queryByRole('searchbox', { name: 'Find a form' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Practice categories' })).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'Time' })).toBeNull();
     expect(screen.queryByText(/Mixed practice/)).toBeNull();
     expect(screen.queryByText('Practice run')).toBeNull();
-    expect(screen.queryByText('Today drill')).toBeNull();
   });
 
-  it('combines category toggles with cross-category quick filters', async () => {
+  it('adds one exact form without selecting its negative or ongoing siblings', async () => {
     await renderApp();
-
-    fireEvent.click(screen.getByRole('button', { name: /^Wants & intentions \d+\// }));
-    expect(await screen.findByText('Wants & intentions added to Practice.')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Past' }));
-    expect(await screen.findByText('Time filter set to Past.')).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Past' }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Choose forms' }));
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Find a form' }), {
+      target: { value: 'potential' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Potential · plain', exact: true }));
+    expect(await screen.findByText('Potential · plain added to Practice.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Practicing 9 forms' })).toBeTruthy();
+    expect(
+      screen.getByRole('checkbox', { name: 'Potential · negative · plain', exact: true }).checked,
+    ).toBe(false);
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Find a form' }), {
+      target: { value: 'progressive' },
+    });
+    expect(screen.getByRole('checkbox', { name: 'Progressive · plain', exact: true }).checked).toBe(
+      false,
+    );
   });
 
-  it('previews category endings and inspects inactive exact forms without changing scope', async () => {
+  it('browses examples without changing selection and closes the chooser', async () => {
     await renderApp();
-
-    const coreForms = screen.getByRole('button', { name: /^Core forms \d+\// });
-    expect(coreForms.getAttribute('aria-description')).toContain('8 of 8 forms');
-    expect(screen.getByRole('button', { name: /^Core forms 8\/8 .*〜ない not/ })).toBe(coreForms);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Choose specific forms' }));
-    const categoryPicker = screen.getByRole('combobox', { name: 'Browse category' });
-    expect(categoryPicker.value).toBe('core-forms');
-    expect(document.getElementById('practice-category-forms-core-forms')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Core forms category' })).toBeNull();
-    fireEvent.change(categoryPicker, { target: { value: 'ability-ongoing' } });
-
+    fireEvent.click(screen.getByRole('button', { name: 'Choose forms' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Potential', exact: true }));
     expect(screen.getByText('食べる → 食べられる')).toBeTruthy();
     expect(screen.getByText('書く → 書ける')).toBeTruthy();
-    expect(screen.getByText('8 forms')).toBeTruthy();
-    expect(document.getElementById('practice-category-forms-core-forms')).toBeNull();
-    expect(
-      screen.getByRole('button', { name: /^Ability & ongoing \d+\// }).getAttribute('aria-pressed'),
-    ).toBe('false');
-  });
-
-  it('adds one exact form from an off category', async () => {
-    await renderApp();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Choose specific forms' }));
-    fireEvent.change(screen.getByRole('combobox', { name: 'Browse category' }), {
-      target: { value: 'ability-ongoing' },
-    });
-    const exactForms = document.getElementById('practice-category-forms-ability-ongoing');
-    fireEvent.click(within(exactForms).getByRole('button', { name: /^Potential 可能形/ }));
-
-    expect(await screen.findByText('Potential added to Practice.')).toBeTruthy();
-    expect(screen.getByText('9 forms')).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: /^Ability & ongoing \d+\// }).getAttribute('aria-pressed'),
-    ).toBe('true');
-  });
-
-  it('blocks exact forms excluded by a global filter and names the conflict', async () => {
-    await renderApp();
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Past' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Choose specific forms' }));
-    fireEvent.change(screen.getByRole('combobox', { name: 'Browse category' }), {
-      target: { value: 'te-form' },
-    });
-    const exactForms = document.getElementById('practice-category-forms-te-form');
-    fireEvent.click(within(exactForms).getByRole('button', { name: /^Te-form\b/ }));
-
-    expect(
-      await screen.findByText('Te-form does not match Time: Past. Set Time to All first.'),
-    ).toBeTruthy();
-    expect(screen.getByText('4 forms')).toBeTruthy();
-    expect(
-      within(screen.getByRole('group', { name: 'Practice categories' }))
-        .getByRole('button', { name: /^Te-form\b/ })
-        .getAttribute('aria-pressed'),
-    ).toBe('false');
+    expect(screen.getByRole('heading', { name: 'Practicing 8 forms' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close form chooser' }));
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Choose forms' }));
   });
 
   it('shows lifetime and trend-oriented Stats without review scheduling', async () => {

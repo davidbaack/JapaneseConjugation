@@ -10,7 +10,7 @@ const TABS = [
 ];
 
 const VIEW_ANCHORS = {
-  practice: () => /Core forms/,
+  practice: () => /Practicing \d+ forms?/,
   stats: () => /See what is getting easier/,
   learn: () => /Conjugation formation guide/,
   drills: () => /Pick a drill and start/,
@@ -21,7 +21,7 @@ const VIEW_ANCHORS = {
 async function gotoFreshApp(page) {
   await page.goto('/');
   // Background service-worker traffic can outlast the usable app in Firefox.
-  await expect(page.getByRole('button', { name: /^Core forms \d+\// })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose forms', exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Answer', exact: true })).toBeVisible();
   await page.evaluate(async () => {
     const registrations = navigator.serviceWorker
@@ -32,7 +32,7 @@ async function gotoFreshApp(page) {
     await Promise.all(keys.map((key) => window.caches.delete(key)));
   });
   await page.goto('/');
-  await expect(page.getByRole('button', { name: /^Core forms \d+\// })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose forms', exact: true })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Answer', exact: true })).toBeVisible();
 }
 
@@ -60,9 +60,11 @@ test.describe('Tab navigation', () => {
     await expect(practiceTab).toHaveClass(/font-semibold/);
     const answer = page.getByPlaceholder('Type romaji or kana...');
     await expect(answer).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Core forms \d+\// })).toBeVisible();
-    await expect(page.getByRole('group', { name: 'Practice categories' })).toBeVisible();
-    await expect(page.getByRole('group', { name: 'Practice quick filters' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Practicing 8 forms' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Choose forms', exact: true })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
     await expect(page.getByText('Change', { exact: true })).toHaveCount(0);
     await expect(page.getByText(/Mixed practice/)).toHaveCount(0);
     await answer.scrollIntoViewIfNeeded();
@@ -87,23 +89,11 @@ test.describe('Tab navigation', () => {
     }));
     expect(pageWidth.scrollWidth).toBe(pageWidth.clientWidth);
 
-    const categoryRail = page.getByTestId('practice-category-rail');
-    const railMetrics = await categoryRail.evaluate((element) => ({
-      clientWidth: element.clientWidth,
-      scrollWidth: element.scrollWidth,
-    }));
-    expect(railMetrics.scrollWidth).toBeGreaterThan(railMetrics.clientWidth);
-    await expect(categoryRail.getByRole('button')).toHaveCount(11);
-
-    await categoryRail.evaluate((element) => {
-      element.scrollLeft = element.scrollWidth;
-      element.dispatchEvent(new Event('scroll'));
-    });
-    await expect(categoryRail.getByRole('button', { name: /^Adjectives \d+\// })).toBeInViewport();
-
-    await expect(page.getByRole('radiogroup', { name: 'Time' })).toBeAttached();
-    await expect(page.getByRole('radiogroup', { name: 'Polarity' })).toBeAttached();
-    await expect(page.getByRole('radiogroup', { name: 'Style' })).toBeAttached();
+    await page.getByRole('button', { name: 'Choose forms', exact: true }).click();
+    await expect(page.getByRole('checkbox', { name: 'Past · plain', exact: true })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Past · polite', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+    await page.getByRole('button', { name: 'Hide form chooser', exact: true }).click();
 
     for (const height of [720, 400]) {
       // A short viewport approximates the space available above a phone keyboard.
@@ -117,17 +107,13 @@ test.describe('Tab navigation', () => {
     }
   });
 
-  test('practice categories wrap into no more than two desktop rows', async ({ page }) => {
+  test('practice summary stays compact on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await gotoFreshApp(page);
-
-    const rowCount = await page.getByTestId('practice-category-rail').evaluate((element) => {
-      const rows = [...element.children].map((child) =>
-        Math.round(child.getBoundingClientRect().top),
-      );
-      return new Set(rows).size;
-    });
-    expect(rowCount).toBeLessThanOrEqual(2);
+    const selection = page.getByRole('region', { name: 'Practice selection' });
+    await expect(selection.getByRole('heading', { name: 'Practicing 8 forms' })).toBeVisible();
+    expect((await selection.boundingBox())?.height).toBeLessThan(160);
+    await expect(selection.getByRole('checkbox')).toHaveCount(0);
   });
 
   test('tools exposes lookup, check, words, lists, and custom words', async ({ page }) => {
