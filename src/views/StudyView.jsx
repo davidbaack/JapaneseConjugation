@@ -36,6 +36,7 @@ import {
   gradeCard,
   gradeTransformationStats,
   cardIdFor,
+  practiceCardKey,
 } from '../utils/storage.js';
 import { recordReadinessAttempt } from '../utils/readiness.js';
 import {
@@ -522,6 +523,7 @@ export default function StudyView({ mode = 'practice' }) {
     return clearBoundedReviewPrefs(rawFocus?.returnPracticePrefs || rawPracticePrefs);
   }, [rawFocus?.returnPracticePrefs, rawPracticePrefs, transformationMode]);
   const [current, setCurrentState] = useState(null);
+  const currentPracticeKey = practiceCardKey(current);
   const setCurrent = useCallback((next) => {
     // Every direct card launch is a new exercise, including an exact-word/form
     // retry. Keep the initialization updater's existing-card behavior intact.
@@ -886,7 +888,7 @@ export default function StudyView({ mode = 'practice' }) {
   }, [
     activeMinimalPairSet?.id,
     bonusMode,
-    current?.id,
+    currentPracticeKey,
     sentenceMode,
     sessionFilterFormGroupId,
     sessionFilterWord?.dict,
@@ -1085,11 +1087,11 @@ export default function StudyView({ mode = 'practice' }) {
 
   useEffect(() => {
     if (phase === 'answering') answerStartedAtRef.current = Date.now();
-  }, [current?.id, phase]);
+  }, [currentPracticeKey, phase]);
 
   useEffect(() => {
     answerComposingRef.current = false;
-  }, [current?.id, phase]);
+  }, [currentPracticeKey, phase]);
 
   useEffect(() => {
     setShowPromptText(!listeningPrompt);
@@ -1108,7 +1110,7 @@ export default function StudyView({ mode = 'practice' }) {
     const button = nextButtonRef.current;
     if (!button || typeof window === 'undefined') return;
     focusWithoutScroll(button);
-  }, [autoAdvanceCorrect, current?.id, phase, wasCorrect]);
+  }, [autoAdvanceCorrect, currentPracticeKey, phase, wasCorrect]);
 
   // Handle TTS speech synthesis inside StudyView
   useEffect(() => {
@@ -1119,7 +1121,7 @@ export default function StudyView({ mode = 'practice' }) {
 
     if (current && phase === 'answering' && listeningPrompt && promptAudioText) {
       const promptKey =
-        current.id ||
+        currentPracticeKey ||
         `${current.verb?.dict || ''}|${current.verb?.group || ''}|${current.type || ''}|${
           current.sourceType || ''
         }`;
@@ -1145,11 +1147,11 @@ export default function StudyView({ mode = 'practice' }) {
   useEffect(() => {
     setCoachRevealed(0);
     setGreenRevealed(0);
-  }, [current?.id, answerMode]);
+  }, [currentPracticeKey, answerMode]);
 
   useEffect(() => {
     usedAnswerHelpRef.current = false;
-  }, [current?.id]);
+  }, [currentPracticeKey]);
 
   // Remember how many leading kana have turned green so they stay green through
   // a backspace and reappear as green immediately when re-typed.
@@ -1169,7 +1171,7 @@ export default function StudyView({ mode = 'practice' }) {
 
   useEffect(() => {
     setSelfCheckOpen(false);
-  }, [current?.id, phase, answerMode]);
+  }, [currentPracticeKey, phase, answerMode]);
 
   useEffect(() => {
     speechSubmittedRef.current = false;
@@ -1182,20 +1184,20 @@ export default function StudyView({ mode = 'practice' }) {
       speechRecognitionRef.current = null;
     }
     setSpeechListening(false);
-  }, [current?.id, phase, answerMode]);
+  }, [currentPracticeKey, phase, answerMode]);
 
   useEffect(() => {
     if (!current || phase !== 'answering') return;
     if (answerMode !== 'speak') return;
     if (!speechRecognitionAvailable) return;
     if (speechListening || speechRecognitionRef.current) return;
-    const autoStartKey = `${current.id}:speak`;
+    const autoStartKey = `${currentPracticeKey}:speak`;
     if (speechAutoStartKeyRef.current === autoStartKey) return;
     speechAutoStartKeyRef.current = autoStartKey;
     startSpeechAnswer({ auto: true });
     // startSpeechAnswer closes over the current spoken-answer targets.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id, phase, answerMode, speechRecognitionAvailable, speechListening]);
+  }, [currentPracticeKey, phase, answerMode, speechRecognitionAvailable, speechListening]);
 
   useEffect(() => {
     setReviewBase(state.session.reviewed || 0);
@@ -1629,8 +1631,8 @@ export default function StudyView({ mode = 'practice' }) {
       ...graded,
       cards: { ...baseState.cards, [rid]: storedCard },
       retryQueue: correct
-        ? (baseState.retryQueue || []).filter((id) => id !== rid)
-        : [...new Set([...(baseState.retryQueue || []), rid])].slice(-20),
+        ? (baseState.retryQueue || []).filter((id) => id !== currentPracticeKey)
+        : [...new Set([...(baseState.retryQueue || []), currentPracticeKey])].slice(-20),
       verbStats,
       readiness: recordReadinessAttempt(baseState.readiness, readinessRuleId, {
         correct,
@@ -1727,7 +1729,8 @@ export default function StudyView({ mode = 'practice' }) {
         !mistake.resolved &&
         mistake.dict === current?.verb?.dict &&
         mistake.group === current?.verb?.group &&
-        mistake.type === current?.type,
+        mistake.type === current?.type &&
+        (!reverseDrill || mistake.promptType === sourceTypeForReading),
     );
     if (!matches.length) return mistakes;
     return matches.reduce(
@@ -1823,12 +1826,13 @@ export default function StudyView({ mode = 'practice' }) {
   }
 
   function selectNextReviewCard(nextState, lastCardId, optionOverrides = {}) {
-    rememberSessionCard(lastCardId);
+    const lastPracticeKey = lastCardId === current?.id ? currentPracticeKey : lastCardId;
+    rememberSessionCard(lastPracticeKey);
     return selectNext(
       nextState,
       practiceWords,
       enabledTypes,
-      lastCardId,
+      lastPracticeKey,
       practicePrefs,
       practiceRuleCandidates,
       {

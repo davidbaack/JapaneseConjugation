@@ -20,21 +20,25 @@ The current app shape is:
 ### Practice
 
 Practice opens directly into the next continuous card when cards are available.
-Category chips and Time, Polarity, and Style filters stay visible above the
-active exercise. See all forms discloses exact-form choices. Fresh learners start
-with Core forms, and category/form selection persists between visits.
+A compact summary above the exercise shows the selected exact forms. Choose
+forms opens a searchable chooser with one checkbox per exact form, grouped under
+expandable grammar headings with meanings and Japanese examples. Fresh learners
+start with the eight basic verb forms, and selection persists between visits.
 
 Launches from Learn, Drills, Guide, and Stats update that persistent selection.
 A word-level "Practice this" launch from Check or Lookup can lock Practice to
 that word until the learner exits its banner.
 
 Default Practice is continuous: it has no 12-card target, daily-goal stop, or
-completion summary. Selection favors the lowest-skill enabled families, delayed
-retry of recent misses, and varied words in the same weak patterns. SRS review
+completion summary. Selection favors the weakest eligible exact forms, delayed
+retry of recent misses, and varied words in the same weak patterns. Form strength
+meters show the same saved estimate used for selection, with recent answers
+moving each score toward 100 or 0. New forms start at neutral 50, and sparse
+evidence is labeled First attempt or Early estimate. SRS review
 data still exists for planning, but due cards do not drive the default queue.
 
-Global filters narrow the selected categories and refuse changes that would
-leave no matching forms. An eligible active card stays in place; an ineligible
+Each checkbox changes only its exact form, immediately, and at least one form
+must remain selected. An eligible active card stays in place; an ineligible
 card is replaced without recording a skip, miss, or progress event. Word removal
 on the active card updates the same durable word-exclusion state managed from
 Tools, and removed words can be restored there.
@@ -134,15 +138,15 @@ than in global Settings.
 - Word filters: JLPT N5-N1, 23 Genki lessons, 50 Minna no Nihongo lessons, word
   types, word groups, and custom study lists.
 - Card coverage: 126 selectable card types across 13 form families.
-- Practice scope: learner-facing category chips, exact-form choices, and global
-  Time, Polarity, and Style filters; categories are balanced rather than weighted
-  by their number of exact forms.
+- Practice scope: a collapsed exact-form chooser with searchable names, meanings,
+  and Japanese examples. Selection prioritizes the weakest eligible exact forms
+  before rotating words, with source-specific retries for Reading practice.
 - Minimal-pair support covers contrasts such as ichidan vs godan ru-verbs,
   i-adjective vs na-adjective, passive vs potential, godan sound-change
   clusters, and causative vs passive.
 
 The default automatic Practice scope is verb-first plus common textbook
-adjectives with Core forms selected.
+adjectives with the eight basic verb forms selected.
 
 AI coaching remains anonymous with shared network and global spending limits;
 see [the AI budget policy](docs/ai-budget.md). Optional telemetry sends only the

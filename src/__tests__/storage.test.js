@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { DEFAULT_PREFS } from '../data/defaults.js';
 import {
   gradeCard,
@@ -12,6 +12,8 @@ import {
   normalizeReferenceState,
   buildFocusCard,
   cardIdFor,
+  practiceCardKey,
+  wordKeyFromCardId,
   freshCardLimit,
   defaultState,
   bonusFreshCardLimit,
@@ -999,6 +1001,132 @@ describe('word-form SRS selection', () => {
     expect(card.verb).toBe(TABERU);
     expect(card.selectionOrigin).toBe('missed');
     expect(card.selectionReason).toBe('Previously missed');
+  });
+
+  it.each([0, 0.5, 0.99, 0.999999])(
+    'retries only the missed reading source at random draw %s',
+    (draw) => {
+      const id = cardIdFor(TABERU, 'dictionary');
+      const missed = { id, type: 'dictionary', sourceType: 'plain-past' };
+      const state = {
+        ...defaultState(),
+        cards: { [id]: gradeCard(null, false) },
+        retryQueue: [practiceCardKey(missed)],
+      };
+      const random = vi.spyOn(Math, 'random').mockReturnValue(draw);
+      try {
+        const card = selectNext(state, [TABERU], ['plain-past', 'te-form'], null, {
+          ...DEFAULT_PREFS,
+          reviewStyle: 'reading',
+        });
+        expect(card.sourceType).toBe('plain-past');
+        expect(card.selectionReason).toBe('Previously missed');
+        expect(wordKeyFromCardId(practiceCardKey(card))).toBe(wordKeyFromCardId(id));
+      } finally {
+        random.mockRestore();
+      }
+    },
+  );
+
+  it('keeps another reading source available while the exact missed prompt is delayed', () => {
+    const id = cardIdFor(TABERU, 'dictionary');
+    const pastKey = practiceCardKey({ id, type: 'dictionary', sourceType: 'plain-past' });
+    const state = {
+      ...defaultState(),
+      cards: { [id]: gradeCard(null, false) },
+      retryQueue: [pastKey],
+    };
+    const prefs = { ...DEFAULT_PREFS, reviewStyle: 'reading' };
+    const other = selectNext(state, [TABERU], ['plain-past', 'te-form'], pastKey, prefs, null, {
+      recentCardIds: [pastKey],
+    });
+    expect(other.sourceType).toBe('te-form');
+    expect(other.selectionBucket).not.toBe('retry');
+    const retry = selectNext(
+      state,
+      [TABERU],
+      ['plain-past', 'te-form'],
+      practiceCardKey(other),
+      prefs,
+    );
+    expect(retry.sourceType).toBe('plain-past');
+    expect(retry.selectionReason).toBe('Previously missed');
+  });
+
+  it('does not transfer a filtered-out reading retry to an enabled source', () => {
+    const id = cardIdFor(TABERU, 'dictionary');
+    const state = {
+      ...defaultState(),
+      cards: { [id]: gradeCard(null, false) },
+      retryQueue: [practiceCardKey({ id, type: 'dictionary', sourceType: 'plain-past' })],
+    };
+    const card = selectNext(state, [TABERU], ['te-form'], null, {
+      ...DEFAULT_PREFS,
+      reviewStyle: 'reading',
+    });
+    expect(card.sourceType).toBe('te-form');
+    expect(card.selectionBucket).not.toBe('retry');
+    expect(state.retryQueue).toHaveLength(1);
+  });
+
+  it('preserves source-specific Reading corrections through stale merges and newer misses', () => {
+    const id = cardIdFor(TABERU, 'dictionary');
+    const pastKey = practiceCardKey({ id, type: 'dictionary', sourceType: 'plain-past' });
+    const teKey = practiceCardKey({ id, type: 'dictionary', sourceType: 'te-form' });
+    const firstMiss = recordMistake([], TABERU, 'dictionary', 'plain-past', 'x', 'たべる', {
+      now: 1000,
+    });
+    const mistakes = recordMistake(firstMiss, TABERU, 'dictionary', 'te-form', 'x', 'たべる', {
+      now: 1100,
+    });
+    const pastMistakeKey = firstMiss[0].key;
+    const stale = { ...defaultState(), retryQueue: [pastKey, teKey], mistakes };
+    const corrected = {
+      ...stale,
+      retryQueue: [teKey],
+      mistakes: markMistakeResolved(mistakes, pastMistakeKey, { now: 2000 }),
+    };
+    // A correction is newer than both the original miss and a concurrent miss
+    // that happened before the matching correct answer.
+    const earlierMiss = {
+      ...stale,
+      mistakes: recordMistake(mistakes, TABERU, 'dictionary', 'plain-past', 'x', 'たべる', {
+        now: 1500,
+      }),
+    };
+    for (const previous of [stale, earlierMiss]) {
+      for (const [left, right] of [
+        [corrected, previous],
+        [previous, corrected],
+      ]) {
+        const merged = mergeCloudState(left, right);
+        expect(merged.retryQueue).toEqual([teKey]);
+        expect(merged.mistakes.find((m) => m.promptType === 'plain-past').resolved).toBe(true);
+        expect(merged.mistakes.find((m) => m.promptType === 'te-form').resolved).toBe(false);
+      }
+    }
+    const laterMiss = {
+      ...stale,
+      mistakes: recordMistake(
+        corrected.mistakes,
+        TABERU,
+        'dictionary',
+        'plain-past',
+        'x',
+        'たべる',
+        {
+          now: 3000,
+        },
+      ),
+    };
+    for (const [left, right] of [
+      [corrected, laterMiss],
+      [laterMiss, corrected],
+    ]) {
+      const merged = mergeCloudState(left, right);
+      expect(new Set(merged.retryQueue)).toEqual(new Set([pastKey, teKey]));
+      expect(merged.mistakes.find((m) => m.promptType === 'plain-past').resolved).toBe(false);
+    }
   });
 
   it('uses dictionary target cards for reading practice without adding dictionary to core', () => {

@@ -114,6 +114,14 @@ export function cardIdFor(word, targetTypeId) {
   return key && targetTypeId ? `${key}|${targetTypeId}` : '';
 }
 
+// Reading sources share saved dictionary totals, but not retries or rotation.
+export function practiceCardKey(card) {
+  if (!card?.id) return '';
+  return card.type === DICTIONARY_TYPE_ID && card.sourceType
+    ? `${card.id}|${card.sourceType}`
+    : card.id;
+}
+
 export function typeIdFromCardId(cardId) {
   const id = String(cardId || '');
   const marker = id.lastIndexOf('|');
@@ -122,7 +130,8 @@ export function typeIdFromCardId(cardId) {
 
 export function wordKeyFromCardId(cardId) {
   const id = String(cardId || '');
-  const marker = id.lastIndexOf('|');
+  const readingMarker = id.lastIndexOf(`|${DICTIONARY_TYPE_ID}|`);
+  const marker = readingMarker >= 0 ? readingMarker : id.lastIndexOf('|');
   return marker >= 0 ? id.slice(0, marker) : '';
 }
 
@@ -797,10 +806,12 @@ export function mergeMistakes(local = [], cloud = []) {
   const byKey = new Map();
   for (const m of [...cloud, ...local]) {
     const prev = byKey.get(m.key);
+    const changedAt = maxNum(m.at, m.resolvedAt);
+    const previousChangedAt = maxNum(prev?.at, prev?.resolvedAt);
     if (
       !prev ||
-      m.at > prev.at ||
-      (m.at === prev.at && stableSyncStringify(m) > stableSyncStringify(prev))
+      changedAt > previousChangedAt ||
+      (changedAt === previousChangedAt && stableSyncStringify(m) > stableSyncStringify(prev))
     ) {
       byKey.set(m.key, m);
     }
@@ -1144,15 +1155,30 @@ export function mergeCloudState(local, cloud) {
     local.practiceSelection,
     cloud.practiceSelection,
   );
+  const mistakes = mergeMistakes(local.mistakes || [], cloud.mistakes || []);
+  // A stale saved snapshot must not resurrect a corrected Reading retry.
+  // Use the merged, source-specific resolution so a newer miss can reopen it.
+  const resolvedReadingRetries = new Set(
+    mistakes
+      .filter((m) => m.resolved && !m.dimension && m.type === DICTIONARY_TYPE_ID && m.promptType)
+      .map((m) =>
+        practiceCardKey({
+          id: cardIdFor(m, DICTIONARY_TYPE_ID),
+          type: DICTIONARY_TYPE_ID,
+          sourceType: m.promptType,
+        }),
+      ),
+  );
   const merged = {
     ...local,
     schemaVersion: SRS_SCHEMA_VERSION,
     cards: mergeCards(local.cards || {}, cloud.cards || {}),
     verbStats: mergeVerbStats(local.verbStats || {}, cloud.verbStats || {}),
     retryQueue: [...new Set([...(local.retryQueue || []), ...(cloud.retryQueue || [])])]
+      .filter((id) => !resolvedReadingRetries.has(id))
       .sort()
       .slice(0, 20),
-    mistakes: mergeMistakes(local.mistakes || [], cloud.mistakes || []),
+    mistakes,
     readiness: mergeReadinessState(local.readiness, cloud.readiness),
     weakness: mergeWeaknessState(local.weakness, cloud.weakness),
     practiceSelection,
@@ -1659,14 +1685,16 @@ function buildWordFormCandidates(
     for (const verb of candidates) {
       const type = readingPractice ? DICTIONARY_TYPE_ID : rule.type;
       const id = cardIdFor(verb, type);
-      const candidateKey = readingPractice ? `${id}|${rule.type}` : id;
+      const sourceType = readingPractice ? rule.type : null;
+      const candidateKey = practiceCardKey({ id, type, sourceType });
       if (!id || seen.has(candidateKey)) continue;
       seen.add(candidateKey);
       entries.push({
         id,
+        practiceKey: candidateKey,
         verb,
         type,
-        sourceType: readingPractice ? rule.type : null,
+        sourceType,
         rule,
         ruleLabel: rule.label,
       });
@@ -1881,7 +1909,7 @@ export function selectNext(
     });
   const pool = buildWordFormCandidates(verbs, enabledTypes, prefs, candidates);
   if (!pool.length) return null;
-  const alternatives = pool.filter((p) => p.id !== lastCardId);
+  const alternatives = pool.filter((p) => p.practiceKey !== lastCardId);
   const avail = alternatives.length ? alternatives : pool;
   const formStrengths = new Map(buildFormStrengthRows(state).map((row) => [row.typeId, row]));
   // A reading pool contains one candidate per word and source form. Normalize
@@ -1907,7 +1935,7 @@ export function selectNext(
     };
   });
   const retryIds = new Set(state.retryQueue || []);
-  const retry = scoredAvail.filter((p) => retryIds.has(p.id));
+  const retry = scoredAvail.filter((p) => retryIds.has(p.practiceKey));
   const due = options.prioritizeDue
     ? scoredAvail.filter((p) => {
         const c = state.cards[p.id];
@@ -1925,19 +1953,19 @@ export function selectNext(
   const nearDue = options.bonusMode
     ? future.filter((p) => state.cards[p.id].nextReview <= now + DAY)
     : [];
-  const retryCandidateIds = new Set(retry.map((p) => p.id));
+  const retryCandidateIds = new Set(retry.map((p) => p.practiceKey));
   const recentIds = new Set((options.recentCardIds || []).filter(Boolean));
   // New forms enter at neutral strength. Preserve the short beginner ladder;
   // afterwards every eligible exact form uses the same score as its meter.
   const beginnerLadderActive =
     options.beginnerLadder && reviewedCardCount(state) < BEGINNER_LADDER_CARD_COUNT;
   const skill = [...reviewed, ...fresh].filter(
-    (p) => !retryCandidateIds.has(p.id) && (!beginnerLadderActive || p.formAttempted >= 3),
+    (p) => !retryCandidateIds.has(p.practiceKey) && (!beginnerLadderActive || p.formAttempted >= 3),
   );
   const hasReviewFallback = fresh.length || nearDue.length || future.length;
   // Keep recently shown skill cards out of rotation by card count (they reappear
   // roughly five cards later), not by wall-clock time.
-  const readySkill = hasReviewFallback ? skill.filter((p) => !recentIds.has(p.id)) : skill;
+  const readySkill = hasReviewFallback ? skill.filter((p) => !recentIds.has(p.practiceKey)) : skill;
   const openBeginnerStage = beginnerLadderActive ? openBeginnerLadderStage(pool, state) : -1;
   const lastTypeId =
     options.lastTypeId ||
@@ -1954,7 +1982,7 @@ export function selectNext(
       .map((id) => (String(id).includes('|') ? wordKeyFromCardId(id) : id))
       .filter(Boolean),
   );
-  const dropRecent = (items) => items.filter((item) => !recentIds.has(item.id));
+  const dropRecent = (items) => items.filter((item) => !recentIds.has(item.practiceKey));
   const dropRecentWords = (items) => {
     const withoutRecent = dropRecent(items);
     const cardFiltered = withoutRecent.length ? withoutRecent : items;

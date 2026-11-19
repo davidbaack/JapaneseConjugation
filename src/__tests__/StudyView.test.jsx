@@ -8,6 +8,7 @@ import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
 import { conjugateItem, surfaceFormFor, wordKey } from '../utils/conjugator.js';
 import { englishForForm } from '../utils/display.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
+import { practiceSelectionForTypeIds } from '../utils/practiceSelection.js';
 import { clearSentenceCorpusCache } from '../utils/sentenceCorpus.js';
 import { buildReadinessFamilyRows } from '../utils/readiness.js';
 import { recordPracticeAnswer } from '../utils/practiceStats.js';
@@ -1255,6 +1256,70 @@ describe('StudyView continuous Practice startup', () => {
     const readinessRows = buildReadinessFamilyRows(nextState);
     const sourceFamily = readinessRows.find((row) => (row.typeIds || []).includes(sourceType));
     expect(sourceFamily.cells.recognition.attempted).toBe(1);
+  });
+
+  it('keeps a missed reading source pending until that exact prompt is corrected', async () => {
+    const target = STARTER_VERBS[0];
+    const types = ['plain-past', 'te-form'];
+    const dictionaryId = cardIdFor(target, 'dictionary');
+    persistStudyCard(target, 'dictionary', { sourceType: 'plain-past' });
+    const app = makeApp({
+      state: {
+        ...defaultState(),
+        enabledTypes: types,
+        practiceSelection: practiceSelectionForTypeIds(types),
+      },
+      allWords: [target],
+      practicePrefs: {
+        ...DEFAULT_PREFS,
+        reviewStyle: 'reading',
+        kanaAssist: 'off',
+        autoAdvanceCorrect: false,
+        autoAdvanceCorrectUserSet: true,
+        autoAiExplainErrors: false,
+      },
+    });
+    function LivePractice() {
+      const [learnerState, updateState] = useState(app.state);
+      mockedApp.value = { ...app, state: learnerState, setState: updateState };
+      return <StudyView />;
+    }
+    render(<LivePractice />);
+    async function answerReading(value, reviewed) {
+      const input = await screen.findByPlaceholderText(/Type dictionary form/i);
+      fireEvent.change(input, { target: { value } });
+      fireEvent.click(screen.getByRole('button', { name: 'Check (Enter)' }));
+      await waitFor(() => expect(mockedApp.value.state.session.reviewed).toBe(reviewed));
+    }
+    async function nextSource(type) {
+      fireEvent.click(screen.getByRole('button', { name: 'Next card', exact: true }));
+      await waitFor(() =>
+        expect(JSON.parse(sessionStorage.getItem('jp-study-current')).sourceType).toBe(type),
+      );
+    }
+    await answerReading('zzz', 1);
+    const pendingRetry = [...mockedApp.value.state.retryQueue];
+    expect(pendingRetry).toHaveLength(1);
+    expect(mockedApp.value.state.mistakes[0]).toMatchObject({
+      promptType: 'plain-past',
+      resolved: false,
+    });
+    await nextSource('te-form');
+    await answerReading(target.reading, 2);
+    expect(mockedApp.value.state.retryQueue).toEqual(pendingRetry);
+    expect(mockedApp.value.state.mistakes[0].resolved).toBe(false);
+    await nextSource('plain-past');
+    await answerReading(target.reading, 3);
+    expect(mockedApp.value.state.retryQueue).toEqual([]);
+    expect(mockedApp.value.state.mistakes[0].resolved).toBe(true);
+    expect(mockedApp.value.state.cards[dictionaryId]).toMatchObject({
+      correct: 2,
+      incorrect: 1,
+      sourceTypeStats: {
+        'plain-past': { correct: 1, incorrect: 1 },
+        'te-form': { correct: 1, incorrect: 0 },
+      },
+    });
   });
 
   it.each([true, false])(
