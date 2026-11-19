@@ -49,7 +49,11 @@ test('Reading corrects only the matching source retry, including after reload', 
     .locator('[aria-current="true"]');
   const input = page.getByPlaceholder('Type dictionary form...');
   const readState = () =>
-    page.evaluate((key) => JSON.parse(localStorage.getItem(key)).state, STORAGE_KEY);
+    page.evaluate((key) => {
+      const saved = localStorage.getItem(key);
+      if (!saved) throw new Error('Expected the seeded learner snapshot.');
+      return JSON.parse(saved).state;
+    }, STORAGE_KEY);
   await expect(active).toHaveAttribute('data-form-type', 'plain-past');
   await input.fill('zzz');
   await page.getByRole('button', { name: 'Check (Enter)' }).click();
