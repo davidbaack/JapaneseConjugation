@@ -71,6 +71,27 @@ describe('StatsDashboard', () => {
     expect(onPracticeTopic).toHaveBeenCalledWith('volitional');
   });
 
+  it('identifies new misses, recovers matching legacy details, and labels missing history', () => {
+    const state = defaultState();
+    answer(state, 'plain-past-negative', false, 1);
+    answer(state, 'plain-negative', false, 2);
+    state.mistakes = [{ dict: '読む', lastAttemptId: 'stats-answer-2' }];
+    state.practiceStats = recordPracticeAnswer(state.practiceStats, {
+      typeId: 'plain-past',
+      correct: false,
+      word: '見る',
+      source: 'guide',
+    });
+    render(<StatsDashboard state={state} onPracticeTopic={vi.fn()} />);
+
+    expect(screen.getByText('見る')).toBeTruthy();
+    expect(screen.getByText('Plain Past · Guide')).toBeTruthy();
+    expect(screen.getByText('読む')).toBeTruthy();
+    expect(screen.getByText('Plain Negative · Practice')).toBeTruthy();
+    expect(screen.getByText('Word unavailable')).toBeTruthy();
+    expect(screen.getByText('Plain Past Negative · Source unavailable')).toBeTruthy();
+  });
+
   it('explains why the only rated topic is both strongest and recommended', () => {
     const state = defaultState();
     for (let index = 0; index < 5; index += 1) answer(state, 'adj-sou', index !== 0, index);

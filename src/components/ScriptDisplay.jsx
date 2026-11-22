@@ -21,6 +21,21 @@ function RubySegment({ text, ruby, className = '', rtClassName = '' }) {
   );
 }
 
+export function ScriptDisplayParts({ parts }) {
+  return parts.map((part, index) =>
+    part.ruby ? (
+      <RubySegment
+        key={`${part.text}:${index}`}
+        text={part.text}
+        ruby={part.ruby}
+        rtClassName="text-[10px] font-medium text-stone-600 dark:text-stone-300"
+      />
+    ) : (
+      <React.Fragment key={`${part.text}:${index}`}>{part.text}</React.Fragment>
+    ),
+  );
+}
+
 export default function ScriptDisplay({
   view,
   word = null,
@@ -36,19 +51,7 @@ export default function ScriptDisplay({
     return (
       <>
         <div className={className} lang={view.lang}>
-          {view.parts.map((part, index) => {
-            const reading = readableRuby(part.text, part.ruby);
-            return reading ? (
-              <RubySegment
-                key={`${part.text}:${index}`}
-                text={part.text}
-                ruby={part.ruby}
-                rtClassName="text-[10px] font-medium text-stone-600 dark:text-stone-300"
-              />
-            ) : (
-              <React.Fragment key={`${part.text}:${index}`}>{part.text}</React.Fragment>
-            );
-          })}
+          <ScriptDisplayParts parts={view.parts} />
         </div>
         {view.sub && <div className={subClassName}>{view.sub}</div>}
       </>

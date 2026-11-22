@@ -351,8 +351,10 @@ const GERUND_WORDS = {
 };
 
 const THIRD_PERSON_WORDS = {
+  be: 'is',
   do: 'does',
   go: 'goes',
+  have: 'has',
 };
 
 // Conjugate only the first (head) word of a phrase, preserving the remainder.
@@ -465,7 +467,7 @@ function splitPastActionParts(action = '') {
   return parts.map((part) => part.trim().replace(/^to\s+/i, '')).filter(Boolean);
 }
 
-function mapPastActionMeaning(meaning, fn) {
+function mapVerbGlosses(meaning, fn) {
   return splitPastActionParts(meaning).map(fn).join(' / ');
 }
 
@@ -516,17 +518,10 @@ export function englishForForm(item, type) {
   }
   const action = cleanEnglishAction(item.meaning);
   const present = presentPhrase(action);
-  const past = mapPastActionMeaning(item.meaning, pastPhrase);
+  const past = mapVerbGlosses(item.meaning, pastPhrase);
   const negative = negativePhrase(action);
   const pastNegative = pastNegativePhrase(action);
-  const conditionalPast = mapPastActionMeaning(
-    item.meaning,
-    (a) => `if/when someone ${pastPhrase(a)}`,
-  );
-  const conditionalPastPolite = mapPastActionMeaning(
-    item.meaning,
-    (a) => `if/when someone ${pastPhrase(a)} (polite)`,
-  );
+  const conditionalTara = mapVerbGlosses(item.meaning, (a) => `if/when someone ${thirdPerson(a)}`);
   const M = {
     'plain-past': past,
     'plain-negative': negative,
@@ -538,7 +533,7 @@ export function englishForForm(item, type) {
     'masu-stem': `${action} stem`,
     'polite-volitional': `let's ${action} (polite)`,
     'polite-te': `${action} and... (polite)`,
-    'polite-conditional-tara': conditionalPastPolite,
+    'polite-conditional-tara': `${conditionalTara} (polite)`,
     honorific: `${action} (honorific, someone else's action)`,
     'honorific-polite': `${action} (honorific polite, someone else's action)`,
     humble: `${action} (humble, my/our action)`,
@@ -554,8 +549,11 @@ export function englishForForm(item, type) {
     'potential-past-negative': `could not ${action} / was not able to ${action}`,
     'potential-conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone can ${a}`),
     volitional: `let's ${action}`,
-    'conditional-tara': conditionalPast,
-    'negative-conditional-tara': `if/when someone did not ${action}`,
+    'conditional-tara': conditionalTara,
+    'negative-conditional-tara': mapVerbGlosses(
+      item.meaning,
+      (a) => `if/when someone does not ${a}`,
+    ),
     'conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone ${thirdPerson(a)}`),
     'negative-conditional-ba': mapActionMeaning(item.meaning, (a) => `if someone does not ${a}`),
     'potential-negative-conditional-ba': mapActionMeaning(

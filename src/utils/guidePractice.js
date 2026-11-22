@@ -511,6 +511,8 @@ export function applyGuideAttemptToState(state, card, result, options = {}) {
       responseMs,
       mode: result.assisted ? 'self-check' : 'input',
       at: gradedAt,
+      word: card.word.dict,
+      source: 'guide',
     }),
     readiness: recordReadinessAttempt(state.readiness, rid, {
       correct: result.correct,

@@ -15,6 +15,7 @@ import { isAdjective } from '../utils/conjugator.js';
 import { GROUP_NAMES } from '../utils/conjugatorExplain.js';
 import { normalizeReferenceState } from '../utils/storage.js';
 import { formDisplay, promptDisplay } from '../utils/display.js';
+import { exerciseEnglishForForm } from '../utils/exerciseMeaning.js';
 import { buildFormationKeysHash } from '../utils/formationKeys.js';
 import { callGemini, aiSystemFromPrefs, AI_COACH_SYSTEM } from '../utils/gemini.js';
 import { DEFAULT_PREFS } from '../data/defaults.js';
@@ -96,9 +97,15 @@ export default function ReferenceViewSub({
   setPracticePrefs,
   setTab,
   practiceWord,
+  initialLookup = null,
 }) {
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState(null);
+  const [query, setQuery] = useState(() => initialLookup?.query || '');
+  const [selected, setSelected] = useState(() =>
+    initialLookup
+      ? [...verbs, ...adjectives].find((word) => wordKeyLocal(word) === initialLookup.wordKey) ||
+        null
+      : null,
+  );
   const [expandedRow, setExpandedRow] = useState(null);
   const [scratchIndex, setScratchIndex] = useState(0);
   const [copyTableOk, setCopyTableOk] = useState(false);
@@ -106,7 +113,11 @@ export default function ReferenceViewSub({
   const [lookupAiLoading, setLookupAiLoading] = useState(false);
   const [lookupAiErr, setLookupAiErr] = useState('');
   const [favoriteMsg, setFavoriteMsg] = useState('');
-  const [confirmedLookupSelection, setConfirmedLookupSelection] = useState(null);
+  const [confirmedLookupSelection, setConfirmedLookupSelection] = useState(() =>
+    initialLookup?.matchKey
+      ? { query: initialLookup.query.trim(), key: initialLookup.matchKey }
+      : null,
+  );
   const lookupAbortRef = useRef(null);
 
   const words = useMemo(() => [...verbs, ...adjectives], [verbs, adjectives]);
@@ -263,6 +274,19 @@ export default function ReferenceViewSub({
     updateReference(() => normalizeReferenceState());
   }
 
+  function launchReferencePractice(word, type, options) {
+    practiceWord(word, type, {
+      ...options,
+      source: 'reference',
+      returnTo: 'reference',
+      lookupReturn: {
+        query,
+        wordKey: wordKeyLocal(word),
+        matchKey: lookupMatchKey(activeLookupMatch),
+      },
+    });
+  }
+
   function isSelectedWord(word) {
     return !!(selected && word && selected.dict === word.dict && selected.group === word.group);
   }
@@ -304,10 +328,8 @@ export default function ReferenceViewSub({
     setPracticePrefs(focusPracticePrefsForWord(practicePrefs, selected));
     setFavoriteMsg(`Drilling only ${selected.dict}.`);
     if (practiceWord) {
-      practiceWord(selected, null, {
-        source: 'reference',
+      launchReferencePractice(selected, null, {
         launchMode: 'word',
-        returnTo: 'reference',
         referenceLabel: 'Word focus',
       });
     } else if (setTab) {
@@ -318,10 +340,8 @@ export default function ReferenceViewSub({
   function drillSelectedWordSweep() {
     if (!detailWord || !practiceWord) return;
     setFavoriteMsg(`Practicing enabled form types for ${detailWord.dict}.`);
-    practiceWord(detailWord, null, {
-      source: 'reference',
+    launchReferencePractice(detailWord, null, {
       launchMode: 'word-sweep',
-      returnTo: 'reference',
       referenceLabel: 'Enabled forms',
     });
   }
@@ -350,10 +370,8 @@ export default function ReferenceViewSub({
     applyReferencePracticeTarget(target, word);
     setFavoriteMsg(`Drilling ${target?.label || type.label}.`);
     if (practiceWord) {
-      practiceWord(word, type.id, {
-        source: 'reference',
+      launchReferencePractice(word, type.id, {
         launchMode: 'drill',
-        returnTo: 'reference',
         referenceLabel: target?.label || type.label,
       });
     } else if (setTab) {
@@ -372,10 +390,8 @@ export default function ReferenceViewSub({
     applyReferencePracticeTarget(target);
     setFavoriteMsg(`Comparing ${target?.typeIds?.length || 1} nearby forms.`);
     if (practiceWord) {
-      practiceWord(selected, row.type.id, {
-        source: 'reference',
+      launchReferencePractice(selected, row.type.id, {
         launchMode: 'compare',
-        returnTo: 'reference',
         referenceLabel: target?.label || row.type.label,
       });
     } else if (setTab) {
@@ -407,10 +423,8 @@ export default function ReferenceViewSub({
         )
       : null;
     if (practiceWord && selected && target.groups.includes(selected.group) && seedType) {
-      practiceWord(selected, seedType, {
-        source: 'reference',
+      launchReferencePractice(selected, seedType, {
         launchMode: 'weak',
-        returnTo: 'reference',
         referenceLabel: target.label,
       });
     } else if (setTab) {
@@ -560,6 +574,13 @@ export default function ReferenceViewSub({
 
   function renderLookupChoice(match) {
     const active = lookupMatchKey(match) === lookupMatchKey(activeLookupMatch);
+    const hasAnotherForm =
+      ambiguousExactLookup &&
+      lookupMatches.some(
+        (other) =>
+          wordKeyLocal(other.word) === wordKeyLocal(match.word) && other.type.id !== match.type.id,
+      );
+    const formMeaning = hasAnotherForm ? exerciseEnglishForForm(match.word, match.type.id) : '';
     const answerView =
       match.matchKind === 'variant'
         ? {
@@ -574,6 +595,7 @@ export default function ReferenceViewSub({
       <button
         key={`${wordKeyLocal(match.word)}-${match.type.id}-${match.matchKind}`}
         onClick={() => confirmLookupMatch(match)}
+        aria-pressed={active}
         className={`w-full rounded-lg border px-3 py-2 text-left transition ${
           active
             ? 'border-indigo-200 bg-indigo-50 dark:bg-indigo-950/20'
@@ -599,6 +621,11 @@ export default function ReferenceViewSub({
             {match.matchKind}
           </span>
         </div>
+        {formMeaning && (
+          <div className="mt-1 text-xs font-medium text-stone-800 dark:text-stone-200">
+            {formMeaning}
+          </div>
+        )}
         <div className="mt-1 truncate text-xs text-stone-600">
           <span className="font-semibold text-stone-800 dark:text-stone-200" lang={wordView.lang}>
             {wordView.main}
@@ -726,60 +753,7 @@ export default function ReferenceViewSub({
                       : 'flex flex-col'
                   }`}
                 >
-                  {primaryLookupMatches.map((m) => {
-                    const active = lookupMatchKey(m) === lookupMatchKey(activeLookupMatch);
-                    const av =
-                      m.matchKind === 'variant'
-                        ? {
-                            main: m.surface || m.answer,
-                            sub: m.surface && m.surface !== m.answer ? m.answer : '',
-                            lang: 'ja',
-                          }
-                        : formDisplay(m.answer, practicePrefs, m.word, m.type.id);
-                    const bv = promptDisplay(m.word, null, practicePrefs);
-                    return (
-                      <button
-                        key={`${wordKeyLocal(m.word)}-${m.type.id}-${m.matchKind}`}
-                        onClick={() => confirmLookupMatch(m)}
-                        className={`w-full text-left px-2 py-2 rounded-lg border transition ${
-                          active
-                            ? 'border-indigo-200 bg-indigo-50 dark:bg-indigo-950/20'
-                            : 'border-stone-100 dark:border-stone-800 hover:border-stone-200 dark:hover:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800/40'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <ScriptDisplay
-                              view={av}
-                              className="text-sm font-medium text-stone-900 dark:text-stone-50"
-                              subClassName="text-[11px] text-stone-600"
-                            />
-                            <div className="text-[11px] text-stone-600 mt-0.5">{m.type.label}</div>
-                          </div>
-                          <span
-                            className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${m.matchKind === 'exact' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}
-                          >
-                            {m.matchKind}
-                          </span>
-                        </div>
-                        <div className="mt-1 text-xs text-stone-600 truncate">
-                          <span
-                            className="font-semibold text-stone-800 dark:text-stone-200"
-                            lang={bv.lang}
-                          >
-                            {bv.main}
-                          </span>
-                          {bv.sub && <span className="text-stone-600"> ({bv.sub})</span>} ·{' '}
-                          {m.word.meaning}
-                        </div>
-                        {m.variantNote && (
-                          <div className="mt-1 text-[11px] text-stone-600 leading-tight">
-                            {m.variantNote}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
+                  {primaryLookupMatches.map(renderLookupChoice)}
                   {additionalExactLookupMatches.length > 0 && (
                     <details className="mt-0 overflow-hidden rounded-lg border border-stone-200 dark:border-stone-800 sm:col-span-2 lg:col-span-3">
                       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-stone-50 px-3 py-2 text-xs font-semibold text-stone-700 dark:bg-stone-950/60 dark:text-stone-200 [&::-webkit-details-marker]:hidden">

@@ -76,7 +76,8 @@ export default function FormStrengthPanel({ rows, currentTypeId, feedback = null
         </span>
       </div>
       <p id={descriptionId} className="mt-1 text-[10px] text-stone-600 dark:text-stone-400">
-        Recent answers shape strength. Lower forms get more practice.
+        New forms start at a neutral 50. Strength combines answer styles. Lower forms get more
+        practice.
       </p>
       <div className="relative mt-2 min-w-0">
         <div

@@ -117,6 +117,8 @@ describe('ReferenceViewSub ambiguity chooser', () => {
     expect(await screen.findByText('Ambiguous exact match')).toBeTruthy();
     expect(screen.getByText('Potential')).toBeTruthy();
     expect(screen.getByText('Passive')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Potential.*can eat/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Passive.*be eaten/ })).toBeTruthy();
     expect(screen.queryByText('Focused lookup hit')).toBeNull();
   });
 

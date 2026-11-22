@@ -157,6 +157,10 @@ test('sentence review explains copied endings and marks only the blank', async (
   const review = page.getByRole('region', { name: 'Sentence blank review' });
   await expect(review).toContainText('The sentence already includes だ; enter 元気そう here.');
   await expect(review.locator('mark').last()).toHaveText('元気そう');
+  await expect(review.locator('mark').last().locator('rt')).toHaveAttribute(
+    'data-reading',
+    'げんきそう',
+  );
   await expect(panel.getByText('Not quite.', { exact: true }).last()).toBeVisible();
   await page.getByRole('button', { name: 'Next card', exact: true }).click();
   await expect(input).toBeVisible();
@@ -165,6 +169,23 @@ test('sentence review explains copied endings and marks only the blank', async (
   await expect(page.getByRole('region', { name: 'Sentence blank review' })).not.toContainText(
     'The sentence already includes',
   );
+});
+
+test('Lookup returns from Practice to the same exact interpretation', async ({ page }) => {
+  await seedPractice(page);
+  await page.getByRole('tab', { name: 'Tools', exact: true }).click();
+  const search = page.getByRole('textbox', { name: 'Search for a word or conjugation form' });
+  await search.fill('食べられる');
+  const potential = page.getByRole('button', { name: /Potential.*can eat/ });
+  const passive = page.getByRole('button', { name: /Passive.*be eaten/ });
+  await expect(potential).toBeVisible();
+  await passive.click();
+  await page.getByRole('button', { name: 'Practice this form', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to reference', exact: true }).click();
+  await expect(search).toHaveValue('食べられる');
+  await expect(passive).toHaveAttribute('aria-pressed', 'true');
+  await expect(potential).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByText('Passive of', { exact: true })).toBeVisible();
 });
 
 test('incompatible word launch previews a replacement and can retain the old selection', async ({

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import HorizontalTabList from '../components/HorizontalTabList.jsx';
 import { IconBook, IconCheck, IconList, IconPen } from '../components/Icons.jsx';
 import { useTablist } from '../components/useTablist.js';
@@ -43,6 +43,8 @@ export default function ToolsView() {
     allVerbs: verbs,
     customAdjectives,
     customVerbs,
+    lookupReturn,
+    setLookupReturn,
     practicePrefs,
     setCustomAdjectives,
     setCustomVerbs,
@@ -57,6 +59,9 @@ export default function ToolsView() {
   } = useApp();
   const [active, setActive] = useState('lookup');
   const activeTool = TOOL_TABS.find((tool) => tool.id === active) || TOOL_TABS[0];
+  useEffect(() => {
+    if (lookupReturn) setLookupReturn(null);
+  }, [lookupReturn, setLookupReturn]);
 
   const { tabProps, panelProps } = useTablist(
     TOOL_TABS.map((tab) => tab.id),
@@ -123,6 +128,7 @@ export default function ToolsView() {
             setPracticePrefs={setPracticePrefs}
             setTab={setTab}
             practiceWord={practiceWord}
+            initialLookup={lookupReturn}
             focused
           />
         )}

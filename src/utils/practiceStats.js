@@ -87,6 +87,10 @@ export function recordPracticeAnswer(stats, answer) {
   const day = String(answer?.day || practiceDateKey(at));
   const id = String(answer?.id || answer?.eventId || createSyncEventId());
   if (current.recent.some((row) => row.id === id)) return current;
+  const word = typeof answer?.word === 'string' ? answer.word.trim() : '';
+  const source = answer?.source;
+  const miss =
+    !correct && word && (source === 'practice' || source === 'guide') ? { word, source } : null;
   return {
     ...current,
     startedAt: current.startedAt || at,
@@ -109,6 +113,7 @@ export function recordPracticeAnswer(stats, answer) {
         correct,
         mode,
         responseMs,
+        ...(miss ? { miss } : {}),
       },
       ...current.recent,
     ].slice(0, 120),
@@ -139,7 +144,13 @@ export function mergePracticeStats(local, cloud) {
     const key =
       row.id || `${row.at}|${row.typeId}|${row.mode}|${row.correct}|${row.responseMs || 0}`;
     const previous = recentByKey.get(key);
-    if (!previous || JSON.stringify(row) > JSON.stringify(previous)) recentByKey.set(key, row);
+    if (
+      !previous ||
+      (row.miss && !previous.miss) ||
+      (!!row.miss === !!previous.miss && JSON.stringify(row) > JSON.stringify(previous))
+    ) {
+      recentByKey.set(key, row);
+    }
   }
   const starts = [left.startedAt, right.startedAt].filter((value) => value > 0);
   return {

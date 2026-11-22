@@ -61,6 +61,7 @@ function clozeBoundaries(entry) {
   return {
     prefix,
     suffix,
+    targetIndex: hasSingleTarget ? targetIndex : -1,
     prefixReading: hasSingleTarget ? readingFor(segments.slice(0, targetIndex)) : prefix,
     suffixReading: hasSingleTarget ? readingFor(segments.slice(targetIndex + 1)) : suffix,
   };

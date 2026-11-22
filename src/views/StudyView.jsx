@@ -504,6 +504,7 @@ export default function StudyView({ mode = 'practice' }) {
     setPracticePrefs,
     wordLists,
     studyFocus: rawFocus,
+    setLookupReturn,
     clearStudyFocus: onFocusConsumed,
     learnFocus: rawLearnFocus,
     openLearnFocus,
@@ -1658,6 +1659,8 @@ export default function StudyView({ mode = 'practice' }) {
         responseMs,
         mode: listeningPrompt ? 'listening' : answerMode,
         at: gradedAt,
+        word: dict,
+        source: 'practice',
       }),
     };
   }
@@ -2660,6 +2663,7 @@ export default function StudyView({ mode = 'practice' }) {
   const referenceLaunch = launchContext;
 
   function returnToReference() {
+    setLookupReturn?.(referenceLaunch?.lookupReturn || null);
     setLaunchContext(null);
     setFocusWordLock(null);
     setWordSweep(null);

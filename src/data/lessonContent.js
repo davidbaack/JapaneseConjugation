@@ -141,7 +141,7 @@ export const LESSON_SECTIONS = [
     summary:
       'These are the everyday dictionary, negative, and polite forms. Plain forms anchor casual speech and embedded clauses; polite forms are the default safe register for conversation.',
     build:
-      'Plain present is the dictionary form. Plain negative uses ichidan stem + ない or godan a-row + ない. Plain past negative adds なかった to that negative base. Polite forms attach ます, ました, ません, or ませんでした to the stem before ます.',
+      'Plain present is the dictionary form. Plain negative uses ichidan stem + ない or godan a-row + ない. For plain past negative, change the final い of ない to かった: 食べない → 食べなかった. Polite forms attach ます, ました, ません, or ませんでした to the stem before ます.',
     variants:
       'Verb plain past is practiced with Te/Ta Sound Changes because it uses the same sound-change table as te-form. Adjective polite forms usually add です or ではありません.',
     watch:
@@ -316,7 +316,7 @@ export const LESSON_SECTIONS = [
     summary:
       'Japanese has several practical if/when tools. たら is broad and event-like, ば is rule-like, and なら sets up “if it is the case that…”',
     build:
-      'たら attaches to the plain past or past-negative. ば uses godan e-row + ば, ichidan stem + れば, and negative なければ. なら follows the plain/dictionary idea.',
+      'Add ら to the plain past or plain past negative: 食べた → 食べたら, 食べなかった → 食べなかったら. ば uses godan e-row + ば, ichidan stem + れば, and negative なければ. なら follows the plain/dictionary idea.',
     variants:
       'Potential, passive, causative, and causative-passive ba forms first make the derived る-form, then change る to れば.',
     watch:
@@ -444,7 +444,7 @@ export const LESSON_SECTIONS = [
     title: 'Causative-Passive',
     kana: '使役受身',
     summary:
-      'Causative-passive means “was made to do” or “was forced/allowed into doing.” It combines causative meaning with passive viewpoint.',
+      '“I was made to work overtime by my boss.” The speaker works overtime, and the boss makes them do it. Causative-passive describes the event from the viewpoint of the person made to act.',
     build:
       'Long form: build the causative and make it passive, usually ending in させられる or せられる. する -> させられる. 来る -> こさせられる.',
     variants:
@@ -501,10 +501,24 @@ export const LESSON_SECTIONS = [
       ['行く', '参る', 'movement special form'],
       ['説明する', 'ご説明いたす', 'humble suru pattern'],
     ],
+    exampleFurigana: true,
+    exampleSupport: {
+      見る: { reading: 'みる', forms: [['はいけんする']] },
+      行く: { reading: 'いく', forms: [['まいる']] },
+      説明する: { reading: 'せつめいする', forms: [['ごせつめいいたす']] },
+    },
     contextExamples: [
       {
         situation: 'Offering your action',
         japanese: '私が資料をご説明いたします。',
+        parts: [
+          { text: '私', ruby: 'わたし' },
+          { text: 'が' },
+          { text: '資料', ruby: 'しりょう' },
+          { text: 'をご' },
+          { text: '説明', ruby: 'せつめい' },
+          { text: 'いたします。' },
+        ],
         english: 'I will explain the materials.',
       },
     ],

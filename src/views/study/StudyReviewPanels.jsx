@@ -8,7 +8,7 @@ import {
   IconSpark,
   IconX,
 } from '../../components/Icons.jsx';
-import ScriptDisplay from '../../components/ScriptDisplay.jsx';
+import ScriptDisplay, { ScriptDisplayParts } from '../../components/ScriptDisplay.jsx';
 import StickyAction from '../../components/StickyAction.jsx';
 import { ConjugationBreakdown } from '../../components/ConjugationBreakdown.jsx';
 import { ChatPanel } from '../../components/ChatPanel.jsx';
@@ -27,6 +27,7 @@ import {
 } from '../../utils/answerFeedbackCopy.js';
 import { accuracyForTotals, evidenceLabelForTotals } from '../../utils/practiceStats.js';
 import { sentenceBlankFeedback } from '../../utils/sentencePrompt.js';
+import { resolveDisplayScripts } from '../../utils/practicePrefs.js';
 
 function ReviewDisclosure({ tone = 'stone', summary, children, hintLabel = 'More' }) {
   const toneClass =
@@ -314,7 +315,7 @@ function guideFocusOptionsForReview(record) {
   };
 }
 
-function SentenceBlankReview({ record, submittedAnswer }) {
+function SentenceBlankReview({ record, submittedAnswer, prefs }) {
   const prompt = record.sentencePrompt;
   if (
     prompt?.mode !== 'forward-cloze' ||
@@ -329,7 +330,16 @@ function SentenceBlankReview({ record, submittedAnswer }) {
     !record.correct && hasSubmittedAnswer
       ? sentenceBlankFeedback(prompt, record.submittedAnswer)
       : null;
-  const { prefix, suffix } = prompt.cloze;
+  const { prefix, suffix, targetIndex } = prompt.cloze;
+  const { kanji, kana } = resolveDisplayScripts(prefs);
+  const parts = prefs.furigana && kanji && kana && targetIndex >= 0 ? prompt.completedParts : null;
+  const before = parts ? <ScriptDisplayParts parts={parts.slice(0, targetIndex)} /> : prefix;
+  const after = parts ? <ScriptDisplayParts parts={parts.slice(targetIndex + 1)} /> : suffix;
+  const filled = parts ? (
+    <ScriptDisplayParts parts={parts.slice(targetIndex, targetIndex + 1)} />
+  ) : (
+    prompt.surface
+  );
   return (
     <section
       aria-label="Sentence blank review"
@@ -347,11 +357,11 @@ function SentenceBlankReview({ record, submittedAnswer }) {
             Your answer in the sentence
           </div>
           <p className="mt-1 break-words text-base text-stone-800 dark:text-stone-200" lang="ja">
-            {prefix}
+            {before}
             <mark className="rounded bg-rose-100 px-0.5 text-rose-900 dark:bg-rose-950 dark:text-rose-100">
               {submittedAnswer}
             </mark>
-            {suffix}
+            {after}
           </p>
         </div>
       )}
@@ -360,11 +370,11 @@ function SentenceBlankReview({ record, submittedAnswer }) {
           Completed sentence · highlighted text fills the blank
         </div>
         <p className="mt-1 break-words text-base text-stone-800 dark:text-stone-200" lang="ja">
-          {prefix}
+          {before}
           <mark className="rounded bg-emerald-100 px-0.5 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-100">
-            {prompt.surface}
+            {filled}
           </mark>
-          {suffix}
+          {after}
         </p>
       </div>
     </section>
@@ -531,7 +541,11 @@ function RunAnswerReveal({
               marked as a miss so it can come back for practice.
             </div>
           )}
-          <SentenceBlankReview record={record} submittedAnswer={reviewSubmittedAnswer} />
+          <SentenceBlankReview
+            record={record}
+            submittedAnswer={reviewSubmittedAnswer}
+            prefs={prefs}
+          />
           {!record.correct && <PromotedRuleCard debug={promotedRuleDebug} />}
 
           {record.correct ? (

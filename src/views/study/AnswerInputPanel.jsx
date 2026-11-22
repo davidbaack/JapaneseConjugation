@@ -7,6 +7,9 @@ import { exerciseMeaningForWord } from '../../utils/exerciseMeaning.js';
 import { buildFormationKeysHash } from '../../utils/formationKeys.js';
 import { clearMinimalPairPrefs, minimalPairReturnEnabledTypes } from '../../utils/minimalPairs.js';
 import { RunAnswerReveal } from './StudyReviewPanels.jsx';
+
+const REVEAL_ACTION_COLORS =
+  'border-amber-200 bg-amber-50/100 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900';
 import { ANSWER_OUTCOME, answerOutcomeCopy } from '../../utils/answerFeedbackCopy.js';
 import {
   practiceSelectionForTypeIds,
@@ -361,7 +364,7 @@ export function AnswerInputPanel({
                   </button>
                   <button
                     onClick={() => gradeSelfCheck(false, 'Missed')}
-                    className="py-2.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-xl text-sm font-medium transition"
+                    className="py-2.5 border border-rose-200 bg-rose-50/100 hover:bg-rose-100 text-rose-800 dark:border-rose-700 dark:bg-rose-950 dark:text-rose-200 dark:hover:bg-rose-900 rounded-xl text-sm font-medium transition"
                   >
                     Missed
                   </button>
@@ -470,7 +473,7 @@ export function AnswerInputPanel({
             <div className="mt-2 grid grid-cols-2 gap-2">
               <button
                 onClick={revealAnswer}
-                className="py-2 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-sm font-medium transition"
+                className={`py-2 border rounded-xl text-sm font-medium transition ${REVEAL_ACTION_COLORS}`}
               >
                 Reveal
               </button>
@@ -528,7 +531,7 @@ export function AnswerInputPanel({
           <div className="grid sm:grid-cols-2 gap-2 mt-3">
             <button
               onClick={revealAnswer}
-              className="py-2.5 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-medium transition"
+              className={`py-2.5 border rounded-xl font-medium transition ${REVEAL_ACTION_COLORS}`}
             >
               I don't know
             </button>
@@ -637,7 +640,7 @@ export function AnswerInputPanel({
               </button>
               <button
                 onClick={revealAnswer}
-                className="py-2 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm text-amber-800"
+                className={`py-2 border rounded-xl text-sm ${REVEAL_ACTION_COLORS}`}
               >
                 Reveal
               </button>
@@ -741,7 +744,7 @@ export function AnswerInputPanel({
               )}
               <button
                 onClick={revealAnswer}
-                className="py-2 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-sm font-medium transition"
+                className={`py-2 border rounded-xl text-sm font-medium transition ${REVEAL_ACTION_COLORS}`}
               >
                 Reveal
               </button>

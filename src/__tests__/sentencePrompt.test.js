@@ -37,6 +37,7 @@ describe('sentence prompt model', () => {
       prefix: '昼に',
       suffix: '。',
       prefixReading: 'ひるに',
+      targetIndex: 2,
       suffixReading: '。',
     });
   });

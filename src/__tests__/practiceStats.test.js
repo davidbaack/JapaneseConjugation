@@ -2,11 +2,22 @@ import { describe, expect, it } from 'vitest';
 import {
   contextualStatsForType,
   defaultPracticeStats,
+  mergePracticeStats,
   practiceTrendDays,
   recordPracticeAnswer,
 } from '../utils/practiceStats.js';
 
 describe('practice stats', () => {
+  it('keeps recent miss details when merging with an older copy of the same attempt', () => {
+    const answer = { id: 'miss', at: 100, typeId: 'plain-past', correct: false };
+    const legacy = recordPracticeAnswer(null, answer);
+    const detailed = recordPracticeAnswer(null, { ...answer, word: '見る', source: 'practice' });
+    const expected = { word: '見る', source: 'practice' };
+    expect(mergePracticeStats(legacy, detailed).recent[0].miss).toEqual(expected);
+    expect(mergePracticeStats(detailed, legacy).recent[0].miss).toEqual(expected);
+    expect(mergePracticeStats(detailed, legacy).lifetime.attempted).toBe(1);
+  });
+
   it('records lifetime, exact-form, topic, mode, and dated evidence together', () => {
     const at = new Date(2026, 8, 20, 12).getTime();
     let stats = recordPracticeAnswer(defaultPracticeStats(), {

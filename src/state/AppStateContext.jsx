@@ -136,6 +136,7 @@ function useAppController() {
   const [session, setSession] = useState(null);
   // A focused Practice launch requested by another view; consumed by Study.
   const [studyFocus, setStudyFocus] = useState(null);
+  const [lookupReturn, setLookupReturn] = useState(null);
   const [learnFocus, setLearnFocus] = useState(null);
   const [guideFocus, setGuideFocus] = useState(null);
   const [labFocus, setLabFocus] = useState(null);
@@ -467,6 +468,7 @@ function useAppController() {
     setWordLists(normalizeWordLists(payload.wordLists));
     setPracticePrefs(mergePracticePrefs(payload.practicePrefs));
     setStudyFocus(null);
+    setLookupReturn(null);
     setLearnFocus(null);
     setGuideFocus(null);
     setLabFocus(null);
@@ -1347,6 +1349,8 @@ function useAppController() {
     setPracticePrefs,
     session,
     studyFocus,
+    lookupReturn,
+    setLookupReturn,
     practiceWord,
     practiceFormGroup,
     clearStudyFocus,

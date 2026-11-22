@@ -1,5 +1,5 @@
 import React from 'react';
-import { FORM_GROUPS } from '../data/conjugationTypes.js';
+import { FORM_GROUPS, getTypeInfo } from '../data/conjugationTypes.js';
 import { useApp } from '../state/AppStateContext.jsx';
 import {
   accuracyForTotals,
@@ -294,15 +294,37 @@ export function StatsDashboard({ state, onPracticeTopic, onContinuePractice }) {
           {recentMisses.length ? (
             <div className="mt-3 space-y-2">
               {recentMisses.map((row, index) => {
-                const topic = FORM_GROUPS.find((item) => item.id === row.topicId);
+                const legacyMistake =
+                  row.id && !row.miss
+                    ? state.mistakes?.find((miss) => miss.lastAttemptId === row.id)
+                    : null;
+                const word =
+                  typeof row.miss?.word === 'string' ? row.miss.word : legacyMistake?.dict;
+                const source =
+                  row.miss?.source ||
+                  (legacyMistake && (legacyMistake.dimension === 'guide' ? 'guide' : 'practice'));
+                const sourceLabel =
+                  source === 'guide'
+                    ? 'Guide'
+                    : source === 'practice'
+                      ? 'Practice'
+                      : 'Source unavailable';
                 return (
                   <div
-                    key={`${row.at}-${row.typeId}-${index}`}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-rose-100 bg-rose-50/60 px-3 py-2 text-xs dark:border-rose-900/50 dark:bg-rose-950/15"
+                    key={row.id || `${row.at}-${row.typeId}-${index}`}
+                    className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg border border-rose-100 bg-rose-50/60 px-3 py-2 text-xs dark:border-rose-900/50 dark:bg-rose-950/15"
                   >
-                    <span className="font-medium text-rose-900 dark:text-rose-100">
-                      {topic?.label || row.typeId}
-                    </span>
+                    <div className="min-w-0 break-words">
+                      <div
+                        className="font-medium text-rose-900 dark:text-rose-100"
+                        lang={word ? 'ja' : undefined}
+                      >
+                        {word || 'Word unavailable'}
+                      </div>
+                      <div className="mt-0.5 text-rose-800 dark:text-rose-200">
+                        {getTypeInfo(row.typeId).label} · {sourceLabel}
+                      </div>
+                    </div>
                     <span className="text-rose-700 dark:text-rose-300">
                       {new Date(row.at).toLocaleDateString()}
                     </span>

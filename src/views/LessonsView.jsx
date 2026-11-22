@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GodanRowChart } from '../components/GodanRowChart.jsx';
 import { IconBook, IconList, IconRefresh, IconSpark } from '../components/Icons.jsx';
+import { ScriptDisplayParts } from '../components/ScriptDisplay.jsx';
 import { getTypeInfo } from '../data/conjugationTypes.js';
 import {
   FOUNDATION_CARDS,
@@ -15,13 +16,17 @@ import {
   buildRuleReviewRecommendation,
 } from '../utils/reviewRecommendations.js';
 import { parseFormationKeysHash } from '../utils/formationKeys.js';
+import { resolveDisplayScripts } from '../utils/practicePrefs.js';
 import BeginnerTerms from '../components/BeginnerTerms.jsx';
 
-function LessonExampleWord({ text, reading = '', meaning = '' }) {
+function LessonExampleWord({ text, reading = '', meaning = '', furigana = null }) {
+  const hasReading = reading && reading !== text;
   return (
     <div>
-      <div lang={/[\u3040-\u30ff\u3400-\u9fff]/u.test(text) ? 'ja' : undefined}>{text}</div>
-      {reading && reading !== text ? (
+      <div lang={/[\u3040-\u30ff\u3400-\u9fff]/u.test(text) ? 'ja' : undefined}>
+        {furigana && hasReading ? <ScriptDisplayParts parts={[{ text, ruby: reading }]} /> : text}
+      </div>
+      {furigana === null && hasReading ? (
         <div lang="ja" className="mt-0.5 text-xs font-normal text-stone-600 dark:text-stone-400">
           {reading}
         </div>
@@ -254,9 +259,12 @@ export default function LessonsView() {
     clearLearnFocus,
     learnFocus,
     openGuideForRule,
+    practicePrefs,
     setTab,
     startReviewRecommendation,
   } = useApp();
+  const { kanji, kana } = resolveDisplayScripts(practicePrefs);
+  const showFurigana = !!practicePrefs?.furigana && kanji && kana;
   const [query, setQuery] = useState('');
   const [showFormationKeys, setShowFormationKeys] = useState(false);
   const [formationKeyHighlight, setFormationKeyHighlight] = useState({ ending: '', row: '' });
@@ -783,6 +791,7 @@ export default function LessonsView() {
                                     text={base}
                                     reading={support?.reading}
                                     meaning={support?.meaning}
+                                    furigana={lesson.exampleFurigana ? showFurigana : null}
                                   />
                                 </td>
                                 <td className="px-4 py-3 text-stone-700 dark:text-stone-300">
@@ -794,6 +803,7 @@ export default function LessonsView() {
                                           text={form}
                                           reading={support.forms[index]?.[0]}
                                           meaning={support.forms[index]?.[1]}
+                                          furigana={lesson.exampleFurigana ? showFurigana : null}
                                         />
                                       ))}
                                     </div>
@@ -829,7 +839,11 @@ export default function LessonsView() {
                                 lang="ja"
                                 className="mt-2 text-base font-semibold leading-relaxed text-stone-950 dark:text-stone-50"
                               >
-                                {example.japanese}
+                                {showFurigana && example.parts ? (
+                                  <ScriptDisplayParts parts={example.parts} />
+                                ) : (
+                                  example.japanese
+                                )}
                               </p>
                               <p className="mt-1 text-sm text-stone-700 dark:text-stone-300">
                                 {example.english}

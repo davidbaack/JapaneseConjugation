@@ -250,7 +250,13 @@ describe('englishForForm', () => {
     expect(englishForForm(TABERU, 'plain-negative')).toBe('do not eat');
     expect(englishForForm(TABERU, 'polite-present')).toBe('eat (polite)');
     expect(englishForForm(TABERU, 'polite-past')).toBe('ate (polite)');
-    expect(englishForForm(TABERU, 'conditional-tara')).toBe('if/when someone ate');
+    expect(englishForForm(TABERU, 'conditional-tara')).toBe('if/when someone eats');
+    expect(englishForForm({ meaning: 'to do', group: 'suru' }, 'conditional-tara')).toBe(
+      'if/when someone does',
+    );
+    expect(englishForForm(TABERU, 'negative-conditional-tara')).toBe(
+      'if/when someone does not eat',
+    );
     expect(englishForForm(TABERU, 'te-form')).toBe('eat and... / eat for a helper pattern');
     expect(englishForForm(TABERU, 'desiderative')).toBe('want to eat');
     expect(englishForForm(TABERU, 'obligation')).toBe('must eat');
@@ -269,7 +275,7 @@ describe('englishForForm', () => {
     expect(englishForForm(miru, 'plain-past')).toBe('saw / watched');
     expect(englishForForm(miru, 'polite-past')).toBe('saw / watched (polite)');
     expect(englishForForm(miru, 'conditional-tara')).toBe(
-      'if/when someone saw / if/when someone watched',
+      'if/when someone sees / if/when someone watches',
     );
   });
 
