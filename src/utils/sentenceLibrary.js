@@ -2,7 +2,7 @@
 // gate as bundled content. Unreviewed legacy rows remain unavailable.
 import { getSupabaseConfig } from './supabase.js';
 import { wordKey } from './conjugator.js';
-import { getAICache, setAICache } from './storage.js';
+import { readAICacheEntry, setAICache } from './storage.js';
 import { retryWithBackoff } from './retry.js';
 import { hydrateSentenceValue } from './sentencePrompt.js';
 import { getSentenceCorpusRevision } from './sentenceCorpus.js';
@@ -14,6 +14,7 @@ import {
 } from './sentenceTrust.js';
 
 const CACHE_STORE = 'katachiya_ai_sentence_cache';
+export const SHARED_SENTENCE_MAX_AGE_MS = 60_000;
 
 function cacheKey(word, type, revision) {
   return `review-v${SENTENCE_REVIEW_VERSION}|${revision}|${wordKey(word)}|${type}`;
@@ -24,9 +25,12 @@ export async function fetchTailoredSentence(word, type) {
 
   const revision = await getSentenceCorpusRevision();
   const key = revision ? cacheKey(word, type, revision) : '';
-  const cached = key ? getAICache(CACHE_STORE, key) : null;
-  if (cached && typeof cached === 'object' && (await verifySentenceValue(word, type, cached))) {
-    return hydrateSentenceValue(cached, word, type, 'db');
+  const cached = key ? readAICacheEntry(CACHE_STORE, key, SHARED_SENTENCE_MAX_AGE_MS) : null;
+  if (cached && (await verifySentenceValue(word, type, cached.v))) {
+    const revalidateAfter = cached.ts + SHARED_SENTENCE_MAX_AGE_MS;
+    if (Date.now() < revalidateAfter) {
+      return { ...hydrateSentenceValue(cached.v, word, type, 'db'), revalidateAfter };
+    }
   }
 
   const { url, anonKey } = getSupabaseConfig();
@@ -74,8 +78,12 @@ export async function fetchTailoredSentence(word, type) {
     en: row?.en,
     review: parseSentenceReview(row?.review || row?.model),
   };
+  const checkedAt = Date.now();
   if (!(await verifySentenceValue(word, type, value))) return null;
 
-  if (key) setAICache(CACHE_STORE, key, value);
-  return hydrateSentenceValue(value, word, type, 'db');
+  if (key) setAICache(CACHE_STORE, key, value, checkedAt);
+  return {
+    ...hydrateSentenceValue(value, word, type, 'db'),
+    revalidateAfter: checkedAt + SHARED_SENTENCE_MAX_AGE_MS,
+  };
 }

@@ -1058,61 +1058,70 @@ describe('StudyView continuous Practice startup', () => {
     });
   });
 
-  it('refreshes expired entries for exact retries while keeping the active sentence frozen', async () => {
-    vi.useFakeTimers();
-    const target = STARTER_VERBS[0];
-    const type = 'plain-past';
-    mockedSentences.bundled.mockResolvedValue(approvedSentenceEntry(target, type));
-    mockedApp.value = makeApp({
-      state: { ...defaultState(), enabledTypes: [type] },
-      allWords: [target],
-      studyFocus: { word: target, type },
-      practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
-    });
+  it.each(['bundled', 'tailored'])(
+    'refreshes expired %s entries while keeping the active sentence frozen',
+    async (loader) => {
+      vi.useFakeTimers();
+      const target = STARTER_VERBS[0];
+      const type = 'plain-past';
+      const loadEntry = mockedSentences[loader];
+      const freshness = loader === 'tailored' ? 10_000 : 60_000;
+      loadEntry.mockResolvedValue({
+        ...approvedSentenceEntry(target, type),
+        ...(loader === 'tailored' ? { source: 'db', revalidateAfter: Date.now() + freshness } : {}),
+      });
+      mockedApp.value = makeApp({
+        state: { ...defaultState(), enabledTypes: [type] },
+        allWords: [target],
+        studyFocus: { word: target, type },
+        practicePrefs: { ...DEFAULT_PREFS, sentenceMode: true },
+      });
 
-    render(<StudyView />);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
-    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(59_999);
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
-    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+      render(<StudyView />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+      expect(loadEntry).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(freshness - 1);
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(loadEntry).toHaveBeenCalledTimes(1);
+      expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
 
-    mockedSentences.bundled.mockResolvedValue(
-      approvedSentenceEntry(target, type, '夜に{w}。', 'I ate at night.'),
-    );
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2);
-    });
-    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
-    fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(mockedSentences.bundled).toHaveBeenCalledTimes(2);
-    // Prefetch refreshed the cache, while review keeps the original sentence.
-    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
-    expect(document.querySelector('[data-sentence-mode]').textContent).not.toContain('夜');
-    fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('夜');
-    expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
-    expect(mockedSentences.bundled).toHaveBeenCalledTimes(2);
-  });
+      loadEntry.mockResolvedValue({
+        ...approvedSentenceEntry(target, type, '夜に{w}。', 'I ate at night.'),
+        ...(loader === 'tailored' ? { source: 'db', revalidateAfter: Date.now() + freshness } : {}),
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2);
+      });
+      expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+      fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(loadEntry).toHaveBeenCalledTimes(2);
+      // Prefetch refreshed the cache, while review keeps the original sentence.
+      expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
+      expect(document.querySelector('[data-sentence-mode]').textContent).not.toContain('夜');
+      fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(document.querySelector('[data-sentence-mode]').textContent).toContain('夜');
+      expect(document.querySelector('[data-sentence-mode]').textContent).toContain('[______]');
+      expect(loadEntry).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it('hides and replays reviewed listening context on an exact-word/form retry', async () => {
     vi.stubGlobal('speechSynthesis', {

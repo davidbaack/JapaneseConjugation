@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const geminiMock = vi.hoisted(() => ({
   getSuggestedWord: vi.fn(),
@@ -36,6 +36,63 @@ afterEach(() => {
 });
 
 describe('CustomDictionaryViewSub suggestions', () => {
+  const write = { dict: '書く', reading: 'かく', meaning: 'to write', group: 'godan' };
+  const read = { dict: '読む', reading: 'よむ', meaning: 'to read', group: 'godan' };
+
+  function delayedLookup() {
+    let resolve;
+    const promise = new Promise((settle) => {
+      resolve = settle;
+    });
+    geminiMock.lookupWordWithGemini.mockReturnValueOnce(promise);
+    return resolve;
+  }
+
+  function search(query, kind = 'verb') {
+    const article = kind === 'verb' ? 'a' : 'an';
+    const input = screen.getByRole('textbox', { name: `Look up ${article} ${kind} to add` });
+    fireEvent.change(input, { target: { value: query } });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+    return input;
+  }
+
+  it('keeps the replacement result when a cancelled lookup completes later', async () => {
+    const finishFirst = delayedLookup();
+    const finishSecond = delayedLookup();
+    renderDictionary();
+    fireEvent.click(screen.getByRole('button', { name: 'Add verb' }));
+    const input = search('write');
+    const signal = geminiMock.lookupWordWithGemini.mock.calls[0][3].signal;
+    fireEvent.click(within(input.parentElement).getByRole('button', { name: 'Cancel' }));
+    expect(signal.aborted).toBe(true);
+    search('read');
+    await act(() => finishSecond(read));
+    await act(() => finishFirst(write));
+    expect(screen.getByText(read.dict)).toBeTruthy();
+    expect(screen.queryByText(write.dict)).toBeNull();
+  });
+
+  it('ignores a pending verb lookup after switching tabs and rejects a wrong-group replacement', async () => {
+    const finishVerb = delayedLookup();
+    const finishAdjective = delayedLookup();
+    const { setCustomAdjectives } = renderDictionary();
+    fireEvent.click(screen.getByRole('button', { name: 'Add verb' }));
+    search('write');
+    const signal = geminiMock.lookupWordWithGemini.mock.calls[0][3].signal;
+    await act(() => fireEvent.click(screen.getByRole('tab', { name: 'Adjectives' })));
+    expect(signal.aborted).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Add adjective' }));
+    await act(() => finishVerb(write));
+    expect(screen.queryByText(write.dict)).toBeNull();
+
+    search('green', 'adjective');
+    await act(() => finishAdjective(write));
+    const confirmation = screen.getByText('Is this the right adjective?').parentElement;
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Add adjective' }));
+    expect(screen.getByText('Choose a Japanese adjective to add.')).toBeTruthy();
+    expect(setCustomAdjectives).not.toHaveBeenCalled();
+  });
+
   it('shows learner-added entries first and discloses built-ins on request', () => {
     renderDictionary({ geminiKey: '' });
 

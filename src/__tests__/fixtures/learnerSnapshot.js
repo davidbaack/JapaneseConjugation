@@ -7,7 +7,7 @@ import { practiceSelectionForTypeIds } from '../../utils/practiceSelection.js';
 import { recordPracticeAnswer } from '../../utils/practiceStats.js';
 import { recordReadinessAttempt } from '../../utils/readiness.js';
 import { formFamilyForType } from '../../utils/reviewScope.js';
-import { cardIdFor, defaultState, gradeCard } from '../../utils/storage.js';
+import { cardIdFor, defaultState, gradeCard, recordPracticeRetry } from '../../utils/storage.js';
 import { recordWeaknessAttempt } from '../../utils/subcategoryWeakness.js';
 
 export const SNAPSHOT_AT = Date.parse('2026-10-07T12:00:00.000Z');
@@ -124,7 +124,14 @@ export function makeLearnerSnapshot() {
   });
 
   state.verbStats = { 食べる: { [cardId]: { seen: 7, incorrect: 3 } } };
-  state.retryQueue = [cardId];
+  Object.assign(
+    state,
+    recordPracticeRetry(state, cardId, {
+      at: SNAPSHOT_AT + 6000,
+      eventId: 'snapshot-6',
+      correct: false,
+    }),
+  );
   state.mistakes = [
     {
       key: 'ichidan|食べる|plain-past|dictionary',

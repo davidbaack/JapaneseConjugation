@@ -321,6 +321,20 @@ export function validateLearnerState(source, { allowMissingFields = true } = {})
       'Retry queue',
       'card identifiers',
     );
+  if (source.retryOutcomes !== undefined) {
+    requireValue(isRecord(source.retryOutcomes), 'Practice retry outcomes', 'an object');
+    for (const [key, outcome] of Object.entries(source.retryOutcomes))
+      requireValue(
+        !!key &&
+          isRecord(outcome) &&
+          Number.isFinite(outcome.at) &&
+          outcome.at >= 0 &&
+          typeof outcome.eventId === 'string' &&
+          typeof outcome.missed === 'boolean',
+        'Practice retry outcome',
+        'a dated miss or correction',
+      );
+  }
   if (source.enabledTypes && !allowMissingFields)
     requireValue(
       source.enabledTypes.every((id) => TYPE_IDS.has(id)),

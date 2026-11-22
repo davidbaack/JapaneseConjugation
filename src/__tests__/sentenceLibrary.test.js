@@ -233,6 +233,33 @@ describe('fetchTailoredSentence', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('revalidates an independent shared replacement and withdrawal with the same corpus revision', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response([validRow()]))
+      .mockResolvedValueOnce(response([validRow({ en: 'Today I ate.' })]))
+      .mockResolvedValue(response([]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { fetchTailoredSentence, SHARED_SENTENCE_MAX_AGE_MS } = await load();
+    const original = await fetchTailoredSentence(WORD, TYPE);
+    const readAt = Date.now();
+    expect(original.en).toBe('I ate today.');
+    expect(original.revalidateAfter).toBe(readAt + SHARED_SENTENCE_MAX_AGE_MS);
+
+    vi.setSystemTime(readAt + SHARED_SENTENCE_MAX_AGE_MS - 1);
+    expect(await fetchTailoredSentence(WORD, TYPE)).toEqual(original);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(original.revalidateAfter);
+    const replacement = await fetchTailoredSentence(WORD, TYPE);
+    expect(replacement.en).toBe('Today I ate.');
+    vi.setSystemTime(replacement.revalidateAfter);
+    expect(await fetchTailoredSentence(WORD, TYPE)).toBeNull();
+    expect(await fetchTailoredSentence(WORD, TYPE)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
   it('never reuses a cached row when the publication revision is unavailable', async () => {
     seedCache(cacheKey(), validRow());
     currentRevision = null;

@@ -122,6 +122,74 @@ export function practiceCardKey(card) {
     : card.id;
 }
 
+const PRACTICE_RETRY_LIMIT = 20;
+
+function newerRetryOutcome(candidate, previous) {
+  if (!previous) return true;
+  return (
+    (candidate.at - previous.at ||
+      compareSyncText(candidate.eventId, previous.eventId) ||
+      Number(previous.missed) - Number(candidate.missed)) > 0
+  );
+}
+
+function retryQueueFromOutcomes(outcomes) {
+  return Object.entries(outcomes)
+    .filter(([, outcome]) => outcome.missed)
+    .sort(
+      ([leftKey, left], [rightKey, right]) =>
+        right.at - left.at ||
+        compareSyncText(right.eventId, left.eventId) ||
+        compareSyncText(leftKey, rightKey),
+    )
+    .slice(0, PRACTICE_RETRY_LIMIT)
+    .map(([key]) => key);
+}
+
+function mergePracticeRetries(...states) {
+  const outcomes = new Map();
+  function retain(key, outcome) {
+    if (newerRetryOutcome(outcome, outcomes.get(key))) outcomes.set(key, outcome);
+  }
+  for (const state of states) {
+    const explicit = state.retryOutcomes || {};
+    for (const [key, outcome] of Object.entries(explicit)) retain(key, outcome);
+
+    // Older snapshots carry queue membership and bounded mistake history.
+    // Import only known misses and corrections, without recreating dropped misses.
+    const queued = new Set(state.retryQueue || []);
+    const described = new Set();
+    for (const mistake of state.mistakes || []) {
+      if (mistake.dimension || (mistake.type === DICTIONARY_TYPE_ID && !mistake.promptType))
+        continue;
+      const key = practiceCardKey({
+        id: cardIdFor(mistake, mistake.type),
+        type: mistake.type,
+        sourceType: mistake.promptType,
+      });
+      if (!key || Object.hasOwn(explicit, key) || (!mistake.resolved && !queued.has(key))) continue;
+      described.add(key);
+      retain(key, {
+        at: Number(mistake.resolved ? mistake.resolvedAt || mistake.at : mistake.at) || 0,
+        eventId: mistake.resolved ? '' : String(mistake.lastAttemptId || ''),
+        missed: !mistake.resolved,
+      });
+    }
+    for (const key of queued) {
+      if (!Object.hasOwn(explicit, key) && !described.has(key))
+        retain(key, { at: 0, eventId: '', missed: true });
+    }
+  }
+  const retryOutcomes = Object.fromEntries(outcomes);
+  return { retryOutcomes, retryQueue: retryQueueFromOutcomes(retryOutcomes) };
+}
+
+export function recordPracticeRetry(state, key, { at, eventId, correct }) {
+  return mergePracticeRetries(state, {
+    retryOutcomes: { [key]: { at, eventId, missed: !correct } },
+  });
+}
+
 export function typeIdFromCardId(cardId) {
   const id = String(cardId || '');
   const marker = id.lastIndexOf('|');
@@ -275,28 +343,26 @@ export function saveAll(
 const AI_CACHE_TTL = 7 * DAY;
 const AI_CACHE_KEYS = ['katachiya_ai_explanations_cache', 'katachiya_ai_sentence_cache'];
 
-export function getAICache(storageKey, cacheKey) {
+export function readAICacheEntry(storageKey, cacheKey, maxAge = AI_CACHE_TTL) {
   try {
     const raw = localStorage.getItem(storageKey);
     if (!raw) return null;
     const store = JSON.parse(raw);
     const entry = store[cacheKey];
-    if (!entry) return null;
-    if (entry && typeof entry === 'object' && entry.ts) {
-      if (Date.now() - entry.ts > AI_CACHE_TTL) return null;
-      return entry.v;
-    }
+    if (!Number.isFinite(entry?.ts)) return null;
+    const age = Date.now() - entry.ts;
+    if (age < 0 || age >= maxAge) return null;
     return entry;
   } catch {
     return null;
   }
 }
 
-export function setAICache(storageKey, cacheKey, value) {
+export function setAICache(storageKey, cacheKey, value, ts = Date.now()) {
   try {
     const raw = localStorage.getItem(storageKey);
     const store = raw ? JSON.parse(raw) : {};
-    store[cacheKey] = { ts: Date.now(), v: value };
+    store[cacheKey] = { ts, v: value };
     localStorage.setItem(storageKey, JSON.stringify(store));
   } catch {}
 }
@@ -525,6 +591,8 @@ function hasLocalStateData(state) {
   return !!(
     hasKeys(state.cards) ||
     hasKeys(state.verbStats) ||
+    hasKeys(state.retryOutcomes) ||
+    hasItems(state.retryQueue) ||
     hasItems(state.mistakes) ||
     hasProgressBucketData(state.shadow) ||
     hasProgressBucketData(state.ambient) ||
@@ -1130,6 +1198,7 @@ export function mergeCloudState(local, cloud) {
           cards: {},
           verbStats: {},
           retryQueue: [],
+          retryOutcomes: {},
           readiness: defaultReadinessState(),
           weakness: defaultWeaknessState(),
           transformation: emptyTransformationStats(),
@@ -1144,6 +1213,7 @@ export function mergeCloudState(local, cloud) {
           cards: {},
           verbStats: {},
           retryQueue: [],
+          retryOutcomes: {},
           readiness: defaultReadinessState(),
           weakness: defaultWeaknessState(),
           transformation: emptyTransformationStats(),
@@ -1156,28 +1226,12 @@ export function mergeCloudState(local, cloud) {
     cloud.practiceSelection,
   );
   const mistakes = mergeMistakes(local.mistakes || [], cloud.mistakes || []);
-  // A stale saved snapshot must not resurrect a corrected Reading retry.
-  // Use the merged, source-specific resolution so a newer miss can reopen it.
-  const resolvedReadingRetries = new Set(
-    mistakes
-      .filter((m) => m.resolved && !m.dimension && m.type === DICTIONARY_TYPE_ID && m.promptType)
-      .map((m) =>
-        practiceCardKey({
-          id: cardIdFor(m, DICTIONARY_TYPE_ID),
-          type: DICTIONARY_TYPE_ID,
-          sourceType: m.promptType,
-        }),
-      ),
-  );
   const merged = {
     ...local,
     schemaVersion: SRS_SCHEMA_VERSION,
     cards: mergeCards(local.cards || {}, cloud.cards || {}),
     verbStats: mergeVerbStats(local.verbStats || {}, cloud.verbStats || {}),
-    retryQueue: [...new Set([...(local.retryQueue || []), ...(cloud.retryQueue || [])])]
-      .filter((id) => !resolvedReadingRetries.has(id))
-      .sort()
-      .slice(0, 20),
+    ...mergePracticeRetries(local, cloud),
     mistakes,
     readiness: mergeReadinessState(local.readiness, cloud.readiness),
     weakness: mergeWeaknessState(local.weakness, cloud.weakness),
@@ -1352,6 +1406,7 @@ export function defaultState() {
     cards: {},
     verbStats: {},
     retryQueue: [],
+    retryOutcomes: {},
     mistakes: [],
     shadow: { attempted: 0, totalRating: 0, byScenario: {} },
     ambient: { sessions: 0, played: 0, lastAt: null },
@@ -1415,7 +1470,7 @@ export function mergeState(saved, sessionOverride) {
     schemaVersion: SRS_SCHEMA_VERSION,
     cards: saved.cards || {},
     verbStats: saved.verbStats || {},
-    retryQueue: Array.isArray(saved.retryQueue) ? saved.retryQueue : [],
+    ...mergePracticeRetries(saved),
     mistakes: Array.isArray(saved && saved.mistakes) ? saved.mistakes : [],
     shadow: (saved && saved.shadow) || base.shadow,
     ambient: (saved && saved.ambient) || base.ambient,
@@ -2036,6 +2091,17 @@ export function selectNext(
     reviewed: dropRecentWords(vary([...nearDue, ...future, ...reviewed])),
   });
   if (!chosen) chosen = choose({ due, retry, readySkill, fresh, nearDue, reviewed });
+  // Pacing is soft when the current selection has no usable reviewed card.
+  if (!chosen && !canIntroduceFresh) {
+    chosen = withSelectionReason(
+      pickFreshReview(
+        scoredAvail.filter((p) => !state.cards[p.id]),
+        options,
+        openBeginnerStage,
+      ),
+      'fresh',
+    );
+  }
   if (!chosen) return null;
   return {
     id: chosen.id,

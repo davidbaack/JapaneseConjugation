@@ -28,6 +28,7 @@ const PROGRESS_FIELDS = [
   'cards',
   'verbStats',
   'retryQueue',
+  'retryOutcomes',
   'mistakes',
   'readiness',
   'weakness',
@@ -1067,6 +1068,7 @@ export function mergeSyncSidecar(localValue, cloudValue, mergedBase, deviceId = 
     const source = progressWinner === 'local' ? local.state || {} : cloud.state || {};
     next = { ...next, state: { ...next.state } };
     for (const field of PROGRESS_FIELDS) next.state[field] = source[field];
+    next.state.retryOutcomes = source.retryOutcomes || {};
   }
   next.state = {
     ...next.state,

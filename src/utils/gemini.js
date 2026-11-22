@@ -289,7 +289,9 @@ export function aiSystemFromPrefs(prefs, base = AI_SYSTEM) {
   return `${base}\n\nFeedback depth: ${level.prompt}\nGuide voice: ${tone.prompt}`;
 }
 
-export async function lookupWordWithGemini(query, apiKey, isAdj = false) {
+/** @param {{ signal?: AbortSignal }} [options] */
+export async function lookupWordWithGemini(query, apiKey, isAdj = false, options = {}) {
+  const { signal } = options;
   guardAIRequest();
   const typeStr = isAdj ? 'adjective' : 'verb';
   const groupOptions = isAdj ? 'i-adjective or na-adjective' : 'ichidan or godan or suru or kuru';
@@ -305,7 +307,7 @@ export async function lookupWordWithGemini(query, apiKey, isAdj = false) {
     },
   };
 
-  const d = await executeGeminiRequest(payload, apiKey);
+  const d = await executeGeminiRequest(payload, apiKey, signal);
   const result = extractJSON(geminiText(d));
   if (result) result.group = normalizeGroup(result.group);
   if (!result || !result.dict || !result.reading || !result.meaning || !result.group)

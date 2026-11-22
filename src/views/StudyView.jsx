@@ -34,6 +34,7 @@ import {
   recordMistake,
   markMistakeResolved,
   gradeCard,
+  recordPracticeRetry,
   gradeTransformationStats,
   cardIdFor,
   practiceCardKey,
@@ -173,7 +174,7 @@ function sentenceEntryKey(word, type) {
 function freshSentenceEntry(cache, key) {
   const cached = cache.get(key);
   if (!cached) return null;
-  if (Date.now() - cached.loadedAt >= SENTENCE_ENTRY_FRESH_MS) {
+  if (Date.now() >= cached.expiresAt) {
     cache.delete(key);
     return null;
   }
@@ -764,7 +765,11 @@ export default function StudyView({ mode = 'practice' }) {
     })
       .then((entry) => {
         if (entry?.jaTemplate) {
-          sentenceEntryCacheRef.current.set(key, { entry, loadedAt: Date.now() });
+          const expiresAt = Math.min(
+            Date.now() + SENTENCE_ENTRY_FRESH_MS,
+            'revalidateAfter' in entry ? entry.revalidateAfter : Infinity,
+          );
+          sentenceEntryCacheRef.current.set(key, { entry, expiresAt });
           return entry;
         }
         return null;
@@ -1631,9 +1636,7 @@ export default function StudyView({ mode = 'practice' }) {
     return {
       ...graded,
       cards: { ...baseState.cards, [rid]: storedCard },
-      retryQueue: correct
-        ? (baseState.retryQueue || []).filter((id) => id !== currentPracticeKey)
-        : [...new Set([...(baseState.retryQueue || []), currentPracticeKey])].slice(-20),
+      ...recordPracticeRetry(baseState, currentPracticeKey, { at: gradedAt, eventId, correct }),
       verbStats,
       readiness: recordReadinessAttempt(baseState.readiness, readinessRuleId, {
         correct,

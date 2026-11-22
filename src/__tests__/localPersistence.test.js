@@ -1,7 +1,16 @@
 // @vitest-environment jsdom
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PREFS, STORAGE_KEY } from '../data/defaults.js';
-import { acceptCurrentStorageSnapshot, defaultState, loadAll, saveAll } from '../utils/storage.js';
+import {
+  acceptCurrentStorageSnapshot,
+  defaultState,
+  loadAll,
+  markMistakeResolved,
+  mergeSyncPayload,
+  recordMistake,
+  recordPracticeRetry,
+  saveAll,
+} from '../utils/storage.js';
 import { adoptSyncMetadata, stampSyncChanges } from '../utils/syncMetadata.js';
 import { recordPracticeAnswer } from '../utils/practiceStats.js';
 import { persistLocalSnapshot } from '../utils/localPersistence.js';
@@ -69,6 +78,56 @@ function save(parts) {
 }
 
 describe('coordinated local learner persistence', () => {
+  it.each(['plain-past', 'dictionary|plain-past'])(
+    'keeps a %s correction after history eviction, stale merge, and reload',
+    async (type) => {
+      const word = { dict: '食べる', reading: 'たべる', meaning: 'to eat', group: 'ichidan' };
+      const [targetType, sourceType] = type.split('|');
+      const key = `verb:ichidan:食べる:たべる|${type}`;
+      const original = baseline();
+      const missed = recordMistake([], word, targetType, sourceType, 'x', 'たべた', { now: 1000 });
+      const stale = {
+        ...original,
+        state: { ...original.state, mistakes: missed, retryQueue: [key] },
+      };
+      let mistakes = markMistakeResolved(missed, missed[0].key, { now: 2000 });
+      for (let i = 0; i < 50; i += 1) {
+        const other = { ...word, dict: `fixture-${i}` };
+        mistakes = recordMistake(mistakes, other, 'plain-past', null, 'x', 'たべた', {
+          now: 3000 + i * 2,
+        });
+        mistakes = markMistakeResolved(mistakes, mistakes[0].key, { now: 3001 + i * 2 });
+      }
+      const corrected = {
+        ...stale,
+        state: {
+          ...stale.state,
+          ...recordPracticeRetry(stale.state, key, { at: 2000, eventId: 'fixed', correct: true }),
+          mistakes,
+        },
+      };
+      // The bounded mistake history no longer includes this card's resolution.
+      expect(corrected.state.mistakes).toHaveLength(50);
+      expect(corrected.state.mistakes.some((mistake) => mistake.key === missed[0].key)).toBe(false);
+      expect(mergeSyncPayload(stale, corrected).state.retryQueue).toEqual([]);
+      expect(mergeSyncPayload(corrected, stale).state.retryQueue).toEqual([]);
+      save(stale);
+      await persistLocalSnapshot(corrected);
+      await persistLocalSnapshot(stale);
+      expect(loadAll().state.retryQueue).toEqual([]);
+
+      const newer = {
+        ...stale,
+        state: {
+          ...stale.state,
+          ...recordPracticeRetry(stale.state, key, { at: 3000, eventId: 'miss', correct: false }),
+        },
+      };
+      await persistLocalSnapshot(newer);
+      expect(loadAll().state.retryQueue).toEqual([key]);
+    },
+  );
+
   it('reclaims disposable cache space before staging and persists the answer through reload', async () => {
     const original = baseline();
     save(original);

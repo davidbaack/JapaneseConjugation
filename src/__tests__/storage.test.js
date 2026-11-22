@@ -13,6 +13,7 @@ import {
   buildFocusCard,
   cardIdFor,
   practiceCardKey,
+  recordPracticeRetry,
   wordKeyFromCardId,
   freshCardLimit,
   defaultState,
@@ -1129,6 +1130,31 @@ describe('word-form SRS selection', () => {
     }
   });
 
+  it('keeps the 20 most recent unresolved misses in either snapshot order', () => {
+    let older = defaultState();
+    for (let i = 0; i < 20; i += 1) {
+      older = {
+        ...older,
+        ...recordPracticeRetry(older, `card-${i}`, {
+          at: i + 1,
+          eventId: `miss-${i}`,
+          correct: false,
+        }),
+      };
+    }
+    const latest = {
+      ...defaultState(),
+      ...recordPracticeRetry(defaultState(), 'zzz-newest', {
+        at: 21,
+        eventId: 'newest-miss',
+        correct: false,
+      }),
+    };
+    const expected = ['zzz-newest', ...older.retryQueue.slice(0, 19)];
+    expect(mergeCloudState(older, latest).retryQueue).toEqual(expected);
+    expect(mergeCloudState(latest, older).retryQueue).toEqual(expected);
+  });
+
   it('uses dictionary target cards for reading practice without adding dictionary to core', () => {
     const card = selectNext(defaultState(), [TABERU], ['plain-past'], null, {
       ...DEFAULT_PREFS,
@@ -1208,7 +1234,7 @@ describe('word-form SRS selection', () => {
     expect(seen.map((card) => card.verb.dict)).not.toContain(IKU.dict);
   });
 
-  it('uses a generous internal fresh-card budget for continuous variety', () => {
+  it('uses the fresh-card budget without stopping continuous Practice in an eligible scope', () => {
     expect(freshCardLimit()).toBe(60);
     expect(bonusFreshCardLimit()).toBe(30);
     const introduced = {};
@@ -1223,14 +1249,22 @@ describe('word-form SRS selection', () => {
         incorrect: 0,
       };
     }
-    const card = selectNext(
-      { ...defaultState(), cards: introduced },
-      [TABERU, KAKU],
-      ['plain-past'],
-      null,
-      DEFAULT_PREFS,
-    );
-    expect(card).toBeNull();
+    const words = [TABERU, KAKU];
+    const forms = ['te-form'];
+    const select = (cards, last = null, scope = words) =>
+      selectNext({ ...defaultState(), cards }, scope, forms, last, DEFAULT_PREFS);
+    const reviewed = cardIdFor(TABERU, forms[0]);
+    const alternative = cardIdFor(KAKU, forms[0]);
+    const reviewedCard = introduced['synthetic-59'];
+    delete introduced['synthetic-59'];
+
+    expect(select(introduced)?.id).toBeTruthy();
+    const atLimit = { ...introduced, 'another-introduction': reviewedCard };
+    expect(select(atLimit)?.id).toBeTruthy();
+    const withReviewed = { ...introduced, [reviewed]: reviewedCard };
+    expect(select(withReviewed)?.id).toBe(reviewed);
+    expect(select(withReviewed, reviewed)?.id).toBe(alternative);
+    expect(select(atLimit, null, [])).toBeNull();
   });
 
   it('prefers the lowest-strength enabled exact form after retry handling', () => {

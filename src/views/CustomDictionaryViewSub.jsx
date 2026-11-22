@@ -18,6 +18,11 @@ const LIST_VIEWPORT = 600; // fixed scroll-container height when windowing
 const VIRTUAL_THRESHOLD = 60; // only window once the list exceeds this many rows
 const AI_HELP_UNAVAILABLE_MESSAGE = 'AI help is unavailable right now. Try again later.';
 const SUGGESTION_UNAVAILABLE_MESSAGE = 'Suggestions are unavailable right now. Try again later.';
+const ADJECTIVE_GROUP_IDS = ['i-adjective', 'na-adjective'];
+
+function groupMatchesDictionary(group, isAdj) {
+  return (isAdj ? ADJECTIVE_GROUP_IDS : VERB_GROUP_IDS).includes(group);
+}
 
 function isTransportOrProxyError(error) {
   const msg = String(error?.message || error || '').toLowerCase();
@@ -56,7 +61,7 @@ export default function CustomDictionaryViewSub({
   const selectDictTab = (id) => {
     setDictTab(id);
     setShowBuiltIns(false);
-    resetAdd();
+    resetAdd(id);
   };
   const { tabProps, panelProps } = useTablist(['verbs', 'adjectives'], dictTab, selectDictTab);
   const [showAdd, setShowAdd] = useState(false);
@@ -72,7 +77,7 @@ export default function CustomDictionaryViewSub({
   const [suggErr, setSuggErr] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
   const suggGen = useRef(0);
-  const lookupCancelledRef = useRef(false);
+  const lookupRequestRef = useRef(null);
 
   const isAdj = dictTab === 'adjectives';
   const geminiAvailable = aiToolsEnabled && !!geminiKey;
@@ -103,6 +108,10 @@ export default function CustomDictionaryViewSub({
     try {
       const r = await getSuggestedWord(wlist, geminiKey, isAdj);
       if (gen !== suggGen.current) return;
+      if (!groupMatchesDictionary(r.group, isAdj)) {
+        setSuggErr(SUGGESTION_UNAVAILABLE_MESSAGE);
+        return;
+      }
       if (wlist.some((v) => v.dict === r.dict)) {
         setSuggErr('Suggestion was already in your list — try again');
         return;
@@ -122,37 +131,48 @@ export default function CustomDictionaryViewSub({
     setSuggLoading(false);
   }, [geminiAvailable, dictTab]);
 
-  function resetAdd() {
+  useEffect(() => () => lookupRequestRef.current?.abort(), []);
+
+  function resetAdd(nextTab = dictTab) {
+    lookupRequestRef.current?.abort();
     setShowAdd(false);
     setQuery('');
     setAddPhase('idle');
     setSuggestion(null);
     setAddError('');
-    setMf({ dict: '', reading: '', meaning: '', group: isAdj ? 'i-adjective' : 'ichidan' });
+    setMf({
+      dict: '',
+      reading: '',
+      meaning: '',
+      group: nextTab === 'adjectives' ? 'i-adjective' : 'ichidan',
+    });
     setMErr('');
   }
 
   async function lookup() {
     if (!query.trim()) return;
     if (addPhase === 'loading') {
-      lookupCancelledRef.current = true;
+      lookupRequestRef.current?.abort();
       setAddPhase('idle');
       return;
     }
-    lookupCancelledRef.current = false;
+    lookupRequestRef.current?.abort();
+    const request = new AbortController();
+    lookupRequestRef.current = request;
     setAddPhase('loading');
     setAddError('');
     try {
-      const r = await lookupWordWithGemini(query, geminiKey, isAdj);
-      if (!lookupCancelledRef.current) {
-        setSuggestion(r);
-        setAddPhase('confirming');
-      }
+      const r = await lookupWordWithGemini(query, geminiKey, isAdj, { signal: request.signal });
+      if (request.signal.aborted) return;
+      setSuggestion(r);
+      setAddPhase('confirming');
     } catch (e) {
-      if (!lookupCancelledRef.current) {
+      if (!request.signal.aborted) {
         setAddPhase('error');
         setAddError(calmAIError(e, AI_HELP_UNAVAILABLE_MESSAGE));
       }
+    } finally {
+      if (lookupRequestRef.current === request) lookupRequestRef.current = null;
     }
   }
 
@@ -164,6 +184,11 @@ export default function CustomDictionaryViewSub({
       reading: sanitizeField(rawWord.reading, FIELD_LIMITS.reading),
       meaning: sanitizeField(rawWord.meaning, FIELD_LIMITS.meaning),
     };
+    if (!groupMatchesDictionary(word.group, isAdj)) {
+      setAddError(isAdj ? 'Choose a Japanese adjective to add.' : 'Choose a Japanese verb to add.');
+      setAddPhase('error');
+      return;
+    }
     if (corpusWords.some((v) => v.dict === word.dict)) {
       setAddError(`${word.dict} is already in your list`);
       setAddPhase('error');
@@ -250,7 +275,10 @@ export default function CustomDictionaryViewSub({
               {showBuiltIns ? 'Hide built-ins' : `Show ${starterWords.length} built-ins`}
             </button>
             <button
-              onClick={() => setShowAdd(!showAdd)}
+              onClick={() => {
+                if (showAdd) resetAdd();
+                else setShowAdd(true);
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition"
             >
               <IconPlus className="w-4 h-4" />
@@ -496,7 +524,7 @@ export default function CustomDictionaryViewSub({
               </div>
             )}
             <button
-              onClick={resetAdd}
+              onClick={() => resetAdd()}
               className="mt-3 text-xs text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-400 block"
             >
               Cancel
