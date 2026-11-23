@@ -388,6 +388,14 @@ function sessionAfterSkip(session = {}, card, options = {}) {
   );
 }
 
+function heldWordSweepCard(sweep, state) {
+  if (!sweep?.word || !sweep.nextTypeId) return null;
+  return withCardOrigin(
+    buildFocusCard(state, sweep.word, sweep.nextTypeId),
+    sweep.repeatPass ? 'missed' : null,
+  );
+}
+
 function loadPersistedCurrent(state, words, enabledTypes, prefs) {
   try {
     if (typeof sessionStorage === 'undefined') return null;
@@ -584,6 +592,7 @@ export default function StudyView({ mode = 'practice' }) {
   const nextButtonRef = useRef(null);
   const focusSeededRef = useRef(false);
   const autoAdvanceRef = useRef(null);
+  const advanceReviewRef = useRef(null);
   const refocusAfterAutoAdvanceRef = useRef(false);
   const answerStartedAtRef = useRef(0);
   const committedAttemptRef = useRef(null);
@@ -607,6 +616,11 @@ export default function StudyView({ mode = 'practice' }) {
   // instead of counting it fully correct. Coaching-only hints are free.
   const usedAnswerHelpRef = useRef(false);
   const typingHintRef = useRef(null);
+  const reviewLimit = activeReviewLimitFromPrefs(practicePrefs);
+  const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
+  const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
+  const wordSweepComplete = !!wordSweep?.complete;
+  const reviewComplete = wordSweepComplete;
 
   const enabledTypes = useMemo(() => {
     if (sessionFilterFormGroupId) {
@@ -624,15 +638,15 @@ export default function StudyView({ mode = 'practice' }) {
         : state.enabledTypes?.length
           ? state.enabledTypes
           : ['plain-past'];
-    return reviewTypeIdsForState(state, baseTypes);
+    return reviewTypeIdsForState({ reviewScope: state.reviewScope }, baseTypes);
   }, [
-    state,
+    state.enabledTypes,
+    state.reviewScope,
     sessionFilterFormGroupId,
     rawFocus?.recommendation?.returnEnabledTypes,
     rawFocus?.returnEnabledTypes,
     transformationMode,
   ]);
-  const enabledTypesKey = enabledTypes.join('|');
   const practiceWords = useMemo(() => {
     const base = filterWordsForStudyScope(
       verbs,
@@ -889,18 +903,68 @@ export default function StudyView({ mode = 'practice' }) {
       : basePromptAudioText
     : basePromptAudioText;
 
-  useEffect(() => {
-    preparedNextCardRef.current = null;
+  const selectNextReviewCard = useCallback(
+    (nextState, lastCardId, optionOverrides = {}) => {
+      const lastPracticeKey = lastCardId === current?.id ? currentPracticeKey : lastCardId;
+      if (lastPracticeKey) {
+        recentCardIdsRef.current = [
+          lastPracticeKey,
+          ...recentCardIdsRef.current.filter((id) => id !== lastPracticeKey),
+        ].slice(0, REVIEW_SESSION_HISTORY_SIZE);
+      }
+      return selectNext(
+        nextState,
+        practiceWords,
+        enabledTypes,
+        lastPracticeKey,
+        practicePrefs,
+        practiceRuleCandidates,
+        {
+          ...reviewSelectionOptions,
+          ...optionOverrides,
+          recentCardIds: recentCardIdsRef.current,
+        },
+      );
+    },
+    [
+      current?.id,
+      currentPracticeKey,
+      enabledTypes,
+      practicePrefs,
+      practiceRuleCandidates,
+      practiceWords,
+      reviewSelectionOptions,
+    ],
+  );
+
+  useLayoutEffect(() => {
+    if (phase !== 'reviewing' || !current || reviewComplete || reviewSetComplete) return;
+    // Paint the review first, then let queued input run ahead of preparation.
+    let preparationTimer;
+    let frame = globalThis.requestAnimationFrame(() => {
+      frame = globalThis.requestAnimationFrame(() => {
+        preparationTimer = setTimeout(() => {
+          const card =
+            heldWordSweepCard(wordSweep, state) || selectNextReviewCard(state, current.id);
+          preparedNextCardRef.current = { exercise: current, card };
+          preloadSentenceForCard(card);
+        }, 0);
+      });
+    });
+    return () => {
+      globalThis.cancelAnimationFrame(frame);
+      clearTimeout(preparationTimer);
+      preparedNextCardRef.current = null;
+    };
   }, [
-    activeMinimalPairSet?.id,
-    bonusMode,
-    currentPracticeKey,
-    sentenceMode,
-    sessionFilterFormGroupId,
-    sessionFilterWord?.dict,
-    sessionFilterWord?.group,
-    transformationMode,
-    enabledTypesKey,
+    current,
+    phase,
+    preloadSentenceForCard,
+    reviewComplete,
+    reviewSetComplete,
+    selectNextReviewCard,
+    state,
+    wordSweep,
   ]);
 
   useLayoutEffect(() => {
@@ -1089,6 +1153,7 @@ export default function StudyView({ mode = 'practice' }) {
 
   useLayoutEffect(() => {
     latestSpeechAttemptRef.current = { card: current, phase, answerMode, submit };
+    advanceReviewRef.current = advanceFromReview;
   });
 
   useEffect(() => {
@@ -1463,12 +1528,7 @@ export default function StudyView({ mode = 'practice' }) {
   const minimalPairFeedback = minimalPairSetForCurrent
     ? minimalPairFeedbackForCard(minimalPairSetForCurrent, current.verb, current.type)
     : null;
-  const reviewLimit = activeReviewLimitFromPrefs(practicePrefs);
-  const reviewsDone = Math.max(0, (state.session.reviewed || 0) - reviewBase);
   const runStats = sessionRunStats(state.session, runBase);
-  const reviewSetComplete = reviewLimit > 0 && reviewsDone >= reviewLimit;
-  const wordSweepComplete = !!wordSweep?.complete;
-  const reviewComplete = wordSweepComplete;
   const hidePromptText = listeningPrompt && phase === 'answering' && !showPromptText;
   const hideEnglishMeaning = englishHintsHidden && phase === 'answering';
   // Guided kana is now an in-box "reveal next" action, not a separate mode.
@@ -1823,54 +1883,6 @@ export default function StudyView({ mode = 'practice' }) {
     }
   }
 
-  function rememberSessionCard(cardId) {
-    if (!cardId) return;
-    recentCardIdsRef.current = [
-      cardId,
-      ...recentCardIdsRef.current.filter((id) => id !== cardId),
-    ].slice(0, REVIEW_SESSION_HISTORY_SIZE);
-  }
-
-  function selectNextReviewCard(nextState, lastCardId, optionOverrides = {}) {
-    const lastPracticeKey = lastCardId === current?.id ? currentPracticeKey : lastCardId;
-    rememberSessionCard(lastPracticeKey);
-    return selectNext(
-      nextState,
-      practiceWords,
-      enabledTypes,
-      lastPracticeKey,
-      practicePrefs,
-      practiceRuleCandidates,
-      {
-        ...reviewSelectionOptions,
-        ...optionOverrides,
-        recentCardIds: recentCardIdsRef.current,
-      },
-    );
-  }
-
-  function prepareLikelyNextCard(nextState, lastCardId, sweepStep = null, optionOverrides = {}) {
-    if (sweepStep?.nextCard) {
-      preparedNextCardRef.current = null;
-      preloadSentenceForCard(sweepStep.nextCard);
-      return sweepStep.nextCard;
-    }
-    const nextCard = selectNextReviewCard(nextState, lastCardId, optionOverrides);
-    if (nextCard) {
-      preparedNextCardRef.current = { lastCardId, card: nextCard };
-      preloadSentenceForCard(nextCard);
-    } else {
-      preparedNextCardRef.current = null;
-    }
-    return nextCard;
-  }
-
-  function consumePreparedNextCard(lastCardId) {
-    const prepared = preparedNextCardRef.current;
-    preparedNextCardRef.current = null;
-    return prepared?.lastCardId === lastCardId ? prepared.card : null;
-  }
-
   function nextWordSweepStep(sweep, nextState, typeId, correct, { holdNext = false } = {}) {
     if (!sweep?.word || !typeId) return { sweep, nextCard: null };
     const completed = new Set(sweep.completedTypeIds || []);
@@ -1900,27 +1912,8 @@ export default function StudyView({ mode = 'practice' }) {
       nextTypeId: holdNext ? nextTypeId : null,
       complete: !nextTypeId && missed.size === 0,
     };
-    const nextCard = nextTypeId
-      ? withCardOrigin(
-          buildFocusCard(nextState, sweep.word, nextTypeId),
-          repeatPass ? 'missed' : null,
-        )
-      : null;
+    const nextCard = holdNext ? null : heldWordSweepCard({ ...nextSweep, nextTypeId }, nextState);
     return { sweep: nextSweep, nextCard };
-  }
-
-  function consumeHeldWordSweepCard(nextState = state) {
-    if (!wordSweep?.word || !wordSweep.nextTypeId) return null;
-    const card = withCardOrigin(
-      buildFocusCard(nextState, wordSweep.word, wordSweep.nextTypeId),
-      wordSweep.repeatPass ? 'missed' : null,
-    );
-    setWordSweep((currentSweep) =>
-      currentSweep?.nextTypeId === wordSweep.nextTypeId
-        ? { ...currentSweep, nextTypeId: null }
-        : currentSweep,
-    );
-    return card;
   }
 
   function resetActiveAttempt() {
@@ -2017,6 +2010,44 @@ export default function StudyView({ mode = 'practice' }) {
     setCoachChatOpen(true);
   }
 
+  function advanceFromReview(automatic = false) {
+    if (!current || phase !== 'reviewing') return;
+    setAnswer('');
+    setCoachRevealed(0);
+    setSelfCheckOpen(false);
+    setStepHint('');
+    setHintMasked(false);
+    setHintRevealed(false);
+    setCoachChatOpen(false);
+    hadKanaMistakeRef.current = false;
+    wrongSnapshotRef.current = null;
+    usedAnswerHelpRef.current = false;
+    refocusAfterAutoAdvanceRef.current = automatic;
+    setWasCorrected(false);
+    setPhase('answering');
+    if (reviewSetComplete || reviewComplete) return;
+
+    const prepared = preparedNextCardRef.current;
+    preparedNextCardRef.current = null;
+    const nextCard =
+      (prepared?.exercise === current ? prepared.card : null) ||
+      heldWordSweepCard(wordSweep, state) ||
+      selectNextReviewCard(state, current.id);
+    if (wordSweep?.nextTypeId) {
+      setWordSweep((sweep) =>
+        sweep?.nextTypeId === wordSweep.nextTypeId ? { ...sweep, nextTypeId: null } : sweep,
+      );
+    }
+    setCurrent(nextCard);
+  }
+
+  function scheduleAutoAdvance() {
+    autoAdvanceRef.current = setTimeout(() => {
+      autoAdvanceRef.current = null;
+      advanceReviewRef.current?.(true);
+    }, CORRECT_AUTO_ADVANCE_MS);
+  }
+
   function submit(choiceValue, options = {}) {
     if (autoAdvanceRef.current) {
       clearTimeout(autoAdvanceRef.current);
@@ -2024,23 +2055,7 @@ export default function StudyView({ mode = 'practice' }) {
     }
     if (options.spoken) stopSpeechRecognition();
     if (phase === 'reviewing') {
-      setAnswer('');
-      setCoachRevealed(0);
-      setSelfCheckOpen(false);
-      setStepHint('');
-      setHintMasked(false);
-      setHintRevealed(false);
-      setCoachChatOpen(false);
-      hadKanaMistakeRef.current = false;
-      wrongSnapshotRef.current = null;
-      usedAnswerHelpRef.current = false;
-      setWasCorrected(false);
-      setPhase('answering');
-      if (!reviewSetComplete && !reviewComplete) {
-        const sweepCard = consumeHeldWordSweepCard(state);
-        const preparedCard = sweepCard ? null : consumePreparedNextCard(current.id);
-        setCurrent(sweepCard || preparedCard || selectNextReviewCard(state, current.id));
-      }
+      advanceFromReview();
       return;
     }
     const raw = choiceValue !== undefined ? choiceValue : answer;
@@ -2106,35 +2121,7 @@ export default function StudyView({ mode = 'practice' }) {
     setPhase('reviewing');
     const reviewWillComplete =
       sweepStep?.sweep?.complete || (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit);
-    const likelyNextCard = reviewWillComplete
-      ? null
-      : prepareLikelyNextCard(nextState, current.id, sweepStep);
-    if (ok && autoAdvanceCorrect && !reviewWillComplete) {
-      autoAdvanceRef.current = setTimeout(() => {
-        autoAdvanceRef.current = null;
-        setAnswer('');
-        setCoachRevealed(0);
-        setSelfCheckOpen(false);
-        setStepHint('');
-        setHintMasked(false);
-        setHintRevealed(false);
-        setCoachChatOpen(false);
-        hadKanaMistakeRef.current = false;
-        wrongSnapshotRef.current = null;
-        usedAnswerHelpRef.current = false;
-        refocusAfterAutoAdvanceRef.current = true;
-        setWasCorrected(false);
-        setPhase('answering');
-        if (sweepStep?.nextCard) {
-          setWordSweep((currentSweep) =>
-            currentSweep?.nextTypeId === sweepStep.sweep.nextTypeId
-              ? { ...currentSweep, nextTypeId: null }
-              : currentSweep,
-          );
-        }
-        setCurrent(likelyNextCard || selectNextReviewCard(nextState, current.id));
-      }, CORRECT_AUTO_ADVANCE_MS);
-    }
+    if (ok && autoAdvanceCorrect && !reviewWillComplete) scheduleAutoAdvance();
   }
 
   function skipCurrent() {
@@ -2156,7 +2143,8 @@ export default function StudyView({ mode = 'practice' }) {
       ? nextWordSweepStep(wordSweep, nextState, current.type, false)
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
-    const likelyNextCard = prepareLikelyNextCard(nextState, current.id, sweepStep);
+    const nextCard = sweepStep?.nextCard || selectNextReviewCard(nextState, current.id);
+    preloadSentenceForCard(nextCard);
     if (!transformationMode)
       setState((previous) => ({
         ...previous,
@@ -2175,7 +2163,7 @@ export default function StudyView({ mode = 'practice' }) {
     setWasCorrected(false);
     setPhase('answering');
     setWasCorrect(false);
-    setCurrent(likelyNextCard || selectNextReviewCard(nextState, current.id));
+    setCurrent(nextCard);
   }
 
   function removeCurrentWordFromReviews() {
@@ -2249,35 +2237,7 @@ export default function StudyView({ mode = 'practice' }) {
     setPhase('reviewing');
     const reviewWillComplete =
       sweepStep?.sweep?.complete || (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit);
-    const likelyNextCard = reviewWillComplete
-      ? null
-      : prepareLikelyNextCard(nextState, current.id, sweepStep);
-    if (ok && autoAdvanceCorrect && !reviewWillComplete) {
-      autoAdvanceRef.current = setTimeout(() => {
-        autoAdvanceRef.current = null;
-        setAnswer('');
-        setCoachRevealed(0);
-        setSelfCheckOpen(false);
-        setStepHint('');
-        setHintMasked(false);
-        setHintRevealed(false);
-        setCoachChatOpen(false);
-        hadKanaMistakeRef.current = false;
-        wrongSnapshotRef.current = null;
-        usedAnswerHelpRef.current = false;
-        refocusAfterAutoAdvanceRef.current = true;
-        setWasCorrected(false);
-        setPhase('answering');
-        if (sweepStep?.nextCard) {
-          setWordSweep((currentSweep) =>
-            currentSweep?.nextTypeId === sweepStep.sweep.nextTypeId
-              ? { ...currentSweep, nextTypeId: null }
-              : currentSweep,
-          );
-        }
-        setCurrent(likelyNextCard || selectNextReviewCard(nextState, current.id));
-      }, CORRECT_AUTO_ADVANCE_MS);
-    }
+    if (ok && autoAdvanceCorrect && !reviewWillComplete) scheduleAutoAdvance();
   }
 
   function revealAnswer() {
@@ -2316,9 +2276,6 @@ export default function StudyView({ mode = 'practice' }) {
       ? nextWordSweepStep(wordSweep, nextState, current.type, false, { holdNext: true })
       : null;
     if (sweepStep) setWordSweep(sweepStep.sweep);
-    const reviewWillComplete =
-      sweepStep?.sweep?.complete || (reviewLimit > 0 && reviewsDone + 1 >= reviewLimit);
-    if (!reviewWillComplete) prepareLikelyNextCard(nextState, current.id, sweepStep);
     const runRecord = buildRunAnswerRecord({
       correct: false,
       submittedAnswer: '',

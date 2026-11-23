@@ -28,6 +28,7 @@ import { defaultReviewScope, normalizeReviewScope, reviewTypeIdsForState } from 
 import {
   QUICK_PRACTICE_DEFAULT_TYPE_IDS,
   defaultWeaknessState,
+  deriveWeaknessSubcategory,
   mergeWeaknessState,
   normalizeWeaknessState,
   rankedWeaknessLanes,
@@ -1673,6 +1674,37 @@ export function cardWeakScore(state, cardId, word = null, typeId = null, options
   return cardMissTerms(card, now) + unresolved * 3 + laneScore * 1.4;
 }
 
+function practiceWeaknessScorer(state, now) {
+  const cardScores = new Map(
+    Object.entries(state.cards).map(([id, card]) => [id, cardMissTerms(card || {}, now)]),
+  );
+  const mistakes = new Map();
+  for (const mistake of state.mistakes || []) {
+    if (mistake.resolved) continue;
+    const key = `${mistake.type}|${mistake.group}|${mistake.dict}`;
+    const weight = (mistake.count || 1) * Math.max(0.25, recencyDecayFactor(mistake.at, now));
+    mistakes.set(key, (mistakes.get(key) || 0) + weight);
+  }
+  const lanes = new Map();
+  for (const [key, lane] of Object.entries(state.weakness?.byLane || {})) {
+    const [typeId, subcategoryId] = key.split('|');
+    const byGroup = lanes.get(typeId) || new Map();
+    byGroup.set(
+      subcategoryId,
+      weaknessLaneScore({ byLane: { [key]: lane } }, typeId, subcategoryId, { now }),
+    );
+    lanes.set(typeId, byGroup);
+  }
+  return ({ id, verb, formType }) => {
+    const byGroup = lanes.get(formType);
+    const laneScore = byGroup?.get(deriveWeaknessSubcategory(verb, formType)?.id) || 0;
+    const unresolved = mistakes.size
+      ? mistakes.get(`${formType}|${verb.group}|${verb.dict}`) || 0
+      : 0;
+    return (cardScores.get(id) || 0) + unresolved * 3 + laneScore * 1.4;
+  };
+}
+
 export function ruleWeakScore(state, ruleId, options = {}) {
   const now = options.now || Date.now();
   const cards = state.cards || {};
@@ -1736,20 +1768,35 @@ function buildWordFormCandidates(
   const pool = ruleCandidates || buildRuleCandidates(words, enabledTypes, prefs);
   const entries = [];
   const seen = new Set();
+  const wordKeys = new Map();
   for (const { rule, candidates } of pool) {
+    const type = readingPractice ? DICTIONARY_TYPE_ID : rule.type;
+    if (!type) continue;
+    const sourceType = readingPractice ? rule.type : null;
     for (const verb of candidates) {
-      const type = readingPractice ? DICTIONARY_TYPE_ID : rule.type;
-      const id = cardIdFor(verb, type);
-      const sourceType = readingPractice ? rule.type : null;
-      const candidateKey = practiceCardKey({ id, type, sourceType });
-      if (!id || seen.has(candidateKey)) continue;
+      let keys = wordKeys.get(verb);
+      if (!keys) {
+        const wordId = wordSrsKey(verb);
+        if (!wordId) continue;
+        keys = { wordId, readingId: readingPractice ? `${wordId}|${DICTIONARY_TYPE_ID}` : null };
+        wordKeys.set(verb, keys);
+      }
+      const id = keys.readingId || `${keys.wordId}|${type}`;
+      const candidateKey = sourceType ? `${id}|${sourceType}` : id;
+      if (seen.has(candidateKey)) continue;
       seen.add(candidateKey);
       entries.push({
         id,
+        wordId: keys.wordId,
         practiceKey: candidateKey,
         verb,
         type,
         sourceType,
+        formType: sourceType || type,
+        formLabel: '',
+        formAttempted: 0,
+        selectionScore: 50,
+        weakScore: 0,
         rule,
         ruleLabel: rule.label,
       });
@@ -1763,8 +1810,16 @@ function formPriority(typeId) {
   return index >= 0 ? index : TEXTBOOK_CORE_TYPE_IDS.length + 100;
 }
 
-function candidateSortScore(entry, wordLists = []) {
-  return wordPriority(entry.verb, wordLists) * 100000 + formPriority(entry.type);
+function comparePracticePriority(wordLists) {
+  const wordScores = new Map();
+  const formScores = new Map();
+  function score(entry) {
+    if (!wordScores.has(entry.verb))
+      wordScores.set(entry.verb, wordPriority(entry.verb, wordLists));
+    if (!formScores.has(entry.type)) formScores.set(entry.type, formPriority(entry.type));
+    return wordScores.get(entry.verb) * 100000 + formScores.get(entry.type);
+  }
+  return (a, b) => score(a) - score(b);
 }
 
 function reviewedCardCount(state = {}) {
@@ -1811,68 +1866,44 @@ function lastSeenForCandidate(state, entry) {
 }
 
 function rotateReviewCandidates(candidates, state, options = {}) {
-  if (!candidates.length) return null;
-  const ranked = [...candidates]
-    .sort(options.rank)
-    .slice(0, Math.min(REVIEW_ROTATION_SIZE, candidates.length));
+  // Maintain the same stable top eight without sorting candidates outside it.
+  const ranked = [];
+  for (const candidate of candidates) {
+    const full = ranked.length === REVIEW_ROTATION_SIZE;
+    if (full && options.rank(candidate, ranked[ranked.length - 1]) >= 0) continue;
+    let index = ranked.length;
+    while (index > 0 && options.rank(candidate, ranked[index - 1]) < 0) index--;
+    ranked.splice(index, 0, candidate);
+    if (full) ranked.pop();
+  }
   ranked.sort(
     (a, b) =>
       lastSeenForCandidate(state, a) - lastSeenForCandidate(state, b) ||
       options.tie(a, b) ||
-      candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists),
+      options.comparePriority(a, b),
   );
   return ranked[0] || null;
 }
 
 function pickSkillReview(pool, state, options = {}) {
+  const byStrength = (a, b) =>
+    a.selectionScore - b.selectionScore ||
+    b.weakScore - a.weakScore ||
+    options.comparePriority(a, b);
   return rotateReviewCandidates(pool, state, {
     ...options,
-    rank:
-      options.rank ||
-      ((a, b) =>
-        a.selectionScore - b.selectionScore ||
-        b.weakScore - a.weakScore ||
-        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
-    tie:
-      options.tie ||
-      ((a, b) =>
-        a.selectionScore - b.selectionScore ||
-        b.weakScore - a.weakScore ||
-        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
-  });
-}
-
-function pickReviewedReview(pool, state, options = {}) {
-  return rotateReviewCandidates(pool, state, {
-    ...options,
-    rank:
-      options.rank ||
-      ((a, b) =>
-        a.selectionScore - b.selectionScore ||
-        b.weakScore - a.weakScore ||
-        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
-    tie:
-      options.tie ||
-      ((a, b) =>
-        a.selectionScore - b.selectionScore ||
-        b.weakScore - a.weakScore ||
-        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
+    rank: options.rank || byStrength,
+    tie: options.tie || byStrength,
   });
 }
 
 function pickFutureReview(pool, state, options = {}) {
+  const byDue = (a, b) =>
+    state.cards[a.id].nextReview - state.cards[b.id].nextReview || options.comparePriority(a, b);
   return rotateReviewCandidates(pool, state, {
     ...options,
-    rank:
-      options.rank ||
-      ((a, b) =>
-        state.cards[a.id].nextReview - state.cards[b.id].nextReview ||
-        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
-    tie:
-      options.tie ||
-      ((a, b) =>
-        state.cards[a.id].nextReview - state.cards[b.id].nextReview ||
-        candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists)),
+    rank: options.rank || byDue,
+    tie: options.tie || byDue,
   });
 }
 
@@ -1891,20 +1922,18 @@ function pickRetryReview(pool, state) {
 }
 
 function pickFreshReview(pool, options, openBeginnerStage) {
-  if (!pool.length) return null;
-  return [...pool].sort(
-    (a, b) =>
-      (a.selectionScore || 0) - (b.selectionScore || 0) ||
-      (openBeginnerStage >= 0
-        ? beginnerLadderSortScore(a, openBeginnerStage) -
-          beginnerLadderSortScore(b, openBeginnerStage)
-        : (b.weakScore || 0) - (a.weakScore || 0)) ||
-      candidateSortScore(a, options.wordLists) - candidateSortScore(b, options.wordLists),
-  )[0];
-}
-
-function candidateFormType(candidate) {
-  return candidate?.sourceType || candidate?.type || '';
+  const compare = (a, b) =>
+    (a.selectionScore || 0) - (b.selectionScore || 0) ||
+    (openBeginnerStage >= 0
+      ? beginnerLadderSortScore(a, openBeginnerStage) -
+        beginnerLadderSortScore(b, openBeginnerStage)
+      : (b.weakScore || 0) - (a.weakScore || 0)) ||
+    options.comparePriority(a, b);
+  let best = null;
+  for (const candidate of pool) {
+    if (!best || compare(candidate, best) < 0) best = candidate;
+  }
+  return best;
 }
 
 function selectionReasonFor(candidate, bucket) {
@@ -1967,40 +1996,31 @@ export function selectNext(
   const alternatives = pool.filter((p) => p.practiceKey !== lastCardId);
   const avail = alternatives.length ? alternatives : pool;
   const formStrengths = new Map(buildFormStrengthRows(state).map((row) => [row.typeId, row]));
-  // A reading pool contains one candidate per word and source form. Normalize
-  // each saved lane once, rather than the complete weakness model per candidate.
-  const laneScores = new Map();
-  for (const [key, lane] of Object.entries(state.weakness?.byLane || {})) {
-    const [typeId, subcategoryId] = key.split('|');
-    laneScores.set(
-      key,
-      weaknessLaneScore({ byLane: { [key]: lane } }, typeId, subcategoryId, { now }),
-    );
-  }
-  const scoredAvail = avail.map((p) => {
-    const formType = candidateFormType(p);
-    const formStrength = formStrengths.get(formType);
-    return {
-      ...p,
-      formType,
-      formLabel: formStrength?.label,
-      formAttempted: formStrength?.attempted || 0,
-      weakScore: cardWeakScore(state, p.id, p.verb, formType, { now, laneScores }),
-      selectionScore: formStrength?.score ?? 50,
-    };
-  });
+  const weakScore = practiceWeaknessScorer(state, now);
+  options = { ...options, comparePriority: comparePracticePriority(options.wordLists) };
   const retryIds = new Set(state.retryQueue || []);
-  const retry = scoredAvail.filter((p) => retryIds.has(p.practiceKey));
-  const due = options.prioritizeDue
-    ? scoredAvail.filter((p) => {
-        const c = state.cards[p.id];
-        return c && c.nextReview <= now;
-      })
-    : [];
+  const retry = [];
+  const due = [];
+  const reviewed = [];
+  const availableFresh = [];
+  for (const p of avail) {
+    const strength = formStrengths.get(p.formType);
+    p.formLabel = strength?.label;
+    p.formAttempted = strength?.attempted || 0;
+    p.selectionScore = strength?.score ?? 50;
+    p.weakScore = weakScore(p);
+    if (retryIds.has(p.practiceKey)) retry.push(p);
+    const card = state.cards[p.id];
+    if (card) {
+      reviewed.push(p);
+      if (options.prioritizeDue && card.nextReview <= now) due.push(p);
+    } else {
+      availableFresh.push(p);
+    }
+  }
   const freshLimit = options.bonusMode ? bonusFreshCardLimit() : freshCardLimit();
   const canIntroduceFresh = newCardsIntroducedToday(state) < freshLimit;
-  const fresh = canIntroduceFresh ? scoredAvail.filter((p) => !state.cards[p.id]) : [];
-  const reviewed = scoredAvail.filter((p) => state.cards[p.id]);
+  const fresh = canIntroduceFresh ? availableFresh : [];
   const future = reviewed.filter((p) => {
     const c = state.cards[p.id];
     return c && c.nextReview > now;
@@ -2041,7 +2061,7 @@ export function selectNext(
   const dropRecentWords = (items) => {
     const withoutRecent = dropRecent(items);
     const cardFiltered = withoutRecent.length ? withoutRecent : items;
-    const wordFiltered = cardFiltered.filter((item) => !recentWordKeys.has(wordSrsKey(item.verb)));
+    const wordFiltered = cardFiltered.filter((item) => !recentWordKeys.has(item.wordId));
     return wordFiltered.length ? wordFiltered : cardFiltered;
   };
   const avoidLastForm = (items) => {
@@ -2069,36 +2089,37 @@ export function selectNext(
     const varied = dropRecentWords(weakest);
     return varied.length ? varied : weakest;
   };
-  const choose = (groups) =>
-    withSelectionReason(pickDueReview(groups.due, state), 'due') ||
-    withSelectionReason(pickRetryReview(groups.retry, state), 'retry') ||
-    withSelectionReason(
-      pickSkillReview(weakestWords(groups.readySkill), state, options),
-      'skill',
-    ) ||
-    withSelectionReason(pickFreshReview(groups.fresh, options, openBeginnerStage), 'fresh') ||
-    withSelectionReason(pickFutureReview(groups.nearDue, state, options), 'varied') ||
-    withSelectionReason(
-      pickReviewedReview(weakestWords(groups.reviewed), state, options),
-      'varied',
+  // Apply variety filters only to buckets reached in priority order.
+  const choose = (preferVariety) => {
+    const varied = (items) => (preferVariety ? dropRecentWords(vary(items)) : items);
+    return (
+      withSelectionReason(pickDueReview(varied(due), state), 'due') ||
+      withSelectionReason(pickRetryReview(varied(retry), state), 'retry') ||
+      withSelectionReason(
+        pickSkillReview(
+          weakestWords(preferVariety ? vary(readySkill) : readySkill),
+          state,
+          options,
+        ),
+        'skill',
+      ) ||
+      withSelectionReason(pickFreshReview(varied(fresh), options, openBeginnerStage), 'fresh') ||
+      withSelectionReason(pickFutureReview(varied(nearDue), state, options), 'varied') ||
+      withSelectionReason(
+        pickSkillReview(
+          weakestWords(preferVariety ? varied([...nearDue, ...future, ...reviewed]) : reviewed),
+          state,
+          options,
+        ),
+        'varied',
+      )
     );
-  let chosen = choose({
-    due: dropRecentWords(vary(due)),
-    retry: dropRecentWords(vary(retry)),
-    readySkill: vary(readySkill),
-    fresh: dropRecentWords(vary(fresh)),
-    nearDue: dropRecentWords(vary(nearDue)),
-    reviewed: dropRecentWords(vary([...nearDue, ...future, ...reviewed])),
-  });
-  if (!chosen) chosen = choose({ due, retry, readySkill, fresh, nearDue, reviewed });
+  };
+  let chosen = choose(true) || choose(false);
   // Pacing is soft when the current selection has no usable reviewed card.
   if (!chosen && !canIntroduceFresh) {
     chosen = withSelectionReason(
-      pickFreshReview(
-        scoredAvail.filter((p) => !state.cards[p.id]),
-        options,
-        openBeginnerStage,
-      ),
+      pickFreshReview(availableFresh, options, openBeginnerStage),
       'fresh',
     );
   }

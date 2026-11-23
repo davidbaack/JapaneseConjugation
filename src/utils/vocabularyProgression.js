@@ -75,10 +75,10 @@ function selectedListWordKeys(prefs = DEFAULT_PREFS, wordLists = []) {
 }
 
 function rankedProgressionWords(words) {
-  return uniqueWords(cleanWords(words)).sort(
-    (a, b) =>
-      wordProgressionScore(a) - wordProgressionScore(b) || wordKey(a).localeCompare(wordKey(b)),
-  );
+  return words
+    .map((word) => ({ word, key: wordKey(word), score: wordProgressionScore(word) }))
+    .sort((a, b) => a.score - b.score || a.key.localeCompare(b.key))
+    .map(({ word }) => word);
 }
 
 function withRankedFallback(matches, ranked, minimum) {
@@ -146,11 +146,17 @@ export function filterWordsForStudyScope(
     ? sourceWords.filter((word) => !builtInKeys.has(wordKey(word)))
     : [];
   const scopedWords = automaticWords;
-  const ranked = rankedProgressionWords(scopedWords);
-  const introduced = introducedBuiltInWordCount(state, ranked);
+  const uniqueBuiltInWords = uniqueWords(scopedWords);
+  const introduced = introducedBuiltInWordCount(state, uniqueBuiltInWords);
   // customWords and scopedWords are disjoint (built-in vs not), so a plain
   // concat adds no duplicates and leaves behavior unchanged when there are none.
   const withCustom = (unlocked) => (customWords.length ? [...unlocked, ...customWords] : unlocked);
+  if (introduced >= 300) {
+    return !customWords.length && scopedWords.length === words.length
+      ? words
+      : withCustom(scopedWords);
+  }
+  const ranked = rankedProgressionWords(uniqueBuiltInWords);
   const wordsForUnlockedKeys = (unlocked) => {
     const unlockedKeys = new Set(unlocked.map(wordKey));
     return withCustom(scopedWords.filter((word) => unlockedKeys.has(wordKey(word))));
@@ -170,16 +176,13 @@ export function filterWordsForStudyScope(
       ),
     );
   }
-  if (introduced < 300) {
-    return wordsForUnlockedKeys(
-      withRankedFallback(
-        ranked.filter((word) => isCommonOrTextbookLevel(word, JLPT_RANK.N3)),
-        ranked,
-        240,
-      ),
-    );
-  }
-  return withCustom(scopedWords);
+  return wordsForUnlockedKeys(
+    withRankedFallback(
+      ranked.filter((word) => isCommonOrTextbookLevel(word, JLPT_RANK.N3)),
+      ranked,
+      240,
+    ),
+  );
 }
 
 export function buildVocabularyProgressionSummary(

@@ -8,6 +8,7 @@ import { STARTER_ADJECTIVES, STARTER_VERBS } from '../data/starterWords.js';
 import { conjugateItem, surfaceFormFor, wordKey } from '../utils/conjugator.js';
 import { englishForForm } from '../utils/display.js';
 import { cardIdFor, defaultState } from '../utils/storage.js';
+import * as practiceStorage from '../utils/storage.js';
 import { practiceSelectionForTypeIds } from '../utils/practiceSelection.js';
 import { clearSentenceCorpusCache } from '../utils/sentenceCorpus.js';
 import { buildReadinessFamilyRows } from '../utils/readiness.js';
@@ -971,6 +972,10 @@ describe('StudyView continuous Practice startup', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
+    expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(40);
+    });
     expect(mockedSentences.bundled).toHaveBeenCalledTimes(2);
     expect(document.querySelector('[data-sentence-mode]')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Next card' }));
@@ -1107,7 +1112,7 @@ describe('StudyView continuous Practice startup', () => {
       expect(document.querySelector('[data-sentence-mode]').textContent).toContain('昼');
       fireEvent.click(screen.getByRole('button', { name: 'Reveal', exact: true }));
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
+        await vi.advanceTimersByTimeAsync(40);
       });
       expect(loadEntry).toHaveBeenCalledTimes(2);
       // Prefetch refreshed the cache, while review keeps the original sentence.
@@ -1151,6 +1156,47 @@ describe('StudyView continuous Practice startup', () => {
     await waitFor(() => expect(mockedSpeech.playPronunciation).toHaveBeenCalledTimes(2));
     expect(mockedSentences.bundled).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['before the second frame', 'while preparation is queued', 'after preparation'])(
+    'selects exactly once when Next is pressed %s',
+    async (timing) => {
+      const target = STARTER_VERBS[0];
+      const type = 'plain-past';
+      persistStudyCard(target, type);
+      mockedApp.value = makeApp({
+        state: { ...defaultState(), enabledTypes: [type] },
+        allWords: [target, STARTER_VERBS[1]],
+        practicePrefs: { ...DEFAULT_PREFS, kanaAssist: 'off' },
+      });
+      render(<StudyView />);
+      const input = await waitForPracticeCard();
+      vi.useFakeTimers();
+      const select = vi.spyOn(practiceStorage, 'selectNext');
+      try {
+        fireEvent.change(input, { target: { value: conjugateItem(target, type) } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+        const next = screen.getByRole('button', { name: 'Next card' });
+        expect(select).not.toHaveBeenCalled();
+        act(() => vi.advanceTimersToNextFrame());
+        expect(select).not.toHaveBeenCalled();
+        if (timing !== 'before the second frame') {
+          act(() => vi.advanceTimersToNextFrame());
+          expect(select).not.toHaveBeenCalled();
+        }
+        if (timing === 'after preparation') {
+          act(() => vi.advanceTimersByTime(1));
+          expect(select).toHaveBeenCalledTimes(1);
+        }
+        fireEvent.click(next);
+        expect(screen.getByPlaceholderText(/Type romaji or kana/i)).toBeTruthy();
+        expect(select).toHaveBeenCalledTimes(1);
+        act(() => vi.advanceTimersByTime(50));
+        expect(select).toHaveBeenCalledTimes(1);
+      } finally {
+        select.mockRestore();
+      }
+    },
+  );
 
   it('keeps a reviewed listening sentence hidden until Show text and plays it once', async () => {
     vi.stubGlobal('speechSynthesis', {
